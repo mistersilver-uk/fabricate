@@ -380,7 +380,7 @@
 {/if}
 
 <style>
-  /* Theme-ROOT tokens only (`--fab-mv2-*` is declared on `.fabricate-manager`). Geometry
+  /* Theme-ROOT tokens only (`--fab-manager-*` is declared inside `.fabricate-manager`). Geometry
      is the prototype's: an 11px head gap over a `minmax(0,1fr) 210px` body at 12px.
 
      `flex-start`, NOT `center`. The identity cell is TWO lines — the name field over the

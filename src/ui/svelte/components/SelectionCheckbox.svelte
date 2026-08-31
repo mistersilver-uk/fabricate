@@ -98,18 +98,20 @@
 {/if}
 
 <style>
-  /* Theme-ROOT tokens ONLY. This primitive is area-agnostic — it lives in
-     `src/ui/svelte/components/`, beside `Stepper` and `Medallion` — so it must not
-     reference `--fab-mv2-*`, which `styles/fabricate.css` declares on `.fabricate-manager`.
-     Outside the manager the property is not in scope, the declaration becomes invalid at
-     computed-value time, and the colour silently falls back to inheritance. Nothing fails;
-     it just looks wrong. `Chip.svelte` records the same rule for the same reason.
+  /* Theme-ROOT tokens ONLY. No scoped `<style>` may reference `--fab-manager-*`, which
+     `styles/fabricate.css` declares inside `.fabricate-manager`, from ANY directory — a
+     component is placed in a directory, not in a DOM subtree, so its scoped CSS cannot
+     guarantee where its host renders. Living in `src/ui/svelte/components/` beside `Stepper`
+     and `Medallion` makes this primitive's reuse obvious, but it is not what forbids the
+     reference: `tests/token-generation-gate.test.js` reds one from every directory. Outside
+     the manager the property is not in scope, the declaration becomes invalid at
+     computed-value time, and the colour silently falls back to inheritance. Nothing fails; it
+     just looks wrong. `Chip.svelte` records the same rule for the same reason.
 
-     The aliases the converted Tool Studio box used resolve to exactly these tokens
-     (`--fab-mv2-border-strong` IS `--fab-border-strong`, `--fab-mv2-accent` IS
-     `--fab-accent`, `--fab-mv2-bg` IS `--fab-bg-1`), so `sm` renders pixel-identically to
-     the box it replaced. `--fab-on-accent` is NOT the checked glyph colour: it differs
-     from `--fab-bg-1` in every theme and would re-colour the shipped Tool Studio.
+     These are the same three tokens the converted Tool Studio box resolved to, so `sm`
+     renders pixel-identically to the box it replaced. `--fab-on-accent` is NOT the checked
+     glyph colour: it differs from `--fab-bg-1` in every theme and would re-colour the
+     shipped Tool Studio.
 
      Svelte compiles these to `.fab-selection-check.svelte-<hash>` and `css: 'injected'`
      puts the block in `document.head` UNLAYERED, so it beats Foundry core's layered

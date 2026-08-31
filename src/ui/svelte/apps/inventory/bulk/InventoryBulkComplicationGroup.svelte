@@ -188,9 +188,10 @@
 </li>
 
 <style>
-  /* Theme-ROOT tokens only, on `Chip.svelte`'s recorded rule: this card renders under
-     `.fabricate-app`, where the manager's `--fab-mv2-*` aliases are not in scope and a
-     declaration referencing one silently falls back to inheritance. */
+  /* Theme-ROOT tokens only, on `Chip.svelte`'s recorded rule: no scoped `<style>` may reach an
+     area-scoped `--fab-manager-*` property, from any directory. This card renders under
+     `.fabricate-app`, where such a property is not in scope and a declaration referencing one
+     silently falls back to inheritance — the consequence here, not the reason for the rule. */
 
   /* A WARNING card, which the queue rows below it deliberately are not. The prototype
      draws the block that way and it is right: every row here is a consequence the run

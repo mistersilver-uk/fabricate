@@ -162,15 +162,18 @@ describe('SelectionCheckbox', () => {
  * mounted DOM, because neither happy-dom nor a mounted assertion can see either property.
  */
 describe('SelectionCheckbox — the two invariants a mounted test cannot see', () => {
-  it('uses theme-ROOT tokens only, never the manager-scoped aliases', () => {
-    // This primitive is area-agnostic. `--fab-mv2-*` is declared on `.fabricate-manager`,
-    // so outside the manager such a declaration is invalid at computed-value time and the
-    // colour silently falls back to inheritance — nothing fails, it just looks wrong, and
-    // the trigger is exactly the reuse the extraction exists to enable.
+  it('uses theme-ROOT tokens only, never an area-scoped manager property', () => {
+    // This primitive is area-agnostic. `--fab-manager-*` is the prefix for an area-scoped
+    // custom property, declared inside `.fabricate-manager`, so outside the manager such a
+    // declaration is invalid at computed-value time and the value silently falls back to
+    // inheritance — nothing fails, it just looks wrong, and the trigger is exactly the
+    // reuse the extraction exists to enable. Issue 1399 retargeted this needle from the
+    // retired manager alias generation; `token-generation-gate.test.js` now owns THAT ban,
+    // and this one owns the area boundary, which the collapse narrowed but did not remove.
     assert.equal(
-      /--fab-mv2-/.test(styles),
+      /--fab-manager-/.test(styles),
       false,
-      'an area-agnostic primitive cannot reach a manager-scoped alias'
+      'an area-agnostic primitive cannot reach an area-scoped manager property'
     );
     // `--fab-on-accent` differs from `--fab-bg-1` in every theme, so substituting it for
     // the checked glyph would re-colour the shipped Tool Studio box.

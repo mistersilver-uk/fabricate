@@ -11,9 +11,11 @@
   description association, the live region, the label-in-name rule and the busy state.
 
   It lives under `apps/manager/` rather than in either studio's folder, beside
-  `BulkEditPanelShell`, for that file's reason: `--fab-mv2-*` is declared on
-  `.fabricate-manager` and staying here keeps it in scope. Two consequences of that placement
-  are load-bearing and both are hand-maintained mirrors:
+  `BulkEditPanelShell`, for that file's reason: `components/` holds the area-agnostic leaves
+  and this card is manager-scoped. The token half of that reason — that the placement keeps
+  an area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
+  may not reach one from any directory. Two consequences of that placement are load-bearing
+  and both are hand-maintained mirrors:
 
    - `scripts/lib/viewLabCases.js` must CLAIM this file, or `view-lab-source-coverage.test.js`
      fails: a component a mounted window renders that no case claims does not produce no
@@ -320,9 +322,13 @@
 </section>
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives HERE
-     rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory, because a component is placed
+     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
+     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
+     any scoped block that tries. The placement's surviving consequence is the screenshot
+     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the studios that actually
      render it instead of matching the broad `theme-or-global-ui` recipe.
 
@@ -378,7 +384,7 @@
      not read as a fourth thing being counted. */
   .fab-bulk-delete-hint {
     margin: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.66rem;
     font-weight: 600;
     line-height: 1.35;

@@ -264,7 +264,7 @@
   }
 
   .manager-availability-menu-button[aria-disabled='true']:hover {
-    border-color: var(--fab-mv2-border);
+    border-color: var(--fab-border);
     box-shadow: none;
   }
 

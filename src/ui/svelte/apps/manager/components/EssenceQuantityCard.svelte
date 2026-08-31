@@ -85,10 +85,11 @@
 </article>
 
 <style>
-  /* Manager-scoped by PLACEMENT: this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager` in styles/fabricate.css) is always in
-     scope for it. That is the opposite of `SelectionCheckbox`, which is area-agnostic and
-     may use theme-root tokens only — do not carry that rule over to here.
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory (design-system spec, *The token
+     namespace is one generation and names its purpose*). `SelectionCheckbox` records the
+     same rule for the same reason; it is no longer the opposite case.
 
      TWO rows — identity (tile + label) above, the stepper below — not a single run. The
      card is TINTED by whether the component contributes this essence at all, so a GM
@@ -102,15 +103,15 @@
     align-content: start;
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-2);
-    border: 1px solid color-mix(in srgb, var(--fab-mv2-accent) 32%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fab-accent) 32%, transparent);
     border-radius: 10px;
-    background: color-mix(in srgb, var(--fab-mv2-accent) 8%, var(--fab-mv2-surface-2));
+    background: color-mix(in srgb, var(--fab-accent) 8%, var(--fab-bg-3));
   }
 
   /* No essence contributed: this card is a control the GM has not used. It recedes rather
      than disappearing — the stepper is still how they would add one. */
   .manager-component-essence-card.is-inactive {
-    border-color: var(--fab-mv2-border);
+    border-color: var(--fab-border);
     background: var(--fab-surface-soft);
     opacity: 0.6;
   }
@@ -131,14 +132,14 @@
     height: 22px;
     border-radius: 6px;
     background: var(--fab-overlay-light-06);
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.7rem;
   }
 
   .manager-component-essence-name {
     min-width: 0;
     overflow: hidden;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.76rem;
     text-overflow: ellipsis;
     white-space: nowrap;

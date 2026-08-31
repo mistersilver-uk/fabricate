@@ -70,7 +70,7 @@ describe('GatheringEventsBrowserView source contract', () => {
   });
 
   it('uses a four-column grid for the event table and a scrollable tags cell', () => {
-    const gridMatch = css.match(/--fab-mv2-gathering-event-grid:([^;]+);/);
+    const gridMatch = css.match(/--fab-manager-gathering-event-grid:([^;]+);/);
     assert.ok(gridMatch, 'event grid CSS variable should be defined');
     // Count top-level columns with a depth-aware scan (no regex) so whitespace
     // inside a function like minmax(0, 1fr) does not split that column in two.

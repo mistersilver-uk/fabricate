@@ -1180,9 +1180,11 @@
 />
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. It sits here rather than
-     in `styles/fabricate.css` so `VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs`
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory (design-system spec, *The token
+     namespace is one generation and names its purpose*). It sits here rather than in
+     `styles/fabricate.css` so `VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs`
      routes a change to the views that actually render it, exactly as `BulkEditSection`
      records for the same reason. */
 
@@ -1192,9 +1194,9 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-accent);
+    border: 1px solid var(--fab-accent);
     border-radius: 8px;
-    background: var(--fab-mv2-bg);
+    background: var(--fab-bg-1);
   }
 
   .fab-bulk-book-pick-head {
@@ -1214,7 +1216,7 @@
     overflow: hidden;
     border-radius: 6px;
     background: var(--fab-surface-raised);
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.68rem;
   }
 
@@ -1234,7 +1236,7 @@
   .fab-bulk-book-pick-name {
     min-width: 0;
     overflow: hidden;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.82rem;
     font-weight: 600;
     text-overflow: ellipsis;
@@ -1244,7 +1246,7 @@
   .fab-bulk-book-pick-meta {
     min-width: 0;
     overflow: hidden;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.62rem;
     line-height: 1.3;
     text-overflow: ellipsis;
@@ -1266,7 +1268,7 @@
     border: none;
     border-radius: 5px;
     background: transparent;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.68rem;
     cursor: pointer;
   }
@@ -1274,7 +1276,7 @@
   .fab-bulk-book-pick-clear:hover:not(:disabled),
   .fab-bulk-book-unstage:hover:not(:disabled) {
     background: var(--fab-surface-raised);
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
   }
 
   .fab-bulk-book-pick-actions {
@@ -1292,10 +1294,10 @@
     height: auto;
     min-height: 30px;
     padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border-strong);
+    border: 1px solid var(--fab-border-strong);
     border-radius: 6px;
     background: var(--fab-surface-raised);
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.68rem;
     font-weight: 600;
     white-space: nowrap;
@@ -1320,7 +1322,7 @@
   .fab-bulk-book-unstage:disabled {
     border-color: var(--fab-border);
     background: transparent;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     opacity: 0.55;
     cursor: default;
   }
@@ -1382,7 +1384,7 @@
   .fab-bulk-book-staged-name {
     min-width: 0;
     overflow: hidden;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.68rem;
     font-weight: 600;
     text-overflow: ellipsis;
@@ -1390,7 +1392,7 @@
   }
 
   .fab-bulk-book-staged-count {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.58rem;
     line-height: 1.3;
   }

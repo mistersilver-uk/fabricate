@@ -370,7 +370,7 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
     'unified Fabricate shell controls should clear host click focus outlines'
   );
   assert.ok(
-    managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    managerFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'manager keyboard focus should remain visible'
   );
   assert.ok(
@@ -727,7 +727,7 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
     'mouse focus should not inherit the host orange focus ring'
   );
   assert.ok(
-    focusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    focusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'keyboard focus should keep a manager focus-visible ring'
   );
   assert.ok(
@@ -822,7 +822,7 @@ test('the rail crafting-system card selects a system and links back to the libra
     'scope card should prevent long names from affecting nav layout'
   );
   assert.ok(
-    scopeBlock.includes('border: 1px solid var(--fab-mv2-border-strong);'),
+    scopeBlock.includes('border: 1px solid var(--fab-border-strong);'),
     'scope card should render as a visible rail card'
   );
 
@@ -845,7 +845,7 @@ test('the rail crafting-system card selects a system and links back to the libra
 
   // The back link is a text link inside the card, not a 28px icon button beside a name.
   assert.ok(
-    returnBlock.includes('color: var(--fab-mv2-text-muted);'),
+    returnBlock.includes('color: var(--fab-text-muted);'),
     'the back link reads as quiet navigation, not an action'
   );
   assert.ok(returnBlock.includes('border: 0;'), 'the back link is a link, not a bordered button');
@@ -858,7 +858,7 @@ test('the rail crafting-system card selects a system and links back to the libra
     'the back link keeps a manager-styled hover'
   );
   assert.ok(
-    focusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    focusBlock.includes('outline: 2px solid var(--fab-accent);'),
     'manager focus should remain visible'
   );
   assert.equal(
@@ -884,7 +884,7 @@ test('manager nav buttons clear host mouse focus and keep green keyboard focus',
   );
   assert.ok(activeNavFocusBlock.includes('box-shadow: none;'), 'active nav focus stays neutral');
   assert.ok(
-    navFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    navFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'keyboard focus on nav buttons should use the manager accent'
   );
   assert.equal(navFocusBlock.includes('orange'), false, 'nav focus should not use orange');
@@ -930,7 +930,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     'expanded gathering nav should use a soft background'
   );
   assert.ok(
-    expandedGroupBlock.includes('box-shadow: inset 0 0 0 1px var(--fab-mv2-border);'),
+    expandedGroupBlock.includes('box-shadow: inset 0 0 0 1px var(--fab-border);'),
     'expanded gathering nav should draw chrome without shifting contents'
   );
   assert.equal(
@@ -1009,7 +1009,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     'mouse focus on gathering toggle should not inherit the host orange focus shadow'
   );
   assert.ok(
-    toggleFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    toggleFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'keyboard focus on gathering toggle should use the manager accent'
   );
   assert.ok(
@@ -1022,7 +1022,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
   );
   assert.ok(activeSubitemFocusBlock.includes('box-shadow: none;'), 'active focus stays neutral');
   assert.ok(
-    subitemFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    subitemFocusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'keyboard focus on gathering submenu entries should use the manager accent'
   );
   assert.equal(
@@ -1162,12 +1162,21 @@ test('manager empty states use refined heading and setup-panel styling', () => {
       emptyPanelBlock.includes('border-radius: 12px;'),
     'the no-state panel should be a rounded 1.5px dashed panel'
   );
-  // A shared primitive must be portable across app areas. `--fab-mv2-*` is declared on
-  // `.fabricate-manager` only, so referencing it makes the declaration invalid at
-  // computed-value time anywhere else (`.fabricate-app`, `.fabricate-admin`,
-  // `.fabricate-interactables-manager`) and the colour silently falls back to inheritance.
-  // Nothing fails; it just looks wrong, and the trigger is the reuse the primitive exists
-  // to enable. Theme-root tokens (`:root` + all seven theme blocks) resolve everywhere.
+  // A shared primitive must be portable across app areas. `--fab-manager-*` is the prefix
+  // for an AREA-SCOPED custom property, declared inside `.fabricate-manager` only, so
+  // referencing it makes the declaration invalid at computed-value time anywhere else
+  // (`.fabricate-app`, `.fabricate-admin`, `.fabricate-interactables-manager`) and the
+  // value silently falls back to inheritance. Nothing fails; it just looks wrong, and the
+  // trigger is the reuse the primitive exists to enable. Theme-root tokens (`:root` + all
+  // seven theme blocks) resolve everywhere.
+  //
+  // The failure mode is NARROWED by issue 1399, not removed: the manager's twelve colour
+  // aliases are inlined onto their foundation tokens, but five layout properties are still
+  // declared inside `.fabricate-manager`, so a primitive that reads one still renders
+  // unstyled in the player app. `tests/token-generation-gate.test.js` DOES catch that now —
+  // its scoped-style test scans every `<style>` under `src/` for the prefix, a strict
+  // superset of these five primitives — and this guard stays because it is the narrower,
+  // louder one: it names the primitive that broke and the token it reached for.
   for (const [name, styles] of Object.entries({
     EmptyState: emptyStateStyles,
     Callout: calloutStyles,
@@ -1176,9 +1185,9 @@ test('manager empty states use refined heading and setup-panel styling', () => {
     Chip: chipStyles,
   })) {
     assert.equal(
-      /--fab-mv2-/.test(styles),
+      /--fab-manager-/.test(styles),
       false,
-      `${name} must reference theme-root tokens, not .fabricate-manager-scoped aliases`
+      `${name} must reference theme-root tokens, not .fabricate-manager-scoped properties`
     );
   }
   assert.ok(
@@ -1244,7 +1253,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
     'no-systems inspector setup panel should use compact grid layout'
   );
   assert.ok(
-    setupCardBlock.includes('border: 1px solid var(--fab-mv2-border);'),
+    setupCardBlock.includes('border: 1px solid var(--fab-border);'),
     'setup panel should use manager flat borders'
   );
   assert.ok(
@@ -1589,7 +1598,7 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
     'rule copy should stack label and description beside the icon'
   );
   assert.ok(
-    ruleCopyDescriptionBlock.includes('color: var(--fab-mv2-text-muted);'),
+    ruleCopyDescriptionBlock.includes('color: var(--fab-text-muted);'),
     'rule descriptions should read as supporting copy'
   );
   assert.ok(
@@ -1802,10 +1811,15 @@ test('manager gathering settings condition panels use a two-column responsive gr
 });
 
 // The recipe library is a list of CARD rows (issue 643), not a column grid. The old
-// assertions pinned `--fab-mv2-recipe-grid`, the `has-no-category` grid variant and
+// assertions pinned a recipe-grid column template, the `has-no-category` grid variant and
 // the medium-query column stacking — none of which a card row has. What replaces them
 // is the pair that actually prevents horizontal overflow: the identity cell is the ONLY
 // shrinkable flex child, and the control cluster never shrinks.
+//
+// The absence assertion on that retired column template is GONE (issue 1399). Its needle
+// was a legacy generation name the sheet had already stopped declaring, so it could only
+// ever pass; `tests/token-generation-gate.test.js` bans the whole name shape from a
+// population that is not empty, which is the same guarantee from a gate that can fail.
 test('manager recipes browser defines a non-overflowing card row', () => {
   const tableBlock = blockFor('.fabricate-manager .manager-recipes-table');
   const rowBlock = blockFor('.fabricate-manager .manager-recipe-row');
@@ -1814,11 +1828,6 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   const groupListBlock = blockFor('.fabricate-manager .manager-recipe-group-list');
 
   assert.ok(tableBlock.includes('display: flex;'), 'the recipes table stacks its category groups');
-  assert.equal(
-    css.includes('--fab-mv2-recipe-grid'),
-    false,
-    'the retired recipe column grid should be gone, not merely unused'
-  );
   // A single column header sits above the whole list (issue 643). It mirrors the row's
   // flex split (identity + cluster) and its cluster shares the row cluster's fixed
   // template, so the labels line up with the cells beneath them.
@@ -2177,7 +2186,7 @@ test('a selected browser row reads as an identity cue in the accent family, not 
   }
 
   assert.ok(
-    identityFocusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    identityFocusBlock.includes('outline: 2px solid var(--fab-accent);'),
     'the identity focus ring follows the accent focus standard, not the success family'
   );
 });
@@ -2246,7 +2255,7 @@ test('Tool Overview source remains a visible drag-only drop zone with first-line
   const sourceHintIconBlock = blockFor('.fabricate-manager .manager-tool-source-copy > small > i');
   for (const declaration of [
     'display: grid;',
-    'border: 1px dashed var(--fab-mv2-border);',
+    'border: 1px dashed var(--fab-border);',
     'background: var(--fab-surface-soft);',
   ]) {
     assert.ok(
@@ -2653,12 +2662,12 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'task panel should reserve toolbar, table scroll, and pagination rows'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-gathering-task-grid:'),
+    tableBlock.includes('--fab-manager-gathering-task-grid:'),
     'task browser should define a compact desktop grid'
   );
   assert.ok(!tableBlock.includes('reorder'), 'task browser should not reserve a reorder column');
   assert.ok(
-    rowBlock.includes('grid-template-columns: var(--fab-mv2-gathering-task-grid);'),
+    rowBlock.includes('grid-template-columns: var(--fab-manager-gathering-task-grid);'),
     'task rows should use the shared task grid'
   );
   assert.ok(
@@ -2670,7 +2679,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'tool rows should anchor the dirty pip overlay without involving header flow'
   );
   assert.ok(
-    toolsSelectedRowBlock.includes('border-color: var(--fab-mv2-border-strong);') &&
+    toolsSelectedRowBlock.includes('border-color: var(--fab-border-strong);') &&
       !toolsSelectedRowBlock.includes('border-color: var(--fab-accent);') &&
       toolsSelectedRowBlock.includes('box-shadow: none;') &&
       !toolsSelectedRowBlock.includes('box-shadow: inset 3px 0 0 var(--fab-accent);'),
@@ -2715,7 +2724,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
       toolsRowDirtySlotBlock.includes('z-index: 4;') &&
       toolsRowDirtySlotBlock.includes('transform: translateY(-50%);') &&
       toolsDirtyChipBlock.includes('white-space: nowrap;') &&
-      toolsDirtyChipBlock.includes('background: var(--fab-mv2-surface-1);') &&
+      toolsDirtyChipBlock.includes('background: var(--fab-bg-2);') &&
       toolsDirtyChipBlock.includes('inset 0 0 0 999px var(--fab-warning-soft),'),
     'tool row dirty pip should overlay the top-left row corner with an opaque readable surface'
   );
@@ -2725,13 +2734,13 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'selected tool inspector heading should hold the selected-tool dirty pip'
   );
   assert.ok(
-    toolsIdentityDropZoneBlock.includes('border: 1px dashed var(--fab-mv2-border-strong);') &&
+    toolsIdentityDropZoneBlock.includes('border: 1px dashed var(--fab-border-strong);') &&
       toolsIdentityDropZoneBlock.includes('border-radius: 8px;') &&
       toolsIdentityDropZoneBlock.includes('background: var(--fab-overlay-light-03);'),
     'mapped tool row identities should present a subtle dashed component drop zone'
   );
   assert.ok(
-    toolsIdentityDropZoneActiveBlock.includes('border-color: var(--fab-mv2-accent);') &&
+    toolsIdentityDropZoneActiveBlock.includes('border-color: var(--fab-accent);') &&
       toolsIdentityDropZoneActiveBlock.includes('background: var(--fab-success-soft);'),
     'mapped tool row component drop zones should show an active drag-over state'
   );
@@ -2826,7 +2835,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'component browser should reserve header, optional pills, card scroll, and footer rows'
   );
   assert.ok(
-    componentPillsBlock.includes('border-top: 1px solid var(--fab-mv2-border);'),
+    componentPillsBlock.includes('border-top: 1px solid var(--fab-border);'),
     'component browser selected tags should occupy a distinct pill row'
   );
   assert.ok(
@@ -2870,7 +2879,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'component grip should avoid viewport-scaled or negative tracking'
   );
   assert.ok(
-    componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'),
+    componentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-border);'),
     'component browser should own a pagination footer'
   );
   assert.ok(
@@ -2924,7 +2933,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'tools component browser should keep a one-column card grid in the narrow inspector'
   );
   assert.ok(
-    toolsComponentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);') &&
+    toolsComponentBrowserFooterBlock.includes('border-top: 1px solid var(--fab-border);') &&
       toolsComponentBrowserFooterBlock.includes('background: transparent;'),
     'tools component browser footer should separate pagination without adding nested card chrome'
   );
@@ -2962,12 +2971,12 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'tools component browser page label should not force overflow in the narrow inspector'
   );
   assert.ok(
-    dropCardBlock.includes('--fab-mv2-task-drop-table-visible-height: 262px;'),
+    dropCardBlock.includes('--fab-manager-task-drop-table-visible-height: 262px;'),
     'drop rules card should define an exact table viewport equal to header plus three rows'
   );
   assert.ok(
     dropCardBlock.includes(
-      'grid-template-rows: auto var(--fab-mv2-task-drop-table-visible-height) auto;'
+      'grid-template-rows: auto var(--fab-manager-task-drop-table-visible-height) auto;'
     ),
     'drop rules card should keep the table viewport definite between the card header and footer'
   );
@@ -2993,7 +3002,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop rules search input should reserve text inset for the leading search icon'
   );
   assert.ok(
-    dropFooterBlock.includes('border-top: 1px solid var(--fab-mv2-border);'),
+    dropFooterBlock.includes('border-top: 1px solid var(--fab-border);'),
     'drop rules count should live in a footer area with pagination'
   );
   assert.ok(
@@ -3001,8 +3010,8 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop rules footer should not nest pagination chrome'
   );
   assert.ok(
-    dropScrollBlock.includes('height: var(--fab-mv2-task-drop-table-visible-height);') &&
-      dropScrollBlock.includes('max-height: var(--fab-mv2-task-drop-table-visible-height);'),
+    dropScrollBlock.includes('height: var(--fab-manager-task-drop-table-visible-height);') &&
+      dropScrollBlock.includes('max-height: var(--fab-manager-task-drop-table-visible-height);'),
     'drop rules table scroll region should show exactly three complete rows before scrolling'
   );
   assert.ok(
@@ -3014,7 +3023,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop rules table should suppress horizontal scroll while retaining vertical scrolling'
   );
   assert.ok(
-    dropTableBlock.includes('--fab-mv2-task-drop-grid:'),
+    dropTableBlock.includes('--fab-manager-task-drop-grid:'),
     'task editor drop rows should define compact desktop geometry'
   );
   assert.ok(
@@ -3038,7 +3047,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop rules header row should clear generic table-head padding so columns align with value rows'
   );
   assert.ok(
-    dropRowBlock.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'),
+    dropRowBlock.includes('grid-template-columns: var(--fab-manager-task-drop-grid);'),
     'drop rows should use the shared single-line editor grid'
   );
   assert.ok(
@@ -3059,7 +3068,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop cells should keep padding inside full-width rows'
   );
   assert.ok(
-    dropCellSeparatorBlock.includes('border-left: 1px solid var(--fab-mv2-border);'),
+    dropCellSeparatorBlock.includes('border-left: 1px solid var(--fab-border);'),
     'drop cells should use vertical separators'
   );
   assert.ok(
@@ -3068,12 +3077,12 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     selectedDropRowBlock.includes('background: var(--fab-success-soft);') &&
-      selectedDropRowBlock.includes('var(--fab-mv2-accent)'),
+      selectedDropRowBlock.includes('var(--fab-accent)'),
     'selected drop rows should use the component-browser success/accent family'
   );
   assert.ok(
-    selectedDropRowBlock.includes('inset 0 1px 0 var(--fab-mv2-border-strong)') &&
-      selectedDropRowBlock.includes('inset 0 -1px 0 var(--fab-mv2-border-strong)'),
+    selectedDropRowBlock.includes('inset 0 1px 0 var(--fab-border-strong)') &&
+      selectedDropRowBlock.includes('inset 0 -1px 0 var(--fab-border-strong)'),
     'selected drop row outline should avoid a right edge next to the card border'
   );
   assert.equal(
@@ -3098,7 +3107,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     css.includes(
-      '.fabricate-manager .manager-drop-empty-component {\n  min-height: 52px;\n  padding: var(--fab-space-chip) var(--fab-space-2);\n  border: 1px dashed var(--fab-mv2-border-strong);'
+      '.fabricate-manager .manager-drop-empty-component {\n  min-height: 52px;\n  padding: var(--fab-space-chip) var(--fab-space-2);\n  border: 1px dashed var(--fab-border-strong);'
     ),
     'empty component placeholders should show the full drop-zone boundary'
   );
@@ -3214,7 +3223,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(
     toolBreakageChanceCardBlock.includes('display: grid;') &&
       toolBreakageChanceCardBlock.includes('padding: var(--fab-space-3);') &&
-      toolBreakageChanceCardBlock.includes('border: 1px solid var(--fab-mv2-border);'),
+      toolBreakageChanceCardBlock.includes('border: 1px solid var(--fab-border);'),
     'tool breakage chance should present the shared slider in a full-width configuration card'
   );
   assert.ok(
@@ -3269,8 +3278,8 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     'drop modifier pills should use restrained neutral chip backgrounds'
   );
   assert.ok(
-    positiveDropModifierPillBlock.includes('color: var(--fab-mv2-text);') &&
-      negativeDropModifierPillBlock.includes('color: var(--fab-mv2-text);'),
+    positiveDropModifierPillBlock.includes('color: var(--fab-text);') &&
+      negativeDropModifierPillBlock.includes('color: var(--fab-text);'),
     'drop modifier chips should avoid saturated text across the whole pill'
   );
   assert.ok(
@@ -3438,7 +3447,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     dropInspectorDividerBlock.includes('height: 1px;') &&
-      dropInspectorDividerBlock.includes('background: var(--fab-mv2-border);'),
+      dropInspectorDividerBlock.includes('background: var(--fab-border);'),
     'selected drop inspector should render a visible divider below the header'
   );
   assert.ok(
@@ -3468,13 +3477,13 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     dropTableRankedBlock.includes(
-      '--fab-mv2-task-drop-grid: 44px minmax(0, 0.92fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);'
+      '--fab-manager-task-drop-grid: 44px minmax(0, 0.92fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);'
     ),
     'ranked-mode drop grid should prepend a narrow 44px rank column and take width from the component column while preserving drop chance and quantity widths'
   );
   assert.ok(
     taskEditorIntermediateQuery.includes(
-      '--fab-mv2-task-drop-grid: 44px minmax(0, 0.96fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);'
+      '--fab-manager-task-drop-grid: 44px minmax(0, 0.96fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);'
     ),
     'intermediate ranked-mode drop grid should keep drop chance and quantity widths while reducing the component column'
   );
@@ -3495,7 +3504,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   assert.ok(
     mediumQuery.includes(
       '.fabricate-manager .manager-gathering-task-drop-table-head,\n  .fabricate-manager .manager-gathering-task-drop-row'
-    ) && mediumQuery.includes('grid-template-columns: var(--fab-mv2-task-drop-grid);'),
+    ) && mediumQuery.includes('grid-template-columns: var(--fab-manager-task-drop-grid);'),
     'medium manager layout should preserve the drop row grid and headers instead of duplicate row labels'
   );
   assert.equal(
@@ -3585,7 +3594,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
 
 test('manager components browser defines drop target and compact responsive list geometry', () => {
   // Issue 676: the component library is a LIST, not a column grid. The
-  // `.manager-components-table` block and its six `--fab-mv2-component-grid`
+  // `.manager-components-table` block and its six component-grid column-template
   // permutations are gone with the table scaffolding, and rows flex + wrap instead —
   // which is what makes the narrow (stacked) surface the smoke harness photographs
   // reflow rather than crush fixed tracks.
@@ -3612,11 +3621,9 @@ test('manager components browser defines drop target and compact responsive list
     ),
     'components route should give the growing row to the list, not the pager'
   );
-  assert.equal(
-    css.includes('--fab-mv2-component-grid'),
-    false,
-    'the dropped table column template must not survive the rebuild'
-  );
+  // The absence assertion on that dropped column template is GONE (issue 1399): its
+  // needle named a legacy generation the sheet no longer declares, so it could only ever
+  // pass. `tests/token-generation-gate.test.js` bans the shape from a live population.
   assert.ok(listBlock.includes('display: flex;'), 'the component list stacks its rows');
   assert.ok(
     rowBlock.includes('display: flex;'),
@@ -3727,7 +3734,7 @@ test('manager components browser defines drop target and compact responsive list
   // narrow surface reflows without a breakpoint re-templating its columns.
 });
 
-// Issue 1036. The `--fab-mv2-essence-grid` column template, its `.has-no-source` variant,
+// Issue 1036. The essence-grid column template, its `.has-no-source` variant,
 // the `.manager-essence-source-cell-image` block and the narrow-container `grid-template-
 // columns` stacking rule are all RETIRED here, and that is a deliberate edit rather than
 // incidental churn: the essence row is a FLEX card that wraps, so a column template on it
@@ -3758,11 +3765,10 @@ test('manager essence browser defines a wrapping card row rather than a column t
   // silently coexisting with the flex row. Each needle carries the punctuation that only a
   // DECLARATION or a RULE OPENER has — a bare class-name match would be satisfied by the
   // retirement comments themselves, which name what they retired.
-  assert.equal(
-    css.includes('--fab-mv2-essence-grid:'),
-    false,
-    'the essence column template is retired with the table head it served'
-  );
+  // The essence column template's own absence assertion is GONE (issue 1399): its needle
+  // was a legacy generation name the sheet no longer declares, so it could only ever pass.
+  // `tests/token-generation-gate.test.js` bans the shape from a population that is not
+  // empty. The three needles below name live selectors and stay.
   assert.equal(
     css.includes('.manager-essences-table.has-no-source {'),
     false,
@@ -3838,7 +3844,7 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   );
   assert.ok(
     editGridBlock.includes(
-      'grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);'
+      'grid-template-columns: 124px minmax(0, 1fr);'
     ),
     'essence edit identity fields should reserve stable square-icon picker space'
   );
@@ -3975,7 +3981,7 @@ test('manager environments browser and edit route define compact responsive geom
     'environment table scroll region should own internal overflow once bounded by the gathering panel'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;'),
+    tableBlock.includes('--fab-manager-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;'),
     'environments table should define one flexible identity column and fixed compact columns so headers and rows align'
   );
   assert.ok(
@@ -4737,7 +4743,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   );
   assert.ok(
     featureTileIconOnBlock.includes('background: var(--fab-bg-3);') &&
-      featureTileIconOnBlock.includes('color: var(--fab-mv2-accent);'),
+      featureTileIconOnBlock.includes('color: var(--fab-accent);'),
     'an enabled feature chip should match the resolution mode card chip fill'
   );
   assert.ok(
@@ -4779,7 +4785,7 @@ test('manager pagination footer uses scoped chrome with stable summary, nav, and
   );
   assert.ok(block.includes('flex-wrap: wrap;'), 'pagination footer should wrap on narrow widths');
   assert.ok(
-    block.includes('border-top: 1px solid var(--fab-mv2-border);'),
+    block.includes('border-top: 1px solid var(--fab-border);'),
     'pagination footer should anchor to the table with a manager border'
   );
   assert.ok(
@@ -5318,7 +5324,7 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   );
   assert.ok(statusBlock.includes('margin-left: auto;'), 'the status line should sit right-aligned');
   assert.ok(
-    statusBlock.includes('color: var(--fab-mv2-text-muted);'),
+    statusBlock.includes('color: var(--fab-text-muted);'),
     'the status line should read as muted metadata'
   );
   assert.ok(
@@ -5423,7 +5429,7 @@ test('the Knowledge surface owns its third column and wraps its row action clust
   // already carries opacity 0.62, so a row-level dim would take the disabled Expend
   // button to about 0.38.
   assert.ok(
-    spentBlock.includes('color: var(--fab-mv2-text-muted);'),
+    spentBlock.includes('color: var(--fab-text-muted);'),
     'the spent row is muted by colour on its name'
   );
   assert.equal(
@@ -5635,7 +5641,7 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
 
   const treatment = blockIn(css, shared.slice(0, -2));
   for (const declaration of [
-    'border: 1px solid var(--fab-mv2-border);',
+    'border: 1px solid var(--fab-border);',
     'border-radius: 8px;',
     'background: var(--fab-overlay-light-03);',
   ]) {
@@ -5645,7 +5651,7 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
   // No surface restates it, in ANY of its blocks — a private copy hiding in a later
   // override is exactly what a first-match-only check would miss. The retired values were
   // `border-radius: 9px` (recipe, component), `border-radius: 10px` (the vocabulary card)
-  // and a solid `--fab-mv2-surface-2` fill on six of the nine.
+  // and a solid `--fab-bg-3` fill on six of the nine.
   for (const row of ROWS) {
     const escaped = row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const blocks = [
@@ -5658,7 +5664,7 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
       // skipped by being byte-identical to a suffix of the shared rule — i.e. by being it.
       if (treatment.includes(block)) continue;
       assert.equal(
-        /border-radius:|border: 1px solid|background: var\(--fab-mv2-surface-2\);/.test(block),
+        /border-radius:|border: 1px solid|background: var\(--fab-bg-3\);/.test(block),
         false,
         `${row} must not restate the shared browser-row treatment:\n${block}`
       );
@@ -5820,7 +5826,7 @@ test('the armed danger button paints a solid danger fill with its own readable f
     );
   }
   assert.ok(
-    rosterFocusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    rosterFocusBlock.includes('outline: 2px solid var(--fab-accent);'),
     'the roster row owns its keyboard focus ring'
   );
 });
@@ -6311,7 +6317,7 @@ test('a range input inside the gathering edit views stays transparent for the sl
 // The gathering task library's inspector rail stacks three cards: "Gathering task details",
 // "Drops summary" and "Used in environments". The middle one restated the whole
 // `.manager-inspector-card` contract and then diverged on the two values it changed — a
-// `--fab-mv2-surface-2` fill instead of the shell's, and 16px of horizontal padding instead
+// `--fab-bg-3` fill instead of the shell's, and 16px of horizontal padding instead
 // of 12px — so it read as a different KIND of card from its neighbours.
 //
 // Asserted on the RENDERED box rather than on the absence of a selector, so a fill
@@ -6543,10 +6549,12 @@ test('the manager themes select options, not just the closed select', () => {
   assert.ok(optionRule, 'the manager must theme its option list, not only the closed field');
   assert.match(
     optionRule,
-    /background:\s*var\(--fab-mv2-[a-z0-9-]+\)/,
-    'an option list without a painted background falls back to the browser default white'
+    /background:\s*var\(--fab-bg-3\)/,
+    'an option list must take its background from `--fab-bg-3`, so it re-themes with the ' +
+      'rest of the manager; unpainted, it falls back to whatever the browser draws, which ' +
+      'in every engine tested is a light list inside a dark app'
   );
-  assert.match(optionRule, /color:\s*var\(--fab-mv2-[a-z0-9-]+\)/);
+  assert.match(optionRule, /color:\s*var\(--fab-text\)/);
 
   // The selected row must be marked the SAME way on both rendering paths — the engines
   // that paint the list in-page and the customizable-select picker. An accent-filled bar
@@ -6559,7 +6567,7 @@ test('the manager themes select options, not just the closed select', () => {
     /background:\s*var\(--fab-overlay-light-08\)/,
     'the checked row shares the picker treatment rather than painting a filled bar'
   );
-  assert.match(checkedRule, /color:\s*var\(--fab-mv2-accent\)/);
+  assert.match(checkedRule, /color:\s*var\(--fab-accent\)/);
 
   // `color-scheme` is the only layer here that reaches every engine: it is what makes the
   // platform-drawn popup dark at all, and without it the rules above are cosmetic.
@@ -6579,7 +6587,7 @@ test('the manager themes select options, not just the closed select', () => {
   );
   const picker = blockFor('.fabricate-manager select::picker(select)');
   assert.ok(picker, 'the picker surface must be themed, not left as the platform default');
-  assert.match(picker, /background:\s*var\(--fab-mv2-surface-2\)/);
+  assert.match(picker, /background:\s*var\(--fab-bg-3\)/);
 });
 
 /*
@@ -8109,9 +8117,9 @@ test('a disabled manager button paints from the disabled rule in every role and 
                  the assertions below pin the paint to that rule rather than to whatever the
                  six probes happen to agree on. -->
             <span data-token="border" style="color: var(--fab-overlay-light-12)"></span>
-            <span data-token="ink" style="color: var(--fab-mv2-text-muted)"></span>
+            <span data-token="ink" style="color: var(--fab-text-muted)"></span>
             <span data-token="surface" style="color: var(--fab-overlay-light-04)"></span>
-            <span data-token="ghost-border" style="color: var(--fab-mv2-border)"></span>
+            <span data-token="ghost-border" style="color: var(--fab-border)"></span>
           </main>
         </body>
       </html>

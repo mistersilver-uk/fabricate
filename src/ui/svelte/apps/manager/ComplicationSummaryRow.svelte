@@ -236,9 +236,9 @@
 </div>
 
 <style>
-  /* Theme-ROOT tokens only — no `--fab-mv2-*` alias — because the player variant of this
-     row renders under `.fabricate-app`, where those manager aliases are not in scope and a
-     declaration referencing one silently falls back to inheritance. `Chip.svelte` records
+  /* Theme-ROOT tokens only — no `--fab-manager-*` property — because the player variant of
+     this row renders under `.fabricate-app`, where an area-scoped property is not in
+     scope and a declaration referencing one silently falls back to inheritance. `Chip.svelte` records
      the rule and the failure mode in full. */
   /* The fill is the ramp step at the row's INDEX in the prototype, not the token whose value
      matches the prototype's row. The two ramps are offset by a step in the middle, and

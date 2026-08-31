@@ -15,7 +15,7 @@
   Two shipped components are close and neither can carry it:
 
   - `ChecklistCardRow` is a DELIBERATE non-reuse. Its icon colour is hard-pinned to
-    `--fab-mv2-accent` in the global sheet while each condition here has its own glyph
+    `--fab-accent` in the global sheet while each condition here has its own glyph
     colour; its detail line is MONO at 0.68rem while these details are proportional prose
     sentences; its root hardcodes `data-tool-prerequisite-row`; and it has no children slot
     for the revealed inputs at all.
@@ -180,8 +180,8 @@
 
 <style>
   /* Theme-ROOT tokens only: this row is rendered inside the manager today, but it carries
-     no `--fab-mv2-*` alias so it stays legible if a player-side surface ever adopts it.
-     `Chip.svelte` states the rule and the reason in full. */
+     no area-scoped `--fab-manager-*` property, so it stays legible if a player-side
+     surface ever adopts it. `Chip.svelte` states the rule and the reason in full. */
   .fab-complication-effect {
     box-sizing: border-box;
     border: 1px solid var(--fab-border);

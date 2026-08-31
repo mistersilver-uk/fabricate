@@ -7638,7 +7638,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   //      `background: var(--fab-bg-1)`, `color: var(--fab-text)` and `color-scheme: dark`. The
   //      manager window root `.fabricate.crafting-system-manager` sets only `font-family` and
   //      makes its `.window-content` transparent; the paint comes from `.fabricate-manager`
-  //      inside it (`color: var(--fab-mv2-text)`, `background: var(--fab-mv2-bg)`,
+  //      inside it (`color: var(--fab-text)`, `background: var(--fab-bg-1)`,
   //      `color-scheme: dark`). All seven `[data-fabricate-theme]` palettes in
   //      `styles/fabricate.css` are dark, and the module sheet loads at `layer(modules)`, which
   //      outranks core's `layer(applications)`, so core's light parchment never paints.

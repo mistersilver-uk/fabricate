@@ -221,7 +221,7 @@
     line-height: 1.4;
   }
 
-  /* FACTS: a RECESSED well, split by hairlines. `--fab-bg-1` over `--fab-mv2-border` is the
+  /* FACTS: a RECESSED well, split by hairlines. `--fab-bg-1` over `--fab-border` is the
      inspector stat-tile idiom (`.manager-essence-stat`), and the maintainer's prototype
      measures to the same pair — so the faithful render and the tokenised one agree. */
   .fab-library-card-facts {
@@ -229,7 +229,7 @@
     align-items: center;
     gap: var(--fab-space-2);
     padding: var(--fab-space-chip) var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-bg-1);
     color: var(--fab-text-subtle);
@@ -247,7 +247,7 @@
      so `tone` is a real enum rather than a boolean wearing a string's clothes: a studio can
      colour a stat by NAMING one, without editing this file. */
   .fab-library-card-fact.is-strong {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.66rem;
     font-weight: 600;
   }
@@ -271,7 +271,7 @@
     flex: 0 0 auto;
     width: 1px;
     height: 0.9em;
-    background: var(--fab-mv2-border);
+    background: var(--fab-border);
   }
 
   /* FOOTER: a divider, leading actions, then trailing actions pushed to the far end.
@@ -289,7 +289,7 @@
     gap: var(--fab-space-2);
     margin-top: var(--fab-space-1);
     padding-top: var(--fab-space-2);
-    border-top: 1px solid var(--fab-mv2-border);
+    border-top: 1px solid var(--fab-border);
   }
 
   .fab-library-card-footer-end {

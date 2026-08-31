@@ -821,9 +821,9 @@
     min-width: 0;
     min-height: 0;
     padding: var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 10px;
-    background: var(--fab-mv2-surface-1);
+    background: var(--fab-bg-2);
     overflow-y: auto;
   }
 
@@ -834,7 +834,7 @@
   }
 
   .manager-scoped-list-inspector:focus-visible {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 

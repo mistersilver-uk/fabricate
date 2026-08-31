@@ -52,8 +52,9 @@
   button-tagged variant. Foundry's rules are inside `@layer`, so this unlayered block beats
   them at any specificity.
 
-  Every token it reads is declared in `:root` or in all seven theme blocks — never a
-  `--fab-mv2-*` manager alias — so the component stays usable outside `.fabricate-manager`.
+  Every token it reads is declared in `:root` or in all seven theme blocks — never an
+  area-scoped `--fab-manager-*` property — so the component stays usable outside
+  `.fabricate-manager`.
 
   Props:
    - tone: `'neutral'` (default), `'primary'` (accent fill — the ONE loud verb per rail),
