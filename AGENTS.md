@@ -915,7 +915,7 @@ Classify every occurrence by the owning object before renaming.
 
 ### The design system is consulted before any UI work
 
-`openspec/specs/design-system/spec.md` is the canonical record of the rules the shared primitive set obeys: the membership bar, the canonical geometry ladders, the rules that route a near-neighbour case to the right primitive, and the recipes that compose them into the browse, editor and player screen archetypes.
+`openspec/specs/design-system/spec.md` is the canonical record of the rules the shared primitive set obeys: the two-caller membership bar, the canonical geometry ladders, the rules that route a near-neighbour case to the right primitive, and the recipes that compose them into the browse, editor and player screen archetypes.
 The set ITSELF is enumerated in `openspec/specs/design-system/library.html`, one primitive per `div.spec-head > h4` heading, which also renders each at its geometry — open it in a browser when a written value needs to be seen rather than read.
 `scripts/lib/designSystemPrimitives.json` is the machine-readable half, one row per shipped primitive keyed on the implementation path a diff names.
 `tests/design-system-coverage.test.js` reads the library and the manifest and fails when they describe different vocabularies.

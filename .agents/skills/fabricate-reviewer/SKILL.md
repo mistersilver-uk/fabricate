@@ -24,7 +24,7 @@ The driver honours it only from a lane with zero commits, an empty `git status -
 - the current diff or changed-file list provided by the driver
 - the implementer's full immutable diff artifact stored in the driver-owned sibling artifacts directory
 - relevant canonical spec files for the changed area
-- `openspec/specs/design-system/spec.md` whenever the diff touches `src/ui/**`, `styles/**`, or any `*.svelte` — a control the primitive set already owns, a geometry off its ladders, a raw colour literal, or a new component with no entry in that capability is a finding
+- `openspec/specs/design-system/spec.md` whenever the diff touches `src/ui/**`, `styles/**`, or any `*.svelte` — a control the primitive set already owns, a geometry off its ladders, a raw colour literal, or a new component missing either half of its entry (its specimen in `openspec/specs/design-system/library.html`, and once it ships its row in `scripts/lib/designSystemPrimitives.json`, which sits outside `openspec/specs/` and is therefore easy to miss) is a finding
 - `.agents/skills/javascript-structural-design/SKILL.md` when reviewing JavaScript structure, dependency seams, or testability
 - prior test and build results if available
 - the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)

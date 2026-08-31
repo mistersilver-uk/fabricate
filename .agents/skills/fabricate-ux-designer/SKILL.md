@@ -28,7 +28,8 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 ## Required context
 
 - `openspec/specs/design-system/spec.md` FIRST for any visual or component work — the rules the canonical primitive set obeys, its geometry ladders, its Svelte APIs, the near-neighbour routing rules, and the browse/editor/player screen recipes
-- `openspec/specs/design-system/library.html` — the visual companion rendering every primitive at that geometry; open it in a browser when a written value needs to be seen rather than read
+- `openspec/specs/design-system/library.html` — where the set ITSELF is enumerated, one primitive per `div.spec-head > h4` heading, each rendered at its canonical geometry; open it in a browser when a written value needs to be seen rather than read
+- `scripts/lib/designSystemPrimitives.json` — the machine-readable half of that enumeration, one row per shipped primitive keyed on the implementation path a diff names
 - `openspec/specs/ui-integration/spec.md` next, then other UI-related specs as needed
 - `.agents/skills/fabricate-ux-designer/references/design-system.md` — the `--fab-*` token, theming-architecture and shipped-inventory reference; where it and the `design-system` capability disagree, the capability wins
 - `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md` — the mandatory reference matrix, reuse-inventory, provenance, and maintainer-manual-evidence procedure for non-trivial UI work

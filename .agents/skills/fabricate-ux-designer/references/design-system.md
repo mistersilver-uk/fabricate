@@ -8,8 +8,8 @@ Build to this reference and the output drops into either app and reskins with ev
 
 > **The `design-system` capability is the authority on the primitive set.**
 > `openspec/specs/design-system/spec.md` is the canonical, versioned record of the rules the
-> shared primitive set obeys: the membership bar, the geometry ladders, the Svelte APIs, the
-> rules that route a near-neighbour case, and the screen recipes.
+> shared primitive set obeys: the two-caller membership bar, the geometry ladders, the Svelte
+> APIs, the rules that route a near-neighbour case, and the screen recipes.
 > The set itself is enumerated in `openspec/specs/design-system/library.html`, one primitive
 > per `div.spec-head > h4` heading, which also renders each at its geometry.
 > `scripts/lib/designSystemPrimitives.json` is the machine-readable half, one row per shipped
