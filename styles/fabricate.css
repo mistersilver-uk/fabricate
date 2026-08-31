@@ -13347,11 +13347,13 @@
   `display`, so that hide still wins — and re-tones from a mono numeral to the gold chip the
   design draws, whose colour pair is stated once beside `.manager-titlebar-badge` above.
 
-  It is selected through `.manager-nav-button` (0,4,0) rather than on its own, because TWO
-  later rules in this sheet re-tone a nav count at lower or equal weight — `.manager-nav-count`
-  itself (0,2,0) and `.manager-nav-button.is-active .manager-nav-count` (0,3,0), which is the
-  one the Downtime row is always in. Both won on source order against a single-class version,
-  and the chip drew in the subtle text colour at weight 600: bare tan lettering, not a badge.
+  It is selected through `.manager-nav-button` (0,4,0) rather than on its own, because a later
+  rule in this sheet re-tones a nav count at lower weight — `.manager-nav-count` itself
+  (0,2,0). It won on source order against a single-class version, and the chip drew in the
+  subtle text colour at weight 600: bare tan lettering, not a badge. (Issue 1304 removed a
+  second tied rule this comment used to name — `.manager-nav-button.is-active
+  .manager-nav-count` — because it restated the base rule byte-for-byte; the tie it broke no
+  longer exists.)
 */
 .fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
   /*
@@ -13416,8 +13418,8 @@
   tips it over, and `anywhere` decided that the failure looked like a broken word.
 
   The state the reporter noticed it in is NOT the cause: the chip measures 47.5px in the
-  active and the idle row alike, because `.manager-nav-button.is-active .manager-nav-count`
-  re-tones a count without resizing it and the gold chip rule pins weight 700 in both states.
+  active and the idle row alike, because nothing in this sheet re-tones a count's size on the
+  active row and the gold chip rule pins weight 700 in both states.
   So this is fixed as what it is — an ugly degradation on a tight track — rather than as a
   state bug, and the fix holds for a COMPANION-supplied label, which may be any length and is
   not ours to shorten.
@@ -13446,27 +13448,44 @@
 
   The disabled Graph row's "Soon" span is the one non-numeric `.manager-nav-count`. It
   is dead UI and this change does not elevate it, so it simply reads as quiet text.
+
+  `--fab-text-subtle` measured 3.70:1 on the idle rail and 3.16:1 on `--fab-surface-active`
+  across the default theme (issue 1304) — a 10px/600 numeral needs 4.5:1, so both grounds
+  failed AA. `--fab-text-muted`, the next step up the text ladder, comes close but still
+  misses on the active ground in ironblood-forge (4.48:1). `--fab-text-secondary` is the
+  first token that clears 4.5:1 on the idle rail AND on `--fab-surface-active` in all seven
+  themes (6.86:1 to 16.70:1 idle, 6.86:1 to 13.01:1 active) — it is also the token the
+  design-system reference already pairs with `--fab-surface-active` for a numeral badge (the
+  Checks tab's count badge in `.agents/skills/fabricate-ux-designer/references/design-system.md`),
+  so this is not a new pairing.
 */
 .fabricate-manager .manager-nav-count {
   flex: 0 0 auto;
   min-width: 0;
-  color: var(--fab-text-subtle);
+  color: var(--fab-text-secondary);
   font-family: var(--fab-font-mono);
 
   /* Prototype scale is 10px (0.625rem); an earlier pass bumped this to 0.74rem for
-     readability, but the font-size audit realigned it to the design (issue 643). The
-     active subitem count below inherits this size and only re-tones, so it scales in step. */
+     readability, but the font-size audit realigned it to the design (issue 643). The active
+     row's count is no longer re-toned separately (issue 1304): it inherits this rule's size
+     AND colour directly, so idle and active share one declaration and one AA guarantee. */
   font-size: 0.625rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   overflow-wrap: normal;
 }
 
-.fabricate-manager .manager-nav-button.is-active .manager-nav-count,
-.fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
-  color: var(--fab-text-subtle);
-  font-weight: 600;
-}
+/*
+  issue 1304 removed the active-row re-tone that used to sit here —
+  `.manager-nav-button.is-active .manager-nav-count` and `.manager-nav-subitem.is-active
+  .manager-nav-count` — because both restated this rule's `color`/`font-weight` byte-for-byte.
+  The active row's ground lifts to `--fab-surface-active` and its label brightens, but the
+  count never moved: it stayed on `--fab-text-subtle`, which fails AA on that ground in every
+  theme. The base rule above now uses `--fab-text-secondary`, which clears 4.5:1 on both the
+  idle rail and `--fab-surface-active` in every theme, so no active-row override is needed —
+  a per-state re-tone here would only be a second place for this token choice to drift out of
+  step with the base rule.
+*/
 
 /*
   THE GOLD BADGE CHIP, stated once (issue 1185).
@@ -13477,10 +13496,15 @@
   copy is a second thing to keep in step across all seven palettes. Each chip's own rule owns
   only its SCALE; the pair is here.
 
-  IT SITS HERE, under the count rules, because it has to beat them and it ties with one on
-  weight: `.manager-nav-button.is-active .manager-nav-count` is also four classes, and the
-  Downtime row is always the active row on its own route. Declared earlier, this block lost on
-  source order and the chip drew as subtle tan lettering at weight 600 — the reported defect.
+  IT SITS HERE, under the count rule, because it used to tie on specificity with the
+  active-row count re-tone `.manager-nav-button.is-active .manager-nav-count` (also four
+  classes) — the Downtime row is always the active row on its own route, so that tie decided
+  this exact badge. Declared earlier, this block lost the tie on source order and the chip
+  drew as subtle tan lettering at weight 600 — the reported defect. Issue 1304 removed that
+  tied rule as dead code, so today this position beats the surviving two-class
+  `.manager-nav-count` on specificity alone and does not depend on order — left here rather
+  than moved, since moving it changes nothing and touching cascade position for no
+  behavioural reason is its own risk.
 
   Neither rule uppercases in CSS, and that is now a shared decision rather than a divergence:
   both sources are the literal localized string `PREMIUM`, and uppercasing an already-uppercase
