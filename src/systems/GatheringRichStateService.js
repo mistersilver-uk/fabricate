@@ -1265,9 +1265,12 @@ export class GatheringRichStateService {
     });
     const prefix = sampleKey.slice(0, sampleKey.length - sentinel.length);
     const taskIds = new Set();
-    for (const key of Object.keys(reveals)) {
+    for (const [key, record] of Object.entries(reveals)) {
       if (!key.startsWith(prefix)) continue;
-      const taskId = key.slice(prefix.length);
+      // The RECORD's own `taskId` first, the key tail only as a fallback: the key is
+      // sanitised segment-by-segment (see `revealKeySegment`), so a task id carrying a dot
+      // survives in the record but not in the key it was filed under.
+      const taskId = stringOrFallback(record?.taskId, '') || key.slice(prefix.length);
       if (taskId) taskIds.add(taskId);
     }
     return [...taskIds];
@@ -2879,10 +2882,26 @@ function plainObjectOrNull(value) {
   return cloneJson(value);
 }
 
+/**
+ * Reduce one segment of a reveal key to a form Foundry cannot take apart.
+ *
+ * Reveal state is persisted through `setFlag`, and Foundry `expandObject`s flag data on
+ * the way in — EVERY dotted key, at every depth, becomes nested objects. An actor uuid is
+ * `Actor.<id>`, so `actor:Actor.<id>:<env>:<task>` was stored as
+ * `reveals["actor:Actor"]["<id>:<env>:<task>"]`: a shape no reader looking for the flat key
+ * can match. Blind reveals were therefore WRITE-ONLY — `revealTask` succeeded, the hook
+ * fired, and `discoveredTasks` stayed empty under every reveal policy.
+ */
+function revealKeySegment(value) {
+  return String(value ?? '').replaceAll('.', '_');
+}
+
 function revealKey({ environmentId, taskId, scope, actor, userId }) {
-  if (scope === 'global') return `global:${environmentId}:${taskId}`;
-  if (scope === 'user') return `user:${userId || 'unknown'}:${environmentId}:${taskId}`;
-  return `actor:${actor?.uuid || actor?.id || 'unknown'}:${environmentId}:${taskId}`;
+  const env = revealKeySegment(environmentId);
+  const task = revealKeySegment(taskId);
+  if (scope === 'global') return `global:${env}:${task}`;
+  if (scope === 'user') return `user:${revealKeySegment(userId || 'unknown')}:${env}:${task}`;
+  return `actor:${revealKeySegment(actor?.uuid || actor?.id || 'unknown')}:${env}:${task}`;
 }
 
 /**
