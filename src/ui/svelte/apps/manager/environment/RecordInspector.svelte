@@ -6,6 +6,7 @@
   } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
   import CompositionStatePill from './CompositionStatePill.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import MatchingEvidenceChips from './MatchingEvidenceChips.svelte';
   import IconButton from '../../../components/IconButton.svelte';
@@ -367,32 +368,25 @@
         </p>
       </div>
       {#if showOverridesToggle}
-        <button
-          type="button"
-          class={`manager-status-toggle manager-environment-override-toggle ${dropRateAdjustmentsEnabled ? 'is-on' : 'is-off'}`}
-          aria-pressed={dropRateAdjustmentsEnabled}
+        <StatusToggle
+          on={dropRateAdjustmentsEnabled}
+          label={dropRateAdjustmentsEnabled
+            ? text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOn',
+                'On'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOff',
+                'Off'
+              )}
+          class="manager-environment-override-toggle"
           data-task-drop-rate-adjustments-toggle={kind === 'event' ? undefined : ''}
           data-event-drop-rate-adjustments-toggle={kind === 'event' ? '' : undefined}
           onclick={() =>
             kind === 'event'
               ? setEventDropAdjustmentsEnabled(!dropRateAdjustmentsEnabled)
               : setTaskDropAdjustmentsEnabled(!dropRateAdjustmentsEnabled)}
-        >
-          <span class="manager-status-toggle-track" aria-hidden="true">
-            <span class="manager-status-toggle-knob"></span>
-          </span>
-          <span class="manager-status-toggle-label">
-            {dropRateAdjustmentsEnabled
-              ? text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOn',
-                  'On'
-                )
-              : text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOff',
-                  'Off'
-                )}
-          </span>
-        </button>
+        />
       {/if}
     </div>
 

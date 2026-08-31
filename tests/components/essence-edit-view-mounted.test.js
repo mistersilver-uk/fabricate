@@ -59,6 +59,7 @@ const harness = createMountedComponentHarness({
     // STATIC import of this tree; omitting it HANGS this suite as `# cancelled`.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/components/Medallion.svelte',

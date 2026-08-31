@@ -368,6 +368,10 @@ function compileManagerRoot() {
   // as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
   writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
+  // THE manager's on/off switch (issue 1040). The root reaches it from 25 components — every
+  // browser, every studio overview tab, the Checks rail, the scoped-entity rows and
+  // `ToggleCard` — so omitting it HANGS every mounted manager test as `# cancelled`.
+  writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

@@ -150,6 +150,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
 ];
@@ -262,7 +263,7 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 39, 'the shipped primitive set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 40, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 7, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(

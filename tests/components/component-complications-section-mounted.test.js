@@ -91,6 +91,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     // The roll condition's comparand is the shared signed-integer stepper (issue 1286).

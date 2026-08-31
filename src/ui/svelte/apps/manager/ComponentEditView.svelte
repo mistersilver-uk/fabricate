@@ -25,6 +25,7 @@
   // screenshot evidence map names it explicitly in the editor's recipe so a change to it
   // still routes evidence to the `manager-component-edit` frames.
   import EssenceQuantityCard from './components/EssenceQuantityCard.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,
@@ -1349,25 +1350,20 @@
                  DISABLED <button> receives no mouse events, so a tooltip would never
                  appear in any browser — and no mounted test would notice, because the
                  attribute IS in the DOM. -->
-            <!-- `is-on`/`is-off` mirror ToggleCard's switch exactly: same class pair,
-                 same `aria-pressed`, so the toggle this replaced is a no-op DOM diff at
-                 the control itself. -->
-            <button
-              type="button"
-              class={`manager-status-toggle ${salvageEnabled ? 'is-on' : 'is-off'}`}
-              data-recipe-field="salvageEnabled"
-              aria-pressed={salvageEnabled}
-              aria-label={text(
+            <!-- The shared switch, so this card and `ToggleCard` draw one control rather
+                 than two spellings of it (issue 1040). The hand-rolled version this replaced
+                 omitted `aria-hidden` on its track, which the primitive always emits: the
+                 track and knob are decoration and the button's own `aria-label` is the name. -->
+            <StatusToggle
+              on={salvageEnabled}
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Component.SalvageEditor.Enable',
                 'Salvage this component'
               )}
               disabled={salvageToggleDisabled}
+              data-recipe-field="salvageEnabled"
               onclick={() => setSalvage({ enabled: !salvageEnabled })}
-            >
-              <span class="manager-status-toggle-track"
-                ><span class="manager-status-toggle-knob"></span></span
-              >
-            </button>
+            />
           </div>
         </div>
 

@@ -3,6 +3,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
   import ChecklistCardRow from '../ChecklistCardRow.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
 
@@ -73,26 +74,19 @@
           )}
         </p>
       </div>
-      <label
-        class="manager-status-toggle manager-tool-setting-toggle"
-        class:is-on={prerequisites.enabled}
-        class:is-off={!prerequisites.enabled}
-      >
-        <input
-          class="manager-tool-setting-toggle-input"
-          type="checkbox"
-          data-tool-prerequisites-enabled
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Tools.Editor.TogglePrerequisites',
-            'Enable character prerequisites'
-          )}
-          checked={prerequisites.enabled}
-          onchange={(event) => patchPrerequisites({ enabled: event.currentTarget.checked })}
-        />
-        <span class="manager-status-toggle-track" aria-hidden="true"
-          ><span class="manager-status-toggle-knob"></span></span
-        >
-      </label>
+      <!-- `as="checkbox"` is the one host whose control is a real `<input type="checkbox">`
+           laid transparently over the track, which is what `scripts/foundry-test-run.mjs`
+           pointer-hit-tests and what `tool-studio-mounted.test.js` walks up from. -->
+      <StatusToggle
+        as="checkbox"
+        on={prerequisites.enabled}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Tools.Editor.TogglePrerequisites',
+          'Enable character prerequisites'
+        )}
+        data-tool-prerequisites-enabled=""
+        onChange={(checked) => patchPrerequisites({ enabled: checked })}
+      />
     </div>
     <fieldset disabled={!prerequisites.enabled} class="manager-tool-prerequisite-list">
       {#if prerequisiteOptions.length === 0}<p class="manager-muted">
@@ -145,26 +139,16 @@
           )}
         </p>
       </div>
-      <label
-        class="manager-status-toggle manager-tool-setting-toggle"
-        class:is-on={bonus.enabled}
-        class:is-off={!bonus.enabled}
-      >
-        <input
-          class="manager-tool-setting-toggle-input"
-          type="checkbox"
-          data-tool-bonus-enabled
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Tools.Editor.ToggleBonus',
-            'Enable Tool check bonus'
-          )}
-          checked={bonus.enabled}
-          onchange={(event) => patchBonus({ enabled: event.currentTarget.checked })}
-        />
-        <span class="manager-status-toggle-track" aria-hidden="true"
-          ><span class="manager-status-toggle-knob"></span></span
-        >
-      </label>
+      <StatusToggle
+        as="checkbox"
+        on={bonus.enabled}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Tools.Editor.ToggleBonus',
+          'Enable Tool check bonus'
+        )}
+        data-tool-bonus-enabled=""
+        onChange={(checked) => patchBonus({ enabled: checked })}
+      />
     </div>
     <label class="manager-tool-bonus-field">
       <span>{text('FABRICATE.Admin.Manager.Tools.Editor.BonusExpression', 'Bonus expression')}</span

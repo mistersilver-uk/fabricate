@@ -19,15 +19,12 @@
   override when a switch goes back on, so nothing is lost and no confirmation is required. The
   note therefore states what the section WILL resolve to, never what would be thrown away.
 
-  THE INHERIT SWITCH IS HAND-ROLLED, AND ITS FOLLOW-UP IS ISSUE 1040. There is no shared
-  `StatusToggle` primitive in this repository: every Manager on/off control emits
-  `.manager-status-toggle` with its `-track`, `-knob` and `-label` children by hand, and issue
-  1040 — "extract a shared StatusToggle primitive and convert the manager sites" — already
-  tracks fixing that across the whole Manager. This row joins that backlog rather than
-  pre-empting it, because extracting a primitive obliges converting every existing site, and
-  that is two dozen components in files whose whole premise here is that four later lanes need
-  not reopen them. Recorded at the site so the debt is visible where it was incurred; the count
-  deliberately is not restated here, because issue 1040 owns the roster.
+  THE INHERIT SWITCH WAS HAND-ROLLED AND IS NOW `<StatusToggle>` (issue 1040). The debt this
+  paragraph used to record — every Manager on/off control emitting `.manager-status-toggle` with
+  its `-track`, `-knob` and `-label` children by hand — is paid: the primitive owns that tree and
+  this row calls it. The switch takes NO `ariaLabel`, because its visible reading ("Fall back to
+  the world default") already names it and a second, differently worded accessible name would be
+  the drift the primitive exists to end.
 
   Props:
    - entityType: `component`, `essence` or `tool`; the row set is derived from it.
@@ -43,6 +40,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import { scopedInheritRows } from './scopedStudio.js';
 
   let {
@@ -74,23 +72,15 @@
     {#if row.note}
       <p class="manager-scoped-inherit-note" data-scoped-inherit-note={row.section}>{row.note}</p>
     {/if}
-    <button
-      type="button"
-      class={`manager-status-toggle ${row.inherited ? 'is-on' : 'is-off'}`}
-      data-scoped-inherit-toggle={row.section}
-      aria-pressed={row.inherited}
+    <StatusToggle
+      on={row.inherited}
+      label={text(
+        'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
+        'Fall back to the world default'
+      )}
       {disabled}
+      data-scoped-inherit-toggle={row.section}
       onclick={() => onToggle(row.section, !row.inherited)}
-    >
-      <span class="manager-status-toggle-track" aria-hidden="true"
-        ><span class="manager-status-toggle-knob"></span></span
-      >
-      <span class="manager-status-toggle-label"
-        >{text(
-          'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
-          'Fall back to the world default'
-        )}</span
-      >
-    </button>
+    />
   </div>
 {/each}

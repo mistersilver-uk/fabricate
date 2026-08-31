@@ -16,10 +16,21 @@
   truth rather than the second being retired. `aria-pressed` on a plain `<button>` is the
   house pattern — the repo uses no `role="switch"` anywhere; do not introduce one here.
 
+  THE SWITCH ITSELF IS NOW `<StatusToggle>` (issue 1040), and that is a COMPOSITION rather
+  than a competing primitive: this card owns icon, title, sub-line and the card's own state
+  class, and the shared switch owns the track, the knob and the reading. The extraction is
+  byte-faithful in the direction that matters here — the primitive emits the identical
+  element tree, the identical class string (`manager-status-toggle is-on|is-off`, in that
+  order) and the identical `aria-pressed`, so the issue-658 retrofit is still a no-op DOM
+  diff. The one thing that differs is a comment anchor for the primitive's conditional
+  reading, which this card never passes and which renders nothing.
+
   String props are PRE-LOCALIZED by the caller (no `localize` import): the caller owns the
   i18n keys and their fallbacks, which keeps this component a presentational leaf.
 -->
 <script>
+  import StatusToggle from '../../components/StatusToggle.svelte';
+
   let {
     // Visual variant appended to the card class (e.g. 'is-info'), toning it when on.
     variant = '',
@@ -69,19 +80,13 @@
       {sub}
     </p>
   </div>
-  <button
-    type="button"
-    class={`manager-status-toggle ${on ? 'is-on' : 'is-off'}`}
-    data-recipe-field={field || undefined}
-    aria-pressed={on}
-    aria-label={toggleLabel || title}
-    title={toggleTitle || undefined}
+  <StatusToggle
+    {on}
     {disabled}
+    ariaLabel={toggleLabel || title}
+    data-recipe-field={field || undefined}
+    title={toggleTitle || undefined}
     {...toggleAttr ? { [toggleAttr]: '' } : {}}
     onclick={() => onToggle(!on)}
-  >
-    <span class="manager-status-toggle-track" aria-hidden="true"
-      ><span class="manager-status-toggle-knob"></span></span
-    >
-  </button>
+  />
 </div>

@@ -10,6 +10,7 @@
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
@@ -1008,11 +1009,12 @@
                   class="manager-labeled-cell manager-status-cell"
                   data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
                 >
-                  <button
-                    type="button"
-                    class={`manager-status-toggle ${displayEnvironment.enabled === false ? 'is-off' : 'is-on'}`}
-                    aria-pressed={displayEnvironment.enabled !== false}
-                    aria-label={text(
+                  <StatusToggle
+                    on={displayEnvironment.enabled !== false}
+                    label={displayEnvironment.enabled === false
+                      ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                      : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.Environment.ToggleNamed',
                       'Toggle {name}'
                     ).replace('{name}', environmentName(displayEnvironment))}
@@ -1024,16 +1026,7 @@
                       );
                     }}
                     onkeydown={(event) => event.stopPropagation()}
-                  >
-                    <span class="manager-status-toggle-track" aria-hidden="true">
-                      <span class="manager-status-toggle-knob"></span>
-                    </span>
-                    <span class="manager-status-toggle-label">
-                      {displayEnvironment.enabled === false
-                        ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                        : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-                    </span>
-                  </button>
+                  />
                 </span>
                 <span
                   role="cell"
@@ -1179,11 +1172,12 @@
               <i class={condition.icon} aria-hidden="true"></i>
               <span>{conditionTitle(condition.kind)}</span>
             </span>
-            <button
-              type="button"
-              class={`manager-status-toggle ${condition.setting.enabled === false ? 'is-off' : 'is-on'}`}
-              aria-pressed={condition.setting.enabled !== false}
-              aria-label={condition.setting.enabled === false
+            <StatusToggle
+              on={condition.setting.enabled !== false}
+              label={condition.setting.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+              ariaLabel={condition.setting.enabled === false
                 ? text(
                     'FABRICATE.Admin.Manager.Environment.Conditions.EnableMatching',
                     'Enable matching'
@@ -1198,16 +1192,7 @@
                   condition.setting.enabled === false,
                   selectedSystemId
                 )}
-            >
-              <span class="manager-status-toggle-track" aria-hidden="true">
-                <span class="manager-status-toggle-knob"></span>
-              </span>
-              <span class="manager-status-toggle-label">
-                {condition.setting.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              </span>
-            </button>
+            />
           </header>
           <p class="manager-condition-panel-hint">{conditionHint(condition.kind)}</p>
 

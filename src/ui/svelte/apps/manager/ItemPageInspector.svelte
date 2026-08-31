@@ -21,6 +21,7 @@
 <script>
   import Chip from './Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -156,12 +157,12 @@
           <Chip tone={recipeCount === 0 ? 'danger' : 'neutral'} data-item-page-type
             >{typePillLabel()}</Chip
           >
-          <button
-            type="button"
-            class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
-            aria-pressed={enabled}
-            data-item-page-toggle
-            aria-label={enabled
+          <StatusToggle
+            on={enabled}
+            label={enabled
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            ariaLabel={enabled
               ? text('FABRICATE.Admin.Manager.BooksScrolls.DisableNamed', 'Disable {name}').replace(
                   '{name}',
                   item.resolvedName
@@ -170,17 +171,9 @@
                   '{name}',
                   item.resolvedName
                 )}
+            data-item-page-toggle=""
             onclick={() => onToggleEnabled(item.id, !enabled)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label"
-              >{enabled
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-            >
-          </button>
+          />
         </span>
       </div>
     </div>
@@ -282,25 +275,17 @@
           <span>{quickSub}</span>
         </span>
         <span class="manager-rule-field">
-          <button
-            type="button"
-            class={`manager-status-toggle ${quickLimited ? 'is-on' : 'is-off'}`}
-            aria-pressed={quickLimited}
-            data-item-page-quick-limit-toggle
-            aria-label={isItemMode
+          <StatusToggle
+            on={quickLimited}
+            label={quickLimited
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            ariaLabel={isItemMode
               ? text('FABRICATE.Admin.Manager.BooksScrolls.LimitedUse', 'Limited use')
               : text('FABRICATE.Admin.Manager.BooksScrolls.LimitedLearning', 'Limited learning')}
+            data-item-page-quick-limit-toggle=""
             onclick={() => onToggleQuickLimit(item.id, !quickLimited)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label"
-              >{quickLimited
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-            >
-          </button>
+          />
         </span>
       </div>
     </section>

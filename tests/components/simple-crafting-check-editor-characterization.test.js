@@ -79,6 +79,7 @@ const harness = createMountedComponentHarness({
     // extended by its `dashed` role now (issue 1096). Manifest only.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     // An issue 1097 addition, and ONLY the dependency manifest: the simple check's Outcomes

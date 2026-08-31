@@ -63,6 +63,7 @@
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import { essenceCapabilityPills } from './essenceStudio.js';
   import IconButton from '../../../components/IconButton.svelte';
 
@@ -209,27 +210,21 @@
      and the GRID card's footer (issue 1036, maintainer round): the prototype's grid card carries
      these actions in a divided footer, not only in the inspector. -->
 {#snippet statusToggle()}
-  <button
-    type="button"
-    class={`manager-status-toggle ${disabled ? 'is-off' : 'is-on'}`}
-    data-essence-toggle={essence.id}
-    aria-pressed={!disabled}
-    aria-label={format(
+  <StatusToggle
+    on={!disabled}
+    ariaLabel={format(
       disabled
         ? 'FABRICATE.Admin.Manager.Essence.EnableNamed'
         : 'FABRICATE.Admin.Manager.Essence.DisableNamed',
       disabled ? 'Enable {name}' : 'Disable {name}',
       { name: essence.name }
     )}
+    data-essence-toggle={essence.id}
     onclick={(event) => {
       event.stopPropagation();
       onToggleEnabled(essence.id, disabled);
     }}
-  >
-    <span class="manager-status-toggle-track" aria-hidden="true"
-      ><span class="manager-status-toggle-knob"></span></span
-    >
-  </button>
+  />
 {/snippet}
 
 {#snippet editButton()}

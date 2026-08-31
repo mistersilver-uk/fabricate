@@ -24,6 +24,7 @@
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../systems/characterPrerequisites.js';
   import { buildRecipeItemPreviewRow } from '../../util/recipeItemPreviewRow.js';
@@ -443,27 +444,20 @@
                   <span class="manager-recipe-item-rule-sub">{rule.sub}</span>
                 </div>
                 {#if rule.id}
-                  <button
-                    type="button"
-                    class={`manager-status-toggle manager-recipe-item-satisfied-toggle ${satisfied(rule.id) ? 'is-on' : 'is-off'}`}
-                    data-recipe-item-satisfied-toggle={rule.id}
-                    aria-pressed={satisfied(rule.id)}
-                    aria-label={text(
+                  <StatusToggle
+                    on={satisfied(rule.id)}
+                    label={satisfied(rule.id)
+                      ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                      : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.RecipeItem.Rules.Satisfied',
                       'Satisfied?'
                     )}
+                    class="manager-recipe-item-satisfied-toggle"
+                    data-recipe-item-satisfied-toggle={rule.id}
                     title={text('FABRICATE.Admin.Manager.RecipeItem.Rules.Satisfied', 'Satisfied?')}
                     onclick={() => toggleSatisfied(rule.id)}
-                  >
-                    <span class="manager-status-toggle-track" aria-hidden="true"
-                      ><span class="manager-status-toggle-knob"></span></span
-                    >
-                    <span class="manager-status-toggle-label"
-                      >{satisfied(rule.id)
-                        ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                        : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-                    >
-                  </button>
+                  />
                 {/if}
               </div>
             {/each}
@@ -630,8 +624,17 @@
     overflow-wrap: anywhere;
   }
 
-  /* GM-only "Satisfied?" experiment toggle, right-aligned in a "Needs:" rule row. */
-  .manager-recipe-item-satisfied-toggle {
+  /* GM-only "Satisfied?" experiment toggle, right-aligned in a "Needs:" rule row.
+
+     `:global(...)` is REQUIRED here, not decoration (issue 1040). The class now rides the
+     `class` prop of a `<StatusToggle>`, and Svelte scopes a rule by stamping its
+     `svelte-<hash>` onto the elements THIS component writes — never onto a child component's
+     internals — so a scoped `.manager-recipe-item-satisfied-toggle` would be emitted with the
+     hash appended and match nothing, silently un-right-aligning the switch.
+     `ManagerButton.svelte` records the same trap and the same two repairs; this rule stays in
+     this file rather than moving to `styles/fabricate.css` because it has exactly one call
+     site, and it is CHAINED with the primitive's own class so it is not a bare global. */
+  :global(.manager-status-toggle.manager-recipe-item-satisfied-toggle) {
     flex: 0 0 auto;
     margin-left: auto;
   }

@@ -20,13 +20,11 @@
   other `ArmedDangerButton` call site, so `armedToken` / `onArm` / `onDisarm` are threaded
   through rather than held here.
 
-  THE ENABLED SWITCH IS HAND-ROLLED, AND ITS FOLLOW-UP IS ISSUE 1040. Like the inherit switch in
-  `InheritRow.svelte`, it emits `.manager-status-toggle` and its `-track` / `-knob` / `-label`
-  children directly, because this repository ships no `StatusToggle` primitive to call. Issue
-  1040 already tracks extracting one and converting the Manager's existing sites, so one more
-  hand-rolled copy is a known and bounded cost rather than an oversight; extracting the
-  primitive here instead would drag every one of those unrelated sites into a change whose
-  whole premise is that four later lanes need not reopen the files it owns.
+  THE ENABLED SWITCH WAS HAND-ROLLED AND IS NOW `<StatusToggle>` (issue 1040), as is the inherit
+  switch in `InheritRow.svelte`. The shared primitive owns the `.manager-status-toggle` element
+  and its `-track` / `-knob` / `-label` children, so this cluster states only the switch's state,
+  its disabled flag, its `data-*` hook and its handler. Like the inherit row it passes no
+  `ariaLabel`: the visible On/Off reading is the switch's name.
 
   Props:
    - entityType: `component`, `essence` or `tool`.
@@ -42,6 +40,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import { scopedEnableable } from './scopedStudio.js';
 
@@ -93,23 +92,15 @@
 <div class="manager-scoped-membership-actions" data-scoped-membership-actions={entityType}>
   {#if member}
     {#if enableable}
-      <button
-        type="button"
-        class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
-        data-scoped-membership-enabled
-        aria-pressed={enabled}
+      <StatusToggle
+        on={enabled}
+        label={enabled
+          ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+          : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
         {disabled}
+        data-scoped-membership-enabled=""
         onclick={() => onToggleEnabled(!enabled)}
-      >
-        <span class="manager-status-toggle-track" aria-hidden="true"
-          ><span class="manager-status-toggle-knob"></span></span
-        >
-        <span class="manager-status-toggle-label"
-          >{enabled
-            ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-            : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-        >
-      </button>
+      />
     {/if}
     {#if copyable}
       <ManagerButton {disabled} data-scoped-membership-copy onclick={() => onCopyFrom()}>

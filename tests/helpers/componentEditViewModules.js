@@ -100,6 +100,9 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // The manager's ONE labelled push-button (issue 1096); every salvage add control and
   // the Manage presets link render through it since issue 1118 task 9.
   'src/ui/svelte/components/ManagerButton.svelte',
+  // The manager's ONE on/off switch (issue 1040). Reached twice over: the salvage gate
+  // renders it directly, and `ToggleCard` above renders it too.
+  'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   // The complications section and its two shared rows (issue 1286). `ComponentEditView`
   // imports the section STATICALLY, so all four are in this tree's module closure whether

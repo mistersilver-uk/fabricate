@@ -30,6 +30,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
     'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
     'src/ui/svelte/apps/manager/environment/MatchingEvidenceChips.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/environment/RecordInspector.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/environment/RecordInspector.svelte'

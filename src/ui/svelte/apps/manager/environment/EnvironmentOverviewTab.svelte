@@ -4,6 +4,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../../util/gatheringFormat.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
 
   let {
     environment = null,
@@ -189,22 +190,14 @@
               </button>
             {/if}
             <div class="manager-task-core-status">
-              <button
-                type="button"
-                class={`manager-status-toggle ${environment.enabled === false ? 'is-off' : 'is-on'}`}
+              <StatusToggle
+                on={environment.enabled !== false}
+                label={environment.enabled === false
+                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
                 data-environment-field="enabled"
-                aria-pressed={environment.enabled !== false}
                 onclick={() => onUpdate({ enabled: environment.enabled === false })}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true"
-                  ><span class="manager-status-toggle-knob"></span></span
-                >
-                <span class="manager-status-toggle-label"
-                  >{environment.enabled === false
-                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span
-                >
-              </button>
+              />
               <p class="manager-muted">
                 {environment.enabled === false
                   ? text(
