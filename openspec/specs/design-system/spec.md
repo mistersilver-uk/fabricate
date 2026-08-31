@@ -77,6 +77,28 @@ A card that merely sits on the page uses a border and no shadow.
 - **WHEN** a primitive needs a colour no `--fab-*` token provides
 - **THEN** the change mints a token in every theme block rather than writing a literal at the call site
 
+### Requirement: The token namespace is one generation and names its purpose
+
+The `--fab-*` namespace holds three kinds of custom property and this requirement governs the first.
+THEME FOUNDATIONS are declared in every theme block and re-theme on a swap.
+CALLER-SET PARAMETERS are given a default in the stylesheet and set per instance from markup or script.
+LOCAL LAYOUT PLUMBING is declared on one selector and read by its own descendants.
+
+A foundation token name MUST NOT carry a version or generation marker.
+`--fab-v2-*`, `--fab-mv2-*` and `--fab-editor-*` are retired and MUST NOT be reintroduced, and no name of the shape `--fab-v<N>-` or `--fab-mv<N>-` may be minted.
+This is a rule about NAMES and does not bear on the library's own version, which `The primitive set is a closed, versioned vocabulary` governs.
+`tests/token-generation-gate.test.js` scans the raw text of every `.css`, `.svelte` and `.js` file under `src/` and `styles/` for those three shapes, so a declaration, a read and a bare mention in a comment all fail alike.
+
+Area scoping is spelled out rather than numbered.
+`--fab-manager-` is the prefix for an area-scoped custom property, and such a property MUST NOT be read outside `.fabricate-manager`, because a shared primitive that reads one renders correctly in the manager and unstyled everywhere else.
+A Svelte scoped `<style>` MUST NOT reach one at all: a component is placed in a directory, not in a DOM subtree, so its own CSS cannot guarantee where its host renders.
+
+#### Scenario: a surface wants its own colour vocabulary
+
+- **WHEN** a surface wants to name a colour it already gets from a foundation token
+- **THEN** the surface reads the foundation token directly
+- **AND** no forwarding alias is minted, because an alias declared once forwards a value without re-theming it and hides the token from every surface outside its selector
+
 ### Requirement: Geometry comes from the published ladders
 
 Control height MUST be one of 26, 28, 30, 34, 38, or 44 for a control a spec marks touch-reachable.

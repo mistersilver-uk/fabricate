@@ -60,7 +60,7 @@ The six theme ids are `fabricate`, `mythwright`, `ironblood-forge`, `hearth-herb
 
 | Layer | Holds |
 |---|---|
-| **Base `:root`** | non-colour tokens (spacing `--fab-space-*`, radii, control heights) **and** the semantic colour-*alias* layer (`--fab-v2-*`, `--fab-status-*`, `--fab-editor-*`) that forwards via `var()` into the live theme |
+| **Base `:root`** | non-colour tokens only — spacing `--fab-space-*`, radii, control heights. There is no colour-alias layer: a forwarding alias re-themes nothing and hides its target from every surface outside its own selector, so a surface reads its foundation token directly (design-system spec, *The token namespace is one generation and names its purpose*) |
 | **`[data-fabricate-theme="…"]` block** | the colour *literals* only — bg, text, accent, semantics, tags, drop-rates, shadows |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -71,7 +71,8 @@ so "base `:root` is colour-free" is about literals, not tokens.
 Every theme block defines the **identical** token surface: the contract test asserts each theme
 declares the same >100 token names plus its own palette anchors, and that no `var(--fab-*)`
 reference is left dangling.
-The `--fab-v2-*` aliases let legacy code migrate one token at a time.
+The namespace is ONE generation: a foundation token name carries no version or generation
+marker, and `tests/token-generation-gate.test.js` fails any that does.
 Every theme is dark, so app roots set `color-scheme: dark` and native controls and `<select>`
 popups match.
 
@@ -86,13 +87,21 @@ The spacing scale is canonically specified in `openspec/specs/ui-integration/spe
   /* spacing — 4px base */
   --fab-space-2xs:2px; --fab-space-1:4px; --fab-space-chip:6px; --fab-space-2:8px;
   --fab-space-3:12px; --fab-space-4:16px; --fab-space-5:20px; --fab-space-6:24px;
-  /* radius */
-  --fab-v2-radius-control:5px;   /* inputs, selects, chips */
-  --fab-v2-radius-panel:6px;     /* cards, panels, wells   */
-  /* sizing rhythm */
-  --fab-v2-control-height:34px; --fab-v2-icon-button:34px;
-  --fab-v2-thumb-sm:40px; --fab-v2-thumb-md:58px; --fab-v2-row-height:72px;
+  /* radius — the two the Books & Scrolls tab and the item-page inspector share.
+     BOTH ARE OFF the canonical ladder below; they are carried at their shipped
+     values because correcting them moves pixels. */
+  --fab-radius-control:5px;      /* inputs, selects, chips */
+  --fab-radius-panel:6px;        /* cards, panels, wells   */
 }
+```
+
+There is no control-height or thumbnail token.
+Heights are literal, which the design-system spec's *Geometry* requirement states outright, and
+the ladder itself is the rule rather than a token:
+
+```text
+control height  26 · 28 · 30 · 34 · 38 · 44   (32 · 36 · 40 are RETIRED)
+thumbnails and portraits carry their own ladder and are not controls
 ```
 
 ### 1.4 The six themes
@@ -187,11 +196,13 @@ sans; mono is only for dice formulas and run IDs.
 
 - **Spacing** (`--fab-space-*`, 4px base): the canonical scale is in
   `openspec/specs/ui-integration/spec.md`; prefer flex/grid with `gap`.
-- **Radius:** `--fab-v2-radius-control` **5px** (inputs, chips) · `--fab-v2-radius-panel` **6px**
-  (cards, panels) · **999px** pills.
-  Player-app cards commonly ride 8–12px; keep to 5 / 8 / 10 / 12 / 999.
+- **Radius:** the canonical ladder is in `openspec/specs/design-system/spec.md` — **6** for chips
+  at or below 24px, **7** for controls of 26–32px, **9** for controls of 34–38px and for rows and
+  wells, **11** for a 44px control and for cards and panels, **999** for pills and tracks.
+  Two shipped tokens, `--fab-radius-control` (5px) and `--fab-radius-panel` (6px), are OFF that
+  ladder and are recorded as debt rather than as a second ladder to design against.
 - **Sizing rhythm:** control and icon-button **34** · thumb-sm **40** · thumb-md **58** ·
-  row **72**.
+  row **72**, written as literals.
 - **Elevation** (`--fab-shadow-*`): `-sm` 0 8 18 · `-md` 0 10 24 · `-lg` 0 14 38 (windows).
   Shadow tint is theme-scoped, keyed off each theme's darkest channel rather than fixed black.
 - **Focus ring:** the Foundry orange ring is overridden per app-area in `styles/fabricate.css`,
@@ -225,8 +236,8 @@ A component that paints its own visuals BEHIND a native control — the chance s
 Exclude the type from every such rule, and enumerate them all before declaring it fixed: this exact bug shipped three times because two rules were patched and a third, reachable through a different ancestor, was missed.
 
 **A primitive must reference theme-ROOT tokens only.**
-`--fab-mv2-*` and similar aliases are declared inside `.fabricate-manager`, so an area-agnostic component that references one is fine in the manager and silently wrong everywhere else: outside that area the property is not in scope, the declaration becomes invalid at computed-value time, and the colour falls back to inheritance.
-Nothing fails and no test catches it — the trigger is exactly the reuse the primitive exists to enable.
+`--fab-manager-*` is the prefix for an area-scoped custom property, declared inside `.fabricate-manager`, so an area-agnostic component that references one is fine in the manager and silently wrong everywhere else: outside that area the property is not in scope, the declaration becomes invalid at computed-value time, and the value falls back to inheritance.
+Nothing fails at run time — the trigger is exactly the reuse the primitive exists to enable — and the two gates that DO catch it are source scans, not renders: `tests/token-generation-gate.test.js` forbids the prefix in any Svelte scoped `<style>`, and `manager-layout.test.js` checks the five shared primitives by name.
 Use tokens declared in `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks, and say so in the component's `<style>` so the next editor does not reintroduce it.
 
 **Svelte trims whitespace at the end of a block.**

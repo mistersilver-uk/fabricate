@@ -23,7 +23,8 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Full-track semantic value scales may use `linear-gradient` only when the gradient directly communicates the numeric meaning of the control, such as a green-to-red risk slider.
 - Use solid colors or RGBA fills for shells, cards, headers, overlays, and controls.
 - Visual hierarchy should come from spacing, typography, borders, and restrained shadows rather than decorative gradients or blur-based glass effects.
-- Shared tokens in `styles/fabricate.css` and app-local editor tokens should be the source of truth for reusable surface treatments.
+- Shared `--fab-*` tokens in `styles/fabricate.css` are the source of truth for reusable surface treatments, and they are ONE generation: a foundation token name carries no version or generation marker, and no app-local token layer forwards one.
+  See `The token namespace is one generation and names its purpose` in `openspec/specs/design-system/spec.md`.
 - Fabricate exposes a global module setting, `fabricate.theme`, for choosing the active product UI colour theme.
 - Fabricate exposes a global module setting, `fabricate.experimentalFeatures`, gating experimental surfaces still in development (currently the recipe-graph placeholder and the GM Manager's world `Downtime` surface).
   It defaults to disabled.
