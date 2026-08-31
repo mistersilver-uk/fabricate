@@ -3426,6 +3426,12 @@
           "MembershipFilterLabel": "Filter essences by membership of this system",
           "MembershipIn": "In this system ({count})",
           "NotInSystem": "Not in this system",
+          "EditRules": "Edit rules",
+          "EditRulesNamed": "Edit rules for {name}",
+          "CountInSystem": "{shown} shown · {members} of {total} in this system",
+          "SharedDefinition": "Shared definition",
+          "SharedDefinitionNote": "Name, icon and colour come from the Essence Catalogue and are shared by every system. Everything below belongs to this system alone.",
+          "OpenWorldDefinition": "Open world definition",
           "BulkEdit": {
             "Heading": "{count} essences selected",
             "HeadingOne": "1 essence selected",

@@ -300,6 +300,82 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     harness.remount();
   });
 
+  it('labels that control `Edit rules` and marks it as leaving the screen', async () => {
+    // `proto:1576`. The prototype's system essence-rules row ends in a LABELLED pill carrying
+    // the external-link glyph, because the words are what say which layer the control opens:
+    // this screen edits ONE system's rules for a world-shared essence.
+    const root = await harness.mount(props([CONFIGURED_DISABLED]));
+    const row = root.querySelector('.manager-essence-row[data-essence-id="aether"]');
+    const edit = row.querySelector('[data-essence-edit="aether"]');
+    assert.ok(
+      edit.textContent.includes('Edit rules'),
+      'the row action states the layer it opens rather than showing a bare pencil'
+    );
+    assert.ok(
+      edit.querySelector('i.fa-arrow-up-right-from-square'),
+      'and carries the prototype trailing glyph that marks a control leaving this screen'
+    );
+    // NON-VACUITY, and the reason the label could not simply replace the class: the Foundry
+    // smoke reaches this control as `.manager-icon-button[title*="Edit" i]` behind a
+    // `count() > 0` guard, so a lost class or a retitled control would stop producing the
+    // `manager-essence-edit-first-state` frame WITHOUT failing anything.
+    assert.ok(
+      edit.classList.contains('manager-icon-button'),
+      'it is still the primitive three surfaces address it by'
+    );
+    assert.ok(
+      edit.getAttribute('title').startsWith('Edit'),
+      'and its title still leads with Edit, which is what the smoke matches on'
+    );
+    // The GRID card keeps the pencil: its footer is a two-slot strip with no room for a
+    // phrase, and the prototype draws no grid presentation for this screen to copy.
+    root.querySelector('[data-essence-view-option="grid"] input').click();
+    flushSync();
+    const card = root.querySelector('.manager-essence-row[data-essence-id="aether"]');
+    assert.ok(
+      card.querySelector('[data-essence-edit="aether"] i.fa-pen'),
+      'the grid card keeps the icon-only pencil'
+    );
+    assert.ok(
+      !card.textContent.includes('Edit rules'),
+      'and does not carry the phrase, so the two presentations differ deliberately'
+    );
+    harness.remount();
+  });
+
+  it('states MEMBERSHIP in the bar count, and falls back to the range without a corpus', async () => {
+    // `proto:1550` / `proto:4971`: `N shown · M of K in this system`. The range it replaces was
+    // already rendered verbatim by `Pagination` at the foot of the same list.
+    const scope = {
+      available: true,
+      sections: [],
+      entries: [
+        { id: 'aether', entity: { name: 'Aether' }, systems: [] },
+        { id: 'water', entity: { name: 'Water' }, systems: [] },
+        { id: 'ember', entity: { name: 'Ember' }, systems: [] },
+      ],
+    };
+    const root = await harness.mount(
+      props([CONFIGURED_DISABLED, PLAIN_ENABLED], { scope, systemId: 'sys-1' })
+    );
+    assert.equal(
+      root.querySelector('[data-essence-count]').textContent.replaceAll(/\s+/g, ' ').trim(),
+      '2 shown · 2 of 3 in this system',
+      'the bar answers how many the filters left, and how much of the world this system holds'
+    );
+
+    // THE NEGATIVE HALF. An unreadable corpus cannot answer `M of K`, and answering it anyway
+    // would report every essence as absent from this system — a false statement rather than an
+    // unavailable one. The bar returns to the range, which is always answerable.
+    const noCorpus = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
+    assert.equal(
+      noCorpus.querySelector('[data-essence-count]').textContent.replaceAll(/\s+/g, ' ').trim(),
+      '1–2 of 2',
+      'with no world corpus the count states the page range and claims nothing about membership'
+    );
+    harness.remount();
+  });
+
   it('reports the enable toggle without writing anything itself', async () => {
     const toggles = [];
     const root = await harness.mount(
@@ -343,6 +419,6 @@ describeBrowserBulkSelection({
   rowControls: {
     scope: '.manager-essence-cluster',
     count: 2,
-    why: 'the cluster holds the enable toggle and the Edit pencil — and the selection control must NOT join them, because the Foundry smoke walk reaches the row actions through button selectors',
+    why: 'the cluster holds the enable toggle and the Edit rules button — and the selection control must NOT join them, because the Foundry smoke walk reaches the row actions through button selectors',
   },
 });

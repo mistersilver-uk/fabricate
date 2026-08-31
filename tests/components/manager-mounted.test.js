@@ -11518,6 +11518,33 @@ describe('CraftingSystemManager mounted behavior', () => {
     const essenceHeroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
     assert.ok(essenceHeroRow, 'essence inspector should use the prominent hero title row');
 
+    // THE SHARED-DEFINITION DEEP LINK (issue 1372, `proto:1676`-`1678`). It is asserted HERE
+    // rather than on the component alone because the two halves fail independently: the
+    // component can render a link the shell never wired, and the shell can wire a callback no
+    // control calls. This clicks the rendered control in the real shell and reads the route.
+    const sharedCard = target.querySelector('[data-essence-section="shared"]');
+    assert.ok(sharedCard, 'the inspector names the layer the GM is looking at');
+    assert.ok(
+      sharedCard.textContent.includes('Shared definition'),
+      'with the prototype kicker, so the rail says which record is world-shared'
+    );
+    target.querySelector('[data-essence-action="open-world-definition"]').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'world-essence-entry',
+      'and the link opens the WORLD definition, which is the only route out to it'
+    );
+
+    navButton('Essence Rules').click();
+    flushSync();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
+    await tick();
+    flushSync();
+
     target.querySelector('[data-essence-action="duplicate"]').click();
     await tick();
     flushSync();
@@ -11631,7 +11658,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    target.querySelector('[data-essence-id="water"] [data-essence-edit="water"]').click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
@@ -12203,7 +12230,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'a gated-off capability shows no pill'
     );
 
-    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    target.querySelector('[data-essence-id="water"] [data-essence-edit="water"]').click();
     await tick();
     flushSync();
     assert.ok(!target.querySelector('.essence-source-trigger'), 'no source picker');
@@ -12263,7 +12290,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Essence Rules').click();
     await tick();
     flushSync();
-    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    target.querySelector('[data-essence-id="water"] [data-essence-edit="water"]').click();
     await tick();
     flushSync();
 
@@ -12301,7 +12328,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Essence Rules').click();
     await tick();
     flushSync();
-    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    target.querySelector('[data-essence-id="water"] [data-essence-edit="water"]').click();
     await tick();
     flushSync();
 
@@ -12346,7 +12373,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Essence Rules').click();
     await tick();
     flushSync();
-    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    target.querySelector('[data-essence-id="water"] [data-essence-edit="water"]').click();
     await tick();
     flushSync();
 
@@ -12386,7 +12413,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Essence Rules').click();
     await tick();
     flushSync();
-    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    target.querySelector('[data-essence-id="water"] [data-essence-edit="water"]').click();
     await tick();
     flushSync();
     const failedName = target.querySelector('#manager-essence-edit-name');
@@ -12421,7 +12448,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Essence Rules').click();
     await tick();
     flushSync();
-    target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
+    target.querySelector('[data-essence-id="water"] [data-essence-edit="water"]').click();
     await tick();
     flushSync();
     const rejectedName = target.querySelector('#manager-essence-edit-name');

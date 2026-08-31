@@ -220,7 +220,17 @@
      the world-scope model - so the suffix is what makes one readout two facts. -->
 {#snippet inheritReadout()}
   {#if inheritSuffixes.length > 0}
-    <span class="manager-essence-inherit-readout" data-essence-inherit-readout={essence.id}>
+    <!-- A `title` carrying the WHOLE readout, because the row's own width decides how much of
+         it is on screen. It clamps to one line and ellipsises, and the labelled `Edit rules`
+         control this change adds to the cluster takes about 90px out of the identity block
+         that holds it — enough that a row overriding both sections shows only the first. The
+         sibling name and description already carry the same affordance for the same reason;
+         without it the second clause is unrecoverable rather than merely abbreviated. -->
+    <span
+      class="manager-essence-inherit-readout"
+      data-essence-inherit-readout={essence.id}
+      title={inheritSuffixes.map((suffix) => `${suffix.sectionLabel} ${suffix.label}`).join(' · ')}
+    >
       {#each inheritSuffixes as suffix (suffix.section)}
         <span class="manager-essence-inherit-item" data-essence-inherit={suffix.section}>
           <span class="manager-essence-inherit-section">{suffix.sectionLabel}</span>
@@ -318,21 +328,57 @@
   </button>
 {/snippet}
 
-{#snippet editButton()}
+<!--
+  THE ROW'S EDIT CONTROL, LABELLED IN THE LIST AND ICON-ONLY IN THE GRID CARD.
+
+  The prototype's system essence-rules row ends in a LABELLED pill — `Edit rules` followed by
+  a small external-link glyph (`proto:1576`) — not in a bare pencil. The words are what say
+  which layer the control opens: this screen edits the SYSTEM's rules for a world essence, and
+  an unlabelled pencil beside a world-shared name reads as "edit the essence".
+
+  IT IS STILL `.manager-icon-button`, AND THAT IS LOAD-BEARING RATHER THAN INHERITED.
+  Three surfaces address this control by that class and nothing else — the View Lab cases
+  `manager-essence-edit-*` (`scripts/lib/viewLabCases.js`), the Foundry smoke's
+  `.manager-icon-button[title*="Edit" i]` inside the first row, and two mounted tests that
+  assert the row has EXACTLY ONE and that it is the edit control. The smoke's locator sits
+  behind a `count() > 0` guard, so losing the class would not fail it: it would silently stop
+  producing the `manager-essence-edit-first-state` frame the docs site publishes. So the
+  variant is a MODIFIER on the shipped primitive, and the `title` keeps its `Edit` lead.
+
+  The GRID card keeps the pencil. Its footer is a two-slot strip beside the enable switch with
+  no room for a phrase, and the prototype draws no grid presentation for this screen at all —
+  so there is no reference for a labelled card footer and inventing one would be drift in the
+  other direction.
+-->
+{#snippet editButton(labelled = false)}
   <button
     type="button"
     class="manager-icon-button manager-essence-edit"
+    class:is-labelled={labelled}
     data-essence-edit={essence.id}
-    aria-label={format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
-      name: essence.name,
-    })}
-    title={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
+    aria-label={labelled
+      ? format('FABRICATE.Admin.Manager.Essence.EditRulesNamed', 'Edit rules for {name}', {
+          name: essence.name,
+        })
+      : format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
+          name: essence.name,
+        })}
+    title={labelled
+      ? text('FABRICATE.Admin.Manager.Essence.EditRules', 'Edit rules')
+      : text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
     onclick={(event) => {
       event.stopPropagation();
       onEdit(essence.id);
     }}
   >
-    <i class="fas fa-pen" aria-hidden="true"></i>
+    {#if labelled}
+      <span class="manager-essence-edit-label"
+        >{text('FABRICATE.Admin.Manager.Essence.EditRules', 'Edit rules')}</span
+      >
+      <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+    {:else}
+      <i class="fas fa-pen" aria-hidden="true"></i>
+    {/if}
   </button>
 {/snippet}
 
@@ -428,8 +474,9 @@
       {:else}
         {@render usageReadout()}
         {@render statusToggle()}
-        <!-- FIRST `.manager-icon-button` in the row stays the edit pencil (View Lab navigates by it). -->
-        {@render editButton()}
+        <!-- FIRST (and only) `.manager-icon-button` in the row stays the edit control; the
+             View Lab, the smoke and two mounted tests navigate by exactly that selector. -->
+        {@render editButton(true)}
         {@render selectionBox()}
       {/if}
     </div>
@@ -495,6 +542,41 @@
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
+  }
+
+  /* THE LABELLED VARIANT OF `.manager-icon-button`, and every value here is COPIED from the
+     labelled-button authority rather than chosen: `.manager-button.fab-manager-button` in
+     `styles/fabricate.css` declares `min-height: 34px`, `padding: 0 var(--fab-space-3)` and
+     `font-size: 0.72rem`, which is the Tool Studio treatment `ManagerButton` reproduces. The
+     control cannot BE a `ManagerButton` — that primitive emits `manager-button
+     fab-manager-button`, whose auto width would fight `.manager-icon-button`'s square
+     `width: 34px; flex: 0 0 34px`, and the class this row is addressed by is the icon one.
+
+     The selector is compounded through `.manager-essence-row` on purpose. The rule it has to
+     beat is `.fabricate-manager .manager-icon-button`, which is (0,2,0); a bare
+     `.manager-essence-edit` scopes to (0,2,0) as well and would be decided by injection order
+     — the kind of tie that resolves differently in a bundle than in a mounted test. Chained,
+     it is (0,3,0) and wins outright.
+
+     `height: auto` with a `min-height` rather than a fixed `height`: Foundry's own `button`
+     rule pins a height, and used height is `max(height, min-height)`, so the pair is what
+     lets the label sit on one line at the shared 34px without the glyph clipping. */
+  .manager-essence-row .manager-essence-edit.is-labelled {
+    width: auto;
+    height: auto;
+    min-height: 34px;
+    flex: 0 0 auto;
+    gap: var(--fab-space-2);
+    padding: 0 var(--fab-space-3);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* The external-link glyph is the prototype's small trailing mark (8px against a 10.5px
+     label), not a second icon at label size. */
+  .manager-essence-row .manager-essence-edit.is-labelled i {
+    font-size: 0.55rem;
   }
 
   /* The chips in the GRID card wrap and sit on the card's tighter badge rhythm. This is a
