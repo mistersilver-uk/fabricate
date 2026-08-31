@@ -162,9 +162,11 @@
 >
 
 <style>
-  /* Theme-root tokens ONLY. This component is area-agnostic, so it must not reference
-     `--fab-manager-*` or any other custom property declared inside `.fabricate-manager`
-     (styles/fabricate.css declares those inside that area block). Outside the manager —
+  /* Theme-root tokens ONLY. NO scoped `<style>` may reference `--fab-manager-*`, or any other
+     custom property `styles/fabricate.css` declares inside `.fabricate-manager`, from ANY
+     directory — a component is placed in a directory, not in a DOM subtree, so its scoped CSS
+     cannot guarantee where its host renders, and `tests/token-generation-gate.test.js` reds the
+     reference wherever it is written. Outside the manager —
      `.fabricate-app`, `.fabricate-admin`, `.fabricate-interactables-manager` — such a
      property is not in scope, the declaration becomes invalid at computed-value time and
      the colour silently falls back to inheritance. Nothing fails; it just looks wrong, and
@@ -436,8 +438,9 @@
   /* An item TAG (issue 772). Purple, through the same `--fab-chip-color` + `color-mix`
      vehicle `.manager-availability-pill.is-tag` already uses, so the tag tone is defined
      once for the whole manager. `--fab-bg-3` is the shade the retired
-     `.manager-component-tag-toggle.is-on` rule mixed against, named here at theme root
-     because this component is area-agnostic. */
+     `.manager-component-tag-toggle.is-on` rule mixed against, named here as the theme-root
+     token it is, on the same rule as the block above: a scoped `<style>` may reach no
+     area-scoped property from any directory, whatever its own reuse looks like. */
   .manager-chip.is-tag {
     --fab-chip-color: var(--fab-purple);
 

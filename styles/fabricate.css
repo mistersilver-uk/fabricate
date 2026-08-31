@@ -112,9 +112,11 @@
   --fab-icon-picker-row: calc(var(--fab-icon-picker-chip) + (2 * var(--fab-space-1)) + 2px);
 
   /* The two radii the Books & Scrolls tab and the item-page inspector share (issue 1399).
-     Both values are OFF the published radius ladder (6/7/9/11/999, panels take 11), and
-     they are carried across at their shipped values rather than corrected here: bringing
-     them onto the ladder moves pixels, which is a visible change and a separate decision.
+     Both values are off the published radius ladder (6/7/9/11/999) FOR THE ELEMENTS THEY
+     PAINT: 5px is not a rung at all, and 6px is the chip rung carried by a panel, which
+     takes 11. They are carried across at their shipped values rather than corrected
+     here: bringing them onto the ladder moves pixels, which is a visible change and a
+     separate decision.
      They stay tokenised precisely so that correction remains a one-line edit instead of
      six scattered literals across two files.
 

@@ -383,15 +383,80 @@ function definitionsFor(corpus) {
   return definitions;
 }
 
-/** The index of the first comma at parenthesis depth zero, or -1. */
-function topLevelComma(text) {
-  let depth = 0;
-  for (const [index, character] of [...text].entries()) {
-    if (character === '(') depth += 1;
-    else if (character === ')') depth -= 1;
-    else if (character === ',' && depth === 0) return index;
+/**
+ * Every index in `text` holding a comma that separates TOP-LEVEL items — one outside `()`,
+ * outside `[]` and outside a quoted string.
+ *
+ * Nesting is the whole reason this exists rather than `String#split(',')`. A comma separates
+ * items in a selector list and cuts a `var()` into its name and its fallback, but it is ORDINARY
+ * TEXT inside a functional pseudo-class (`:is(select, input)`), inside an attribute value
+ * (`[data-x="a,b"]`) and inside any quoted string. The first two shapes are live: measured over
+ * both shipped stylesheets, ELEVEN of 5044 rules carry a comma inside `:is(…)` or `:not(…)`, and
+ * splitting one of them yields fragments that are not selectors at all — which reads to a caller
+ * as a rule breaking a rule it never broke.
+ *
+ * Depth is CLAMPED at zero on the closing side so that one stray `)` or `]` cannot drive the
+ * count negative and hide every later comma; a scanner that silently reports "no separator here"
+ * is the failure mode this function exists to remove.
+ *
+ * Walks by UTF-16 unit rather than by `[...text]` code point, because the indexes it returns are
+ * used with `String#slice`, and the two disagree the moment the text holds an astral character.
+ *
+ * @param {string} text
+ * @returns {number[]} Ascending indexes; empty when the text holds no top-level comma.
+ */
+function topLevelCommas(text) {
+  const indexes = [];
+  let parentheses = 0;
+  let brackets = 0;
+  let quote = null;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (quote !== null) {
+      if (character === '\\') index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") quote = character;
+    else if (character === '(') parentheses += 1;
+    else if (character === ')') parentheses = Math.max(0, parentheses - 1);
+    else if (character === '[') brackets += 1;
+    else if (character === ']') brackets = Math.max(0, brackets - 1);
+    else if (character === ',' && parentheses === 0 && brackets === 0) indexes.push(index);
   }
-  return -1;
+  return indexes;
+}
+
+/** The first top-level comma, or -1 — the single cut cutting `var(--a, F)` into name and fallback. */
+function topLevelComma(text) {
+  const [first] = topLevelCommas(text);
+  return first ?? -1;
+}
+
+/**
+ * A selector LIST split into the individual selectors the cascade applies SEPARATELY.
+ *
+ * `,` is the list separator only at top level, so `.a:is([type="text"], [type="number"])` is ONE
+ * selector and not two. Exported because every gate that asks a question of "the rule's selector"
+ * has to ask it of each item — `String#includes` over the joined list is satisfied by any one of
+ * them — and each such gate reaching for `split(',')` re-acquires the defect above.
+ *
+ * An EMPTY item is returned rather than filtered out: `.a, .b,` has a trailing separator and no
+ * third selector, and a caller asking "does every item satisfy P" must be given something that
+ * fails rather than a shortened list that vacuously passes. This is also why the function does not
+ * simply drop blanks — `splitSelectorList('')` is `['']`, not `[]`.
+ *
+ * @param {string} selector A rule's whole selector list, as `rulesIn`-style callers report it.
+ * @returns {string[]} Each item, trimmed, in source order.
+ */
+export function splitSelectorList(selector) {
+  const items = [];
+  let start = 0;
+  for (const cut of [...topLevelCommas(selector), selector.length]) {
+    items.push(selector.slice(start, cut).trim());
+    start = cut + 1;
+  }
+  return items;
 }
 
 /**

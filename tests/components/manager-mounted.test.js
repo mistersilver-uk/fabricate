@@ -155,11 +155,15 @@ function compileManagerRoot() {
   // test as `# cancelled` for the same reason as the card above.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte');
   // The four shared bulk-edit primitives (issue 1010). They sit directly under
-  // `apps/manager/` — beside Chip and Callout, NOT under `components/` — because their root
-  // classes are `manager-*` and every consumer is a manager view. The reason once recorded
-  // here, that the placement lets them reach an area-scoped `--fab-manager-*` property, has
-  // LAPSED: issue 1399 inlined the manager colour aliases they used, and a scoped `<style>`
-  // may no longer reach such a property from ANY directory.
+  // `apps/manager/` — beside Chip and Callout, NOT under `components/` — because every module
+  // that imports one is under `src/ui/svelte/apps/manager/`, and because `BulkEditPanelShell`
+  // is coupled to the area by SELECTOR: its scoped block carries four
+  // `:global(.fabricate-manager .manager-button…)` rules and reads the `fabricate-manager`
+  // container query, none of which a move to `components/` would survive. Their own root
+  // classes are `fab-bulk-*` and say nothing about placement. The reason once recorded here,
+  // that the placement lets them reach an area-scoped `--fab-manager-*` property, has LAPSED:
+  // issue 1399 inlined the manager colour aliases they used, and a scoped `<style>` may no
+  // longer reach such a property from ANY directory.
   // `ComponentsBrowserView` imports the toolbar and `ComponentBulkEditPanel` imports the
   // other three, so omitting any one of them HANGS every mounted manager test.
   for (const bulkPrimitive of [

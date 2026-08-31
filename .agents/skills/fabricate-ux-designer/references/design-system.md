@@ -90,10 +90,11 @@ The spacing scale is canonically specified in `openspec/specs/ui-integration/spe
   --fab-space-2xs:2px; --fab-space-1:4px; --fab-space-chip:6px; --fab-space-2:8px;
   --fab-space-3:12px; --fab-space-4:16px; --fab-space-5:20px; --fab-space-6:24px;
   /* radius — the two the Books & Scrolls tab and the item-page inspector share.
-     BOTH ARE OFF the canonical ladder below; they are carried at their shipped
-     values because correcting them moves pixels. */
-  --fab-books-control-radius:5px;      /* inputs, selects, chips */
-  --fab-books-panel-radius:6px;        /* cards, panels, wells   */
+     OFF the canonical ladder below FOR THE ELEMENTS THEY PAINT: 5px is not a rung at
+     all, and 6px is the chip rung carried by a panel, which takes 11. They are carried
+     at their shipped values because correcting them moves pixels. */
+  --fab-books-control-radius:5px;      /* Books & Scrolls + inspector only */
+  --fab-books-panel-radius:6px;        /* Books & Scrolls + inspector only */
 }
 ```
 
@@ -202,8 +203,11 @@ sans; mono is only for dice formulas and run IDs.
   at or below 24px, **7** for controls of 26–32px, **9** for controls of 34–38px and for rows and
   wells, **11** for a 44px control and for cards and panels, **999** for pills and tracks.
   Two shipped tokens, `--fab-books-control-radius` (5px) and `--fab-books-panel-radius` (6px),
-  are OFF that ladder; they are named for the surface that carries them, not for a control
-  class, precisely so they read as that surface's debt rather than as a second ladder.
+  are off that ladder **for the elements they paint** — 5px is not a rung at all, and 6px is the
+  chip rung carried by a panel, which takes 11.
+  They are read by the Books & Scrolls tab and the item-page inspector and by nothing else, and
+  they are named for the surface that carries them, not for a control class, precisely so they
+  read as that surface's debt rather than as a second ladder.
 - **Sizing rhythm:** control and icon-button **34** · thumb-sm **40** · thumb-md **58** ·
   row **72**, written as literals.
 - **Elevation** (`--fab-shadow-*`): `-sm` 0 8 18 · `-md` 0 10 24 · `-lg` 0 14 38 (windows).
@@ -577,8 +581,8 @@ Critical/Warning count pills + a green-check / red-x checklist.
    The primary number and its action win; everything else supports.
 6. **Snap to the scale.**
    Space in 4px steps; radius and control height come from the two ladders in
-   `openspec/specs/design-system/spec.md`, which this file points at in §4 rather than
-   restating — 32 / 36 / 40 are RETIRED control heights, and 40 is a thumbnail size.
+   `openspec/specs/design-system/spec.md`, which §4 cites and reproduces — 32 / 36 / 40 are
+   RETIRED control heights, and 40 is a thumbnail size.
 7. **No colour literals in UI.**
    Only `var(--fab-*)`; verify the screen reskins under all six themes before calling it done.
 8. **When it renders correctly in isolation but wrong in Foundry, read the runtime.**

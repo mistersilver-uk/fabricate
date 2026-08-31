@@ -63,6 +63,7 @@ import {
   pixelValuesIn,
   resolveValueCandidates,
   scanPixelValues,
+  splitSelectorList,
   stripCssComments,
   styleTextFor,
   varReferencesIn,
@@ -406,6 +407,32 @@ test('a var() reference is parsed with its fallback, brackets and all', () => {
   assert.equal(nested[1].fallback, 'calc(var(--c) + 2px)');
   assert.equal(varReferencesIn('var(--a)')[0].fallback, null);
   assert.deepEqual(varReferencesIn('height: 40px'), []);
+});
+
+test('a selector list splits on its separators only, not on every comma', () => {
+  assert.deepEqual(splitSelectorList('.a .ok, .b .oops'), ['.a .ok', '.b .oops']);
+
+  // The shape that made `String#split(',')` red a rule wholly inside its area: ONE selector
+  // carrying a comma inside a functional pseudo-class. Eleven of the 5044 rules in the two
+  // shipped stylesheets have it today, all eleven already `.fabricate-manager` rules.
+  assert.deepEqual(
+    splitSelectorList('.fabricate-manager .x input:is([type="text"], [type="number"])'),
+    ['.fabricate-manager .x input:is([type="text"], [type="number"])'],
+    'a comma inside `:is(…)` is an argument separator, so the list has one item'
+  );
+  assert.deepEqual(splitSelectorList('.a:not(.b, .c), .d'), ['.a:not(.b, .c)', '.d']);
+
+  // Brackets and quotes each carry a comma that no parenthesis depth can see.
+  assert.deepEqual(splitSelectorList('[data-x="a,b"], .d'), ['[data-x="a,b"]', '.d']);
+  assert.deepEqual(splitSelectorList('[data-x="]"] .a, .b'), ['[data-x="]"] .a', '.b']);
+
+  // An empty item is REPORTED, not filtered: a caller asking "does every item satisfy P" must
+  // get something that fails, rather than a shortened list that passes for the wrong reason.
+  assert.deepEqual(splitSelectorList('.a,'), ['.a', '']);
+  assert.deepEqual(splitSelectorList(''), ['']);
+
+  // A stray closer must not drive the depth negative and swallow every later separator.
+  assert.deepEqual(splitSelectorList('.a), .b'), ['.a)', '.b']);
 });
 
 test('the real corpus is both stylesheets, and its custom properties come from both', () => {

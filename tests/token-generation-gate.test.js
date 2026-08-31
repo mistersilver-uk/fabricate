@@ -39,7 +39,12 @@
  *      two areas is the most likely way it recurs, because sharing primitives across areas is
  *      what the collapse was for. Every selector test here therefore runs per COMPOUND, and the
  *      area compound carries a right-hand boundary so `.fabricate-manager-widget` does not pass
- *      on a prefix collision.
+ *      on a prefix collision. THE SPLIT THAT FINDS THOSE COMPOUNDS IS NOT `split(',')`: a comma
+ *      inside `:is(…)` or inside `[data-x="a,b"]` is not a list separator. Measured: ELEVEN of
+ *      the 5044 rules in the two shipped stylesheets carry the first shape, and all eleven are
+ *      already `.fabricate-manager` rules — so the naive split sat one declaration away from
+ *      reddening a rule that is entirely inside the area. The split is `splitSelectorList`,
+ *      which cuts at depth zero only.
  *   5. A NON-VACUITY FLOOR MUST NOT BE WRITTEN AGAINST THE CONSTANT IT POLICES. Looping over
  *      `SCANNED_EXTENSIONS` to prove each extension arrived narrows the check in step with the
  *      list, and the file-count floor does not cover the gap because `.css` contributes exactly
@@ -57,18 +62,32 @@
  * Svelte scoped `<style>` are policed as CSS; the remaining channel is a token spelled into a
  * STRING — `chanceColorScale.js` is the one that actually happened, and a template's
  * `style="… var(--fab-manager-x)"` is the same mistake in a `.svelte` file's markup rather than
- * in its `<style>`. Test 5 scans both file kinds' raw text for the two USE shapes, a `var()` read
- * and a `name:` declaration, rather than for the name alone. That is a deliberate departure from
- * the raw-name scan test 1 uses: `--fab-manager-` is a LIVE prefix, and twenty-nine comments
- * under `src/` correctly name it to tell a reader which properties a component may not reach.
- * Banning the name would delete the rule's own documentation. A module that assembles the name
- * from fragments still passes, and no text scan can help that.
+ * in its `<style>`. Test 5 scans both file kinds' raw text for the three USE shapes — a `var()`
+ * read, a `name:` declaration, and a quoted property name, which is how the CSSOM pair
+ * `setProperty('--fab-manager-x', v)` / `getPropertyValue('--fab-manager-x')` spells it — rather
+ * than for the name alone. That is a deliberate departure from the raw-name scan test 1 uses:
+ * `--fab-manager-` is a LIVE prefix, and twenty-nine comments under `src/` correctly name it to
+ * tell a reader which properties a component may not reach. Banning the name would delete the
+ * rule's own documentation, so the quote class stops at `'` and `"` and excludes the backtick
+ * those comments use.
+ *
+ * WHAT REMAINS UNCOVERED is one channel and it is named rather than implied: a module that
+ * assembles the name ACROSS ITS PREFIX — `'--fab-' + area + '-accent'`, or a template literal
+ * interpolating inside `--fab-manager-` itself — is textually incomplete, and no text scan can
+ * help that. A fragment that keeps the prefix WHOLE, `'--fab-manager-' + key`, is not in that
+ * gap: the quoted shape sees it.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
-import { collectStyleCorpus, declarationsIn } from './helpers/styleBlockScan.js';
+import {
+  STYLE_CORPUS_EXTENSIONS,
+  STYLE_CORPUS_ROOTS,
+  collectStyleCorpus,
+  declarationsIn,
+  splitSelectorList,
+} from './helpers/styleBlockScan.js';
 
 /** The roots the product ships from. Prose that must name a retired generation lives outside. */
 const SCANNED_ROOTS = Object.freeze(['src', 'styles']);
@@ -159,13 +178,23 @@ const AREA_SELECTOR = '.fabricate-manager';
 const AREA_COMPOUND = new RegExp(`${AREA_SELECTOR.replace(/\./gu, '\\.')}(?![\\w-])`, 'u');
 
 /**
- * The two shapes that USE an area-scoped property, for the channels that are not CSS.
+ * The three shapes that USE an area-scoped property, for the channels that are not CSS.
  *
- * A read and a declaration, rather than the bare name: see the closing paragraph of the header.
+ * A use rather than the bare name: see the closing paragraph of the header. The three are the CSS
+ * read, the CSS declaration, and the CSSOM pair — `el.style.setProperty('--fab-manager-x', v)`
+ * and `getComputedStyle(el).getPropertyValue('--fab-manager-x')`, which reach the same property
+ * from JavaScript carrying neither a `var(` nor a trailing colon, so the first two shapes are
+ * blind to them. Zero live occurrences today; it is one line of scan for a channel that is
+ * textually complete, which is the only kind a text scan can decide at all.
+ *
+ * The quote class is `'` and `"` and deliberately NOT a backtick: twenty-nine comments under
+ * `src/` write the prefix inside backticks in prose, to say which properties a component may not
+ * reach, and banning that spelling would delete the rule's own documentation.
  */
 const AREA_USE_SHAPES = Object.freeze([
   { label: 'read', pattern: new RegExp(`var\\(\\s*${AREA_SCOPED_PREFIX}`, 'u') },
   { label: 'declaration', pattern: new RegExp(`${AREA_SCOPED_PREFIX}[\\w-]*\\s*:`, 'u') },
+  { label: 'CSSOM name', pattern: new RegExp(`['"]${AREA_SCOPED_PREFIX}`, 'u') },
 ]);
 
 /**
@@ -229,21 +258,42 @@ function rulesIn(css) {
 }
 
 /**
- * True when EVERY compound of a selector LIST satisfies `predicate` — trap 4.
+ * The compounds of a selector LIST that FAIL `predicate` — trap 4.
  *
  * `rulesIn` reports a rule's whole selector list as one string, so any test written with
  * `String#includes` over that string is satisfied by one compound and blind to its siblings.
  * Both selector assertions in this file route through here so neither can drift back.
+ *
+ * THE SPLIT IS `splitSelectorList`, NOT `String#split(',')`, and the difference is a measured
+ * false failure rather than a nicety: a comma inside a functional pseudo-class is an argument
+ * separator, so `.fabricate-manager .x input:is([type="text"], [type="number"])` is ONE compound
+ * that the naive split shreds into two, the second of which (`[type="number"])`) is not a
+ * selector and matches nothing. Eleven live rules carry that shape and all eleven are already
+ * `.fabricate-manager` rules, so the naive split sat one declaration away from reddening a rule
+ * wholly inside the area — with advice ("if only one compound belongs to the manager, it is two
+ * rules") that its author could not act on.
+ *
+ * It returns the failing compounds rather than a boolean so the caller can CITE them. A rule with
+ * a five-item list and one offending item otherwise reports the whole list and leaves the reader
+ * to find which item is meant.
+ *
+ * @param {string} selector A rule's whole selector list.
+ * @param {(compound: string) => boolean} predicate
+ * @returns {string[]} The compounds failing `predicate`, in source order.
+ */
+function compoundsFailing(selector, predicate) {
+  return splitSelectorList(selector).filter((compound) => !predicate(compound));
+}
+
+/**
+ * True when EVERY compound of a selector LIST satisfies `predicate` — trap 4.
  *
  * @param {string} selector A rule's whole selector list.
  * @param {(compound: string) => boolean} predicate
  * @returns {boolean}
  */
 function everyCompound(selector, predicate) {
-  return selector
-    .split(',')
-    .map((part) => part.trim())
-    .every((compound) => predicate(compound));
+  return compoundsFailing(selector, predicate).length === 0;
 }
 
 /**
@@ -254,11 +304,20 @@ function everyCompound(selector, predicate) {
  * makes the scoped blocks the half most likely to drift. A walk of `styles/` alone left the
  * second premise-guard blind to 180 files: inserting `--fab-text-muted: rgb(255 0 0 / 50%)` into
  * a scoped block whose next line reads `color: var(--fab-text-muted)` was green.
+ *
+ * The roots and extensions are the SHARED constants rather than a list spelled again here.
+ * Spelling them again dropped `.scss`, which `STYLE_CORPUS_EXTENSIONS` carries deliberately —
+ * `lint:css` globs `styles/**\/*.{css,scss}`, so a future `.scss` file is gated by stylelint and
+ * would have been invisible to this gate. Inert while the tree has none, and exactly the kind of
+ * hand-copied list that stops being inert without anybody editing this file.
  */
 let cachedRules = null;
 function shippedStyleRules() {
   if (cachedRules === null) {
-    const corpus = collectStyleCorpus({ roots: ['src', 'styles'], extensions: ['.css', '.svelte'] });
+    const corpus = collectStyleCorpus({
+      roots: [...STYLE_CORPUS_ROOTS],
+      extensions: [...STYLE_CORPUS_EXTENSIONS],
+    });
     cachedRules = Object.entries(corpus).flatMap(([file, css]) =>
       rulesIn(css).map((rule) => ({ ...rule, file }))
     );
@@ -386,6 +445,47 @@ test('every inline target is declared only at theme root', () => {
   );
 });
 
+test('a rule is cited at the line its own selector starts on', () => {
+  // The two assertions above report `file:line`, and until this branch every rule was cited at
+  // the PREVIOUS rule's `}` — in a Svelte file, where `maskNonStyleRegions` blanks the whole
+  // template, at line 1 for every offence in the file. That was a one-flag fix inside `rulesIn`
+  // (`preludeStarted` rather than `prelude === ''`) which only ever changes failure-message text,
+  // so nothing above can see it regress. This is what sees it.
+  //
+  // Written as an invariant over the whole corpus rather than as one hand-picked `file:line`
+  // pair, which would rot on the next edit to that stylesheet: masking and comment stripping both
+  // preserve offsets, so a rule's cited line must be a line of the file on disk that CONTAINS the
+  // first token of that rule's selector. Whitespace collapsing cannot break the check, because
+  // the first token has no whitespace in it by construction.
+  const rules = shippedStyleRules();
+  const sources = collectWorkingTreeSources([...STYLE_CORPUS_ROOTS], [...STYLE_CORPUS_EXTENSIONS]);
+
+  const offences = [];
+  let checked = 0;
+  for (const rule of rules) {
+    const [head] = rule.selector.split(/\s/u);
+    if (head === undefined || head === '') continue;
+    const cited = (sources[rule.file] ?? '').split('\n')[rule.line - 1];
+    checked += 1;
+    if (cited === undefined || !cited.includes(head)) {
+      offences.push(`${rule.file}:${rule.line} \`${rule.selector}\` cites "${(cited ?? '').trim()}"`);
+    }
+  }
+
+  assert.ok(
+    checked > 1000,
+    `only ${checked} rules were line-checked, against the ~4000 both stylesheets hold. An ` +
+      'invariant asserted over an empty set passes forever.'
+  );
+  assert.deepEqual(
+    offences,
+    [],
+    'a rule is reported at a line that does not hold the start of its selector, so every offence ' +
+      'either of the assertions above prints sends its reader to the wrong place in a ' +
+      '20,000-line stylesheet — or, for a Svelte scoped block, to line 1:\n  ' + offences.join('\n  ')
+  );
+});
+
 test('an area-scoped manager property is declared and read only inside its area', () => {
   const allRules = shippedStyleRules();
   assertBothCorporaReached(allRules);
@@ -403,13 +503,33 @@ test('an area-scoped manager property is declared and read only inside its area'
       'below is vacuous.'
   );
 
+  // THE TOP-LEVEL SPLIT IS EXERCISED BY THE LIVE CORPUS, not only by the fixtures in
+  // `style-block-scan.test.js`. A rule whose naive `split(',')` yields more items than
+  // `splitSelectorList` does is one this test would have shredded, and it would have been
+  // reddened on a fragment the moment it declared an area-scoped property. A floor of ONE rather
+  // than the eleven measured today, because the population is free to move and a count would
+  // turn every unrelated stylesheet edit into a failure here.
+  const shredded = allRules.filter(
+    (rule) => rule.selector.split(',').length !== splitSelectorList(rule.selector).length
+  );
+  assert.ok(
+    shredded.length >= 1,
+    'no rule in either stylesheet carries a comma inside a functional pseudo-class or an ' +
+      'attribute value any more, so nothing live exercises the top-level split and a regression ' +
+      "to `String#split(',')` would go unnoticed here. Prove the split against a fixture instead."
+  );
+
   // EVERY compound, with a boundary, and both halves are load-bearing — see trap 4. A rule whose
   // selector list is `.fabricate-app .oops, .fabricate-manager .ok` reads a manager property from
   // a player surface under its first compound, which is this change's motivating defect written
   // as one rule; and `.fabricate-manager-widget` is a different class that merely starts the same.
-  const offences = rules
-    .filter((rule) => !everyCompound(rule.selector, (compound) => AREA_COMPOUND.test(compound)))
-    .map((rule) => `${rule.file}:${rule.line} \`${rule.selector}\``);
+  const offences = rules.flatMap((rule) => {
+    const outside = compoundsFailing(rule.selector, (compound) => AREA_COMPOUND.test(compound));
+    if (outside.length === 0) return [];
+    return [
+      `${rule.file}:${rule.line} \`${rule.selector}\` — outside the area: \`${outside.join('`, `')}\``,
+    ];
+  });
 
   assert.deepEqual(
     offences,
@@ -418,9 +538,11 @@ test('an area-scoped manager property is declared and read only inside its area'
       `declared or read outside \`${AREA_SELECTOR}\` — by EVERY compound of the rule's selector ` +
       'list, because the cascade applies a comma-joined rule to each of them separately. Outside ' +
       'the area the property is undefined, the declaration is invalid at computed-value time, and ' +
-      'the value falls back to inheritance — nothing fails, it just looks wrong. If the rule ' +
-      'genuinely belongs to every area, it is reading a foundation token, not an area-scoped ' +
-      'one; if only one compound belongs to the manager, it is two rules:\n  ' + offences.join('\n  ')
+      'the value falls back to inheritance — nothing fails, it just looks wrong. Each offence ' +
+      'names the compounds that sit outside the area: where they are some of several, split the ' +
+      'list so only the manager compound keeps this property; where they are the whole list, the ' +
+      'rule is reading an area-scoped property from outside the area, and what it wants is a ' +
+      'foundation token:\n  ' + offences.join('\n  ')
   );
 });
 
@@ -475,6 +597,12 @@ test('no module or template under src/ spells an area-scoped manager property in
   // to say a component may NOT reach it, and a raw-name ban would delete the rule's own
   // documentation. `styles/` is excluded because the global sheet is where these properties
   // legitimately live; test 3 is what polices it.
+  //
+  // The three shapes are not the same as "prose is exempt", and the difference is measured: a
+  // comment writing a CONCRETE name followed by a colon matches the declaration shape, and one
+  // quoting a concrete name in straight quotes matches the CSSOM shape. Neither is live — all
+  // twenty-nine use the backticked `--fab-manager-*` wildcard spelling — but the exemption is for
+  // that spelling and not for comments as a class.
   const sources = collectWorkingTreeSources(['src'], ['.js', '.svelte']);
   const files = Object.keys(sources);
 
@@ -504,7 +632,10 @@ test('no module or template under src/ spells an area-scoped manager property in
       `subtree, so neither can guarantee that the element it styles renders under ` +
       `\`${AREA_SELECTOR}\` — and where it does not, the property is undefined, the declaration is ` +
       'invalid at computed-value time, and the value falls back to inheritance. Return a ' +
-      'foundation token, or put the rule in the global sheet under an area selector. Naming the ' +
-      'prefix in a COMMENT is fine and is not what this matches:\n  ' + offences.join('\n  ')
+      'foundation token, or put the rule in the global sheet under an area selector. Prose may ' +
+      'still name the prefix, in the wildcard spelling the twenty-nine comments under `src/` ' +
+      'use — `--fab-manager-*` — which matches none of the three shapes; a concrete name ' +
+      'followed by a colon, or in straight quotes, does match wherever it is written:\n  ' +
+      offences.join('\n  ')
   );
 });

@@ -100,9 +100,11 @@
 </div>
 
 <style>
-  /* Theme-root tokens ONLY. This component is area-agnostic, so it must not reference
-     `--fab-manager-*` or any other custom property declared inside `.fabricate-manager`
-     (styles/fabricate.css declares those inside that area block). Outside the manager —
+  /* Theme-root tokens ONLY. NO scoped `<style>` may reference `--fab-manager-*`, or any other
+     custom property `styles/fabricate.css` declares inside `.fabricate-manager`, from ANY
+     directory — a component is placed in a directory, not in a DOM subtree, so its scoped CSS
+     cannot guarantee where its host renders, and `tests/token-generation-gate.test.js` reds the
+     reference wherever it is written. Outside the manager —
      `.fabricate-app`, `.fabricate-admin`, `.fabricate-interactables-manager` — such a
      property is not in scope, the declaration becomes invalid at computed-value time and
      the colour silently falls back to inheritance. Nothing fails; it just looks wrong, and
