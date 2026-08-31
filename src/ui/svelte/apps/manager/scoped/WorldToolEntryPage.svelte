@@ -370,6 +370,7 @@
         role="tabpanel"
         aria-labelledby={`world-tool-entry-tab-${activeTab}`}
         tabindex="-1"
+        data-keyboard-focus="true"
       >
         {#if !entry}
           <p class="manager-muted" data-world-tool-entry-missing>
