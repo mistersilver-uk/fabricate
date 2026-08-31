@@ -165,57 +165,72 @@
 </script>
 
 <main class="manager-main" data-scoped-page="world-essences" aria-label={title}>
-  <!-- The CREATE affordance, and the only chrome this page owns above the shell. It is a name
-       field rather than a bare button because `createEntity` takes an identity and refuses a
-       duplicate id silently: a button that minted "New essence" twice would do nothing the
-       second time and say nothing about why. -->
-  <section class="manager-scoped-essence-create" data-scoped-essence-create>
-    <label class="manager-scoped-essence-create-field">
-      <span class="manager-scoped-essence-create-label">
-        {text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence name')}
-      </span>
-      <input
-        type="text"
-        value={draftName}
-        data-scoped-essence-new-name
-        placeholder={text('FABRICATE.Admin.Manager.Scoped.Essence.NewPlaceholder', 'Ember')}
-        oninput={(event) => (draftName = event.currentTarget.value)}
-      />
-    </label>
-    <ManagerButton
-      role="primary"
-      disabled={!canCreate}
-      data-scoped-essence-create-action
-      onclick={createEssence}
-    >
-      <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
-    </ManagerButton>
-  </section>
+  <!--
+    ONE CHILD OF `<main>`, WITH ITS OWN TWO-ROW GRID.
 
-  <EntityCatalogueShell
-    {scope}
-    {actions}
-    {systems}
-    hookValue={PAGE_ID}
-    {title}
-    subtitle={text(
-      'FABRICATE.Admin.Manager.Scoped.Essence.InspectorResting',
-      'Choose an essence to see which systems hold it and what each one inherits.'
-    )}
-    icon={PAGE_ICON}
-    emptyTitle={text('FABRICATE.Admin.Manager.Scoped.Essence.EmptyTitle', 'No world essences yet')}
-    emptyHint={text(
-      'FABRICATE.Admin.Manager.Scoped.Essence.EmptyHint',
-      'Name one above to create it. Every crafting system that adopts it shares this definition.'
-    )}
-    {sectionNotes}
-    bind:selectedId
-    onSelect={(entityId) => (selectedId = entityId)}
-    onOpenEntry={(entityId) => onOpenEntry(entityId)}
-    rowMeta={essenceRowMeta}
-    inspectorBody={essenceInspector}
-  />
+    `.manager-main` is `display: grid` with a single `minmax(0, 1fr)` row for a full-width world
+    route, so TWO children land in the same grid area and paint over each other: measured in the
+    View Lab, the create field's label sat under the shell's search box and the create button
+    landed in the inspector column. `styles/fabricate.css` is closed to this lane by
+    `### GM World Scoped Entity Routes` requirement 7, so the row split belongs here — and it
+    belongs here anyway, because it is this page's composition rather than the route's.
+  -->
+  <div class="manager-scoped-essence-page">
+    <!-- The CREATE affordance, and the only chrome this page owns above the shell. It is a name
+         field rather than a bare button because `createEntity` takes an identity and refuses a
+         duplicate id silently: a button that minted "New essence" twice would do nothing the
+         second time and say nothing about why. -->
+    <section class="manager-scoped-essence-create" data-scoped-essence-create>
+      <label class="manager-scoped-essence-create-field">
+        <span class="manager-scoped-essence-create-label">
+          {text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence name')}
+        </span>
+        <input
+          type="text"
+          value={draftName}
+          data-scoped-essence-new-name
+          placeholder={text('FABRICATE.Admin.Manager.Scoped.Essence.NewPlaceholder', 'Ember')}
+          oninput={(event) => (draftName = event.currentTarget.value)}
+        />
+      </label>
+      <ManagerButton
+        role="primary"
+        disabled={!canCreate}
+        data-scoped-essence-create-action
+        onclick={createEssence}
+      >
+        <i class="fas fa-plus" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
+      </ManagerButton>
+    </section>
+
+    <EntityCatalogueShell
+      {scope}
+      {actions}
+      {systems}
+      hookValue={PAGE_ID}
+      {title}
+      subtitle={text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.InspectorResting',
+        'Choose an essence to see which systems hold it and what each one inherits.'
+      )}
+      icon={PAGE_ICON}
+      emptyTitle={text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.EmptyTitle',
+        'No world essences yet'
+      )}
+      emptyHint={text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.EmptyHint',
+        'Name one above to create it. Every crafting system that adopts it shares this definition.'
+      )}
+      {sectionNotes}
+      bind:selectedId
+      onSelect={(entityId) => (selectedId = entityId)}
+      onOpenEntry={(entityId) => onOpenEntry(entityId)}
+      rowMeta={essenceRowMeta}
+      inspectorBody={essenceInspector}
+    />
+  </div>
 </main>
 
 <!--
@@ -279,6 +294,14 @@
   /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
      stays at zero. `styles/fabricate.css` is closed to this lane by `### GM World Scoped Entity
      Routes` requirement 7, so every rule this screen owns lives here. */
+  .manager-scoped-essence-page {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--fab-space-2);
+    min-width: 0;
+    min-height: 0;
+  }
+
   .manager-scoped-essence-create {
     display: flex;
     flex-wrap: wrap;

@@ -439,72 +439,89 @@
     ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
     : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence')}
 >
-  {#if scopedKnown}
-    <!-- THE IDENTITY BANNER. It names what this editor does NOT own, which is the one thing a
+  <!--
+    ONE HEAD ELEMENT, AND IT IS LOAD-BEARING RATHER THAN TIDINESS.
+
+    `styles/fabricate.css:2448` gives this route's `<main>` `grid-template-rows: auto minmax(0,
+    1fr)` — EXACTLY TWO rows, the tab strip and the form. Adding the world-scope banner as a
+    third child of `<main>` puts it in an implicit third row, and the form then overlaps the tab
+    strip: measured in the View Lab, the tab button was visible, enabled and stable and every
+    click on it was intercepted by `<form id="manager-essence-edit-form">`, which is a screen a
+    GM cannot change tabs on. The sheet is closed to this lane by `### GM World Scoped Entity
+    Routes` requirement 7, so the fix belongs here: the banner and the strip share the `auto`
+    row inside one element, and the grid still sees two children.
+
+    NOTHING about the rendered strip changes — `EssenceEditorTabs` keeps its own ids, hooks and
+    classes, which is what makes this a wrapper rather than a conversion.
+  -->
+  <div class="manager-essence-edit-head">
+    {#if scopedKnown}
+      <!-- THE IDENTITY BANNER. It names what this editor does NOT own, which is the one thing a
          system-scope editor over a shared definition has to say before anything else. -->
-    <section class="manager-essence-scope-banner" data-essence-scope-banner={essence?.id}>
-      <p class="manager-essence-scope-note">
-        {formatted(
-          'FABRICATE.Admin.Manager.Scoped.Essence.IdentityBanner',
-          'Name, icon and colour come from the Essence Catalogue, shared with {count} other system(s). Everything below belongs to {system} alone.',
-          { count: sharedWithCount, system: systemName }
-        )}
-      </p>
-      {#if !member}
-        <!-- THE BLOCK STATE. No membership record means nothing in this system reads any of the
-             values below, so the editor says so and offers the one action that changes it. -->
-        <Callout
-          tone="warning"
-          text={formatted(
-            'FABRICATE.Admin.Manager.Scoped.Essence.NoRulesHere',
-            'No rules in {system}. Add it here to give this system its own record; it inherits every world default until you override a section.',
-            { system: systemName }
+      <section class="manager-essence-scope-banner" data-essence-scope-banner={essence?.id}>
+        <p class="manager-essence-scope-note">
+          {formatted(
+            'FABRICATE.Admin.Manager.Scoped.Essence.IdentityBanner',
+            'Name, icon and colour come from the Essence Catalogue, shared with {count} other system(s). Everything below belongs to {system} alone.',
+            { count: sharedWithCount, system: systemName }
           )}
-          dataAttr="data-essence-scope-state"
-          dataValue="no-membership"
+        </p>
+        {#if !member}
+          <!-- THE BLOCK STATE. No membership record means nothing in this system reads any of the
+             values below, so the editor says so and offers the one action that changes it. -->
+          <Callout
+            tone="warning"
+            text={formatted(
+              'FABRICATE.Admin.Manager.Scoped.Essence.NoRulesHere',
+              'No rules in {system}. Add it here to give this system its own record; it inherits every world default until you override a section.',
+              { system: systemName }
+            )}
+            dataAttr="data-essence-scope-state"
+            dataValue="no-membership"
+          />
+        {/if}
+        <MembershipActions
+          entityType="essence"
+          entityId={essence?.id ?? ''}
+          systemId={activeSystemId}
+          entityName={essence?.name ?? ''}
+          {systemName}
+          {member}
+          enabled={systemRow?.enabled === true}
+          disabled={saving}
+          {armedToken}
+          onArm={(token) => (armedToken = token)}
+          onDisarm={() => (armedToken = '')}
+          onAdd={() => actions?.addToSystem?.(essence?.id, activeSystemId)}
+          onRemove={() => actions?.removeFromSystem?.(essence?.id, activeSystemId)}
+          onToggleEnabled={(next) => actions?.setEnabled?.(essence?.id, activeSystemId, next)}
         />
-      {/if}
-      <MembershipActions
-        entityType="essence"
-        entityId={essence?.id ?? ''}
-        systemId={activeSystemId}
-        entityName={essence?.name ?? ''}
-        {systemName}
-        {member}
-        enabled={systemRow?.enabled === true}
-        disabled={saving}
-        {armedToken}
-        onArm={(token) => (armedToken = token)}
-        onDisarm={() => (armedToken = '')}
-        onAdd={() => actions?.addToSystem?.(essence?.id, activeSystemId)}
-        onRemove={() => actions?.removeFromSystem?.(essence?.id, activeSystemId)}
-        onToggleEnabled={(next) => actions?.setEnabled?.(essence?.id, activeSystemId, next)}
-      />
-      {#if member}
-        <!-- THE TWO INHERIT SWITCHES, and they sit ABOVE the tab strip rather than inside the
+        {#if member}
+          <!-- THE TWO INHERIT SWITCHES, and they sit ABOVE the tab strip rather than inside the
              On-craft tab on purpose: the switch is what unlocks the value card beneath it, and a
              GM must be able to see both the state and the control that changes it at once. -->
-        <div class="manager-essence-scope-inherit">
-          <InheritRow
-            entityType="essence"
-            inherited={inheritedMap}
-            notes={inheritNotes}
-            disabled={saving}
-            onToggle={(section, next) =>
-              actions?.setSectionInherited?.(essence?.id, activeSystemId, section, next)}
-          />
-        </div>
-      {/if}
-    </section>
-  {/if}
+          <div class="manager-essence-scope-inherit">
+            <InheritRow
+              entityType="essence"
+              inherited={inheritedMap}
+              notes={inheritNotes}
+              disabled={saving}
+              onToggle={(section, next) =>
+                actions?.setSectionInherited?.(essence?.id, activeSystemId, section, next)}
+            />
+          </div>
+        {/if}
+      </section>
+    {/if}
 
-  <EssenceEditorTabs
-    {activeTab}
-    {onCraftCount}
-    blockingCount={validationCounts.blocking}
-    warningCount={validationCounts.warnings}
-    onChange={(tab) => (activeTab = tab)}
-  />
+    <EssenceEditorTabs
+      {activeTab}
+      {onCraftCount}
+      blockingCount={validationCounts.blocking}
+      warningCount={validationCounts.warnings}
+      onChange={(tab) => (activeTab = tab)}
+    />
+  </div>
 
   <form id="manager-essence-edit-form" class="manager-essence-edit-view" onsubmit={handleSave}>
     <div
@@ -578,6 +595,16 @@
 </main>
 
 <style>
+  /* The `auto` grid row this route declares, holding BOTH the banner and the tab strip. See the
+     note in the markup: a third child of `<main>` lands in an implicit row and the form overlaps
+     the strip. */
+  .manager-essence-edit-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
   /* The world-scope banner. STATIC class names, so Svelte can prove each selector is used and
      `lint:svelte:warnings` stays at zero; `styles/fabricate.css` is closed to this lane. */
   .manager-essence-scope-banner {

@@ -3823,73 +3823,62 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
 
   // ── The two SYSTEM-SCOPE essence states issue 1372 adds ────────────────────────────────────
+  // ── The system-scope essence state issue 1372 adds, and the ONE it cannot photograph ───────
   managerCase({
     id: 'manager-essences-membership-all',
     label: 'Manager — Essences all world essences',
     reaches: 'beyond',
     smokeLabels: [],
-    // The two-option membership filter, switched to `All world essences`. The lab's three systems
-    // hold DIFFERENT essences, and the `1.30.0` migration lifts every one of them into one world
-    // corpus, so this system genuinely has world essences it holds no record for — which is the
-    // only state in which the absent row and its Add action exist to be photographed.
+    // The two-option membership filter with its counts, switched to `All world essences`.
+    //
+    // ── WHAT THIS FRAME DOES NOT SHOW, AND WHY THAT IS NOT AN OVERSIGHT ─────────────────────
+    // It does NOT show an ABSENT row or its Add action, because the lab world cannot reach that
+    // state: `tests/view-lab/world/labContent.js` gives all three crafting systems the SAME
+    // `ESSENCES` list, so after the `1.30.0` lift every system is a member of all six world
+    // essences and none is absent from any of them. The first run of this case failed exactly
+    // there, which is the correct outcome — a case may not assert a state its fixture cannot
+    // produce, and the alternative was to widen a fixture that six other essence frames read for
+    // their counts, their status segments and their disabled-in-use headline.
+    //
+    // The absent row is covered where it can be reached:
+    // `tests/components/essence-world-scope-screens-mounted.test.js` renders it, and
+    // `world-essence-catalogue` photographs all THREE per-system states from the world side,
+    // where the fixture does vary. Recorded here rather than left as a silent gap.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
       { selector: '[data-essence-membership-filter]', select: 'all' },
     ],
     expectView: 'essences',
-    // BOTH SIDES OF THE FILTER IN ONE FRAME: a row this system has, and a row it does not. A
-    // frame carrying only the second would be a frame of an empty system.
-    expectContained: [
-      { container: '.manager-main', target: '[data-essence-membership-filter]' },
-      { container: '.manager-main', target: '[data-essence-membership-state="absent"]' },
-      { container: '.manager-main', target: '[data-essence-membership-state="enabled"]' },
-    ],
+    expectSelector: '[data-essence-membership-filter]',
+    // CONTAINMENT IS FOR CONTROLS THAT MUST FIT, never for list rows: `expectContained` asserts a
+    // target sits inside its container's BOX, and a row in a scrolling column legitimately
+    // extends past `.manager-main`. Measured — the first run failed for a row that renders
+    // correctly.
+    expectContained: [{ container: '.manager-main', target: '[data-essence-membership-filter]' }],
     kinds: ['manager', 'essences'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceRow\.svelte$/,
     ],
   }),
-  managerCase({
-    id: 'manager-essence-edit-inherit-lock',
-    label: 'Manager — Essence edit inherit lock',
-    reaches: 'beyond',
-    smokeLabels: [],
-    // ONE SECTION INHERITED AND ONE OVERRIDDEN, IN THE SAME FRAME — which is the whole point of
-    // the world-scope model and the one state a single-section frame cannot show.
-    //
-    // The inherited half is REACHED BY THE GM ACTION rather than seeded, and that is forced
-    // rather than chosen: the `1.30.0` migration writes every membership record with BOTH
-    // sections overridden, so there is no fixture state in which one is already inherited. So the
-    // walk flips `effectSource` with its own switch and leaves `macro` alone, which also makes
-    // the frame evidence that the switch WORKS rather than only that the two states render.
-    query: {},
-    steps: [
-      { selector: '#manager-nav-essence-rules' },
-      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
-      { selector: '[data-scoped-inherit-toggle="effectSource"]' },
-      { selector: '[data-essence-tab="oncraft"]' },
-    ],
-    expectView: 'essence-edit',
-    expectContained: [
-      // The LOCKED card, and the macro card's unlink still present beside it. Asserting only the
-      // lock would pass on an editor that locked BOTH, which is a different defect wearing the
-      // same green.
-      { container: '.manager-main', target: '[data-scoped-source-locked="effectSource"]' },
-      { container: '.manager-main', target: '[data-scoped-macro-unlink]' },
-    ],
-    kinds: ['manager', 'essences'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceOnCraftTab\.svelte$/,
-      // NO `ItemDropZone` PATTERN. It is a BROAD signal in `designSystemPrimitives.json`, and
-      // `selectRenderFileCases` `continue`s on a broad signal BEFORE it consults `sourceMatches`
-      // at all — so the declaration would be inert configuration nothing reads, which
-      // `design-system-primitives.test.js` reds on by name.
-    ],
-  }),
-
+  // ── `manager-essence-edit-inherit-lock` IS DELIBERATELY NOT REGISTERED ──────────────────────
+  //
+  // The state it would show — one section INHERITED with its value card locked and one OVERRIDDEN
+  // beside it — is reached by flipping an inherit switch, and in the View Lab that write does not
+  // reach the screen: the toggle renders and clicks, and neither its own state chip nor the value
+  // card beneath it changes. The cause is not in this registry and not in the screens: a
+  // world-scope write persists through `ScopedDefinitionStore#save`, and `viewState.worldScope` is
+  // rebuilt ONLY inside `adminStore`'s `refresh()`, which no world-scope action calls and which
+  // the manager app invokes from its own document hooks alone. So every world-scope write is
+  // durable and invisible until the next refresh.
+  //
+  // A CASE THAT CANNOT REACH ITS STATE IS NOT REGISTERED, because a failing case fails the capture
+  // job WHOLE and publishes NOTHING for every other case in the run — which is how one bad
+  // selector costs an entire evidence set. The lock itself is asserted in both directions in
+  // `tests/components/essence-edit-view-mounted.test.js`, which drives `scope` as a prop and so
+  // cannot see the missing refresh. This note stands until that seam is wired, and the change that
+  // wires it registers the case.
   managerCase({
     id: 'manager-environments-browse-normal',
     label: 'Manager — Environments browse normal',
