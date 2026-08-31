@@ -62,6 +62,12 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   // World > Travel page photographs an empty realm list and every realm-gated environment
   // resolves against nothing.
   put('travelConfig', content.travelConfig);
+  // The WORLD TOOL corpus (issue 1373, epic 1357). World scope, like the currency ladder: a
+  // crafting system carries its own in-system tools, and the world record that is SHARED across
+  // systems lives in its own setting. Without it the world Tools Catalogue photographs its
+  // no-state hero and the world Tool entry is unreachable, because the only way in is a
+  // catalogue row.
+  put('toolScope', content.toolScope);
   // FIVE parties, and every one of them earns its place in the World > Parties card list:
   // the pane is paged at four, searchable once more than one exists, and draws its enable
   // gate, its unlinked travel-actor tile and its disabled treatment only when a party is in

@@ -2360,6 +2360,10 @@ It could the moment the in-system record stops deciding its own keys, which is w
    The seed is a DEEP copy, so neither scope can reach into the other through a shared reference — the one exception to requirement 11's aliasing rule.
    A value structured cloning refuses degrades to a shallow copy rather than being dropped, because a seed that silently lost a repair recipe would be worse than one that shares a reference nothing structurally mutates.
    Seeding is NOT the default treatment for a section whose shipped field names an in-system reference: `### Essence scope` requirement 5 settles `effectSource` as a LIVE PARENT on the opposite side of the same question, and records what distinguishes the two.
+   **The world default is AUTHORED through its own tool-family write action, never through the section writer.**
+   `updateWorldDefaultSection` refuses every name outside the scope's declared sections and `repairRequirements` is deliberately not one of them, so routing the write through it returns `false` and stores nothing.
+   The seed's WRITE path and its READ path are therefore deliberately asymmetric: the world holds it and a tool-family-only action writes it, while the membership record alone answers it.
+   Without that action the world Tool entry would display a seed source nobody could author, which is a screen stating a value the model makes unreachable.
 3. `enabled` KEEPS its shipped meaning verbatim, and it is a HARD block rather than the essence's soft disable: a reference to a tool that does not resolve, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED` (`## Tool` requirement 3).
    The two entities' meanings of one field name are deliberately different, and neither is derived from the other.
 4. **The break mode is NOT a new field.**
@@ -2369,6 +2373,11 @@ It could the moment the in-system record stops deciding its own keys, which is w
 5. **The WORLD tool-breakage authority is persisted by `fabricate.toolScope` ALONE and carries no per-system half.**
    The per-system override stays where `## CraftingSystem` requirement 21 puts it — on the crafting system — because a second per-system home would author one field at two scopes, which the Purpose above prohibits.
    It is ABSENCE-PRESERVING at world scope: an unauthored or unrecognized authority persists NO key rather than a minted `toolSpecific`, since a minted default is indistinguishable from a GM's deliberate choice.
+
+   **AND THE WRITE HALF IS ABSENCE-PRESERVING TOO, which is what keeps inheritance from being a one-way door.**
+   The world authority is authored through a tool-family-only world-scope action that writes the key for a recognized token and REMOVES it for anything else, so "no world authority" stays expressible on disk rather than only on first read.
+   An action that minted `toolSpecific` on a clear would leave a GM who authored a world value with no way back to the unauthored state, and every absence-preserving system would go on inheriting a choice nobody made.
+   It is STRUCTURALLY ABSENT on the component and essence write families rather than present and refusing, on the same rule this section's `setEnabled` states: a caller must not be able to conclude a write landed.
 
    **It became LIVE at `1.30.0`.**
    The crafting-system normalizer substituted `toolSpecific` for anything missing or unrecognised on EVERY normalize until that release, so every persisted system carried a concrete value and `system.toolBreakage.authority ?? world` could never fall through; the flip that makes it absence-preserving is what made this half reachable.

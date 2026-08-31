@@ -3882,6 +3882,75 @@ export function buildLabContent() {
       ...TIDEWRACK_COMPONENTS,
     ],
     tools: [...SMITHING_TOOLS, ...HERBALISM_TOOLS, ...RUNEWORK_TOOLS],
+    // THE WORLD TOOL CORPUS (issue 1373, epic 1357), in the shape `toolScope` persists: an
+    // `entities` roster of identity records, `defaults` keyed by entity id, `membership` keyed
+    // by `<entityId>|<systemId>`, and the world break mode beside them.
+    //
+    // IT IS SEEDED SO THE WORLD SCREENS HAVE SOMETHING TO PHOTOGRAPH. A capture case cannot
+    // reach the world Tool ENTRY at all without a catalogue row to click, and an empty corpus
+    // renders the no-state hero - which would publish an empty frame as evidence of a
+    // catalogue.
+    //
+    // `lab-tool-unlinked` earns its place: `worldScopeEntityGrouping` records that a definition
+    // with no source references of its own becomes a world entity FLAGGED UNLINKED, and that
+    // state is drawn by a different badge in a different tone. One linked row cannot show it.
+    toolScope: {
+      entities: [
+        ...[...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => ({
+          id: tool.id,
+          name: tool.name,
+          img: tool.img,
+          description: '',
+          originItemUuid: tool.originItemUuid,
+          registeredItemUuid: tool.registeredItemUuid,
+          aliasItemUuids: [],
+        })),
+        {
+          id: 'lab-tool-unlinked',
+          name: 'Unclaimed Bellows',
+          img: `${ICON_BASE}/tools/smithing/bellows-tan.webp`,
+          description: 'A world record no game-world Item stands behind yet.',
+        },
+      ],
+      defaults: Object.fromEntries(
+        [...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => [
+          tool.id,
+          {
+            id: tool.id,
+            breakage: tool.breakage ?? { mode: 'limitedUses', maxUses: null },
+            onBreak: tool.onBreak ?? { mode: 'destroy' },
+            // The SEEDED third section, on ONE tool only: the entry's repair tab states a
+            // count, and a corpus where every record carried the same number could not show
+            // that the count is read per record.
+            ...(tool.id === 'sm-tool-hammer'
+              ? { repairRequirements: [{ id: 'sm-tool-hammer-repair', ingredients: [] }] }
+              : {}),
+          },
+        ])
+      ),
+      membership: Object.fromEntries(
+        [
+          ...SMITHING_TOOLS.map((tool) => [tool.id, LAB_SYSTEM_IDS.SMITHING]),
+          ...HERBALISM_TOOLS.map((tool) => [tool.id, LAB_SYSTEM_IDS.HERBALISM]),
+        ].map(([entityId, systemId]) => [
+          `${entityId}|${systemId}`,
+          {
+            entityId,
+            systemId,
+            // ONE OVERRIDE among them, so the catalogue's per-section inherit counts are a
+            // real number rather than "every system, always".
+            inherit: entityId === 'sm-tool-anvil' ? { breakage: false } : {},
+            enabled: true,
+            ...(entityId === 'sm-tool-anvil'
+              ? { breakage: { mode: 'diceExpression', formula: '1d20', threshold: 3 } }
+              : {}),
+          },
+        ])
+      ),
+      // AUTHORED, so the World breakage default card draws a SELECTED segment rather than the
+      // unauthored state, and the system Tool Rules tri-state has a world token to name.
+      toolBreakage: { authority: 'toolSpecific' },
+    },
     // Exposed so the uuid index can resolve an owned recipe-item copy back to the book it is a
     // copy OF. Without an index entry the copy still matches its definition (matching is by uuid,
     // not by document) but every surface that resolves the source through `fromUuid` renders it

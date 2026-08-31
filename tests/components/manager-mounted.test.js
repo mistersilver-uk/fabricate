@@ -900,14 +900,17 @@ function compileManagerRoot() {
     'src/migration/worldScopeEntityGrouping.js',
     'src/utils/definitionIndex.js',
     'src/utils/sourceReferenceUnion.js',
-    // Issue 1372 (epic 1357, PR 6b): the two world ESSENCE screens are real bodies now, so the
-    // shared scoped list shells, the inherit row and the membership cluster are all in this
-    // root's static graph — and so are the three plain modules underneath them. Same mechanical
-    // rule as every entry above: drop one and the whole file HANGS behind one
-    // ERR_MODULE_NOT_FOUND, reported as `# cancelled`, rather than failing a test.
+    // Issue 1372 (epic 1357, PR 6b) and issue 1373 (PR 6c): the two world ESSENCE screens and
+    // the world TOOL screens are real bodies now, so the shared scoped list shells, the inherit
+    // row and the membership cluster are all in this root's static graph — and so are the plain
+    // modules underneath them. This list has NO dependency validator —
+    // `assertCompiledSvelteClosure` walks `.svelte` only — so an omission here does not fail
+    // one test: it HANGS the whole file behind one ERR_MODULE_NOT_FOUND, and every blocked test
+    // is reported as `# cancelled` rather than failing.
     'src/ui/svelte/stores/worldScopeProjection.js',
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
+    'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
     'src/utils/scopedEntityListModel.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
@@ -19221,7 +19224,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['authority', 'search', 'create', 'list']
     );
     const authority = target.querySelector('[data-manager-tools-authority]');
-    assert.equal(authority.querySelectorAll('[data-tool-authority-segment]').length, 2);
+    // THREE, not two (issue 1373): `Inherit`, `Tool-specific`, `Check-driven`. This count is
+    // a guard in BOTH directions - shipping the tri-state without moving it reds, and
+    // claiming a tri-state while leaving it at 2 reds.
+    assert.equal(authority.querySelectorAll('[data-tool-authority-segment]').length, 3);
     assert.deepEqual(
       [...authority.children].map((element) =>
         element.classList.contains('manager-tools-authority-heading')
@@ -25731,15 +25737,15 @@ describe('CraftingSystemManager mounted behavior', () => {
   describe('world scoped-entity routes (issue 1362)', () => {
     /**
      * Rail leaf id -> the route token it commits, the screen title it renders, and the BODY
-     * SELECTOR that route's page draws.
-     *
-     * The body selector was a fixed `[data-scoped-placeholder="<token>"]` for all four, and
-     * issue 1372 makes that false for `world-essences`: the essence catalogue is a real screen
-     * now and draws the shared list shell instead. Naming the selector per route keeps the
-     * assertion LIVE in both directions rather than deleting it for the replaced route — the
-     * replaced page must still render a body of its own, and the three that still delegate must
-     * still render the shared one. The titles are the prototype's, verbatim, including the
+     * SELECTOR that route's page draws. The titles are the prototype's, verbatim, including the
      * lowercase `c` and the plural `Tools`.
+     *
+     * The body selector was a fixed `[data-scoped-placeholder="<token>"]` for all four, and the
+     * screen lanes of this epic make that false one route at a time and in no fixed order: issue
+     * 1372 replaced `world-essences` and issue 1373 replaced `world-tools`, and both draw the
+     * shared list shell instead. Naming the selector per route keeps the assertion LIVE in both
+     * directions rather than deleting it for a replaced route — a replaced page must still render
+     * a body of its own, and the routes that still delegate must still render the shared one.
      */
     const RAIL_REACHABLE_ROUTES = [
       [
@@ -25755,12 +25761,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         '[data-scoped-placeholder="world-vocabulary"]',
       ],
       ['essence-catalogue', 'world-essences', 'Essence Catalogue', '[data-scoped-list]'],
-      [
-        'tool-catalogue',
-        'world-tools',
-        'Tools Catalogue',
-        '[data-scoped-placeholder="world-tools"]',
-      ],
+      // Issue 1373: the real catalogue. `data-scoped-list` is the shell's own hook, and the
+      // route token pins it to the screen this row is about rather than to any scoped list.
+      ['tool-catalogue', 'world-tools', 'Tools Catalogue', '[data-scoped-list="world-tools"]'],
     ];
 
     async function settleRoute() {
@@ -25819,6 +25822,25 @@ describe('CraftingSystemManager mounted behavior', () => {
         seenPages.size,
         RAIL_REACHABLE_ROUTES.length,
         'each route rendered a DISTINCT page: a duplicated pageId would collapse this set'
+      );
+    });
+
+    // THE WORLD BREAKAGE DEFAULT IS ON THE CATALOGUE AND NOWHERE ELSE (issue 1373).
+    //
+    // Asserted in the DOM rather than from source because "the only surface at world scope
+    // that authors it" is a claim about what RENDERS: a second writer added to the entry
+    // route would leave every source assertion in this repository green.
+    it('the world Tools Catalogue carries the world breakage default control', async () => {
+      await mountRail();
+      worldNavItem('tool-catalogue').click();
+      await settleRoute();
+      const card = target.querySelector('[data-world-tool-break-mode]');
+      assert.ok(Boolean(card), 'the catalogue renders the World breakage default card');
+      assert.equal(
+        card.querySelectorAll('[data-world-tool-break-segment]').length,
+        2,
+        'TWO options at world scope, never three: the world is where this value is authored, ' +
+          'so there is nothing above it to inherit from'
       );
     });
 
@@ -25892,18 +25914,26 @@ describe('CraftingSystemManager mounted behavior', () => {
      * near-identical block SonarCloud's new-code duplication gate counts, and both defaults
      * leave every existing caller reading exactly what it read before.
      *
+     * `craftingCheck` joins them for the same reason (issue 1373): AC-4 needs a trigger to
+     * exist before the authority-gated break-tools card has anywhere to render, and the
+     * default fixture authors none.
+     *
      * @param {object} [options]
      * @param {object|null} [options.worldToolBreakage] The world scope's `toolBreakage` block.
      * @param {object|null} [options.systemToolBreakage] The selected system's own block.
      * @param {Array<object>|null} [options.worldEssences] The world essence corpus. Named
      *   entities are what the entry heading below is about; the id-only default keeps the rail
      *   counts every caller above it reads exactly where they were.
+     * @param {object|null} [options.craftingCheck] The selected system's crafting check.
+     * @param {string} [options.resolutionMode] The selected system's resolution mode.
      * @returns {Promise<object>} the store
      */
     async function mountWithRealStore({
       worldToolBreakage,
       systemToolBreakage,
       worldEssences,
+      craftingCheck,
+      resolutionMode,
     } = {}) {
       scopeStores = {
         component: scopeStore(worldEntities(3, 'comp')),
@@ -25920,6 +25950,8 @@ describe('CraftingSystemManager mounted behavior', () => {
         id: 'sys1',
         name: 'Forge',
         ...(systemToolBreakage ? { toolBreakage: systemToolBreakage } : {}),
+        ...(craftingCheck ? { craftingCheck } : {}),
+        ...(resolutionMode ? { resolutionMode } : {}),
       });
       const alchemy = makeSystem({ id: 'sys2', name: 'Alchemy' });
       const systems = [forge, alchemy];
@@ -26066,7 +26098,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         await tick();
         flushSync();
         const segments = target.querySelectorAll('[data-tool-authority-segment]');
-        assert.equal(segments.length, 2, 'the Tool Studio authority radiogroup is rendered');
+        assert.equal(segments.length, 3, 'the Tool Studio authority radiogroup is rendered');
         return [...segments].map((segment) => ({
           authority: segment.dataset.toolAuthoritySegment,
           selected: segment.classList.contains('is-selected'),
@@ -26089,15 +26121,33 @@ describe('CraftingSystemManager mounted behavior', () => {
         return get(store.viewState).selectedSystem.toolBreakage;
       }
 
+      function segmentLabel(value) {
+        return target
+          .querySelector(`[data-tool-authority-segment="${value}"]`)
+          ?.textContent?.trim();
+      }
+
       it('a WORLD authority reaches the card when the system authored none', async () => {
         const store = await mountWithRealStore({
           worldToolBreakage: { authority: 'checkDriven' },
         });
+        // AC-1. POSITIVELY, through the helper that reads the class AND the radio together:
+        // `inherit` is the single selected segment and `checkDriven` is NOT. Selecting the
+        // resolved token here is the defect - it draws an inherited value as this system's own
+        // choice, and re-clicking it MINTS an override nothing can then clear.
         assert.equal(
           selectedAuthority(await openToolStudio()),
-          'checkDriven',
-          'a system that authored nothing INHERITS the world break mode; re-defaulting locally ' +
-            'is what made the world half unreachable before'
+          'inherit',
+          'a system that authored nothing INHERITS the world break mode, and the control says ' +
+            'so on the AUTHORED layer rather than drawing the resolved token as current'
+        );
+        // AC-2. The inherit segment names the WORLD's token. This fixture is the right one
+        // precisely because deriving the label off `breakageAuthority` would read the same
+        // value here - so the disagreeing fixture below is what actually catches it.
+        assert.match(
+          segmentLabel('inherit'),
+          /Check-driven/,
+          'the inherit segment names what the world actually says'
         );
         assert.deepEqual(publishedToolBreakage(store), {
           authority: 'checkDriven',
@@ -26115,6 +26165,14 @@ describe('CraftingSystemManager mounted behavior', () => {
           'toolSpecific',
           'the per-system override is the winning scope'
         );
+        // AC-2, on the fixture where the two values DISAGREE. A label derived from
+        // `breakageAuthority` renders `Tool-specific` here and is wrong; only the world's own
+        // token, carried on the `scope` leg of the bundle, answers `Check-driven`.
+        assert.match(
+          segmentLabel('inherit'),
+          /Check-driven/,
+          'the inherit segment names the WORLD token, not the resolved one'
+        );
         assert.deepEqual(publishedToolBreakage(store), {
           authority: 'toolSpecific',
           source: 'system',
@@ -26123,12 +26181,114 @@ describe('CraftingSystemManager mounted behavior', () => {
 
       it('neither scope authoring a token falls to the default, and says so', async () => {
         const store = await mountWithRealStore();
-        assert.equal(selectedAuthority(await openToolStudio()), 'toolSpecific');
+        assert.equal(
+          selectedAuthority(await openToolStudio()),
+          'inherit',
+          'nothing authored anywhere is still not this system authoring toolSpecific'
+        );
+        // AND THE LABEL DOES NOT CALL IT A WORLD DEFAULT. `DEFAULT_TOOL_BREAKAGE_AUTHORITY` is
+        // a shipped fallback, not a GM's choice, so copy crediting the world with it would be
+        // a lie the `default` branch exists to prevent.
+        assert.match(segmentLabel('inherit'), /\(default\)/);
+        assert.doesNotMatch(segmentLabel('inherit'), /World default/);
         assert.deepEqual(
           publishedToolBreakage(store),
           { authority: 'toolSpecific', source: 'default' },
           'the third branch of the resolver: the same TOKEN as an authored toolSpecific, and a ' +
             'different source — which is the whole reason source exists'
+        );
+      });
+
+      // AC-3. CHOOSING `Inherit` CLEARS RATHER THAN MINTS.
+      //
+      // ASSERTED ON THE FORWARDED ARGUMENT, never on a post-state, and that is not a
+      // convenience: `adminStore.js`'s `setToolBreakageAuthority` writes `{toolBreakage: {}}`
+      // for anything outside the two tokens, and `updateSystem` is what turns that into a key
+      // REMOVAL. A double whose `updateSystem` ends in `Object.assign` cannot delete a key, so
+      // a post-state check cannot tell a clear from a re-write of the same token.
+      //
+      // The seam is a property read at CALL TIME - `store.setToolBreakageAuthority?.(...)` in
+      // the shell - so replacing the property after mount intercepts the real call path rather
+      // than a copy of it.
+      // AC-4. A WORLD `checkDriven` WITH NOTHING ON THE SYSTEM REACHES `ChecksView`.
+      //
+      // `tests/world-scope-tool-breakage-authority.test.js` records that of the FOUR manager
+      // surfaces reading this field, only the Tool Studio radiogroup has behavioural coverage -
+      // the other three are held by a text scan alone. This is the second, and it is the one
+      // that matters most: a re-default anywhere along the chain leaves a GM who authored a
+      // world `checkDriven` looking at a triggers list that says, in as many words, "switch the
+      // tool-breakage authority to check-driven".
+      //
+      // A TRIGGER HAS TO EXIST FIRST. The gate is `showBreakTools`, which is only asked once
+      // there is a trigger card to ask it on, so the fixture authors one.
+      it('a WORLD checkDriven reaches the Checks triggers with NOTHING on the system', async () => {
+        await mountWithRealStore({
+          worldToolBreakage: { authority: 'checkDriven' },
+          // `routedByCheck` because the crafting check is OPTIONAL in `simple` mode, and an
+          // optional check that is off collapses the section strip to `roll` alone - so the
+          // triggers section, and with it the authority gate, would have nowhere to render.
+          resolutionMode: 'routedByCheck',
+          craftingCheck: {
+            enabled: true,
+            mode: 'passFail',
+            macroUuid: null,
+            outcomes: [],
+            routed: {
+              enabled: true,
+              type: 'relative',
+              rollFormula: '1d20',
+              checkBreakage: {
+                triggers: [
+                  {
+                    id: 'trg-1',
+                    condition: { type: 'rollTotal', operator: '<=', value: 1 },
+                    outcome: 'failure',
+                    breakTools: false,
+                  },
+                ],
+              },
+            },
+          },
+        });
+        navButton('Checks').click();
+        await tick();
+        flushSync();
+        await openChecksActivity('crafting');
+        await openChecksSection('triggers');
+        const trigger = target.querySelector('[data-trigger="trg-1"]');
+        assert.ok(Boolean(trigger), 'the authored trigger renders, so the gate has a subject');
+        target.querySelector('[data-trigger-disclosure="trg-1"]').click();
+        await tick();
+        flushSync();
+        assert.ok(
+          Boolean(target.querySelector('[data-trigger="trg-1"] [data-trigger-break]')),
+          'the break-tools card renders ENABLED under an inherited world checkDriven'
+        );
+        assert.ok(
+          !target.querySelector('[data-trigger-break-unavailable]'),
+          'and the "switch the authority to check-driven" hint stands down: it is already ' +
+            'check-driven, at world scope'
+        );
+      });
+
+      it('choosing Inherit CLEARS the per-system override rather than minting one', async () => {
+        const store = await mountWithRealStore({
+          worldToolBreakage: { authority: 'checkDriven' },
+          systemToolBreakage: { authority: 'toolSpecific' },
+        });
+        await openToolStudio();
+        const forwarded = [];
+        store.setToolBreakageAuthority = (authority) => {
+          forwarded.push(authority);
+          return Promise.resolve();
+        };
+        target.querySelector('[data-tool-authority-segment="inherit"] input[type="radio"]').click();
+        flushSync();
+        assert.deepEqual(
+          forwarded,
+          [null],
+          'Inherit forwards null, which is what `setToolBreakageAuthority` turns into a key ' +
+            'removal. Forwarding a token instead writes an override the GM cannot clear'
         );
       });
     });

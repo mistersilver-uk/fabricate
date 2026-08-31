@@ -1919,6 +1919,12 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
    A control that offers "inherit" beside the concrete choices needs to know which of them is current, and a resolved token cannot answer that.
    So the projection that publishes the resolved authority ALSO publishes which scope authored it, one value per branch of the resolver, and the shell carries that value to the control on its own prop.
    Both halves are the gateway's, and neither is deferrable to the change that draws the control: the producer is open to that change, but the carrier line is inside a closed file, so publishing the value without carrying it would leave it unreachable.
+   **THREE VALUES, NOT TWO, AND THE THIRD ARRIVES ON THE BUNDLE RATHER THAN ON A PROP OF ITS OWN.**
+   A control offering "inherit" needs the RESOLVED token, the SCOPE that authored it, and the value it would fall back to — and the third is the WORLD's own token, which no resolved value can recover: `checkDriven` looks identical whether this system authored it or inherited it.
+   It reaches a system-scope authoring surface through the `scope` leg of that type's per-entity bundle, which is the published world corpus and already carries it, rather than through a fourth static attribute the closed shell would have to add.
+   That is what keeps such a control buildable without reopening a gateway file, and it holds only because the shell spreads the bundle BEFORE it restates the static attributes, so a screen that DECLARES exactly what its call site passes never falls through to the bundle for a name the site restates.
+   The rule the shell states is the binding one: a screen declares what its call site passes, or the site passes what the screen declares.
+   A screen reading the bundle-supplied leg in a reactive scope projects it to a scalar immediately, because the corpus is a new object on every world-scope publish.
    **The CAPTURE REGISTRY is NOT one of the closed files, and the reason is structural rather than a concession.**
    A capture case asserts that a route is REACHABLE and drives it by clicking a rendered control, so a route whose only entrance is a screen that has not shipped cannot be reached: the capture driver throws by name on a selector that matches nothing, and — because capture coverage is keyed on the route a case asserts — an unreachable case becomes its own surface and is selected by every later change to a capture input.
    A case registered ahead of its screen therefore fails the capture run whole, thereafter, for every change that touches a capture input.
@@ -1975,6 +1981,28 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
    The System Essence Rules bar reads `{shown} shown · {members} of {total} in this system`, which is the one count no other control on the screen answers; it falls back to the page range when the world corpus cannot answer membership, because `{members} of {total}` over an unreadable corpus reports every essence as absent from this system, which is false rather than unavailable.
    The range it replaces is rendered verbatim by the pager at the foot of the same list, so the bar was restating it.
    The world essence entry editor renders the shared preview's live-update note; the browser inspector is the one site that suppresses it, because that rail is read-only and has nothing to type into.
+
+### GM World Tool Screens
+
+The two world tool screens and the system-scope Tool Rules list share one break-mode contract, and it is stated here rather than per screen because the three surfaces disagree about the same value only if it is.
+
+1. **The world Tools Catalogue carries the World breakage default control, and it is the ONLY surface at world scope that authors it.**
+   Its two options are `toolSpecific` and `checkDriven`; there is no third, because the world is where this value is authored and there is nothing above it to inherit from.
+   It states how many crafting systems override it before an edit lands, on the same rule every world-default editor states its inherit count — counting only systems whose OWN authored token DIFFERS from the world's, since a system that agrees is unaffected by a world change either way.
+   **A count it cannot answer is WITHHELD rather than answered `0`.**
+   The crafting-system roster a world screen receives is a projected allowlist, so a roster that does not carry each system's own `toolBreakage` block cannot answer the question at all; reading an absent field would report "nothing overrides it", which is a wrong number rather than a missing one.
+2. **The world Tool entry displays the world break mode READ-ONLY.**
+   Authoring it from two world screens would be one field authored at two places, which `## Scoped Entity Definitions` prohibits, and the failure is concrete: two controls over one setting disagree the moment either is edited with the other on screen.
+   The entry states it because a GM authoring a tool's breakage section has to know which authority decides whether that section is read at all.
+3. **The system Tool Rules list's break-mode control is a TRI-STATE whose selection is the AUTHORED layer, never the resolved token.**
+   Its third option CLEARS the per-system override rather than writing one of the two tokens.
+   A control selected on the resolved token is indistinguishable between "this system chose it" and "this system inherited it", and re-selecting the segment it already draws as current MINTS an override — which is the defect this requirement removes.
+   Selection is read from the published authoring scope, one value per branch of the resolver, and never from a comparison of the resolved token against the world's: that comparison is wrong for a REDUNDANT override, which is exactly the state the two-state control produced.
+   The inherit option is LABELLED with the world's own token, and where the world authored nothing the label says so rather than crediting the world with the shipped fallback.
+   The pill beside it names the layer the current answer came from, and it has THREE states for the resolver's three branches rather than the prototype's two.
+4. **The world Tool entry authors the world `repairRequirements` default, and the screen says it is a SEED.**
+   A later world edit never reaches a system already seeded (`## Scoped Entity Definitions` `### Tool scope` requirement 2), so the entry must not imply a live parent: it states no inherit count for that section, because a count would claim an inheritance the resolver does not honour.
+   The section's own ingredient groups are not authored at world scope, because a repair group names components in the OWNING crafting system, which world scope cannot address.
 
 ### Scoped entity editor patterns
 

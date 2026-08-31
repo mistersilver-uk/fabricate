@@ -4293,3 +4293,72 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
     'an unmatched UI path falls through to the fallback, which is what the probe rules out'
   );
 });
+
+// ── The world-tool capture cases and the lab fixture that feeds them (issue 1373) ──────────
+//
+// A CASE THAT NAMES A FIXTURE RECORD IS A HAND-MAINTAINED MIRROR, and this is the guard that
+// stops it rotting silently. The `world-tool-entry` case is reached by CLICKING a catalogue
+// row, so its steps name a world tool by id; the capture driver throws by name on a selector
+// that matches nothing, and a case registered ahead of its data fails the capture run WHOLE,
+// thereafter, for every change that touches a capture input.
+//
+// So the ids the cases click are resolved against the lab world's own corpus, through the REAL
+// store and the REAL projection rather than by reading the fixture literal: what has to hold is
+// that the record survives normalization and projects a row, not that a key is present.
+test('every world tool id the capture cases click exists in the lab world, projected', async () => {
+  const [{ buildLabContent }, { createToolScopeStore }, { projectWorldScopeEntity }] =
+    await Promise.all([
+      import('./view-lab/world/labContent.js'),
+      import('../src/systems/worldScopeStores.js'),
+      import('../src/ui/svelte/stores/worldScopeProjection.js'),
+    ]);
+
+  const content = buildLabContent();
+  const settings = new Map([['toolScope', content.toolScope]]);
+  const store = createToolScopeStore({
+    getSetting: (key) => settings.get(key),
+    setSetting: async () => {},
+  });
+  store.load();
+  const scope = projectWorldScopeEntity({
+    entityType: 'tool',
+    corpus: store.corpus(),
+    systems: content.systems.map((system) => ({ id: system.id, name: system.name })),
+  });
+
+  const clicked = new Set();
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const step of viewCase.steps || []) {
+      for (const [, id] of String(step.selector || '').matchAll(
+        /\[data-scoped-list-(?:row|inspect)="([^"]+)"\]/g
+      )) {
+        clicked.add(id);
+      }
+    }
+  }
+  assert.ok(clicked.size > 0, 'the scan found no clicked row ids; it is broken');
+
+  for (const id of clicked) {
+    const entry = scope.entries.find((candidate) => candidate.id === id);
+    assert.ok(
+      Boolean(entry),
+      `a capture case clicks the world row "${id}", which the lab world does not hold`
+    );
+    assert.ok(
+      entry.membershipCount > 0,
+      `"${id}" has no membership record, so its entry editor shows no per-system row and the ` +
+        'frame is evidence of an empty state rather than of the screen'
+    );
+  }
+
+  // NON-VACUITY ON THE FIXTURE, not only on the scan. Both states the catalogue draws have to
+  // exist, or the frame shows one badge and proves nothing about the other.
+  assert.ok(
+    scope.entries.some((entry) => entry.hasSourceLink),
+    'the lab world holds a LINKED world tool'
+  );
+  assert.ok(
+    scope.entries.some((entry) => !entry.hasSourceLink),
+    'and an UNLINKED one, which is the state a source-item badge alone cannot show'
+  );
+});

@@ -96,6 +96,19 @@ const SHARED_PRIMITIVES = [
   // Tool Studio header, which is the authority the primitive reproduces — and they already
   // sit in four different mounted trees between them.
   'src/ui/svelte/components/ManagerButton.svelte',
+  // The scoped-entity list composition and the world-catalogue shell over it (issue 1380).
+  // `EntityListInspectorFrame` is the sharpest entry since `Chip`: SIX screens across four
+  // lanes of epic 1357 compose it, so every lane that lands drops it into another mounted
+  // tree, and each omission costs a HUNG suite rather than a failing one.
+  //
+  // `EntityRulesListShell` is deliberately NOT here yet, and that is the guard below working
+  // rather than an oversight: nothing renders it, so it is reachable from no declared
+  // application root and adding it would red the reachability assertion. `RowDisclosure`
+  // came off this list for exactly that reason at issue 1096's parity round, and the note
+  // there records that it goes back on the moment something renders it. Same rule: the lane
+  // whose screen composes the rules-list shell adds it in that change.
+  'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

@@ -6,12 +6,28 @@
   import Pagination from '../../components/Pagination.svelte';
   import ItemDropZone from './ItemDropZone.svelte';
   import { filterTools, projectToolRow } from './tools/toolStudio.js';
+  import {
+    breakModeSourcePill,
+    INHERIT_BREAK_MODE,
+    systemBreakModeOptions,
+  } from './scoped/worldToolStudio.js';
 
   let {
     tools = [],
     selectedToolId = '',
     managedItemOptions = [],
     breakageAuthority = 'toolSpecific',
+    // THE WORLD SCOPE'S OWN PROJECTION and the AUTHORING LAYER of the resolved token above
+    // (issue 1373). Both are already passed by the call site, which is what makes the
+    // tri-state buildable without reopening a gateway file: `CraftingSystemManagerRoot`
+    // spreads the tool bundle FIRST and restates `breakageAuthority` / `breakageSource`
+    // after, so declaring exactly what the site passes keeps the lookup off the spread.
+    //
+    // Declaring a name the site does NOT pass would make every reader of it a live
+    // subscriber to the whole bundle, which the root's own note records; both of these are
+    // passed, so neither does.
+    scope = null,
+    breakageSource = 'default',
     onSelectTool = () => {},
     onEditTool = () => {},
     onCreateToolDrop = () => {},
@@ -28,6 +44,28 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  // PROJECTED TO A SCALAR IMMEDIATELY, and that is a cost decision rather than a style one.
+  // `scope` is a NEW OBJECT on every world-corpus publish, so reading it inside a reactive
+  // scope would re-render this whole view on every world-scope edit. One derivation bounds
+  // that to a string comparison; world-corpus publishes are GM-edit-driven, not per-frame.
+  //
+  // `worldScopeProjection` attaches `toolBreakage` ONLY when the corpus holds one, so `''`
+  // means the world authored nothing - which is a different label and a different pill from
+  // an authored `toolSpecific`, and is why this is read rather than inferred from the
+  // resolved token.
+  const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
+
+  const authoritySegments = $derived(
+    systemBreakModeOptions({
+      worldAuthority,
+      systemAuthority: breakageAuthority,
+      source: breakageSource,
+      text,
+    })
+  );
+
+  const authorityPill = $derived(breakModeSourcePill(breakageSource, text));
 
   const filteredTools = $derived(filterTools(tools, searchTerm, managedItemOptions));
   const pagedTools = $derived(
@@ -121,44 +159,48 @@
     >
       <div class="manager-tools-authority-heading">
         <span><i class="fas fa-sliders" aria-hidden="true"></i></span>
-        <div>
+        <!--
+          THE PILL SITS INSIDE THE TITLE CELL, not beside the `ALL TOOLS` chip, and that is a
+          layout constraint rather than a preference. `styles/fabricate.css` gives this heading
+          `grid-template-columns: 20px minmax(0, 1fr) max-content` and is closed to this lane,
+          so a FOURTH child would flow into an implicit second row under the glyph. Nesting it
+          in the `1fr` cell keeps the heading at three children and lets the pill wrap under a
+          long title instead of forcing a row.
+        -->
+        <div class="manager-tools-authority-title">
           <strong>{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}</strong
+          >
+          <Chip tone={authorityPill.tone} data-tool-authority-pill={authorityPill.state}
+            >{authorityPill.label}</Chip
           >
         </div>
         <Chip tone="neutral">{text('FABRICATE.Admin.Manager.Tools.AllTools', 'ALL TOOLS')}</Chip>
       </div>
+      <!--
+        THREE SEGMENTS, SELECTED ON THE AUTHORED LAYER (issue 1373). `selected` comes from
+        `breakageSource`, never from `breakageAuthority === value`: the resolved token cannot
+        tell "this system chose it" from "this system inherited it", so a two-state control
+        drew the inherited value as current and MINTED a per-system override the moment a GM
+        clicked the segment already highlighted - an override nothing could then clear.
+      -->
       <div
         class="manager-tools-authority-segments"
         role="radiogroup"
         aria-label={text('FABRICATE.Admin.Manager.Tools.AuthorityTitle', 'Tool breakage source')}
       >
-        {#each ['toolSpecific', 'checkDriven'] as authority (authority)}
-          <label
-            class:is-selected={breakageAuthority === authority}
-            data-tool-authority-segment={authority}
-          >
+        {#each authoritySegments as segment (segment.value)}
+          <label class:is-selected={segment.selected} data-tool-authority-segment={segment.value}>
             <input
               type="radio"
               name="tool-breakage-authority"
-              value={authority}
-              checked={breakageAuthority === authority}
-              onchange={() => onSetBreakageAuthority(authority)}
+              value={segment.value}
+              checked={segment.selected}
+              onchange={() =>
+                onSetBreakageAuthority(segment.value === INHERIT_BREAK_MODE ? null : segment.value)}
             />
             <span class="manager-tools-authority-option">
-              <i
-                class={authority === 'toolSpecific'
-                  ? 'fas fa-screwdriver-wrench'
-                  : 'fas fa-dice-d20'}
-                aria-hidden="true"
-              ></i>
-              <span
-                >{authority === 'toolSpecific'
-                  ? text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific')
-                  : text(
-                      'FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven',
-                      'Check-driven'
-                    )}</span
-              >
+              <i class={segment.icon} aria-hidden="true"></i>
+              <span>{segment.label}</span>
             </span>
           </label>
         {/each}
@@ -312,3 +354,25 @@
     </div>
   {/if}
 </main>
+
+<style>
+  /* The title cell holds the heading word AND the authoring-source pill (issue 1373). STATIC
+     class name, so Svelte can prove the selector is used and `lint:svelte:warnings` stays at
+     zero.
+
+     The PILL'S OWN SIZING is not authored here: the host sheet's descendant rule under
+     `.manager-tools-authority-heading` still reaches it one level deeper, which is why it
+     stays the smaller 18px/0.56rem treatment its sibling wears.
+
+     The token that rule selects on is deliberately not written out. `manager-layout.test.js`
+     ratchets the hand-rolled-chip migration by matching that token ANYWHERE in a manager
+     `.svelte` file, comment prose included - which is a decision it records, because one site
+     passes the classes to a child as a string prop and an attribute-shaped scan missed it. */
+  .manager-tools-authority-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-chip);
+    min-width: 0;
+  }
+</style>

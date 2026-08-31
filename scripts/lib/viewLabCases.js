@@ -1226,14 +1226,91 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `Tools Catalogue` is PLURAL where its siblings are singular, and `Tools` is a live
     // substring of it — which is why the shipped `Tools` rail entry could no longer be reached
     // by text either.
-    steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
+    // THE ROW IS INSPECTED, not merely listed. The shell's inspector column is where the
+    // per-section inherit counts and the per-system membership cluster live, and neither is
+    // rendered at rest - so a frame taken without this click shows a list and nothing this
+    // screen decides.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-scoped-list-inspect="sm-tool-hammer"]' },
+    ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-page="world-tools"]',
+    // THE REAL CATALOGUE, not the placeholder (issue 1373). Three things have to be IN the
+    // frame rather than merely rendered somewhere: the World breakage default card with a
+    // segment selected, a populated row, and that row's source badge. `expectContained` is
+    // what proves each is inside its container rather than clipped out of it.
+    expectContained: [
+      {
+        container: '[data-world-tool-break-mode]',
+        target: '[data-world-tool-break-segment="toolSpecific"]',
+      },
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-source]',
+      },
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inherit-count="breakage"]',
+      },
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-world-tool-repair-seed="sm-tool-hammer"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    // THE PLACEHOLDER CLAIM IS GONE, and dropping it is not optional bookkeeping.
+    // `tests/manager-scoped-prop-contract.test.js` pairs "a case claims the shared placeholder
+    // body" against "that route's page still imports it" as a BICONDITIONAL, so a claim left
+    // behind here publishes this route's real screen as evidence of a placeholder-body change.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      // The membership cluster the inspector renders per crafting system row. It became
+      // reachable in a captured window the moment this catalogue stopped being a placeholder,
+      // and an unclaimed reachable component selects an UNRELATED frame as its evidence.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/MembershipActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry',
+    label: 'Manager — World Tool entry',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // REACHED BY CLICKING A CATALOGUE ROW, which is the only way in: the entry route takes an
+    // entity id the rail cannot supply. That is why the lab fixture seeds a world tool corpus
+    // (`tests/view-lab/world/labContent.js`) - the capture driver throws by name on a selector
+    // that matches nothing, so the fixture and this case ship together.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-scoped-page="world-tool-entry"]',
+    // A SECTION TAB OPEN WITH ITS INHERIT COUNT, the read-only world break mode, and at least
+    // one per-system row. Each is a distinct decision this screen makes, and a frame missing
+    // any of them is evidence of a different screen.
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-world-tool-entry-inherit-count="breakage"]',
+      },
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-world-tool-entry-break-label]',
+      },
+    ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
     ],
   }),
   managerCase({
