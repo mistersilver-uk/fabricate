@@ -2,14 +2,41 @@
 <!--
   The world Tool entry editor (issue 1373, epic 1357).
 
-  == THE WORLD BREAK MODE IS READ-ONLY HERE, AND THAT IS THE DECISION ======================
+  == THE SCREEN IS THREE TABS, AND IT USED TO BE SIX ======================================
+  `Identity`, `Breakage`, `On break`, `Repair materials`, `Crafting systems`, `Validation`
+  was the section list wearing a tab strip: one tab per persisted key rather than one tab per
+  decision a GM makes. Three of them - breakage, what happens when it breaks, and what mends
+  it afterwards - are one question asked three times, and each panel held a single segmented
+  control over two thirds of empty pane.
+
+  What is here now is `Overview`, `Breakage` and `Validation`:
+
+   - OVERVIEW is the identity the record actually has - the game-world Item behind it, and
+     the display label every system shows. The linked Item was stated NOWHERE before, which
+     is the one fact every other field on the screen derives from;
+   - BREAKAGE opens with the world break mode, READ-ONLY, because it decides whether the
+     control beneath it is consulted at all. That statement used to be a full-width band
+     ABOVE the tab strip, where it sat over tabs it says nothing about;
+   - VALIDATION wears its own count in the strip, so a GM does not open a tab to learn
+     whether anything is wrong.
+
+  `Crafting systems` is gone rather than folded. The per-system membership cluster it held is
+  the CATALOGUE inspector's, which renders it for every world entity through
+  `EntityCatalogueShell`; a second copy behind a tab here was one meaning implemented twice.
+
+  == THERE IS NO SAVE BUTTON, AND THAT IS THE DECISION ====================================
+  World-scope writes land on change - `updateEntity` and `updateWorldDefaultSection` persist
+  the moment a field or a segment is touched - so there is no draft for a Save to flush. The
+  prototype's header carries one because its own fixture is draft-based. A button that saved
+  nothing because everything was already saved would teach a GM that their edits are pending
+  when they are not, so the header carries Back and Delete and stops there.
+
+  == THE WORLD BREAK MODE IS READ-ONLY HERE, AND THAT IS ALSO A DECISION ==================
   It is authored on the Tools Catalogue and nowhere else. `## Scoped Entity Definitions`
   prohibits one field authored at two places, and the failure it prevents is concrete: two
   controls over one setting disagree the moment either is edited with the other on screen.
-  `FABRICATE.Admin.Manager.Scoped.ToolEntrySubtitle` names the break mode among this screen's
-  contents, and a read-only statement satisfies that without putting a second writer here.
 
-  == THREE SECTIONS, AND THE THIRD IS A SEED RATHER THAN A PARENT =========================
+  == THE THIRD SECTION IS A SEED RATHER THAN A PARENT =====================================
   `breakage` and `onBreak` are world defaults a membership record INHERITS: each states how
   many systems inherit it before an edit lands, read from `entry.inheritCounts`, which
   `worldScopeProjection` populates from `descriptor.sections` alone.
@@ -17,9 +44,8 @@
   `repairRequirements` is the third, is NOT in `descriptor.sections`, and therefore carries no
   inherit count at all - correctly, because it is copied ONCE when a tool joins a system and
   then diverges freely. A count here would claim a live parent the resolver does not honour,
-  and `resolveTool` reads the list from the MEMBERSHIP RECORD ALONE. So the tab states the
-  seed rule instead of a count, and the tab set comes from `worldToolSectionTabs()` rather
-  than a hand-written list.
+  and `resolveTool` reads the list from the MEMBERSHIP RECORD ALONE. So the card states the
+  seed rule instead of a count.
 
   Its full ingredient-group editor is deliberately NOT here. A repair recipe names ingredient
   groups over the OWNING SYSTEM's components, which world scope cannot address - `toolScope.js`
@@ -34,18 +60,14 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import Chip from '../Chip.svelte';
   import EditorTabs from '../EditorTabs.svelte';
   import { toolBreakageSummary, toolOnBreakSummary } from '../tools/toolStudio.js';
-  import MembershipActions from './MembershipActions.svelte';
   import ScopedEntityPreview from './ScopedEntityPreview.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
-  import {
-    isSeededToolSection,
-    toolBreakModeLabel,
-    worldToolSectionTabs,
-  } from './worldToolStudio.js';
+  import { isSeededToolSection, toolBreakModeLabel } from './worldToolStudio.js';
 
   // `systems` IS DELIBERATELY NOT DECLARED, though the call site passes it in the tool bundle.
   // It is `projectSystems`' narrowed `{id, name}` roster, which cannot answer `member`,
@@ -55,16 +77,12 @@
   let { scope = null, actions = null, entityId = '', onBackToCatalogue = () => {} } = $props();
 
   const BREAKAGE_MODES = ['limitedUses', 'breakageChance', 'diceExpression'];
+  const DEFAULT_BREAK_MODE = 'toolSpecific';
   const ON_BREAK_MODES = ['destroy', 'flagBroken', 'replaceWith'];
 
-  const SECTION_TABS = worldToolSectionTabs();
-
   const TAB_ICONS = {
-    identity: 'fas fa-hammer',
+    identity: 'fas fa-circle-info',
     breakage: 'fas fa-heart-crack',
-    onBreak: 'fas fa-explosion',
-    repairRequirements: 'fas fa-screwdriver-wrench',
-    systems: 'fas fa-diagram-project',
     validation: 'fas fa-clipboard-check',
   };
 
@@ -121,20 +139,14 @@
     {
       id: 'identity',
       icon: TAB_ICONS.identity,
-      labelKey: 'FABRICATE.Admin.Manager.Scoped.Entry.TabIdentity',
-      label: 'Identity',
+      labelKey: 'FABRICATE.Admin.Manager.Scoped.Entry.TabOverview',
+      label: 'Overview',
     },
-    ...SECTION_TABS.map((section) => ({
-      id: section,
-      icon: TAB_ICONS[section],
-      labelKey: '',
-      label: sectionLabel(section),
-    })),
     {
-      id: 'systems',
-      icon: TAB_ICONS.systems,
-      labelKey: 'FABRICATE.Admin.Manager.Scoped.Entry.TabSystems',
-      label: 'Crafting systems',
+      id: 'breakage',
+      icon: TAB_ICONS.breakage,
+      labelKey: '',
+      label: sectionLabel('breakage'),
     },
     {
       id: 'validation',
@@ -143,6 +155,18 @@
       label: 'Validation',
     },
   ]);
+
+  // THE VALIDATION TAB WEARS ITS OWN COUNT, which is what makes the strip readable at a
+  // glance: a GM should not have to open the tab to learn whether anything is wrong. A clean
+  // record shows a tick rather than `0`, because a zero reads as a quantity of something.
+  const tabBadges = $derived({
+    validation:
+      validationCounts.blocking > 0
+        ? { label: String(validationCounts.blocking), tone: 'danger' }
+        : validationCounts.warnings > 0
+          ? { label: String(validationCounts.warnings), tone: 'warning' }
+          : { label: '✓', tone: 'success' },
+  });
 
   /**
    * The inherit count one section states before an edit lands, or `null` for a SEEDED section
@@ -170,9 +194,51 @@
   }
 
   const breakageSummary = $derived(
-    toolBreakageSummary(worldDefaultTool(), worldAuthority || 'toolSpecific')
+    toolBreakageSummary(worldDefaultTool(), worldAuthority || DEFAULT_BREAK_MODE)
   );
   const onBreakSummary = $derived(toolOnBreakSummary(worldDefaultTool()));
+
+  /**
+   * What the breakage section RESOLVES TO, in words.
+   *
+   * `toolBreakageSummary` answers a KIND - `breakageChance`, `diceExpression`, `limitedUses` -
+   * which is a persisted field name and not copy. It was being rendered straight to the panel,
+   * so the Breakage tab read `breakageChance` under its own control. This turns the kind into
+   * the value it stands for, exactly as the row badge and the inspector card already do.
+   */
+  const breakageSummaryLabel = $derived.by(() => {
+    const tool = worldDefaultTool();
+    if (breakageSummary === 'immune') {
+      return text('FABRICATE.Admin.Manager.Tools.SummaryImmune', 'Immune');
+    }
+    if (breakageSummary === 'breakable') {
+      return text('FABRICATE.Admin.Manager.Tools.SummaryCheckDriven', 'Roll to break');
+    }
+    if (breakageSummary === 'breakageChance') {
+      return format('FABRICATE.Admin.Manager.Tools.SummaryChanceValue', '{count}% break', {
+        count: tool.breakage?.breakageChance ?? 0,
+      });
+    }
+    if (breakageSummary === 'diceExpression') {
+      return format('FABRICATE.Admin.Manager.Tools.SummaryDiceValue', '{formula} roll', {
+        formula: tool.breakage?.formula || '-',
+      });
+    }
+    const maxUses = Number(tool.breakage?.maxUses);
+    if (Number.isInteger(maxUses) && maxUses > 0) {
+      return format('FABRICATE.Admin.Manager.Tools.SummaryUseCount', '{count} uses', {
+        count: maxUses,
+      });
+    }
+    return text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses');
+  });
+
+  /**
+   * What one on-break mode DOES, in words, for the summary line under its control.
+   */
+  const onBreakSummaryLabel = $derived(
+    onBreakModeLabel(onBreakSummary) || onBreakModeLabel('destroy')
+  );
 
   function breakageModeLabel(mode) {
     return {
@@ -214,6 +280,14 @@
    * testing the old names after a rename.
    */
   const sourceLinked = $derived(entry?.hasSourceLink === true);
+
+  /**
+   * The game-world Item this record names, for the linked-item tile.
+   *
+   * REGISTERED FIRST, then ORIGIN, which is `toolSourceUuid`'s own precedence: a Tool that was
+   * re-linked carries both, and the registered uuid is the one the resolver reads.
+   */
+  const sourceUuid = $derived(String(entity?.registeredItemUuid || entity?.originItemUuid || ''));
 
   const validationRows = $derived([
     {
@@ -273,6 +347,15 @@
     ),
   });
 
+  /**
+   * The world defaults, resolved, as the preview's fact rows.
+   *
+   * THE SUBLINE SAYS WHAT THE RULE DOES, never how many systems inherit it. `1 systems
+   * inherit it` was an unpluralised count of a fact the tab bodies already state, in the one
+   * place a GM is asking what the Tool will DO - and it read as debug output beside the
+   * prototype's `Tool-specific · tracked per copy`. The inherit counts stay where they answer
+   * a question: on the section itself, before an edit lands.
+   */
   const previewRules = $derived([
     {
       id: 'break-mode',
@@ -285,72 +368,124 @@
     },
     {
       id: 'breakage',
-      icon: 'fas fa-heart-crack',
-      title: breakageModeLabel(defaults.breakage?.mode) || breakageModeLabel('limitedUses'),
-      subtitle: format(
-        'FABRICATE.Admin.Manager.Scoped.Entry.PreviewInheriting',
-        '{count} systems inherit it',
-        { count: inheritCount('breakage') ?? 0 }
-      ),
+      icon: 'fas fa-hourglass-half',
+      title: breakageSummaryLabel,
+      subtitle:
+        (worldAuthority || DEFAULT_BREAK_MODE) === 'checkDriven'
+          ? text(
+              'FABRICATE.Admin.Manager.Tools.Editor.PreviewCheckDriven',
+              'Check-driven · follows the crafting roll'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Tools.Editor.PreviewToolSpecific',
+              'Tool-specific · tracked per copy'
+            ),
     },
     {
       id: 'on-break',
-      icon: 'fas fa-explosion',
-      title: onBreakModeLabel(defaults.onBreak?.mode) || onBreakModeLabel('destroy'),
-      subtitle: format(
-        'FABRICATE.Admin.Manager.Scoped.Entry.PreviewInheriting',
-        '{count} systems inherit it',
-        { count: inheritCount('onBreak') ?? 0 }
+      icon: 'fas fa-heart-crack',
+      title: format(
+        'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
+        'On break: {action}',
+        {
+          action: (
+            onBreakModeLabel(defaults.onBreak?.mode) || onBreakModeLabel('destroy')
+          ).toLocaleLowerCase(),
+        }
+      ),
+      subtitle: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak',
+        'Runs immediately after breakage'
+      ),
+    },
+    {
+      id: 'repair',
+      icon: 'fas fa-screwdriver-wrench',
+      title: format(
+        repairGroups.length === 1
+          ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
+          : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
+        repairGroups.length === 1 ? '{count} group' : '{count} groups',
+        { count: repairGroups.length }
+      ),
+      subtitle: text(
+        'FABRICATE.Admin.Manager.Tools.RepairSeedPreview',
+        'Copied once when a system adopts this Tool'
       ),
     },
   ]);
 
   const pageTitle = $derived(text('FABRICATE.Admin.Manager.Scoped.ToolEntryTitle', 'Tool entry'));
-
-  function systemLabel(row) {
-    const named = typeof row?.systemName === 'string' ? row.systemName.trim() : '';
-    return named || String(row?.systemId ?? '');
-  }
 </script>
 
 <main class="manager-main" data-scoped-page="world-tool-entry" aria-label={pageTitle}>
-  <header class="manager-world-tool-entry-head">
-    <ManagerButton role="ghost" data-world-tool-entry-back onclick={() => onBackToCatalogue()}>
-      <i class="fas fa-arrow-left" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle', 'Tools Catalogue')}</span>
-    </ManagerButton>
-    <h2 class="manager-world-tool-entry-name" data-world-tool-entry-name>{entryName}</h2>
-    <Chip
-      tone={sourceLinked ? 'neutral' : 'warning'}
-      icon={sourceLinked ? 'fas fa-link' : 'fas fa-link-slash'}
-      data-world-tool-entry-source={sourceLinked ? 'linked' : 'unlinked'}
-    >
-      {sourceLinked
-        ? text('FABRICATE.Admin.Manager.Scoped.List.SourceLinked', 'Linked')
-        : text('FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked', 'No source item')}
-    </Chip>
-  </header>
-
   <!--
-    THE WORLD BREAK MODE, READ-ONLY. It is stated here because a GM authoring this Tool's
-    breakage section has to know which authority decides whether the section is even read;
-    it is not authored here because the catalogue owns it.
+    THE ENTITY HEADER, not a second breadcrumb strip.
+
+    It carried a Back button, a bare `<h2>` and a source pill and nothing else, so the screen
+    opened with a generic page title over a name over a tab strip, and the two actions a GM
+    comes here to reach - leave, and delete - were one of them and hidden respectively. The
+    prototype's is a medallion, the name, what the record IS, and the actions right-aligned on
+    the same line, and that is what this is.
+
+    THERE IS NO SAVE BUTTON, and its absence is the decision. World-scope writes land on
+    change: `updateEntity` and `updateWorldDefaultSection` persist the moment a field or a
+    segment is touched, so there is no draft for a Save to flush. A button that saved nothing
+    because everything was already saved is worse than no button, because it teaches a GM that
+    their edits are pending when they are not.
   -->
-  <section class="manager-world-tool-entry-mode" data-world-tool-entry-break-mode>
-    <i class="fas fa-sliders" aria-hidden="true"></i>
-    <div class="manager-world-tool-entry-mode-copy">
-      <span class="manager-kicker"
-        >{text('FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle', 'World breakage default')}</span
+  <header class="manager-world-tool-entry-head">
+    <img
+      class="manager-world-tool-entry-medallion"
+      src={entity?.img || ''}
+      alt=""
+      data-world-tool-entry-medallion
+    />
+    <div class="manager-world-tool-entry-identity">
+      <h2 class="manager-world-tool-entry-name" data-world-tool-entry-name>{entryName}</h2>
+      <p
+        class="manager-muted manager-world-tool-entry-kind"
+        data-world-tool-entry-source={sourceLinked ? 'linked' : 'unlinked'}
       >
-      <strong data-world-tool-entry-break-label>{toolBreakModeLabel(worldAuthority, text)}</strong>
+        {sourceLinked
+          ? text('FABRICATE.Admin.Manager.Scoped.Entry.LinkedItemSub', 'Linked game-world Item')
+          : text('FABRICATE.Admin.Manager.Scoped.Entry.UnlinkedItemSub', 'No Item linked')}
+      </p>
     </div>
-    <p class="manager-muted manager-world-tool-entry-mode-note">
-      {text(
-        'FABRICATE.Admin.Manager.Tools.WorldAuthorityReadOnly',
-        'World default, set once for every Tool on the Tools Catalogue. Systems may override it.'
-      )}
-    </p>
-  </section>
+    <div class="manager-world-tool-entry-actions">
+      <ManagerButton role="ghost" data-world-tool-entry-back onclick={() => onBackToCatalogue()}>
+        <i class="fas fa-arrow-left" aria-hidden="true"></i>
+        <span>{text('FABRICATE.Admin.Manager.Scoped.Entry.BackToTools', 'Back to tools')}</span>
+      </ManagerButton>
+      <!-- ARMED, because this deletes the world record, its world defaults AND every
+           membership record naming it - `deleteEntity` sweeps all three - and there is no
+           undo. The shipped two-step control is what every other destructive manager action
+           uses; a bare button here would be the only unguarded one. -->
+      <ArmedDangerButton
+        token={`world-tool-delete:${entityId}`}
+        armed={armedToken === `world-tool-delete:${entityId}`}
+        idleLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.Delete', 'Delete')}
+        armedLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirm', 'Delete for good?')}
+        idleAriaLabel={format(
+          'FABRICATE.Admin.Manager.Scoped.Entry.DeleteAria',
+          'Delete {name} from the world catalogue',
+          { name: entryName }
+        )}
+        armedAriaLabel={format(
+          'FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirmAria',
+          'Confirm deleting {name} from every system that has it',
+          { name: entryName }
+        )}
+        onArm={(token) => (armedToken = token)}
+        onDisarm={() => (armedToken = '')}
+        onConfirm={async () => {
+          armedToken = '';
+          await actions?.deleteEntity?.(entityId);
+          onBackToCatalogue();
+        }}
+      />
+    </div>
+  </header>
 
   <div class="manager-world-tool-entry-body">
     <EditorTabs
@@ -361,6 +496,9 @@
       ariaLabel="Tool entry sections"
       idStem="world-tool-entry"
       hookAttribute="data-world-tool-entry-tab"
+      badges={tabBadges}
+      badgeAttribute="data-world-tool-entry-tab-badge"
+      danger
     />
 
     <div class="manager-world-tool-entry-columns">
@@ -380,162 +518,230 @@
             )}
           </p>
         {:else if activeTab === 'identity'}
-          <label class="manager-field" data-world-tool-entry-field="name">
-            <span>{text('FABRICATE.Admin.Manager.Scoped.Entry.Name', 'Name')}</span>
-            <input
-              type="text"
-              value={entity?.name ?? ''}
-              onchange={(event) =>
-                actions?.updateEntity?.(entityId, { name: event.currentTarget.value })}
-            />
-          </label>
-          <label class="manager-field" data-world-tool-entry-field="description">
-            <span>{text('FABRICATE.Admin.Manager.Scoped.Entry.Description', 'Description')}</span>
-            <textarea
-              rows="3"
-              value={entity?.description ?? ''}
-              onchange={(event) =>
-                actions?.updateEntity?.(entityId, { description: event.currentTarget.value })}
-            ></textarea>
-          </label>
+          <!--
+            THREE CARDS, and the first is the one the screen was missing entirely: WHAT this
+            world record is a record OF. A GM opening a Tool entry saw a name and a description
+            with no statement of the game-world Item behind them, which is the one fact every
+            other field on this screen is derived from.
+          -->
+          <section class="manager-world-tool-entry-card" data-world-tool-entry-card="linked-item">
+            <p class="manager-kicker">
+              {text('FABRICATE.Admin.Manager.Scoped.Entry.LinkedItem', 'Linked item')}
+            </p>
+            <div class="manager-world-tool-entry-tile">
+              <img src={entity?.img || ''} alt="" />
+              <div class="manager-world-tool-entry-tile-copy">
+                <strong>{entryName}</strong>
+                <small class="manager-muted" data-world-tool-entry-source-uuid>
+                  {sourceLinked
+                    ? sourceUuid
+                    : text(
+                        'FABRICATE.Admin.Manager.Scoped.Entry.UnlinkedItemHint',
+                        'No Item linked — name, art and description are authored here.'
+                      )}
+                </small>
+              </div>
+              <Chip
+                tone={sourceLinked ? 'neutral' : 'warning'}
+                icon={sourceLinked ? 'fas fa-link' : 'fas fa-link-slash'}
+              >
+                {sourceLinked
+                  ? text('FABRICATE.Admin.Manager.Scoped.List.SourceLinked', 'Linked')
+                  : text('FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked', 'No source item')}
+              </Chip>
+            </div>
+            <label class="manager-field" data-world-tool-entry-field="description">
+              <span>{text('FABRICATE.Admin.Manager.Scoped.Entry.Description', 'Description')}</span>
+              <textarea
+                rows="3"
+                value={entity?.description ?? ''}
+                onchange={(event) =>
+                  actions?.updateEntity?.(entityId, { description: event.currentTarget.value })}
+              ></textarea>
+            </label>
+          </section>
+
+          <section class="manager-world-tool-entry-card" data-world-tool-entry-card="display-label">
+            <p class="manager-kicker">
+              {text('FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabel', 'Display label')}
+            </p>
+            <!-- NO SECOND VISIBLE LABEL. The card's kicker already reads `Display label`, so a
+                 `Name` caption under it names the same field twice; the accessible name goes
+                 on the input instead, which is what a screen reader announces anyway. -->
+            <div class="manager-field" data-world-tool-entry-field="name">
+              <input
+                type="text"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabel',
+                  'Display label'
+                )}
+                value={entity?.name ?? ''}
+                onchange={(event) =>
+                  actions?.updateEntity?.(entityId, { name: event.currentTarget.value })}
+              />
+            </div>
+            <p class="manager-muted manager-world-tool-entry-hint">
+              {text(
+                'FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelHint',
+                'The name every crafting system shows for this Tool.'
+              )}
+            </p>
+          </section>
         {:else if activeTab === 'breakage'}
-          <p class="manager-muted" data-world-tool-entry-inherit-count="breakage">
-            {format(
-              'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
-              '{count} crafting systems inherit this world default today.',
-              { count: inheritCount('breakage') }
-            )}
-          </p>
-          <div
-            class="manager-world-tool-entry-modes"
-            role="radiogroup"
-            aria-label={sectionLabel('breakage')}
-          >
-            {#each BREAKAGE_MODES as mode (mode)}
-              <label
-                class:is-selected={(defaults.breakage?.mode ?? 'limitedUses') === mode}
-                data-world-tool-entry-breakage-mode={mode}
+          <!--
+            ONE TAB FOR THE WHOLE BREAKAGE STORY. It used to be three — `Breakage`, `On break`
+            and `Repair materials` — which split one decision across three panels a GM had to
+            hold in their head: what makes it break, what happens when it does, and what mends
+            it afterwards are the same question asked three times.
+
+            THE WORLD BREAK MODE LEADS, READ-ONLY. It decides whether the control under it is
+            even consulted, so stating it anywhere else — and it used to be a full-width band
+            ABOVE the tab strip, on every tab including the ones it says nothing about — puts
+            the condition away from the thing it conditions.
+          -->
+          <div class="manager-world-tool-entry-mode" data-world-tool-entry-break-mode>
+            <i class="fas fa-sliders" aria-hidden="true"></i>
+            <div class="manager-world-tool-entry-mode-copy">
+              <span class="manager-kicker"
+                >{text(
+                  'FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle',
+                  'World breakage default'
+                )}</span
               >
-                <input
-                  type="radio"
-                  name="world-tool-breakage-mode"
-                  value={mode}
-                  checked={(defaults.breakage?.mode ?? 'limitedUses') === mode}
-                  onchange={() => patchSection('breakage', { mode })}
-                />
-                <span>{breakageModeLabel(mode)}</span>
-              </label>
-            {/each}
-          </div>
-          <p class="manager-muted" data-world-tool-entry-breakage-summary>{breakageSummary}</p>
-        {:else if activeTab === 'onBreak'}
-          <p class="manager-muted" data-world-tool-entry-inherit-count="onBreak">
-            {format(
-              'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
-              '{count} crafting systems inherit this world default today.',
-              { count: inheritCount('onBreak') }
-            )}
-          </p>
-          <div
-            class="manager-world-tool-entry-modes"
-            role="radiogroup"
-            aria-label={sectionLabel('onBreak')}
-          >
-            {#each ON_BREAK_MODES as mode (mode)}
-              <label
-                class:is-selected={(defaults.onBreak?.mode ?? 'destroy') === mode}
-                data-world-tool-entry-onbreak-mode={mode}
+              <strong data-world-tool-entry-break-label
+                >{toolBreakModeLabel(worldAuthority, text)}</strong
               >
-                <input
-                  type="radio"
-                  name="world-tool-onbreak-mode"
-                  value={mode}
-                  checked={(defaults.onBreak?.mode ?? 'destroy') === mode}
-                  onchange={() => patchSection('onBreak', { mode })}
-                />
-                <span>{onBreakModeLabel(mode)}</span>
-              </label>
-            {/each}
+            </div>
+            <p class="manager-muted manager-world-tool-entry-mode-note">
+              {text(
+                'FABRICATE.Admin.Manager.Tools.WorldAuthorityReadOnly',
+                'World default, set once for every Tool on the Tools Catalogue. Systems may override it.'
+              )}
+            </p>
           </div>
-          <p class="manager-muted" data-world-tool-entry-onbreak-summary>{onBreakSummary}</p>
-        {:else if activeTab === 'repairRequirements'}
-          <!-- NO INHERIT COUNT, and the copy says why. See the header: a seed has no live
-             parent, so a count would claim an inheritance the resolver does not honour. -->
-          <p class="manager-muted" data-world-tool-entry-seed-note>
-            {text(
-              'FABRICATE.Admin.Manager.Tools.RepairSeedNote',
-              'Copied once when a system adopts this Tool, then edited there. Changing it here never reaches a system that already has it.'
-            )}
-          </p>
-          <p data-world-tool-entry-repair-count>
-            {format(
-              repairGroups.length === 1
-                ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
-                : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
-              repairGroups.length === 1 ? '{count} group' : '{count} groups',
-              { count: repairGroups.length }
-            )}
-          </p>
-          <p class="manager-muted" data-world-tool-entry-repair-scope-note>
-            {text(
-              'FABRICATE.Admin.Manager.Tools.RepairScopeNote',
-              'A repair group names components in the owning crafting system, which world scope cannot address, so the groups themselves are edited in that system Tool Rules editor.'
-            )}
-          </p>
-          {#if repairGroups.length > 0}
-            <ManagerButton
-              data-world-tool-entry-repair-clear
-              onclick={() => actions?.setWorldRepairRequirements?.(entityId, [])}
+
+          <section class="manager-world-tool-entry-card" data-world-tool-entry-card="breakage">
+            <p class="manager-kicker">
+              {text('FABRICATE.Admin.Manager.Tools.Editor.HowItBreaks', 'How this Tool breaks')}
+            </p>
+            <div
+              class="manager-world-tool-entry-modes"
+              role="radiogroup"
+              aria-label={sectionLabel('breakage')}
             >
-              {text('FABRICATE.Admin.Manager.Tools.RepairClearSeed', 'Clear the seed')}
-            </ManagerButton>
-          {/if}
-        {:else if activeTab === 'systems'}
-          <ul class="manager-world-tool-entry-systems" role="list">
-            {#each memberRows as row (row.systemId)}
-              <li
-                class="manager-world-tool-entry-system"
-                data-world-tool-entry-system={row.systemId}
+              {#each BREAKAGE_MODES as mode (mode)}
+                <label
+                  class:is-selected={(defaults.breakage?.mode ?? 'limitedUses') === mode}
+                  data-world-tool-entry-breakage-mode={mode}
+                >
+                  <input
+                    type="radio"
+                    name="world-tool-breakage-mode"
+                    value={mode}
+                    checked={(defaults.breakage?.mode ?? 'limitedUses') === mode}
+                    onchange={() => patchSection('breakage', { mode })}
+                  />
+                  <span>{breakageModeLabel(mode)}</span>
+                </label>
+              {/each}
+            </div>
+            <p class="manager-muted" data-world-tool-entry-breakage-summary>
+              {breakageSummaryLabel}
+            </p>
+            <p class="manager-muted" data-world-tool-entry-inherit-count="breakage">
+              {format(
+                inheritCount('breakage') === 1
+                  ? 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCountOne'
+                  : 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
+                inheritCount('breakage') === 1
+                  ? '{count} crafting system inherits this world default today.'
+                  : '{count} crafting systems inherit this world default today.',
+                { count: inheritCount('breakage') }
+              )}
+            </p>
+          </section>
+
+          <section class="manager-world-tool-entry-card" data-world-tool-entry-card="on-break">
+            <p class="manager-kicker">
+              {text('FABRICATE.Admin.Manager.Tools.Editor.WhenItBreaks', 'When it breaks')}
+            </p>
+            <div
+              class="manager-world-tool-entry-modes"
+              role="radiogroup"
+              aria-label={sectionLabel('onBreak')}
+            >
+              {#each ON_BREAK_MODES as mode (mode)}
+                <label
+                  class:is-selected={(defaults.onBreak?.mode ?? 'destroy') === mode}
+                  data-world-tool-entry-onbreak-mode={mode}
+                >
+                  <input
+                    type="radio"
+                    name="world-tool-onbreak-mode"
+                    value={mode}
+                    checked={(defaults.onBreak?.mode ?? 'destroy') === mode}
+                    onchange={() => patchSection('onBreak', { mode })}
+                  />
+                  <span>{onBreakModeLabel(mode)}</span>
+                </label>
+              {/each}
+            </div>
+            <p class="manager-muted" data-world-tool-entry-onbreak-summary>
+              {onBreakSummaryLabel}
+            </p>
+            <p class="manager-muted" data-world-tool-entry-inherit-count="onBreak">
+              {format(
+                inheritCount('onBreak') === 1
+                  ? 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCountOne'
+                  : 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
+                inheritCount('onBreak') === 1
+                  ? '{count} crafting system inherits this world default today.'
+                  : '{count} crafting systems inherit this world default today.',
+                { count: inheritCount('onBreak') }
+              )}
+            </p>
+          </section>
+
+          <section class="manager-world-tool-entry-card" data-world-tool-entry-card="repair">
+            <!-- NO INHERIT COUNT, and the copy says why. See the header: a seed has no live
+                 parent, so a count would claim an inheritance the resolver does not honour. -->
+            <p class="manager-kicker">
+              {text(
+                'FABRICATE.Admin.Manager.Scoped.Sections.RepairRequirements',
+                'Repair materials'
+              )}
+            </p>
+            <p data-world-tool-entry-repair-count>
+              {format(
+                repairGroups.length === 1
+                  ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
+                  : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
+                repairGroups.length === 1 ? '{count} group' : '{count} groups',
+                { count: repairGroups.length }
+              )}
+            </p>
+            <p class="manager-muted" data-world-tool-entry-seed-note>
+              {text(
+                'FABRICATE.Admin.Manager.Tools.RepairSeedNote',
+                'Copied once when a system adopts this Tool, then edited there. Changing it here never reaches a system that already has it.'
+              )}
+            </p>
+            <p class="manager-muted" data-world-tool-entry-repair-scope-note>
+              {text(
+                'FABRICATE.Admin.Manager.Tools.RepairScopeNote',
+                'A repair group names components in the owning crafting system, which world scope cannot address, so the groups themselves are edited in that system Tool Rules editor.'
+              )}
+            </p>
+            {#if repairGroups.length > 0}
+              <ManagerButton
+                class="manager-world-tool-entry-inline-action"
+                data-world-tool-entry-repair-clear
+                onclick={() => actions?.setWorldRepairRequirements?.(entityId, [])}
               >
-                <span class="manager-world-tool-entry-system-name">{systemLabel(row)}</span>
-                <span class="manager-world-tool-entry-system-inherit">
-                  {#each SECTION_TABS.filter((section) => !isSeededToolSection(section)) as section (section)}
-                    <Chip
-                      tone={row.inherited?.[section] === false ? 'accent' : 'neutral'}
-                      data-world-tool-entry-system-section={section}
-                    >
-                      {`${sectionLabel(section)} - ${
-                        row.inherited?.[section] === false
-                          ? text(
-                              'FABRICATE.Admin.Manager.Scoped.Inherit.StateOverridden',
-                              'Overridden'
-                            )
-                          : text(
-                              'FABRICATE.Admin.Manager.Scoped.Inherit.StateInherited',
-                              'Inherited'
-                            )
-                      }`}
-                    </Chip>
-                  {/each}
-                </span>
-                <MembershipActions
-                  entityType="tool"
-                  {entityId}
-                  systemId={row.systemId}
-                  entityName={entryName}
-                  systemName={systemLabel(row)}
-                  member={row.member === true}
-                  enabled={row.enabled === true}
-                  {armedToken}
-                  onArm={(token) => (armedToken = token)}
-                  onDisarm={() => (armedToken = '')}
-                  onAdd={() => actions?.addToSystem?.(entityId, row.systemId)}
-                  onRemove={() => actions?.removeFromSystem?.(entityId, row.systemId)}
-                  onToggleEnabled={(next) => actions?.setEnabled?.(entityId, row.systemId, next)}
-                />
-              </li>
-            {/each}
-          </ul>
+                {text('FABRICATE.Admin.Manager.Tools.RepairClearSeed', 'Clear the seed')}
+              </ManagerButton>
+            {/if}
+          </section>
         {:else}
           <ScopedValidationTab
             title={text('FABRICATE.Admin.Manager.Scoped.Entry.TabValidation', 'Validation')}
@@ -606,35 +812,154 @@
 
      And the tie is settled by adding the element selector: `main.manager-main[data-scoped-page]`
      is (0,3,1) against the shipped rule's (0,3,0), so it wins wherever it is injected. The
-     catalogue page carries the identical rule for the identical reason. */
+     catalogue page carries the identical rule for the identical reason.
+
+     TWO TRACKS NOW, not three: the read-only break-mode band moved INSIDE the Breakage tab,
+     so the header and the tabbed body are the whole of this screen's vertical structure. */
   main.manager-main[data-scoped-page='world-tool-entry'] {
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
+  /* THE MEDALLION, THE NAME AND WHAT IT IS on the left; the actions pushed to the trailing
+     edge. `flex-wrap` so a long name and three controls stack rather than crushing each
+     other at a narrow window, and `margin-left: auto` on the cluster rather than a spacer. */
   .manager-world-tool-entry-head {
     display: flex;
     grid-row: 1;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-3);
     padding: var(--fab-space-2) var(--fab-space-3) 0;
     min-width: 0;
   }
 
-  .manager-world-tool-entry-name {
+  .manager-world-tool-entry-medallion {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 10px;
+    object-fit: cover;
+  }
+
+  .manager-world-tool-entry-identity {
+    display: flex;
+    flex: 1 1 12rem;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-2);
+    margin-left: auto;
+    min-width: 0;
+  }
+
+  /* An ELEMENT rule, not an inherited colour: Foundry's core sheet styles bare `h1`-`h6`, and
+     an element rule beats whatever this heading would otherwise inherit. */
+  h2.manager-world-tool-entry-name {
     margin: 0;
     color: var(--fab-mv2-text);
-    font-size: 0.95rem;
+    font-family: var(--fab-font-serif);
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.2;
     overflow-wrap: break-word;
+  }
+
+  .manager-world-tool-entry-kind {
+    margin: 0;
+    font-size: 0.66rem;
+  }
+
+  /* ── THE TAB BODY'S CARDS ──────────────────────────────────────────────────────────────
+     One bordered panel per decision, which is what fills a pane the segmented control alone
+     left two thirds empty. */
+  .manager-world-tool-entry-card {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 12px;
+    background: var(--fab-overlay-light-03);
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-tile {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2);
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 10px;
+    background: var(--fab-surface-soft);
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-tile img {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 8px;
+    object-fit: cover;
+  }
+
+  .manager-world-tool-entry-tile-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-tile-copy strong {
+    color: var(--fab-mv2-text);
+    font-family: var(--fab-font-serif);
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow-wrap: break-word;
+  }
+
+  /* The uuid is a machine string, so it takes the mono face and truncates rather than
+     wrapping a 40-character identifier over three lines. */
+  .manager-world-tool-entry-tile-copy small {
+    min-width: 0;
+    font-family: var(--fab-font-mono);
+    font-size: 0.6rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* INLINE, not stretched. The button fills its flex column here because the card is a column
+     of full-width blocks, and a full-width `Clear the seed` reads as the card's primary action
+     rather than the small destructive escape hatch it is. The selector is `:global` because
+     the class is passed into a child component and never receives this block's scoping
+     attribute, so a scoped selector would be pruned as unused. */
+  :global(.manager-world-tool-entry-inline-action) {
+    align-self: flex-start;
+  }
+
+  .manager-world-tool-entry-hint {
+    margin: 0;
+    font-size: 0.62rem;
   }
 
   .manager-world-tool-entry-mode {
     display: flex;
-    grid-row: 2;
+    flex: 0 0 auto;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-2);
-    margin: var(--fab-space-2) var(--fab-space-3) 0;
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-mv2-border);
     border-radius: 11px;
@@ -665,7 +990,7 @@
      tabs off screen. */
   .manager-world-tool-entry-body {
     display: grid;
-    grid-row: 3 / -1;
+    grid-row: 2 / -1;
     grid-template-rows: auto minmax(0, 1fr);
     gap: var(--fab-space-2);
     padding: 0 var(--fab-space-3) var(--fab-space-3);
@@ -725,39 +1050,5 @@
     width: 1px;
     height: 1px;
     opacity: 0;
-  }
-
-  .manager-world-tool-entry-systems {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-system {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: 9px;
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-system-name {
-    color: var(--fab-mv2-text);
-    font-size: 0.74rem;
-    font-weight: 600;
-    overflow-wrap: break-word;
-  }
-
-  .manager-world-tool-entry-system-inherit {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-chip);
-    min-width: 0;
   }
 </style>
