@@ -20,20 +20,35 @@
  * None of those is hypothetical and none was caught by reading the code. Each was caught by
  * reading output, so each is pinned here.
  *
- * ── WHY THE FIXTURES ARE STRINGS ────────────────────────────────────────────────────────
+ * ── WHY THE FIXTURES ARE STRINGS, AND WHY ONE OF THEM IS NOT ────────────────────────────
  * `UI_PATH_PATTERN` in `scripts/lib/viewLabCases.js` is `/^(src\/ui\/|styles\/)|\.(svelte|css)$/`,
  * and the second alternation is NOT anchored to a directory — so `isUiFile` returns true for
- * `tests/fixtures/anything.svelte`. A committed fixture with either extension would arm the
+ * `tests/fixtures/anything.svelte`. A COMMITTED fixture with either extension would arm the
  * screenshot-evidence gate for a change that renders nothing at all. Helper proofs therefore take
- * source as strings, and the two end-to-end proofs point at the REAL tree rather than at a
- * fixture of it.
+ * source as strings.
+ *
+ * One proof cannot: `the scan reaches a value written only into a token` is end to end by
+ * definition — it exists to show that the filesystem walker, the Svelte `<style>` extractor and
+ * the resolver feed ONE definition namespace, so a token declared in a `.css` resolves inside a
+ * `.svelte` block. It used to point at the real tree, where `styles/fabricate.css` declared a
+ * 40px thumbnail token that `BooksScrollsView.svelte` read. Issue 1399 inlined that pair with the
+ * rest of the legacy token generations, and the tree now holds no token-mediated retired height
+ * at all — so the capability had to stop depending on the corpus happening to contain one.
+ *
+ * It is therefore built as REAL FILES in a tmpdir and read through `collectStyleCorpus`, which
+ * already takes `roots`. `scanPixelValues` would accept an in-memory `{path: text}` object, and
+ * that is the cheap version to refuse: it bypasses `collectWorkingTreeSources`, `styleTextFor`
+ * and `maskNonStyleRegions` entirely, and would replace an end-to-end capability proof with a
+ * resolver-only one. A tmpdir root is never reached by `isUiFile` and is never committed, so it
+ * costs nothing the string fixtures were avoiding.
  *
  * `tests/helpers/` is outside the `npm test` glob and `tests/*.test.js` is inside it, which is
  * why this file exists at all — the same arrangement, for the same reason, as
  * `tests/source-scan.test.js`.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -406,12 +421,25 @@ test('the real corpus is both stylesheets, and its custom properties come from b
     'Svelte scoped blocks must be in the corpus — they are the half stylelint cannot reach'
   );
 
-  const defined = collectCustomProperties(corpus);
-  assert.deepEqual(
-    defined.get('--fab-v2-thumb-sm'),
-    ['40px'],
-    'a token defined in the global sheet must be visible when resolving a Svelte declaration'
+  // ONE definition namespace, fed by both walkers — asserted structurally rather than by naming
+  // a token. Naming one is how this assertion came to pin a legacy token that issue 1399 then
+  // deleted; a property of the corpus cannot be retired out from under the check.
+  const stylesheetOnly = collectCustomProperties({
+    'styles/fabricate.css': corpus['styles/fabricate.css'],
+  });
+  const svelteOnly = collectCustomProperties(
+    Object.fromEntries(Object.entries(corpus).filter(([file]) => file.startsWith('src/')))
   );
+  const defined = collectCustomProperties(corpus);
+
+  assert.ok(stylesheetOnly.size > 0, 'the global sheet declares custom properties');
+  assert.ok(svelteOnly.size > 0, 'Svelte scoped blocks declare custom properties too');
+  for (const name of [...stylesheetOnly.keys()]) {
+    assert.ok(defined.has(name), `${name} is declared in the global sheet but missing from the map`);
+  }
+  for (const name of [...svelteOnly.keys()]) {
+    assert.ok(defined.has(name), `${name} is declared in a Svelte block but missing from the map`);
+  }
   assert.ok(
     (defined.get('--fab-stepper-fill-height') ?? []).length > 1,
     'a token defined at more than one height must keep every definition'
@@ -419,21 +447,53 @@ test('the real corpus is both stylesheets, and its custom properties come from b
 });
 
 test('the scan reaches a value written only into a token', () => {
-  // End to end, against the real tree: `BooksScrollsView.svelte` reads `--fab-v2-thumb-sm`, which
-  // the global sheet defines as 40px. The line carries no pixel value at all, so this occurrence
-  // is invisible to a text-only scan — and with a text-only scan, the cheapest way to pay a
-  // ratchet down would be to move the literal into a token and leave the pixel where it is.
-  const { occurrences } = scanPixelValues({
-    corpus: collectStyleCorpus(),
-    properties: ['height'],
-    values: [40],
-  });
-  const indirect = occurrences.find(
-    (record) => record.file === 'src/ui/svelte/apps/manager/BooksScrollsView.svelte'
-  );
+  // END TO END over a synthetic corpus of REAL FILES (issue 1399 — see the fixture note in the
+  // header for why it is no longer the real tree, and why an in-memory corpus will not do).
+  //
+  // The `.svelte` block carries NO pixel literal on the declaring line: the 40 lives only in a
+  // `.css` in the same corpus. A text-only scan cannot see it, and with a text-only scan the
+  // cheapest way to pay a ratchet down would be to move the literal into a token and leave the
+  // pixel exactly where it is.
+  //
+  // Both files are load-bearing. The `.css` proves a stylesheet root is walked and read whole;
+  // the `.svelte` proves `maskNonStyleRegions` runs, because the markup above its block carries
+  // `height: 36px` as PROSE which must NOT be scanned — so the assertion on the matched values
+  // fails if the mask is dropped, rather than only the assertion on the resolved text.
+  const root = mkdtempSync(join(tmpdir(), 'fabricate-style-corpus-'));
+  try {
+    writeFileSync(join(root, 'tokens.css'), ':root {\n  --fixture-thumb: 40px;\n}\n');
+    writeFileSync(
+      join(root, 'Reader.svelte'),
+      [
+        '<!-- This docblock writes height: 36px in PROSE, outside any style block. -->',
+        '<div class="thumb"></div>',
+        '',
+        '<style>',
+        '  .thumb {',
+        '    height: var(--fixture-thumb);',
+        '  }',
+        '</style>',
+        '',
+      ].join('\n')
+    );
 
-  assert.ok(Boolean(indirect), 'the token-mediated occurrence is no longer being found');
-  assert.equal(indirect.raw, 'var(--fab-v2-thumb-sm)');
-  assert.equal(indirect.resolved, '40px');
-  assert.ok(!/\d+px/.test(indirect.raw), 'the source line carries no pixel literal to match');
+    const corpus = collectStyleCorpus({ roots: [root], extensions: ['.svelte', '.css'] });
+    const files = Object.keys(corpus);
+    assert.equal(files.length, 2, `the fixture corpus must hold both files, got ${files.join(', ')}`);
+
+    const { occurrences } = scanPixelValues({ corpus, properties: ['height'], values: [36, 40] });
+
+    assert.deepEqual(
+      occurrences.map((record) => record.value),
+      [40],
+      'the 36px in the Svelte docblock prose is not a declaration and must not be scanned'
+    );
+    const [indirect] = occurrences;
+    assert.ok(indirect.file.endsWith('Reader.svelte'), 'the hit belongs to the Svelte reader');
+    assert.equal(indirect.raw, 'var(--fixture-thumb)');
+    assert.equal(indirect.resolved, '40px');
+    assert.ok(!/\d+px/.test(indirect.raw), 'the source line carries no pixel literal to match');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -52,8 +52,11 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/Chip.svelte',
   // The manager's ONE multi-select toolbar and ONE bulk-edit chrome (issue 1010), extracted
   // so the Component Studio and the Recipe Studio render the same controls. They live
-  // directly under `apps/manager/` rather than `components/` because their scoped CSS reads
-  // `--fab-mv2-*`, which is declared on `.fabricate-manager` and undefined outside it. Each
+  // directly under `apps/manager/` rather than `components/` so they may reach an
+  // area-scoped `--fab-manager-*` property, which is declared on `.fabricate-manager` and
+  // undefined outside it. (Issue 1399 inlined the manager colour aliases they used, so
+  // their scoped CSS reads theme-root tokens today; the boundary the placement respects is
+  // unchanged, and is asserted by `manager-layout.test.js`.) Each
   // is already in two mounted trees — the browser view's and the bulk panel's — and reaches
   // a third through the manager root, so an omission costs a HUNG suite, not a failing one.
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',

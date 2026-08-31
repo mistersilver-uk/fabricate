@@ -23,9 +23,10 @@
  * failure this whole change is about. The three retired values are a closed, explicitly named
  * prohibition, so every hit is either a regression or a non-control a reviewer can weigh.
  *
- * The long-term rule is that a control height comes from `var(--fab-v2-control-height)`. That is
- * not yet reachable: the token is declared once, at `styles/fabricate.css:125`, and has zero
- * readers.
+ * The long-term rule is that a control height comes from a single published token rather than a
+ * literal. That is not yet reachable: no such token exists. One was declared for it and never
+ * read, and issue 1399 deleted it with the rest of the legacy generation rather than leave a
+ * name in the sheet standing in for a decision nobody had taken.
  *
  * ── WHAT MAKES THIS NOT VACUOUS ─────────────────────────────────────────────────────────
  * An absence gate over an empty corpus passes forever. Four independent controls stand against
@@ -39,9 +40,18 @@
  *      group-by with the unfiltered occurrence list and this degenerates into "some rung appears
  *      in each corpus", which the floors already imply, at which point it stops being a separate
  *      control while still passing. So the loop asserts that its group really is one rung's.
- *   3. RESOLUTION DEPTH above zero, and an indirect occurrence whose source line carries no
- *      pixel literal at all. If `var()` resolution silently stopped, both read zero while every
- *      other assertion here still passes.
+ *   3. RESOLUTION DEPTH above zero. If `var()` resolution silently stopped, this reads zero
+ *      while every other assertion here still passes.
+ *
+ *      It used to have a second half — an indirect occurrence in THIS corpus whose source line
+ *      carried no pixel literal at all — and that half has moved (issue 1399). It depended on
+ *      the tree happening to contain a retired height reached through a token, the corpus no
+ *      longer contains one, and a control that can be emptied by ordinary work is a control
+ *      that will one day be deleted as stale rather than repaired. It is re-established, end to
+ *      end and on a corpus that cannot drift, by `the scan reaches a value written only into a
+ *      token` in `tests/style-block-scan.test.js`, over a synthetic corpus of REAL FILES read
+ *      through `collectStyleCorpus`. Depth stays here because it is a property of THIS scan of
+ *      THIS corpus, which is the thing the other three controls are about.
  *   4. The ratchet itself fails on a SHRINK as well as a growth, so quietly paying one down
  *      without banking it is a failure rather than a free slot for the next author.
  *
@@ -245,17 +255,6 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
     'these declarations hit the resolution depth cap, so their candidate sets are INCOMPLETE and ' +
       'a retired value beyond the cap reads as absent:\n  ' + retired.capReached.join('\n  ')
   );
-
-  // The sharpest control on resolution: a hit whose own line carries no pixel literal at all.
-  // `BooksScrollsView.svelte:706` is `height: var(--fab-v2-thumb-sm)`. A text-only scanner cannot
-  // see it, and losing it would lose one occurrence, one file and one row all at once.
-  const indirect = retired.occurrences.filter((record) => !/\d+px/.test(record.raw));
-  assert.ok(
-    indirect.length > 0,
-    'no retired height is reached through a token any more. Either the corpus changed or the ' +
-      'scan stopped substituting: the difference matters, because the second silently rewards ' +
-      'hiding a literal behind a custom property.'
-  );
 });
 
 /**
@@ -284,10 +283,10 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
  *
  * ACCEPTED, on the requirement's own terms rather than for convenience: all three components
  * size a THUMBNAIL, and the geometry requirement exempts art and portraits from the control
- * ladder — the same clause that lets `BooksScrollsView.svelte:706` stay in the baseline. Closing
- * it would also mean resolving a token through Svelte markup and a JS prop default, which is a
- * different scanner from this one. So "no new retired control height has been introduced" is a
- * claim about what the two stylesheet corpora DECLARE, not about what the product renders.
+ * ladder — the same clause that lets `BooksScrollsView.svelte:706` stay in the baseline at 40px.
+ * Closing it would also mean resolving a token through Svelte markup and a JS prop default, which
+ * is a different scanner from this one. So "no new retired control height has been introduced" is
+ * a claim about what the two stylesheet corpora DECLARE, not about what the product renders.
  */
 test('no new retired control height has been introduced', () => {
   const { retired } = scan();

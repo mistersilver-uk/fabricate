@@ -1199,7 +1199,7 @@ function verdictFor(order, primitive, candidate) {
  * cannot quietly turn a documented tie into a real repaint.
  *
  * Textual, exactly like the winner-change comparison in `repaintsAt`: two spellings of one
- * computed value (`--fab-mv2-border` for `var(--fab-border)`) count as divergent here, which is
+ * computed value (`--fab-border` for `var(--fab-border)`) count as divergent here, which is
  * blind spot 6 and is why the real-browser gate stays the arbiter of pixels.
  */
 function divergentFacets(candidate, primitive, overlap) {
@@ -1436,8 +1436,8 @@ function describeBlindSpots({ sites, unbalanced, atRisk }) {
     'Specificity is COMPUTED, not measured. `manager-layout.test.js` remains the real-browser ' +
       'gate; this module tells it where to look.',
     'Custom-property indirection is NOT resolved, so a reported value change can still compute ' +
-      'identically. `--fab-mv2-border` is declared as `var(--fab-border)` and ' +
-      '`--fab-mv2-text-muted` as `var(--fab-text-muted)`, so a winner change between those two ' +
+      'identically. `--fab-border` is declared as `var(--fab-border)` and ' +
+      '`--fab-text-muted` as `var(--fab-text-muted)`, so a winner change between those two ' +
       'spellings is a zero-pixel change that this report nevertheless prints as a change.',
     '`@media` and `@container` rules are scored like any other and carry their condition in the ' +
       'report, but whether the condition holds at a given viewport is not evaluated.',

@@ -10,12 +10,19 @@
  *
  * ── WHY IT RESOLVES `var()` AT ALL ──────────────────────────────────────────────────────
  * A value gate matches on TEXT, so a banned literal written into a custom property and read
- * back is invisible to it. The codebase already does exactly this: `styles/fabricate.css`
- * defines `--fab-v2-thumb-sm: 40px` and `apps/manager/BooksScrollsView.svelte` reads
- * `height: var(--fab-v2-thumb-sm)`. The consequence is not the missed occurrence — it is
- * that with a text-only scan the CHEAPEST WAY TO PAY A RATCHET DOWN is to move the literal
- * into a token. The pixel does not move, the control is still 36px tall, and the gate goes
- * green. A ratchet whose debt can be discharged by renaming is not a ratchet.
+ * back is invisible to it. The consequence is not the missed occurrence — it is that with a
+ * text-only scan the CHEAPEST WAY TO PAY A RATCHET DOWN is to move the literal into a token.
+ * The pixel does not move, the control is still 36px tall, and the gate goes green. A ratchet
+ * whose debt can be discharged by renaming is not a ratchet.
+ *
+ * The shipped corpus carried exactly that shape until issue 1399 — `styles/fabricate.css`
+ * declared a 40px thumbnail token that one Svelte block read — and the collapse of the legacy
+ * token generations inlined it. So the capability is no longer proved by the tree happening to
+ * contain such a pair: `style-block-scan.test.js` builds a SYNTHETIC CORPUS OF REAL FILES in a
+ * tmpdir, a `.css` declaring the token and a `.svelte` reading it, and drives it through
+ * `collectStyleCorpus` so the walker, the `<style>` extractor and the resolver are all still
+ * proved end to end. Do not weaken that to an in-memory `{path: text}` literal: `scanPixelValues`
+ * accepts one, and it would bypass every stage above the resolver.
  *
  * ── WHY THE RESOLUTION RUNS TO A FIXED POINT ────────────────────────────────────────────
  * One level is not enough, and this corpus proves it rather than a hypothetical one.
@@ -553,9 +560,9 @@ export function pixelValuesIn(text) {
 /**
  * For each wanted pixel value that any candidate carries, the SHORTEST candidate carrying it.
  *
- * Shortest because that is the most resolved form: for `var(--fab-v2-thumb-sm)` it is `40px`
- * rather than the raw reference, which is the text a reader needs in order to adjudicate a row
- * whose source line holds no pixel value at all.
+ * Shortest because that is the most resolved form: for a bare `var(--some-token)` it is the
+ * token's own definition rather than the raw reference, which is the text a reader needs in
+ * order to adjudicate a row whose source line holds no pixel value at all.
  *
  * @param {readonly string[]} candidates
  * @param {Set<number>} banned

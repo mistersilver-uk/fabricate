@@ -367,10 +367,15 @@ describe('EnvironmentCard markup contracts', () => {
     assert.ok(cardSource.includes('gathering-env-card-event-label'), 'event chip renders a level-name label');
   });
 
-  it('uses base tokens only (no manager-only --fab-mv2-* tokens)', () => {
-    assert.equal(cardSource.includes('--fab-mv2-'), false, 'no manager-only tokens in the player card');
-    assert.equal(listSource.includes('--fab-mv2-'), false, 'no manager-only tokens in the list');
-    assert.equal(viewSource.includes('--fab-mv2-'), false, 'no manager-only tokens in the view');
+  it('uses base tokens only (no area-scoped --fab-manager-* properties)', () => {
+    // `--fab-manager-*` is the prefix for an area-scoped custom property, declared inside
+    // `.fabricate-manager`. These three files render in the PLAYER app, where such a
+    // property is out of scope: the declaration is invalid at computed-value time and the
+    // value silently falls back to inheritance (issue 1399 retargeted this from the
+    // retired manager alias generation, which no longer exists to name).
+    assert.equal(cardSource.includes('--fab-manager-'), false, 'no area-scoped properties in the player card');
+    assert.equal(listSource.includes('--fab-manager-'), false, 'no area-scoped properties in the list');
+    assert.equal(viewSource.includes('--fab-manager-'), false, 'no area-scoped properties in the view');
   });
 
   it('pins each card slot so the bottom card is not squashed by flex-shrink', () => {

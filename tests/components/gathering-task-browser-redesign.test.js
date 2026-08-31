@@ -74,7 +74,7 @@ describe('GatheringTasksBrowserView card-style row', () => {
   });
 
   it('uses a four-column grid for the task table', () => {
-    const gridMatch = css.match(/--fab-mv2-gathering-task-grid:\s*([^;]+);/);
+    const gridMatch = css.match(/--fab-manager-gathering-task-grid:\s*([^;]+);/);
     assert.ok(gridMatch, 'task grid CSS variable should be defined');
     const columns = gridMatch[1].split(/\s+(?![^()]*\))/).filter(Boolean);
     assert.equal(columns.length, 4, 'expected four grid columns (identity, tags, status, actions)');

@@ -825,15 +825,15 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
 
   it('puts the context rail on the ONE shared right-hand-panel surface', () => {
     // Issue 643 put the Recipe Studio rail on the SAME surface as its main editor panel
-    // (--fab-mv2-surface-1) while every other screen kept the lighter --fab-mv2-surface-2.
+    // (--fab-bg-2) while every other screen kept the lighter --fab-bg-3.
     // Issue 881 removed that split: the Tool Studio's right panel is the same shade the
     // Recipe Studio rail already used, so the odd one out was the shared rule, and the
     // Tags & Categories rail read visibly lighter than the panel it must match. One shade
     // now, so the per-view carve-out must be GONE, not merely unused.
     assert.match(
       css,
-      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-mv2-surface-1\);/,
-      'the shared inspector sits on --fab-mv2-surface-1 on every screen'
+      /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-bg-2\);/,
+      'the shared inspector sits on --fab-bg-2 on every screen'
     );
     assert.doesNotMatch(
       css,
@@ -844,7 +844,7 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
     // panels cannot drift apart by having one written as a raw ramp step.
     assert.match(
       css,
-      /\.fabricate-manager\s+\.manager-tool-preview\s*\{[^}]*background:\s*var\(--fab-mv2-surface-1\);/,
+      /\.fabricate-manager\s+\.manager-tool-preview\s*\{[^}]*background:\s*var\(--fab-bg-2\);/,
       'the Tool Studio preview panel shares the inspector surface token'
     );
   });
