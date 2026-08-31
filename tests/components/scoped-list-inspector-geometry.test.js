@@ -69,6 +69,21 @@ const EPSILON_PX = 1;
 const ROW_COUNT = 25;
 /** The manager host's height, so the column has a definite one to be bounded by. */
 const HOST_HEIGHT_PX = 900;
+/**
+ * A TALLER host for the short-but-multi-page probe, and the extra height is load-bearing.
+ *
+ * The foot pager renders only past one page since issue 1372, so the only fixture that draws one
+ * AND leaves the column any slack is a list of more than one page whose FIRST page is short. The
+ * smallest page size the pager offers is ten rows, which is around 500px of list — enough to fill
+ * a 900px column once the toolbar and the pager are on it, and a fixture with no slack proves
+ * nothing about who takes it. Every case below asserts its own slack precondition before
+ * measuring, so a wrong value here reds rather than passing quietly.
+ */
+const TALL_HOST_HEIGHT_PX = 1400;
+/** Entities in the short-but-multi-page fixture: more than one default page, driven down to ten. */
+const PAGED_ROW_COUNT = 26;
+/** The page size that probe is driven to, which is `Pagination`'s smallest offered option. */
+const PAGED_PAGE_SIZE = 10;
 
 // Two REAL window widths, one comfortably either side of the threshold once the rail is taken
 // off. Asserted against the measured container width below rather than assumed.
@@ -116,7 +131,7 @@ const harness = createMountedComponentHarness({
   componentPath: SHELL,
 });
 
-function page(productMarkup, windowWidth) {
+function page(productMarkup, windowWidth, hostHeight = HOST_HEIGHT_PX) {
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>${fabricateCss}</style>
     <style>${frameCss.css}</style>
@@ -124,7 +139,7 @@ function page(productMarkup, windowWidth) {
     <style>
       :root { --font-primary: Arial, sans-serif; }
       html, body { margin: 0; padding: 0; }
-      .probe-host { width: ${windowWidth}px; height: ${HOST_HEIGHT_PX}px; }
+      .probe-host { width: ${windowWidth}px; height: ${hostHeight}px; }
     </style></head>
     <body>
       <div class="probe-host">
@@ -179,6 +194,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   let markup = '';
   let unavailableMarkup = '';
   let shortMarkup = '';
+  let shortPagedMarkup = '';
 
   before(async () => {
     assert.ok(
@@ -243,11 +259,56 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       inspectorBody: laneInspectorBody,
     });
     shortMarkup = shortTarget.innerHTML;
+
+    // THE SHORT-BUT-MULTI-PAGE FIXTURE, built by DRIVING the control rather than by a prop: the
+    // frame owns its own page size and exposes no way in, so the probe does what a GM does —
+    // opens a corpus that pages, then picks the smallest size. Twenty-six entities is two default
+    // pages, which is what makes the size selector reachable at all; at ten a page it is three.
+    const pagedTarget = await harness.mount({
+      scope: projectWorldScopeEntity({
+        entityType: 'component',
+        corpus: {
+          entities: Array.from({ length: PAGED_ROW_COUNT }, (unused, index) => ({
+            id: `component-${index}`,
+            name: `Ash ${index}`,
+            description: 'A component',
+            img: 'icons/commodities/ash.webp',
+          })),
+          defaults: [],
+          membership: [],
+        },
+        systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      }),
+      actions: {},
+      systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      hookValue: 'world-components',
+      title: 'Component catalogue',
+      subtitle: 'One per world.',
+      selectedId: 'component-0',
+      inspectorBody: laneInspectorBody,
+    });
+    const sizeSelect = pagedTarget.querySelector(
+      '.manager-scoped-list-column [data-pagination-size]'
+    );
+    assert.ok(
+      Boolean(sizeSelect),
+      `a ${PAGED_ROW_COUNT}-entity corpus rendered no page-size control in the list column, so ` +
+        'this fixture never reached the multi-page state it exists to measure'
+    );
+    sizeSelect.value = String(PAGED_PAGE_SIZE);
+    sizeSelect.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    await harness.setProps({});
+    shortPagedMarkup = pagedTarget.innerHTML;
+
     harness.teardown();
     assert.ok(
       markup.includes('data-scoped-list-inspector'),
       'the mounted catalogue rendered no inspector region, so nothing below is measuring one'
     );
+    // NOT asserted as a string here: the shell's INSPECTOR renders its own persistent pager over
+    // the system list, so `shortMarkup` contains `data-pagination-summary` whether or not the
+    // FOOT pager does. That is exactly the confusion `measureShortColumn` resolves by scoping to
+    // `.manager-scoped-list-column`, and each geometry case asserts its own `hasPagination`.
     browser = await chromium.launch();
   });
 
@@ -276,25 +337,40 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     return result;
   }
 
-  async function measureShort(windowWidth) {
+  /**
+   * Measure one short-list probe's column.
+   *
+   * `.manager-pagination` is resolved INSIDE `.manager-scoped-list-column`, never from the
+   * document. The catalogue shell's inspector renders its OWN persistent pager over the system
+   * list, so a document-wide lookup silently answers about the inspector's pager the moment the
+   * foot one is absent — which is exactly the state this file now measures.
+   *
+   * @param {string} productMarkup
+   * @param {number} windowWidth
+   * @param {number} hostHeight
+   */
+  async function measureShortColumn(productMarkup, windowWidth, hostHeight) {
     const context = await browser.newContext({
-      viewport: { width: windowWidth, height: HOST_HEIGHT_PX },
+      viewport: { width: windowWidth, height: hostHeight },
     });
     const tab = await context.newPage();
-    await tab.setContent(page(shortMarkup, windowWidth));
+    await tab.setContent(page(productMarkup, windowWidth, hostHeight));
     const result = await tab.evaluate(() => {
       const column = document.querySelector('.manager-scoped-list-column');
-      const rowsRegion = document.querySelector('.manager-scoped-list-rows');
-      const pagination = document.querySelector('.manager-pagination');
-      if (!column || !rowsRegion || !pagination) return { rendered: false };
+      const rowsRegion = column?.querySelector('.manager-scoped-list-rows');
+      const list = column?.querySelector('.manager-scoped-list');
+      if (!column || !rowsRegion || !list) return { rendered: false };
+      const pagination = column.querySelector('.manager-pagination');
       return {
         rendered: true,
+        hasPagination: Boolean(pagination),
         columnBottom: column.getBoundingClientRect().bottom,
         rowsBottom: rowsRegion.getBoundingClientRect().bottom,
-        paginationBottom: pagination.getBoundingClientRect().bottom,
-        paginationHeight: pagination.getBoundingClientRect().height,
+        paginationBottom: pagination ? pagination.getBoundingClientRect().bottom : 0,
+        paginationHeight: pagination ? pagination.getBoundingClientRect().height : 0,
         rowsHeight: rowsRegion.getBoundingClientRect().height,
-        listBottom: document.querySelector('.manager-scoped-list').getBoundingClientRect().bottom,
+        listHeight: list.getBoundingClientRect().height,
+        listBottom: list.getBoundingClientRect().bottom,
       };
     });
     await context.close();
@@ -390,16 +466,24 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     );
   });
 
-  it('keeps the pagination bar at the FOOT of a short list rather than floating it up', async () => {
+  it('gives the ROWS REGION the slack on a short list rather than sizing it to its content', async () => {
     // WHAT THE ROWS REGION'S `flex: 1 1 auto` ACTUALLY BUYS, measured rather than assumed. With
     // a list taller than the column every child is shrinking, so the declaration changes nothing
     // and the overflow case above cannot see it — it survived a mutation run for exactly that
-    // reason. Its effect appears on a SHORT list: without it the rows region is content-sized,
-    // the pagination bar rides directly under the last row, and it moves up and down the screen
-    // as a filter changes how many rows there are. The browse archetype's rule is that the
-    // pagination bar sits outside the scroll area and never moves.
-    const box = await measureShort(WIDE_WINDOW_PX);
+    // reason. Its effect appears on a SHORT list: without it the rows region is content-sized and
+    // whatever sits under it rides directly beneath the last row, moving up and down the screen
+    // as a filter changes how many rows there are.
+    //
+    // THIS FIXTURE DRAWS NO PAGER AT ALL since issue 1372 — one row is one page — so the claim is
+    // stated about the region itself: it reaches the foot of the column while the LIST inside it
+    // stops far short. That is the same declaration, read without needing something below it.
+    const box = await measureShortColumn(shortMarkup, WIDE_WINDOW_PX, HOST_HEIGHT_PX);
     assert.equal(box.rendered, true);
+    assert.equal(
+      box.hasPagination,
+      false,
+      'the one-row fixture drew a foot pager, so this case is not measuring the state it names'
+    );
     assert.ok(
       box.columnBottom - box.listBottom > 100,
       `the fixture's single row already fills the column (${box.listBottom} against a column ` +
@@ -407,21 +491,58 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         'this case proves nothing'
     );
     assert.ok(
+      box.rowsBottom >= box.columnBottom - EPSILON_PX,
+      `the rows region ends at ${box.rowsBottom} inside a column ending at ${box.columnBottom}: ` +
+        'it took its height from its one row instead of from the column'
+    );
+  });
+
+  it('keeps the pagination bar at the FOOT of a short MULTI-PAGE list rather than floating it up', async () => {
+    // THE OTHER HALF, and it needs a fixture that actually draws a pager. The browse archetype's
+    // rule is that the pagination bar sits outside the scroll area and never moves; with the bar
+    // now suppressed on a single page, the only state in which that rule has a subject is a list
+    // of more than one page whose first page is short — which is what this probe builds.
+    const box = await measureShortColumn(shortPagedMarkup, WIDE_WINDOW_PX, TALL_HOST_HEIGHT_PX);
+    assert.equal(box.rendered, true);
+    assert.equal(
+      box.hasPagination,
+      true,
+      `a ${PAGED_ROW_COUNT}-entity corpus at ${PAGED_PAGE_SIZE} a page drew NO foot pager, so ` +
+        'every assertion below is about an element that is not there'
+    );
+    assert.ok(
+      box.columnBottom - box.listBottom > 100,
+      `the fixture's ${PAGED_PAGE_SIZE} rows already fill the column (${box.listBottom} against ` +
+        `a column bottom of ${box.columnBottom}), so there is no slack to attribute and this ` +
+        'case proves nothing'
+    );
+    assert.ok(
       box.paginationBottom >= box.columnBottom - EPSILON_PX,
       `the pagination bar ends at ${box.paginationBottom} inside a column ending at ` +
         `${box.columnBottom}: it floated up under the last row instead of staying at the foot`
     );
     // ── AND THE PAGER IS NOT THE THING THAT GREW ────────────────────────────────────────────
-    // `.manager-scoped-list-column > :global(.manager-pagination) { flex: 0 0 auto }` was
-    // ungated: mutating it to `1 1 auto` stretched the pager to 364px on this fixture and the
-    // assertion above STILL PASSED, because a pager that fills the column also ends at the
-    // column's foot. The slack belongs to the rows region — that is what puts the footer at the
-    // bottom rather than making the footer tall — so both halves are stated.
+    // `.manager-scoped-list-column > :global(.manager-pagination) { flex: 0 0 auto }` is ungated
+    // by the assertion above, because a pager that fills the column also ends at the column's
+    // foot. The slack belongs to the rows region — that is what puts the footer at the bottom
+    // rather than making the footer tall — so it is stated separately.
+    //
+    // IT IS BOUNDED AGAINST A ROW, and that is a correction rather than a flourish. This was
+    // `rowsHeight > paginationHeight * 2`, which on this fixture PASSES the very mutation it was
+    // written for: with both children growing they split the slack, and 976px of rows against a
+    // 309px pager clears that bound comfortably while the pager is seven times its own content
+    // height. A row is the fixture's own measure of what one line of this list costs, so "the
+    // pager is chrome, not as tall as a row and a half" is a claim about the pager itself —
+    // measured at 45px against a 71px row, and at 309px under the mutation.
+    const rowHeight = box.listHeight / PAGED_PAGE_SIZE;
     assert.ok(
-      box.rowsHeight > box.paginationHeight * 2,
-      `the rows region is ${Math.round(box.rowsHeight)}px against a ${Math.round(
-        box.paginationHeight
-      )}px pager: the pagination bar took the column's slack instead of the list`
+      rowHeight > 0,
+      'the list measured no height, so the bound below divides by nothing and asserts nothing'
+    );
+    assert.ok(
+      box.paginationHeight < rowHeight * 1.5,
+      `the pager is ${Math.round(box.paginationHeight)}px against a ${Math.round(rowHeight)}px ` +
+        "row: the pagination bar took the column's slack instead of the list"
     );
   });
 
