@@ -25896,12 +25896,19 @@ describe('CraftingSystemManager mounted behavior', () => {
      * @param {object} [options]
      * @param {object|null} [options.worldToolBreakage] The world scope's `toolBreakage` block.
      * @param {object|null} [options.systemToolBreakage] The selected system's own block.
+     * @param {Array<object>|null} [options.worldEssences] The world essence corpus. Named
+     *   entities are what the entry heading below is about; the id-only default keeps the rail
+     *   counts every caller above it reads exactly where they were.
      * @returns {Promise<object>} the store
      */
-    async function mountWithRealStore({ worldToolBreakage, systemToolBreakage } = {}) {
+    async function mountWithRealStore({
+      worldToolBreakage,
+      systemToolBreakage,
+      worldEssences,
+    } = {}) {
       scopeStores = {
         component: scopeStore(worldEntities(3, 'comp')),
-        essence: scopeStore(worldEntities(2, 'ess')),
+        essence: scopeStore(worldEssences ?? worldEntities(2, 'ess')),
         tool: scopeStore(
           worldEntities(1, 'tool'),
           worldToolBreakage ? { toolBreakage: worldToolBreakage } : {}
@@ -26124,6 +26131,129 @@ describe('CraftingSystemManager mounted behavior', () => {
           'the third branch of the resolver: the same TOKEN as an authored toolSpecific, and a ' +
             'different source — which is the whole reason source exists'
         );
+      });
+    });
+
+    // ── THE WORLD ESSENCE ENTRY HEADING NAMES THE DRAFT (issue 1372, parity round 5) ────
+    //
+    // NESTED HERE for the same reason the block above is: `mountWithRealStore` is declared in
+    // this describe, and it is the only harness in the repository that drives the manager shell
+    // over a real world-scope corpus — which is what it takes to render this heading at all.
+    //
+    // ONLY A MOUNT OF THE SHELL CAN ANSWER THIS, and that is the point rather than a
+    // preference. The heading lives in `.manager-header`, a SIBLING of `.manager-main`, so
+    // `WorldEssenceEntryPage`'s own mounted suite cannot see it: every assertion there is green
+    // whether the shell renders the draft name, the persisted name or nothing. And the seam
+    // between them is a reported value, so a test that read the reporting callback would be
+    // satisfied by a shell that received the name and printed the other one.
+    //
+    // The DOM, not the callback, for the reason Svelte 5 makes sharp: the shell holds this name
+    // in a rune it can only publish by REASSIGNING, and every wrong version of that — a mutated
+    // object, a value read off the deliberately non-reactive draft handle — reports correctly
+    // and renders staleness.
+    describe('world essence entry heading (issue 1372)', () => {
+      /** Two NAMED world essences: the heading is about a name, so an id-only corpus is mute. */
+      const WORLD_ESSENCES = Object.freeze([
+        Object.freeze({ id: 'ash', name: 'Ash', icon: 'fas fa-fire', colorToken: 'ember' }),
+        Object.freeze({ id: 'brine', name: 'Brine' }),
+      ]);
+
+      async function settleEntryRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const headingText = () =>
+        target
+          .querySelector('[data-world-essence-entry-heading] .manager-title')
+          ?.textContent?.trim();
+
+      const subtitleText = () =>
+        target.querySelector('[data-world-essence-entry-subline]')?.textContent?.trim();
+
+      /** Open `ash`'s world entry editor the way a GM does: rail, then the row's pen. */
+      async function openAshEntry() {
+        await mountWithRealStore({ worldEssences: [...WORLD_ESSENCES] });
+        worldNavItem('essence-catalogue').click();
+        await settleEntryRoute();
+        const open = target.querySelector(
+          '[data-scoped-list-row="ash"] [data-scoped-list-action="open-entry"]'
+        );
+        assert.ok(
+          Boolean(open),
+          'the essence catalogue rendered no open-entry action for `ash`, so nothing below ' +
+            'reaches the editor this block is about'
+        );
+        open.click();
+        await settleEntryRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          'world-essence-entry',
+          'the row pen did not commit the entry route'
+        );
+      }
+
+      /** Type into the buffered name field — an `input` event, which is the only thing that
+       * moves the draft: it is seeded from the persisted record, so a click cannot dirty it. */
+      async function typeName(value) {
+        const field = target.querySelector('[data-scoped-entry-name]');
+        assert.ok(Boolean(field), 'the entry editor rendered no name field');
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleEntryRoute();
+      }
+
+      it('opens on the persisted name', async () => {
+        await openAshEntry();
+        assert.equal(
+          headingText(),
+          'Ash',
+          'an untouched editor must head the screen with the record on disk'
+        );
+      });
+
+      it('FOLLOWS the buffered name as the GM types, before any Save', async () => {
+        await openAshEntry();
+        await typeName('Aetherlight');
+        assert.equal(
+          target.querySelector('[data-scoped-entry-name]').value,
+          'Aetherlight',
+          'the keystroke never reached the draft, so the heading assertion below is vacuous'
+        );
+        assert.equal(
+          headingText(),
+          'Aetherlight',
+          'the heading still names the PERSISTED essence while the name field and the player ' +
+            'preview both show the buffered one — one screen naming one essence two ways'
+        );
+      });
+
+      it('leaves the USAGE SUBTITLE on the persisted record, which is a count of systems', async () => {
+        await openAshEntry();
+        const before = subtitleText();
+        assert.ok(
+          Boolean(before),
+          'the heading block rendered no subtitle at all, so its stability below proves nothing'
+        );
+        await typeName('Aetherlight');
+        assert.equal(
+          subtitleText(),
+          before,
+          'a rename changed the count of systems using this essence, which no keystroke can do ' +
+            'until the write lands'
+        );
+      });
+
+      it('falls back to the ROUTE TITLE when the buffered name is emptied', async () => {
+        // The same guard the missing-record path takes. A GM who clears the field is authoring
+        // an empty name, and an empty `<h1>` is not a heading — this is what the route already
+        // renders for a record whose persisted name is empty.
+        await openAshEntry();
+        await typeName('');
+        assert.equal(headingText(), 'Essence entry');
       });
     });
   });

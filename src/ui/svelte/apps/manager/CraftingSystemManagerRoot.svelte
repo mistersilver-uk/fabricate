@@ -2941,15 +2941,48 @@
   let worldEssenceEntryHandle = null;
   let worldEssenceEntryDirty = $state(false);
   let worldEssenceEntrySaving = $state(false);
+  /**
+   * The BUFFERED name, for the heading below. `null` while no editor is reporting one, which is
+   * what makes the heading fall back to the projection rather than to an empty string.
+   *
+   * @type {string|null}
+   */
+  let worldEssenceEntryDraftName = $state(null);
 
   function handleWorldEssenceEntryDraft(handle) {
     worldEssenceEntryHandle = handle ?? null;
-    if (!handle) worldEssenceEntryDirty = false;
+    if (!handle) {
+      worldEssenceEntryDirty = false;
+      worldEssenceEntryDraftName = null;
+    }
   }
 
   function handleWorldEssenceEntryDirty(dirty) {
     worldEssenceEntryDirty = dirty === true;
   }
+
+  function handleWorldEssenceEntryDraftName(name) {
+    worldEssenceEntryDraftName = typeof name === 'string' ? name : null;
+  }
+
+  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK (issue 1372, maintainer parity round 5).
+  //
+  // With the edit buffered, the name field and the player preview rail both showed the buffered
+  // name while this heading showed the persisted one — one screen naming one essence two ways.
+  // A heading names the thing being edited, and the enabled `Save essence` beside it is what says
+  // the edit is unsaved; the heading is not a second, quieter version of that signal.
+  //
+  // It is declared HERE rather than beside `worldEssenceEntrySubtitle` because it reads
+  // `worldEssenceEntryDraftName`, which is declared above and would be in its temporal dead zone
+  // there. The SUBTITLE deliberately stays on the projection — see its own note.
+  //
+  // `??` and not `||`: an editor reporting an EMPTY name is reporting a real authored state, and
+  // it falls through to `viewTitle()` below exactly as an empty persisted name already does.
+  const worldEssenceEntryName = $derived(
+    worldEssenceEntryRecord
+      ? (worldEssenceEntryDraftName ?? worldEssenceEntryRecord.entity?.name ?? '')
+      : ''
+  );
 
   /**
    * Flush the world essence entry editor's buffered edit.
@@ -9308,8 +9341,8 @@
               glyph={22}
             />
             <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={worldEssenceEntryRecord.entity?.name || ''}>
-                {worldEssenceEntryRecord.entity?.name || viewTitle()}
+              <h1 class="manager-title" title={worldEssenceEntryName}>
+                {worldEssenceEntryName || viewTitle()}
               </h1>
               <p class="manager-subtitle" data-world-essence-entry-subline>
                 {worldEssenceEntrySubtitle}
@@ -11015,6 +11048,7 @@
         onBackToCatalogue={() => setView('world-essences')}
         onDraftChange={handleWorldEssenceEntryDraft}
         onDirtyChange={handleWorldEssenceEntryDirty}
+        onDraftNameChange={handleWorldEssenceEntryDraftName}
       />
     {:else if currentView === 'world-tools'}
       <WorldToolCataloguePage
