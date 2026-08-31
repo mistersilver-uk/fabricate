@@ -116,22 +116,66 @@ test('createdResults join recovers component name, not the raw uuid', async () =
   assert.ok(!content.includes('Item.h1'), 'raw item uuid not shown when component resolves');
 });
 
-test('_terminalStart skips chat output for opaque blind tasks', async () => {
-  resetChat();
-  const engine = buildEngine();
-  await engine._terminalStart({
+// A blind attempt used to post NOTHING, which made a successful blind gather
+// indistinguishable from nothing happening: the start response withholds
+// `createdResults` by design, so the card is the player's only report. These two pin
+// the replacement contract — the card is always posted; only the IDENTITY moves.
+async function startBlind(engine, { revealedTaskIds = null } = {}) {
+  if (revealedTaskIds) {
+    engine.richState = { listRevealedTaskIds: () => revealedTaskIds };
+  }
+  return engine._terminalStart({
     viewer: { isGM: false },
     actor: { name: 'Aria' },
     system: buildSystem(true),
     environment: { id: 'env-1', selectionMode: 'blind' },
     task: { id: 'task-1', name: 'Forage Herbs' },
     status: 'succeeded',
-    run: { id: 'run-1', status: 'succeeded', economyEvidence: { stamina: { spent: 5 } } },
-    createdResults: [],
+    run: {
+      id: 'run-1',
+      status: 'succeeded',
+      economyEvidence: { stamina: { spent: 5 }, node: { remaining: 2 } }
+    },
+    createdResults: [{ actorUuid: 'Actor.aria', componentId: 'comp-herb', quantity: 2 }],
     usedTools: [],
     checkResult: { items: [], events: [] }
   });
-  assert.equal(chatCreated.length, 0, 'blind task posts no chat card');
+}
+
+test('_terminalStart reports an unrevealed blind attempt under the generic label', async () => {
+  resetChat();
+  const engine = buildEngine();
+
+  await startBlind(engine);
+
+  assert.equal(chatCreated.length, 1, 'blind task still posts a chat card');
+  const { content } = chatCreated[0];
+  assert.ok(content.includes('2× Herb'), 'the haul the player actually received is named');
+  assert.ok(!content.includes('Forage Herbs'), 'the drawn task is NOT named');
+  assert.ok(
+    content.includes('FABRICATE.Gathering.BlindTaskLabel'),
+    'the generic blind label stands in for the task name'
+  );
+  assert.ok(
+    !content.includes('FABRICATE.Chat.GatherNodes'),
+    'the drawn task’s node count stays hidden — the in-memory run carries it unredacted'
+  );
+});
+
+test('_terminalStart names a blind task the reveal policy has already disclosed', async () => {
+  resetChat();
+  const engine = buildEngine();
+
+  await startBlind(engine, { revealedTaskIds: ['task-1'] });
+
+  assert.equal(chatCreated.length, 1, 'one card posted');
+  const { content } = chatCreated[0];
+  assert.ok(content.includes('Forage Herbs'), 'a revealed task is named on its own card');
+  assert.ok(
+    !content.includes('FABRICATE.Gathering.BlindTaskLabel'),
+    'the generic label is dropped once the task is revealed'
+  );
+  assert.ok(content.includes('FABRICATE.Chat.GatherNodes'), 'a revealed task reports its nodes');
 });
 
 test('_terminalStart posts chat output for transparent tasks', async () => {
@@ -212,4 +256,61 @@ test('a component-identified award renders its component, with no uuid to join o
   assert.ok(content.includes('Herb'), 'the component name resolves from componentId alone');
   assert.ok(content.includes('4× Herb'), 'with its quantity');
   assert.ok(!content.includes('fabricate-gather-chat__empty'), 'this is NOT an empty award');
+});
+
+// ---------------------------------------------------------------------------
+// The pooled `Nd100` roll is chat output too: `resolveD100Attempt` posts it via
+// `toMessage`, publicly, with the flavour the engine hands it. It used to be built
+// from `task.name` unconditionally, so the very first blind attempt broadcast the
+// drawn task's real name to the whole table — the one place blind gathering spoke
+// was the one place it leaked.
+// ---------------------------------------------------------------------------
+
+function buildD100Engine({ revealedTaskIds = null } = {}) {
+  const calls = [];
+  const engine = new GatheringEngine({ systemManager: { getItems: () => COMPONENTS } });
+  engine.richState = {
+    resolveD100Attempt(args) {
+      calls.push(args);
+      return Promise.resolve({ status: 'succeeded', items: [], events: [] });
+    },
+    ...(revealedTaskIds ? { listRevealedTaskIds: () => revealedTaskIds } : {})
+  };
+  return { engine, calls };
+}
+
+function d100Args(selectionMode) {
+  return {
+    viewer: { isGM: false },
+    actor: { name: 'Aria' },
+    system: buildSystem(true),
+    environment: { id: 'env-1', selectionMode },
+    task: { id: 'task-1', name: 'Forage Herbs' },
+    interactive: false
+  };
+}
+
+test('the pooled d100 roll does not name an unrevealed blind task', async () => {
+  const { engine, calls } = buildD100Engine();
+
+  await engine._resolveD100Outcome(d100Args('blind'));
+
+  assert.equal(calls.length, 1, 'the resolver ran');
+  assert.equal(calls[0].flavor, 'FABRICATE.Gathering.BlindTaskLabel — Gathering check');
+});
+
+test('the pooled d100 roll names a revealed blind task', async () => {
+  const { engine, calls } = buildD100Engine({ revealedTaskIds: ['task-1'] });
+
+  await engine._resolveD100Outcome(d100Args('blind'));
+
+  assert.equal(calls[0].flavor, 'Forage Herbs — Gathering check');
+});
+
+test('the pooled d100 roll names the task in a transparent environment', async () => {
+  const { engine, calls } = buildD100Engine();
+
+  await engine._resolveD100Outcome(d100Args('targeted'));
+
+  assert.equal(calls[0].flavor, 'Forage Herbs — Gathering check');
 });
