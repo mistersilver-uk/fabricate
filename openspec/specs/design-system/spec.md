@@ -577,20 +577,22 @@ The player window carries NO premium signal in any state, and a player-side choo
 
 A new shared primitive enters the set only through a change that records its ENTRY, and an entry is two artifacts rather than one: a SPECIMEN in `openspec/specs/design-system/library.html` and, once the primitive ships, a ROW in `scripts/lib/designSystemPrimitives.json`.
 The specimen MUST state the primitive's purpose, its canonical geometry in published ladder values, and its Svelte API including the event contract and the accessible naming it requires.
-The row MUST name the implementation path and the library entry it corresponds to, and MUST record the caller count that justified the primitive.
+The row MUST name the implementation path and MUST record the caller count that justified the primitive.
+It MUST also name the library entry it corresponds to, unless the primitive ships with no specimen at all, in which case it carries `library: null` and the undocumented register in `tests/design-system-coverage.test.js` names it; that register is pinned by exact equality, and shortening it is the only direction the debt is meant to move.
 The split is deliberate rather than filing: purpose, geometry and API are what a reader needs rendered, and the path-to-name correspondence is what a gate needs to check.
 That obligation binds a primitive the change ADDS or ALTERS.
 An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference; the library records which entries currently do so, and closing that list is tracked as a debt rather than presented as complete.
 
 A change that adds a component under `src/ui/svelte/components/` without a specimen has added an undocumented primitive; a change that ships a primitive without its manifest row has added a name no diff can be attributed to; and a change that adds a row naming a library entry that does not exist has recorded a correspondence to nothing.
-`tests/design-system-coverage.test.js` is the gate that fails on all three: it requires every file under `src/ui/svelte/components/` to carry a manifest row, requires no entry recorded as unbuilt to ship as a component, and requires every row's library name to resolve to a specimen that is not a declined candidate.
+`tests/design-system-coverage.test.js` is the gate those prohibitions are enforced through: it requires every file under `src/ui/svelte/components/` to carry a manifest row, requires no entry recorded as unbuilt to ship as a component, and requires every row's library name to resolve to a specimen that is not a declined candidate.
+The row is what the gate compels, so a component that ships with no specimen clears it only by carrying `library: null` and a matching line in the pinned undocumented register — which states the debt on the record rather than failing the change, and is the same treatment the carried-forward entries above receive.
 Where a proposal conflicts with a shipped component, the change MUST either adopt the shipped behaviour or state why it is being replaced.
 
 #### Scenario: An implementer needs a primitive the set does not contain
 
 - **WHEN** planned work needs a shared component the set does not contain
 - **THEN** the change adds its specimen to the visual library and, once the primitive ships, its row to the manifest
-- **AND** the entry names the two or more independent callers that justify it
+- **AND** the change names the two or more independent callers that justify it
 
 ### Requirement: The ruled-out register is part of the specification
 
