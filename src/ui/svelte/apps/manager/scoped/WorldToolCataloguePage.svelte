@@ -362,12 +362,16 @@
 
   /* The shipped segmented-control treatment, matched to `.manager-tools-authority-segments`
      so a GM sees one break-mode control across the two scopes. */
-  /* WRAPS rather than shrinking. Three segments each carry a full label — the widest is
-     `Inherit · Tool-specific (default)` — and the option inside is an `inline-flex` with no
-     truncation, so a row that shrinks its segments below their content width pushes the text
-     outside the card. The capture gate measures exactly that and reported the third segment
-     clipped. Wrapping keeps every label whole at any card width; truncating would hide the
-     value the segment exists to state. */
+  /* WRAPS rather than shrinking, as a floor under a narrow card — but this is NOT what the
+     capture gate was reporting. An earlier note here read the failure as segments shrinking
+     below their content width. Measured, the card was 18px tall and the segment sat 36px
+     BELOW its bottom edge, on a 1026px-wide card carrying two short labels: the overflow was
+     vertical, from the 0px grid row the header now explains, and wrapping alone left the case
+     failing with the identical message. The world control has TWO segments, never three —
+     `worldToolStudio.js` states why — so `Inherit · …` is not among its labels.
+
+     The labels keep `flex: 1 1 0` and `min-width: 0` so the two segments stay equal width,
+     which is the parity with `.manager-tools-authority-segments` the note above commits to. */
   .manager-world-tool-break-segments {
     display: flex;
     flex: 1 1 auto;
@@ -382,9 +386,10 @@
 
   .manager-world-tool-break-segments label {
     display: flex;
-    flex: 1 1 auto;
+    flex: 1 1 0;
     align-items: center;
     justify-content: center;
+    min-width: 0;
     padding: 6px var(--fab-space-2);
     border-radius: 7px;
     cursor: pointer;
