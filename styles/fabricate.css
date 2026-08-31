@@ -9740,6 +9740,181 @@
   min-width: 0;
 }
 
+/* ── THE SCOPED-ENTITY LIST SHELLS' HOST-SHEET STEM (issue 1380) ────────────────────────────
+   A REQUIREMENT-7 CORRECTION, NOT A REOPENING. `ui-integration/spec.md`
+   `### GM World Scoped Entity Routes` requirement 7 closes this file to the lanes that build the
+   six scoped editors, and it also says a gateway closure "is void for a seam the enumeration does
+   not name". The enumeration pre-loaded here covers `manager-scoped-preview-*`,
+   `manager-scoped-inherit-*` and `manager-scoped-membership-actions`: a preview panel, an inherit
+   row and an action cluster. It names nothing for a LIST, a toolbar, a filter row or an inspector
+   frame, and the epic already set this precedent for the identical defect in the block above —
+   "its DEFAULT stem had no rules at all, so the shell rendered unstyled for any caller that did
+   not bring its own... the default has to arrive with the shell."
+
+   THIS BLOCK IS ADDITIVE AND EDITS NO EXISTING RULE. Every selector below carries a
+   `manager-scoped-list-*` class that nothing else in this repository renders, so the Component,
+   Recipe and Essence Studios are byte-identical across it. In particular the `.is-selection` join
+   at the multi-select row block ABOVE is deliberately left alone: appending a fourth name there
+   would change three shipped studios' rendering to save four declarations here.
+
+   ── WHY ANY OF IT IS HERE AND NOT IN THE FRAME'S SCOPED `<style>` ──────────────────────────
+   Two mechanical reasons, and neither is a preference:
+
+    1. `BulkSelectionToolbar` renders `<div class="{rowClass} is-selection">` IN ITS OWN TEMPLATE.
+       Svelte's scoping hash is applied to the elements a component renders, so a scoped rule in
+       the frame cannot reach that root at all. This is the exact defect recorded against the
+       essence view further up this file: the selection row lost its `display: flex`, its
+       `width: 100%` and its hairline, and `Clear`'s `margin-left: auto` went inert.
+    2. The toolbar's `<select>` and search `<input>` have to OUTRANK Foundry core's own aggressive
+       element rules. `.fabricate-manager .manager-scoped-list-toolbar select` is (0,2,1); a
+       Svelte-scoped `select.svelte-<hash>` is (0,1,1) and loses. Without this the controls render
+       at core's 14px `.application` base — full-width, taller than the controls beside them, and
+       wrapping one filter row into three, which is what the block above records happening.
+
+   The frame keeps everything a scoped rule CAN prove: its grid tracks, its container query and
+   its own inspector surface. */
+
+/* The filter row, and the selection row that joins it. Same metrics as the three studio filter
+   rows, restated rather than joined onto them for the reason the `.is-selection` note gives:
+   those selectors are pinned by exact string in `tests/components/manager-layout.test.js`. */
+.fabricate-manager .manager-scoped-list-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The row CONTEXT that separates the selection register from the filter row above it: a hairline
+   rule and the row's own gap. Its content is a control, a count and two text actions, so the
+   filter row's own spacing would be too loose. */
+.fabricate-manager .manager-scoped-list-filter-row.is-selection {
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+/* The control type scale. See reason 2 in the block header. */
+.fabricate-manager .manager-scoped-list-toolbar .manager-search input,
+.fabricate-manager .manager-scoped-list-toolbar select {
+  font-size: var(--fab-recipe-control-font);
+}
+
+.fabricate-manager .manager-scoped-list-toolbar .manager-search input {
+  border-radius: 9px;
+}
+
+.fabricate-manager .manager-scoped-list-toolbar select {
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 9px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-bg);
+  cursor: pointer;
+}
+
+/* The list and its rows. The skin matches the ONE browser-row treatment above — hairline edge,
+   8px corner, translucent overlay fill — and the geometry matches the recipe and component rows'
+   denser 11px/12px card, because a scoped list is the same kind of library at the same density. */
+.fabricate-manager .manager-scoped-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-list-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 62px;
+  padding: 11px 12px;
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-text);
+  background: var(--fab-overlay-light-03);
+}
+
+.fabricate-manager .manager-scoped-list-row > * {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-scoped-list-row:hover {
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-mv2-surface-3);
+}
+
+/* TWO INDEPENDENT STATES, AND A ROW CARRIES BOTH. `.is-selected` is "you are here" — an identity
+   cue, so it reads in the accent family rather than in success or amber; `.is-bulk-selected` is
+   "this row is in the set the next Apply writes to", one surface step forward. Written as two
+   rules in this order so a row that is both renders the active surface. */
+.fabricate-manager .manager-scoped-list-row.is-selected {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-scoped-list-row.is-bulk-selected {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
+/* The identity cell is a real `<button>` wearing row chrome, so Foundry's host button geometry is
+   reset explicitly — the same properties `Chip`'s and the selection toolbar's button rules reset,
+   and for the same reason: core's fixed button height crops it. */
+.fabricate-manager .manager-scoped-list-identity {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  flex: 1 1 260px;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-scoped-list-identity:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-scoped-list-identity:focus-visible {
+  outline: 2px solid var(--fab-mv2-accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.fabricate-manager .manager-scoped-list-identity .manager-system-copy {
+  display: grid;
+  align-content: center;
+  overflow: hidden;
+}
+
+.fabricate-manager .manager-scoped-list-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-1);
+  min-width: 0;
+}
+
 /* World > Parties owns the entire content column: the card editor makes the former
    inspector redundant. The route marker comes from the root so World does not release
    its column for any future world surface by accident. This list and the root's
