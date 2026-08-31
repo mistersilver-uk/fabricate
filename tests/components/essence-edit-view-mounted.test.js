@@ -44,8 +44,25 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
     // The essence colour fold, shared by the player card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
+    // The world-scope model this editor renders since issue 1372. `essenceScoped.js` imports
+    // nothing; `scopedStudio.js` is `InheritRow`'s and `MembershipActions`' row-set source and
+    // reaches the projection and the three scope modules underneath it.
+    'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
+    'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
+    'src/ui/svelte/stores/worldScopeProjection.js',
+    'src/systems/componentScope.js',
+    'src/systems/essenceScope.js',
+    'src/systems/toolScope.js',
+    'src/systems/scopedDefinitions.js',
+    'src/systems/scopedDefinitionStore.js',
+    'src/migration/worldScopeEntityGrouping.js',
+    'src/utils/definitionIndex.js',
+    'src/utils/sourceReferenceUnion.js',
   ],
   compiledModules: [
+    'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
+    'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
@@ -390,6 +407,154 @@ describe('1036 EssenceEditView — tab badges', () => {
     // by design. The negative control is the macro row above, which does fail.
     const colourRow = root.querySelector('[data-essence-validation-check="colour"]');
     assert.ok(!/WARNING/i.test(colourRow.textContent), 'the colour row never warns');
+    harness.remount();
+  });
+  // ── THE WORLD-SCOPE LOCK (issue 1372, criterion 10) ─────────────────────────────────────────
+  //
+  // BOTH DIRECTIONS ARE EXERCISED IN ONE TEST, and that pairing is the whole point. The lock is
+  // observable ONLY as an absence, and an absence assertion against a hook nothing renders passes
+  // on a tree where the lock was never built — so the same mount asserts the OVERRIDDEN section's
+  // unlink control EXISTS. One inherited and one overridden in one render also makes the failure
+  // "locked both" distinguishable from "locked neither", which a single-section fixture cannot do.
+
+  /**
+   * A world essence scope projection with one membership record whose two sections differ.
+   *
+   * @param {{effectSource: boolean, macro: boolean}} inherited per-section inherit switches.
+   * @param {boolean} [member]
+   * @returns {object}
+   */
+  function scopeWith(inherited, member = true) {
+    return {
+      entityType: 'essence',
+      sections: ['effectSource', 'macro'],
+      enableable: true,
+      taggable: false,
+      sourceLinked: false,
+      hasColorToken: true,
+      available: true,
+      seeded: { entities: true, defaults: true, membership: true },
+      entities: [{ id: 'aether', name: 'Aether' }],
+      entries: [
+        {
+          id: 'aether',
+          entity: { id: 'aether', name: 'Aether' },
+          defaults: { id: 'aether', effectSource: 'Item.world-ruby', macro: 'Macro.world-bind' },
+          membershipCount: 2,
+          inheritCounts: { effectSource: 1, macro: 1 },
+          hasSourceLink: false,
+          systems: [
+            { systemId: 'sys-a', systemName: 'Mythwright Forge', member, enabled: true, inherited },
+            {
+              systemId: 'sys-b',
+              systemName: 'Ironblood',
+              member: true,
+              enabled: true,
+              inherited: {},
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  const SCOPE_PROPS = {
+    actions: {},
+    systems: [
+      { id: 'sys-a', name: 'Mythwright Forge' },
+      { id: 'sys-b', name: 'Ironblood' },
+    ],
+    systemId: 'sys-a',
+  };
+
+  it("locks an INHERITED section's value card read-only while the overridden one stays editable", async () => {
+    globalThis.fromUuid = async () => null;
+    const root = await harness.mount(
+      props({ ...SCOPE_PROPS, scope: scopeWith({ effectSource: true, macro: false }) })
+    );
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+    openTab(root, 'oncraft');
+
+    // THE NEGATIVE HALF: the inherited section presents no edit affordance at all.
+    assert.equal(
+      root.querySelector('[data-scoped-source-unlink]'),
+      null,
+      'an inherited section is not this system to change, so its unlink must be absent'
+    );
+    assert.ok(
+      root.querySelector('[data-scoped-source-locked="effectSource"]'),
+      'and it renders a read-only card in its place rather than nothing at all'
+    );
+
+    // THE POSITIVE HALF, IN THE SAME RENDER: the OVERRIDDEN section is fully editable, which is
+    // what makes the absence above a measurement rather than a selector that matches nothing.
+    assert.ok(
+      root.querySelector('[data-scoped-macro-unlink]'),
+      'the overridden macro section keeps its unlink'
+    );
+    assert.equal(root.querySelector('[data-scoped-macro-locked]'), null);
+    harness.remount();
+  });
+
+  it('unlocks the section once its inherit switch goes off, so the lock is not a permanent state', async () => {
+    globalThis.fromUuid = async () => null;
+    const root = await harness.mount(
+      props({ ...SCOPE_PROPS, scope: scopeWith({ effectSource: false, macro: true }) })
+    );
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+    openTab(root, 'oncraft');
+
+    // The mirror image of the test above, on the same component and the same fixture shape. A
+    // lock that never lifted would satisfy the negative half of that test forever.
+    assert.ok(root.querySelector('[data-scoped-source-unlink]'));
+    assert.equal(root.querySelector('[data-scoped-source-locked]'), null);
+    assert.equal(root.querySelector('[data-scoped-macro-unlink]'), null);
+    assert.ok(root.querySelector('[data-scoped-macro-locked="macro"]'));
+    harness.remount();
+  });
+
+  it('states the BLOCK when this system holds no membership record, and offers the one fix', async () => {
+    globalThis.fromUuid = async () => null;
+    const root = await harness.mount(
+      props({ ...SCOPE_PROPS, scope: scopeWith({}, false) })
+    );
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+
+    assert.ok(
+      root.querySelector('[data-essence-scope-state="no-membership"]'),
+      'no record in this system means nothing here reads any of these values, and it says so'
+    );
+    assert.ok(
+      root.querySelector('[data-scoped-membership-add]'),
+      'and the one action that changes that is on screen'
+    );
+    // NON-VACUITY: the inherit switches are NOT drawn for a non-member, because there is no
+    // record for them to write to — a switch that wrote to nothing would report a state it
+    // could not hold.
+    assert.equal(root.querySelector('[data-scoped-inherit-toggle="effectSource"]'), null);
+    harness.remount();
+  });
+
+  it('renders none of the world-scope chrome when the corpus cannot answer for this essence', async () => {
+    // THE DEFAULT PATH, pinned. An essence the world catalogue does not hold is an ordinary
+    // state while `## CraftingSystem` requirement 36 holds, and the editor must render exactly as
+    // it did before issue 1372 — no banner, no switches, no lock.
+    globalThis.fromUuid = async () => null;
+    const root = await harness.mount(props());
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+    openTab(root, 'oncraft');
+
+    assert.equal(root.querySelector('[data-essence-scope-banner]'), null);
+    assert.equal(root.querySelector('[data-scoped-inherit-toggle]'), null);
+    assert.equal(root.querySelector('[data-scoped-source-locked]'), null);
+    assert.ok(
+      root.querySelector('[data-scoped-source-unlink]'),
+      'and the source card is editable, which is what the shipped editor always did'
+    );
     harness.remount();
   });
 });

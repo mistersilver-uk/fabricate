@@ -295,6 +295,16 @@ function compileManagerRoot() {
   // validation tabs are converted onto them, so both are in this root's static graph.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte');
+  // THE THREE SHARED SCOPED-LIST PRIMITIVES (issue 1380) and the two per-`(entity, system)`
+  // patterns they compose (issue 1362). `EntityRulesListShell` is compiled ALONGSIDE the two
+  // this root reaches today and is deliberately not conditional on a consumer: three lanes add
+  // theirs in parallel with no ordering between them, so each adds all three idempotently. A
+  // duplicate is a one-minute textual conflict; an omission is a silent hang somebody bisects.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/MembershipActions.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte');
@@ -894,6 +904,15 @@ function compileManagerRoot() {
     'src/migration/worldScopeEntityGrouping.js',
     'src/utils/definitionIndex.js',
     'src/utils/sourceReferenceUnion.js',
+    // Issue 1372 (epic 1357, PR 6b): the two world ESSENCE screens are real bodies now, so the
+    // shared scoped list shells, the inherit row and the membership cluster are all in this
+    // root's static graph — and so are the three plain modules underneath them. Same mechanical
+    // rule as every entry above: drop one and the whole file HANGS behind one
+    // ERR_MODULE_NOT_FOUND, reported as `# cancelled`, rather than failing a test.
+    'src/ui/svelte/stores/worldScopeProjection.js',
+    'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
+    'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
+    'src/utils/scopedEntityListModel.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -25688,14 +25707,37 @@ describe('CraftingSystemManager mounted behavior', () => {
   // from source; this covers the four a GM can actually reach, through the rail, in the DOM.
   describe('world scoped-entity routes (issue 1362)', () => {
     /**
-     * Rail leaf id -> the route token it commits and the screen title it renders. The titles
-     * are the prototype's, verbatim, including the lowercase `c` and the plural `Tools`.
+     * Rail leaf id -> the route token it commits, the screen title it renders, and the BODY
+     * SELECTOR that route's page draws.
+     *
+     * The body selector was a fixed `[data-scoped-placeholder="<token>"]` for all four, and
+     * issue 1372 makes that false for `world-essences`: the essence catalogue is a real screen
+     * now and draws the shared list shell instead. Naming the selector per route keeps the
+     * assertion LIVE in both directions rather than deleting it for the replaced route — the
+     * replaced page must still render a body of its own, and the three that still delegate must
+     * still render the shared one. The titles are the prototype's, verbatim, including the
+     * lowercase `c` and the plural `Tools`.
      */
     const RAIL_REACHABLE_ROUTES = [
-      ['component-catalogue', 'world-components', 'Component catalogue'],
-      ['vocabulary', 'world-vocabulary', 'Tags & Categories'],
-      ['essence-catalogue', 'world-essences', 'Essence Catalogue'],
-      ['tool-catalogue', 'world-tools', 'Tools Catalogue'],
+      [
+        'component-catalogue',
+        'world-components',
+        'Component catalogue',
+        '[data-scoped-placeholder="world-components"]',
+      ],
+      [
+        'vocabulary',
+        'world-vocabulary',
+        'Tags & Categories',
+        '[data-scoped-placeholder="world-vocabulary"]',
+      ],
+      ['essence-catalogue', 'world-essences', 'Essence Catalogue', '[data-scoped-list]'],
+      [
+        'tool-catalogue',
+        'world-tools',
+        'Tools Catalogue',
+        '[data-scoped-placeholder="world-tools"]',
+      ],
     ];
 
     async function settleRoute() {
@@ -25721,7 +25763,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     it('commits its own route, page hook and title from the rail — with no system selected', async () => {
       await mountRail();
       const seenPages = new Set();
-      for (const [leaf, token, title] of RAIL_REACHABLE_ROUTES) {
+      for (const [leaf, token, title, bodySelector] of RAIL_REACHABLE_ROUTES) {
         worldNavItem(leaf).click();
         await settleRoute();
         assert.equal(
@@ -25737,8 +25779,9 @@ describe('CraftingSystemManager mounted behavior', () => {
           title
         );
         assert.ok(
-          Boolean(target.querySelector(`[data-scoped-placeholder="${token}"]`)),
-          `${token} renders the shared placeholder body keyed on its own route`
+          Boolean(target.querySelector(bodySelector)),
+          `${token} renders its own body (${bodySelector}); a route wired into the shell with no ` +
+            'body renders an empty main and every other assertion here still passes'
         );
         // FULL WIDTH IS THE OTHER HALF OF THE ROUTE. A page wired into the shell but left in
         // the aside chain renders against a permanent dead strip, which no source assertion

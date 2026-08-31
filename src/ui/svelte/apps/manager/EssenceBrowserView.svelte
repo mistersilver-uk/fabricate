@@ -47,8 +47,18 @@
     toggleEssenceSelection,
   } from '../../../../utils/essenceBulkEditModel.js';
   import { ESSENCE_STATUS_SEGMENTS, ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
+  import { essenceSystemState, essenceValueSuffix } from './scoped/essenceScoped.js';
 
   let {
+    // ── THE WORLD-SCOPE SEAM (issue 1374), READ HERE FROM ISSUE 1372 ────────────────────────
+    // `scope`, `actions` and `systemId` are three of the four keys `essenceScopeProps` supplies,
+    // so declaring them is CORRECT rather than hazardous: the spread owns each name, and the
+    // lookup never falls through to the bundle thunk. `systems` is deliberately NOT declared —
+    // this screen resolves membership against `scope.entries`, which is the projection's join,
+    // and the narrowed `{id, name}` roster answers none of the three questions it asks.
+    scope = null,
+    actions = null,
+    systemId = '',
     essenceCards = [],
     showSourceUi = false,
     showPropertyMacroUi = false,
@@ -65,6 +75,14 @@
     onSelectionCleared = null,
     browserState = $bindable(null),
   } = $props();
+
+  // ── THE MEMBERSHIP FILTER IS COMPONENT-LOCAL, AND THAT IS A DECISION ─────────────────────
+  // Every other axis on this toolbar lives on the LIFTED browser state so it survives the editor
+  // round-trip. This one does not, because it is not a preference: `All world essences` puts rows
+  // on screen that this system does not have, and a GM returning from an editor to a list showing
+  // entities that are not in the system they are editing would read it as data loss. It resets to
+  // `in` on every mount, which is the state the shipped screen has always had.
+  let membershipFilter = $state('in');
 
   let ownBrowserState = $state(createEssenceBrowserState());
   // The active view-state: the root's lifted object when bound, else the local fallback.
@@ -89,6 +107,9 @@
     ui.pageIndex = 0;
     ui.bulkSelectedEssenceIds = new Set();
     ui.systemId = selectedSystemId;
+    // The membership axis names THIS system's records, so it cannot survive a system switch for
+    // the same reason the source filter cannot.
+    membershipFilter = 'in';
   });
 
   function text(key, fallback) {
@@ -104,6 +125,95 @@
     return result;
   }
 
+  // ── MEMBERSHIP, RESOLVED AGAINST THE WORLD CORPUS ────────────────────────────────────────
+  //
+  // TWO OPTIONS, NOT THREE. `In this system` and `All world essences`, each carrying its count.
+  // The shared list model offers `all` / `in` / `out` for a system-scope list, and this screen is
+  // the prototype's `sysEss`, which offers two: `out` alone is a list a GM cannot act on from
+  // here beyond adding, and `all` already contains it with the members for context.
+  const activeSystemId = $derived(String(systemId || selectedSystemId || ''));
+  const worldEntries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
+  // The filter renders only when the world corpus can actually answer it. An unreadable corpus
+  // publishes `available: false`, and a control offering `All world essences` over a corpus
+  // nobody could read would report every essence as absent from this system.
+  const membershipAvailable = $derived(scope?.available === true && activeSystemId !== '');
+  const memberIds = $derived(new Set((essenceCards || []).map((essence) => essence.id)));
+  const systemRows = $derived(
+    new Map(
+      worldEntries.map((entry) => [
+        entry.id,
+        (entry.systems ?? []).find((row) => row.systemId === activeSystemId) ?? null,
+      ])
+    )
+  );
+  const membershipCounts = $derived({
+    in: (essenceCards || []).length,
+    all: Math.max(worldEntries.length, (essenceCards || []).length),
+  });
+
+  /**
+   * The world essences this system has NO record for, projected into the card shape the row
+   * renders, so one list can carry both.
+   *
+   * `enabled: true` is not a fiction: `addToSystem` seeds a membership record with `enabled: true`,
+   * so it is what this row WILL be the moment the Add beside it is pressed — which is also why the
+   * status segment counts it as enabled under `All world essences`.
+   */
+  const absentCards = $derived(
+    membershipFilter === 'all' && membershipAvailable
+      ? worldEntries
+          .filter((entry) => !memberIds.has(entry.id))
+          .map((entry) => ({
+            id: entry.id,
+            name: entry.entity?.name || entry.id,
+            description: entry.entity?.description || '',
+            icon: entry.entity?.icon || 'fas fa-mortar-pestle',
+            colorToken: entry.entity?.colorToken || '',
+            enabled: true,
+            componentUsageCount: 0,
+            recipeUsageCount: 0,
+            hasEffectTransfer: false,
+            hasPropertyMacro: false,
+            sourceState: 'none',
+          }))
+      : []
+  );
+  const listCards = $derived([...(essenceCards || []), ...absentCards]);
+
+  /**
+   * One row's three-state membership answer.
+   *
+   * @param {object} essence a rendered card.
+   * @returns {string} one of `absent` / `disabled` / `enabled`.
+   */
+  function membershipStateOf(essence) {
+    if (!memberIds.has(essence?.id)) return 'absent';
+    return essenceSystemState({ member: true, enabled: essence?.enabled !== false });
+  }
+
+  /**
+   * The `· world default` / `· overridden here` suffix run for one row.
+   *
+   * IT IS ON THE ROW AND NOT IN THE INSPECTOR, and that is a recorded limit rather than a
+   * placement preference. The browser inspector is rendered by `CraftingSystemManagerRoot.svelte`
+   * — which `### GM World Scoped Entity Routes` requirement 7 closes to this lane — with explicit
+   * props and no bundle spread, so a prop declared on `EssenceBrowserInspector` for this would
+   * take its default forever. The row is the surface this lane can reach, and it carries the same
+   * two words about the same two sections.
+   *
+   * @param {object} essence
+   * @returns {Array<{section: string, label: string}>}
+   */
+  function inheritSuffixes(essence) {
+    if (!membershipAvailable || !memberIds.has(essence?.id)) return [];
+    const inherited = systemRows.get(essence?.id)?.inherited ?? null;
+    if (!inherited) return [];
+    return (scope?.sections ?? []).map((section) => ({
+      section,
+      label: essenceValueSuffix(inherited[section] !== false, text),
+    }));
+  }
+
   // The SEARCH is applied here rather than in the pure model, which says so in its own
   // header: whether a source name is searchable depends on `showSourceUi`, and that is a
   // presentation fact the model has no business knowing. The TERM still lives on the lifted
@@ -112,7 +222,7 @@
   const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
   const searchedEssences = $derived(
     normalizedSearch
-      ? (essenceCards || []).filter((essence) =>
+      ? listCards.filter((essence) =>
           [
             essence.name || '',
             essence.description || '',
@@ -123,7 +233,7 @@
             .toLowerCase()
             .includes(normalizedSearch)
         )
-      : essenceCards || []
+      : listCards
   );
 
   const model = $derived(
@@ -373,6 +483,39 @@
         </ManagerButton>
       </div>
 
+      <!-- THE MEMBERSHIP AXIS (issue 1372). Two options with their counts, which is the
+           prototype's own vocabulary for this screen. It renders only when the world corpus can
+           answer it: over an unreadable corpus every essence reports as absent from this system,
+           which is a false statement rather than an empty one. -->
+      {#if membershipAvailable}
+        <select
+          class="manager-essence-membership-filter"
+          data-essence-membership-filter
+          value={membershipFilter}
+          onchange={(event) => {
+            membershipFilter = event.currentTarget.value;
+            ui.pageIndex = 0;
+          }}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Essence.MembershipFilterLabel',
+            'Filter essences by membership of this system'
+          )}
+        >
+          <option value="in" data-essence-membership-option="in"
+            >{format('FABRICATE.Admin.Manager.Essence.MembershipIn', 'In this system ({count})', {
+              count: membershipCounts.in,
+            })}</option
+          >
+          <option value="all" data-essence-membership-option="all"
+            >{format(
+              'FABRICATE.Admin.Manager.Essence.MembershipAll',
+              'All world essences ({count})',
+              { count: membershipCounts.all }
+            )}</option
+          >
+        </select>
+      {/if}
+
       <!-- RETAINED from the shipped browser and reachable only with source UI on: a broken
            source link is otherwise unfindable, which is the only reason `needs-attention`
            exists. The `aria-label` is the select's accessible name. -->
@@ -466,7 +609,7 @@
     listClass="manager-essences-table"
     listAttrs={{ 'data-essence-view': ui.viewMode }}
     scrollLabel={text('FABRICATE.Admin.Manager.Essence.TableShort', 'Essences')}
-    isEmpty={(essenceCards || []).length === 0}
+    isEmpty={listCards.length === 0}
     totalCount={model.totalCount}
     pageSize={ui.pageSize}
     pageIndex={model.pageIndex}
@@ -511,12 +654,15 @@
         bulkSelected={bulkSelectedIds.has(essence.id)}
         effectTransferEnabled={showSourceUi}
         propertyMacrosEnabled={showPropertyMacroUi}
+        membershipState={membershipAvailable ? membershipStateOf(essence) : ''}
+        inheritSuffixes={inheritSuffixes(essence)}
         {text}
         {format}
         onSelect={(id) => onSelectEssence(id)}
         onEdit={(id) => onEditEssence(id)}
         onToggleEnabled={(id, enabled) => onToggleEssenceEnabled(id, enabled)}
         onToggleBulkSelected={(id) => toggleBulkSelected(id)}
+        onAddToSystem={(id) => actions?.addToSystem?.(id, activeSystemId)}
       />
     {/snippet}
   </LibraryShelf>

@@ -71,6 +71,17 @@
     effectTransferEnabled = false,
     propertyMacrosEnabled = false,
     saving = false,
+    // ── THE WORLD-SCOPE LOCK (issue 1372) ──────────────────────────────────────────────────
+    // `{effectSource: boolean, macro: boolean}` — whether this system INHERITS that section from
+    // the world default. While it does, this system does not own the value, so the editor must
+    // not present an edit affordance for it: the card renders read-only, the drop zone and the
+    // picker are not drawn, and the unlink control is absent. Turning the section's inherit
+    // switch off is the one action that unlocks it, and that switch lives beside the card rather
+    // than inside it. Defaults to all-false, so the shipped editor renders exactly as it did.
+    lockedSections = {},
+    // `{[section]: string}` — the one-line summary of what the locked value resolves to. Without
+    // it a locked card states a name and never says why it cannot be edited.
+    inheritNotes = {},
     onSourceSelect = () => {},
     onSourceDrop = () => {},
     onSourceClear = () => {},
@@ -78,6 +89,9 @@
     onMacroDrop = () => {},
     onMacroUnlink = () => {},
   } = $props();
+
+  const sourceLocked = $derived(lockedSections?.effectSource === true);
+  const macroLocked = $derived(lockedSections?.macro === true);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -221,49 +235,72 @@
             )}
       </p>
 
-      {#if sourceLinked}
-        <!-- The Tool Studio's linked card, from the same primitive `ToolOverviewTab` renders.
+      {#if sourceLocked}
+        <!-- LOCKED: this system inherits the section, so it does not own the value. A read-only
+             card states what resolves and why, and draws no drop target, no picker and no
+             unlink — the absence of `[data-scoped-source-unlink]` IS the lock.
+
+             NESTED RATHER THAN FLATTENED INTO ONE `{:else if}` CHAIN, deliberately. The
+             linked/unlinked pair below is pinned by `essence-studio-fidelity.test.js` as
+             `{#if sourceLinked}` with the drop-or-pick zone strictly after its `{:else}` — the
+             assertion that stopped the zone rendering twice — and folding this branch into that
+             chain would rewrite the very structure that pin exists to hold. -->
+        <div class="manager-essence-locked-card" data-scoped-source-locked="effectSource">
+          <span class="manager-essence-locked-value">
+            {sourceItem?.name ||
+              storedSourceName ||
+              text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None')}
+          </span>
+          {#if inheritNotes?.effectSource}
+            <p class="manager-muted" data-scoped-source-locked-note>{inheritNotes.effectSource}</p>
+          {/if}
+        </div>
+      {:else}
+        {#if sourceLinked}
+          <!-- The Tool Studio's linked card, from the same primitive `ToolOverviewTab` renders.
              The sub-line is the INSTRUCTION, not the uuid: the card is itself the drop
              target, and telling the GM so is the thing the uuid was occupying the line
              instead of doing. The uuid is still reachable — `Copy source UUID` is the first
              of the grouped pair, and its `title` shows it. -->
-        <ItemDropZone
-          item={sourceItem}
-          kind="essence-source"
-          title={sourceItem.name}
-          hint={text(
-            'FABRICATE.Admin.Manager.Essence.OnCraft.SourceReplaceHint',
-            'Drop another Item here to replace the linked source.'
-          )}
-          disabled={saving}
-          copyLabel={sourceUuid ||
-            text(
-              'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
-              'This component has no source item UUID.'
+          <ItemDropZone
+            item={sourceItem}
+            kind="essence-source"
+            title={sourceItem.name}
+            hint={text(
+              'FABRICATE.Admin.Manager.Essence.OnCraft.SourceReplaceHint',
+              'Drop another Item here to replace the linked source.'
             )}
-          unlinkLabel={text(
-            'FABRICATE.Admin.Features.Essences.ClearSourceItem',
-            'Remove source item'
-          )}
-          onDrop={onSourceDrop}
-          onCopy={onCopySourceUuid && sourceUuid ? () => onCopySourceUuid(sourceUuid) : null}
-          onUnlink={() => onSourceClear()}
-        />
-      {:else}
-        <!-- UNLINKED only. `EssenceSourceSelector` is the drop-or-PICK affordance, and the
+            disabled={saving}
+            copyLabel={sourceUuid ||
+              text(
+                'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
+                'This component has no source item UUID.'
+              )}
+            unlinkLabel={text(
+              'FABRICATE.Admin.Features.Essences.ClearSourceItem',
+              'Remove source item'
+            )}
+            onDrop={onSourceDrop}
+            onCopy={onCopySourceUuid && sourceUuid ? () => onCopySourceUuid(sourceUuid) : null}
+            onUnlink={() => onSourceClear()}
+            unlinkAttr="data-scoped-source-unlink"
+          />
+        {:else}
+          <!-- UNLINKED only. `EssenceSourceSelector` is the drop-or-PICK affordance, and the
              pick half is why it survives at all: an essence source is an in-system managed
              component, so there is a list to choose from that a document drop zone cannot
              offer. Rendering it BESIDE the linked card is what said the same thing twice. -->
-        <div class="manager-essence-source-drop-zone">
-          <EssenceSourceSelector
-            value={null}
-            items={managedItemOptions}
-            disabled={saving}
-            onDrop={onSourceDrop}
-            onSelect={(itemId) => onSourceSelect(itemId || '')}
-            onClear={() => onSourceClear()}
-          />
-        </div>
+          <div class="manager-essence-source-drop-zone">
+            <EssenceSourceSelector
+              value={null}
+              items={managedItemOptions}
+              disabled={saving}
+              onDrop={onSourceDrop}
+              onSelect={(itemId) => onSourceSelect(itemId || '')}
+              onClear={() => onSourceClear()}
+            />
+          </div>
+        {/if}
       {/if}
     </section>
   {/if}
@@ -302,32 +339,50 @@
            `Macro.lab-aether-binding` as its title AND again as its sub-line. The Tool Studio
            gives that line to a useful sentence, so this does too; the uuid survives as the
            card's title in the unresolved case, which is the one case it is diagnostic in. -->
-      <ItemDropZone
-        item={macroItem}
-        kind="essence-macro"
-        documentType="Macro"
-        state={macroMissing ? 'missing' : 'linked'}
-        disabled={saving}
-        title={text('FABRICATE.Admin.Manager.Essence.Macro.DropTitle', 'Drop a script macro here')}
-        hint={macroUuid
-          ? text(
-              'FABRICATE.Admin.Manager.Essence.Macro.ReplaceHint',
-              'Drop another Macro here to replace the linked script.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Essence.Macro.EmptyHint',
-              'Drop a script Macro from this world or an installed compendium.'
-            )}
-        subline={macroMissing
-          ? text(
-              'FABRICATE.Admin.Manager.Essence.Macro.Missing',
-              'This macro no longer resolves, so it will be skipped at craft time.'
-            )
-          : ''}
-        unlinkLabel={text('FABRICATE.Admin.Manager.Essence.Macro.Unlink', 'Unlink macro')}
-        onDrop={onMacroDrop}
-        onUnlink={macroUuid ? onMacroUnlink : null}
-      />
+      {#if macroLocked}
+        <!-- LOCKED, for the same reason and with the same consequence as the source card. -->
+        <div class="manager-essence-locked-card" data-scoped-macro-locked="macro">
+          <span class="manager-essence-locked-value">
+            {macroName ||
+              macroUuid ||
+              text('FABRICATE.Admin.Manager.Essence.Macro.Unnamed', 'the linked property macro')}
+          </span>
+          {#if inheritNotes?.macro}
+            <p class="manager-muted" data-scoped-macro-locked-note>{inheritNotes.macro}</p>
+          {/if}
+        </div>
+      {:else}
+        <ItemDropZone
+          item={macroItem}
+          kind="essence-macro"
+          documentType="Macro"
+          state={macroMissing ? 'missing' : 'linked'}
+          disabled={saving}
+          title={text(
+            'FABRICATE.Admin.Manager.Essence.Macro.DropTitle',
+            'Drop a script macro here'
+          )}
+          hint={macroUuid
+            ? text(
+                'FABRICATE.Admin.Manager.Essence.Macro.ReplaceHint',
+                'Drop another Macro here to replace the linked script.'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Essence.Macro.EmptyHint',
+                'Drop a script Macro from this world or an installed compendium.'
+              )}
+          subline={macroMissing
+            ? text(
+                'FABRICATE.Admin.Manager.Essence.Macro.Missing',
+                'This macro no longer resolves, so it will be skipped at craft time.'
+              )
+            : ''}
+          unlinkLabel={text('FABRICATE.Admin.Manager.Essence.Macro.Unlink', 'Unlink macro')}
+          onDrop={onMacroDrop}
+          onUnlink={macroUuid ? onMacroUnlink : null}
+          unlinkAttr="data-scoped-macro-unlink"
+        />
+      {/if}
       {#if macroWarning}
         <p class="manager-validation-error" role="alert" data-essence-macro-warning>
           {macroWarning}
@@ -338,6 +393,23 @@
 </div>
 
 <style>
+  /* THE LOCKED VALUE CARD. Static class names, so Svelte can prove each selector is used and
+     `lint:svelte:warnings` stays at zero. */
+  .manager-essence-locked-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-chip);
+    min-width: 0;
+  }
+
+  .manager-essence-locked-value {
+    color: var(--fab-mv2-text);
+    font-family: var(--fab-font-serif);
+    font-size: 0.85rem;
+    font-weight: 600;
+    overflow-wrap: break-word;
+  }
+
   .manager-essence-tab-stack {
     display: flex;
     flex-direction: column;

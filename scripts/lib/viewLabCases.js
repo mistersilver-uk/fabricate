@@ -1066,6 +1066,13 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
     ],
   }),
+  // ── The two world ESSENCE screens, REAL bodies from issue 1372 ─────────────────────────────
+  //
+  // The catalogue's `ScopedPlaceholderPage` claim is DELETED here, not merely joined by the new
+  // patterns. The shared placeholder body is claimed by every case that renders it and this route
+  // no longer does, so a claim left behind would publish this screen as evidence of a change to a
+  // component it does not contain — the exact inversion `manager-scoped-prop-contract.test.js`
+  // reds on, in both directions.
   managerCase({
     id: 'world-essence-catalogue',
     label: 'Manager — World Essence Catalogue',
@@ -1074,11 +1081,62 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [{ selector: '#manager-world-nav-essence-catalogue' }],
     expectView: 'world-essences',
     expectSelector: '[data-scoped-page="world-essences"]',
+    // THE THREE-STATE PER-SYSTEM INDICATOR, proved present rather than assumed. `expectSelector`
+    // alone passes on a route that rendered its shell and no rows at all, which is what an
+    // unseeded world corpus looks like — and a frame of an empty catalogue is not evidence of a
+    // catalogue.
+    expectContained: [
+      { container: '[data-scoped-list]', target: '[data-scoped-essence-glyph]' },
+      { container: '[data-scoped-list]', target: '[data-scoped-system-state]' },
+    ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+      // The two shared list primitives this screen composes (issue 1380). They are claimed by the
+      // cases that RENDER them, exactly as the placeholder body was: a shell edit that selected no
+      // frame would publish nothing, and one that selected an unrelated frame would be worse.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
+      /^src\/utils\/scopedEntityListModel\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-essence-entry',
+    label: 'Manager — World Essence entry',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // REACHED THE WAY A GM REACHES IT, through the catalogue row's pen. That is the whole reason
+    // this case could not exist before issue 1372: the route normalized and rendered, and nothing
+    // navigated to it, so a case would have had to seed a state no GM can produce — the
+    // fixture-bypass hazard this registry already carries against it.
+    steps: [
+      { selector: '#manager-world-nav-essence-catalogue' },
+      { selector: '[data-scoped-list-action="open-entry"]' },
+    ],
+    expectView: 'world-essence-entry',
+    expectSelector: '[data-scoped-page="world-essence-entry"]',
+    // BOTH world-default cards, with their inherit lines. A frame that showed the identity fields
+    // alone would show nothing this screen exists for.
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-essence-entry"]',
+        target: '[data-scoped-world-default="effectSource"]',
+      },
+      {
+        container: '[data-scoped-page="world-essence-entry"]',
+        target: '[data-scoped-world-default="macro"]',
+      },
+      {
+        container: '[data-scoped-world-default="effectSource"]',
+        target: '[data-scoped-world-default-inherit="effectSource"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/MembershipActions\.svelte$/,
     ],
   }),
   managerCase({
@@ -3687,6 +3745,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
+      // The world-scope model this editor renders since issue 1372: the inherit switches, the
+      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
+      // frames because those are the frames that show them, exactly as the placeholder body was
+      // claimed by every case that rendered it.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
   managerCase({
@@ -3714,6 +3778,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
+      // The world-scope model this editor renders since issue 1372: the inherit switches, the
+      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
+      // frames because those are the frames that show them, exactly as the placeholder body was
+      // claimed by every case that rendered it.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
   managerCase({
@@ -3743,6 +3813,80 @@ export const VIEW_LAB_CASES = Object.freeze([
       // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
+      // The world-scope model this editor renders since issue 1372: the inherit switches, the
+      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
+      // frames because those are the frames that show them, exactly as the placeholder body was
+      // claimed by every case that rendered it.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
+    ],
+  }),
+
+  // ── The two SYSTEM-SCOPE essence states issue 1372 adds ────────────────────────────────────
+  managerCase({
+    id: 'manager-essences-membership-all',
+    label: 'Manager — Essences all world essences',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The two-option membership filter, switched to `All world essences`. The lab's three systems
+    // hold DIFFERENT essences, and the `1.30.0` migration lifts every one of them into one world
+    // corpus, so this system genuinely has world essences it holds no record for — which is the
+    // only state in which the absent row and its Add action exist to be photographed.
+    query: {},
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '[data-essence-membership-filter]', select: 'all' },
+    ],
+    expectView: 'essences',
+    // BOTH SIDES OF THE FILTER IN ONE FRAME: a row this system has, and a row it does not. A
+    // frame carrying only the second would be a frame of an empty system.
+    expectContained: [
+      { container: '.manager-main', target: '[data-essence-membership-filter]' },
+      { container: '.manager-main', target: '[data-essence-membership-state="absent"]' },
+      { container: '.manager-main', target: '[data-essence-membership-state="enabled"]' },
+    ],
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceRow\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essence-edit-inherit-lock',
+    label: 'Manager — Essence edit inherit lock',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // ONE SECTION INHERITED AND ONE OVERRIDDEN, IN THE SAME FRAME — which is the whole point of
+    // the world-scope model and the one state a single-section frame cannot show.
+    //
+    // The inherited half is REACHED BY THE GM ACTION rather than seeded, and that is forced
+    // rather than chosen: the `1.30.0` migration writes every membership record with BOTH
+    // sections overridden, so there is no fixture state in which one is already inherited. So the
+    // walk flips `effectSource` with its own switch and leaves `macro` alone, which also makes
+    // the frame evidence that the switch WORKS rather than only that the two states render.
+    query: {},
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '[data-scoped-inherit-toggle="effectSource"]' },
+      { selector: '[data-essence-tab="oncraft"]' },
+    ],
+    expectView: 'essence-edit',
+    expectContained: [
+      // The LOCKED card, and the macro card's unlink still present beside it. Asserting only the
+      // lock would pass on an editor that locked BOTH, which is a different defect wearing the
+      // same green.
+      { container: '.manager-main', target: '[data-scoped-source-locked="effectSource"]' },
+      { container: '.manager-main', target: '[data-scoped-macro-unlink]' },
+    ],
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceOnCraftTab\.svelte$/,
+      // NO `ItemDropZone` PATTERN. It is a BROAD signal in `designSystemPrimitives.json`, and
+      // `selectRenderFileCases` `continue`s on a broad signal BEFORE it consults `sourceMatches`
+      // at all — so the declaration would be inert configuration nothing reads, which
+      // `design-system-primitives.test.js` reds on by name.
     ],
   }),
 

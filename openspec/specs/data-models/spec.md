@@ -2025,9 +2025,11 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > The five vocabulary keys have no destination at all, because `fabricate.worldVocabulary` does not exist.
 > `## Component`, `## EssenceDefinition` and `## Tool` therefore still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does — with the single addition that a reader's row also carries the resolver's `member` and `inherited` keys.
 >
-> **EXPOSED BUT UNREACHABLE** as of issue 1362, and this is a state of its own rather than a variant of the others: a WRITER now exists in `src/`.
+> **REACHABLE FOR ESSENCES, EXPOSED BUT UNREACHABLE FOR COMPONENTS AND TOOLS**, as of issue 1372.
 > `src/ui/svelte/stores/worldScopeActions.js` implements the whole per-entity-type action family — create, update and delete a world entity, write a world-default section, add to and remove from a system, flip a section's inherit switch, write a membership override, copy a membership, and (component only) the additive tag and per-tag mute writes — and `adminStore` exposes it as `store.worldScope`.
-> Nothing in `src/` CALLS it: every world scoped-entity route this repository renders is a placeholder, so no GM can reach one.
+> **The ESSENCE family is now called from `src/`.** `world-essences` and `world-essence-entry` render real screens: a GM can create a world essence, edit its identity, write and clear both world defaults, add it to a system, remove it, enable and disable it there, and flip either inherit switch.
+> The COMPONENT and TOOL families remain uncalled, because `world-components`, `world-component-entry`, `world-tools` and `world-tool-entry` are still placeholders, and the vocabulary leg still mints no family at all.
+> The line this note draws is therefore per entity type rather than across the whole family, and naming which types are on which side of it is the point: a reader who takes "unreachable" as a property of the module would conclude a world essence cannot be authored today, and it can be.
 > The READ union is untouched by this: no world scoped-entity WRITER is reachable by a GM, so the union's world half is empty on every world that has not been migrated and equal to the in-system records on every world that has.
 > Stated explicitly because the difference matters to the next reader in exactly one direction: a GM cannot author a world entity today, and code that could is nevertheless present and binding.
 

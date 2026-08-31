@@ -3815,18 +3815,41 @@ describe('world scoped-entity source contract (issue 1362)', () => {
         'cross-check below would be against the wrong set'
     );
 
+    // TWO SPELLINGS, AND BOTH ARE READ (issue 1372). A page that still DELEGATES its body states
+    // the four facts as attributes on `ScopedPlaceholderPage`; a page a screen lane has REPLACED
+    // states them as module constants beside its own `<main>`. Reading only the first form makes
+    // every replaced page answer `undefined` on all four, which collapses the distinctness sets
+    // below to fewer than seven and reds a lane that did everything right — and reading only the
+    // second would do the same to the four that have not been replaced yet. The swap detector has
+    // to survive the transition it exists to police, so it resolves either.
+    const declared = (source, attribute, constant) =>
+      source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1] ??
+      source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1];
     const pages = readdirSync(scopedDir)
       .filter((entry) => entry.startsWith('World') && entry.endsWith('.svelte'))
       .map((entry) => {
         const source = readFileSync(resolve(scopedDir, entry), 'utf8');
         return {
           file: entry,
-          pageId: source.match(/pageId="([^"]+)"/)?.[1],
-          icon: source.match(/icon="([^"]+)"/)?.[1],
-          titleKey: source.match(/titleKey="([^"]+)"/)?.[1],
-          titleFallback: source.match(/titleFallback="([^"]+)"/)?.[1],
+          pageId: declared(source, 'pageId', 'PAGE_ID'),
+          icon: declared(source, 'icon', 'PAGE_ICON'),
+          titleKey: declared(source, 'titleKey', 'TITLE_KEY'),
+          titleFallback: declared(source, 'titleFallback', 'TITLE_FALLBACK'),
         };
       });
+    // NON-VACUITY, because the regex pair above is exactly the thing that can silently answer
+    // `undefined` for every page after a rename: a set of seven `undefined`s has size one, which
+    // the distinctness assertions below would catch, but a set of seven MISSING title fallbacks
+    // would not — nothing else reads that field.
+    for (const page of pages) {
+      for (const field of ['pageId', 'icon', 'titleKey', 'titleFallback']) {
+        assert.equal(
+          typeof page[field],
+          'string',
+          `${page.file} declares no ${field} in either supported spelling`
+        );
+      }
+    }
     assert.equal(pages.length, 7, 'seven world scoped-entity pages');
 
     for (const field of ['pageId', 'icon', 'titleKey']) {
