@@ -2,6 +2,7 @@
 layout: default
 title: 0003 — Whole-Array Crafting-Definition Storage
 parent: Architecture Decisions
+grand_parent: Technical Details
 nav_order: 3
 ---
 
