@@ -3177,7 +3177,12 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Tools && typeof lang.FABRICATE.Admin.Manager.Tools === 'object',
       'lang should expose a FABRICATE.Admin.Manager.Tools block'
     );
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.Title, 'Tools');
+    // `Tool Rules`, not `Tools` (issue 1373). The rail entry, the breadcrumb leaf and the
+    // page heading all read `Tool Rules` since the world catalogue took ownership of Tool
+    // identity, art and description; a heading reading `Tools` over a rail entry reading
+    // `Tool Rules` is the WCAG 2.5.3 "Label in Name" hazard that relabel had to avoid once
+    // already.
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.Title, 'Tool Rules');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Add, 'Add tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll, 'Save All');

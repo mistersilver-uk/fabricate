@@ -19217,11 +19217,13 @@ describe('CraftingSystemManager mounted behavior', () => {
           ? 'authority'
           : element.hasAttribute('data-manager-tools-search')
             ? 'search'
-            : element.hasAttribute('data-tool-create-card')
-              ? 'create'
-              : 'list'
+            : element.hasAttribute('data-manager-tools-sort')
+              ? 'sort'
+              : element.hasAttribute('data-tool-create-card')
+                ? 'create'
+                : 'list'
       ),
-      ['authority', 'search', 'create', 'list']
+      ['authority', 'search', 'sort', 'create', 'list']
     );
     const authority = target.querySelector('[data-manager-tools-authority]');
     // THREE, not two (issue 1373): `Inherit`, `Tool-specific`, `Check-driven`. This count is
@@ -19234,14 +19236,17 @@ describe('CraftingSystemManager mounted behavior', () => {
           ? 'heading'
           : element.classList.contains('manager-tools-authority-segments')
             ? 'segments'
-            : 'caption'
+            : 'other'
       ),
-      ['heading', 'segments', 'caption']
+      ['heading', 'segments']
     );
-    assert.match(
-      authority.querySelector('.manager-tools-authority-caption').textContent,
-      /Each Tool tracks its own breakage.*applies to all 1 tool/
+    assert.ok(
+      !authority.querySelector('.manager-tools-authority-caption'),
+      'the breakage card is a head and a track, with no caption restating the selected segment'
     );
+    // NO GLYPHS on the system card's segments, where the WORLD card's carry one. Asserted
+    // because the two cards look alike and the difference is the design's own composition.
+    assert.equal(authority.querySelectorAll('[data-tool-authority-segment] i').length, 0);
     authority.querySelector('input[value="checkDriven"]').click();
     assert.deepEqual(authorityChanges, ['checkDriven']);
 
@@ -19257,7 +19262,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the bare search control does not disguise the result count as a chip'
     );
-    assert.equal(target.querySelector('[data-tool-result-count]').textContent.trim(), '1 tool');
+    assert.match(
+      target.querySelector('[data-tool-result-count]').textContent,
+      /1 shown .* 1 of 1 in this system/
+    );
+    // THE THREE MEMBERSHIP SEGMENTS, which are the only route on this screen to a world Tool
+    // this system has no rules for.
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tool-membership-option]')].map(
+        (element) => element.dataset.toolMembershipOption
+      ),
+      ['in', 'all', 'over']
+    );
     assert.equal(createCard.querySelector('summary, select, button'), null);
     dispatchDrop(createCard, { type: 'Item', uuid: worldItem.uuid });
     await tick();
@@ -19274,7 +19290,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(dropped.length, 1, 'the tool create zone still refuses every non-Item payload');
 
     target.querySelector('.manager-tools-enabled-toggle').click();
-    target.querySelector('.manager-tools-library-actions .manager-icon-button').click();
+    target.querySelector('.manager-tools-library-actions [data-tool-edit-rules]').click();
     assert.deepEqual(enabledChanges, [['tool-catalyst', false]]);
     assert.deepEqual(edits, ['tool-catalyst']);
     assert.deepEqual(
@@ -19289,6 +19305,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(selections, ['tool-catalyst', 'tool-catalyst']);
     assert.ok(target.querySelector('[data-tool-library-scroll]'));
     assert.ok(target.querySelector('[data-tool-browser-pagination] .manager-pagination'));
+    // NO ON-BREAK CHIP on a system row. The on-break action is a WORLD default, stated on the
+    // world catalogue's row; repeating it here says nothing this screen decides.
+    assert.equal(
+      [...target.querySelectorAll('.manager-tools-library-chips .manager-chip')].filter((chip) =>
+        /Destroys|Marks broken|Replaces/.test(chip.textContent)
+      ).length,
+      0
+    );
   });
 
   it('does not override a valid Tool selection and emits nothing for an empty library', async () => {
@@ -19388,7 +19412,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   async function openFixtureToolEditor(calls) {
     const row = target.querySelector('[data-manager-tool-id="tool-catalyst"]');
     assert.ok(row, 'the persisted Tool is rendered in the library');
-    row.querySelector('.manager-tools-library-actions .manager-icon-button').click();
+    row.querySelector('.manager-tools-library-actions [data-tool-edit-rules]').click();
     flushSync();
     const openIndex = calls.findIndex((call) => call[0] === 'openToolDraft');
     assert.ok(openIndex >= 0);
@@ -19466,7 +19490,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     const inspector = target.querySelector('[data-tool-browser-inspector]');
     assert.ok(inspector);
     assert.match(inspector.textContent, /Artisan Catalyst/);
-    assert.equal(inspector.querySelector('[data-tool-inspector-edit]'), null);
+    // AN INLINE EDITOR is what this route must not restore, and it still does not. The
+    // inspector's own route into the tool-edit ROUTE is a different thing and is asserted in
+    // its own test below; `[data-manager-tool-editor]` is the inline one.
     assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
   });
@@ -19502,28 +19528,41 @@ describe('CraftingSystemManager mounted behavior', () => {
       inspector.querySelector('[data-tool-inspector-description]').textContent,
       'A well-balanced forge hammer.'
     );
+    // ONE GROUP HEADING, NOT FOUR (issue 1373). Each row used to carry its own kicker —
+    // `BREAKAGE` over a row already reading `5 uses` in bold — so the assertions matched the
+    // heading and the value together. The heading the panel needs is the one naming the whole
+    // group, and it is asserted separately below.
     assert.match(
       inspector.querySelector('[data-tool-inspector-rule="breakage"]').textContent,
-      /Breakage.*5 uses/
+      /5 uses/
     );
     assert.match(
       inspector.querySelector('[data-tool-inspector-rule="on-break"]').textContent,
-      /On break.*destroy the item/i
+      /destroy the item/i
     );
     assert.match(
       inspector.querySelector('[data-tool-inspector-rule="prerequisites"]').textContent,
-      /Prerequisites.*1 prerequisite/
+      /1 prerequisite/
     );
     assert.match(
       inspector.querySelector('[data-tool-inspector-rule="bonus"]').textContent,
-      /Check bonus.*Adds @prof/
+      /Adds @prof/
+    );
+    assert.equal(
+      inspector.querySelectorAll('.manager-tool-inspector-section-kicker').length,
+      1,
+      'the four resolved rules sit under one heading naming the group, not four naming each row'
+    );
+    assert.match(
+      inspector.querySelector('.manager-tool-inspector-section-kicker').textContent,
+      /Effective rules here/i
     );
     assert.equal(inspector.querySelector('[data-tool-inspector-validation]'), null);
     // Issue 881: the library inspector renders the SAME icon fact row the editor's
     // behavior preview does, from the same behavior-fact projection — one implementation,
     // so the two side panels cannot hold two geometries for one meaning.
     assert.equal(
-      inspector.querySelectorAll('[data-tool-inspector-rule] > .manager-icon-fact-row').length,
+      inspector.querySelectorAll('.manager-icon-fact-row[data-tool-inspector-rule]').length,
       4
     );
   });
@@ -19553,17 +19592,34 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('keeps Edit on the Tool row instead of duplicating it in the inspector', async () => {
+  // ── THE INSPECTOR CARRIES A ROUTE INTO THE EDITOR, AND THAT IS A REVERSAL ────────────────
+  // This test used to assert the opposite — `Edit` on the row and NOTHING in the inspector —
+  // on the reasoning that a second pen beside the row's pen is a duplicate affordance. The
+  // design says otherwise, and its picture is what settles it: the panel ends in a
+  // full-width primary button pinned to the foot of the column, which is where a GM who has
+  // just read four resolved rules is looking when they decide to change one.
+  //
+  // The two are not duplicates once they are not the same control. The row's is a labelled
+  // `Edit rules` button ON the row it edits, reachable without selecting anything; the
+  // panel's is the terminal action of the panel that describes the selection. Both are kept
+  // asserted here, and both must reach the same route.
+  it('routes into the Tool editor from the row AND from the foot of the inspector', async () => {
     const calls = await mountToolRoute();
     target
       .querySelector('[data-manager-tool-id="tool-catalyst"] .manager-tools-select-target')
       .click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-tool-inspector-edit]'), null);
+
+    const inspectorEdit = target.querySelector(
+      '[data-tool-browser-inspector] [data-tool-inspector-edit]'
+    );
+    assert.ok(inspectorEdit, 'the inspector pins its route into the rules editor');
+    assert.equal(inspectorEdit.dataset.toolInspectorEdit, 'tool-catalyst');
+
     target
       .querySelector(
-        '[data-manager-tool-id="tool-catalyst"] .manager-tools-library-actions .manager-icon-button'
+        '[data-manager-tool-id="tool-catalyst"] .manager-tools-library-actions [data-tool-edit-rules]'
       )
       .click();
     await tick();
