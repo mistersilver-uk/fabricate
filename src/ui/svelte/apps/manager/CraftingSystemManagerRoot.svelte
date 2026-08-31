@@ -2867,6 +2867,58 @@
     )
   );
 
+  // THE ESSENCE ENTRY ROUTE'S HEADER NAMES THE ESSENCE (issue 1372, maintainer parity round 4).
+  //
+  // The prototype heads that screen with the essence's own tile, its NAME, and
+  // `World definition · used by 8 of 24 systems` (`essEntry.png`). What shipped was the generic
+  // page header every route falls through to — the static title `Essence entry` over a sentence
+  // describing what the screen is FOR — so the one thing a GM opened the screen to work on was
+  // the one thing the top of it did not say. The breadcrumb named it and the header did not.
+  //
+  // IT REUSES THE RECIPE EDITOR'S HEADING BLOCK WHOLESALE, which is the same move
+  // `data-component-edit-heading` and `data-downtime-chrome-heading` above already make: same
+  // classes, same `Medallion`, same 44px. An entity-named page header is one meaning, and a
+  // fourth parallel block would be a fourth implementation of it that agreed with the other
+  // three only until one of them changed.
+  //
+  // WHY IT IS DERIVED HERE RATHER THAN PASSED UP FROM THE PAGE. `.manager-header` is a SIBLING
+  // of `.manager-main` — that is the whole reason the route's surface fix had to be written
+  // twice — so the page cannot render into it, exactly as it cannot render its own breadcrumb.
+  // The corpus the page reads is the corpus this shell already publishes to it, so the heading
+  // follows from `worldScopeState` with no new prop and no new import.
+  //
+  // A MISSING RECORD FALLS BACK, it does not print an empty header: an entry route with no
+  // subject chosen, or one whose subject the corpus no longer holds, renders the generic title
+  // and subtitle below — which is the state the page itself answers with its entity-not-found
+  // empty state, and the same guard `currentView === 'recipe-edit' && recipeDraft` uses.
+  const worldEssenceEntryRecord = $derived(
+    currentView === 'world-essence-entry'
+      ? ((worldScopeState.essence?.entries ?? []).find(
+          (candidate) => candidate?.id === worldScopedEntryId
+        ) ?? null)
+      : null
+  );
+
+  // `count` is the projection's own member total and `total` is the crafting-system roster the
+  // same entry was built against, so this line cannot disagree with the `n of m systems have
+  // rules` count the page prints below it.
+  const worldEssenceEntrySubtitle = $derived(
+    worldEssenceEntryRecord
+      ? interpolate(
+          text(
+            'FABRICATE.Admin.Manager.Scoped.EssenceEntryIdentitySubtitle',
+            'World definition · used by {count} of {total} systems'
+          ),
+          {
+            count: Number(worldEssenceEntryRecord.membershipCount) || 0,
+            total: Array.isArray(worldEssenceEntryRecord.systems)
+              ? worldEssenceEntryRecord.systems.length
+              : 0,
+          }
+        )
+      : ''
+  );
+
   // Open an entry route ON a world entity. Routed through the same confirm-discard gate every
   // other navigation passes, and the subject is recorded only once that gate has allowed the
   // move — a refused exit must not leave the shell naming a record it did not navigate to.
@@ -9136,6 +9188,36 @@
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={viewTitle()}>{viewTitle()}</h1>
               <p class="manager-subtitle" data-downtime-chrome-subline>{viewSubtitle()}</p>
+            </div>
+          </div>
+        {:else if worldEssenceEntryRecord}
+          <!-- The essence's own identity header. See `worldEssenceEntryRecord` above for why it
+             is derived in the shell and why it reuses the recipe editor's heading block. The
+             medallion carries the essence's colour the way every other essence tile in the
+             manager does — `tint` recolours the glyph and washes the surface, and unset
+             resolves to the accent.
+
+             `glyph` is set because the other two headings that reuse this block carry an
+             IMAGE, and `Medallion`'s 0.9rem default is sized for the 40px row tiles: left
+             unset, a 14px glyph inside a 44px tile reads as a speck against the prototype's,
+             which fills about half the tile (`essEntry.png`). It is passed here rather than
+             derived from `size` inside the primitive for the reason its own doc gives —
+             deriving it would re-type all ~40 medallions in the manager at once, which is a
+             change with its own frames. -->
+          <div class="manager-recipe-edit-heading" data-world-essence-entry-heading>
+            <Medallion
+              icon={worldEssenceEntryRecord.entity?.icon || 'fas fa-mortar-pestle'}
+              tint={worldEssenceEntryRecord.entity?.colorToken || ''}
+              size={44}
+              glyph={22}
+            />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={worldEssenceEntryRecord.entity?.name || ''}>
+                {worldEssenceEntryRecord.entity?.name || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-world-essence-entry-subline>
+                {worldEssenceEntrySubtitle}
+              </p>
             </div>
           </div>
         {:else if currentView !== 'tool-edit'}

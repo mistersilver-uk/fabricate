@@ -41,7 +41,11 @@
    - tabs: `{id, icon, labelKey, label}[]`, in render order. `labelKey` is looked up and
      `label` is the English fallback, matching the `text()` contract everywhere else.
    - activeTab / onSelect(tabId) / badges: as before. A badge is a plain value or
-     `{label, tone}` where tone is one of neutral/success/warning/danger.
+     `{label, tone, icon, srLabel}` where tone is one of neutral/success/warning/danger.
+     `icon` renders a leading Font Awesome glyph through `Chip`'s own `icon` prop and is
+     what lets a badge be a GLYPH rather than a count — the scoped entry editors' passing
+     Validation tab is a tick, not a number, so an icon-only badge (empty `label`) survives
+     the emptiness filter. `srLabel` is that glyph's accessible name; see `badgeAttributes`.
    - ariaLabelKey / ariaLabel: the strip's own accessible name.
    - idStem: builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`.
    - hookAttribute: the per-button `data-*` name carrying the tab id.
@@ -84,14 +88,18 @@
           return {
             label: badge.label ?? badge.value ?? '',
             tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral'),
+            icon: typeof badge.icon === 'string' ? badge.icon : '',
+            srLabel: typeof badge.srLabel === 'string' ? badge.srLabel : '',
           };
         }
         return {
           label: badge,
           tone: tab.id === 'validation' ? 'danger' : 'neutral',
+          icon: '',
+          srLabel: '',
         };
       })
-      .filter((badge) => badge.label !== '' && badge.label !== 0);
+      .filter((badge) => badge.icon !== '' || (badge.label !== '' && badge.label !== 0));
   }
 
   // A badge tone name is this component's own vocabulary; `Chip` names the colour families
@@ -113,8 +121,15 @@
   }
 
   function badgeAttributes(tab, badge) {
-    if (!badgeAttribute) return {};
-    return { [badgeAttribute]: tab.id, 'data-badge-tone': badge.tone };
+    // `aria-label` rides here rather than being a rendered string, because a GLYPH badge would
+    // otherwise contribute nothing to the tab's accessible name while a COUNT badge contributes
+    // its number. A screen reader would then hear `Validation` for a passing tab and `Validation
+    // 3` for a failing one, which is the difference between the two states being announced and
+    // one of them being silent. It is on the chip rather than on the button so the tab's own
+    // label stays first.
+    const label = badge.srLabel ? { 'aria-label': badge.srLabel } : {};
+    if (!badgeAttribute) return label;
+    return { ...label, [badgeAttribute]: tab.id, 'data-badge-tone': badge.tone };
   }
 
   function onKeydown(event, index) {
@@ -146,8 +161,11 @@
       <i class={tab.icon} aria-hidden="true"></i>
       <span>{text(tab.labelKey, tab.label)}</span>
       {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
-        <Chip tone={badgeTone(badge.tone)} class={badgeClass} {...badgeAttributes(tab, badge)}
-          >{badge.label}</Chip
+        <Chip
+          tone={badgeTone(badge.tone)}
+          icon={badge.icon}
+          class={badgeClass}
+          {...badgeAttributes(tab, badge)}>{badge.label}</Chip
         >
       {/each}
     </button>

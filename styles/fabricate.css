@@ -25007,3 +25007,30 @@
 .fabricate-manager[data-manager-view='essences'] .manager-inspector .manager-inspector-card {
   background: transparent;
 }
+
+/* THE PAGE HEADER BAND IS PART OF THE SAME FLAT SURFACE, and it was the one region the block
+   above could not reach. `.manager-header` is a SIBLING of `.manager-main`, not a descendant, so
+   the `.manager-main` rule never applied to it and the strip carrying the breadcrumb, the title
+   and the subtitle went on painting `--fab-mv2-surface-1` (`--fab-bg-2`) while the pane directly
+   beneath it moved to `--fab-bg-0`. Sampled at three heights on all three screens the band read
+   this theme's `--fab-bg-2` where the prototype's reads its `--fab-bg-0` equivalent — a two-rung
+   step across the top ~90px of every screen, which is the first thing on it. (The measured
+   values are not written here: this file's colour-literal gate,
+   `tests/components/theme-colour-contract.test.js`, scans comments too, and rightly so — a hex
+   in a comment is how one gets copied into a declaration.)
+
+   The prototype has no step there at all: its header, its pane and its inspector are one
+   continuous surface and the only thing marking the header's end is the hairline the shared
+   `.manager-header` rule already draws. That `border-bottom` is why this is safe to flatten —
+   remove the fill and the boundary is still stated, by a border, exactly as every card boundary
+   on these screens now is.
+
+   Route-scoped and additive for the same reasons the surface block above gives, and by the same
+   precedent: the shared `.manager-header` rule is manager-wide chrome that a dozen other studios
+   are drawn against, so it is not touched. `--fab-bg-0` again, so no theme is frozen — seven
+   theme blocks redeclare this ramp and a literal would freeze one of them into all seven. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-header,
+.fabricate-manager[data-manager-view='world-essence-entry'] .manager-header,
+.fabricate-manager[data-manager-view='essences'] .manager-header {
+  background: var(--fab-bg-0);
+}
