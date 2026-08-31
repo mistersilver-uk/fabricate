@@ -193,6 +193,11 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './scoped/WorldToolCataloguePage.svelte',
   './scoped/WorldToolEntryPage.svelte',
   './scoped/WorldVocabularyPage.svelte',
+  // ADDED BY ISSUE 1372's HEADER-CREATE SEAM. The prototype puts `+ New essence` in the page
+  // header band, which only this file renders; `mintEssenceId` is the epic's own import-free
+  // presentation leaf and slugs the new record's id with suffix collision resolution, so the
+  // alternative to importing it was a second copy of that logic in the gateway.
+  './scoped/essenceScoped.js',
   './scoped/scopedEntryRoutes.js',
   './tools/ToolBrowserInspector.svelte',
   './world/WorldCurrencyTab.svelte',

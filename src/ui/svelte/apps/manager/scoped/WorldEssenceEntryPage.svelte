@@ -69,8 +69,10 @@
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
   import {
+    essenceColourCaption,
     essenceInheritLine,
     essenceSectionValueName,
+    essenceShortValueName,
     essenceSystemState,
     isWorldAddressableEffectSource,
     isDocumentUuid,
@@ -146,6 +148,43 @@
   );
   const entity = $derived(entry?.entity ?? null);
   const normalizedIcon = $derived(normalizeEssenceIcon(entity?.icon || DEFAULT_ESSENCE_ICON));
+
+  /**
+   * The colour token's display name and the value this theme resolves it to.
+   *
+   * An UNSET colour renders NOTHING rather than the word "None": the medallion beside it already
+   * shows the theme-accent fallback, and a caption reading `None` under a tinted tile states the
+   * opposite of what the tile shows. See `essenceColourCaption` for why the hex is read rather
+   * than written.
+   */
+  const colourCaption = $derived(essenceColourCaption(entity?.colorToken));
+
+  /**
+   * The world-default card HEADINGS, in the prototype's words.
+   *
+   * `scopedSectionLabel` answers the SHORT name a section is referred to by across five screens —
+   * `Effect source`, `Property macro` — and that is right for an inherit row or a filter chip. A
+   * card heading on the screen that AUTHORS the default is a different job, and the prototype
+   * writes it as the whole phrase: `Active effect source` and `Macro on craft` (`essEntry.png`).
+   * The short name would leave the two cards named after fields rather than after what they do.
+   *
+   * An early-return chain, not a nested ternary: SonarCloud reports S3358 in a file it indexes.
+   *
+   * @param {string} section
+   * @returns {string}
+   */
+  function sectionHeading(section) {
+    if (section === 'effectSource') {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.HeadEffectSource',
+        'Active effect source'
+      );
+    }
+    if (section === 'macro') {
+      return text('FABRICATE.Admin.Manager.Scoped.Essence.HeadMacro', 'Macro on craft');
+    }
+    return scopedSectionLabel(section, text);
+  }
   const defaults = $derived(entry?.defaults ?? null);
   const sections = $derived(Array.isArray(scope?.sections) ? scope.sections : []);
   const systemRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
@@ -448,6 +487,20 @@
       >
         {#if activeTab === 'definition'}
           <!--
+            TWO COLUMNS, AND THE RIGHT ONE IS THE PLAYER PREVIEW.
+
+            The prototype's essence entry is a form beside a ~310px rail headed `HOW PLAYERS SEE
+            IT`, carrying the two inventory tiles, then `EFFECTIVE BEHAVIOUR` and the live-update
+            note (`essEntry.png`). Every one of those parts already existed here — they are what
+            `EssenceBehaviorPreview` renders — but the panel stacked the aside BELOW the danger
+            card at the foot of a single column, roughly 1,100px down. The GM typing a name could
+            not see the thing the panel exists to show them changing.
+
+            The main column keeps the flex stack it had, so nothing inside it moves.
+          -->
+          <div class="manager-scoped-entry-body">
+            <div class="manager-scoped-entry-main">
+              <!--
             THE SCOPE BANNER. Everything under it is one record shared by every crafting system,
             and this screen is reached from a system-scoped rail — so without it a GM has no
             standing signal that the name they are editing changes in six places at once. The
@@ -455,20 +508,20 @@
             heading rather than a `Callout` because it introduces a region rather than warning
             about one.
           -->
-          <div class="manager-scoped-entry-kicker is-world" data-scoped-entry-world-banner>
-            <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
-              <i class="fas fa-globe"></i>
-            </span>
-            <h3 class="manager-scoped-entry-kicker-label">
-              {text(
-                'FABRICATE.Admin.Manager.Scoped.Essence.WorldBanner',
-                'World definition · shared by every system'
-              )}
-            </h3>
-            <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
-          </div>
+              <div class="manager-scoped-entry-kicker is-world" data-scoped-entry-world-banner>
+                <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
+                  <i class="fas fa-globe"></i>
+                </span>
+                <h3 class="manager-scoped-entry-kicker-label">
+                  {text(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.WorldBanner',
+                    'World definition · shared by every system'
+                  )}
+                </h3>
+                <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
+              </div>
 
-          <!--
+              <!--
             THE IDENTITY CARD, at the prototype's proportions: a FIXED narrow icon column and one
             fluid field column beside it.
 
@@ -478,8 +531,8 @@
             only shape that keeps Name, Description and the colour palette on ONE measure, so a
             long name and a long description align rather than stepping around the tile.
           -->
-          <section class="manager-scoped-entry-identity" data-scoped-entry-identity={entry.id}>
-            <!--
+              <section class="manager-scoped-entry-identity" data-scoped-entry-identity={entry.id}>
+                <!--
               THE SAME THREE CONTROLS THE SYSTEM-SCOPE IDENTITY TAB USES, and for the reason the
               shells were built on: a GM authors one essence's identity, and it must not be a
               searchable picker in one scope and a text box in the other.
@@ -493,186 +546,213 @@
               is the maintainer's own round-3 ruling on `EssenceIdentityTab` (issue 1036) and one
               essence identity must not read as two different shapes across the two scopes.
             -->
-            <div class="manager-scoped-entry-identity-tile">
-              <span class="manager-scoped-entry-label"
-                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldIcon', 'Icon')}</span
-              >
-              <Medallion
-                icon={normalizedIcon}
-                tint={entity?.colorToken || ''}
-                size={150}
-                glyph={48}
-              />
-              <IconPicker
-                value={normalizedIcon}
-                buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
-                onChange={(iconClass) => patchIdentity('icon', iconClass)}
-              />
-            </div>
-
-            <div class="manager-scoped-entry-identity-fields">
-              <label class="manager-scoped-entry-field">
-                <span class="manager-scoped-entry-label"
-                  >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldName', 'Name')}</span
-                >
-                <input
-                  class="manager-scoped-entry-name"
-                  type="text"
-                  value={entity?.name ?? ''}
-                  data-scoped-entry-name
-                  onchange={(event) => patchIdentity('name', event.currentTarget.value)}
-                />
-              </label>
-
-              <label class="manager-scoped-entry-field">
-                <span class="manager-scoped-entry-label">
-                  {text('FABRICATE.Admin.Manager.Scoped.Essence.FieldDescription', 'Description')}
-                  <span class="manager-scoped-entry-label-aside"
-                    >{text(
-                      'FABRICATE.Admin.Manager.Scoped.Essence.FieldOptional',
-                      '· optional'
-                    )}</span
+                <div class="manager-scoped-entry-identity-tile">
+                  <span class="manager-scoped-entry-label"
+                    >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldIcon', 'Icon')}</span
                   >
-                </span>
-                <textarea
-                  rows="3"
-                  value={entity?.description ?? ''}
-                  data-scoped-entry-description
-                  placeholder={text(
-                    'FABRICATE.Admin.Manager.Scoped.Essence.DescriptionPlaceholder',
-                    'What this quality means in your world, and where it comes from.'
-                  )}
-                  onchange={(event) => patchIdentity('description', event.currentTarget.value)}
-                ></textarea>
-              </label>
+                  <Medallion
+                    icon={normalizedIcon}
+                    tint={entity?.colorToken || ''}
+                    size={150}
+                    glyph={48}
+                  />
+                  <IconPicker
+                    value={normalizedIcon}
+                    buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
+                    onChange={(iconClass) => patchIdentity('icon', iconClass)}
+                  />
+                  <!--
+                THE COLOUR CAPTION, under the icon picker exactly where the prototype puts it
+                (`essEntry.png`). The swatch row further down is a CHOOSER — it says which colour
+                is selected only by a ring — and this says which one in words, beside the tile the
+                colour is actually tinting.
 
-              <div class="manager-scoped-entry-field" data-scoped-entry-colour>
-                <span class="manager-scoped-entry-label"
-                  >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour')}</span
-                >
-                <!--
+                THE HEX IS READ FROM THE CASCADE, NEVER WRITTEN. `src/ui/**` may carry no raw
+                colour literal at all, and a literal would be wrong the moment a GM switched
+                theme, since every `--fab-tag-*` token is re-declared in each of the seven theme
+                blocks. So `essenceColourCaption` resolves it from the live cascade, which makes
+                it the truthful answer for whichever theme is active.
+              -->
+                  {#if colourCaption}
+                    <span class="manager-scoped-entry-colour-caption" data-scoped-entry-colour-name>
+                      {colourCaption}
+                    </span>
+                  {/if}
+                </div>
+
+                <div class="manager-scoped-entry-identity-fields">
+                  <label class="manager-scoped-entry-field">
+                    <span class="manager-scoped-entry-label"
+                      >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldName', 'Name')}</span
+                    >
+                    <input
+                      class="manager-scoped-entry-name"
+                      type="text"
+                      value={entity?.name ?? ''}
+                      data-scoped-entry-name
+                      onchange={(event) => patchIdentity('name', event.currentTarget.value)}
+                    />
+                  </label>
+
+                  <label class="manager-scoped-entry-field">
+                    <span class="manager-scoped-entry-label">
+                      {text(
+                        'FABRICATE.Admin.Manager.Scoped.Essence.FieldDescription',
+                        'Description'
+                      )}
+                      <span class="manager-scoped-entry-label-aside"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Scoped.Essence.FieldOptional',
+                          '· optional'
+                        )}</span
+                      >
+                    </span>
+                    <textarea
+                      rows="3"
+                      value={entity?.description ?? ''}
+                      data-scoped-entry-description
+                      placeholder={text(
+                        'FABRICATE.Admin.Manager.Scoped.Essence.DescriptionPlaceholder',
+                        'What this quality means in your world, and where it comes from.'
+                      )}
+                      onchange={(event) => patchIdentity('description', event.currentTarget.value)}
+                    ></textarea>
+                  </label>
+
+                  <div class="manager-scoped-entry-field" data-scoped-entry-colour>
+                    <span class="manager-scoped-entry-label"
+                      >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour')}</span
+                    >
+                    <!--
                   `ManagerColorPopover` takes `layout="inline"` here exactly as
                   `EssenceIdentityTab` does: the popover chrome is applied by the global sheet,
                   which this lane may not open, and inline strips it and nothing else.
                 -->
-                <ManagerColorPopover
-                  layout="inline"
-                  allowNone
-                  allowCustom={false}
-                  manageDismiss={false}
-                  colorToken={entity?.colorToken || ''}
-                  unset={!entity?.colorToken}
-                  customColor=""
-                  presetGridLabel={text(
-                    'FABRICATE.Admin.Manager.Essence.Colour.Presets',
-                    'Essence colour presets'
+                    <ManagerColorPopover
+                      layout="inline"
+                      allowNone
+                      allowCustom={false}
+                      manageDismiss={false}
+                      colorToken={entity?.colorToken || ''}
+                      unset={!entity?.colorToken}
+                      customColor=""
+                      presetGridLabel={text(
+                        'FABRICATE.Admin.Manager.Essence.Colour.Presets',
+                        'Essence colour presets'
+                      )}
+                      noneLabel={text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')}
+                      onClear={() => patchIdentity('colorToken', '')}
+                      onChange={(next) => patchIdentity('colorToken', next?.colorToken || '')}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <div class="manager-scoped-entry-kicker" data-scoped-entry-defaults-banner>
+                <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
+                  <i class="fas fa-globe"></i>
+                </span>
+                <h3 class="manager-scoped-entry-kicker-label">
+                  {text(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.DefaultsBanner',
+                    'Default on craft'
                   )}
-                  noneLabel={text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')}
-                  onClear={() => patchIdentity('colorToken', '')}
-                  onChange={(next) => patchIdentity('colorToken', next?.colorToken || '')}
-                />
+                </h3>
+                <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
               </div>
-            </div>
-          </section>
 
-          <div class="manager-scoped-entry-kicker" data-scoped-entry-defaults-banner>
-            <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
-              <i class="fas fa-globe"></i>
-            </span>
-            <h3 class="manager-scoped-entry-kicker-label">
-              {text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultsBanner', 'Default on craft')}
-            </h3>
-            <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
-          </div>
-
-          <!-- THE TWO WORLD DEFAULTS. Each states how many member systems inherit it and how many
+              <!-- THE TWO WORLD DEFAULTS. Each states how many member systems inherit it and how many
                override it locally BEFORE the change lands, because that count is the whole reach of
                the edit and a GM cannot recover it after the fact. -->
-          <section class="manager-scoped-entry-defaults">
-            {#each sections as section (section)}
-              {@const ui = sectionUi(section)}
-              {@const value = sectionValueName(section)}
-              {@const label = scopedSectionLabel(section, text)}
-              <article
-                class="manager-scoped-entry-default"
-                data-scoped-world-default={section}
-                data-scoped-world-default-state={value ? 'set' : 'unset'}
-              >
-                <header class="manager-scoped-entry-default-head">
-                  <span class="manager-scoped-entry-default-glyph" aria-hidden="true">
-                    <i class={ui?.glyph ?? PAGE_ICON}></i>
-                  </span>
-                  <h4 class="manager-scoped-entry-default-title">{label}</h4>
-                  <StatusPill
-                    tone={value ? 'success' : 'subtle'}
-                    icon={value ? 'fas fa-circle-check' : 'fas fa-circle-minus'}
-                    label={value
-                      ? text(ui?.setKey ?? '', ui?.set ?? label)
-                      : text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultNone', 'No default')}
-                  />
-                </header>
+              <section class="manager-scoped-entry-defaults" data-scoped-entry-defaults-section>
+                {#each sections as section (section)}
+                  {@const ui = sectionUi(section)}
+                  {@const value = sectionValueName(section)}
+                  {@const label = scopedSectionLabel(section, text)}
+                  {@const heading = sectionHeading(section)}
+                  <article
+                    class="manager-scoped-entry-default"
+                    data-scoped-world-default={section}
+                    data-scoped-world-default-state={value ? 'set' : 'unset'}
+                  >
+                    <header class="manager-scoped-entry-default-head">
+                      <span class="manager-scoped-entry-default-glyph" aria-hidden="true">
+                        <i class={ui?.glyph ?? PAGE_ICON}></i>
+                      </span>
+                      <h4 class="manager-scoped-entry-default-title">{heading}</h4>
+                      <StatusPill
+                        tone={value ? 'success' : 'subtle'}
+                        icon={value ? 'fas fa-circle-check' : 'fas fa-circle-minus'}
+                        label={value
+                          ? text(ui?.setKey ?? '', ui?.set ?? label)
+                          : text(
+                              'FABRICATE.Admin.Manager.Scoped.Essence.DefaultNone',
+                              'No default'
+                            )}
+                      />
+                    </header>
 
-                <p class="manager-scoped-entry-default-blurb">
-                  {text(ui?.blurbKey ?? '', ui?.blurb ?? '')}
-                </p>
+                    <p class="manager-scoped-entry-default-blurb">
+                      {text(ui?.blurbKey ?? '', ui?.blurb ?? '')}
+                    </p>
 
-                <!--
+                    <!--
                   THE CONTROL IS THE SHARED DROP ZONE, not a uuid text box. `documentType` comes
                   from the section table, so the effect source refuses a Macro drag and the macro
                   refuses an Item drag before either reaches `dropSection`.
                 -->
-                <div
-                  class="manager-scoped-entry-default-slot"
-                  data-scoped-world-default-value={section}
-                >
-                  <ItemDropZone
-                    item={value ? { name: value } : null}
-                    title={text(ui?.promptKey ?? '', ui?.prompt ?? label)}
-                    hint={sectionAddressLine(section, value)}
-                    documentType={ui?.documentType ?? 'Item'}
-                    emptyIcon="fas fa-arrow-down-to-bracket"
-                    unlinkAttr="data-scoped-world-default-clear"
-                    unlinkLabel={format(
-                      'FABRICATE.Admin.Manager.Scoped.Essence.DefaultClearNamed',
-                      'Clear the world default for {section}',
-                      { section: label }
-                    )}
-                    onDrop={(data) => dropSection(section, data)}
-                    onUnlink={value ? () => clearSection(section) : null}
-                  />
-                </div>
+                    <div
+                      class="manager-scoped-entry-default-slot"
+                      data-scoped-world-default-value={section}
+                    >
+                      <ItemDropZone
+                        item={value ? { name: value } : null}
+                        title={text(ui?.promptKey ?? '', ui?.prompt ?? label)}
+                        hint={sectionAddressLine(section, value)}
+                        documentType={ui?.documentType ?? 'Item'}
+                        emptyIcon="fas fa-arrow-down-to-bracket"
+                        unlinkAttr="data-scoped-world-default-clear"
+                        unlinkLabel={format(
+                          'FABRICATE.Admin.Manager.Scoped.Essence.DefaultClearNamed',
+                          'Clear the world default for {section}',
+                          { section: label }
+                        )}
+                        onDrop={(data) => dropSection(section, data)}
+                        onUnlink={value ? () => clearSection(section) : null}
+                      />
+                    </div>
 
-                <p
-                  class="manager-scoped-entry-default-inherit"
-                  data-scoped-world-default-inherit={section}
-                >
-                  {essenceInheritLine(entry, section, format)}
-                </p>
+                    <p
+                      class="manager-scoped-entry-default-inherit"
+                      data-scoped-world-default-inherit={section}
+                    >
+                      {essenceInheritLine(entry, section, format)}
+                    </p>
 
-                {#if sectionRefusal[section]}
-                  <p
-                    class="manager-muted manager-form-warning"
-                    role="alert"
-                    data-scoped-world-default-refused={section}
-                  >
-                    {sectionRefusal[section]}
-                  </p>
-                {/if}
-              </article>
-            {/each}
-          </section>
+                    {#if sectionRefusal[section]}
+                      <p
+                        class="manager-muted manager-form-warning"
+                        role="alert"
+                        data-scoped-world-default-refused={section}
+                      >
+                        {sectionRefusal[section]}
+                      </p>
+                    {/if}
+                  </article>
+                {/each}
+              </section>
 
-          <div class="manager-scoped-entry-kicker" data-scoped-entry-systems-banner>
-            <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
-              <i class="fas fa-layer-group"></i>
-            </span>
-            <h3 class="manager-scoped-entry-kicker-label">
-              {text('FABRICATE.Admin.Manager.Scoped.Essence.SystemsBanner', 'Per-system rules')}
-            </h3>
-            <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
-          </div>
+              <div class="manager-scoped-entry-kicker" data-scoped-entry-systems-banner>
+                <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
+                  <i class="fas fa-layer-group"></i>
+                </span>
+                <h3 class="manager-scoped-entry-kicker-label">
+                  {text('FABRICATE.Admin.Manager.Scoped.Essence.SystemsBanner', 'Per-system rules')}
+                </h3>
+                <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
+              </div>
 
-          <!-- THE MEMBERSHIP LIST. Rows come from `entry.systems` — the projection's JOIN — and
+              <!-- THE MEMBERSHIP LIST. Rows come from `entry.systems` — the projection's JOIN — and
                never from the `systems` prop, which is a narrowed `{id, name}` roster and cannot
                answer `member`, `inherited` or `enabled`.
 
@@ -681,63 +761,101 @@
                resolves to in that system, and the shipped action cluster. A stack of names and
                switches says a system HAS the essence and nothing about what it does there, which
                is the whole subject of this screen. -->
-          <section class="manager-scoped-entry-systems" data-scoped-entry-systems>
-            <header class="manager-scoped-entry-systems-head">
-              <span class="manager-scoped-entry-default-glyph" aria-hidden="true">
-                <i class="fas fa-wand-sparkles"></i>
-              </span>
-              <div class="manager-scoped-entry-systems-copy">
-                <h4 class="manager-scoped-entry-default-title">
-                  {text(
-                    'FABRICATE.Admin.Manager.Scoped.Essence.SystemsHead',
-                    'Systems using this essence'
-                  )}
-                </h4>
-                <p class="manager-scoped-entry-systems-sub">
-                  {text(
-                    'FABRICATE.Admin.Manager.Scoped.Essence.SystemsSub',
-                    'The rules hold what the essence does on craft in that system: its active effect source item and its macro.'
-                  )}
-                </p>
-              </div>
-              <span class="manager-scoped-entry-systems-count" data-scoped-entry-systems-count>
-                {systemsCountText}
-              </span>
-            </header>
-
-            <ul class="manager-scoped-entry-system-list" role="list">
-              {#each systemRows as row (row.systemId)}
-                <li
-                  class="manager-scoped-entry-system"
-                  data-scoped-entry-system={row.systemId}
-                  data-scoped-entry-system-state={essenceSystemState(row)}
-                >
-                  <span class="manager-scoped-entry-system-copy">
-                    <span class="manager-scoped-entry-system-name">{systemLabel(row)}</span>
-                    <span class="manager-scoped-entry-system-meta">{systemMeta(row)}</span>
+              <section class="manager-scoped-entry-systems" data-scoped-entry-systems>
+                <header class="manager-scoped-entry-systems-head">
+                  <span class="manager-scoped-entry-default-glyph" aria-hidden="true">
+                    <i class="fas fa-wand-sparkles"></i>
                   </span>
-                  <span class="manager-scoped-entry-system-summary">{systemSummary(row)}</span>
-                  <MembershipActions
-                    entityType="essence"
-                    entityId={entry.id}
-                    systemId={row.systemId}
-                    entityName={entity?.name ?? entry.id}
-                    systemName={systemLabel(row)}
-                    member={row.member === true}
-                    enabled={row.enabled === true}
-                    {armedToken}
-                    onArm={(token) => (armedToken = token)}
-                    onDisarm={() => (armedToken = '')}
-                    onAdd={() => actions?.addToSystem?.(entry.id, row.systemId)}
-                    onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
-                    onToggleEnabled={(next) => actions?.setEnabled?.(entry.id, row.systemId, next)}
-                  />
-                </li>
-              {/each}
-            </ul>
-          </section>
+                  <div class="manager-scoped-entry-systems-copy">
+                    <h4 class="manager-scoped-entry-default-title">
+                      {text(
+                        'FABRICATE.Admin.Manager.Scoped.Essence.SystemsHead',
+                        'Systems using this essence'
+                      )}
+                    </h4>
+                    <p class="manager-scoped-entry-systems-sub">
+                      {text(
+                        'FABRICATE.Admin.Manager.Scoped.Essence.SystemsSub',
+                        'The rules hold what the essence does on craft in that system: its active effect source item and its macro.'
+                      )}
+                    </p>
+                  </div>
+                  <span class="manager-scoped-entry-systems-count" data-scoped-entry-systems-count>
+                    {systemsCountText}
+                  </span>
+                </header>
 
-          <!-- THE LIVE NOTE IS ON (`proto:3537`). `EssenceBehaviorPreview` already renders the
+                <ul class="manager-scoped-entry-system-list" role="list">
+                  {#each systemRows as row (row.systemId)}
+                    <li
+                      class="manager-scoped-entry-system"
+                      data-scoped-entry-system={row.systemId}
+                      data-scoped-entry-system-state={essenceSystemState(row)}
+                    >
+                      <span class="manager-scoped-entry-system-copy">
+                        <span class="manager-scoped-entry-system-name">{systemLabel(row)}</span>
+                        <span class="manager-scoped-entry-system-meta">{systemMeta(row)}</span>
+                      </span>
+                      <span class="manager-scoped-entry-system-summary">{systemSummary(row)}</span>
+                      <MembershipActions
+                        entityType="essence"
+                        entityId={entry.id}
+                        systemId={row.systemId}
+                        entityName={entity?.name ?? entry.id}
+                        systemName={systemLabel(row)}
+                        member={row.member === true}
+                        enabled={row.enabled === true}
+                        {armedToken}
+                        onArm={(token) => (armedToken = token)}
+                        onDisarm={() => (armedToken = '')}
+                        onAdd={() => actions?.addToSystem?.(entry.id, row.systemId)}
+                        onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
+                        onToggleEnabled={(next) =>
+                          actions?.setEnabled?.(entry.id, row.systemId, next)}
+                      />
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+
+              <!-- THE DANGER CARD. Deleting a world essence reaches every system that has rules for
+               it, so the reach is stated beside the control rather than only in a dialog — and the
+               control is the shipped `ArmedDangerButton`, which is this repository's one
+               destructive-confirm affordance. -->
+              <section class="manager-scoped-entry-danger" data-scoped-entry-delete>
+                <span class="manager-scoped-entry-danger-glyph" aria-hidden="true">
+                  <i class="fas fa-triangle-exclamation"></i>
+                </span>
+                <div class="manager-scoped-entry-danger-copy">
+                  <h4 class="manager-scoped-entry-danger-title">
+                    {text(
+                      'FABRICATE.Admin.Manager.Scoped.Essence.DeleteTitle',
+                      'Delete this essence'
+                    )}
+                  </h4>
+                  <p class="manager-scoped-entry-danger-note">{deleteNote}</p>
+                </div>
+                <ArmedDangerButton
+                  token={deleteToken}
+                  armed={armedToken === deleteToken}
+                  idleLabel={text(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.DeleteAction',
+                    'Delete essence'
+                  )}
+                  armedLabel={text(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.DeleteConfirm',
+                    'Confirm?'
+                  )}
+                  idleAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteAction', 'Delete essence')} — ${deleteNote}`}
+                  armedAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteConfirm', 'Confirm?')} — ${deleteNote}`}
+                  onArm={(token) => (armedToken = token)}
+                  onDisarm={() => (armedToken = '')}
+                  onConfirm={deleteEssence}
+                />
+              </section>
+            </div>
+
+            <!-- THE LIVE NOTE IS ON (`proto:3537`). `EssenceBehaviorPreview` already renders the
                footer strip — glyph plus "This preview updates live as you edit." — and the
                prototype's essence-definition editor draws it at the foot of exactly this
                panel, as every one of its six editors does (`proto:6138`, `6155`, `6209`).
@@ -745,45 +863,20 @@
                recompute on every keystroke saying nothing about it; the browser inspector,
                which is the site that legitimately suppresses it, is a read-only rail with
                nothing to type into. -->
-          <section class="manager-scoped-entry-preview" data-scoped-entry-preview>
-            <EssenceBehaviorPreview
-              essence={previewEssence}
-              effectTransferEnabled={Boolean(defaults?.effectSource)}
-              propertyMacrosEnabled={Boolean(defaults?.macro)}
-              sourceName={sectionValueName('effectSource')}
-              macroName={sectionValueName('macro')}
-            />
-          </section>
-
-          <!-- THE DANGER CARD. Deleting a world essence reaches every system that has rules for
-               it, so the reach is stated beside the control rather than only in a dialog — and the
-               control is the shipped `ArmedDangerButton`, which is this repository's one
-               destructive-confirm affordance. -->
-          <section class="manager-scoped-entry-danger" data-scoped-entry-delete>
-            <span class="manager-scoped-entry-danger-glyph" aria-hidden="true">
-              <i class="fas fa-triangle-exclamation"></i>
-            </span>
-            <div class="manager-scoped-entry-danger-copy">
-              <h4 class="manager-scoped-entry-danger-title">
-                {text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteTitle', 'Delete this essence')}
-              </h4>
-              <p class="manager-scoped-entry-danger-note">{deleteNote}</p>
-            </div>
-            <ArmedDangerButton
-              token={deleteToken}
-              armed={armedToken === deleteToken}
-              idleLabel={text(
-                'FABRICATE.Admin.Manager.Scoped.Essence.DeleteAction',
-                'Delete essence'
-              )}
-              armedLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteConfirm', 'Confirm?')}
-              idleAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteAction', 'Delete essence')} — ${deleteNote}`}
-              armedAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteConfirm', 'Confirm?')} — ${deleteNote}`}
-              onArm={(token) => (armedToken = token)}
-              onDisarm={() => (armedToken = '')}
-              onConfirm={deleteEssence}
-            />
-          </section>
+            <section class="manager-scoped-entry-preview" data-scoped-entry-preview>
+              <!-- The two NAMES are shortened for display: a value stored as a document uuid would
+                 otherwise render as `Runs Macro.lab-aether-binding` in the behaviour list, where
+                 the row's own verb already states the document type. The card's uuid sub-line in
+                 the form beside it still prints the address in full. -->
+              <EssenceBehaviorPreview
+                essence={previewEssence}
+                effectTransferEnabled={Boolean(defaults?.effectSource)}
+                propertyMacrosEnabled={Boolean(defaults?.macro)}
+                sourceName={essenceShortValueName(sectionValueName('effectSource'))}
+                macroName={essenceShortValueName(sectionValueName('macro'))}
+              />
+            </section>
+          </div>
         {:else}
           <ScopedValidationTab
             stackClass="manager-scoped-tab-stack"
@@ -837,6 +930,13 @@
     min-height: 0;
   }
 
+  /* The colour-token name under the icon picker. Quieter than a field label and not one: it
+     states a value rather than naming a control. */
+  .manager-scoped-entry-colour-caption {
+    color: var(--fab-text-subtle);
+    font-size: 0.68rem;
+  }
+
   .manager-scoped-entry-panel {
     display: flex;
     flex-direction: column;
@@ -858,6 +958,7 @@
 
      Enumerated by class rather than written as `> *`, because a universal child selector would
      have to be `:global` to survive scoping and this component owns every one of these six. */
+  .manager-scoped-entry-body,
   .manager-scoped-entry-kicker,
   .manager-scoped-entry-identity,
   .manager-scoped-entry-defaults,
@@ -865,6 +966,35 @@
   .manager-scoped-entry-preview,
   .manager-scoped-entry-danger {
     flex: 0 0 auto;
+  }
+
+  /* THE TWO-COLUMN BODY. 310px matches the prototype's rail and is close enough to the 300px
+     every inspector on this app already uses that a GM learns one panel width, not two.
+     `align-items: start` keeps the rail at the top of the form rather than stretching it to the
+     height of a scroll the GM has not reached yet. */
+  .manager-scoped-entry-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: var(--fab-space-3);
+    align-items: start;
+    min-width: 0;
+  }
+
+  .manager-scoped-entry-main {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--fab-space-3);
+    min-width: 0;
+  }
+
+  /* Below the threshold the rail stacks under the form rather than compressing to a column too
+     narrow for an inventory tile — the same ruling `EntityListInspectorFrame` makes about its own
+     inspector, at the width this page's own layout already breaks at. */
+  @container fabricate-manager (max-width: 1000px) {
+    .manager-scoped-entry-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   /* THE SECTION KICKER: a 20px glyph tile, a tracked uppercase label, and a rule that runs to
@@ -933,7 +1063,10 @@
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
     border-radius: 12px;
-    background: var(--fab-bg-2);
+    /* NO FILL (issue 1372). See the essence surface-ladder block in `styles/fabricate.css`: the
+       prototype draws every card in the content area on the pane's own surface and separates
+       them with the border alone. */
+    background: transparent;
     min-width: 0;
   }
 
@@ -985,9 +1118,19 @@
     font-weight: 600;
   }
 
+  /* ONE CARD PER ROW, FULL WIDTH.
+
+     The prototype stacks `Active effect source` and `Macro on craft` as two full-width cards
+     (`essEntry.png`); this shipped as `auto-fit, minmax(22rem, 1fr)`, which put them side by side
+     at any width over about 45rem and halved the measure each card's drop target, uuid line and
+     inherit sentence had. Beside a 310px preview rail that is a ~330px card holding a full item
+     uuid.
+
+     `minmax(0, 1fr)` rather than removing the grid, because the gap and the overflow floor are
+     still this container's. */
   .manager-scoped-entry-defaults {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--fab-space-3);
     min-width: 0;
   }
@@ -999,7 +1142,10 @@
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
     border-radius: 12px;
-    background: var(--fab-bg-2);
+    /* NO FILL (issue 1372). See the essence surface-ladder block in `styles/fabricate.css`: the
+       prototype draws every card in the content area on the pane's own surface and separates
+       them with the border alone. */
+    background: transparent;
     min-width: 0;
   }
 
@@ -1051,7 +1197,10 @@
     flex-direction: column;
     border: 1px solid var(--fab-border);
     border-radius: 12px;
-    background: var(--fab-bg-2);
+    /* NO FILL (issue 1372). See the essence surface-ladder block in `styles/fabricate.css`: the
+       prototype draws every card in the content area on the pane's own surface and separates
+       them with the border alone. */
+    background: transparent;
     min-width: 0;
     overflow: hidden;
   }

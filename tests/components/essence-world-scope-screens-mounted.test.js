@@ -54,6 +54,10 @@ const SHELL_MODULES = [
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+  // The catalogue inspector's pinned foot action (issue 1372). A missing entry here does not
+  // FAIL the suite, it HANGS it and reports `# cancelled` — see
+  // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
+  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
@@ -207,11 +211,25 @@ describe('criterion 4 — the essence catalogue renders NO source-item affordanc
 
 describe('criterion 5 — the per-system indicator has three distinct states', () => {
   it('renders exactly {absent, disabled, enabled} across three fixture systems', async () => {
+    // ── THE INDICATOR MOVED FROM THE ROW TO THE INSPECTOR (issue 1372) ────────────────────────
+    // It used to be a strip of one coloured dot per crafting system in the LIST ROW. The
+    // prototype's row draws none (`essences.png`), and the strip was about 90px of a 1280px row
+    // spent on six identical circles whose system and state were reachable only by hovering one
+    // of them. The three states are now WORDS on the inspector's system rows, beside the Add /
+    // enable / Remove controls that act on them, which is where the prototype puts them.
+    //
+    // So the cells are read from the inspector, which means the row has to be SELECTED first —
+    // and that is also why the View Lab case for this screen now clicks a row before capturing.
+    // SELECTED BY CLICKING THE ROW, not by a prop: the page owns `selectedId` internally and
+    // binds it into the shell, so a prop of that name on the page is not read at all and a test
+    // that passed one would silently measure the resting inspector.
     const root = await pageHarness.mount(pageProps());
-    const row = root.querySelector('[data-scoped-list-row="ash"]');
-    assert.ok(row, 'the fixture entity has a row');
+    root.querySelector('[data-scoped-list-inspect="ash"]').click();
+    flushSync();
+    const inspector = root.querySelector('[data-scoped-list-inspector]');
+    assert.ok(inspector, 'the inspected entity has an inspector panel');
 
-    const states = [...row.querySelectorAll('[data-scoped-system-state]')].map((node) =>
+    const states = [...inspector.querySelectorAll('[data-scoped-system-state]')].map((node) =>
       node.getAttribute('data-scoped-system-state')
     );
     // A SET EQUALITY, not three existence checks. `enabled: false` keeps the record and its
@@ -222,7 +240,7 @@ describe('criterion 5 — the per-system indicator has three distinct states', (
 
     // Each cell names its system too, so the state is legible without decoding a colour.
     const bySystem = new Map(
-      [...row.querySelectorAll('[data-scoped-system]')].map((node) => [
+      [...inspector.querySelectorAll('[data-scoped-system]')].map((node) => [
         node.getAttribute('data-scoped-system'),
         node.getAttribute('data-scoped-system-state'),
       ])
@@ -230,6 +248,16 @@ describe('criterion 5 — the per-system indicator has three distinct states', (
     assert.equal(bySystem.get('sys-a'), 'enabled');
     assert.equal(bySystem.get('sys-b'), 'disabled');
     assert.equal(bySystem.get('sys-c'), 'absent');
+
+    // NON-VACUITY, and the deletion half: the ROW must no longer carry a pip strip, or this case
+    // would go on passing over a screen that draws both.
+    const row = root.querySelector('[data-scoped-list-row="ash"]');
+    assert.ok(row, 'the fixture entity still has a row');
+    assert.equal(
+      row.querySelectorAll('[data-scoped-system-state]').length,
+      0,
+      'the row draws no per-system strip; the prototype draws none and the inspector says it'
+    );
     pageHarness.remount();
   });
 
@@ -242,32 +270,38 @@ describe('criterion 5 — the per-system indicator has three distinct states', (
   });
 });
 
-describe('the catalogue creates from a NAME, with no drop target presupposed', () => {
-  it('mints a slugged id and calls createEntity with the identity an essence actually has', async () => {
-    const created = [];
-    const root = await pageHarness.mount(
-      pageProps({ actions: { createEntity: (entity) => created.push(entity) } })
+describe('the catalogue owns no create affordance; the page header does', () => {
+  it('renders neither the name field nor the create button it used to carry', async () => {
+    // ── WHERE CREATE WENT, AND WHY THIS CASE IS AN ABSENCE ────────────────────────────────────
+    // The prototype puts one `+ New essence` button in the header band, right-aligned on the
+    // title line (`essences.png`). This page shipped a full-width band above the list carrying a
+    // `New essence name` label, a text input and the button — about 60px of chrome that read as a
+    // form a GM had to fill in before anything else on the screen was available.
+    //
+    // The header band is rendered by `CraftingSystemManagerRoot.svelte`, which no page can reach,
+    // so the affordance moved there and nothing about it is left here. Its evidence moved with
+    // it: `essence-world-scope-screens.test.js` asserts the header branch, the handler's two
+    // delegations and the bounded import, and unit-tests `mintEssenceId`'s slug and its
+    // suffix collision resolution directly.
+    //
+    // THIS CASE IS THE DELETION HALF. Without it the old band could be reintroduced beside the
+    // header button and every other assertion in this file would stay green.
+    const root = await pageHarness.mount(pageProps({ actions: { createEntity: () => {} } }));
+    assert.equal(
+      root.querySelectorAll('[data-scoped-essence-new-name]').length,
+      0,
+      'the create name field is gone from the page'
     );
-    const field = root.querySelector('[data-scoped-essence-new-name]');
-    assert.ok(field, 'the create affordance is a NAME field, not an item drop target');
-    field.value = 'Ember Dust';
-    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
-    // FLUSHED BEFORE THE CLICK. The button is `disabled` until the name is non-empty, and a
-    // disabled button swallows a click silently — so without the flush this test would report
-    // "createEntity was never called" for a screen that works.
-    flushSync();
-    root.querySelector('[data-scoped-essence-create-action]').click();
-    await Promise.resolve();
-
-    assert.equal(created.length, 1);
-    assert.equal(created[0].id, 'ember-dust');
-    assert.equal(created[0].name, 'Ember Dust');
-    // AND NO SOURCE FIELD. A component or a tool is created by linking an Item; an essence is
-    // created from nothing, so writing one of the three source-link names here would author a
-    // field `normalizeWorldEntities` does not carry for this type.
-    assert.deepEqual(
-      Object.keys(created[0]).sort(),
-      ['colorToken', 'description', 'icon', 'id', 'name']
+    assert.equal(
+      root.querySelectorAll('[data-scoped-essence-create-action]').length,
+      0,
+      'and so is the button beside it'
+    );
+    // NON-VACUITY: the page did mount and did render its list, so the two zeroes above are
+    // measurements rather than the result of an empty tree.
+    assert.ok(
+      root.querySelector('[data-scoped-list-row]'),
+      'the page rendered its list, so the absences above are measured against a real screen'
     );
     pageHarness.remount();
   });

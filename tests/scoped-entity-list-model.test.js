@@ -289,7 +289,12 @@ describe('scopedEntityListModel filters', () => {
 
   it('sorts by the shipped vocabulary and by a lane descriptor', () => {
     const model = createScopedEntityListModel();
-    assert.deepEqual(SCOPED_LIST_SORTS, ['name-asc', 'name-desc', 'systems-desc']);
+    // EVERY KEY CARRIES BOTH DIRECTIONS (issue 1372). `systems-asc` was missing while
+    // `systems-desc` shipped, which was invisible while the frame offered one flat `<select>` of
+    // composite sort ids and became a live defect the moment it offered the prototype's key
+    // picker beside a direction toggle: composing `systems-asc` fell through to the default and
+    // silently produced name order.
+    assert.deepEqual(SCOPED_LIST_SORTS, ['name-asc', 'name-desc', 'systems-asc', 'systems-desc']);
     assert.deepEqual(
       model.project({ entries, sort: 'name-asc' }).rows.map((row) => row.id),
       ['a', 'b', 'c']
@@ -301,6 +306,13 @@ describe('scopedEntityListModel filters', () => {
     assert.deepEqual(
       model.project({ entries, sort: 'systems-desc' }).rows.map((row) => row.id),
       ['a', 'c', 'b']
+    );
+    // THE MIRROR, and it is not merely the reverse of the line above: the NAME tie-break runs in
+    // the same direction on both, so entities on an equal membership count keep one stable
+    // neighbourhood whichever way the count is ordered.
+    assert.deepEqual(
+      model.project({ entries, sort: 'systems-asc' }).rows.map((row) => row.id),
+      ['b', 'c', 'a']
     );
     const sorts = [{ id: 'by-id-desc', compare: (left, right) => (left.id < right.id ? 1 : -1) }];
     assert.deepEqual(

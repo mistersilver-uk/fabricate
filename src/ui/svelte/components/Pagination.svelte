@@ -17,6 +17,21 @@
     // control. Under it the summary and the per-page selector are always present, and
     // the nav renders its (disabled) arrows rather than vanishing.
     persistent = false,
+    // Issue 1372, opt-OUT and DEFAULT ON so every shipped surface renders unchanged.
+    //
+    // A page-size choice is a BROWSE-SCREEN control: `design-system/spec.md` puts the pagination
+    // bar at the foot of a browse screen, outside the scroll area, and a GM changing how many
+    // rows they see at once is changing how they read the whole list. An INSPECTOR's pager is a
+    // different control with the same anatomy — it walks a fixed five-row window over one
+    // record's related rows inside a 300px column, and the prototype draws it as summary plus
+    // arrows with no size selector (`essences.png`). Offering one there would put a third
+    // `<select>` in a column that already cannot hold two side by side, to change a number
+    // nothing else on the screen refers to.
+    //
+    // It is a PROP ON THE PRIMITIVE rather than a second pager component: the summary, the nav,
+    // the disabled-arrow rule and the range arithmetic are identical, and this is the one part
+    // that differs.
+    showPageSize = true,
   } = $props();
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
@@ -91,18 +106,20 @@
         </button>
       </nav>
     {/if}
-    <label class="manager-pagination-size">
-      <span>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
-      <select
-        value={pageSize}
-        data-pagination-size
-        aria-label={text('FABRICATE.Admin.Manager.Pagination.PerPageLabel', 'Rows per page')}
-        onchange={(event) => changePageSize(event.currentTarget.value)}
-      >
-        {#each pageSizeOptions as option (option)}
-          <option value={option}>{option}</option>
-        {/each}
-      </select>
-    </label>
+    {#if showPageSize}
+      <label class="manager-pagination-size">
+        <span>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
+        <select
+          value={pageSize}
+          data-pagination-size
+          aria-label={text('FABRICATE.Admin.Manager.Pagination.PerPageLabel', 'Rows per page')}
+          onchange={(event) => changePageSize(event.currentTarget.value)}
+        >
+          {#each pageSizeOptions as option (option)}
+            <option value={option}>{option}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
   </section>
 {/if}

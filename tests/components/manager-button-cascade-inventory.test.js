@@ -436,7 +436,11 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
-        buttons: 28,
+        // 28 -> 30 with issue 1372's two world-essence header actions — `+ New essence` on the
+        // catalogue and `Back` on the entry — which are two more `<ManagerButton>`s in the same
+        // container: the count is the container's own population read from the tree, so it moves
+        // whenever a header branch gains or loses a control.
+        buttons: 30,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -463,7 +467,8 @@ const REVIEWED = [
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
         role: 'primary',
-        buttons: 14,
+        // 14 -> 15 with issue 1372's world-essence header create action.
+        buttons: 15,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -642,6 +647,22 @@ const REVIEWED = [
       '`SearchablePopover` trigger rendered from `RecipeRoutingAssignment``s `triggerClass` ' +
       'string, so naming it by its own trigger class is the only way it keeps the row`s 28px ' +
       'scale beside the two converted controls it sits with.',
+  },
+
+  {
+    id: scopedRule(
+      'scoped/EntityCatalogueShell.svelte',
+      '.manager-scoped-catalogue-system .manager-button.is-danger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it. The catalogue inspector`s system ' +
+      'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
+      '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +
+      'so this rule cannot be re-chained onto the primitive. What it states is a SIZE taken ' +
+      'from the layout context — 26px rather than the page-level 34px — because five of those ' +
+      'rows plus three cards, a search field and a pager have to fit one 300px inspector ' +
+      'column, which is the arrangement the prototype draws (`essences.png`).',
   },
 
   {

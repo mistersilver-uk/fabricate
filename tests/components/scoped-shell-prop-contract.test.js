@@ -46,21 +46,41 @@ function sourceOf(path) {
   return readFileSync(resolve(repoRoot, path), 'utf8');
 }
 
+// The seven added by issue 1372 are all INSPECTOR COPY or LIST COPY.
+//
+// `countUnit`, `inspectorKicker` and `searchPlaceholder` are the noun this screen counts and
+// searches, which only a lane knows; `sectionTitles`, `sectionIcons` and `extraCards` are the
+// world-default cards' copy, which the prototype titles after the VALUE each default resolves to
+// rather than after the section; `inspectorFoot` is the panel's one pinned primary action.
+//
+// None of them is a second entity-shape switch: every one is pre-localized copy or a snippet, and
+// the shell still tests no `scope.entityType`.
 const CATALOGUE_PROPS = [
   'actions',
   'bulk',
+  'countUnit',
   'emptyHint',
   'emptyTitle',
+  'extraCards',
   'filters',
   'hookValue',
   'icon',
   'inspectorBody',
+  'inspectorCaption',
+  'inspectorFoot',
+  'inspectorKicker',
+  'membershipFilter',
   'onOpenEntry',
+  'onOpenSystemRules',
   'onSelect',
   'rowMeta',
   'scope',
   'searchOf',
+  'searchPlaceholder',
+  'sectionIcons',
   'sectionNotes',
+  'sectionTitles',
+  'selectAllLabel',
   'selectedId',
   'sorts',
   'subtitle',
@@ -124,8 +144,23 @@ describe('the shells declare the pinned prop sets', () => {
       'systemName',
     ]);
     assert.deepEqual([...catalogue].filter((name) => !rules.has(name)).sort(), [
+      // The seven inspector/list copy props issue 1372 added, plus the two the split always had.
+      // They are catalogue-only because the rules-list shell supplies NO `inspectorBody` and so
+      // renders no inspector at all: there is nothing on that screen for a kicker, a card title or
+      // a pinned foot action to appear in.
+      'countUnit',
+      'extraCards',
       'inspectorBody',
+      'inspectorCaption',
+      'inspectorFoot',
+      'inspectorKicker',
+      'membershipFilter',
       'onOpenEntry',
+      'onOpenSystemRules',
+      'searchPlaceholder',
+      'sectionIcons',
+      'sectionTitles',
+      'selectAllLabel',
     ]);
   });
 });
@@ -138,6 +173,22 @@ describe('no chrome is inlined into a shell', () => {
     '<EmptyState',
     '<SelectionCheckbox',
   ];
+
+  // ONE SANCTIONED EXCEPTION, AND IT IS BOUNDED BY POSITION AND BY PROPS.
+  //
+  // The rule this suite enforces is that a shell must not re-render the frame's LIST chrome: a
+  // second list pager beside the frame's is the duplication the split exists to prevent.
+  //
+  // The catalogue inspector's system list is a DIFFERENT COLLECTION with its own pager, and the
+  // prototype draws one (`essences.png`): a search field over the systems that hold this entity,
+  // five rows, and `Showing 1-5 of 13` with page arrows. It is not reachable from the frame, which
+  // knows nothing about `entry.systems`, so a shell-rendered `Pagination` is the only way to have
+  // it at all, and hand-rolling a pager rather than composing the primitive is the worse of the
+  // two failures this file guards against.
+  //
+  // So the exception is CHECKED rather than waived: it must sit inside the inspector snippet, and
+  // it must carry the two props that make it the inspector's rather than the list's.
+  const INSPECTOR_PAGER = { [CATALOGUE]: 1, [RULES]: 0 };
 
   for (const shell of [CATALOGUE, RULES]) {
     it(`${shell.split('/').pop()} renders exactly one frame and none of the composed chrome`, () => {
@@ -153,13 +204,35 @@ describe('no chrome is inlined into a shell', () => {
       for (const element of COMPOSED) {
         assert.equal(
           source.split(element).length - 1,
-          0,
+          element === '<Pagination' ? INSPECTOR_PAGER[shell] : 0,
           `${element} is the frame's to render; a second one beside the frame is the duplication ` +
             'this split exists to prevent, and a frame-count-only assertion ships it green'
         );
       }
     });
   }
+
+  it('the catalogue pager is the INSPECTOR pager, by position and by props', () => {
+    const source = sourceOf(CATALOGUE);
+    const snippet = source.indexOf('{#snippet catalogueInspector');
+    const pager = source.indexOf('<Pagination');
+    assert.ok(snippet > 0, 'the inspector snippet was not found, so the position check is vacuous');
+    assert.ok(
+      pager > snippet,
+      'the shell pager sits inside the inspector snippet, not beside the frame'
+    );
+    // The PROP evidence: it walks a fixed five-row window with no page-size selector, where the
+    // frame's list pager takes the browse-screen default. A pager that grew a size selector here
+    // would be the list pager copied, which is what the count check alone cannot see.
+    const call = source.slice(pager, source.indexOf('/>', pager));
+    assert.match(call, /showPageSize=\{false\}/, 'the inspector pager offers no page size');
+    assert.match(
+      call,
+      /pageSize=\{SYSTEM_PAGE_SIZE\}/,
+      'and walks the system window, not the list'
+    );
+    assert.doesNotMatch(call, /onPageSizeChange/, 'so it has no size handler to wire either');
+  });
 
   it('and the FRAME renders each of them, so the zero counts above are a measurement', () => {
     const frame = sourceOf(FRAME);

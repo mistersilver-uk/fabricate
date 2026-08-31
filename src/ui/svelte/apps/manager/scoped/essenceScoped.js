@@ -194,6 +194,80 @@ export function isDocumentUuid(value) {
 }
 
 /**
+ * The COLOUR CAPTION under an entity's name: the token's display name, and the value the theme
+ * currently resolves it to.
+ *
+ * ── THE HEX IS READ, NEVER WRITTEN ──────────────────────────────────────────────────────────────
+ * The prototype's caption is a colour name followed by that colour's hex. Two things stop this
+ * being a literal. `src/ui/**` may carry no raw colour value at all — `theme-colour-contract.test.js`
+ * scans comments as well as declarations — and a literal would be WRONG the moment a GM switched
+ * theme, because every `--fab-tag-*` token is re-declared in each of the seven theme blocks.
+ *
+ * So the value is resolved from the live cascade. That also makes it the truthful answer for
+ * whichever theme is active, which a table of hexes in this file could never be.
+ *
+ * ── IT RESOLVES AT `.fabricate`, NOT AT THE DOCUMENT ROOT AND NOT AT A BOUND NODE ──────────────
+ * Every `--fab-tag-*` token is declared inside the seven `.fabricate[data-fabricate-theme="…"]`
+ * blocks and NOWHERE at `:root`, so `document.documentElement` resolves them all to `''`.
+ *
+ * The first version instead resolved at the caption's own element, handed in through a
+ * `bind:this`. That is more precise and it does not work: `bind:this` is assigned after the
+ * subtree mounts, so the caption's first — and, as measured in the View Lab, its only — render
+ * saw `null` and printed the name alone. Custom properties INHERIT, so resolving at the theme
+ * root is the same value with none of the ordering.
+ *
+ * ── IT FAILS TO THE NAME, NOT TO A GUESS ────────────────────────────────────────────────────────
+ * `getComputedStyle` is unavailable in a non-browser environment and returns `''` for a custom
+ * property no sheet declares, so both the mounted-test case and an unknown token fall back to the
+ * name alone. A caption that is one word instead of two is a smaller failure than one asserting a
+ * colour nothing on screen is painted in.
+ *
+ * @param {string} token a `--fab-tag-*` token name, e.g. `lavender`.
+ * @returns {string} `''` when no token is set.
+ */
+export function essenceColourCaption(token) {
+  const name = String(token ?? '').trim();
+  if (name === '') return '';
+  const label = name.charAt(0).toUpperCase() + name.slice(1);
+  const target = globalThis.document?.querySelector?.('.fabricate') ?? null;
+  if (!target || typeof globalThis.getComputedStyle !== 'function') return label;
+  let value = '';
+  try {
+    // CALLED ON `globalThis`, NEVER DETACHED. `const compute = globalThis.getComputedStyle`
+    // followed by `compute(target)` invokes it with `this === undefined`, which every browser
+    // rejects as an illegal invocation — and a `catch` swallows it, so the caption would render
+    // the name alone while every gate stayed green.
+    value = globalThis.getComputedStyle(target).getPropertyValue(`--fab-tag-${name}`).trim();
+  } catch {
+    // A document that cannot be styled. The name alone is still true.
+    return label;
+  }
+  return value ? `${label} \u00b7 ${value.toUpperCase()}` : label;
+}
+
+/**
+ * A stored value's display name with a document-UUID PREFIX dropped.
+ *
+ * ── IT IS A DISPLAY TRIM AND NOT A RESOLUTION ───────────────────────────────────────────────
+ * Naming the document behind a uuid needs `await fromUuid`, which a list row cannot wait for once
+ * per candidate and a pure leaf must not do at all. The terminal segment — the id — is the closest
+ * true thing a row can say, and it is what a GM recognises: `Macro.lab-aether-binding` printed
+ * whole under a card already titled `Macro` read as `Macro Macro.lab-aether-binding`.
+ *
+ * The trim is CONDITIONAL on the value actually being a uuid, so a real name that happens to carry
+ * a full stop ("Ember Brand, Mk. II") is returned untouched.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function essenceShortValueName(value) {
+  const name = typeof value === 'string' ? value.trim() : '';
+  if (!isDocumentUuid(name)) return name;
+  const segments = name.split('.');
+  return segments[segments.length - 1];
+}
+
+/**
  * Whether one candidate referent may be written as a WORLD default `effectSource`.
  *
  * @param {unknown} value the candidate's id or uuid.

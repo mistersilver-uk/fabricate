@@ -75,9 +75,22 @@ export const SYSTEM_MEMBERSHIP_FILTERS = Object.freeze(['all', 'in', 'out']);
 /**
  * The sorts every scoped list offers before a lane adds its own.
  *
+ * ── EVERY KEY CARRIES BOTH DIRECTIONS, AND THE MISSING ONE WAS A UI DEFECT ────────────────────
+ * `systems-asc` was absent while `systems-desc` shipped, which is invisible while the frame
+ * offers one flat `<select>` of sort IDS and fatal the moment it offers what the prototype draws:
+ * a KEY picker (`SORT BY [Name]`) beside a DIRECTION toggle (`[⇅ Asc]`). That decomposition
+ * composes `${key}-${direction}`, so a key with one direction makes the toggle a control that
+ * silently falls back to name order on one of its two positions — a filter that lies rather than
+ * one that is unavailable.
+ *
  * @type {readonly string[]}
  */
-export const SCOPED_LIST_SORTS = Object.freeze(['name-asc', 'name-desc', 'systems-desc']);
+export const SCOPED_LIST_SORTS = Object.freeze([
+  'name-asc',
+  'name-desc',
+  'systems-asc',
+  'systems-desc',
+]);
 
 /**
  * The default search string for one entry: its name and description, lowercased.
@@ -288,18 +301,40 @@ export function createScopedEntityListModel() {
         return true;
       });
 
+      // A LANE DESCRIPTOR OUTRANKS EVERY BUILT-IN ID, so it is tested before the switch rather
+      // than inside it: a lane may legitimately declare a sort whose id shadows one of these.
       const extra = asArray(sorts).find((descriptor) => descriptor?.id === sort);
-      if (extra) rows.sort((left, right) => extra.compare(left, right));
-      else if (sort === 'name-desc') {
-        rows.sort((left, right) => compareKeys(index.sortKey, right, left));
-      } else if (sort === 'systems-desc') {
-        rows.sort(
-          (left, right) =>
-            (Number(right.membershipCount) || 0) - (Number(left.membershipCount) || 0) ||
-            compareKeys(index.sortKey, left, right)
-        );
+      if (extra) {
+        rows.sort((left, right) => extra.compare(left, right));
       } else {
-        rows.sort((left, right) => compareKeys(index.sortKey, left, right));
+        // The NAME tie-break runs in the same direction on BOTH membership sorts, so two entities
+        // held by the same number of systems keep one stable neighbourhood however the count is
+        // ordered. Reversing it with the count would make the tie-break read as a second key.
+        switch (sort) {
+          case 'name-desc': {
+            rows.sort((left, right) => compareKeys(index.sortKey, right, left));
+            break;
+          }
+          case 'systems-desc': {
+            rows.sort(
+              (left, right) =>
+                (Number(right.membershipCount) || 0) - (Number(left.membershipCount) || 0) ||
+                compareKeys(index.sortKey, left, right)
+            );
+            break;
+          }
+          case 'systems-asc': {
+            rows.sort(
+              (left, right) =>
+                (Number(left.membershipCount) || 0) - (Number(right.membershipCount) || 0) ||
+                compareKeys(index.sortKey, left, right)
+            );
+            break;
+          }
+          default: {
+            rows.sort((left, right) => compareKeys(index.sortKey, left, right));
+          }
+        }
       }
 
       return { rows, systemRows, searchText: index.text };

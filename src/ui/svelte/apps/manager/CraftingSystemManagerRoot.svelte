@@ -149,6 +149,7 @@
   import WorldToolEntryPage from './scoped/WorldToolEntryPage.svelte';
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
+  import { mintEssenceId } from './scoped/essenceScoped.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -2875,6 +2876,67 @@
       worldScopedEntryId = nextEntryId;
       activeView = view;
     });
+  }
+
+  /**
+   * Create a world essence from the page header and open its entry editor.
+   *
+   * ── THE SEAM, AND ITS WHOLE EXTENT ──────────────────────────────────────────────────────────
+   * `### GM World Scoped Entity Routes` requirement 7 closes this file to the catalogue lanes, and
+   * this is the one place it is opened: the header band the prototype puts `+ New essence` in is
+   * rendered here and cannot be reached from a page. Everything else the button needs already
+   * exists here — `store.worldScope.essence.createEntity` is the same family the page is handed,
+   * and `openWorldScopedEntry` is the same navigation the row's pen already takes.
+   *
+   * THE NAME IS A PLACEHOLDER AND THE EDITOR IS THE POINT. `createEntity` refuses a duplicate id,
+   * so a fixed id would make the second press a button that does nothing and says nothing;
+   * `mintEssenceId` resolves the collision by suffix instead. Navigating straight into the entry
+   * puts the GM on the screen that names it, so the placeholder is never a row they have to find
+   * again.
+   *
+   * @returns {Promise<void>}
+   */
+  /**
+   * Open ONE crafting system's essence rules for a world essence, from the catalogue inspector.
+   *
+   * ── THE SECOND SEAM, AND THE SAME BOUND AS THE FIRST ────────────────────────────────────────
+   * The prototype's catalogue inspector lists the systems that hold an essence and gives each one
+   * a `Rules ↗` deep link (`essences.png`). Both halves of that navigation are the shell's:
+   * selecting a crafting system runs through `selectSystem`, which owns the route-exit gate and
+   * the store write, and changing route sets `activeView`. A page can do neither.
+   *
+   * IT COMPOSES, AND ADDS NOTHING. `selectSystem` is the same function the rail's scope select and
+   * five other navigations call, and `essences` is the shipped system-scope essence rules route.
+   * The one thing this adds is the pairing.
+   *
+   * THE ENTITY ID IS ACCEPTED AND DELIBERATELY UNUSED. The rules list is not addressable by
+   * entity — it opens on the system's whole essence list — and a caller that passed a different
+   * shaped argument would be a defect this signature makes visible rather than one that silently
+   * routes somewhere close enough.
+   *
+   * @param {string} _entityId the essence the row belongs to; see above.
+   * @param {string} systemId the crafting system whose rules to open.
+   * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
+   */
+  function openSystemEssenceRules(_entityId, systemId) {
+    if (!systemId) return false;
+    return afterTruthyResult(selectSystem(systemId, 'essences'), () => {
+      activeView = 'essences';
+    });
+  }
+
+  async function createWorldEssence() {
+    const name = text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence');
+    const id = mintEssenceId(name, worldScopeState.essence?.entities ?? []);
+    const created = await store?.worldScope?.essence?.createEntity?.({
+      id,
+      name,
+      icon: 'fas fa-flask-vial',
+      colorToken: '',
+      description: '',
+    });
+    if (created === false) return;
+    openWorldScopedEntry('world-essence-entry', id);
   }
 
   // -- Full width: ONE mechanically checked decision over a THREE-state classification ---
@@ -9122,9 +9184,57 @@
         sit permanently disabled against an id the route does not have. Each screen's own
         actions belong on the surface that owns them, which PRs 6a-c and 7 build.
       -->
-      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute}
+      <!--
+        ONE WORLD SCOPED ROUTE IS BACK IN, AND IT IS A SEAM RATHER THAN A RELAXATION (issue 1372).
+
+        The exclusion above is about the FALLTHROUGH: a world scoped route has no selected crafting
+        system, so the final `{:else}` branch's Create would create a crafting system and its Export
+        would sit disabled against an id the route does not have. That reasoning is about the
+        DEFAULT branch, not about the band, and the Essence Catalogue needs the band: the prototype
+        puts its one `+ New essence` button in the header, right-aligned on the title line
+        (`essences.png`), and there is nowhere else on a released full-width route to put it that
+        does not cost the list a 60px form band.
+
+        The world essence ENTRY route joins it for the same reason and a sharper one. The prototype
+        heads that screen with `← Back` and a save action beside the essence's own name
+        (`essEntry.png`), and the shipped screen had NO way out of it but the breadcrumb: the page
+        renders a Back only in its entity-not-found empty state, so the one state a GM actually
+        reaches it in offered none. `Save` is deliberately not added — `patchIdentity` writes on
+        every change, so the screen has no dirty state a Save could commit and a button that
+        committed nothing would be worse than the absence.
+
+        So each route is admitted BY NAME and lands on its OWN branch below — neither reaches the
+        fallthrough — and the other five world scoped routes stay excluded exactly as before.
+      -->
+      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
-          {#if currentView === 'world-downtime'}
+          {#if currentView === 'world-essence-entry'}
+            <ManagerButton data-world-essence-back onclick={() => setView('world-essences')}>
+              <i class="fas fa-arrow-left" aria-hidden="true"></i>
+              <!-- A SEPARATE KEY from the page's own `BackToCatalogue`, which reads "Back to the
+                   catalogue". That phrase belongs to the entity-not-found empty state, where it is
+                   the only thing on screen and has to say where it goes; in the header band it
+                   sits beside a breadcrumb that already names the destination, and the prototype
+                   writes it as one word (`essEntry.png`). -->
+              <span
+                >{text('FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogueShort', 'Back')}</span
+              >
+            </ManagerButton>
+          {:else if currentView === 'world-essences'}
+            <!--
+              CREATE TAKES NO NAME FIELD. `mintEssenceId` slugs an id from the name and RESOLVES a
+              collision by suffix (`ash`, `ash-2`), so pressing this twice mints two records rather
+              than silently doing nothing the second time — which is the failure the page's old
+              name field existed to prevent and no longer can happen. The new essence opens
+              straight into its own world entry editor, which is where its name, icon, colour and
+              description are authored; a row called "New essence" left on the list would be a
+              record a GM has to go and find.
+            -->
+            <ManagerButton role="primary" data-world-essence-create onclick={createWorldEssence}>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
+            </ManagerButton>
+          {:else if currentView === 'world-downtime'}
             {#if downtimeCoreFallback}
               <!--
                 The design puts this promotional pill at the top of every Downtime screen, in
@@ -10692,6 +10802,7 @@
       <WorldEssenceCataloguePage
         {...essenceScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-essence-entry', entityId)}
+        onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
       />
     {:else if currentView === 'world-essence-entry'}
       <WorldEssenceEntryPage

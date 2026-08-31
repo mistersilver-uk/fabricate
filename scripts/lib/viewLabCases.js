@@ -1048,19 +1048,49 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Essence Catalogue',
     reaches: 'beyond',
     smokeLabels: [],
-    steps: [{ selector: '#manager-world-nav-essence-catalogue' }],
+    // THE SECOND STEP SELECTS A ROW, AND WITHOUT IT THIS CASE PHOTOGRAPHS THE WRONG SCREEN.
+    //
+    // The inspector is most of a 300px column and the richest region on the page — the world
+    // defaults, their inherit counts, the per-system rules list and the deep link into the entry
+    // editor all live in it. It renders `Nothing selected` until a row is clicked, so a case that
+    // stops at the rail entry publishes a frame in which the whole right-hand third of the screen
+    // is an empty state. Three review rounds compared that frame against a prototype whose
+    // inspector is full and read the difference as a styling gap.
+    //
+    // `[data-scoped-list-inspect]` matches every row's identity button and the runner takes
+    // `.first()`, so this selects the first row of the default `Name A–Z` page — `Aether`, which
+    // carries a colour token, a linked effect source and a property macro, and is therefore the
+    // one row that exercises every readout the inspector can draw.
+    steps: [
+      { selector: '#manager-world-nav-essence-catalogue' },
+      { selector: '[data-scoped-list-inspect]' },
+    ],
     expectView: 'world-essences',
     expectSelector: '[data-scoped-page="world-essences"]',
-    // THE THREE-STATE PER-SYSTEM INDICATOR, proved present rather than assumed. `expectSelector`
+    // THE ROWS AND THE FILLED INSPECTOR, proved present rather than assumed. `expectSelector`
     // alone passes on a route that rendered its shell and no rows at all, which is what an
     // unseeded world corpus looks like — and a frame of an empty catalogue is not evidence of a
     // catalogue.
+    //
+    // The per-system PIP STRIP is no longer asserted because the row no longer draws one: it was
+    // six identical dots the prototype does not have, and the three states it encoded are now
+    // words on the inspector's system rows. What replaces it as the proof that the panel is
+    // populated is the inspector's own content — a world-default card and the foot action — which
+    // is a stricter assertion of the same claim, because both are unreachable until a row is
+    // selected and the previous set was not.
     expectContained: [
       {
         container: '[data-scoped-list]',
         target: '[data-scoped-list-row] [data-medallion="glyph"]',
       },
-      { container: '[data-scoped-list]', target: '[data-scoped-system-state]' },
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inherit-note="effectSource"]',
+      },
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inspector-foot]',
+      },
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
@@ -1091,13 +1121,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-scoped-page="world-essence-entry"]',
     // BOTH world-default cards, with their inherit lines. A frame that showed the identity fields
     // alone would show nothing this screen exists for.
+    //
+    // ── THE MACRO CARD IS MEASURED AGAINST ITS SECTION, NOT THE PAGE, AND THAT IS THE DESIGN ──
+    // The prototype stacks the two world defaults as full-width cards (`essEntry.png`), and its
+    // OWN 900px frame cuts the second one off at the fold — the effect-source card ends around
+    // 710px and the macro card runs from about 730 past the bottom edge. So "both cards inside the
+    // page's rect at 1280x900" is not a fact about this screen being correct; it is a fact about
+    // the cards being side by side, which is the layout this pass replaced.
+    //
+    // What the assertion still buys is everything it was for: the macro card RENDERS, and it is
+    // not clipped by the container that owns it. The effect-source card and its inherit line stay
+    // measured against the page, so a frame that scrolled past the whole defaults region still
+    // fails.
     expectContained: [
       {
         container: '[data-scoped-page="world-essence-entry"]',
         target: '[data-scoped-world-default="effectSource"]',
       },
       {
-        container: '[data-scoped-page="world-essence-entry"]',
+        container: '[data-scoped-entry-defaults-section]',
         target: '[data-scoped-world-default="macro"]',
       },
       {
