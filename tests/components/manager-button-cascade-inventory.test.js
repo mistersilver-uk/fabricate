@@ -436,11 +436,14 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
-        // 28 -> 30 with issue 1372's two world-essence header actions — `+ New essence` on the
-        // catalogue and `Back` on the entry — which are two more `<ManagerButton>`s in the same
-        // container: the count is the container's own population read from the tree, so it moves
-        // whenever a header branch gains or loses a control.
-        buttons: 30,
+        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own: the
+        // catalogue's `+ New essence`. The entry's `Back`/`Save` pair renders into this same
+        // container from `scoped/ScopedEntryHeaderActions.svelte`, which slots into the div and
+        // declares no region of its own, so it is the `ComponentEditorHeader` case the `why`
+        // below already records — reached by the rule, not attributable to this file by a static
+        // count. The number is the container's own population read from the tree, so it moves
+        // whenever a header branch gains or loses a control it renders itself.
+        buttons: 29,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
