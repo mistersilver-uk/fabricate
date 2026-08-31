@@ -113,16 +113,21 @@
     popoverClass — optional extra class on the portaled popover element (the
                    pickerClass lands on the trigger's root, which the portaled
                    popover escapes, so a popover-scoped style needs its own hook)
-    *AriaLabel / searchPlaceholder / emptyHint — localized strings. `emptyHint` is the
-                   no-matches TITLE, so it must stay short: `EmptyState` renders a title
-                   as a 13px/600 serif heading with no width cap, and a sentence handed
-                   to it sets as a multi-line heading under the hero glyph.
-    emptyDetail  — OPTIONAL explanatory sentence rendered as `EmptyState`'s BODY beneath
-                   that title. It exists because at least one empty reason is a
-                   configuration explanation rather than a name — the travel-actor
-                   picker's "no actor has a configured player-character type" names the
-                   module setting to change — and prose belongs in a body, not in a
-                   heading. Callers passing only `emptyHint` render exactly as before.
+    *AriaLabel / searchPlaceholder / emptyHint — localized strings. `emptyHint` feeds
+                   `EmptyState`'s `title` slot (its `<h3>`) HERE, so it must stay short:
+                   `EmptyState` renders a title as a 13px/600 serif heading with no width
+                   cap, and a sentence handed to it sets as a multi-line heading under the
+                   hero glyph. This is the opposite mapping from `VocabularyPanel`, whose
+                   own `emptyHint` prop feeds `EmptyState`'s `hint` slot (its `<p>`) — the
+                   two components chose the same prop name for two different `EmptyState`
+                   slots, so read the mapping from this doc rather than from the name alone.
+    emptyDetail  — OPTIONAL explanatory sentence rendered as `EmptyState`'s `hint` slot
+                   (its `<p>`, beneath the `title` slot `emptyHint` feeds). It exists
+                   because at least one empty reason is a configuration explanation rather
+                   than a name — the travel-actor picker's "no actor has a configured
+                   player-character type" names the module setting to change — and prose
+                   belongs in a body, not in a heading. Callers passing only `emptyHint`
+                   render exactly as before.
     open         — OPTIONAL `$bindable` open state (default false). Bind it when a
                    surface must open the picker from something OTHER than the trigger,
                    or must force it shut from outside — the World > Parties card does
@@ -546,40 +551,53 @@
 
       {#if header}{@render header(filteredOptions.length, options.length)}{/if}
 
-      <div
-        class="manager-travel-popover-options"
-        role="listbox"
-        aria-label={dialogAriaLabel || undefined}
-      >
-        {#if isGrouped}
-          {#each groupedOptions as bucket (bucket.id)}
-            <div
-              class="manager-travel-popover-group"
-              role="group"
-              aria-label={bucket.label || undefined}
-              data-popover-group={bucket.id}
-            >
-              {#if bucket.label}
-                <p class="manager-travel-popover-group-label" aria-hidden="true">{bucket.label}</p>
-              {/if}
-              {#each bucket.options as option (option.id)}
-                {@render optionRow(option)}
-              {/each}
-            </div>
-          {/each}
-        {:else}
-          {#each filteredOptions as option (option.id)}
-            {@render optionRow(option)}
+      <!-- The empty branch is a SIBLING of the `role="listbox"` box, never a child of it
+           (issue 1035): a listbox's only valid children are its options/groups, so a
+           no-matches `<h3>`/`<p>` rendered inside it misrepresented the empty panel as a
+           selectable part of the list to assistive tech. `filteredOptions.length` alone
+           decides which renders — `isGrouped` is derived FROM `filteredOptions` (it is
+           false whenever every bucket is empty), so a grouped picker whose search matches
+           nothing already falls out of `isGrouped` and into this same empty branch. -->
+      {#if filteredOptions.length > 0}
+        <div
+          class="manager-travel-popover-options"
+          role="listbox"
+          aria-label={dialogAriaLabel || undefined}
+        >
+          {#if isGrouped}
+            {#each groupedOptions as bucket (bucket.id)}
+              <div
+                class="manager-travel-popover-group"
+                role="group"
+                aria-label={bucket.label || undefined}
+                data-popover-group={bucket.id}
+              >
+                {#if bucket.label}
+                  <p class="manager-travel-popover-group-label" aria-hidden="true">
+                    {bucket.label}
+                  </p>
+                {/if}
+                {#each bucket.options as option (option.id)}
+                  {@render optionRow(option)}
+                {/each}
+              </div>
+            {/each}
           {:else}
-            <EmptyState
-              compact
-              icon="fas fa-magnifying-glass"
-              title={emptyHint}
-              hint={emptyDetail || undefined}
-            />
-          {/each}
-        {/if}
-      </div>
+            {#each filteredOptions as option (option.id)}
+              {@render optionRow(option)}
+            {/each}
+          {/if}
+        </div>
+      {:else}
+        <div class="manager-travel-popover-options" role="status" aria-live="polite">
+          <EmptyState
+            compact
+            icon="fas fa-magnifying-glass"
+            title={emptyHint}
+            hint={emptyDetail || undefined}
+          />
+        </div>
+      {/if}
 
       {#if footer}{@render footer()}{/if}
     </div>
