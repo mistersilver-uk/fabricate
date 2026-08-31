@@ -77,9 +77,9 @@ Product UI padding, margin, and gap spacing must derive from a shared 4px-based 
 
 ### Shared product UI primitives
 
-The `design-system` capability is the canonical record of WHICH primitives that set contains, their canonical geometry, their Svelte APIs, the rules that route a near-neighbour case to the right one, and the recipes that compose them into the browse, editor and player screen archetypes.
-Its visual companion at `openspec/specs/design-system/library.html` renders every primitive at the geometry that capability states, and is the artifact to open when a written geometry needs to be seen rather than read.
-This section states the RULE that a repeated thing is one primitive; `design-system` states what the set IS, and a change that adds or alters a shared primitive updates that capability and its library in the same change.
+The `design-system` capability is the canonical record of the RULES that set obeys: its canonical geometry ladders, its Svelte APIs, the rules that route a near-neighbour case to the right primitive, and the recipes that compose them into the browse, editor and player screen archetypes.
+The set ITSELF is enumerated in `openspec/specs/design-system/library.html`, one primitive per `div.spec-head > h4` heading, each rendered at its canonical geometry; that file is part of the capability rather than a companion to it, and it is the artifact to open when a written geometry needs to be seen rather than read.
+This section states the RULE that a repeated thing is one primitive; `design-system` states what the set IS, and a change that adds or alters a shared primitive adds its specimen to that library and, once the primitive ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change.
 
 Wherever two or more product UI surfaces perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component every site imports.
 The subject is every product surface — the GM manager and the player crafting, alchemy, gathering, inventory, and Journal surfaces alike — because two surfaces rendering the same meaning are duplicates whichever audience they face.
