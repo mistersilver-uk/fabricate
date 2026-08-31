@@ -152,7 +152,9 @@ A component MAY declare its own container and its own rung where the thing that 
 A layout that reserves fixed rail widths MUST also declare a container minimum, because `ApplicationV2#_updatePosition` clamps only to a computed `min-width` that defaults to zero and a `minmax(0, 1fr)` centre column can otherwise collapse.
 The shipped manager grid is `220px minmax(0, 1fr) 300px` with fixed outer tracks; giving those tracks a `minmax(0, …)` upper bound is a proposed change recorded in the migrations, not a description of what ships.
 
-A focusable element that is not a form control, contentEditable, or a button with a form MUST carry `data-keyboard-focus="true"` when it handles arrow, Page, or Home and End keys, or the keypress ALSO reaches Foundry's bindings and pans or zooms the canvas.
+A focusable element that is not a form control, contentEditable, or a button with a form MUST carry `data-keyboard-focus="true"`, or the keypress ALSO reaches Foundry's bindings and pans or zooms the canvas.
+The condition is HOLDING FOCUS, not handling keys: an element that handles nothing still takes every keystroke the GM aims at it and hands it to the canvas, so `tabindex="-1"` on a non-form element is itself the trigger, since that attribute exists only to make the element a focus target.
+The carve-out for a button is FORM-SCOPED and stays that way: `hasFocus` answers `!!focused.form`, so a button outside a form is exactly as unrecognised as a bare div, and a roving-tabindex tab strip — which handles the arrows and calls `preventDefault()` without `stopPropagation()` — runs its own handler AND pans the canvas.
 The attribute is an OPT-IN that declares the element focused: `data-keyboard-focus="false"` does the opposite and hands the keypress to the canvas, so the value matters as much as the attribute.
 A listbox MUST keep DOM focus on ONE element and drive selection with `aria-activedescendant`; roving focus onto option buttons re-arms those bindings and is forbidden.
 Where the list has a search field, that field holds focus.
@@ -176,11 +178,12 @@ Foundry owns the picker dialog, the path is an implementation detail, and a long
 A native `select` renders its option popup through the operating system, which reaches it only through the control’s own computed background and `color-scheme`, and differs by browser and platform even then.
 Whenever the options need a selected tick, a group heading, a per-option description, a badge, or a reason for being unavailable, the control MUST render its own option list using the floating-surface geometry instead of a native popup.
 
-#### Scenario: A primitive handles arrow keys on a non-input element
+#### Scenario: A non-input element can hold focus
 
-- **WHEN** a focusable element that is not a form control handles arrow, Page, or Home and End keys
+- **WHEN** an element that is not a form control, contentEditable, or a button inside a form can receive focus — which `tabindex="-1"` alone establishes, whether or not the element handles a key
 - **THEN** it carries `data-keyboard-focus="true"`
 - **AND** the keypress does not also reach Foundry's canvas bindings
+- **AND** a button outside a form is in scope, because `hasFocus` recognises a button only by its `form`
 
 ### Requirement: Near-neighbour primitives are routed by a stated rule
 

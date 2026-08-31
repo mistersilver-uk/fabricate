@@ -50,8 +50,18 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(HERE, '..');
 const UI_ROOT = path.join(REPO_ROOT, 'src', 'ui', 'svelte');
 
-/** Foundry's `hasFocus` recognises these by tag name, so they need no declaration. */
-const SELF_DECLARING_TAGS = new Set(['input', 'select', 'textarea', 'button']);
+/**
+ * Foundry's `hasFocus` recognises these by TAG NAME alone, so they need no declaration.
+ *
+ * `button` is deliberately NOT here. `hasFocus` returns `!!focused.form` for a BUTTON, so a button
+ * with no ancestor `<form>` is exactly as unrecognised as a bare div — and this app renders almost
+ * none, so every roving-tabindex tab strip in the corpus was silently exempt under a blanket
+ * `button` entry. Those are the WORSE case: they handle the arrows themselves, with
+ * `preventDefault()` and no `stopPropagation()`, so the keypress ran the tab strip AND panned the
+ * canvas. `openspec/specs/design-system/spec.md` says "a button with a form" for this reason; the
+ * walk below carries an `inForm` flag so the carve-out matches the spec rather than widening it.
+ */
+const SELF_DECLARING_TAGS = new Set(['input', 'select', 'textarea']);
 
 function svelteFiles(dir, found = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -74,17 +84,21 @@ function svelteFiles(dir, found = []) {
  * @param {(element: object) => void} visit
  * @param {Set<object>} [seen]
  */
-function walkElements(node, visit, seen = new Set()) {
+function walkElements(node, visit, inForm = false, seen = new Set()) {
   if (!node || typeof node !== 'object' || seen.has(node)) return;
   seen.add(node);
   if (Array.isArray(node)) {
-    for (const child of node) walkElements(child, visit, seen);
+    for (const child of node) walkElements(child, visit, inForm, seen);
     return;
   }
-  if (node.type === 'RegularElement') visit(node);
+  let descendantsAreInForm = inForm;
+  if (node.type === 'RegularElement') {
+    visit(node, inForm);
+    if (node.name.toLowerCase() === 'form') descendantsAreInForm = true;
+  }
   for (const key of Object.keys(node)) {
     if (key === 'parent') continue;
-    walkElements(node[key], visit, seen);
+    walkElements(node[key], visit, descendantsAreInForm, seen);
   }
 }
 
@@ -98,8 +112,10 @@ function focusTargets() {
   for (const file of svelteFiles(UI_ROOT)) {
     const source = fs.readFileSync(file, 'utf8');
     const ast = parse(source, { modern: true });
-    walkElements(ast.fragment, (element) => {
-      if (SELF_DECLARING_TAGS.has(element.name.toLowerCase())) return;
+    walkElements(ast.fragment, (element, inForm) => {
+      const tag = element.name.toLowerCase();
+      if (SELF_DECLARING_TAGS.has(tag)) return;
+      if (tag === 'button' && inForm) return;
       const attributes = element.attributes || [];
       const named = (name) =>
         attributes.find((attribute) => attribute.type === 'Attribute' && attribute.name === name);
@@ -121,7 +137,7 @@ describe('design system: a programmatic focus target declares itself focused to 
   it('finds programmatic focus targets, so the assertions below are not vacuous', () => {
     const targets = focusTargets();
     assert.ok(
-      targets.length >= 10,
+      targets.length >= 24,
       `the walk reached ${targets.length} focus targets. A walk that reaches an empty or ` +
         'truncated set passes every assertion below while proving nothing.'
     );

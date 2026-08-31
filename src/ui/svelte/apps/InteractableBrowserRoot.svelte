@@ -249,6 +249,7 @@
         aria-selected={activeTab === 'tools'}
         aria-controls="fab-ib-panel-tools"
         tabindex={activeTab === 'tools' ? 0 : -1}
+        data-keyboard-focus="true"
         bind:this={toolsTabEl}
         onclick={() => (activeTab = 'tools')}
         onkeydown={onTabKeydown}
@@ -264,6 +265,7 @@
         aria-selected={activeTab === 'tasks'}
         aria-controls="fab-ib-panel-tasks"
         tabindex={activeTab === 'tasks' ? 0 : -1}
+        data-keyboard-focus="true"
         bind:this={tasksTabEl}
         onclick={() => (activeTab = 'tasks')}
         onkeydown={onTabKeydown}

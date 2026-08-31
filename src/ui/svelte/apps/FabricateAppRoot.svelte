@@ -492,6 +492,7 @@
         aria-label={tab.accessibleName}
         aria-describedby={tab.tooltip ? `player-nav-tooltip-${tab.routeKey}` : undefined}
         tabindex={tab.routeKey === focusableTab?.routeKey ? 0 : -1}
+        data-keyboard-focus="true"
         onclick={() => onSelectTab?.(tab.routeKey)}
         onkeydown={(event) => onNavKeydown(event, index)}
       >

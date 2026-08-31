@@ -138,6 +138,7 @@
       aria-selected={activeTab === tab.id}
       aria-controls={`${idStem}-panel-${tab.id}`}
       tabindex={activeTab === tab.id ? 0 : -1}
+      data-keyboard-focus="true"
       {...buttonAttributes(tab)}
       onclick={() => onSelect(tab.id)}
       onkeydown={(event) => onKeydown(event, index)}
