@@ -147,14 +147,17 @@ describe('the shells declare the pinned prop sets', () => {
     // sets are nearly identical is the point: one composition, configured per scope.
     const catalogue = new Set(CATALOGUE_PROPS);
     const rules = new Set(RULES_PROPS);
-    assert.deepEqual(
-      [...rules].filter((name) => !catalogue.has(name)).sort(),
-      ['armedToken', 'onOpenEditor', 'onOpenWorldEntry', 'systemId', 'systemName']
-    );
-    assert.deepEqual(
-      [...catalogue].filter((name) => !rules.has(name)).sort(),
-      ['inspectorBody', 'onOpenEntry']
-    );
+    assert.deepEqual([...rules].filter((name) => !catalogue.has(name)).sort(), [
+      'armedToken',
+      'onOpenEditor',
+      'onOpenWorldEntry',
+      'systemId',
+      'systemName',
+    ]);
+    assert.deepEqual([...catalogue].filter((name) => !rules.has(name)).sort(), [
+      'inspectorBody',
+      'onOpenEntry',
+    ]);
   });
 });
 
@@ -191,7 +194,12 @@ describe('no chrome is inlined into a shell', () => {
 
   it('and the FRAME renders each of them, so the zero counts above are a measurement', () => {
     const frame = sourceOf(FRAME);
-    for (const element of ['<BulkSelectionToolbar', '<Pagination', '<EmptyState', '<SelectionCheckbox']) {
+    for (const element of [
+      '<BulkSelectionToolbar',
+      '<Pagination',
+      '<EmptyState',
+      '<SelectionCheckbox',
+    ]) {
       assert.ok(
         frame.includes(element),
         `${element} appears nowhere in the frame either, so the shells' zero counts say nothing`
@@ -234,10 +242,7 @@ describe('the spread detector, proved against fixtures before it is applied', ()
   const ALIASED = `import Catalogue from '../scoped/EntityCatalogueShell.svelte';`;
 
   it('DETECTS a spread at a directly-named call site', () => {
-    const found = detectShellSpreads(
-      `${IMPORT}\n<EntityCatalogueShell {...props} />`,
-      SHELLS
-    );
+    const found = detectShellSpreads(`${IMPORT}\n<EntityCatalogueShell {...props} />`, SHELLS);
     assert.equal(found.length, 1);
     assert.equal(found[0].binding, 'EntityCatalogueShell');
   });
@@ -263,10 +268,7 @@ describe('the spread detector, proved against fixtures before it is applied', ()
   });
 
   it('does not confuse a longer tag name for the binding', () => {
-    assert.deepEqual(
-      detectShellSpreads(`${ALIASED}\n<CatalogueRow {...props} />`, SHELLS),
-      []
-    );
+    assert.deepEqual(detectShellSpreads(`${ALIASED}\n<CatalogueRow {...props} />`, SHELLS), []);
   });
 
   it('resolves a binding only for an import of one of the three shells', () => {
@@ -333,7 +335,10 @@ describe('the pagination footer is fed the CLAMPED index', () => {
   });
 
   it('answers null when the component or the attribute is absent', () => {
-    assert.equal(attributeValueOn('<Pagination persistent={true} />', 'Pagination', 'pageIndex'), null);
+    assert.equal(
+      attributeValueOn('<Pagination persistent={true} />', 'Pagination', 'pageIndex'),
+      null
+    );
     assert.equal(attributeValueOn(FIXTURE_CLAMPED, 'Medallion', 'pageIndex'), null);
   });
 
@@ -341,9 +346,77 @@ describe('the pagination footer is fed the CLAMPED index', () => {
     assert.equal(
       attributeValueOn(sourceOf(FRAME), 'Pagination', 'pageIndex'),
       'page.pageIndex',
-      "`Pagination` computes its displayed range from the index its OWNER hands it, so a frame " +
+      '`Pagination` computes its displayed range from the index its OWNER hands it, so a frame ' +
         'that clamped for slicing and passed its own raw state states a range the list does not ' +
         'show for the frame before the write-back lands'
+    );
+  });
+});
+
+describe('the host-sheet block is ADDITIVE and edits no existing rule', () => {
+  // ── WHY THIS IS ASSERTED AT ALL ─────────────────────────────────────────────────────────
+  // `ui-integration/spec.md` `### GM World Scoped Entity Routes` requirement 7 closes
+  // `styles/fabricate.css` to the scoped-entity lanes, and voids that closure only for a seam
+  // the enumeration does not name — with the reopening change's own unchanged-render evidence.
+  // The frames are that evidence for what a GM sees; this is the mechanical half, and it is the
+  // one a reviewer can check from the diff alone.
+  const CSS_PATH = 'styles/fabricate.css';
+  const STEM = 'manager-scoped-list';
+
+  /** Every rule in the sheet, as `{ selector, index }`, comments stripped. */
+  function rulesOf(css) {
+    const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    return [...stripped.matchAll(/([^{}]+)\{[^{}]*\}/g)].map((match) => ({
+      selector: match[1].replace(/\s+/g, ' ').trim(),
+      index: match.index,
+    }));
+  }
+
+  it('finds the scoped-list rules at all, so the clauses below are not vacuous', () => {
+    const rules = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
+    assert.ok(rules.length > 500, `the rule parse found only ${rules.length} rules`);
+    assert.ok(
+      rules.filter((rule) => rule.selector.includes(STEM)).length >= 8,
+      'the new block was not found, so "it edits no existing rule" is a sentence about nothing'
+    );
+  });
+
+  it('never APPENDS a scoped-list class to a rule that also serves another surface', () => {
+    // THE MUTATION THIS KILLS: appending `manager-scoped-list-filter-row` to the shipped
+    // `.is-selection` group instead of authoring a new rule. That is four fewer declarations
+    // and it changes what three shipped studios render, which is exactly the reopening
+    // requirement 7 forbids.
+    //
+    // The test is about the COMMA-SEPARATED LIST, not about descendants. A rule may compose a
+    // shared class under one of these stems — `.manager-scoped-list-identity .manager-system-copy`
+    // is the same idiom the shipped component row already uses — because that adds a rule for
+    // markup this change renders. What it may not do is join a selector list some OTHER surface
+    // is already in, because every declaration in that rule then lands on that surface too.
+    const rules = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
+    const offenders = [];
+    for (const rule of rules) {
+      if (!rule.selector.includes(STEM)) continue;
+      const selectors = rule.selector.split(',').map((selector) => selector.trim());
+      const shared = selectors.filter((selector) => !selector.includes(STEM));
+      if (shared.length > 0) offenders.push(`${rule.selector} :: joins ${shared.join(' / ')}`);
+    }
+    assert.deepEqual(offenders, [], offenders.join(' | '));
+  });
+
+  it('leaves the shipped multi-select row group naming exactly its three studios', () => {
+    const css = readFileSync(resolve(repoRoot, CSS_PATH), 'utf8');
+    const group = rulesOf(css).find(
+      (rule) => rule.selector.includes('.is-selection') && rule.selector.includes('recipe')
+    );
+    assert.ok(Boolean(group), 'the shipped `.is-selection` group is gone, not merely unedited');
+    assert.deepEqual(
+      group.selector.split(',').map((selector) => selector.trim()),
+      [
+        '.fabricate-manager .manager-recipe-filter-row.is-selection',
+        '.fabricate-manager .manager-component-filter-row.is-selection',
+        '.fabricate-manager .manager-essence-filter-row.is-selection',
+      ],
+      'a fourth name here changes what the Recipe, Component and Essence Studios render'
     );
   });
 });
