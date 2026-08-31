@@ -34,6 +34,7 @@ import {
   mintEssenceId,
   worldAddressableEffectSources,
 } from '../src/ui/svelte/apps/manager/scoped/essenceScoped.js';
+import { WORLD_IDENTITY_FIELDS } from '../src/migration/worldScopeEntityGrouping.js';
 import { membershipKey } from '../src/systems/scopedDefinitions.js';
 import { createWorldScopeActions } from '../src/ui/svelte/stores/worldScopeActions.js';
 import { projectWorldScopeEntity } from '../src/ui/svelte/stores/worldScopeProjection.js';
@@ -143,6 +144,18 @@ function staticAttributesAt(componentName) {
 // bound is what keeps the reopening honest: the leaf is `scoped/essenceScoped.js`, which imports
 // nothing itself, the import is NAMED rather than a namespace, and the handler composes two things
 // this file already owns.
+//
+// SEAM 3 (issue 1372, maintainer parity round 4) is the entry editor's EXPLICIT SAVE. The screen
+// buffers its edit now, and the two things that act on a buffered edit are renderable only here:
+// the header's `← Back` / `Save essence` pair, because `.manager-header` is a sibling of
+// `.manager-main` and no page can render into it, and the unsaved-changes prompt, because leaving
+// by the rail or the breadcrumb never reaches the page at all.
+//
+// ITS BOUND IS THE SAME SHAPE AS SEAM 2's. The render is ONE shared component in the header-actions
+// chain rather than a hand-rolled pair, so the world tool entry takes it verbatim; the flush and
+// the guard delegate to `scoped/scopedEntryDraft.js`, which imports nothing itself; and the prompt
+// is the SHIPPED three-way essence one rather than a new dialog — a second prompt saying the same
+// thing in different words is how two screens end up disagreeing about one verb.
 
 describe('requirement 7 correction — the reopened gateway grew a seam, not a dependency', () => {
   /** Every module specifier the gateway imports, in source order. */
@@ -254,6 +267,110 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
       rootSource,
       /onOpenWorldDefinition=\{\(id\) => openWorldScopedEntry\('world-essence-entry', id\)\}/,
       'the seam routes to the world essence entry through the shared route-exit gate'
+    );
+  });
+
+  it('SEAM 3 renders the action pair through ONE shared component, not a hand-rolled pair', () => {
+    // The RENDER bound: one element, in the branch that already existed, and it is the component
+    // the world tool entry takes next rather than two buttons this file spells out. A second copy
+    // of the pair is exactly the recipe drift `design-system/spec.md` orders "back before save"
+    // to prevent.
+    assert.equal(
+      [...rootSource.matchAll(/<ScopedEntryHeaderActions\b/g)].length,
+      1,
+      'the header carries exactly one scoped-entry action pair'
+    );
+    const attributes = staticAttributesAt('ScopedEntryHeaderActions');
+    assert.deepEqual(
+      attributes,
+      [
+        'backAttribute',
+        'saveAttribute',
+        'backLabel',
+        'saveLabel',
+        'saveDisabled',
+        'saving',
+        'onBack',
+        'onSave',
+      ],
+      'the pair is configured by props alone; a per-screen tweak here would be a second pair'
+    );
+    // The two hooks the capture registry and the mounted suites name are still rendered, and are
+    // rendered BY THIS FILE — the component takes them as props precisely so it cannot rename a
+    // selector out from under a site.
+    assert.match(rootSource, /backAttribute="data-world-essence-back"/);
+    assert.match(rootSource, /saveAttribute="data-world-essence-save"/);
+  });
+
+  it('SEAM 3 puts the editor in the route-exit chain, so the rail and the breadcrumb prompt too', () => {
+    // THE HALF A MOUNT CANNOT REACH. `setView` is the shell's, and the rail, the breadcrumb and
+    // the header's own Back all pass through it — so an editor whose guard is wired only to its
+    // own Back button loses an unsaved edit on the other two ways out, silently, and every
+    // mounted assertion about the page stays green.
+    assert.match(
+      rootSource,
+      /function confirmWorldEssenceEntryRouteExit\(/,
+      'the shell declares no world-entry route-exit guard'
+    );
+    assert.match(
+      rootSource,
+      /const worldEntryConfirmed = confirmWorldEssenceEntryRouteExit\(nextView, nextRouteId\);/,
+      'the guard is declared but never reached from `confirmRouteExitGuards`, which is the ' +
+        'cascade every navigation in this shell passes through'
+    );
+    // …and it delegates rather than restating the shape: the three-way answer, the save-gated
+    // navigation and the synchronous clean path are all `scopedEntryDraft.js`'s.
+    assert.match(
+      rootSource,
+      /return confirmScopedEntryExit\(\{/,
+      'the guard hand-rolls the three-way prompt shape instead of taking the shared one'
+    );
+    assert.match(
+      rootSource,
+      /confirm: \(\) => store\?\.confirmDiscardDirtyEssenceDraft\?\.\(\),/,
+      'the prompt is the shipped essence one, not a second dialog saying the same thing'
+    );
+  });
+
+  it('SEAM 3 gates navigation on the SAVE landing, and disables the button when nothing is dirty', () => {
+    // Both halves are one-line reads and both are the difference between a Save control and a
+    // decoration: a guard that ignored the result navigates away from work nothing persisted, and
+    // a button that is never disabled says nothing about whether the last edit landed.
+    assert.match(
+      rootSource,
+      /return \(await worldEssenceEntryHandle\.save\(\)\) !== false;/,
+      'the shell discards what the flush answered, so a refused write still navigates'
+    );
+    assert.match(
+      rootSource,
+      /saveDisabled=\{!worldEssenceEntryDirty\}/,
+      'the Save button is never disabled, so it cannot say whether there is anything to save'
+    );
+  });
+});
+
+// ── (1d) THE ENTRY EDITOR'S BUFFERED IDENTITY FIELD LIST IS A MIRROR ──────────────────────────
+
+describe('the entry editor buffers exactly the identity fields an essence lifts to world scope', () => {
+  it('declares the SAME list as `WORLD_IDENTITY_FIELDS.essences`, in the same order', () => {
+    // `WorldEssenceEntryPage` states the list rather than importing it, because its dependency
+    // graph is copied module by module into three hand-rolled mounted trees and an omission there
+    // HANGS a suite rather than failing it. A stated list is a MIRROR, and a mirror rots silently:
+    // a field added to the world identity set and not to this one is simply never editable, on the
+    // one screen that exists to edit it, with every other test green.
+    const entrySource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte'),
+      'utf8'
+    );
+    const declaration = /const IDENTITY_FIELDS = Object\.freeze\(\[([^\]]*)\]\)/.exec(entrySource);
+    assert.ok(declaration, 'the entry editor declares no frozen IDENTITY_FIELDS list');
+    const declared = [...declaration[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+    assert.ok(declared.length > 0, 'the declaration parsed to an empty list, so the equality below is vacuous');
+    assert.deepEqual(
+      declared,
+      [...WORLD_IDENTITY_FIELDS.essences],
+      'the entry editor buffers a different set of identity fields from the one an essence ' +
+        'actually lifts to world scope, so at least one of them is uneditable or unsaveable'
     );
   });
 });

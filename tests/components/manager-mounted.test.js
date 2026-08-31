@@ -272,24 +272,18 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/scoped/${scopedPage}.svelte`);
   }
-  // The entry routes' breadcrumb seam (issue 1362) — a plain module, copied raw rather than
-  // compiled, the same way `crafting/craftingNav.js` is. The ROOT imports it statically for the
-  // three-crumb entry trail, and this suite hand-rolls its temp tree with no dependency
-  // validator for `.js`, so omitting it does not fail one test: it HANGS the whole file behind
-  // one ERR_MODULE_NOT_FOUND and `node --test` reports every blocked test as `# cancelled`.
-  {
-    const moduleDestination = join(
-      tempRoot,
-      'src/ui/svelte/apps/manager/scoped/scopedEntryRoutes.js'
-    );
+  // The two scoped-entry plain modules the ROOT imports statically — the breadcrumb seam
+  // (issue 1362) and the buffered-draft seam (issue 1372) — copied raw rather than compiled, the
+  // same way `crafting/craftingNav.js` is. This suite hand-rolls its temp tree with no dependency
+  // validator for `.js`, so omitting one does not fail a test: it HANGS the whole file behind one
+  // ERR_MODULE_NOT_FOUND and `node --test` reports every blocked test as `# cancelled`.
+  for (const rawModule of [
+    'src/ui/svelte/apps/manager/scoped/scopedEntryRoutes.js',
+    'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
+  ]) {
+    const moduleDestination = join(tempRoot, rawModule);
     mkdirSync(dirname(moduleDestination), { recursive: true });
-    writeFileSync(
-      moduleDestination,
-      readFileSync(
-        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/scopedEntryRoutes.js'),
-        'utf8'
-      )
-    );
+    writeFileSync(moduleDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
   }
   // The shared scoped-entity patterns (issue 1362): the Tool Studio's preview and both
   // validation tabs are converted onto them, so both are in this root's static graph.
@@ -305,6 +299,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/MembershipActions.svelte');
+  // The world scoped-entry editor's header action pair (issue 1372). The ROOT renders it, so it
+  // is in this root's static graph and an omission HANGS every test in this file.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedEntryHeaderActions.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte');

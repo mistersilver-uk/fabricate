@@ -150,6 +150,8 @@
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
   import { mintEssenceId } from './scoped/essenceScoped.js';
+  import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
+  import { confirmScopedEntryExit } from './scoped/scopedEntryDraft.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -2919,6 +2921,85 @@
       : ''
   );
 
+  /**
+   * THE WORLD ESSENCE ENTRY EDITOR'S BUFFERED EDIT, HELD WHERE ITS TWO CONSUMERS ARE
+   * (issue 1372, maintainer parity round 4).
+   *
+   * That editor persisted every keystroke on change and so carried no Save at all. It buffers now
+   * — the mechanism is `scoped/scopedEntryDraft.js`, shared with the tool entry editor — and the
+   * two things that act on a buffered edit are both HERE and cannot be anywhere else: the header
+   * action pair, because `.manager-header` is a sibling of `.manager-main`, and the route-exit
+   * cascade, because leaving via the rail or the breadcrumb never touches the page at all.
+   *
+   * `handle` is a LIVE accessor the page reports once on mount, not a snapshot: the guard reads
+   * it at the moment of a click, and a snapshot published by an effect can be one turn behind the
+   * click that reads it. `worldEssenceEntryDirty` is the reactive mirror the button is disabled
+   * from, reported separately for the opposite reason — a disabled attribute has to re-render.
+   *
+   * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
+   */
+  let worldEssenceEntryHandle = null;
+  let worldEssenceEntryDirty = $state(false);
+  let worldEssenceEntrySaving = $state(false);
+
+  function handleWorldEssenceEntryDraft(handle) {
+    worldEssenceEntryHandle = handle ?? null;
+    if (!handle) worldEssenceEntryDirty = false;
+  }
+
+  function handleWorldEssenceEntryDirty(dirty) {
+    worldEssenceEntryDirty = dirty === true;
+  }
+
+  /**
+   * Flush the world essence entry editor's buffered edit.
+   *
+   * Answers whether it landed, because the route-exit guard gates navigation on it: a Save that a
+   * write refused must leave the GM on the editor with the edit still in front of them rather
+   * than navigating away from work nothing persisted. Same contract as `saveEssenceEdit` and
+   * `saveSystemDetails` in the guards above.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function saveWorldEssenceEntry() {
+    if (!worldEssenceEntryHandle) return false;
+    worldEssenceEntrySaving = true;
+    try {
+      return (await worldEssenceEntryHandle.save()) !== false;
+    } finally {
+      worldEssenceEntrySaving = false;
+    }
+  }
+
+  /**
+   * The world essence entry editor's route-exit prompt.
+   *
+   * Re-entering the SAME essence is not leaving it, so it never prompts — the same subject
+   * comparison `confirmEssenceRouteExit` and `confirmToolsRouteExit` make, and for the same
+   * reason: `world-essence-entry` is one of the routes whose view token does not change when its
+   * subject does, which is exactly what `nextRouteId` exists for.
+   *
+   * The prompt itself is the shipped three-way essence one. It is not a new dialog: the sentence
+   * is about an essence with unsaved changes, which is what this is, and a second prompt saying
+   * the same thing in different words is how two screens end up disagreeing about one verb.
+   *
+   * @param {string} nextView
+   * @param {string} nextRouteId
+   * @returns {boolean|Promise<boolean>}
+   */
+  function confirmWorldEssenceEntryRouteExit(nextView, nextRouteId = '') {
+    if (activeView !== 'world-essence-entry') return true;
+    if (nextView === 'world-essence-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
+      return true;
+    }
+    return confirmScopedEntryExit({
+      dirty: worldEssenceEntryHandle?.isDirty() === true,
+      confirm: () => store?.confirmDiscardDirtyEssenceDraft?.(),
+      save: () => saveWorldEssenceEntry(),
+      discard: () => worldEssenceEntryHandle?.discard?.(),
+    });
+  }
+
   // Open an entry route ON a world entity. Routed through the same confirm-discard gate every
   // other navigation passes, and the subject is recorded only once that gate has allowed the
   // move — a refused exit must not leave the shell naming a record it did not navigate to.
@@ -5156,6 +5237,21 @@
   // companion's navigation guard is being asked about. Every other caller keeps its
   // one-argument shape.
   function confirmRouteExitGuards(nextView, nextRouteId = '') {
+    // THE WORLD SCOPED-ENTRY EDITOR IS ASKED FIRST, and the order is immaterial rather than
+    // arbitrary: every guard below is gated on an `activeView` that a world route cannot also
+    // be, so on `world-essence-entry` the whole rest of this cascade is already a synchronous
+    // `true`. Asking first therefore reorders nothing and keeps the new link to one function.
+    const worldEntryConfirmed = confirmWorldEssenceEntryRouteExit(nextView, nextRouteId);
+    if (isPromise(worldEntryConfirmed)) {
+      return worldEntryConfirmed.then((value) =>
+        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
+      );
+    }
+    if (worldEntryConfirmed === false) return false;
+    return continueRouteExitAfterWorldEntry(nextView, nextRouteId);
+  }
+
+  function continueRouteExitAfterWorldEntry(nextView, nextRouteId = '') {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
       return environmentConfirmed.then((value) => {
@@ -9281,9 +9377,14 @@
         heads that screen with `← Back` and a save action beside the essence's own name
         (`essEntry.png`), and the shipped screen had NO way out of it but the breadcrumb: the page
         renders a Back only in its entity-not-found empty state, so the one state a GM actually
-        reaches it in offered none. `Save` is deliberately not added — `patchIdentity` writes on
-        every change, so the screen has no dirty state a Save could commit and a button that
-        committed nothing would be worse than the absence.
+        reaches it in offered none.
+
+        `Save` JOINS IT (issue 1372, maintainer parity round 4), and the earlier note here — that
+        a Save could commit nothing because `patchIdentity` wrote on every change — has been
+        answered by changing the screen rather than the header: the editor buffers its edit now,
+        so there IS a dirty state, and `design-system/spec.md`'s EDITOR recipe orders "the action
+        pair with back before save" for every screen of that archetype. Both halves render through
+        `ScopedEntryHeaderActions`, which the world tool entry takes next.
 
         So each route is admitted BY NAME and lands on its OWN branch below — neither reaches the
         fallthrough — and the other five world scoped routes stay excluded exactly as before.
@@ -9291,17 +9392,38 @@
       {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-essence-entry'}
-            <ManagerButton data-world-essence-back onclick={() => setView('world-essences')}>
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <!-- A SEPARATE KEY from the page's own `BackToCatalogue`, which reads "Back to the
-                   catalogue". That phrase belongs to the entity-not-found empty state, where it is
-                   the only thing on screen and has to say where it goes; in the header band it
-                   sits beside a breadcrumb that already names the destination, and the prototype
-                   writes it as one word (`essEntry.png`). -->
-              <span
-                >{text('FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogueShort', 'Back')}</span
-              >
-            </ManagerButton>
+            <!--
+              THE EDITOR ACTION PAIR, THROUGH THE SHARED COMPONENT (issue 1372, parity round 4).
+
+              `design-system/spec.md`'s EDITOR recipe orders "the action pair with back before
+              save", and the prototype draws exactly that on this screen (`essEntry.png`). The
+              world tool entry takes the same pair next, so it is one component rather than two
+              copies — two screens of one archetype rendering their action pair from two places
+              is the recipe drift that sentence exists to prevent.
+
+              THE BACK LABEL IS A SEPARATE KEY from the page's own `BackToCatalogue`, which reads
+              "Back to the catalogue". That phrase belongs to the entity-not-found empty state,
+              where it is the only thing on screen and has to say where it goes; in the header
+              band it sits beside a breadcrumb that already names the destination, and the
+              prototype writes it as one word.
+
+              BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit
+              gate as the rail and the breadcrumb — so an unsaved edit prompts whichever of the
+              three ways out a GM takes.
+            -->
+            <ScopedEntryHeaderActions
+              backAttribute="data-world-essence-back"
+              saveAttribute="data-world-essence-save"
+              backLabel={text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogueShort',
+                'Back'
+              )}
+              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.Save', 'Save essence')}
+              saveDisabled={!worldEssenceEntryDirty}
+              saving={worldEssenceEntrySaving}
+              onBack={() => setView('world-essences')}
+              onSave={saveWorldEssenceEntry}
+            />
           {:else if currentView === 'world-essences'}
             <!--
               CREATE TAKES NO NAME FIELD. `mintEssenceId` slugs an id from the name and RESOLVES a
@@ -10891,6 +11013,8 @@
         {...essenceScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-essences')}
+        onDraftChange={handleWorldEssenceEntryDraft}
+        onDirtyChange={handleWorldEssenceEntryDirty}
       />
     {:else if currentView === 'world-tools'}
       <WorldToolCataloguePage

@@ -21,7 +21,7 @@
  * against a hand-written projection that could disagree with the shipped one.
  */
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
@@ -77,6 +77,51 @@ const pageHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
+});
+
+/**
+ * The ENTRY editor's own harness (issue 1372, maintainer parity round 4).
+ *
+ * Separate from the two above because it mounts a different component with a different graph —
+ * the identity controls, the drop zones and the player preview — and because the question it
+ * answers is one only a mount can: that an edit accumulates LOCALLY and reaches the world-scope
+ * write family on Save and not before.
+ */
+const entryHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-world-essence-entry-',
+  rawModules: [
+    ...SCOPED_RAW_MODULES,
+    'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
+    'src/ui/svelte/apps/manager/essences/essenceStudio.js',
+    'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/svelte/util/essenceTint.js',
+    'src/ui/svelte/util/dropUtils.js',
+    'src/ui/svelte/util/essencePreviewRow.js',
+    'src/ui/svelte/util/foundryIconVocabulary.js',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/managerColorTokens.js',
+    'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/utils/essenceValidation.js',
+  ],
+  compiledModules: [
+    ...SHELL_MODULES,
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
+    'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
+    'src/ui/svelte/components/IconPicker.svelte',
+    'src/ui/svelte/components/ManagerColorPopover.svelte',
+    'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
+    'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
+  ],
+  componentPath: 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
 });
 
 const shellHarness = createMountedComponentHarness({
@@ -156,11 +201,13 @@ function pageProps(extra = {}) {
 before(async () => {
   await pageHarness.setup();
   await shellHarness.setup();
+  await entryHarness.setup();
 });
 
 after(() => {
   pageHarness.teardown();
   shellHarness.teardown();
+  entryHarness.teardown();
 });
 
 describe('criterion 4 — the essence catalogue renders NO source-item affordance', () => {
@@ -304,5 +351,153 @@ describe('the catalogue owns no create affordance; the page header does', () => 
       'the page rendered its list, so the absences above are measured against a real screen'
     );
     pageHarness.remount();
+  });
+});
+
+// ── THE ENTRY EDITOR BUFFERS ITS EDIT (issue 1372, maintainer parity round 4) ────────────────
+//
+// The prototype heads this screen with `Save essence` (`essEntry.png`) and this shipped with no
+// save action at all, because `patchIdentity` wrote through on change. The screen buffers now, so
+// three things are true that a source read cannot answer and a spy would answer dishonestly:
+//
+//  - an edit reaches NOTHING until Save. Asserted as "the write family was not called", against a
+//    recording family, which is the only place a spy is the subject rather than a substitute;
+//  - the edit RENDERS. An editor that buffers an edit it does not show is worse than one that
+//    writes through, and the control the GM acted on is the wrong place to read that: an `<input>`
+//    holds whatever was typed into it whether or not the draft took it. So the proof is a DERIVED
+//    readout — the world-default card's own `set`/`unset` state, computed from the draft;
+//  - Save flushes exactly the difference, and discard puts the screen back.
+
+describe('the world essence entry editor buffers its edit until Save', () => {
+  /** A recording world-scope essence action family. */
+  function recordingActions() {
+    const calls = [];
+    return {
+      calls,
+      updateEntity: (...args) => {
+        calls.push(['updateEntity', ...args]);
+        return true;
+      },
+      updateWorldDefaultSection: (...args) => {
+        calls.push(['updateWorldDefaultSection', ...args]);
+        return true;
+      },
+    };
+  }
+
+  /**
+   * Mount the entry editor on `ash`, which carries a world `effectSource` in `essenceScope()`.
+   *
+   * The handle and the reported dirty flag are captured exactly as the manager shell captures
+   * them, so what the assertions read is what the header button and the route-exit guard read.
+   */
+  async function mountEntry() {
+    const actions = recordingActions();
+    const reported = { handle: null, dirty: [] };
+    const root = await entryHarness.mount({
+      scope: essenceScope(),
+      actions,
+      entityId: 'ash',
+      onBackToCatalogue: () => {},
+      onDraftChange: (handle) => (reported.handle = handle),
+      onDirtyChange: (dirty) => reported.dirty.push(dirty),
+    });
+    assert.ok(
+      Boolean(root.querySelector('[data-scoped-entry="world-essence-entry"]')),
+      'the editor did not render its panel, so nothing below is measuring the screen'
+    );
+    assert.ok(reported.handle, 'the editor reported no draft handle, so the shell has no Save');
+    return { root, actions, reported };
+  }
+
+  const defaultState = (root, section) =>
+    root
+      .querySelector(`[data-scoped-world-default="${section}"]`)
+      ?.getAttribute('data-scoped-world-default-state');
+
+  afterEach(() => entryHarness.remount());
+
+  it('CLEARING a world default writes nothing, and the card still reports the change', async () => {
+    const { root, actions, reported } = await mountEntry();
+    assert.equal(defaultState(root, 'effectSource'), 'set', 'the fixture opened with no default');
+    assert.equal(reported.handle.isDirty(), false, 'a screen nobody has touched is not dirty');
+
+    root.querySelector('[data-scoped-world-default-clear]').click();
+    await entryHarness.setProps({});
+
+    assert.deepEqual(
+      actions.calls,
+      [],
+      'the edit reached the world-scope write family before anything asked it to'
+    );
+    assert.equal(
+      defaultState(root, 'effectSource'),
+      'unset',
+      'the card still reads `set`, so the staged edit reached nothing that renders: an editor ' +
+        'that buffers an edit it does not show is worse than one that writes through'
+    );
+    assert.equal(reported.handle.isDirty(), true);
+    assert.equal(reported.dirty.at(-1), true, 'the header button was never told to enable');
+  });
+
+  it('SAVE flushes exactly the difference, and nothing else on the record', async () => {
+    const { root, actions, reported } = await mountEntry();
+    root.querySelector('[data-scoped-world-default-clear]').click();
+    await entryHarness.setProps({});
+
+    assert.equal(await reported.handle.save(), true);
+    assert.deepEqual(actions.calls, [
+      ['updateWorldDefaultSection', 'ash', 'effectSource', null],
+    ]);
+    assert.equal(
+      reported.handle.isDirty(),
+      false,
+      'the flag is still set after a Save that landed, so the guard would offer to write it again'
+    );
+  });
+
+  it('DISCARD puts the screen back to the record on disk, and writes nothing', async () => {
+    const { root, actions, reported } = await mountEntry();
+    root.querySelector('[data-scoped-world-default-clear]').click();
+    await entryHarness.setProps({});
+    assert.equal(defaultState(root, 'effectSource'), 'unset', 'the edit never landed in the draft');
+
+    reported.handle.discard();
+    await entryHarness.setProps({});
+
+    assert.equal(defaultState(root, 'effectSource'), 'set', 'discard left the abandoned edit up');
+    assert.equal(reported.handle.isDirty(), false);
+    assert.deepEqual(actions.calls, [], 'discarding an edit is not a write');
+  });
+
+  it('TYPING a name is buffered too, and the input reverts on discard', async () => {
+    const { root, actions, reported } = await mountEntry();
+    const name = root.querySelector('[data-scoped-entry-name]');
+    assert.equal(name.value, 'Ash');
+
+    name.value = 'Aether';
+    name.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await entryHarness.setProps({});
+    assert.deepEqual(actions.calls, [], 'a keystroke wrote through to the world record');
+    assert.equal(reported.handle.isDirty(), true);
+
+    reported.handle.discard();
+    await entryHarness.setProps({});
+    // The input is the one control whose value the test set itself, so this is a real read: Svelte
+    // writes the reverted draft value back over it, and a discard that only cleared a flag would
+    // leave `Aether` standing in the field.
+    assert.equal(root.querySelector('[data-scoped-entry-name]').value, 'Ash');
+    assert.equal(reported.handle.isDirty(), false);
+  });
+
+  it('WITHDRAWS the handle when the editor unmounts, so a stale one cannot answer for it', async () => {
+    const { reported } = await mountEntry();
+    entryHarness.remount();
+    assert.equal(
+      reported.handle,
+      null,
+      'the shell is still holding a handle on an unmounted editor, which would answer the ' +
+        'route-exit guard about a screen nobody is looking at'
+    );
   });
 });
