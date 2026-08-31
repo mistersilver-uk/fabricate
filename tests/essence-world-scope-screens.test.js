@@ -125,10 +125,24 @@ function staticAttributesAt(componentName) {
 // and no bundle spread, so — unlike every scoped page — a prop declared on it would take its
 // default forever and no lane outside this file could reach it.
 //
-// These are the two evidence halves. The first is the IMPORT-SURFACE assertion: the correction
-// grew a seam, not a dependency, because it is wired from a shell function the file already owns
-// and already calls at three other sites. The second bounds the render change to one attribute on
-// one existing child, so "supplied a seam" and "built a screen here" are told apart mechanically.
+// THERE ARE NOW TWO SEAMS, and each carries its own bounded evidence.
+//
+// SEAM 1 is the inspector's deep link. Its evidence is the pair below: the render change is one
+// attribute on one child that was already rendered here, and the callback delegates to a shell
+// function this file already owns and already calls at three other sites.
+//
+// SEAM 2 (issue 1372) is the page header's `+ New essence` action. The prototype puts one button
+// in the header band, right-aligned on the title line (`essences.png`), where the screen shipped a
+// full-width name-field band above the list — and the header band is rendered HERE, by the
+// `.manager-header-actions` chain, so no page can reach it.
+//
+// SEAM 2 GROWS THE IMPORT SURFACE BY EXACTLY ONE SPECIFIER, and that is why the assertion below
+// is a bound rather than an equality with the shipped nine. `mintEssenceId` slugs a new record's
+// id and resolves a collision by suffix; the alternative to importing it was a second copy of that
+// logic in the gateway, which is the failure the one-implementation rule exists to prevent. The
+// bound is what keeps the reopening honest: the leaf is `scoped/essenceScoped.js`, which imports
+// nothing itself, the import is NAMED rather than a namespace, and the handler composes two things
+// this file already owns.
 
 describe('requirement 7 correction — the reopened gateway grew a seam, not a dependency', () => {
   /** Every module specifier the gateway imports, in source order. */
@@ -136,7 +150,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     return [...rootSource.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
   }
 
-  it('IMPORT SURFACE: the essence-family dependency set is unchanged by the correction', () => {
+  it('IMPORT SURFACE: the essence-family dependency set grows by exactly one pure leaf', () => {
     const specifiers = gatewayImportSpecifiers();
     // NON-VACUITY first: an empty match set would make the equality below assert nothing.
     assert.ok(specifiers.length > 50, 'the gateway import scan found no imports at all');
@@ -152,8 +166,54 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
         './essences/EssenceBulkEditPanel.svelte',
         './scoped/WorldEssenceCataloguePage.svelte',
         './scoped/WorldEssenceEntryPage.svelte',
+        './scoped/essenceScoped.js',
       ],
-      'a correction that had to import something new would be building here, not carrying a seam'
+      'a correction that had to import a COMPONENT would be building here, not carrying a seam'
+    );
+  });
+
+  it('SEAM 2 imports one NAMED helper from a leaf that imports nothing itself', () => {
+    // A NAMESPACE import would turn this line into a permanent door: every future addition to the
+    // leaf would be reachable from the gateway with no diff here at all. The named form makes the
+    // next thing the gateway wants from that module a visible edit to this file and to this test.
+    assert.match(
+      rootSource,
+      /import \{ mintEssenceId \} from '\.\/scoped\/essenceScoped\.js';/,
+      'the gateway takes exactly `mintEssenceId`, by name'
+    );
+    const leaf = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/essenceScoped.js'),
+      'utf8'
+    );
+    assert.ok(leaf.length > 500, 'the leaf source read produced nothing, so the scan below is empty');
+    assert.deepEqual(
+      [...leaf.matchAll(/^import\s/gm)].map((match) => match[0]),
+      [],
+      'and that leaf still imports nothing, so the gateway inherits no new dependency through it'
+    );
+  });
+
+  it('SEAM 2 renders ONE header control and composes two things the shell already owns', () => {
+    // The RENDER bound: one branch, one button, in the header-actions chain — no new element type,
+    // no new region, no screen.
+    const branches = [...rootSource.matchAll(/data-world-essence-create/g)];
+    assert.equal(branches.length, 1, 'the header carries exactly one create control');
+    assert.match(
+      rootSource,
+      /<ManagerButton role="primary" data-world-essence-create onclick=\{createWorldEssence\}>/,
+      'and it is the shipped button primitive, not hand-rolled markup'
+    );
+    // The HANDLER bound: the write is the store family the pages are already handed, and the
+    // navigation is the same route-exit-gated function the row's pen uses.
+    assert.match(
+      rootSource,
+      /store\?\.worldScope\?\.essence\?\.createEntity\?\./,
+      'the write goes through the essence write family, not a new path'
+    );
+    assert.match(
+      rootSource,
+      /openWorldScopedEntry\('world-essence-entry', id\)/,
+      'and the navigation is the shell function three other sites already call'
     );
   });
 

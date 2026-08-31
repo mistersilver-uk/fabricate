@@ -80,8 +80,10 @@
     // `absent` renders the Add treatment. Collapsing the two would put an Add button on every row
     // of a world whose corpus is unreadable.
     membershipState = '',
-    // `{section, label}[]` — `· world default` / `· overridden here`, per world-default section.
-    inheritSuffixes = [],
+    // `{section, label}[]` — one CLAUSE per world-default section, each naming the value that
+    // section resolves to in this system and marking a local override. See `summaryClauses` in
+    // `EssenceBrowserView.svelte` for the wording and for what it cannot say.
+    summaryClauses = [],
     text = (_key, fallback) => fallback,
     format = (_key, fallback) => fallback,
     onSelect = () => {},
@@ -216,11 +218,14 @@
   </span>
 {/snippet}
 
-<!-- WHERE EACH WORLD-DEFAULT SECTION'S VALUE CAME FROM. A resolved value renders identically
-     whether this system inherited it or authored it, and that difference is the whole subject of
-     the world-scope model - so the suffix is what makes one readout two facts. -->
-{#snippet inheritReadout()}
-  {#if inheritSuffixes.length > 0}
+<!-- WHAT THIS ESSENCE DOES IN THIS SYSTEM, one clause per world-default section.
+
+     Each clause NAMES ITS VALUE and marks a local override in parentheses, which is the
+     prototype's own line (`sysEss.png`): `Effects from Ember Brand (override) · Macro: Radiant
+     Blessing`. The clauses arrive already worded from `EssenceBrowserView.summaryClauses`; this
+     snippet owns only their separator and the one-line clamp. -->
+{#snippet summaryReadout()}
+  {#if summaryClauses.length > 0}
     <!-- A `title` carrying the WHOLE readout, because the row's own width decides how much of
          it is on screen. It clamps to one line and ellipsises, and the labelled `Edit rules`
          control this change adds to the cluster takes about 90px out of the identity block
@@ -230,12 +235,11 @@
     <span
       class="manager-essence-inherit-readout"
       data-essence-inherit-readout={essence.id}
-      title={inheritSuffixes.map((suffix) => `${suffix.sectionLabel} ${suffix.label}`).join(' · ')}
+      title={summaryClauses.map((clause) => clause.label).join(' · ')}
     >
-      {#each inheritSuffixes as suffix (suffix.section)}
-        <span class="manager-essence-inherit-item" data-essence-inherit={suffix.section}>
-          <span class="manager-essence-inherit-section">{suffix.sectionLabel}</span>
-          <span class="manager-essence-inherit-state">{suffix.label}</span>
+      {#each summaryClauses as clause (clause.section)}
+        <span class="manager-essence-inherit-item" data-essence-inherit={clause.section}>
+          {clause.label}
         </span>
       {/each}
     </span>
@@ -439,6 +443,17 @@
     data-essence-bulk-selected={bulkSelected}
     aria-current={selected ? 'true' : undefined}
   >
+    <!-- THE SELECTION BOX LEADS THE ROW, as the prototype draws it — `[☐] [icon] [name] …`
+         (`sysEss.png`). It shipped TRAILING, after the edit control, which put it under the
+         toolbar's own Select all only by accident of row width and read as the last of five
+         trailing controls rather than as the row's membership in a set.
+
+         It stays OUTSIDE the identity `<button>`: `SelectionCheckbox` renders a `<label>` around
+         an `<input>`, and interactive content inside a `<button>` is invalid DOM.
+
+         An ABSENT row still renders none — it is a world essence this system has no record for,
+         so there is nothing for a bulk edit addressed at this system's list to act on. -->
+    {#if !absent}{@render selectionBox()}{/if}
     <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
       {@render medallionTile()}
       <span class="manager-system-copy">
@@ -456,8 +471,8 @@
           list's own edge while every shorter row below it fitted. Moving it into the identity
           block, which does shrink, is both the prototype's layout and the repair.
         -->
-        {#if inheritSuffixes.length > 0}
-          {@render inheritReadout()}
+        {#if summaryClauses.length > 0}
+          {@render summaryReadout()}
         {:else}
           <span
             class="manager-system-description manager-essence-description"
@@ -479,7 +494,6 @@
         <!-- FIRST (and only) `.manager-icon-button` in the row stays the edit control; the
              View Lab, the smoke and two mounted tests navigate by exactly that selector. -->
         {@render editButton(true)}
-        {@render selectionBox()}
       {/if}
     </div>
   </li>
@@ -675,12 +689,10 @@
       justify-content: flex-end;
     }
   }
-  /* Each entry names its section, so two sections in the same state are still two readable
-     facts rather than the same words twice. */
+  /* Each entry is one whole clause naming one section's value, so two sections read as two facts
+     rather than as the same words twice. */
   .manager-essence-inherit-item {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--fab-space-1);
+    display: inline;
   }
 
   .manager-essence-inherit-item + .manager-essence-inherit-item::before {
@@ -688,21 +700,6 @@
     margin-right: var(--fab-space-1);
     margin-left: var(--fab-space-1);
     color: var(--fab-text-subtle);
-  }
-
-  /* `--fab-text-*`, NOT `--fab-mv2-text-subtle` / `--fab-mv2-text-secondary`. The manager alias
-     block declares only bg / surface-1..3 / border / border-strong / text / text-muted / accent
-     / info / warning / danger, so both of those names were UNDEFINED: each declaration was
-     invalid at computed-value time and the colour fell back to inheritance, which is why the
-     section name and the separator rendered in the row's body colour rather than at the two
-     weights this readout is built on. Nothing failed and no test caught it. */
-  .manager-essence-inherit-section {
-    color: var(--fab-text-secondary);
-    font-weight: 600;
-  }
-
-  .manager-essence-inherit-state {
-    color: var(--fab-text-muted);
   }
 
   /* The readout is the row's SUB-LINE now, so it takes the description's size and clamps to one

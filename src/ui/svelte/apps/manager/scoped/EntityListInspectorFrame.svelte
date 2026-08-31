@@ -42,7 +42,8 @@
 
   `Pagination` takes `persistent={true}`. Its default is `false`, which hides the footer below a
   page's worth of rows, and `design-system/spec.md` requires a browse screen never to hide its
-  disabled arrows.
+  disabled arrows. The prototype draws no foot pager at all on its six-row catalogue frame; that
+  difference is kept deliberately, and the pager's own comment in the template records why.
 
   ── THE ROW IS NOT A BUTTON ───────────────────────────────────────────────────────────────────
   It contains `SelectionCheckbox`'s `<input>` and `<label>`, so the click target is the NESTED
@@ -88,6 +89,18 @@
      their navigation without either of them hand-writing a button run.
    - rowMeta(entry, ctx) / inspectorBody(entry, ctx) / bulk(selectedIds, ctx): see the ctx note
      on `rowContext` below.
+   - inspectorKicker: the uppercase eyebrow over the inspector's identity block (`WORLD
+     DEFINITION`, `SELECTED ESSENCE`). Pre-localized, from the lane, because it names the LAYER
+     the panel is showing and only the lane knows which one it is.
+   - inspectorCaption(entry): the one line under the inspected name — the slot the prototype
+     fills with a colour name and its hex. A SNIPPET rather than a string prop, because what
+     belongs there is per-entity and per-scope (a colour for an essence, a source item for a
+     component) and only the lane knows which. The frame renders the colour TOKEN NAME when no
+     lane supplies one.
+   - inspectorFoot(entry): the full-width action pinned to the BOTTOM of the inspector, outside
+     its scroll area, exactly as the pagination bar sits outside the list's.
+   - countUnit: the plural noun the result count is stated in (`essences`). The count itself is
+     this frame's arithmetic; only the word is the lane's.
    - selectedId: the inspected row, and BINDABLE — the same idiom `armedToken` uses two lines
      below, for the same reason. A row click writes it, so the owner and this frame never hold
      different values, and an owner that sets it overrides the click at any time including back
@@ -150,9 +163,28 @@
     filters = [],
     sorts = [],
     searchOf = defaultScopedSearchText,
+    // The list search box's placeholder. The lane supplies it because the prototype names what is
+    // being searched — `Search essences…` — and only the lane knows the noun; the shipped generic
+    // `Search…` stays the fallback so a caller that says nothing renders as before.
+    searchPlaceholder = '',
     rowActions = [],
     rowMeta = undefined,
     inspectorBody = undefined,
+    inspectorKicker = '',
+    inspectorCaption = undefined,
+    inspectorFoot = undefined,
+    countUnit = '',
+    // Whether the toolbar offers the world/system MEMBERSHIP `<select>`. Default ON, so every
+    // other caller renders unchanged. The essence catalogue turns it off: the prototype's toolbar
+    // is `[All] [search] SORT BY [Name] [Asc]  6 of 6 essences` and carries no such control
+    // (`essences.png`), and on a WORLD catalogue the axis it filters — "held by at least one
+    // system" — is already the `n/24 SYSTEMS` stat on every row and the `13 / 24` in the
+    // inspector, so the select spent toolbar width on a question the list already answers.
+    membershipFilter = true,
+    // The VISIBLE caption on the select-all box. The prototype's reads `All` where the shipped
+    // primitive says `Select all`. Only the caption moves: the primitive's `ariaLabel` is
+    // untouched, because `All` is not an accessible name a screen-reader user can act on.
+    selectAllLabel = '',
     bulk = undefined,
     selectedId = $bindable(''),
     onSelect = () => {},
@@ -191,7 +223,16 @@
   let query = $state('');
   let membership = $state('all');
   let filterValues = $state({});
-  let sort = $state('name-asc');
+  // THE SORT IS TWO CONTROLS, NOT ONE `<select>` OF COMPOSITE IDS.
+  //
+  // The prototype's toolbar reads `SORT BY [Name ▾] [⇅ Asc]` (`essences.png`) — a KEY picker and
+  // a DIRECTION toggle — where this frame shipped a single select offering `Name A–Z`,
+  // `Name Z–A` and `Most systems`. The composite list is why the direction was unreachable for
+  // the membership key at all: `systems-asc` did not exist, and nothing said so.
+  //
+  // The model still takes ONE id. The decomposition is presentational and composes back to it.
+  let sortKey = $state('name');
+  let sortDirection = $state('asc');
   let pageIndex = $state(0);
   let pageSize = $state(DEFAULT_PAGE_SIZE);
   let selectedIds = $state(new Set());
@@ -208,6 +249,14 @@
 
   const laneFilters = $derived(Array.isArray(filters) ? filters : []);
   const laneSorts = $derived(Array.isArray(sorts) ? sorts : []);
+
+  // A LANE SORT IS ITS OWN WHOLE ORDER, so it is passed through verbatim and the direction
+  // toggle goes inert against it. A descriptor supplies one `compare`, not a pair, so composing
+  // a direction onto its id would produce an id `project` does not know and fall back silently to
+  // name order — a control that changes nothing while looking as though it did.
+  const laneSortIds = $derived(new Set(laneSorts.map((descriptor) => descriptor?.id)));
+  const directional = $derived(!laneSortIds.has(sortKey));
+  const sort = $derived(directional ? `${sortKey}-${sortDirection}` : sortKey);
 
   const projected = $derived(
     model.project({
@@ -288,8 +337,14 @@
     disarm();
   }
 
-  function changeSort(value) {
-    sort = String(value ?? 'name-asc');
+  function changeSortKey(value) {
+    sortKey = String(value ?? 'name');
+    pageIndex = 0;
+    disarm();
+  }
+
+  function toggleSortDirection() {
+    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     pageIndex = 0;
     disarm();
   }
@@ -311,6 +366,23 @@
     filterValues = {};
     pageIndex = 0;
     disarm();
+  }
+
+  /**
+   * The colour caption's raw token, for the lane's `inspectorCaption` snippet.
+   *
+   * The frame does not RESOLVE it: what a caption says about a colour is scope copy, and the one
+   * resolution this app has — the live `--fab-tag-*` value at the rendering element — belongs
+   * beside the screens that state it. The frame passes the token through and renders the name
+   * alone when no lane supplies a snippet.
+   *
+   * @param {string} token a `colorToken` value, e.g. `lavender`.
+   * @returns {string} `''` when unset, so the caller renders nothing rather than a blank line.
+   */
+  function colourCaption(token) {
+    const name = String(token ?? '').trim();
+    if (name === '') return '';
+    return name.charAt(0).toUpperCase() + name.slice(1);
   }
 
   function inspect(entityId) {
@@ -433,16 +505,34 @@
     out: text('FABRICATE.Admin.Manager.Scoped.List.MembershipOut', 'Not in this system'),
   });
 
-  const sortLabels = $derived({
-    'name-asc': text('FABRICATE.Admin.Manager.Scoped.List.SortNameAsc', 'Name A–Z'),
-    'name-desc': text('FABRICATE.Admin.Manager.Scoped.List.SortNameDesc', 'Name Z–A'),
-    'systems-desc': text('FABRICATE.Admin.Manager.Scoped.List.SortSystemsDesc', 'Most systems'),
+  const sortKeyLabels = $derived({
+    name: text('FABRICATE.Admin.Manager.Scoped.List.SortKeyName', 'Name'),
+    systems: text('FABRICATE.Admin.Manager.Scoped.List.SortKeySystems', 'Systems'),
   });
 
   const sortOptions = $derived([
-    ...Object.keys(sortLabels).map((id) => ({ id, label: sortLabels[id] })),
+    ...Object.keys(sortKeyLabels).map((id) => ({ id, label: sortKeyLabels[id] })),
     ...laneSorts.map((descriptor) => ({ id: descriptor.id, label: descriptor.label })),
   ]);
+
+  const directionLabel = $derived(
+    sortDirection === 'asc'
+      ? text('FABRICATE.Admin.Manager.Scoped.List.SortAsc', 'Asc')
+      : text('FABRICATE.Admin.Manager.Scoped.List.SortDesc', 'Desc')
+  );
+
+  // `{shown} of {total} {unit}` — the prototype's `6 of 6 essences`, right-aligned on the toolbar
+  // row. It states the FILTERED count against the corpus total, which is the pair a GM needs to
+  // tell "this world holds six" from "four are hidden by a filter I forgot".
+  const resultCount = $derived(
+    countUnit
+      ? format('FABRICATE.Admin.Manager.Scoped.List.ResultCount', '{shown} of {total} {unit}', {
+          shown: projected.rows.length,
+          total: entries.length,
+          unit: countUnit,
+        })
+      : ''
+  );
 </script>
 
 <!--
@@ -480,35 +570,70 @@
           data-scoped-list-toolbar
           aria-label={text('FABRICATE.Admin.Manager.Scoped.List.Filters', 'List filters')}
         >
+          <!--
+            ONE ROW, AND THE SELECTION CONTROL IS IN IT.
+
+            The prototype's catalogue toolbar is a single line — `[☐ All] [🔍 Search essences…]
+            SORT BY [Name ▾] [⇅ Asc]  6 of 6 essences` (`essences.png`) — where this frame shipped
+            two bands, the second holding nothing but a select-all box. The band cost about 40px
+            above the first row and read as a mode the GM had entered rather than as a control.
+
+            `BulkSelectionToolbar` renders its own `<div class="{rowClass} is-selection">` and
+            cannot be told not to, so it is NESTED INSIDE the filter row and flattened to
+            `display: contents` by the scoped rule below. Its children — the box, and the count,
+            select-all-results and Clear controls that appear only at a non-zero count — then join
+            this row directly, which is exactly the register the prototype draws.
+
+            Its `rowClass` is UNCHANGED. `scoped-entity-list-shells-mounted.test.js` asserts this
+            root wears `manager-scoped-list-filter-row` and no studio default, and the flattening
+            is a layout fact rather than a naming one.
+          -->
           <div class={TOOLBAR_ROW_CLASS}>
+            <BulkSelectionToolbar
+              rowClass={TOOLBAR_ROW_CLASS}
+              toolbarAttr={TOOLBAR_ATTR}
+              pageBoxAttr={PAGE_BOX_ATTR}
+              countAttr={COUNT_ATTR}
+              resultsAttr={RESULTS_ATTR}
+              clearAttr={CLEAR_ATTR}
+              pageSelectionState={selection.pageSelectionState}
+              count={selection.count}
+              showSelectAllResults={selection.showSelectAllResults}
+              selectAllResultsCount={selection.selectAllResultsCount}
+              {selectAllLabel}
+              onTogglePage={togglePage}
+              onSelectAllResults={selectAllResults}
+              onClear={clearSelection}
+            />
+
             <label class="manager-search">
               <i class="fas fa-search" aria-hidden="true"></i>
               <input
                 type="search"
                 value={query}
                 data-scoped-list-search
-                placeholder={text(
-                  'FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder',
-                  'Search…'
-                )}
+                placeholder={searchPlaceholder ||
+                  text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
                 aria-label={text('FABRICATE.Admin.Manager.Scoped.List.SearchLabel', 'Search')}
                 oninput={(event) => changeQuery(event.currentTarget.value)}
               />
             </label>
 
-            <select
-              value={membership}
-              data-scoped-list-membership
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Scoped.List.MembershipLabel',
-                'Membership filter'
-              )}
-              onchange={(event) => changeMembership(event.currentTarget.value)}
-            >
-              {#each membershipOptions as option (option)}
-                <option value={option}>{membershipLabels[option]}</option>
-              {/each}
-            </select>
+            {#if membershipFilter}
+              <select
+                value={membership}
+                data-scoped-list-membership
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Scoped.List.MembershipLabel',
+                  'Membership filter'
+                )}
+                onchange={(event) => changeMembership(event.currentTarget.value)}
+              >
+                {#each membershipOptions as option (option)}
+                  <option value={option}>{membershipLabels[option]}</option>
+                {/each}
+              </select>
+            {/if}
 
             {#each laneFilters as filter (filter.id)}
               <select
@@ -523,33 +648,44 @@
               </select>
             {/each}
 
+            <span class="manager-scoped-list-sort-label" id="scoped-list-sort-label">
+              {text('FABRICATE.Admin.Manager.Scoped.List.SortByLabel', 'Sort by')}
+            </span>
             <select
-              value={sort}
+              value={sortKey}
               data-scoped-list-sort
-              aria-label={text('FABRICATE.Admin.Manager.Scoped.List.SortLabel', 'Sort order')}
-              onchange={(event) => changeSort(event.currentTarget.value)}
+              aria-labelledby="scoped-list-sort-label"
+              onchange={(event) => changeSortKey(event.currentTarget.value)}
             >
               {#each sortOptions as option (option.id)}
                 <option value={option.id}>{option.label}</option>
               {/each}
             </select>
-          </div>
 
-          <BulkSelectionToolbar
-            rowClass={TOOLBAR_ROW_CLASS}
-            toolbarAttr={TOOLBAR_ATTR}
-            pageBoxAttr={PAGE_BOX_ATTR}
-            countAttr={COUNT_ATTR}
-            resultsAttr={RESULTS_ATTR}
-            clearAttr={CLEAR_ATTR}
-            pageSelectionState={selection.pageSelectionState}
-            count={selection.count}
-            showSelectAllResults={selection.showSelectAllResults}
-            selectAllResultsCount={selection.selectAllResultsCount}
-            onTogglePage={togglePage}
-            onSelectAllResults={selectAllResults}
-            onClear={clearSelection}
-          />
+            <!-- The direction is a TOGGLE that states its current position, not a second select.
+                 `aria-pressed` carries the same fact to a screen reader, and the control goes
+                 `disabled` — never hidden — against a lane sort, so a GM who cannot reverse an
+                 order can still see that reversing is what the control does. -->
+            <button
+              type="button"
+              class="manager-scoped-list-direction"
+              data-scoped-list-direction={sortDirection}
+              aria-pressed={sortDirection === 'asc'}
+              disabled={!directional}
+              title={text(
+                'FABRICATE.Admin.Manager.Scoped.List.SortDirection',
+                'Reverse the sort order'
+              )}
+              onclick={toggleSortDirection}
+            >
+              <i class="fas fa-arrow-down-a-z" aria-hidden="true"></i>
+              <span>{directionLabel}</span>
+            </button>
+
+            {#if resultCount}
+              <span class="manager-scoped-list-count" data-scoped-list-count>{resultCount}</span>
+            {/if}
+          </div>
         </section>
 
         {#if bulk && !inspectorBody && selection.count > 0}
@@ -598,6 +734,32 @@
                   data-scoped-list-bulk-selected={bulkSelected}
                   aria-current={inspected ? 'true' : undefined}
                 >
+                  <!--
+                    THE SELECTION BOX LEADS THE ROW.
+
+                    The prototype's row is `[☐] [icon] [name / description] [stats] [pill] [pen]`
+                    (`essences.png`); this frame shipped it TRAILING, after the actions, matching
+                    `ComponentRow`. Leading is the prototype's order and it is also the one the
+                    select-all box in the toolbar directly above now points down a column at —
+                    trailing left that box aligned over the row's pen.
+
+                    It stays OUTSIDE the identity `<button>`: `SelectionCheckbox` renders a
+                    `<label>` around an `<input>`, and interactive content inside a `<button>` is
+                    invalid DOM that `createElement` lands silently.
+                  -->
+                  <SelectionCheckbox
+                    size="lg"
+                    wrapper="label"
+                    checked={bulkSelected}
+                    ariaLabel={format(
+                      'FABRICATE.Admin.Manager.Scoped.List.SelectRow',
+                      'Select {name}',
+                      { name }
+                    )}
+                    data-scoped-list-select={entry.id}
+                    onChange={() => toggleRow(entry.id)}
+                  />
+
                   <button
                     type="button"
                     class="manager-scoped-list-identity"
@@ -653,18 +815,6 @@
                         <i class={action.icon} aria-hidden="true"></i>
                       </IconButton>
                     {/each}
-                    <SelectionCheckbox
-                      size="lg"
-                      wrapper="label"
-                      checked={bulkSelected}
-                      ariaLabel={format(
-                        'FABRICATE.Admin.Manager.Scoped.List.SelectRow',
-                        'Select {name}',
-                        { name }
-                      )}
-                      data-scoped-list-select={entry.id}
-                      onChange={() => toggleRow(entry.id)}
-                    />
                   </span>
                 </li>
               {/each}
@@ -672,6 +822,29 @@
           {/if}
         </div>
 
+        <!--
+          THE FOOT PAGER IS PERSISTENT, AND THIS IS THE ONE PROTOTYPE DIFFERENCE THIS FILE KEEPS.
+
+          The prototype's catalogue draws no foot pager (`essences.png`); its only pager is the
+          inspector's, over the system list. That was tried here — `persistent` removed, so the bar
+          hides while every row fits the smallest page size — and it is REVERTED, because the
+          prototype's frame is a six-row mock rather than a ruling about a two-hundred-essence
+          world, and hiding the bar breaks four things that are:
+
+           - `design-system/spec.md` line 562: "The pagination bar sits OUTSIDE the scroll area so
+             it never moves, and it never hides its disabled arrows";
+           - `scoped-entity-list-shells-mounted.test.js` "keeps the pagination footer present below
+             one page of rows", which asserts exactly that sentence;
+           - the clamp case in the same file, which reads the footer to prove the index was clamped
+             — with the bar hidden at ten rows it reads `null`;
+           - `scoped-list-inspector-geometry.test.js` "keeps the pagination bar at the FOOT of a
+             short list", which is the only measurement proving the rows region takes the column's
+             slack rather than the pager riding up under the last row.
+
+          Three of those four are about the SHORT-LIST case specifically, which is the only case
+          where hiding it changes anything — so the behaviour the prototype's frame implies is the
+          exact behaviour they were written to forbid.
+        -->
         <Pagination
           persistent={true}
           totalCount={page.totalCount}
@@ -692,42 +865,77 @@
           aria-label={text('FABRICATE.Admin.Manager.Scoped.List.Inspector', 'Details')}
         >
           {#if bulk && selection.count > 0}
-            {@render bulk([...selectedIds], rowContext(null))}
+            <div class="manager-scoped-list-inspector-scroll">
+              {@render bulk([...selectedIds], rowContext(null))}
+            </div>
           {:else if inspectedEntry}
             {@const thumbnail = thumbnailOf(inspectedEntry)}
-            <div class="manager-inspector-title-row">
-              <span class="manager-inspector-icon">
-                <Medallion
-                  src={thumbnail.src}
-                  icon={thumbnail.icon}
-                  tint={thumbnail.tint}
-                  size={42}
-                />
-              </span>
-              <span class="manager-inspector-copy">
-                <!--
-                  AN `<h2>`, as every shipped inspector renders it. `.manager-inspector-name`
-                  fully specifies its own appearance, so the element choice is free — and it is
-                  the entry point a screen-reader user browsing by heading needs into the panel
-                  focus was just moved to. It also puts the catalogue shell's own `<h3>` group
-                  head at a level that does not skip.
-                -->
-                <h2 class="manager-inspector-name" data-scoped-list-inspector-name>
-                  {scopedEntryName(inspectedEntry)}
-                </h2>
-                <span class="manager-system-description">{descriptionOf(inspectedEntry)}</span>
-              </span>
+            {@const caption = colourCaption(inspectedEntry?.entity?.colorToken)}
+            <!--
+              THE IDENTITY BLOCK IS THREE STACKED PARTS, NOT A TWO-COLUMN ROW.
+
+              The prototype's inspector opens with a kicker, then the medallion beside the name
+              and a colour caption, then the description ACROSS THE FULL COLUMN below both
+              (`essences.png`). This frame shipped the description in the copy column beside the
+              medallion, which is a 190px measure inside a 300px panel — the frame captured on
+              the branch clipped `The binding between things, drawn thin…` at the first line.
+            -->
+            <div class="manager-scoped-list-inspector-identity">
+              {#if inspectorKicker}
+                <p class="manager-kicker" data-scoped-list-inspector-kicker>{inspectorKicker}</p>
+              {/if}
+              <div class="manager-inspector-title-row">
+                <span class="manager-inspector-icon">
+                  <Medallion
+                    src={thumbnail.src}
+                    icon={thumbnail.icon}
+                    tint={thumbnail.tint}
+                    size={42}
+                  />
+                </span>
+                <span class="manager-inspector-copy">
+                  <!--
+                    AN `<h2>`, as every shipped inspector renders it. `.manager-inspector-name`
+                    fully specifies its own appearance, so the element choice is free — and it is
+                    the entry point a screen-reader user browsing by heading needs into the panel
+                    focus was just moved to. It also puts the catalogue shell's own `<h3>` group
+                    head at a level that does not skip.
+                  -->
+                  <h2 class="manager-inspector-name" data-scoped-list-inspector-name>
+                    {scopedEntryName(inspectedEntry)}
+                  </h2>
+                  {#if caption}
+                    <span class="manager-scoped-list-inspector-caption" data-scoped-list-caption>
+                      {#if inspectorCaption}
+                        {@render inspectorCaption(inspectedEntry)}
+                      {:else}{caption}{/if}
+                    </span>
+                  {/if}
+                </span>
+              </div>
+              <p class="manager-scoped-list-inspector-description">
+                {descriptionOf(inspectedEntry)}
+              </p>
             </div>
-            {@render inspectorBody(inspectedEntry, rowContext(inspectedEntry))}
+            <div class="manager-scoped-list-inspector-scroll">
+              {@render inspectorBody(inspectedEntry, rowContext(inspectedEntry))}
+            </div>
+            {#if inspectorFoot}
+              <div class="manager-scoped-list-inspector-foot" data-scoped-list-inspector-foot>
+                {@render inspectorFoot(inspectedEntry)}
+              </div>
+            {/if}
           {:else}
-            <EmptyState
-              compact
-              {icon}
-              title={text('FABRICATE.Admin.Manager.Scoped.List.RestingTitle', 'Nothing selected')}
-              hint={subtitle}
-              dataAttr="data-scoped-list-inspector-state"
-              dataValue="resting"
-            />
+            <div class="manager-scoped-list-inspector-scroll">
+              <EmptyState
+                compact
+                {icon}
+                title={text('FABRICATE.Admin.Manager.Scoped.List.RestingTitle', 'Nothing selected')}
+                hint={subtitle}
+                dataAttr="data-scoped-list-inspector-state"
+                dataValue="resting"
+              />
+            </div>
           {/if}
         </aside>
       {/if}
@@ -868,6 +1076,74 @@
     min-width: 0;
   }
 
+  /* THE SELECTION REGISTER IS FLATTENED INTO THE FILTER ROW. `BulkSelectionToolbar` renders its
+     own row element and takes no "render inline" prop, so the box is nested and its wrapper is
+     removed from the box tree — which also drops the global `.is-selection` hairline and its
+     `padding-top`, since neither paints on a `display: contents` box.
+
+     `:global()` because the element is the PRIMITIVE'S, not this template's: Svelte's
+     unused-selector analysis cannot see across a component boundary and would emit this whole
+     block as a dead comment. The local half of the selector keeps it out of every other screen,
+     exactly as the `.manager-pagination` rule above does. */
+  .manager-scoped-list-toolbar :global(.manager-scoped-list-filter-row.is-selection) {
+    display: contents;
+  }
+
+  /* `SORT BY`, the prototype's tracked micro-label before the key select. It is a `<span>` rather
+     than a `<label>` because it names TWO controls — the key and the direction toggle — and a
+     `<label>` may point at only one; the select carries `aria-labelledby` back to it instead. */
+  .manager-scoped-list-sort-label {
+    flex: 0 0 auto;
+    color: var(--fab-text-subtle);
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* The direction toggle. Its metrics are COPIED from the toolbar select beside it — 34px tall,
+     `--fab-space-2` inline padding — so the two read as one control pair rather than as a button
+     dropped next to a field. It needs the manager's `<button>` reset assumptions stated locally
+     because Foundry's host rule centres content and pins a fixed height. */
+  .manager-scoped-list-direction {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: var(--fab-space-chip);
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    /* A FORM CONTROL, so it takes the control rung — the same one the search field and the
+       selects beside it sit on (issue 1372). */
+    background: var(--fab-bg-1);
+    color: var(--fab-text);
+    font-size: var(--fab-recipe-control-font);
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .manager-scoped-list-direction:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* `6 of 6 essences`, pushed to the trailing edge of the row exactly as the prototype draws it.
+     `margin-left: auto` rather than a spacer element, so a narrow container wraps it onto its own
+     line instead of stranding an empty box. */
+  .manager-scoped-list-count {
+    flex: 0 0 auto;
+    margin-left: auto;
+    color: var(--fab-text-subtle);
+    font-size: 0.68rem;
+    white-space: nowrap;
+  }
+
   .manager-scoped-list-rows {
     flex: 1 1 auto;
     min-width: 0;
@@ -875,17 +1151,75 @@
     overflow-y: auto;
   }
 
+  /* THE SCROLL MOVED OFF THE PANEL AND ONTO ITS MIDDLE CHILD.
+
+     The prototype pins `Open definition` to the FOOT of the inspector, full width, below a
+     divider (`essences.png`) — the same relationship the pagination bar has to the list, and for
+     the same reason: it is the panel's one primary action and it must not walk off the bottom of
+     a column whose body is a world-defaults stack, a system list and a pager. So the identity
+     block and the foot are `flex: 0 0 auto` and the body between them takes the slack and owns
+     the `overflow-y`, exactly as `.manager-scoped-list-column` already arranges its own three
+     parts. A `grid-template-rows` triple would do the same but charge two row gaps for the two
+     tracks the resting and bulk states leave empty. */
   .manager-scoped-list-inspector {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
     min-width: 0;
     min-height: 0;
-    padding: var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-3) var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 10px;
-    background: var(--fab-bg-2);
+    /* THE PANE'S OWN SURFACE, not a rung above it. The prototype's inspector column is the same
+       shade as the list beside it and is bounded by its border (issue 1372); `--fab-bg-2` put
+       it two rungs above the pane, which is what made the whole right third read as a different,
+       lighter screen. */
+    background: var(--fab-bg-0);
+  }
+
+  .manager-scoped-list-inspector-scroll {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
+    min-height: 0;
     overflow-y: auto;
+  }
+
+  .manager-scoped-list-inspector-identity {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--fab-space-2xs);
+    min-width: 0;
+  }
+
+  /* The colour caption, under the name and above the description. See `colourCaption` for why it
+     carries the token's NAME and not the prototype's hex. */
+  .manager-scoped-list-inspector-caption {
+    color: var(--fab-text-subtle);
+    font-size: 0.66rem;
+  }
+
+  /* FULL COLUMN WIDTH, below the medallion rather than beside it. */
+  .manager-scoped-list-inspector-description {
+    margin: var(--fab-space-2xs) 0 0;
+    color: var(--fab-text-muted);
+    font-size: 0.72rem;
+    line-height: 1.45;
+    overflow-wrap: break-word;
+  }
+
+  /* The pinned foot. Its divider is the row's own border rather than a `<hr>`. It does NOT
+     stretch its child: `ManagerButton` owns a `fullWidth` prop, so the lane says so at the call
+     site rather than this frame reaching across a component boundary to re-declare it. */
+  .manager-scoped-list-inspector-foot {
+    display: grid;
+    flex: 0 0 auto;
+    padding-top: var(--fab-space-2);
+    border-top: 1px solid var(--fab-border);
+    min-width: 0;
   }
 
   /* The landmark is a focus TARGET, not a tab stop, so the ring is drawn only for a

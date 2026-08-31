@@ -345,39 +345,83 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
         cells.map((cell) => cell.getAttribute('data-scoped-list-inherit-count')),
         sections
       );
-      // Labelled through `scopedSectionLabel`, so the five names are read from ONE list.
+      // THE CARD TITLE IS THE LANE'S, WITH `scopedSectionLabel` AS THE FALLBACK (issue 1372).
+      //
+      // The prototype's world-default cards title themselves after the VALUE the default
+      // resolves to — `Effects from Ember Brand` — and put the inherit arithmetic underneath
+      // (`essences.png`). So a lane that supplies `sectionTitles` decides the words, and this
+      // harness supplies none: what it measures is that the FALLBACK is still the one shared
+      // section-name list, which is the property this case was written for.
       assert.deepEqual(
         cells.map((cell) =>
-          cell.querySelector('.manager-scoped-catalogue-fact-label').textContent.trim()
+          cell.querySelector('.manager-scoped-catalogue-card-title').textContent.trim()
         ),
         sections.map((section) => LABELS[section])
       );
-      // Each count is the real membership number, not a placeholder: one of the two systems has
-      // every entity and the second has none.
+      // THE CARD'S SECOND LINE IS THE LANE'S NOTE, AND THE COUNT IS ITS FALLBACK.
+      //
+      // The prototype's card is exactly two lines — the value, then `7 of 13 systems inherit it`
+      // (`essences.png`) — so the shell has one slot to fill, not two. A lane that supplies
+      // `sectionNotes` owns the wording (the essence catalogue's is the inherit line WITH its
+      // override clause, which the bare count cannot say); a lane that supplies none gets the
+      // count. Both branches are asserted, because a shell that dropped the fallback would look
+      // correct on every screen that happens to pass a note.
       for (const cell of cells) {
-        assert.match(cell.textContent, /1 inheriting/);
+        assert.match(cell.textContent, /Falls back to /);
+      }
+      const bare = await catalogueHarness.mount({
+        ...props,
+        selectedId: first.id,
+        sectionNotes: {},
+      });
+      for (const cell of bare.querySelectorAll('[data-scoped-list-inherit-count]')) {
+        assert.match(
+          cell.textContent,
+          /1 inheriting/,
+          'with no lane note the card states the projection count itself'
+        );
       }
     });
   }
 
-  it('renders NO group chrome around a ONE-SECTION entity, and a head above a two-section one', async () => {
-    const component = await catalogueHarness.mount({
-      ...catalogueProps('component'),
-      selectedId: 'component-0',
+  it('heads the world-defaults stack once, whatever the section count', async () => {
+    // ── A REVERSAL, AND THE PROTOTYPE IS THE REASON ────────────────────────────────────────────
+    // This case used to assert the opposite: NO group head above a one-section entity, on the
+    // reading that a header and a divider around a single number cost more than the number. That
+    // held while the region was a run of `label · N inheriting` lines with no other chrome.
+    //
+    // It is now a stack of CARDS, and the prototype heads that stack `WORLD DEFAULTS` on every
+    // screen it draws (`essences.png`). An unheaded card stack is worse than a headed one at any
+    // section count: the cards are titled after their VALUES, so with no kicker there is nothing
+    // on screen that says the values are world defaults rather than this entity's own.
+    for (const entityType of ['component', 'essence', 'tool']) {
+      const props = catalogueProps(entityType);
+      const root = await catalogueHarness.mount({
+        ...props,
+        selectedId: props.scope.entries[0].id,
+      });
+      assert.equal(
+        root.querySelectorAll('[data-scoped-list-defaults] .manager-kicker').length,
+        1,
+        `${entityType}: the world-defaults stack carries exactly one head`
+      );
+    }
+  });
+
+  it('heads the system list and states members over roster beside it', async () => {
+    // `SYSTEM RULES  13 / 24` (`essences.png`). The pair is the fact: a count of member systems
+    // alone cannot tell "every system has it" from "half of them do".
+    const props = catalogueProps('essence');
+    const root = await catalogueHarness.mount({
+      ...props,
+      selectedId: props.scope.entries[0].id,
     });
-    assert.equal(
-      component.querySelectorAll('.manager-scoped-catalogue-facts-head').length,
-      0,
-      'a header and a divider around a single count costs more space than the count'
-    );
-    const tool = await catalogueHarness.mount({
-      ...catalogueProps('tool'),
-      selectedId: 'tool-0',
-    });
-    assert.equal(
-      tool.querySelectorAll('.manager-scoped-catalogue-facts-head').length,
-      1,
-      'the positive control: the head IS rendered when there is a group to label'
+    const count = root.querySelector('[data-scoped-list-system-count]');
+    assert.ok(count, 'the system section states its count');
+    assert.match(
+      count.textContent.trim(),
+      /^\d+ \/ \d+$/,
+      'as members over the roster, not as one number'
     );
   });
 

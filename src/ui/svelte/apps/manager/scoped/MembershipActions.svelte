@@ -35,6 +35,8 @@
    - member: whether a membership record exists.
    - enabled: the record's flag; read only when the entity type is enableable.
    - copyable: whether any other system has a record to copy from.
+   - hint / compact: the non-member explanatory line, and the cluster's density. Both default to
+     the shipped inline form; see their declarations.
    - disabled / busy: while the editor is saving.
    - armedToken / onArm(token) / onDisarm(token): the owner's single-armed-token invariant.
    - onAdd() / onRemove() / onCopyFrom() / onToggleEnabled(next).
@@ -54,6 +56,24 @@
     member = false,
     enabled = true,
     copyable = false,
+    // Whether the non-member branch carries its explanatory line. DEFAULT ON, so every shipped
+    // site renders unchanged. It is turned off where the cluster is the TRAILING half of a
+    // one-line row — the catalogue inspector's system list — because there the sentence is not a
+    // hint under a button, it is the thing that decides the row's width, and it pushed a 300px
+    // panel's rows to four lines each. The same words stay reachable: the entry editor states
+    // them in full beside the same Add.
+    hint = true,
+    // The CLUSTER'S DENSITY. `false` is the shipped inline form: a switch captioned On/Off and a
+    // labelled Remove. `true` reduces both to their glyphs for a caller whose row is a line in a
+    // 300px inspector column — the catalogue's system list — where the two captions are about
+    // 60px of a 258px row and were enough to wrap every row onto three lines.
+    //
+    // NEITHER CONTROL LOSES ITS NAME. The switch gains an explicit `aria-label` it never had
+    // (it relied on a visible caption plus `aria-pressed`), and Remove keeps its full consequence
+    // sentence in `aria-label` and `title` and REGAINS a visible word the moment it is armed:
+    // arming is the point at which "what am I about to do" has to be readable, and an armed
+    // control that is still a bare glyph is the one state this cluster must not have.
+    compact = false,
     disabled = false,
     busy = false,
     armedToken = '',
@@ -81,6 +101,15 @@
 
   const enableable = $derived(scopedEnableable(entityType));
   const removeToken = $derived(`scoped-membership-remove:${entityId}|${systemId}`);
+  const toggleConsequence = $derived(
+    formatted(
+      enabled
+        ? 'FABRICATE.Admin.Manager.Scoped.Membership.DisableIn'
+        : 'FABRICATE.Admin.Manager.Scoped.Membership.EnableIn',
+      enabled ? 'Disable {entity} in {system}' : 'Enable {entity} in {system}',
+      { entity: entityName || entityId, system: systemName || systemId }
+    )
+  );
   const removeConsequence = $derived(
     formatted(
       'FABRICATE.Admin.Manager.Scoped.Membership.RemoveConsequence',
@@ -98,17 +127,21 @@
         class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
         data-scoped-membership-enabled
         aria-pressed={enabled}
+        aria-label={toggleConsequence}
+        title={compact ? toggleConsequence : undefined}
         {disabled}
         onclick={() => onToggleEnabled(!enabled)}
       >
         <span class="manager-status-toggle-track" aria-hidden="true"
           ><span class="manager-status-toggle-knob"></span></span
         >
-        <span class="manager-status-toggle-label"
-          >{enabled
-            ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-            : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-        >
+        {#if !compact}
+          <span class="manager-status-toggle-label"
+            >{enabled
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+          >
+        {/if}
       </button>
     {/if}
     {#if copyable}
@@ -122,7 +155,7 @@
       armed={armedToken === removeToken}
       {disabled}
       {busy}
-      idleLabel={text('FABRICATE.Admin.Manager.Scoped.Membership.Remove', 'Remove')}
+      idleLabel={compact ? '' : text('FABRICATE.Admin.Manager.Scoped.Membership.Remove', 'Remove')}
       armedLabel={text('FABRICATE.Admin.Manager.Scoped.Membership.RemoveConfirm', 'Confirm?')}
       idleAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Membership.Remove', 'Remove')} — ${removeConsequence}`}
       armedAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Membership.RemoveConfirm', 'Confirm?')} — ${removeConsequence}`}
@@ -136,11 +169,13 @@
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Scoped.Membership.Add', 'Add to this system')}</span>
     </ManagerButton>
-    <p class="manager-muted" data-scoped-membership-hint>
-      {text(
-        'FABRICATE.Admin.Manager.Scoped.Membership.AddHint',
-        'It inherits every world default until you override a section.'
-      )}
-    </p>
+    {#if hint}
+      <p class="manager-muted" data-scoped-membership-hint>
+        {text(
+          'FABRICATE.Admin.Manager.Scoped.Membership.AddHint',
+          'It inherits every world default until you override a section.'
+        )}
+      </p>
+    {/if}
   {/if}
 </div>

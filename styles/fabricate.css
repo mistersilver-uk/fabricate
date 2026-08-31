@@ -24937,3 +24937,89 @@
     flex: 1 1 auto;
   }
 }
+
+/* ── THE ESSENCE SCREENS' SURFACE LADDER (issue 1372) ────────────────────────────────────────
+   THE PROTOTYPE'S CONTENT AREA IS ONE FLAT SURFACE. Its page, its list rows, its inspector
+   column and the cards inside that column are all the SAME shade, and a card reads as a card
+   because of a 1px border rather than because of a fill. Sampled out of `essences.png`,
+   `essEntry.png` and `sysEss.png`, the whole content area is one value, with exactly two others
+   on screen: a darker one for the rail and the app title bar, and a lighter one for FORM
+   CONTROLS — the search field and the selects.
+
+   What shipped stacked six surfaces, every one of them lighter than the prototype's, because
+   each layer helpfully added a rung: `.manager-main` paints `--fab-bg-2` for the whole manager,
+   the list row adds `--fab-overlay-light-03` over that, the inspector column adds `--fab-bg-3`,
+   and the pager band adds another overlay.
+   Measured against the prototype the pane was two rungs light and the inspector three, and the
+   borders between the cards had nothing left to separate.
+
+   `--fab-bg-0` IS the prototype's content shade, so nothing here mints a colour: the screens had
+   simply picked the wrong rungs of a ramp that already had the right one.
+
+   ── WHY IT IS ROUTE-SCOPED, AND WHY THAT IS THE PRECEDENT RATHER THAN A HEDGE ────────────────
+   `.manager-main`'s `--fab-bg-2` is a manager-WIDE default that predates this epic and
+   that a dozen other studios are drawn against. The Checks Studio hit the identical drift and
+   fixed it exactly this way — see the block at `.fabricate-manager[data-manager-view^="checks"]
+   .manager-environment-edit-view[data-checks-editor]` above, whose comment says the manager-wide
+   `--fab-bg-2` "is the CARD shade in the prototype — so the studio's cards were sitting on their
+   own colour and every border between them disappeared", and that other views' backgrounds are
+   deliberately out of that change's scope. This block is that shape, for these three routes.
+
+   ── TOKENS ONLY, AND ONE ACCEPTED DRIFT ─────────────────────────────────────────────────────
+   Seven theme blocks redeclare `--fab-bg-0` through `--fab-bg-3`, so a literal here would freeze
+   one theme's value into all seven. The form controls stay one rung up at `--fab-bg-1`, which is
+   a shade off the prototype's, and that drift is ACCEPTED under the standing ruling recorded at
+   the Component Studio token mapping near the head of this file: map index-aligned onto the
+   existing ramp rather than mint a raw colour that has to be authored into every theme and
+   silently rewrites each one's ramp contour.
+
+   ── OUT OF SCOPE, STATED ────────────────────────────────────────────────────────────────────
+   The RAIL and the app title bar. The prototype paints them a shade below its content surface
+   with no token on this ramp at all, and they are shared chrome that every other manager route
+   renders — so matching them is a manager-wide colour decision rather than one of these three
+   screens', and it is left alone. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-main,
+.fabricate-manager[data-manager-view='world-essence-entry'] .manager-main,
+.fabricate-manager[data-manager-view='essences'] .manager-main {
+  background: var(--fab-bg-0);
+}
+
+/* THE ROWS AND THE PAGER LOSE THEIR FILLS. The border is what makes a row a row here, which is
+   the prototype's own construction; a fill on top of a pane one rung darker is what made five
+   near-identical greys on one screen. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row,
+.fabricate-manager[data-manager-view='world-essences'] .manager-pagination,
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row,
+.fabricate-manager[data-manager-view='essences'] .manager-pagination {
+  background: transparent;
+}
+
+/* THE HOVER AND SELECTED STATES STILL HAVE TO READ. With the resting fill gone, the row's two
+   feedback states are the only things that change its surface, so they are restated one rung up
+   from the pane rather than left pointing at a ladder that no longer starts where they assumed.
+   Without this, hover painted `--fab-surface-raised` — the lightest surface the set has — and
+   the row jumped from flat to the lightest thing on the screen under the pointer. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row:hover,
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row:hover {
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row.is-selected,
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row.is-selected {
+  background: var(--fab-bg-1);
+}
+
+/* THE SYSTEM-SCOPE RULES LIST SHARES THE MANAGER'S OWN INSPECTOR ASIDE, so its surfaces have to
+   be brought onto the same ladder here rather than in a component's scoped `<style>`. The
+   catalogue's inspector is a column this epic's own frame draws and it states its own; this one
+   is `.manager-inspector`, which every manager route renders, and its `--fab-bg-2` fill
+   plus the `--fab-overlay-light-04` on each card put the whole right third of the screen two and
+   three rungs above the list beside it. Scoped to the route for the reason the block above gives:
+   the aside is shared chrome and the other studios' inspectors are not in this change's scope. */
+.fabricate-manager[data-manager-view='essences'] .manager-inspector {
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager[data-manager-view='essences'] .manager-inspector .manager-inspector-card {
+  background: transparent;
+}

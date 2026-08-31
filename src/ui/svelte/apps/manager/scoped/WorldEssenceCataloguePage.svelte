@@ -3,9 +3,9 @@
   The world ESSENCE CATALOGUE (issue 1372, epic 1357). One definition per quality — name, icon,
   colour, description — and nothing about what an essence DOES, which is a per-system rule.
 
-  It composes `EntityCatalogueShell` (issue 1380) and supplies the three things the shell leaves
-  to a lane: the row meta run, the inspector body below the shell's own two regions, and the
-  create affordance.
+  It composes `EntityCatalogueShell` (issue 1380) and supplies what the shell leaves to a lane:
+  the row meta run, the world-default card copy, the enabled roll-up card, and the inspector's
+  pinned foot action.
 
   ── AN ESSENCE HAS NO SOURCE ITEM, AND THAT IS STRUCTURAL ─────────────────────────────────────
   `src/migration/worldScopeEntityGrouping.js` lifts exactly `name`, `icon`, `colorToken` and
@@ -15,22 +15,31 @@
   GLYPH plus a colour token. The shell reads that from `scope.sourceLinked` and `scope.hasColorToken`
   rather than from a test of the entity type here, which is why nothing below mentions either.
 
-  ── THE PER-SYSTEM INDICATOR HAS THREE STATES, NOT TWO ────────────────────────────────────────
+  ── THE PER-SYSTEM INDICATOR HAS THREE STATES, AND THE ROW SHOWS NONE OF THEM ─────────────────
   Not a member / a member that is disabled / a member that is enabled. `enabled: false` KEEPS the
   membership record and its overrides, so "disabled" and "absent" are different authored states
-  with different repairs — a toggle for one and an Add for the other. `essenceScoped.js` names the
-  three once and this screen reads them from there.
+  with different repairs — a toggle for one and an Add for the other.
+
+  The ROW states only the ROLL-UP of those three, as the prototype's single pill (`Enabled`,
+  `Disabled`, `11 on / 2 off`). The per-system detail is the INSPECTOR's, one named row per
+  system with the controls that change it — see the pip-strip note in `<style>` for why the row's
+  own dot strip is gone.
 
   ── NO PAGE TITLE ─────────────────────────────────────────────────────────────────────────────
   The manager shell's header already renders this screen's `<h1>` and its subtitle from
   `viewTitle`. `ScopedPlaceholderPage` records what a second one costs: the first frame of a world
   page showed the screen title twice and the subtitle three times.
 
-  ── CREATE TAKES A NAME, AND NOTHING ELSE ─────────────────────────────────────────────────────
-  A component or a tool world entity is created by LINKING an Item; an essence is created from
-  nothing, so there is no drop target to presuppose and the header carries a name field and a
-  button. The id is slugged from the name by `mintEssenceId` — never `Math.random()`, which is a
-  SonarCloud vulnerability, and never `foundry.utils.randomID()`, which a pure leaf cannot reach.
+  ── CREATE IS THE PAGE HEADER'S, AND THIS PAGE OWNS NONE OF IT ────────────────────────────────
+  The prototype puts one `+ New essence` button in the header band, right-aligned on the line that
+  carries the title and subtitle (`essences.png`). This page shipped it as a full-width band above
+  the list carrying a label, a text input and the button — about 60px of chrome that read as a form
+  a GM had to fill in before anything else on the screen was available.
+
+  The header band belongs to `CraftingSystemManagerRoot.svelte`, which renders this screen's `<h1>`
+  and subtitle, so the affordance moved there and nothing about it is left here. The id is still
+  slugged by `mintEssenceId` — never `Math.random()`, which is a SonarCloud vulnerability, and
+  never `foundry.utils.randomID()`, which a pure leaf cannot reach.
 
   Declared props are EXACTLY the four the bundle supplies plus the one static attribute the call
   site passes. `CraftingSystemManagerRoot.svelte` records why that matters: a name declared here
@@ -40,20 +49,29 @@
   Props:
    - scope / actions / systems: from `essenceScopeProps`.
    - onOpenEntry(entityId): into this essence's world entry editor.
+   - onOpenSystemRules(entityId, systemId): from an inspector system row into THAT system's
+     own essence rules. It is the shell's second gateway seam: selecting a crafting system and
+     changing route are both the manager shell's, and no page can do either.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import InspectorActionButton from '../InspectorActionButton.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import {
+    essenceColourCaption,
     essenceInheritLine,
     essenceSectionValueName,
-    essenceSystemState,
-    mintEssenceId,
+    essenceShortValueName,
   } from './essenceScoped.js';
 
-  let { scope = null, actions = null, systems = [], onOpenEntry = () => {} } = $props();
+  let {
+    scope = null,
+    actions = null,
+    systems = [],
+    onOpenEntry = () => {},
+    onOpenSystemRules = () => {},
+  } = $props();
 
   // The route hook, the glyph and the screen name, declared as constants rather than as props on
   // a shared placeholder body. `manager-contract.test.js` reads all four off this file to pair
@@ -78,62 +96,149 @@
     return result;
   }
 
-  let draftName = $state('');
   let selectedId = $state('');
-  let creating = $state(false);
 
   const title = $derived(text(TITLE_KEY, TITLE_FALLBACK));
-  const entities = $derived(Array.isArray(scope?.entities) ? scope.entities : []);
-  const canCreate = $derived(draftName.trim() !== '' && !creating);
 
-  // The per-section one-line summary the shell renders under each inherit count. Without it a
-  // count reads "Effect source · 3 inheriting" and never says WHAT three systems are inheriting.
-  const sectionNotes = $derived(noteFor(entities.find((entity) => entity.id === selectedId)));
+  // The inspected entry, resolved once. Three derivations read it — the card titles, the card
+  // notes and the enabled roll-up — and each one walking `scope.entries` itself would make a
+  // selection change three linear scans of the corpus instead of one.
+  const inspectedEntry = $derived(
+    (scope?.entries ?? []).find((candidate) => candidate.id === selectedId) ?? null
+  );
 
   /**
-   * The world-default summary for the inspected entry, keyed by section.
+   * The GLYPH each world-default card leads with, keyed by section.
    *
-   * @param {object|undefined} entity
+   * The row's own capability chips already use these two glyphs for these two meanings, so a wand
+   * means "active effects" and `</>` means "macro" everywhere on this screen rather than only
+   * where a chip happens to render.
+   */
+  const sectionIcons = Object.freeze({
+    effectSource: 'fas fa-wand-magic-sparkles',
+    macro: 'fas fa-code',
+  });
+
+  // ── THE CARD TITLES NAME THE VALUE, NOT THE SECTION ─────────────────────────────────────────
+  // The prototype's world-default cards read `Effects from Ember Brand` and `Macro Ember Infusion`
+  // (`essences.png`): the title IS what the default resolves to. A card titled `Effect source`
+  // says which row it is and nothing about what a GM would be changing by opening it.
+  const sectionTitles = $derived(titlesFor(inspectedEntry));
+
+  // The per-section one-line summary the shell renders under each card. It is the INHERIT
+  // ARITHMETIC — `7 of 13 systems inherit this default` — because the value has moved up into
+  // the title and the count is what remains to be said.
+  const sectionNotes = $derived(notesFor(inspectedEntry));
+
+  // The prototype's THIRD card, which is not a world default at all: the membership `enabled`
+  // roll-up. It has no section and no inherit count, so it cannot come from the section loop.
+  const extraCards = $derived(enabledCardFor(inspectedEntry));
+
+  /**
+   * The world-default card TITLES for the inspected entry, keyed by section.
+   *
+   * @param {object|null} entry the projected world entry.
    * @returns {{[section: string]: string}}
    */
-  function noteFor(entity) {
-    const entry = (scope?.entries ?? []).find((candidate) => candidate.id === entity?.id) ?? null;
+  function titlesFor(entry) {
     const defaults = entry?.defaults ?? null;
-    const notes = {};
+    const titles = {};
     for (const section of scope?.sections ?? []) {
       const name = essenceSectionValueName(defaults?.[section]);
-      notes[section] = name
-        ? format('FABRICATE.Admin.Manager.Scoped.Essence.DefaultIs', 'World default: {name}', {
-            name,
-          })
-        : text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultUnset', 'No world default set');
+      titles[section] = name ? sectionValuePhrase(section, name) : sectionUnsetPhrase(section);
+    }
+    return titles;
+  }
+
+  /**
+   * `Effects from {name}` / `Macro {name}` — the prototype's two phrasings.
+   *
+   * An early-return chain rather than a nested ternary, which SonarCloud reports as S3358.
+   *
+   * @param {string} section
+   * @param {string} name the resolved value's display name.
+   * @returns {string}
+   */
+  function sectionValuePhrase(section, name) {
+    if (section === 'effectSource') {
+      return format('FABRICATE.Admin.Manager.Scoped.Essence.CardEffects', 'Effects from {name}', {
+        name: essenceShortValueName(name),
+      });
+    }
+    if (section === 'macro') {
+      return format('FABRICATE.Admin.Manager.Scoped.Essence.CardMacro', 'Macro {name}', {
+        name: essenceShortValueName(name),
+      });
+    }
+    return name;
+  }
+
+  /**
+   * What a card says when its section has NO world default.
+   *
+   * IT IS NOT `No world default set` FOR BOTH. The two sections fail differently and a GM repairs
+   * them differently: an unset effect source means nothing transfers, an unset macro means nothing
+   * runs, and one sentence for both says neither.
+   *
+   * @param {string} section
+   * @returns {string}
+   */
+  function sectionUnsetPhrase(section) {
+    if (section === 'effectSource') {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.CardEffectsUnset',
+        'No default effect source'
+      );
+    }
+    if (section === 'macro') {
+      return text('FABRICATE.Admin.Manager.Scoped.Essence.CardMacroUnset', 'No default macro');
+    }
+    return text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultUnset', 'No world default set');
+  }
+
+  /**
+   * The world-default inherit line for the inspected entry, keyed by section.
+   *
+   * @param {object|null} entry
+   * @returns {{[section: string]: string}}
+   */
+  function notesFor(entry) {
+    const notes = {};
+    for (const section of scope?.sections ?? []) {
+      notes[section] = essenceInheritLine(entry, section, format);
     }
     return notes;
   }
 
-  function systemLabel(row) {
-    const named = typeof row?.systemName === 'string' ? row.systemName.trim() : '';
-    return named || String(row?.systemId ?? '');
-  }
-
   /**
-   * One state's glyph. An early-return chain rather than a nested ternary, which SonarCloud
-   * reports as S3358 in a file it indexes.
+   * The enabled roll-up card, or none when no system holds this essence.
    *
-   * @param {string} state one of `ESSENCE_SYSTEM_STATES`.
-   * @returns {string}
+   * `0 of 0 systems have it enabled` under an entry no system uses is arithmetically true and
+   * says nothing; the empty case is already stated by the inherit lines above it.
+   *
+   * @param {object|null} entry
+   * @returns {Array<{id: string, icon: string, title: string, note: string}>}
    */
-  function stateIcon(state) {
-    if (state === 'absent') return 'fas fa-circle-minus';
-    if (state === 'disabled') return 'fas fa-circle-pause';
-    return 'fas fa-circle-check';
+  function enabledCardFor(entry) {
+    const members = (entry?.systems ?? []).filter((row) => row.member === true);
+    if (members.length === 0) return [];
+    const on = members.filter((row) => row.enabled === true).length;
+    return [
+      {
+        id: 'enabled',
+        icon: 'fas fa-layer-group',
+        title: format(
+          'FABRICATE.Admin.Manager.Scoped.Essence.CardEnabled',
+          '{on} of {members} systems have it enabled',
+          { on, members: members.length }
+        ),
+        note: text(
+          'FABRICATE.Admin.Manager.Scoped.Essence.CardEnabledHint',
+          'Disabled rules still match ingredients, but run nothing on craft.'
+        ),
+      },
+    ];
   }
-
-  const stateLabels = $derived({
-    absent: text('FABRICATE.Admin.Manager.Scoped.Essence.StateAbsent', 'Not in this system'),
-    disabled: text('FABRICATE.Admin.Manager.Scoped.Essence.StateDisabled', 'Disabled here'),
-    enabled: text('FABRICATE.Admin.Manager.Scoped.Essence.StateEnabled', 'Enabled here'),
-  });
 
   /**
    * The ROLL-UP of one essence's per-system states, as the prototype's single row pill.
@@ -181,67 +286,20 @@
       }),
     };
   }
-
-  async function createEssence() {
-    const name = draftName.trim();
-    if (!name || creating) return;
-    creating = true;
-    try {
-      const id = mintEssenceId(name, entities);
-      const created = await actions?.createEntity?.({
-        id,
-        name,
-        icon: PAGE_ICON,
-        colorToken: '',
-        description: '',
-      });
-      if (created !== false) draftName = '';
-    } finally {
-      creating = false;
-    }
-  }
 </script>
 
 <main class="manager-main" data-scoped-page="world-essences" aria-label={title}>
   <!--
-    ONE CHILD OF `<main>`, WITH ITS OWN TWO-ROW GRID.
+    ONE CHILD OF `<main>`, AND NOW ONE ROW.
 
     `.manager-main` is `display: grid` with a single `minmax(0, 1fr)` row for a full-width world
-    route, so TWO children land in the same grid area and paint over each other: measured in the
-    View Lab, the create field's label sat under the shell's search box and the create button
-    landed in the inspector column. `styles/fabricate.css` is closed to this lane by
-    `### GM World Scoped Entity Routes` requirement 7, so the row split belongs here — and it
-    belongs here anyway, because it is this page's composition rather than the route's.
+    route, so two children land in the same grid area and paint over each other. That is why this
+    wrapper exists. It used to split into TWO rows because the page carried a create band above
+    the shell; the create affordance is now the page header's, so the wrapper is one row again and
+    the list starts at the top of the main column exactly as the prototype draws it
+    (`essences.png`).
   -->
   <div class="manager-scoped-essence-page">
-    <!-- The CREATE affordance, and the only chrome this page owns above the shell. It is a name
-         field rather than a bare button because `createEntity` takes an identity and refuses a
-         duplicate id silently: a button that minted "New essence" twice would do nothing the
-         second time and say nothing about why. -->
-    <section class="manager-scoped-essence-create" data-scoped-essence-create>
-      <label class="manager-scoped-essence-create-field">
-        <span class="manager-scoped-essence-create-label">
-          {text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence name')}
-        </span>
-        <input
-          type="text"
-          value={draftName}
-          data-scoped-essence-new-name
-          placeholder={text('FABRICATE.Admin.Manager.Scoped.Essence.NewPlaceholder', 'Ember')}
-          oninput={(event) => (draftName = event.currentTarget.value)}
-        />
-      </label>
-      <ManagerButton
-        role="primary"
-        disabled={!canCreate}
-        data-scoped-essence-create-action
-        onclick={createEssence}
-      >
-        <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
-      </ManagerButton>
-    </section>
-
     <EntityCatalogueShell
       {scope}
       {actions}
@@ -259,14 +317,30 @@
       )}
       emptyHint={text(
         'FABRICATE.Admin.Manager.Scoped.Essence.EmptyHint',
-        'Name one above to create it. Every crafting system that adopts it shares this definition.'
+        'Create one from the page header. Every crafting system that adopts it shares this definition.'
       )}
       {sectionNotes}
+      {sectionTitles}
+      {sectionIcons}
+      {extraCards}
+      inspectorKicker={text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.InspectorKicker',
+        'World definition'
+      )}
+      countUnit={text('FABRICATE.Admin.Manager.Scoped.Essence.CountUnit', 'essences')}
+      membershipFilter={false}
+      selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.SelectAllShort', 'All')}
+      searchPlaceholder={text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.SearchPlaceholder',
+        'Search essences…'
+      )}
+      inspectorFoot={essenceInspectorFoot}
+      inspectorCaption={essenceInspectorCaption}
       bind:selectedId
       onSelect={(entityId) => (selectedId = entityId)}
       onOpenEntry={(entityId) => onOpenEntry(entityId)}
+      onOpenSystemRules={(entityId, systemId) => onOpenSystemRules(entityId, systemId)}
       rowMeta={essenceRowMeta}
-      inspectorBody={essenceInspector}
     />
   </div>
 </main>
@@ -336,39 +410,46 @@
   <span class="manager-scoped-essence-rollup" data-scoped-essence-rollup={entry.id}>
     <StatusPill tone={rollup.tone} icon={rollup.icon} label={rollup.label} />
   </span>
-  <span class="manager-scoped-essence-states" role="list">
-    {#each entry.systems ?? [] as row (row.systemId)}
-      {@const state = essenceSystemState(row)}
-      <span
-        role="listitem"
-        class="manager-scoped-essence-state"
-        data-scoped-system-state={state}
-        data-scoped-system={row.systemId}
-        title={`${systemLabel(row)} — ${stateLabels[state]}`}
-      >
-        <i class={stateIcon(state)} aria-hidden="true"></i>
-      </span>
-    {/each}
-  </span>
 {/snippet}
 
 <!--
-  The inspector body BELOW the shell's own inherit counts and membership rows: the world-default
-  readouts and the deep link into the entry editor, which is where they are edited.
+  THE COLOUR CAPTION under the inspected name: the token's display name and the value this theme
+  resolves it to. See `essenceColourCaption` for why the hex is READ from the cascade rather than
+  written into the source, and why it is read at the theme root.
 -->
-{#snippet essenceInspector(entry)}
-  <div class="manager-scoped-essence-defaults" data-scoped-essence-defaults={entry.id}>
-    {#each scope?.sections ?? [] as section (section)}
-      <p class="manager-muted" data-scoped-essence-default={section}>
-        {essenceInheritLine(entry, section, format)}
-      </p>
-    {/each}
-    <ManagerButton data-scoped-essence-open-entry onclick={() => onOpenEntry(entry.id)}>
-      <i class="fas fa-pen" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.OpenEntry', 'Edit this definition')}</span
-      >
-    </ManagerButton>
-  </div>
+{#snippet essenceInspectorCaption(entry)}
+  {essenceColourCaption(entry?.entity?.colorToken)}
+{/snippet}
+
+<!--
+  THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT.
+
+  The prototype ends the panel with a full-width `Open definition` button below a divider
+  (`essences.png`). It shipped as a default-role button INSIDE the scrolling body, under the
+  world-default readouts, which put the panel's only navigation below a system list of arbitrary
+  length — reachable in the lab's six-system corpus and not in a world with thirty.
+
+  ── IT IS AN `InspectorActionButton`, NOT A `ManagerButton`, AND THAT IS THE COLOUR FIX ────────
+  The prototype paints it the peach ACCENT. `ManagerButton role="primary"` emits
+  `.manager-button.is-primary`, which `styles/fabricate.css` declares as the SUCCESS family — the
+  green Save treatment — and that stylesheet is closed to this lane, so no prop on that primitive
+  can reach the accent.
+
+  `InspectorActionButton` is the shipped answer and it was extracted for exactly this: its own
+  header records that "the design's primary is the accent", that the recipe and component
+  inspectors already paint their Edit in it, and that "the essence rail's green Edit was the odd
+  one". This panel's `Open definition` is that same control — the one loud verb at the foot of an
+  inspector rail — so it takes the same primitive and the same `tone="primary"` rather than a new
+  role class in a sheet this lane may not open.
+-->
+{#snippet essenceInspectorFoot(entry)}
+  <InspectorActionButton
+    tone="primary"
+    icon="fas fa-arrow-up-right-from-square"
+    label={text('FABRICATE.Admin.Manager.Scoped.Essence.OpenEntry', 'Open definition')}
+    data-scoped-essence-open-entry
+    onClick={() => onOpenEntry(entry.id)}
+  />
 {/snippet}
 
 <style>
@@ -377,32 +458,9 @@
      Routes` requirement 7, so every rule this screen owns lives here. */
   .manager-scoped-essence-page {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: var(--fab-space-2);
+    grid-template-rows: minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
-  }
-
-  .manager-scoped-essence-create {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2);
-    align-items: flex-end;
-    min-width: 0;
-  }
-
-  .manager-scoped-essence-create-field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-    min-width: 0;
-    flex: 1 1 14rem;
-  }
-
-  .manager-scoped-essence-create-label {
-    color: var(--fab-mv2-text);
-    font-size: 0.72rem;
-    font-weight: 600;
   }
 
   /* THE STAT COLUMN. A fixed `min-width` on each cell is what turns three per-row numbers into
@@ -443,60 +501,23 @@
     white-space: nowrap;
   }
 
+  /*
+     THE PER-SYSTEM PIP STRIP IS DELETED, AND THAT IS A CORRECTION.
+
+     The row drew one coloured dot per crafting system — six of them in the lab corpus, about 90px
+     of a 1280px row — and the prototype's row draws NONE (`essences.png`). Compared as markup that
+     read as extra information for free; compared as images it is the widest thing in the row after
+     the identity block, and it is what squeezed the description into an ellipsis two words in.
+
+     Nothing is lost, because nothing on the strip was legible anyway: a dot's system and state
+     were reachable only through a `title` a GM has to hover one of six identical circles to read.
+     The same three states are now stated in WORDS in the inspector, one row per system, with the
+     Add / enable / Remove controls that act on them — which is where the prototype puts them and
+     where a GM can do something about what they say.
+  */
   .manager-scoped-essence-rollup {
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
-  }
-
-  /*
-     ONE PIP PER SYSTEM, not a list of system names.
-
-     This shipped rendering every member system's full name inline. At six systems that wrapped
-     to two lines and roughly tripled the row height, which is what the capture frame showed: a
-     row of mostly empty space with a name list under it. The prototype's row carries COMPACT
-     STATS instead — components, recipes, and systems as `{n}/{total}` — and puts the per-system
-     detail in the inspector, which is exactly where this shell already renders membership rows.
-
-     The state and the system are still on each pip as `data-scoped-system-state` and
-     `data-scoped-system`, and the accessible name is still the full `system — state` pair in
-     `title`, so nothing that could read the roster before has lost it.
-  */
-  .manager-scoped-essence-states {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-2xs);
-    min-width: 0;
-  }
-
-  /* THREE STATES, THREE CHANNELS — colour, glyph and the visible system name with a title
-     attribute. A state told by colour alone does not survive greyscale, and this strip is the
-     only place a GM sees all three at once. */
-  .manager-scoped-essence-state {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--fab-space-chip);
-    color: var(--fab-text-muted);
-    font-size: 0.58rem;
-  }
-
-  .manager-scoped-essence-state[data-scoped-system-state='enabled'] {
-    color: var(--fab-success);
-  }
-
-  .manager-scoped-essence-state[data-scoped-system-state='disabled'] {
-    color: var(--fab-warning);
-  }
-
-  .manager-scoped-essence-state-name {
-    overflow-wrap: break-word;
-  }
-
-  .manager-scoped-essence-defaults {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-    min-width: 0;
   }
 </style>
