@@ -915,8 +915,10 @@ Classify every occurrence by the owning object before renaming.
 
 ### The design system is consulted before any UI work
 
-`openspec/specs/design-system/spec.md` is the canonical record of the shared primitive set: which primitives exist, their canonical geometry, their Svelte APIs, the rules that route a near-neighbour case to the right one, and the recipes that compose them into the browse, editor and player screen archetypes.
-Its visual companion, `openspec/specs/design-system/library.html`, renders every primitive at that geometry and is opened in a browser when a written value needs to be seen rather than read.
+`openspec/specs/design-system/spec.md` is the canonical record of the rules the shared primitive set obeys: the membership bar, the canonical geometry ladders, the rules that route a near-neighbour case to the right primitive, and the recipes that compose them into the browse, editor and player screen archetypes.
+The set ITSELF is enumerated in `openspec/specs/design-system/library.html`, one primitive per `div.spec-head > h4` heading, which also renders each at its geometry — open it in a browser when a written value needs to be seen rather than read.
+`scripts/lib/designSystemPrimitives.json` is the machine-readable half, one row per shipped primitive keyed on the implementation path a diff names.
+`tests/design-system-coverage.test.js` reads the library and the manifest and fails when they describe different vocabularies.
 
 Every agent that plans, implements, reviews, or documents a change touching `src/ui/`, `styles/`, or a UI requirement in `openspec/specs/` MUST read that capability first and MUST cite the entry it relied on.
 The order is fixed: **reuse, then extend, then add.**
@@ -926,7 +928,8 @@ A surface that hand-rolls markup a primitive already owns is a defect, not a var
 - **Extend.** If the case needs behaviour the primitive lacks, add a prop to the primitive that owns the meaning.
 Adding flexibility there takes precedence over a second component that owns half of it.
 - **Add.** Only when neither holds, and only with two or more independent callers, does a new primitive enter the set.
-That change adds its entry to `openspec/specs/design-system/spec.md` AND its specimen to `openspec/specs/design-system/library.html` in the same change — an entry with no specimen is a geometry nobody can see, and a component under `src/ui/svelte/components/` with no entry is an undocumented primitive.
+That change adds its specimen to `openspec/specs/design-system/library.html` AND, once it ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change.
+A component under `src/ui/svelte/components/` with no specimen is an undocumented primitive, a specimen with no row for a shipped primitive is a name no diff can be attributed to, and `tests/design-system-coverage.test.js` is the gate that fails on either.
 
 A candidate that decomposes entirely into existing members is a composition and does not enter the set; it goes to the capability's ruled-out register with the composition that replaces it, so it is not re-proposed.
 Where a proposal conflicts with a shipped component, the shipped props are the specification — adopt them, or state in the same change why they are being replaced.
@@ -1058,7 +1061,8 @@ Plan-review, implementation-review, and docs-loop reviewers return their verdict
 - Delete test files.
 - Change `module.json` id or module name.
 - Add npm dependencies without a plan entry that explains why they are needed.
-- Add a component under `src/ui/svelte/components/` without adding its entry to `openspec/specs/design-system/spec.md` and its specimen to `openspec/specs/design-system/library.html` in the same change.
+- Add a component under `src/ui/svelte/components/` without adding its specimen to `openspec/specs/design-system/library.html` and its row to `scripts/lib/designSystemPrimitives.json` in the same change.
+`tests/design-system-coverage.test.js` enforces this and fails when the library and the manifest describe different vocabularies.
 Equally, do not hand-roll markup for a control the primitive set already owns, and do not introduce a second component that owns half a meaning an existing primitive owns — extend that primitive instead.
 - Patch dead UI / config / code branches as a workaround.
 When a control has nothing useful to configure or a code path has no remaining purpose, propose wholesale removal first.

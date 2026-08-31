@@ -6,8 +6,10 @@ This capability is the canonical, normative record of Fabricate's shared UI desi
 It exists because a design system that lives only in prototypes drifts: the audit that produced this capability found 99 distinct button signatures, 79 icon-chip signatures, 75 field signatures, 70 card signatures and 55 kicker variants across the surfaces it swept.
 `ui-integration` states the requirement that a repeated thing MUST be one shared primitive; this capability states what that set IS.
 
-The human-readable visual library that renders every primitive in this capability at its canonical geometry lives at `openspec/specs/design-system/library.html`.
-It is the same normative content with specimens attached, and it is the artifact to open when a written geometry needs to be seen rather than read.
+The set itself is ENUMERATED in `openspec/specs/design-system/library.html`, one primitive per `div.spec-head > h4` heading, each rendered at its canonical geometry.
+That file is part of this capability rather than a companion to it: it is the same normative content with specimens attached, and it is the artifact to open when a written geometry needs to be seen rather than read.
+The machine-readable half is `scripts/lib/designSystemPrimitives.json`, one row per SHIPPED primitive keyed on the implementation path a diff names.
+`tests/design-system-coverage.test.js` reads both and fails when they describe different vocabularies.
 
 ### Corpus and authority
 
@@ -22,7 +24,11 @@ Where a primitive already ships, its props ARE the specification and a proposal 
 
 ### Requirement: The primitive set is a closed, versioned vocabulary
 
-The shared primitive set MUST be the set enumerated in this capability, and a surface MUST reach for a member of it before writing a new component.
+The shared primitive set MUST be the set `openspec/specs/design-system/library.html` enumerates, one member per `div.spec-head > h4` heading, and a surface MUST reach for a member of it before writing a new component.
+The library is where the vocabulary lives and this document is where its rules live; a requirement that pointed at an enumeration in neither file would bind a reader to a list nothing contains.
+A member that has SHIPPED MUST also carry a row in `scripts/lib/designSystemPrimitives.json` naming its implementation path, which is what lets a diff be attributed to a primitive.
+A member that has not shipped carries no row, because the manifest enumerates what ships and a row naming no file is a correspondence to nothing.
+`tests/design-system-coverage.test.js` reads both artifacts and fails when a name is in one and not the other, in either direction.
 Adding a prop to the primitive that already owns a meaning takes precedence over introducing a second component that owns half of it.
 
 A candidate that decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set; it is recorded with the composition that replaces it so it is not re-proposed.
@@ -569,18 +575,21 @@ The player window carries NO premium signal in any state, and a player-side choo
 
 ### Requirement: The set is extended by an explicit, recorded decision
 
-A new shared primitive enters the set only through a change that adds its entry to this capability and its specimen to `openspec/specs/design-system/library.html` in the same change.
-The entry MUST state the primitive's purpose, its canonical geometry in published ladder values, its Svelte API including the event contract and the accessible naming it requires, and the caller count that justified it.
+A new shared primitive enters the set only through a change that records its ENTRY, and an entry is two artifacts rather than one: a SPECIMEN in `openspec/specs/design-system/library.html` and, once the primitive ships, a ROW in `scripts/lib/designSystemPrimitives.json`.
+The specimen MUST state the primitive's purpose, its canonical geometry in published ladder values, and its Svelte API including the event contract and the accessible naming it requires.
+The row MUST name the implementation path and the library entry it corresponds to, and MUST record the caller count that justified the primitive.
+The split is deliberate rather than filing: purpose, geometry and API are what a reader needs rendered, and the path-to-name correspondence is what a gate needs to check.
 That obligation binds a primitive the change ADDS or ALTERS.
 An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference; the library records which entries currently do so, and closing that list is tracked as a debt rather than presented as complete.
 
-A change that adds a component under `src/ui/svelte/components/` without a corresponding entry here has added an undocumented primitive, and a change that adds an entry here without the specimen has added a geometry nobody can see.
+A change that adds a component under `src/ui/svelte/components/` without a specimen has added an undocumented primitive; a change that ships a primitive without its manifest row has added a name no diff can be attributed to; and a change that adds a row naming a library entry that does not exist has recorded a correspondence to nothing.
+`tests/design-system-coverage.test.js` is the gate that fails on all three.
 Where a proposal conflicts with a shipped component, the change MUST either adopt the shipped behaviour or state why it is being replaced.
 
 #### Scenario: An implementer needs a primitive the set does not contain
 
 - **WHEN** planned work needs a shared component the set does not contain
-- **THEN** the change adds its entry to this capability and its specimen to the visual library
+- **THEN** the change adds its specimen to the visual library and, once the primitive ships, its row to the manifest
 - **AND** the entry names the two or more independent callers that justify it
 
 ### Requirement: The ruled-out register is part of the specification
