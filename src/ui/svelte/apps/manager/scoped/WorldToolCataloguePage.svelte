@@ -14,14 +14,21 @@
   a list, not a second catalogue composition, and it defines no list, filter or inspector
   structure of its own.
 
-  == THE TWO-TRACK LAYOUT IS SPANNED, NOT REDECLARED =======================================
-  `styles/fabricate.css` gives every `.manager-main` `grid-template-rows: auto auto 1fr`, and
-  that stylesheet is closed to this lane. A page with a card and a list would put the list in
-  the second `auto` track and leave the `1fr` empty, which content-sizes the list inside an
-  `overflow: hidden` main. Redeclaring the template from a Svelte-scoped block is a
-  specificity TIE with the shipped rule and resolves on injection order, which nothing here
-  controls. Spanning the list from row 2 to the end is a property no shipped rule sets, so it
-  composes with the template instead of racing it.
+  == THE TWO-TRACK LAYOUT IS REDECLARED, BECAUSE THE SPAN HAD NOTHING TO SPAN ==============
+  An earlier revision spanned rows instead of redeclaring, on the premise that
+  `styles/fabricate.css` gives every `.manager-main` `grid-template-rows: auto auto 1fr`.
+  That is true of the shared rule and FALSE of this view: `styles/fabricate.css:9588-9601`
+  overrides every world-scope view to `grid-template-rows: minmax(0, 1fr)` — ONE track. Against
+  one track the card took the `1fr`, the list opened an implicit second row that claimed the
+  height, the `1fr` resolved to 0px, and the card rendered its own head, segments and note
+  outside an 18px box. The View Lab caught it as
+  `[data-world-tool-break-segment=toolSpecific] is clipped or extends outside
+  [data-world-tool-break-mode]`.
+
+  The old note was right that redeclaring from an all-class scoped selector is a specificity
+  TIE resolved on injection order. Adding the element selector settles it on specificity
+  instead: `main.manager-main[data-scoped-page]` is (0,3,1) against the shipped rule's (0,3,0),
+  so it wins wherever it is injected.
 
   == AND THE OVERRIDE COUNT IS CONDITIONAL, WHICH IS A REPORTED GAP RATHER THAN A CHOICE ===
   The prototype's card states `{n} systems override it`, counting systems whose OWN authored
@@ -299,9 +306,14 @@
      markup. `.manager-main`, `.manager-inspector-card` and `.manager-muted` are shipped and
      reused rather than restated. */
 
-  /* SPANNED, NOT REDECLARED. See the header: the shipped `.manager-main` template is
-     `auto auto 1fr`, so a two-child page leaves the growing track empty and content-sizes its
-     list. `grid-row` is set by no shipped rule, so this composes rather than ties. */
+  /* THE TEMPLATE THIS PAGE ACTUALLY NEEDS. See the header: the world-scope override at
+     `styles/fabricate.css:9592` gives this view ONE `minmax(0, 1fr)` track, so the card and the
+     list cannot both be placed by spanning. The element selector carries this past the shipped
+     rule on specificity rather than on injection order. */
+  main.manager-main[data-scoped-page='world-tools'] {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
   .manager-world-tool-break-card {
     display: flex;
     flex-direction: column;
