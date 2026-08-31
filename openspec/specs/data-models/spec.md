@@ -2064,6 +2064,7 @@ WorldEssence = {
 WorldDefaults = {
   id: string,                      // the world entity id
   [section]: unknown,              // per entity; ABSENCE-PRESERVING, never a minted default
+  enabled?: boolean,               // TOOLS ONLY - the world MASTER SWITCH; absent means enabled
   // Per entity, BESIDE the sections and carrying no inherit switch: `tags` on a component,
   // `repairRequirements` on a tool. Both are ABSENT when unauthored.
 }
@@ -2074,7 +2075,9 @@ SystemMembershipRecord = {
   systemId: string,
   inherit: { [section: string]: boolean },  // an omitted section reads as INHERITED
   [section]: unknown,                       // the local override, RETAINED while dormant
-  enabled?: boolean,                        // essences and tools ONLY; default true
+  enabled?: boolean,                        // essences and tools ONLY; default true. This is the
+                                            // SYSTEM half of a tool's resolved enablement; see
+                                            // requirement 7.
   // Per entity, BESIDE the sections and carrying no inherit switch: `tags` and `mutedTags` on
   // a component, `repairRequirements` on a tool. All are ABSENT when unauthored.
 }
@@ -2100,9 +2103,39 @@ SystemMembershipRecord = {
    Nothing is lost, so no confirmation is required and the inherit row's copy stays "fall back".
 6. Resolution answers `inherited` PER SECTION: `true` when there is no membership record, and otherwise the record's switch for that section.
    A record whose `inherit` map OMITS a section reads as inheriting it, because that is the state a record created by "add to system" is in.
-7. **There is no world-level `enabled` flag.**
-   For an enableable entity, resolution answers `enabled: false` for an absent membership record because it is NOT A MEMBER, never because it inherited an off.
-   Disabling an entity world-wide is N membership edits, or a bulk action, and never a fourth layer.
+7. **A world-level `enabled` flag exists for a `worldEnableable` scope, and it is a MASTER SWITCH rather than a fourth layer.**
+   The TOOL is the only scope that declares one today; the component has no enabled flag at all and the essence's world defaults carry none.
+
+   **The resolved value is the AND of the two flags — `resolved = world.enabled && system.enabled` — and WORLD OFF WINS.**
+   A world-disabled tool is off in every crafting system that has it, whatever each system says.
+   The per-system flag keeps its own meaning exactly and simply cannot re-enable a world-disabled record, so re-enabling at world scope restores whatever each system had already chosen rather than turning anything on.
+
+   **The two scopes' `enabled` are DIFFERENT CONCEPTS and prose must not name them alike.**
+   A world record's flag is the WORLD MASTER SWITCH — whether the Tool exists as a usable thing in this world at all — and a rules record's flag is the SYSTEM ENABLEMENT — whether this crafting system currently uses the Tool it has adopted.
+   The resolution answers all three under three distinct names: `worldEnabled`, `systemEnabled` and the AND as `enabled`.
+   An authoring surface reads the layer it writes; a consumer reads `enabled`.
+   Nothing above the resolver re-derives the AND, because a screen that computed it locally is how one scope's answer and another's diverge.
+
+   **It is not a fourth layer, and this is the distinction.**
+   The switch carries no per-section inherit decision, is not seeded onto a membership record, and takes no override: it is one boolean at world scope that vetoes a boolean at system scope.
+   The three layers, their per-section resolution and requirement 2's per-SECTION unit are all unchanged.
+
+   **ABSENCE READS AS ENABLED, and that is a compatibility requirement rather than a convenience.**
+   The flag is ABSENCE-PRESERVING on disk — an unauthored or non-boolean value persists NO key rather than a minted `true` — so every world default written before the switch existed comes back without it, and only an explicit `false` disables.
+   A world SETTING preserves key absence (unlike `setFlag`, whose merge resurrects a removed key), so the absence survives the round trip rather than only the first read.
+   This is DELIBERATELY ASYMMETRIC with the membership record's `enabled`, which is minted `true` on every normalize: a membership record exists only because a GM added the entity to a system, so minting states a fact that write already established, whereas minting at world scope would rewrite every persisted world default in the corpus to say something nobody authored.
+
+   For an enableable entity, resolution still answers `enabled: false` for an absent membership record because it is NOT A MEMBER, never because it inherited an off.
+
+   7a.
+   **The READ UNION re-applies the world veto over its merged rows, and it is a VETO ONLY.**
+   Requirement 15's union re-spreads the in-system record last while `## CraftingSystem` requirement 36 holds, and a normalized in-system tool carries `enabled` unconditionally — so the resolver's AND is overwritten on every read-union row unless the veto is re-applied after the merge.
+   That precedence is correct for a value the system AUTHORED and wrong for a world-scope veto, because "world off wins" means the world's off cannot be outvoted by anything.
+   The re-application never turns a row ON, so a corpus with no world-disabled record answers the identical rows — and the identical ARRAY — that it answered before the switch existed.
+   7b.
+   **A world screen must state the membership count before a GM flips the switch off.**
+   A world-scope write persists on change and has no confirmation step, and switching a Tool off silently stops every recipe in every member system that requires it.
+   The count is the number of crafting systems holding a membership record for that entity, stated beside the control rather than after the write.
 8. **`enabled` is opt-in PER ENTITY and the opt-out is STRUCTURAL rather than conventional.**
    The generic resolver does not compute the key for every entity and let one path override it: an entity that carries no enabled flag gets an answer on which `"enabled" in result` is FALSE — the key is ABSENT, not `false`.
    A resolver that answered `false` would satisfy every statement about the record and still hand a screen the exact value it would read to draw a toggle the domain does not have.
@@ -2366,6 +2399,12 @@ It could the moment the in-system record stops deciding its own keys, which is w
    Without that action the world Tool entry would display a seed source nobody could author, which is a screen stating a value the model makes unreachable.
 3. `enabled` KEEPS its shipped meaning verbatim, and it is a HARD block rather than the essence's soft disable: a reference to a tool that does not resolve, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED` (`## Tool` requirement 3).
    The two entities' meanings of one field name are deliberately different, and neither is derived from the other.
+
+   3a.
+   **The TOOL is the one scope that declares a WORLD MASTER SWITCH**, under requirement 7 of `## Scoped Entity Definitions`: its world defaults may carry `enabled`, and resolution answers `world.enabled && system.enabled`.
+   What blocks is the RESOLVED value, so a world-disabled tool blocks with `TOOL_BLOCKED` in every member system exactly as an unadopted or system-disabled one does — the block reason does not distinguish them, because a player cannot act on the difference.
+   The essence declares no such switch: its `enabled` is a soft disable of essence-carried BEHAVIOUR, and a world-wide veto over behaviour a GM cannot see in that scope's own screens would be a persisted field with no authoring surface.
+   The component declares none because it has no enabled flag at any scope at all.
 4. **The break mode is NOT a new field.**
    The world/system pair is `toolBreakage.authority` (`## CraftingSystem` requirement 21) carrying the same two tokens `toolSpecific` / `checkDriven`; the per-tool control under `checkDriven` stays `checkBreakable`.
    The prototype's `tool` / `check` / `immune` spellings are not introduced, and `immune` is a retired name.

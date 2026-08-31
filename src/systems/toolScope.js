@@ -1,5 +1,7 @@
 import {
+  applyWorldEnabledVeto,
   defineScope,
+  isWorldEnabled,
   normalizeMemberships,
   normalizeWorldDefaults,
   resolveScopedDefinition,
@@ -30,6 +32,16 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * that resolves to a disabled tool, BLOCKS the attempt with `TOOL_BLOCKED` (`## Tool`
  * requirement 3). That is a hard block, not the essence's soft disable, and the two are
  * deliberately different meanings of one field name.
+ *
+ * THE WORLD DEFAULTS CARRY A MASTER SWITCH, AND THE TOOL IS THE ONLY SCOPE THAT DECLARES ONE.
+ * `TOOL_SCOPE` is `worldEnableable`, so a tool's world defaults may carry `enabled` and the
+ * resolver answers `world.enabled && system.enabled`: a world-disabled Tool is off in every
+ * system whatever each system says. The per-system flag is unchanged and still means what it
+ * meant; it simply cannot re-enable a world-disabled Tool. An ABSENT world flag reads as
+ * enabled, so a world that never touches the switch behaves exactly as it did.
+ *
+ * The read union re-applies that veto — see {@link resolveToolScope} — because requirement 36
+ * lets the in-system record decide every key it carries, `enabled` included.
  *
  * THE BREAK MODE IS NOT A NEW FIELD, AND IT IS LIVE FROM `1.30.0`.
  * `resolveToolBreakageAuthority` resolves the SHIPPED
@@ -114,9 +126,21 @@ function attachRepairRequirements(entry) {
 export const TOOL_SCOPE = defineScope({
   sections: TOOL_SECTIONS,
   enableable: true,
+  worldEnableable: true,
   worldExtras: attachRepairRequirements,
   membershipExtras: attachRepairRequirements,
 });
+
+/**
+ * Whether a tool's WORLD record leaves it enabled. Re-exported under a tool-shaped name so a
+ * caller that holds one tool's world defaults reads the rule rather than the field.
+ *
+ * @param {object|null|undefined} worldDefault
+ * @returns {boolean}
+ */
+export function isToolEnabledInWorld(worldDefault) {
+  return isWorldEnabled(worldDefault);
+}
 
 /**
  * Normalize the world tool defaults.
@@ -280,11 +304,19 @@ export function toolAttemptBlockReason(resolved) {
  * @returns {Array<object>}
  */
 export function resolveToolScope(worldCorpus, systemId, systemTools) {
-  return unionScopedDefinitions({
-    corpus: worldCorpus,
-    systemId,
-    systemDefinitions: systemTools,
-    resolve: resolveTool,
-    entityType: 'tools',
-  });
+  // THE VETO IS RE-APPLIED OVER THE MERGED ROWS, and `applyWorldEnabledVeto` says why: the union
+  // re-spreads the in-system record last, so a normalized in-system tool's own `enabled` wins
+  // every key contest — which is correct for a value that system AUTHORED and wrong for a
+  // world-scope veto. It only ever turns a row OFF, so a corpus with no world-disabled tool
+  // answers the identical array this function has always answered.
+  return applyWorldEnabledVeto(
+    unionScopedDefinitions({
+      corpus: worldCorpus,
+      systemId,
+      systemDefinitions: systemTools,
+      resolve: resolveTool,
+      entityType: 'tools',
+    }),
+    worldCorpus?.defaults
+  );
 }
