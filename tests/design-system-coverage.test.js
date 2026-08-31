@@ -40,6 +40,7 @@
  * drift the census exists to catch. The pin makes that repair a deliberate, reviewable edit.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -333,9 +334,10 @@ const CITED_WITHOUT_ENTRY = [
     name: 'RoutingOverview',
     why:
       'Cited at `library.html:1576` and `:1588` as the element two specimens render. NOT a loose ' +
-      'citation: `spec.md:413-415` already MANDATES the surface — "The routing is authored in TWO ' +
-      'surfaces" and "A ROUTING OVERVIEW lists every source with the set it produces". This is a ' +
-      'bound requirement whose specimen has no entry of its own.',
+      'citation: spec.md requirement "Sets and groups are the container layer above the row" ' +
+      'already MANDATES the surface — "The routing is authored in TWO surfaces" and "A ROUTING ' +
+      'OVERVIEW lists every source with the set it produces". This is a bound requirement whose ' +
+      'specimen has no entry of its own.',
   },
 ];
 
@@ -375,6 +377,82 @@ test('every component the library cites by filename still exists', () => {
         'evidence for a stated geometry or a recorded migration; a renamed file leaves the claim ' +
         'standing with nothing behind it.'
     );
+  }
+});
+
+/**
+ * A citation of a `spec.md` requirement, written as the words `spec.md requirement` followed by the
+ * heading in double quotes.
+ *
+ * The notation exists because the alternative rotted inside this very change. Amending `spec.md`
+ * added six lines above the vocabulary requirement, and that shifted every `spec.md:NNN` citation in
+ * `scripts/lib/designSystemPrimitives.js`, in this file and in `library.html` section 16 onto prose
+ * that says something else — including the one sentence that carries the whole distinction between
+ * a BOUND requirement and a loose citation. A line number cannot be resolved by anything, so nothing
+ * reported it; a heading can be, and the property below does.
+ */
+const REQUIREMENT_CITATION = /spec\.md requirement "([^"]+)"/g;
+
+/**
+ * Collapse a JSDoc line break — newline, optional `*` gutter, indentation — into a single space.
+ *
+ * Without this the notation would carry a hidden formatting rule: a heading that happened to wrap
+ * across two comment lines would read correctly and match nothing, so the guard below would be
+ * strictest exactly where prose is longest. The first draft of this change hit that on its own
+ * first run.
+ *
+ * @param {string} prose
+ * @returns {string} the same prose on one line
+ */
+const unwrapped = (prose) => prose.replaceAll(/\n\s*\*?\s*/g, ' ');
+
+/** `### Requirement:` headings, which is what a citation has to land on. */
+const SPEC_REQUIREMENTS = [
+  ...readFileSync(path.join(REPO_ROOT, 'openspec/specs/design-system/spec.md'), 'utf8').matchAll(
+    /^### Requirement: (.+)$/gm
+  ),
+].map((match) => match[1]);
+
+/**
+ * Every body of prose that cites `spec.md` by requirement, as `[label, text]`.
+ *
+ * The manifest enters as its PARSED `why` strings rather than as raw JSON, because JSON escapes the
+ * quotes the notation uses and a raw scan would miss a citation it should have checked — the failure
+ * mode this whole file exists to prevent.
+ */
+const CITING_PROSE = [
+  [
+    'scripts/lib/designSystemPrimitives.js',
+    readFileSync(path.join(REPO_ROOT, 'scripts/lib/designSystemPrimitives.js'), 'utf8'),
+  ],
+  ['openspec/specs/design-system/library.html', librarySource],
+  ['tests/design-system-coverage.test.js', readFileSync(fileURLToPath(import.meta.url), 'utf8')],
+  ['scripts/lib/designSystemPrimitives.json', MANIFEST_ROWS.map((row) => row.why).join('\n')],
+];
+
+test('every spec.md citation names a requirement that still exists', () => {
+  const requirements = new Set(SPEC_REQUIREMENTS);
+  assert.ok(
+    requirements.size > 20,
+    `spec.md yielded ${requirements.size} requirement headings, so the reader is broken and every ` +
+      'citation below would be reported as dangling'
+  );
+  for (const [label, prose] of CITING_PROSE) {
+    const cited = [...unwrapped(prose).matchAll(REQUIREMENT_CITATION)].map((match) => match[1]);
+    assert.ok(
+      cited.length > 0,
+      `${label} cites no spec.md requirement in the notation this property reads. Either the ` +
+        'notation changed, in which case every citation in that file is now unchecked, or the ' +
+        'file stopped citing the capability and no longer belongs in this list.'
+    );
+    for (const heading of cited) {
+      assert.ok(
+        requirements.has(heading),
+        `${label} cites ${JSON.stringify(heading)}, which is no "### Requirement:" heading in ` +
+          'spec.md. A reader following the citation finds nothing, which is the defect this ' +
+          'change was opened to close.'
+      );
+    }
   }
 });
 
