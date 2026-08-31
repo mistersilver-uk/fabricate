@@ -403,7 +403,7 @@
   }
 
   .manager-essence-locked-value {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-family: var(--fab-font-serif);
     font-size: 0.85rem;
     font-weight: 600;
