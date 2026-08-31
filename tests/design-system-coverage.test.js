@@ -49,13 +49,24 @@ import {
   NOT_A_PRIMITIVE,
   RULED_OUT,
 } from '../scripts/lib/designSystemPrimitives.js';
-import {
-  listSvelteComponents,
-  toRepositoryPaths,
-} from '../scripts/lib/svelteComponentFiles.js';
+import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteComponentFiles.js';
+
 import { parseDesignLibrary, primitiveNamesIn, readDesignLibrary } from './helpers/designLibrary.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * Order two strings by code point, ascending.
+ *
+ * Explicit rather than a bare `sort()`, for the reason `scripts/lib/svelteComponentFiles.js`
+ * records beside its own copy: `localeCompare` is locale-dependent, so two machines could order
+ * the registers below differently and disagree about a set they both measured correctly.
+ *
+ * @param {string} left
+ * @param {string} right
+ * @returns {number} negative, zero or positive per the `Array#sort` contract
+ */
+const byCodePoint = (left, right) => (left < right ? -1 : Number(left > right));
 
 const librarySource = readDesignLibrary();
 const library = parseDesignLibrary(librarySource);
@@ -204,7 +215,8 @@ test('every manifest library name resolves to a library entry', () => {
   assert.ok(MANIFEST_NAMES.length > 0, 'no row records a library name, so this has no domain');
   const ruledOut = new Set(RULED_OUT_NAMES);
   const entries = new Set(library.names);
-  for (const row of MANIFEST_ROWS.filter((candidate) => candidate.library !== null)) {
+  const namedRows = MANIFEST_ROWS.filter((candidate) => candidate.library !== null);
+  for (const row of namedRows) {
     const name = row.library.slice(1, -1);
     assert.ok(
       !ruledOut.has(name),
@@ -294,7 +306,7 @@ test('the shipped rows the library does not name are exactly the known set', () 
   assert.deepEqual(
     MANIFEST_ROWS.filter((row) => row.library === null)
       .map((row) => row.path)
-      .sort(),
+      .sort(byCodePoint),
     UNDOCUMENTED_ROWS,
     'the undocumented shipped set changed. Adding one is a new undocumented primitive; removing ' +
       'one means a library entry was written for it, which is the direction this list should move.'
@@ -351,7 +363,10 @@ test('every primitive name in the library is an entry, a declined candidate, or 
 });
 
 test('every component the library cites by filename still exists', () => {
-  const cited = [...new Set(librarySource.match(/[A-Za-z][A-Za-z0-9]*\.svelte/g) ?? [])].sort();
+  const citations = [...librarySource.matchAll(/[A-Za-z][A-Za-z0-9]*\.svelte/g)].map(
+    (match) => match[0]
+  );
+  const cited = [...new Set(citations)].sort(byCodePoint);
   assert.ok(cited.length > 20, `the library cites ${cited.length} components, so it stopped citing`);
   for (const file of cited) {
     assert.ok(
