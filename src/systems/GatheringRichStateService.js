@@ -584,37 +584,49 @@ export class GatheringRichStateService {
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
     const biomeAggregation = rules.biomeModifierAggregation;
 
-    // Draw each percentile throw from a pre-rolled `Nd100` pool when animating, so
-    // Dice So Nice shows the whole attempt at once; otherwise fall back to the
-    // injected `this.rollD100()` seam (unchanged for the automated/timed path).
-    const throwCount = rowContributions.length + eventContributions.length;
-    let animationPool = null;
-    let nextRoll = () => this.rollD100();
-    if (animate && typeof globalThis.Roll === 'function' && throwCount > 0) {
+    // ONE d100 for the attempt. Every enabled drop row is tested against this SAME
+    // percentile roll, so an attempt is a single gathering check whose one number
+    // decides the whole haul: the rarer a row, the higher the roll it needs.
+    //
+    // Each row's MARGINAL chance is untouched — a row at 40% still drops on 40 of the
+    // 100 faces — so `previewDropBreakdown` and every authored rate keep their meaning.
+    // What changes is the CORRELATION: rows now succeed and fail together in rarity
+    // order, instead of each being an independent draw. That is what makes the roll
+    // reportable; the previous per-row model could only ever be published as an
+    // `Nd100` pool whose total was the sum of unrelated checks and meant nothing.
+    //
+    // EVENTS KEEP THEIR OWN INDEPENDENT THROWS and are never pooled or posted. Sharing
+    // the attempt roll with them would fire EVERY matched hazard on a high roll and
+    // none on a low one, welding "found the good loot" to "sprang all nine traps".
+    // Events are environment hazards, not part of the gathering check the player rolls.
+    // Drawn ONLY when there is something to test it against. A task with no enabled drop
+    // rows is rejected by start validation, so this is unreachable in play, but rolling a
+    // gathering check against nothing would still be wrong — and it would consume a draw.
+    const rollsAttemptCheck = rowContributions.length > 0;
+    let attemptRoll = null;
+    let attemptRollMessage = null;
+    if (rollsAttemptCheck && animate && typeof globalThis.Roll === 'function') {
       try {
-        animationPool = await new globalThis.Roll(`${throwCount}d100`).evaluate({
-          allowInteractive: false,
-        });
-        const faces = Array.isArray(animationPool?.dice?.[0]?.results)
-          ? animationPool.dice[0].results
-              .map((entry) => Number(entry?.result))
-              .filter((face) => Number.isFinite(face))
-          : [];
-        let cursor = 0;
-        nextRoll = () => (cursor < faces.length ? faces[cursor++] : this.rollD100());
+        const rolled = await new globalThis.Roll('1d100').evaluate({ allowInteractive: false });
+        const face = Number(rolled?.dice?.[0]?.results?.[0]?.result);
+        if (Number.isFinite(face)) {
+          attemptRoll = face;
+          attemptRollMessage = rolled;
+        }
       } catch (error) {
-        console.error('Fabricate | Failed to pre-roll d100 animation pool:', error);
-        animationPool = null;
-        nextRoll = () => this.rollD100();
+        console.error('Fabricate | Failed to roll the d100 gathering check:', error);
       }
     }
+    // The injected seam still owns the non-animated path, and catches an animated roll
+    // that failed to evaluate, so resolution never depends on the chat/DSN round trip.
+    if (rollsAttemptCheck && attemptRoll === null) attemptRoll = this.rollD100();
 
     const droppedItems = rowContributions
       .map((entry, index) =>
         rollDropRow({
           row: entry.row,
           index,
-          roll: nextRoll(),
+          roll: attemptRoll,
           modifier: taskModifier + flatBonus,
           conditions,
           biomes,
@@ -631,7 +643,7 @@ export class GatheringRichStateService {
         rollDropRow({
           row: entry.event,
           index,
-          roll: nextRoll(),
+          roll: this.rollD100(),
           modifier: numericModifier(entry.event?.eventModifier, eventModifier) + flatBonus,
           conditions,
           biomes,
@@ -644,11 +656,12 @@ export class GatheringRichStateService {
     const selectedEvents = selectDrops(droppedEvents, rules.eventSelectionMode, rules.eventLimit);
     const eventPolicy = rules.eventPolicy;
 
-    // Surface the pooled roll to chat so Dice So Nice animates it. Interactive/
-    // animate-only; a chat failure is logged and swallowed, never thrown.
-    if (animationPool) {
+    // Surface the attempt's single d100 to chat so Dice So Nice animates it, and so the
+    // number the player reads is the number the rows were actually tested against.
+    // Interactive/animate-only; a chat failure is logged and swallowed, never thrown.
+    if (attemptRollMessage) {
       try {
-        await animationPool.toMessage({ speaker, flavor }, { rollMode, create: true });
+        await attemptRollMessage.toMessage({ speaker, flavor }, { rollMode, create: true });
       } catch (error) {
         console.error('Fabricate | Failed to post d100 roll to chat:', error);
       }

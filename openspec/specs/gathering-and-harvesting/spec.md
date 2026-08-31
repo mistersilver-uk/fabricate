@@ -887,9 +887,15 @@ Resolve gathering-native Gathering Task drops and composed events through ordere
 Every modifier's mode is the single global system `rules.dropModifierMode`; there is no per-entry override.
 The additive total is applied before the multiplicative product.
 Because the environment adjustment is clamped into the base before the modifier mix, the pipeline clamps twice (once at compose time, once in the mixer); when `dropRate + environmentDropRateAdjustment` leaves `[0, 100]` and later modifiers pull back toward the range, the compose-time saturation is observable (e.g. base 90, env +20, additive -30 yields `clamp(110) = 100` then `70`).
-Then roll `d100`, add the gathering modifier, and drop the row when `effectiveRoll >= 101 - finalDropRate`. `environmentDropRateAdjustment` is zero when the selected environment disables task drop-rate adjustments for that task.
+The attempt then rolls a SINGLE `d100`, and every enabled item row is tested against that same roll: add the gathering modifier and drop the row when `effectiveRoll >= 101 - finalDropRate`.
+Each row's marginal chance is unchanged by this — a row at 40 still drops on 40 of the 100 faces — but rows are not independent draws: within one attempt they succeed and fail together in rarity order, so a low roll yields only the commonest rows and a high roll yields the rare ones too.
+That is what makes a gathering attempt one reportable check; per-row draws could only ever be published as a pool whose total is the sum of unrelated checks.
+The roll is drawn only when the task has at least one enabled item row.
+`environmentDropRateAdjustment` is zero when the selected environment disables task drop-rate adjustments for that task.
 An additive system mode yields `multiplicativeFactor === 1` and is byte-identical to the prior flat sum.
 3. For every enabled composed event in the environment whose runtime condition gates are satisfied, resolve event character modifier references and matching condition modifiers, calculate `finalEventRate = round(clamp((foldedBase + additiveTotal) * multiplicativeFactor, 0, 100))` where `foldedBase = clamp(dropRate + environmentDropRateAdjustment, 0, 100)` is folded at compose time, using the same two-clamp additive-then-multiplicative-then-round aggregation (over both character and condition modifiers) as item rows, roll `d100`, add the event modifier, and drop the event when `effectiveRoll >= 101 - finalEventRate`.
+Each event rolls its OWN `d100`, independent of every other event and of the attempt's item-row roll.
+Events are environment hazards rather than part of the gathering check, and one shared roll would fire every matched event together on a high roll and none at all on a low one.
 4. System Gathering Rules select rewards after item rows roll once rules are authored.
 5. Reward `highestRankedDrop` awards the first dropped item row in authored row order.
 6. Reward `allDrops` awards every dropped item row.
