@@ -2680,7 +2680,10 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
   // attributed to a case, and each answers with one frame of every surface.
   for (const line of [
     'function managerCase(entry) {',
-    "  'RadioCardGroup',",
+    // Was `  'RadioCardGroup',`, one element of the hand-written `MANAGER_PRIMITIVES` array. Issue
+    // 1378 replaced that array with a derivation over `designSystemPrimitives.js`, so the same
+    // constant is now one line rather than fourteen; this is that line.
+    "const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');",
     '  ...journalBlindRunCases(),',
     'export function mapChangedFilesToCases(files = [], { patches } = {}) {',
   ]) {

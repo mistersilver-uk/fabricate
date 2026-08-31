@@ -122,6 +122,7 @@ const GATE_TARGETS = [
   'scripts/lib/foundryImagePin.js',
   'scripts/lib/foundryChromeCache.js',
   'scripts/lib/foundryChromeSpec.js',
+  'scripts/lib/designSystemPrimitives.js',
   'scripts/lib/viewLabCases.js',
   'scripts/lib/viewLabLayoutAssertion.js',
   'scripts/view-lab-chrome.mjs',
