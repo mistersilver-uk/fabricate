@@ -2,6 +2,7 @@
 layout: default
 title: 0002 — Fabricate Premium Companion Architecture
 parent: Architecture Decisions
+grand_parent: Technical Details
 nav_order: 2
 ---
 

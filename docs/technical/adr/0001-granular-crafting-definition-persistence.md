@@ -2,12 +2,13 @@
 layout: default
 title: 0001 — Granular Crafting-Definition Persistence
 parent: Architecture Decisions
+grand_parent: Technical Details
 nav_order: 1
 ---
 
 # ADR 0001 — Granular crafting-definition persistence
 
-**Status:** **SUPERSEDED by [ADR 0003]({% link adr/0003-whole-array-crafting-definition-storage.md %})**, on the terms this record set for itself.
+**Status:** **SUPERSEDED by [ADR 0003]({% link technical/adr/0003-whole-array-crafting-definition-storage.md %})**, on the terms this record set for itself.
 The replacement condition below — 1.41 MB of connect overhead, roughly 4,160 records — was breached by a factor of four at 2,000 recipes, the smallest corpus a live Foundry client was ever measured at, and never came back under.
 Nothing in this record is edited to agree with that outcome; it is preserved as the reasoning the decision was actually taken against.
 
@@ -635,7 +636,7 @@ Crossing this bound supersedes the decision rather than amending it again, on th
 > Issue 1255 measured a real Foundry 14.365 client booting a converted world at 2,000, 5,000 and 10,000 recipes.
 > The connect overhead was **5.60 MB, 6.73 MB and 8.63 MB** — four times the budget at the smallest corpus measured, and rising.
 > The measured per-record constant was **452–489 bytes**, not the 339 modelled here.
-> [ADR 0003]({% link adr/0003-whole-array-crafting-definition-storage.md %}) records the measurement and the reversal.
+> [ADR 0003]({% link technical/adr/0003-whole-array-crafting-definition-storage.md %}) records the measurement and the reversal.
 > A+ is not taken up with it: it stays as future exploration, unmeasured against a live client.
 
 **What remains unmeasured, and is the real exposure.**

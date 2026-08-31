@@ -1,7 +1,8 @@
 ---
 layout: default
 title: Protecting Your Worlds
-nav_order: 16
+parent: Technical Details
+nav_order: 2
 ---
 
 # Protecting Your Worlds
@@ -138,25 +139,12 @@ As described above, an automated check keeps Fabricate's appearance from bleedin
 
 ## Built with AI as a force multiplier
 
-I will be upfront about this.
 I build Fabricate with the help of AI coding agents, including Claude and Codex, and I understand why that gives some people pause.
 
-I use these tools professionally, day in and day out, to deliver mission-critical platform infrastructure for a global finance company.
-I know how to write a harness for them, prompt them effectively, automate guardrails around them, review their output, and feed corrections back so they keep improving.
-I have applied that same discipline to Fabricate.
+That deserves more than a closing paragraph, so it now has a page of its own.
+[AI Disclosure]({% link technical/ai-disclosure.md %}) sets out where AI is and is not used, what agents are never allowed to do, and why none of it runs inside your game.
 
-That discipline is the reason Fabricate has deep static code analysis, linting, expansive test coverage, and a complete end-to-end Foundry integration test.
-Those safeguards are rare in Foundry modules, and they are exactly what an agent's output has to pass here before it can reach you.
-
-Used responsibly, agents are a force multiplier.
-If I had built all of that automation from scratch by hand, I would still be writing the automation instead of the module.
-I work full time in a demanding job, and I have a family and a home to look after, so I do not have eight or more hours a day to pour into this.
-The agents let the time I do have go into Fabricate itself, on top of guardrails I trust.
-
-Here is the part that matters for your world.
+The short version belongs here, though.
 Whether a particular line of code was typed by me or drafted by an agent is not what keeps your data safe.
-What keeps it safe is everything every change has to pass before it can reach you, the automated tests, the static analysis and quality checks, the real Foundry integration test that fails on any runtime error, the staged and closed-beta release process, and the reversible migrations that refuse to corrupt your data.
+What keeps it safe is everything above: the automated tests, the static analysis and quality checks, the real Foundry integration test that fails on any runtime error, the staged and closed-beta release process, and the reversible migrations that refuse to corrupt your data.
 On top of all of that, I review what ships and _I_ am **accountable** for it.
-
-AI makes the work faster.
-The engineering rigour and human governance I bring to the project are what protect your game.
