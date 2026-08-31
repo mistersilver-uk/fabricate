@@ -58,8 +58,13 @@
   is what stops a second near-identical `.svelte` tab block, which SonarCloud counts.
 -->
 <script>
+  import { formulaRolls } from '../../../../../utils/rollFormulaRollability.js';
   import { localize } from '../../../util/foundryBridge.js';
+  import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
+  import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import Chip from '../Chip.svelte';
   import EditorTabs from '../EditorTabs.svelte';
@@ -347,6 +352,36 @@
    */
   const sourceLinked = $derived(entry?.hasSourceLink === true);
 
+  // ── THE WORLD MASTER SWITCH ────────────────────────────────────────────────────────────
+  // A world-disabled Tool is off in EVERY crafting system that has it, whatever each of them
+  // says, because `resolveScopedDefinition` ANDs the world flag with the per-system one. An
+  // ABSENT flag reads as enabled, which is every record in every world that has never touched
+  // the switch, so `!== false` is the read rather than `=== true`.
+  const worldEnabled = $derived(entry?.worldEnabled !== false);
+  const memberSystemCount = $derived(memberRows.filter((row) => row.member === true).length);
+
+  // ── THE BREAKAGE VALUE, PER MODE ───────────────────────────────────────────────────────
+  // The mode cards say WHICH rule applies; these say what the rule is SET TO. Without them a
+  // world default reading `Breakage chance` is stuck at whatever `breakageChance` the record
+  // happened to be seeded with, and the one number the mode exists to carry is unauthorable at
+  // world scope.
+  const breakMode = $derived(defaults.breakage?.mode ?? 'limitedUses');
+  const breakFormula = $derived(String(defaults.breakage?.formula ?? ''));
+
+  /**
+   * Whether the authored dice expression can actually be ROLLED.
+   *
+   * `Roll.validate` IS NOT THIS TEST and would pass formulas that throw the moment a craft
+   * evaluates them - `formulaRolls` carries the whole argument, and it is the same predicate
+   * the crafting check's modifier resolver uses. It FAILS OPEN with no dice engine, so a
+   * headless render never paints an authoring error over a formula a GM wrote against a real
+   * Foundry.
+   *
+   * An EMPTY formula is not "invalid", it is UNSET: the mode has simply not been finished, and
+   * the Validation tab is where an incomplete record is reported.
+   */
+  const formulaRollable = $derived(breakFormula.trim() === '' || formulaRolls(breakFormula));
+
   /**
    * The game-world Item this record names, for the linked-item tile.
    *
@@ -354,6 +389,52 @@
    * re-linked carries both, and the registered uuid is the one the resolver reads.
    */
   const sourceUuid = $derived(String(entity?.registeredItemUuid || entity?.originItemUuid || ''));
+
+  /**
+   * Whether the selected breakage MODE has a usable VALUE behind it.
+   *
+   * A mode with no value is not a neutral default: `limitedUses` with no `maxUses` is an
+   * unlimited Tool wearing a limited label, and `diceExpression` with a formula that throws
+   * fails the whole craft at evaluate time with only a console error. Both are states the mode
+   * cards alone cannot show, which is why this is a check rather than a hint.
+   */
+  const breakageValueStatus = $derived.by(() => {
+    if (breakMode === 'diceExpression') {
+      if (breakFormula.trim() === '') return 'warn';
+      return formulaRollable ? 'pass' : 'block';
+    }
+    if (breakMode === 'limitedUses') {
+      const maxUses = Number(defaults.breakage?.maxUses);
+      return Number.isInteger(maxUses) && maxUses > 0 ? 'pass' : 'warn';
+    }
+    return Number(defaults.breakage?.breakageChance) > 0 ? 'pass' : 'warn';
+  });
+
+  const breakageValueCheckTitle = $derived(
+    breakageValueStatus === 'pass'
+      ? text(
+          'FABRICATE.Admin.Manager.Scoped.Entry.CheckBreakageValue',
+          'The breakage mode has a value'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Scoped.Entry.CheckBreakageValueMissing',
+          'The breakage mode has no usable value'
+        )
+  );
+
+  const breakageValueCheckDetail = $derived.by(() => {
+    if (breakageValueStatus === 'pass') return '';
+    if (breakMode === 'diceExpression' && breakFormula.trim() !== '') {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Entry.CheckBreakageFormulaDetail',
+        'This expression parses but cannot be rolled, so every attempt that consults it fails.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Scoped.Entry.CheckBreakageValueDetail',
+      'Every system inheriting this default reads the mode with nothing behind it.'
+    );
+  });
 
   const validationRows = $derived([
     {
@@ -379,6 +460,12 @@
             'FABRICATE.Admin.Manager.Scoped.Entry.CheckUnlinkedDetail',
             'This record names no game-world Item, so nothing in an inventory resolves to it.'
           ),
+    },
+    {
+      id: 'breakage-value',
+      status: breakageValueStatus,
+      title: breakageValueCheckTitle,
+      detail: breakageValueCheckDetail,
     },
     {
       id: 'membership',
@@ -653,6 +740,65 @@
               )}
             </p>
           </section>
+
+          <!--
+            THE WORLD MASTER SWITCH, and it is the design's third Overview card.
+
+            It is NOT the per-system toggle the catalogue inspector's membership rows carry.
+            World off wins: `resolveScopedDefinition` ANDs this flag with each system's own, so
+            a world-disabled Tool is off everywhere and no per-system write can bring it back.
+
+            THE MEMBER COUNT IS STATED BESIDE IT, BEFORE THE CLICK. A GM turning this off is
+            silently switching a Tool off in every system that has adopted it, and every recipe
+            in those systems that requires it stops being craftable. The switch cannot state
+            that consequence AFTER the fact - there is no confirmation step on a world-scope
+            write, because every other field on this screen persists on change too - so the
+            number a GM needs is on screen before they reach for it.
+          -->
+          {#if scope?.worldEnableable}
+            <section
+              class="manager-world-tool-entry-card manager-world-tool-entry-switch"
+              data-world-tool-entry-card="enabled"
+            >
+              <div class="manager-world-tool-entry-switch-copy">
+                <strong>{text('FABRICATE.Admin.Manager.Tools.WorldEnabled', 'Tool enabled')}</strong
+                >
+                <p class="manager-muted">
+                  {text(
+                    'FABRICATE.Admin.Manager.Tools.WorldEnabledHint',
+                    'Recipes can require this Tool while it is enabled. Systems may still disable it for themselves.'
+                  )}
+                </p>
+                <p class="manager-muted" data-world-tool-entry-enabled-reach>
+                  {format(
+                    memberSystemCount === 1
+                      ? 'FABRICATE.Admin.Manager.Tools.WorldEnabledReachOne'
+                      : 'FABRICATE.Admin.Manager.Tools.WorldEnabledReach',
+                    memberSystemCount === 1
+                      ? '{count} crafting system has this Tool and loses it while this is off.'
+                      : '{count} crafting systems have this Tool and lose it while this is off.',
+                    { count: memberSystemCount }
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                class={`manager-status-toggle ${worldEnabled ? 'is-on' : 'is-off'}`}
+                data-world-tool-entry-enabled={worldEnabled ? 'on' : 'off'}
+                aria-pressed={worldEnabled}
+                onclick={() => actions?.setWorldEnabled?.(entityId, !worldEnabled)}
+              >
+                <span class="manager-status-toggle-track" aria-hidden="true"
+                  ><span class="manager-status-toggle-knob"></span></span
+                >
+                <span class="manager-status-toggle-label"
+                  >{worldEnabled
+                    ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                    : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+                >
+              </button>
+            </section>
+          {/if}
         {:else if activeTab === 'breakage'}
           <!--
             ONE TAB FOR THE WHOLE BREAKAGE STORY. It used to be three — `Breakage`, `On break`
@@ -700,6 +846,125 @@
               optionDataAttr="data-world-tool-entry-breakage-mode"
               onChange={(mode) => patchSection('breakage', { mode })}
             />
+            <!--
+              THE VALUE EDITOR FOR THE SELECTED MODE, one per mode, which the screen had none of.
+
+              The mode cards above author `breakage.mode` and nothing else, so a world default
+              reading `Breakage chance` was stuck at whatever `breakageChance` it happened to be
+              seeded with and a GM had no way to move it. Each control writes into the SAME
+              section object as the mode - `patchSection` merges - so switching modes never
+              erases the value the other mode was carrying.
+
+              The controls are the SHIPPED ones the system Tool Rules editor already renders for
+              the same three modes, so one meaning has one control across the two scopes.
+            -->
+            <div class="manager-world-tool-entry-break-value" data-world-tool-entry-breakage-value>
+              {#if breakMode === 'limitedUses'}
+                <div class="manager-world-tool-entry-field-row">
+                  <div class="manager-world-tool-entry-field-copy">
+                    <span class="manager-kicker"
+                      >{text(
+                        'FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopy',
+                        'Uses per copy'
+                      )}</span
+                    >
+                    <small class="manager-muted"
+                      >{text(
+                        'FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopyHint',
+                        'A fresh copy starts with this many uses.'
+                      )}</small
+                    >
+                  </div>
+                  <Stepper
+                    value={defaults.breakage?.maxUses ?? 1}
+                    min={1}
+                    {...stepperLabels(
+                      text('FABRICATE.Admin.Manager.Tools.BreakageMaxUses', 'Maximum uses')
+                    )}
+                    inputProps={{ 'data-world-tool-entry-max-uses': '' }}
+                    onChange={(maxUses) => patchSection('breakage', { maxUses })}
+                  />
+                </div>
+              {:else if breakMode === 'breakageChance'}
+                <div class="manager-world-tool-entry-field-copy">
+                  <span class="manager-kicker"
+                    >{text(
+                      'FABRICATE.Admin.Manager.Tools.BreakageChancePerUse',
+                      'Break chance per use'
+                    )}</span
+                  >
+                  <small class="manager-muted"
+                    >{text(
+                      'FABRICATE.Admin.Manager.Tools.BreakageChanceControlHint',
+                      'Each time the Tool is used, this percentage is its chance to break.'
+                    )}</small
+                  >
+                </div>
+                <ChanceSlider
+                  value={defaults.breakage?.breakageChance ?? 0}
+                  numberLabel={text(
+                    'FABRICATE.Admin.Manager.Tools.BreakageChancePercent',
+                    'Break chance percent'
+                  )}
+                  rangeLabel={text(
+                    'FABRICATE.Admin.Manager.Tools.BreakageChance',
+                    'Breakage chance'
+                  )}
+                  resolveColor={toolBreakageChanceColor}
+                  trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+                  controlClass="manager-tool-breakage-chance-control"
+                  numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
+                  rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}
+                  onChange={(breakageChance) => patchSection('breakage', { breakageChance })}
+                />
+              {:else}
+                <div class="manager-world-tool-entry-field-row">
+                  <label class="manager-field manager-world-tool-entry-formula">
+                    <span class="manager-kicker"
+                      >{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span
+                    >
+                    <input
+                      type="text"
+                      data-world-tool-entry-formula
+                      aria-invalid={formulaRollable ? undefined : 'true'}
+                      value={breakFormula}
+                      oninput={(event) =>
+                        patchSection('breakage', { formula: event.currentTarget.value })}
+                    />
+                  </label>
+                  <div class="manager-world-tool-entry-field-copy">
+                    <span class="manager-kicker"
+                      >{text(
+                        'FABRICATE.Admin.Manager.Tools.BreakageThreshold',
+                        'Break below'
+                      )}</span
+                    >
+                    <Stepper
+                      value={defaults.breakage?.threshold ?? 0}
+                      step={1}
+                      {...stepperLabels(
+                        text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')
+                      )}
+                      inputProps={{ 'data-world-tool-entry-threshold': '' }}
+                      onChange={(threshold) => patchSection('breakage', { threshold })}
+                    />
+                  </div>
+                </div>
+                <!-- ROLLED, NOT PARSED. `Roll.validate` returns true for expressions that throw
+                     the moment a craft evaluates them, so the guard evaluates the formula with
+                     every term maximized and requires a finite total. It FAILS OPEN with no
+                     dice engine, so nothing red appears in a headless render. -->
+                {#if !formulaRollable}
+                  <p class="manager-muted is-danger" data-world-tool-entry-formula-error>
+                    <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+                    {text(
+                      'FABRICATE.Admin.Manager.Tools.BreakageFormulaUnrollable',
+                      'This expression parses but cannot be rolled, so every attempt that consults it fails.'
+                    )}
+                  </p>
+                {/if}
+              {/if}
+            </div>
             <!-- THE VALUE, not the mode. The card above already names the mode; this states
                  what it currently resolves to, which no card can. The on-break section has no
                  counterpart line because its mode IS its whole answer, and a line repeating
@@ -1007,6 +1272,89 @@
   .manager-world-tool-entry-hint {
     margin: 0;
     font-size: 0.62rem;
+  }
+
+  /* THE MASTER-SWITCH CARD IS A ROW, not the column its siblings are: its copy and its one
+     control sit side by side, which is what the design draws and what stops a two-line
+     explanation pushing a 20px toggle onto a line of its own. It reuses the card box above
+     and overrides only the axis. */
+  .manager-world-tool-entry-switch {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-3);
+  }
+
+  .manager-world-tool-entry-switch-copy {
+    display: flex;
+    flex: 1 1 14rem;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-switch-copy strong {
+    color: var(--fab-mv2-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .manager-world-tool-entry-switch-copy p {
+    margin: 0;
+    font-size: 0.62rem;
+  }
+
+  /* THE BREAKAGE VALUE EDITORS. One column, because only ONE of the three ever renders and a
+     grid sized for the widest of them would leave the other two floating in a track they do
+     not fill. */
+  .manager-world-tool-entry-break-value {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  /* A label cell and its control on one line, wrapping to two under a narrow pane rather than
+     letting a stepper shrink below its own digits. */
+  .manager-world-tool-entry-field-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--fab-space-3);
+    min-width: 0;
+  }
+
+  /* NO `flex` SHORTHAND HERE, and that is the whole bug this rule used to carry. The copy cell
+     appears in TWO contexts: beside a control in `.manager-world-tool-entry-field-row`, which
+     is a ROW, and directly above one in the break-value column. `flex: 1 1 10rem` in a COLUMN
+     container makes the basis a HEIGHT, so the two-line caption above the break-chance slider
+     grew to 160px and opened a 150px void between the label and the control it labels.
+     The basis therefore belongs to the ROW context alone. */
+  .manager-world-tool-entry-field-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-field-row > .manager-world-tool-entry-field-copy {
+    flex: 1 1 10rem;
+  }
+
+  .manager-world-tool-entry-field-copy small {
+    font-size: 0.6rem;
+  }
+
+  .manager-world-tool-entry-formula {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+
+  /* AN INVALID FORMULA IS EDGE-MARKED as well as explained, so the field a GM must fix is
+     identifiable without reading the sentence under it. Two selectors deep so it beats the
+     shipped `.manager-field input` border. */
+  .manager-world-tool-entry-formula input[aria-invalid='true'] {
+    border-color: var(--fab-danger-border);
   }
 
   /* INFORMATION, NOT A WELL. This band states a value authored on another screen, and the

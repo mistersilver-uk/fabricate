@@ -66,6 +66,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // Issue 1118: the resolver ranks a rolling modifier by the deterministic average this
   // import-free leaf computes, and the same walk is what tells it a modifier rolls at all.
   'src/utils/rollExpressionAverage.js',
+  'src/utils/rollFormulaRollability.js',
   'src/utils/routedOutcomeKeywords.js',
   // Issue 1098: `routedOutcomeKeywords.js` now reads the failure-result policy to decide
   // which outcome tiers a result-authoring control may offer, so this leaf joins the

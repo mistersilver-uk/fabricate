@@ -1314,6 +1314,47 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'world-tool-entry-overview',
+    label: 'Manager — World Tool entry, Overview',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A SECOND FRAME ON ONE SCREEN, because the entry's two tabs make DIFFERENT decisions and
+    // its sibling case opens Breakage. Overview is where the world record's identity and its
+    // MASTER SWITCH live (issue 1373), and the switch is the one control on this screen that
+    // reaches every crafting system at once - a state no case covered, which is exactly the
+    // gap that publishes an unrelated frame.
+    //
+    // NO TAB STEP: Overview is the tab the route opens on, and clicking the tab it is already
+    // on would assert nothing the default does not.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-card="enabled"]',
+    // THE SWITCH AND THE CONSEQUENCE COUNT BESIDE IT. A world-scope write persists on change
+    // and has no confirmation step, so a frame proving the control without the count would be
+    // evidence of the half that is safe to ship on its own and is not.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="enabled"]',
+        target: '[data-world-tool-entry-enabled]',
+      },
+      {
+        container: '[data-world-tool-entry-card="enabled"]',
+        target: '[data-world-tool-entry-enabled-reach]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
     id: 'world-scoped-rail-collapsed',
     label: 'Manager — World scoped rail collapsed',
     reaches: 'beyond',

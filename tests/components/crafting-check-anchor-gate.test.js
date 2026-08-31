@@ -30,6 +30,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...CHECKS_TREE_RAW_MODULES,
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     // The DC-macro card joined the routed tree with issue 1096's dcMode work.
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',

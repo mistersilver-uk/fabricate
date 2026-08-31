@@ -101,6 +101,7 @@
 
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { reduceRollExpression } from '../utils/rollExpressionAverage.js';
+import { formulaRolls } from '../utils/rollFormulaRollability.js';
 
 import { resolveModifierLibrary } from './characterLibraries.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
@@ -837,50 +838,21 @@ function resolveCatalogueEntry(id, entry, resolveExpression, Roll) {
 /**
  * Whether a rolling fragment can actually be ROLLED, proven by rolling it.
  *
- * `Roll.validate` IS NOT THIS TEST, and believing it was is how the first version of this
- * guard came to have a hole the size of a capitalized function name. `validate` is
- * `evaluateSync({ strict: false })`, and `Roll#_evaluateASTSync` SKIPS every
- * non-deterministic node — so on a fragment that rolls, which is every fragment reaching
- * here, the dice-bearing subtree is never evaluated and no evaluate-time error class is
- * exercised at all. It is a PARSE oracle wearing an evaluation's clothes. Measured against
- * the shipped 14.365 stack over 355 emitted formulas, 25 validated `true` and then threw:
+ * DELEGATED to `src/utils/rollFormulaRollability.js`, which carries the whole argument: that
+ * `Roll.validate` is a PARSE oracle wearing an evaluation's clothes, that `maximize: true` is
+ * what makes the proof total, that the finite test on the total closes the `max(, 2)` empty-head
+ * trap, and that a missing dice engine must FAIL OPEN. The world Tool entry's breakage formula
+ * field needs the identical predicate, and two copies of an argument this long is how one of
+ * them ends up subtly weaker than the other.
  *
- * | authored            | what `evaluate()` says                                            |
- * |---------------------|-------------------------------------------------------------------|
- * | `MAX(1d4, 2)`       | `The function "MAX" is not registered in CONFIG.Dice.functions`    |
- * | `1000d6`            | `You may not evaluate a DiceTerm with more than 999 results`       |
- * | `1d4 + .5`          | `Unresolved StringTerm .5` (`Constant` needs a leading digit)      |
- *
- * Each of those throws inside `evaluateCheckRoll`, which the runners catch as a FAILED
- * check — ingredients spent, tools broken, every attempt, with only a `console.error`.
- *
- * `maximize: true` is what makes the proof total: it renders every term deterministic, so
- * `_evaluateASTSync` skips NOTHING and every node is really evaluated. The finite test on
- * the total is required rather than decorative — `Roll#total` is `Number(this._total) || 0`,
- * which passes `-Infinity` through as a number, and `max(, 2)` is exactly that shape. So
- * this predicate closes the empty-head trap BY CONSTRUCTION rather than by argument.
- *
- * Measured at 0.03-0.5 ms per fragment on the real stack, exploding and reroll pools
- * included, and it runs once per eligible rolling entry per resolution.
- *
- * FAIL OPEN when there is no dice engine (headless, tests), matching
- * `stripRetiredModifierPlaceholder`: nothing evaluates the formula there either, and
- * answering "unrollable" would silently delete a modifier from every headless resolution.
+ * Kept as a named local so this module's call site still reads as a question about a FRAGMENT.
  *
  * @param {string} formula The assembled, clamped fragment.
  * @param {typeof globalThis.Roll} [Roll]
  * @returns {boolean}
  */
 function fragmentRolls(formula, Roll) {
-  if (typeof Roll !== 'function') return true;
-  try {
-    const roll = new Roll(formula);
-    if (typeof roll?.evaluateSync !== 'function') return true;
-    roll.evaluateSync({ maximize: true });
-    return Number.isFinite(roll.total);
-  } catch {
-    return false;
-  }
+  return formulaRolls(formula, Roll);
 }
 
 /**

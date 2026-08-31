@@ -23,6 +23,7 @@ const harness = createMountedComponentHarness({
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
   ],
   compiledModules: ['src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte'],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
