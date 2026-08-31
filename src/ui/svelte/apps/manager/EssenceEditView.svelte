@@ -607,11 +607,19 @@
 
   /* The world-scope banner. STATIC class names, so Svelte can prove each selector is used and
      `lint:svelte:warnings` stays at zero; `styles/fabricate.css` is closed to this lane. */
+  /* A CARD, not loose text. This rendered as an unstyled paragraph and two bare controls sitting
+     above the tab strip, which read as content that had escaped its container rather than as a
+     scope banner. The surface is what says "this part is not about the system you are editing". */
   .manager-essence-scope-banner {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
+    margin-bottom: var(--fab-space-3);
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: var(--fab-radius-card, 12px);
+    background: var(--fab-mv2-surface-2);
   }
 
   .manager-essence-scope-note {
@@ -621,10 +629,12 @@
     line-height: 1.55;
   }
 
+  /* The two inherit rows sit side by side where the card is wide enough, so the banner costs one
+     band rather than four stacked ones above the tab strip. */
   .manager-essence-scope-inherit {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--fab-space-3);
     min-width: 0;
   }
 
