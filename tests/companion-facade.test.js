@@ -1537,7 +1537,7 @@ describe('the harness copies are faithful to src/main.js', () => {
       ],
       [
         'resolveComponent',
-        'resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null',
+        'resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null',
         'every entry answers componentNotFound, so no award ever lands',
       ],
       [
@@ -1848,7 +1848,7 @@ describe('the harness copies are faithful to src/main.js', () => {
           ],
           [
             'resolveComponent',
-            'resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null',
+            'resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null',
             'every component row answers componentNotFound',
           ],
           [

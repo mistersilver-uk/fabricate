@@ -78,6 +78,7 @@ import {
 import { readPooledCurrencyBalance, resolveWorldCurrencyUnitByName } from './currencyAffordance.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import { pooledItemOrder } from './pooledAllocation.js';
+import { resolvedComponentsFor, resolvedToolsFor } from './scopedEntityReads.js';
 
 /**
  * The CLOSED key set of one cost entry, on `companionComponentAward`'s precedent.
@@ -182,7 +183,7 @@ function validatePooledActors(actors) {
 
 /** One system's component definitions, as an array whatever the system carries. */
 function systemComponents(system) {
-  return Array.isArray(system?.components) ? system.components : [];
+  return resolvedComponentsFor(system);
 }
 
 /**
@@ -265,7 +266,7 @@ function toolDisplayName(system, tool) {
 /** Resolve a tool cost's name against every system's first-class Tool definitions. */
 function resolveNamedTool(systems, name) {
   const wanted = name.toLowerCase();
-  const tools = (system) => (Array.isArray(system?.tools) ? system.tools : []);
+  const tools = (system) => resolvedToolsFor(system);
   return resolveNamedDefinition(
     systems,
     name,

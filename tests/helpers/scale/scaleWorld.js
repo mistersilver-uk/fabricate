@@ -65,6 +65,7 @@ export async function loadBenchmarkModules() {
     graphModule,
     recipeRowProjectionModule,
     worldScopeStoresModule,
+    scopedEntityReadsModule,
   ] = await Promise.all([
     import('../../../src/systems/RecipeManager.js'),
     import('../../../src/systems/CraftingSystemManager.js'),
@@ -92,6 +93,9 @@ export async function loadBenchmarkModules() {
     // module reaches `src/config/settings.js`, which must not be evaluated before
     // `installFoundryEnv()` has installed `game`.
     import('../../../src/systems/worldScopeStores.js'),
+    // The shared read seam (issue 1370). The other spelling of the manager's three read
+    // unions, and the one every reader holding a system RECORD rather than a manager uses.
+    import('../../../src/systems/scopedEntityReads.js'),
   ]);
 
   cachedModules = {
@@ -119,6 +123,7 @@ export async function loadBenchmarkModules() {
     componentNameMatch: componentNameMatchModule,
     definitionIndex: definitionIndexModule,
     worldScopeStores: worldScopeStoresModule,
+    scopedEntityReads: scopedEntityReadsModule,
     recipeBrowser: recipeBrowserModule,
     componentBrowser: componentBrowserModule,
     pagination: paginationModule,

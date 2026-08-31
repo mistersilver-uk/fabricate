@@ -79,7 +79,8 @@ Schema `6` added the three envelope-level world-scope entity slices (`componentS
 
 **Schema `6` is NOT A LIFT, and that breaks with the previous three bumps.**
 Schemas `3`, `4` and `5` each moved data OFF the system and reduced or deleted the system's own copy, pairing a hoist with a strip.
-Schema `6` has no hoist and no strip half, because the source data has not left the system: the in-system `components`, `essenceDefinitions` and `tools` arrays survive and the in-system record remains AUTHORITATIVE until the consumer sweep (`data-models/spec.md` -> CraftingSystem requirement 36).
+Schema `6` has no hoist and no strip half, because the source data has not left the system: the in-system `components`, `essenceDefinitions` and `tools` arrays survive and the in-system record remains AUTHORITATIVE while `data-models/spec.md` -> CraftingSystem requirement 36 holds.
+Readers now ENTER through the world-scope read union, and that changes nothing here: reading is not authority, the union answers every field, row and row order from the in-system record for as long as requirement 36 holds, and no import path reads the union to build a system.
 The invariant is therefore ONE-DIRECTIONAL, and is stated in the only form that is true of the whole upcast: it MUST NOT REMOVE a key from any record of `system.components`, `system.essenceDefinitions` or `system.tools`, nor change the value of a key the input carried.
 "Deep-equal to the input" is false for a schema-`1` payload independently of this change, because the first-class tool upcast already ADDS keys to a component-linked tool.
 The envelope MUST carry a `runtimeStateIncluded` boolean marker, which is `false` for authoring-only exports.

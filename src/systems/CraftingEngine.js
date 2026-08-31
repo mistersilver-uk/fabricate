@@ -67,6 +67,11 @@ import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import {
+  resolvedComponentsFor,
+  resolvedEssencesFor,
+  resolvedToolsFor,
+} from './scopedEntityReads.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
 import { buildStepRecipeView } from './stepRecipeView.js';
 import { effectiveToolBreakageAuthority } from './toolBreakageAuthority.js';
@@ -2535,11 +2540,11 @@ export class CraftingEngine {
           recipeManager ? recipeManager.getRecipes({ craftingSystemId: id, enabled: true }) : [],
         getComponentsForSystem: (id) => {
           const sys = systemManager.getSystem(id);
-          return sys?.components || [];
+          return resolvedComponentsFor(sys);
         },
       });
 
-    const components = system.components || [];
+    const components = resolvedComponentsFor(system);
     const recipes = systemRecipes;
     // The bare owned items, for the uuid/essence-keyed paths (consumption and essence
     // accumulation) that must key on the item, not its bucketed component id.
@@ -2985,7 +2990,7 @@ export class CraftingEngine {
     const qty = Math.max(0, Math.trunc(Number(quantity) || 0));
     if (qty <= 0) return null;
 
-    const component = findById(getDefinitionIndex(system?.components), componentId);
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
     let sourceItem = null;
     if (component?.registeredItemUuid) {
       try {
@@ -3716,7 +3721,7 @@ export class CraftingEngine {
     return createToolReplacementCreator({
       system,
       resolveComponentSource: async ({ componentId }) => {
-        const component = findById(getDefinitionIndex(system?.components), componentId);
+        const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
         if (!component?.registeredItemUuid) return component;
         const source = await this.resolveItemUuid(component.registeredItemUuid);
         return source?.documentName === 'Item' ? source : null;
@@ -3825,7 +3830,7 @@ export class CraftingEngine {
       : null;
     if ((result.componentId || result.systemItemId) && recipe.craftingSystemId) {
       managedItem = findById(
-        getDefinitionIndex(system?.components),
+        getDefinitionIndex(resolvedComponentsFor(system)),
         result.componentId || result.systemItemId
       );
       if (managedItem?.registeredItemUuid) {
@@ -4011,7 +4016,7 @@ export class CraftingEngine {
     if (contributingEssenceIds.length === 0) return;
 
     // 3. For each contributing essence, find its EssenceDefinition and resolve the source item
-    const essenceDefinitions = system.essenceDefinitions || [];
+    const essenceDefinitions = resolvedEssencesFor(system);
     const effectsData = [];
 
     for (const essenceId of contributingEssenceIds) {
@@ -4122,7 +4127,7 @@ export class CraftingEngine {
   }
 
   _snapshotEssenceEnabled(resolvedEssences, system) {
-    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definitions = resolvedEssencesFor(system);
     const snapshot = {};
     for (const essenceId of Object.keys(resolvedEssences || {})) {
       const definition = definitions.find((def) => def?.id === essenceId);
@@ -4196,7 +4201,7 @@ export class CraftingEngine {
     const features = system?.features || {};
     if (features.propertyMacros !== true || features.essences !== true) return false;
 
-    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definitions = resolvedEssencesFor(system);
     if (definitions.length === 0) return false;
 
     // Everything this predicate reads is on the definition itself, so it is decidable
@@ -4385,8 +4390,10 @@ export class CraftingEngine {
     const sourceComponentId =
       definition.sourceComponentId || definition.associatedSystemItemId || '';
     if (sourceComponentId) {
+      // The legacy `items` alias is NOT a scoped corpus and keeps its raw read: it predates
+      // `components` and no world entity has ever been lifted from it.
       const components = Array.isArray(system?.components)
-        ? system.components
+        ? resolvedComponentsFor(system)
         : Array.isArray(system?.items)
           ? system.items
           : [];
@@ -5286,7 +5293,7 @@ export class CraftingEngine {
    *   componentName: string, position: number|null}>}
    */
   _complicationChatEntries(fired, system) {
-    const componentIndex = getDefinitionIndex(system?.components);
+    const componentIndex = getDefinitionIndex(resolvedComponentsFor(system));
     return publicComplications(fired).map((entry) => ({
       name: entry.name,
       description: entry.description,
@@ -5390,7 +5397,7 @@ export class CraftingEngine {
    */
   _resolveToolChatEntries(tools, system) {
     const componentById = new Map(
-      (system?.components || []).map((component) => [component?.id, component])
+      resolvedComponentsFor(system).map((component) => [component?.id, component])
     );
     const entries = [];
     const seen = new Set();
@@ -5434,14 +5441,12 @@ export class CraftingEngine {
    */
   _resolveBrokenToolChatEntries(usedTools, system) {
     const componentById = new Map(
-      (system?.components || []).map((component) => [component?.id, component])
+      resolvedComponentsFor(system).map((component) => [component?.id, component])
     );
     // The evidence carries `toolId` (issue 1119) precisely so this card can reach the Tool.
     // Resolving `componentId` alone produced BLANK entries — not even a fallback — for an
     // item-sourced Tool, which has no component to name.
-    const toolById = new Map(
-      (Array.isArray(system?.tools) ? system.tools : []).map((tool) => [tool?.id, tool])
-    );
+    const toolById = new Map(resolvedToolsFor(system).map((tool) => [tool?.id, tool]));
     const entries = [];
     const seen = new Set();
     for (const record of usedTools || []) {
@@ -5683,7 +5688,7 @@ export class CraftingEngine {
     if (!systemId) return [];
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
-    return Array.isArray(system?.components) ? system.components : [];
+    return resolvedComponentsFor(system);
   }
 
   /**
@@ -5844,7 +5849,7 @@ export class CraftingEngine {
       };
     }
 
-    const managedItems = system.components || [];
+    const managedItems = resolvedComponentsFor(system);
     const component = findById(getDefinitionIndex(managedItems), componentId);
     if (!component) {
       return {
@@ -6346,7 +6351,7 @@ export class CraftingEngine {
    */
   findComponentItems(actor, component, system) {
     const items = [...actor.items];
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = resolvedComponentsFor(system);
     if (
       component.registeredItemUuid ||
       component.originItemUuid ||
@@ -6668,7 +6673,7 @@ export class CraftingEngine {
     // Resolved ONCE for the whole award rather than per result: `costFor` is called for
     // every result in the group, and every bulk row calls this method, so a scan here was
     // a `rows x results x components` term.
-    const managedItemIndex = getDefinitionIndex(system?.components);
+    const managedItemIndex = getDefinitionIndex(resolvedComponentsFor(system));
     const award = resolveProgressiveAward({
       results,
       initialRemaining: Number(checkResult?.value || 0),
@@ -6718,7 +6723,7 @@ export class CraftingEngine {
       salvageRun
     );
     if (!resolved) return null;
-    const managedItemIndex = getDefinitionIndex(system?.components);
+    const managedItemIndex = getDefinitionIndex(resolvedComponentsFor(system));
     const stages = resolved.results.map((result) => {
       const componentId = result?.componentId || result?.systemItemId || null;
       return {
@@ -6741,7 +6746,7 @@ export class CraftingEngine {
    */
   _resolveSalvageTools(system, salvage) {
     const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
-    const library = Array.isArray(system?.tools) ? system.tools : [];
+    const library = resolvedToolsFor(system);
     const seen = new Set();
     const tools = [];
     for (const rawId of ids) {

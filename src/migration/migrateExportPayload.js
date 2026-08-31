@@ -462,7 +462,9 @@ function scopeSliceToEnvelopeShape(payload) {
  * Every prior bump moved data OFF the system and paired a `buildWorldX` with a `stripSystemX`.
  * Schema 6 has NO strip half, because the source data has not left the system: the in-system
  * `components` / `essenceDefinitions` / `tools` arrays survive and the in-system record stays
- * AUTHORITATIVE until the consumer sweep. A lift that stripped identity off `system.components`
+ * AUTHORITATIVE while `## CraftingSystem` requirement 36 holds. Readers now ENTER through the
+ * read union, which changes nothing here: reading is not authority, and no import path reads
+ * the union to build a system. A lift that stripped identity off `system.components`
  * would perform, through the import door, exactly the shed that blanks every screen in the
  * destination world on the first save.
  *

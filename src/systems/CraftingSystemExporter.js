@@ -166,8 +166,11 @@ export function validateImportData(rawData) {
   // than the migrated one — and that is not a stylistic choice. The 5→6 upcast REPLACES a slice
   // it cannot read with a freshly derived one, so by the time we look at `data` a malformed slice
   // has already become a well-formed one and this check would never fire. A dropped slice is an
-  // import that quietly creates no memberships, which is indistinguishable from success until the
-  // consumer sweep makes the read union visible.
+  // import that quietly creates no memberships. That was indistinguishable from success until the
+  // read repointing of issue 1370 made the union visible to every non-UI reader; it is now
+  // observable, but only once a world default or a membership override is authored, because
+  // while `## CraftingSystem` requirement 36 holds the in-system record decides every key it
+  // carries. So the check stays where it is rather than being demoted to a runtime symptom.
   for (const key of Object.values(WORLD_SCOPE_SLICE_KEYS)) {
     const slice = rawData[key];
     if (slice === undefined) continue;

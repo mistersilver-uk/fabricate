@@ -61,8 +61,10 @@
  * it; CONSTRAINT 0 makes decline the DOMINANT class, so surfacing it would fire on nearly every
  * migrated world - which `worldScopeEntityNotice.js` rejects by name, because a notice that always
  * fires is a notice nobody reads, and the severity derivation would flip almost every pass to a
- * PERMANENT warning. It is also not actionable at `1.30.0`: nothing resolves through a world
- * default until the consumer sweep, so a declined section has NO observable consequence in the
+ * PERMANENT warning. It is also not actionable at `1.30.0`: every membership record is created
+ * fully OVERRIDING, and while `## CraftingSystem` requirement 36 holds the in-system record
+ * decides every key it carries anyway - so nothing resolves through a world default and a
+ * declined section has NO observable consequence in the
  * GM's world, and the remedy once the catalogue editors ship is to author the world default
  * directly rather than to backfill the section in every member system. It is carried on the
  * transient report for the acceptance suite and for the editors of PRs 6a-c.

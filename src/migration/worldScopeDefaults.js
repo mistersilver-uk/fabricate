@@ -30,14 +30,17 @@
  * `coerceComponentSection` coerces `''` to absence, so an empty `category` is unstorable outright.
  * `breakage: {}` and `onBreak: {}` ARE storable overrides, and the objection to them is a NAME
  * COLLISION: both keys are spelled identically at world scope and on the shipped in-system `Tool`,
- * and `unionScopedDefinitions` spreads the RESOLVED sections LAST over the surviving in-system
- * record (`src/systems/scopedDefinitionStore.js`), so `{}` would OVERWRITE a live in-system block
- * rather than mean "no breakage". The in-system arrays stay authoritative until the consumer sweep
- * (`## CraftingSystem` requirement 36), so that block is where a GM's post-migration edits land.
- * The read union has NO PRODUCTION CONSUMER at `1.30.0`, so this is a hazard the sweep would
- * inherit rather than one any reader meets today - which is why it is designed out here, at the
- * only moment the whole corpus is in hand, rather than left for the release that first reads
- * through the union to discover.
+ * so `{}` would OVERWRITE a live in-system block rather than mean "no breakage".
+ *
+ * **THAT HAZARD IS DORMANT while `## CraftingSystem` requirement 36 holds, and RE-ARMS when it
+ * retires, so the decline is KEPT rather than relaxed.** `unionScopedDefinitions` no longer
+ * spreads the resolved sections LAST: for the duration of requirement 36 it re-applies the whole
+ * in-system record over them (`src/systems/scopedDefinitionStore.js`), so a `{}` override cannot
+ * reach a live in-system block today. The union DOES have production consumers as of issue 1370,
+ * so this is no longer a hazard deferred to a later release to discover - it is one designed out
+ * here, at the only moment the whole corpus is in hand, and held out by a rule dated to
+ * requirement 36. The in-system arrays stay authoritative while that requirement holds, so that
+ * block is where a GM's post-migration edits land.
  *
  * A world default for a section some member left unauthored would therefore CHANGE THAT MEMBER'S
  * RESOLVED BEHAVIOUR at migration time - silently handing it the donor's category, breakage mode

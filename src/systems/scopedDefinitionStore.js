@@ -1,3 +1,5 @@
+import { identityOf, WORLD_IDENTITY_FIELDS } from '../migration/worldScopeEntityGrouping.js';
+
 import { findWorldDefault, membershipKey } from './scopedDefinitions.js';
 
 /**
@@ -183,13 +185,22 @@ function membershipsForSystem(memberships, systemId) {
  * THE READ UNION for one entity type and one crafting system.
  *
  * IT IS NOT THE BASIS UNION, and conflating the two is the single most consequential mistake
- * available in this change. This one answers what a system's entity list IS: the world entities
- * whose membership record for that system is PRESENT, resolved through #1358's three-layer
- * resolver, unioned with that system's surviving in-system array, WORLD WINNING on an id
- * collision FIELD BY FIELD. It is MEMBERSHIP-FILTERED and returns RESOLVED values, never raw
- * world entities — an unfiltered union would give every system every world entity and delete the
- * membership model #1358 built, and a raw-entity union would hand back world defaults in place of
- * a system's own overrides, bypassing the inherit map.
+ * available in this change. This one answers what a system's entity list IS: that system's
+ * surviving in-system array, merged with the world entities whose membership record for that
+ * system is PRESENT, each resolved through #1358's three-layer resolver. It is
+ * MEMBERSHIP-FILTERED and returns RESOLVED values, never raw world entities — an unfiltered
+ * union would give every system every world entity and delete the membership model #1358
+ * built, and a raw-entity union would hand back world defaults in place of a system's own
+ * overrides, bypassing the inherit map.
+ *
+ * **While `## CraftingSystem` requirement 36 holds, the IN-SYSTEM RECORD DECIDES: the union
+ * answers every KEY that record carries, its ROW ORDER and its ROW SET, re-derived from it at
+ * read time, and the world layer supplies only the keys it does not carry. The world-wins
+ * precedence below is the TARGET contract and is SUSPENDED, not consumed, for the duration; it
+ * re-arms when requirement 36 retires.**
+ * The two sections below are kept in that order — the `1363` correction first, then the
+ * `1370` inversion — because each is the reason the next was needed, and a reader who meets
+ * only the first must not read it as the current rule.
  *
  * ## "WORLD WINS" IS PER FIELD, AND WAS PER RECORD (issue 1363)
  *
@@ -202,18 +213,63 @@ function membershipsForSystem(memberships, systemId) {
  * field it authors. Nothing about world precedence is weakened — it is corrected only in that a
  * world record no longer ERASES disjoint in-system fields.
  *
- * TWO SPREAD HAZARDS, both real and both intended, stated here so neither is later read as a
- * defect:
+ * ## THE IN-SYSTEM RECORD DECIDES THE KEYS, THE ORDER AND THE ROW SET, WHILE REQUIREMENT 36 HOLDS
  *
- * - `resolveScopedDefinition` guards `undefined`, so `resolved` cannot blank a section.
- *   `...entity` is NOT guarded that way: a world entity carrying an EMPTY-STRING `description`
- *   or `img` overwrites a populated legacy one, because `normalizeWorldEntities` preserves every
- *   authored field verbatim and enforces only an identity floor. That is world precedence working
- *   as specified — an authored empty string is an authored value.
- * - `resolveScopedDefinition` ALWAYS emits `member` and `inherited`, and for an enableable scope
- *   ALWAYS emits `enabled`, so the merge overwrites a legacy `enabled` on essences and tools.
- *   THAT IS INTENDED: after the migration the membership record is the only correct source of
- *   `enabled` for a world-claimed essence or tool, and the legacy value is the pre-migration copy.
+ * The two spread hazards this note used to record as INTENDED are now INVERTED, for the duration
+ * of `## CraftingSystem` requirement 36, and both are restated here rather than deleted so a
+ * reader meeting the old reasoning elsewhere can see exactly what replaced it and why.
+ *
+ * - RETIRED: "a world entity carrying an EMPTY-STRING `description` or `img` overwrites a
+ *   populated legacy one, and that is world precedence working as specified". The whole in-system
+ *   record is RE-SPREAD last, so an authored empty string on the world entity no longer erases a
+ *   populated in-system value. It was never a durable rule: every shipped identity writer writes
+ *   the IN-SYSTEM copy, `refreshComponentMetadataForUpdatedItem` rewrites `name`, `img` and
+ *   `description` in place on the `updateItem` hook, and no shipped writer writes the world
+ *   entity — so world-wins precedence on an identity field reverts the GM's own edit on the very
+ *   next read.
+ * - RETIRED: "after the migration the membership record is the only correct source of `enabled`
+ *   for a world-claimed essence or tool". That held while NOTHING read this union and no editor
+ *   wrote either copy. It stops holding under requirement 36: no shipped editor writes a world or
+ *   membership `enabled`, `buildMembershipRecord` froze the membership copy at migration time,
+ *   and `CraftingSystemManager` is a live writer of the in-system essence `enabled`. Because
+ *   `resolveScopedDefinition` emits `enabled` UNCONDITIONALLY for an enableable scope — and
+ *   `resolveComponent` emits `tags` unconditionally — those two keys were overwritten even when
+ *   no scope had authored anything, so a GM-disabled tool read back as usable.
+ *
+ * `member` and `inherited` survive the re-spread untouched, because no shipped in-system record
+ * carries either key.
+ *
+ * ABSENCE IS A VALUE, so the re-spread alone is not enough: a spread cannot DELETE. Every field in
+ * `WORLD_IDENTITY_FIELDS` the in-system record does not carry is deleted from the merged row, with
+ * {@link identityOf} as the oracle for "which identity keys does this record carry" — it skips
+ * exactly the `undefined` ones. Without that half, a world entity's stale `description` survives on
+ * a record the GM has since cleared.
+ *
+ * THE MEMO'S SYSTEM-HALF GUARD IS `(revision, length)`, AND THIS CHANGE IS THE FIRST FOR WHICH
+ * THAT DECIDES REAL ANSWERS. All thirteen `advanceDefinitionRevision` call sites advance
+ * `components` or `recipeItemDefinitions`; none advances `tools` or `essenceDefinitions`. No
+ * writer needs one today, because every shipped tool and essence edit REPLACES the array. A
+ * future IN-PLACE edit preserving both identity and length would serve a stale union to every
+ * repointed reader, silently - so a writer added there must advance the revision, exactly as the
+ * component writers do.
+ *
+ * ROW ORDER and ROW SET are dated to the same requirement, and that is why this walks `legacy`
+ * ONCE. The union emits the in-system array's rows, in the in-system array's order, and the world
+ * layer contributes rows only after requirement 36 retires. Three resolution tiers are FIRST-WINS
+ * over array order (`buildIndex` keeps the first record per id, the first per name, and the
+ * earliest position per source reference), so a world-roster-ordered union would silently
+ * re-rank them. The row-set rule is what stops a GM's deleted component — whose world entity and
+ * membership record `_deleteComponentSet` leaves behind — from being RESURRECTED by a repointed
+ * reader beside the recipes that same delete disabled; a keep-mode import can create the same
+ * membered-but-recordless pair with no deletion involved.
+ *
+ * A DUPLICATE ID IS PRESERVED, NOT COLLAPSED, and the retired shape got its own reason wrong. The
+ * two-pass build keyed the in-system records into a LAST-WINS map on the claim that "both shipped
+ * index builders are — the definition index and `CraftingSystemManager`'s own `itemById`".
+ * `itemById` is last-wins; `buildIndex` is FIRST-wins. So that map would have made a repointed
+ * `findById` answer the LAST record where the pre-repoint reader answered the FIRST, and a
+ * repointed listing builder emit ONE row where it emitted TWO. Walking `legacy` once keeps both
+ * rows in in-system order and leaves first-wins resolution exactly as it was.
  *
  * The BASIS union (`CraftingSystemManager#_scopeBasis`) is deliberately NOT membership-filtered,
  * because #1358's membership requirement is that an absent record is a REFUSAL, never a PRUNE: a
@@ -232,66 +288,110 @@ function membershipsForSystem(memberships, systemId) {
  * @param {unknown} options.systemDefinitions The system's surviving in-system array.
  * @param {(worldDefault: object|null, membership: object|null) => object} options.resolve The
  *   per-entity resolver from `componentScope.js` / `essenceScope.js` / `toolScope.js`.
+ * @param {'components'|'essences'|'tools'} options.entityType Selects the lifted identity field
+ *   list the DELETE half re-derives against. REQUIRED: an omitted or unrecognised value THROWS,
+ *   because defaulting it would silently disable a correctness rule — see
+ *   {@link liftedIdentityFields}. `resolveComponentScope` / `resolveEssenceScope` /
+ *   `resolveToolScope` are the only production callers, and each passes a literal.
  * @returns {Array<object>}
  */
-export function unionScopedDefinitions({ corpus, systemId, systemDefinitions, resolve }) {
+export function unionScopedDefinitions({
+  corpus,
+  systemId,
+  systemDefinitions,
+  resolve,
+  entityType,
+}) {
   const legacy = Array.isArray(systemDefinitions) ? systemDefinitions : [];
   const entities = Array.isArray(corpus?.entities) ? corpus.entities : [];
   const defaults = Array.isArray(corpus?.defaults) ? corpus.defaults : [];
   const memberships = Array.isArray(corpus?.membership) ? corpus.membership : [];
   const system = typeof systemId === 'string' ? systemId.trim() : '';
+  if (!system) return [...legacy];
+
+  // One pass to bucket the memberships and one to key the world roster, rather than a
+  // `findMembership` scan per row: the union is memoized, but a memo over an O(entities x
+  // memberships) build is still an O(entities x memberships) build on every world edit.
+  const bySystem = membershipsForSystem(memberships, system);
+  const byId = worldEntitiesById(entities);
+  const identityFields = liftedIdentityFields(entityType);
 
   const union = [];
-  const claimed = new Set();
-  if (system) {
-    // One pass to bucket the memberships and one to walk the entities, rather than a
-    // `findMembership` scan per entity: the union is memoized, but a memo over an O(entities x
-    // memberships) build is still an O(entities x memberships) build on every world edit.
-    const bySystem = membershipsForSystem(memberships, system);
-    const byId = legacyById(legacy);
-    for (const entity of entities) {
-      const membership = bySystem.get(entity.id);
-      if (!membership) continue;
-      claimed.add(entity.id);
-      // FIELD BY FIELD, NOT RECORD BY RECORD (issue 1363). The surviving in-system record is
-      // spread FIRST, so it supplies every field no world layer owns, and the world layer still
-      // wins every field it authors. See the docblock for why this is not a weakening of
-      // "world wins".
-      union.push({
-        ...byId.get(entity.id),
-        ...entity,
-        ...resolve(findWorldDefault(defaults, entity.id), membership),
-      });
-    }
-  }
   for (const entry of legacy) {
     const id = typeof entry?.id === 'string' ? entry.id.trim() : entry?.id;
-    if (id === undefined || id === null || claimed.has(id)) continue;
-    claimed.add(id);
-    union.push(entry);
+    const membership = id === undefined || id === null ? undefined : bySystem.get(id);
+    const entity = id === undefined || id === null ? undefined : byId.get(id);
+    if (!membership || !entity) {
+      // No world half for this row, so the row IS the in-system record, untouched and
+      // un-reallocated.
+      union.push(entry);
+      continue;
+    }
+    // FIELD BY FIELD, NOT RECORD BY RECORD (issue 1363), and then RE-DERIVED FROM THE IN-SYSTEM
+    // RECORD (issue 1370). The world layer supplies only the keys the in-system record does not
+    // carry, for exactly as long as `## CraftingSystem` requirement 36 holds.
+    const merged = {
+      ...entry,
+      ...entity,
+      ...resolve(findWorldDefault(defaults, id), membership),
+      ...entry,
+    };
+    const carried = identityOf(entry, entityType);
+    for (const field of identityFields) {
+      if (!(field in carried)) delete merged[field];
+    }
+    union.push(merged);
   }
   return union;
 }
 
 /**
- * The legacy in-system records of one system, keyed by trimmed id.
+ * The lifted identity field list for one entity type, REFUSING an unrecognised one.
  *
- * LAST-WINS ON A DUPLICATE ID, deliberately, because both shipped index builders are — the
- * definition index and `CraftingSystemManager`'s own `itemById`. A hand-edited corpus carrying a
- * duplicate id is already broken, but it must break the SAME WAY everywhere: a first-wins map
- * here would make the read union answer one record while every index answered the other, which
- * is the silent divergence the migration's own output-uniqueness post-condition exists to
- * prevent it ever creating.
+ * IT THROWS RATHER THAN DEFAULTING TO AN EMPTY LIST, and that is the whole point of the
+ * function. The DELETE half of the key rule is a CORRECTNESS rule, so defaulting an unknown key
+ * to "delete nothing" fails OPEN: a typo in one of the three call sites would leave a stale
+ * world name, icon or image on a record the GM has since cleared, on every read, with every
+ * suite in the repository still green. Measured: two such typos kept 943 tests across 23 files
+ * passing. A key that silently disables a correctness rule should be loud.
  *
- * @param {Array<object>} legacy
+ * The three production callers are `resolveComponentScope`, `resolveEssenceScope` and
+ * `resolveToolScope`, and each passes a literal.
+ *
+ * @param {'components'|'essences'|'tools'} entityType
+ * @returns {readonly string[]}
+ */
+function liftedIdentityFields(entityType) {
+  const fields = WORLD_IDENTITY_FIELDS[entityType];
+  if (!fields) {
+    const known = Object.keys(WORLD_IDENTITY_FIELDS).join(', ');
+    throw new TypeError(
+      'unionScopedDefinitions: unknown entityType ' +
+        JSON.stringify(entityType) +
+        '; expected one of ' +
+        known
+    );
+  }
+  return fields;
+}
+
+/**
+ * The world entity roster keyed by id.
+ *
+ * FIRST-WINS, matching {@link normalizeWorldEntities}, which already de-duplicates the roster
+ * first-wins before it is published. A store's corpus therefore cannot exercise the branch at
+ * all; a hand-built fixture corpus can, and it must answer the same record the roster's own
+ * normalizer would have kept.
+ *
+ * @param {Array<object>} entities
  * @returns {Map<unknown, object>}
  */
-function legacyById(legacy) {
+function worldEntitiesById(entities) {
   const byId = new Map();
-  for (const entry of legacy) {
-    const id = typeof entry?.id === 'string' ? entry.id.trim() : entry?.id;
-    if (id === undefined || id === null) continue;
-    byId.set(id, entry);
+  for (const entity of entities) {
+    const id = entity?.id;
+    if (id === undefined || id === null || byId.has(id)) continue;
+    byId.set(id, entity);
   }
   return byId;
 }

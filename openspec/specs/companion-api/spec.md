@@ -235,7 +235,9 @@ No caller-supplied bag is spread into any collaborator, seam or item payload: a 
 `awards` holds at most 64 entries, because every entry is a document write and an unbounded list is an unbounded write batch driven by an external caller; the bound starts small because widening what a member accepts is free under the compatibility promise while narrowing it is a version bump.
 `systemId` is declared once per call rather than per entry, and every entry resolves within it, so a mixed-system award is two calls.
 That is a rule about the **award's** request shape and not about every member: the pooled holdings members resolve a system **per cost entry**, because a downtime stage's requirements are mixed-system by construction and splitting one stage into one call per crafting system would make the caller compose the all-or-nothing guarantee itself.
-A component id is not unique across crafting systems, so per-entry resolution has to report an unresolved ambiguity rather than settle it: a name matching in two systems answers `ambiguous` on the read, and a system a cost names that does not exist is a **row-level** `systemNotFound` on the consume where the award answers it at call level.
+Per-entry resolution has to REPORT an unresolved ambiguity rather than settle it, because the candidate systems resolve DIFFERENT DOCUMENT SETS: the owned-item matcher is system-scoped through the durable identity roles map, so which member system answers decides which of an actor's documents the consume will find and debit.
+A name — or, since the `1.30.0` migration re-keyed each real entity to ONE world id, an ID — matching in two systems answers `ambiguous` on the read, and a system a cost names that does not exist is a **row-level** `systemNotFound` on the consume where the award answers it at call level.
+The earlier justification, that "a component id is not unique across crafting systems", is RETRACTED: that migration made the id unique per real entity and shared across the systems that carry it, which makes the obligation MORE reachable rather than less.
 
 **Both award members target WORLD actors, and cannot address an unlinked token actor.**
 Every actor-targeted member resolves `actorId` against the world actor collection through the shared resolver named above, never against a token, a token id or a uuid.
@@ -416,6 +418,7 @@ Otherwise every name folds into ONE case-insensitive tier in which abbreviation 
 A cost name matching a component in more than one crafting system, or a coin name answering to more than one unit, sets `ambiguous: true` on that reading and resolves to the first in order.
 `ambiguous` is a strict boolean rather than a nullable one: `false` is a true statement about every reading that resolved, and about every refusal too.
 It is required because the caller is liable to CONSUME by the id the read handed back, so a quietly chosen system is a quietly chosen set of documents and a quietly chosen coin is a quietly chosen debit.
+An ID-KEYED reading may now be ambiguous where it previously could not be: before the `1.30.0` migration one real entity authored in two crafting systems carried two DIFFERENT ids, so the id tier could only ever answer in one of them; the migration re-keys both in-system records to one world id, so the same read now answers in every member system.
 
 ### The Consume Takes Components First And Coin Last
 

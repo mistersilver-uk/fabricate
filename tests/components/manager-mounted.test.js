@@ -874,6 +874,18 @@ function compileManagerRoot() {
     'src/systems/toolScope.js',
     'src/systems/scopedDefinitions.js',
     'src/systems/scopedDefinitionStore.js',
+    // Issue 1370 (epic 1357, PR 8a): `toolBreakageRuntime.js` now reads the system's TOOL
+    // LIBRARY through the shared read seam too, so its closure gains the seam, the two
+    // remaining scope modules, the migration module holding the ONE lifted-identity field
+    // list, and the definition index the seam memoizes through. Same mechanical rule as the
+    // block above: drop one and every mounted manager test reports `# cancelled` behind one
+    // ERR_MODULE_NOT_FOUND rather than failing.
+    'src/systems/scopedEntityReads.js',
+    'src/systems/componentScope.js',
+    'src/systems/essenceScope.js',
+    'src/migration/worldScopeEntityGrouping.js',
+    'src/utils/definitionIndex.js',
+    'src/utils/sourceReferenceUnion.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });

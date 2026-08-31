@@ -122,8 +122,14 @@ import {
   remapWorldScopeIdentityFlags as remapIdentityFlagsAcrossActors,
 } from './migration/remapWorldScopeIdentityFlags.js';
 import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
+// THE SHARED READ SEAM (issue 1370). Seven call sites in this file enter through it, and this
+// file is outside the CI lint glob - so an omitted import here is a ReferenceError that no
+// lint, no test and no build reports. `tests/main-undefined-identifiers.test.js` is the guard.
+import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityReads.js';
+import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
+import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
-import { buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice } from './migration/worldScopeEntityNotice.js';
+import { buildWorldIdentityDriftNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -1114,6 +1120,56 @@ class Fabricate {
     this.essenceScopeStore.load();
     this.toolScopeStore = createToolScopeStore({ getSetting, setSetting });
     this.toolScopeStore.load();
+    // 1.30.0 (issue 1370, epic 1357): THE WORLD IDENTITY DRIFT AUDIT, run once per session.
+    //
+    // HERE, AND NOT IN THE MIGRATION'S NOTICE SLOT. That slot sits inside `_runMigrations()`,
+    // which has already returned by the time these three stores load, returns early on a
+    // non-active-GM client, and is guarded on a report that is `null` unless the migration ran
+    // this session. Drift is not a migration event: it appears on the GM's FIRST identity edit
+    // after the migration and every session thereafter, so the audit belongs after the loads and
+    // before either manager — which is also the last point at which nothing has read the union.
+    //
+    // ACTIVE GM, NOT `isGM`. `User#isGM` is `hasRole(ASSISTANT)`, so an `isGM` gate posts this
+    // notice once per assistant as well as once for the full GM.
+    //
+    // INFO, NEVER WARN. Nothing is wrong: the read union re-derives identity from the in-system
+    // record, so this discloses which of the GM's edits the shared world record has not caught up
+    // with. A permanent warning would also redden every View Lab capture, which runs this path on
+    // every build.
+    //
+    // The COMPOSITION is not here, for the same reason the migration's is not: nothing in this
+    // file can be executed by a unit test, and a source-text grep can pin a DISPATCH but never
+    // a SUM.
+    if (game.users?.activeGM?.id === game.user?.id) {
+      const worldIdentityDrift = reportWorldIdentityDrift(readPersistedCraftingSystems(), {
+        components: this.componentScopeStore.corpus(),
+        essences: this.essenceScopeStore.corpus(),
+        tools: this.toolScopeStore.corpus()
+      });
+      // THE FULL LEDGER GOES TO THE CONSOLE, AND FABRICATE HAS TO PUT IT THERE ITSELF.
+      // `ui.notifications.info` defaults `console: true`, but what core logs is the
+      // notification element's own `textContent` - i.e. the CAPPED message it was handed. So
+      // the toast's "the full list is in the console" clause is only true because of this
+      // line; without it a GM with 200 drifted components opens the console and finds the
+      // same truncated sentence, with the withheld records unrecoverable from a running
+      // client. Verified against V14.365.0.
+      //
+      // `info`, NOT `debug`, and that is the difference between a working pointer and a dead
+      // one. `console.debug` maps to DevTools' VERBOSE level, which Chromium's default level
+      // filter EXCLUDES - so a GM who follows the copy literally, presses F12 and reads the
+      // console would see core's own `console.info` line for the toast (the CAPPED message) and
+      // not this one. `info` is also the level core's notification logger uses for an info
+      // notice, so the two lines sit at the same level in the same place.
+      //
+      // It costs nothing elsewhere: the View Lab's console gate is fatal on `error` and on
+      // `Fabricate |`-prefixed `warning` only, and does not collect `info`.
+      const driftDetail = describeWorldIdentityDrift(worldIdentityDrift);
+      if (driftDetail) console.info(`Fabricate | world identity drift: ${driftDetail}`);
+      const driftNotice = buildWorldIdentityDriftNotice(worldIdentityDrift, (key, data) =>
+        data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+      );
+      if (driftNotice) ui.notifications?.info?.(driftNotice);
+    }
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
       getCraftingSystemManager: () => this.craftingSystemManager ?? null,
@@ -3055,7 +3111,7 @@ class Fabricate {
   _componentAwardSeams() {
     return {
       resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
-      resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null,
+      resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null,
       findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? [],
       resolveSourceItem: (uuid) => fromUuid(uuid),
       isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
@@ -3115,7 +3171,7 @@ class Fabricate {
       ...this._worldCurrencySeams(),
       isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id,
       resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
-      resolveComponent: (system, componentId) => findById(getDefinitionIndex(system?.components), componentId) ?? null,
+      resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null,
       findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []
     };
   }
@@ -3437,7 +3493,7 @@ class Fabricate {
    */
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component = findById(getDefinitionIndex(system?.components), target?.componentId);
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId);
     return {
       actorId: target?.actorId ?? null,
       actorName: '',
@@ -3743,7 +3799,7 @@ class Fabricate {
     }
     const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
     const system = this.craftingSystemManager?.getSystem?.(craftingSystemId) ?? null;
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = resolvedComponentsFor(system);
     const submittedItems = resolveAlchemySubmissions(
       sources,
       components,
@@ -4286,9 +4342,9 @@ class Fabricate {
   _resolveJournalTool(systemId, toolId) {
     const system = this.craftingSystemManager?.getSystem(systemId);
     if (!system || !toolId) return null;
-    const tool = (system.tools || []).find((entry) => entry?.id === toolId);
+    const tool = resolvedToolsFor(system).find((entry) => entry?.id === toolId);
     if (!tool) return null;
-    const component = linkedComponentFor(tool, system.components || []);
+    const component = linkedComponentFor(tool, resolvedComponentsFor(system));
     const img = resolveToolDisplayImage(tool, component);
     return {
       id: tool.id,
@@ -4344,7 +4400,7 @@ class Fabricate {
   _resolveJournalComponent(systemId, componentId) {
     if (!systemId || !componentId) return null;
     const system = this.craftingSystemManager?.getSystem(systemId);
-    const component = findById(getDefinitionIndex(system?.components), componentId);
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
     return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   }
 

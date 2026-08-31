@@ -1,6 +1,12 @@
+import { resolvedComponentsFor } from './scopedEntityReads.js';
+
 function componentList(systemOrComponents = null) {
   if (Array.isArray(systemOrComponents)) return systemOrComponents;
-  if (Array.isArray(systemOrComponents?.components)) return systemOrComponents.components;
+  // Only the ID SET is consumed downstream, and the read union's row set is the in-system
+  // array's row set, so this repoint cannot widen or narrow what the validator accepts.
+  if (Array.isArray(systemOrComponents?.components)) {
+    return resolvedComponentsFor(systemOrComponents);
+  }
   if (Array.isArray(systemOrComponents?.items)) return systemOrComponents.items;
   return [];
 }

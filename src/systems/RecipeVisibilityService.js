@@ -18,6 +18,7 @@ import {
   readDiscoveryProgressEntries,
   readLearnedRecipeEntries,
 } from './recipeKeyedFlagEntries.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { selectWritableActors } from './writableActors.js';
 
@@ -1384,7 +1385,7 @@ export class RecipeVisibilityService {
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) || [];
     return computeSystemVisibility(system, {
       recipes,
-      components: system.components || [],
+      components: resolvedComponentsFor(system),
     });
   }
 

@@ -50,6 +50,33 @@ const foundryGlobals = {
   jQuery: 'readonly',
   $: 'readonly',
   socketlib: 'readonly',
+  // Deprecated but still reachable, and reached under a `typeof` guard in the manager app's
+  // export path. Declaring it is exactly what this map is for.
+  saveDataToFile: 'readonly',
+};
+
+// Svelte 5 RUNES. In a `.svelte.js` module these are compiler-provided, so ESLint sees bare
+// identifiers and reports `no-undef` on every one - measured, 147 of them across the fourteen
+// rune modules, from TWO names (`$state` 80, `$derived` 67); the 148th report in that baseline
+// is `saveDataToFile` above, not a rune. Without declaring them the whole `.svelte.js` class -
+// including the 1577-line GM manager app and the base mixin of every V2 application - is
+// checked by NOTHING, which is the gap `tests/main-undefined-identifiers.test.js` exists to
+// close.
+//
+// SCOPED TO `**/*.svelte.js` ALONE, and unlike `foundryGlobals` above the scope is load-bearing
+// rather than tidy. "Over-declaring a readonly global is harmless" holds for a Foundry global,
+// which really is present at runtime everywhere the code runs. A rune is NOT: outside a rune
+// module `$state(...)` is a genuine defect - it compiles to nothing and fails silently at
+// runtime - and `no-undef` is what catches it today. Declaring these repo-wide would retire
+// that check to buy a convenience.
+const svelteRuneGlobals = {
+  $state: 'readonly',
+  $derived: 'readonly',
+  $effect: 'readonly',
+  $props: 'readonly',
+  $bindable: 'readonly',
+  $inspect: 'readonly',
+  $host: 'readonly',
 };
 
 export default [
@@ -210,6 +237,17 @@ export default [
         'error',
         { cases: { camelCase: true, pascalCase: true, kebabCase: true } },
       ],
+    },
+  },
+
+  // 4b. Svelte 5 rune globals, for rune modules ONLY. A separate block rather than a wider
+  //     spread because ESLint MERGES `globals` across every block whose `files` match, so a
+  //     `.svelte.js` file gets browser + Foundry + runes while a plain `.js` file keeps
+  //     `no-undef` on a rune used where no compiler will process it.
+  {
+    files: ['**/*.svelte.js'],
+    languageOptions: {
+      globals: { ...svelteRuneGlobals },
     },
   },
 

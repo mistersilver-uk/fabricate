@@ -1,6 +1,7 @@
 import { stampItemDataRoleIdentity } from './config/flags.js';
 import { Tool } from './models/Tool.js';
 import { setStackQuantity } from './systems/itemStackQuantity.js';
+import { resolvedToolsFor } from './systems/scopedEntityReads.js';
 import { effectiveToolBreakageAuthority } from './systems/toolBreakageAuthority.js';
 
 /**
@@ -30,9 +31,7 @@ import { effectiveToolBreakageAuthority } from './systems/toolBreakageAuthority.
 export function stampReplacementComponentIdentity(itemData, system, componentId) {
   const systemId = system?.id;
   stampItemDataRoleIdentity(itemData, systemId, 'componentId', componentId);
-  const linkingTools = (Array.isArray(system?.tools) ? system.tools : []).filter(
-    (tool) => tool?.componentId === componentId
-  );
+  const linkingTools = resolvedToolsFor(system).filter((tool) => tool?.componentId === componentId);
   if (linkingTools.length === 1) {
     stampItemDataRoleIdentity(itemData, systemId, 'toolId', linkingTools[0].id);
   }
