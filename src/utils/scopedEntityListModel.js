@@ -321,13 +321,18 @@ export function createScopedEntityListModel() {
  * `essenceBrowserModel.js` and `recipeBrowserModel.js` — and a bare `localeCompare` is an
  * `Intl.Collator` with default options. So the options list here is empty on purpose.
  *
- * THE GATE IMPORTS `sortEssences` AND SORTS WITH IT, which is a stronger claim than the one this
- * comment used to make. It said the order was pinned against `localeCompare` itself; it was
- * pinned against a hand-written restatement of what `localeCompare` was believed to do, in the
- * test file. That is proof against ICU moving under the repository and no proof at all against
- * the browser models moving — measured: giving `componentBrowserModel` a `numeric` collator
- * created exactly the divergence this collator answers, and the suite stayed green. Importing
- * the shipped sort makes the drift claim true in the direction that can actually drift.
+ * THE GATE IMPORTS ALL THREE SHIPPED SORTS AND RUNS THEM, and it took two corrections to get
+ * there because each version claimed more than it observed. The first said the order was pinned
+ * against `localeCompare` itself and was pinned against a hand-written restatement of it inside
+ * the test file: proof against ICU moving under the repository, none at all against the browser
+ * models moving. Measured — giving `componentBrowserModel` a `numeric` collator created exactly
+ * the divergence this collator answers, and the suite stayed green. The second imported
+ * `sortEssences` alone while still saying "the three shipped browser models", and the same
+ * mutation on `componentBrowserModel` still passed.
+ *
+ * It now runs `sortComponents`, `sortEssences` and `sortRecipes`, asserts the three agree with
+ * EACH OTHER, and then asserts this model agrees with them — so the drift claim is true in every
+ * direction that can drift, and a studio that leaves the other two is caught as well.
  *
  * `numeric: true` WAS SET HERE AND WAS REMOVED. It is the better reading of "Ash 2" against
  * "Ash 10" and it has no precedent in this repository, and adding it did not remove the

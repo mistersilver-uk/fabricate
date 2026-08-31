@@ -33,9 +33,12 @@ import {
   WORLD_SCOPE_DESCRIPTORS,
 } from '../src/ui/svelte/stores/worldScopeProjection.js';
 import { paginateRows } from '../src/utils/browserPagination.js';
-// THE SHIPPED SORT ITSELF, not a restatement of what it is believed to do. See the ordering
-// case below for what the restatement failed to catch.
+// ALL THREE SHIPPED SORTS, run rather than restated. The ordering case below asserts they agree
+// with each other AND with this model, because "the three shipped browser models" was claimed by
+// a gate that imported one of them — see that case for what each version failed to catch.
+import { sortComponents } from '../src/utils/componentBrowserModel.js';
 import { sortEssences } from '../src/utils/essenceBrowserModel.js';
+import { sortRecipes } from '../src/utils/recipeBrowserModel.js';
 import {
   describeBulkSelection,
   pruneBulkSelection,
@@ -329,11 +332,24 @@ describe('scopedEntityListModel filters', () => {
     const model = createScopedEntityListModel();
     const { rows } = model.project({ entries: NAMES.map((name, index) => named(name, index)) });
 
-    const shipped = sortEssences(NAMES.map((name) => ({ name }))).map((essence) => essence.name);
+    // ALL THREE, because the claim is about all three. The first repair imported only
+    // `sortEssences`, and giving `componentBrowserModel.js` a numeric collator STILL left this
+    // suite green — the same overstatement one step smaller. Asserting the three agree with each
+    // other first also catches the studios drifting apart, which is a defect in its own right and
+    // one nothing else in the repository measures.
+    const rowsOf = (name) => ({ name });
+    const orders = {
+      components: sortComponents(NAMES.map(rowsOf)).map((row) => row.name),
+      essences: sortEssences(NAMES.map(rowsOf)).map((row) => row.name),
+      recipes: sortRecipes(NAMES.map(rowsOf)).map((row) => row.name),
+    };
+    assert.deepEqual(orders.essences, orders.components, 'two studios already disagree');
+    assert.deepEqual(orders.recipes, orders.components, 'two studios already disagree');
+
     assert.deepEqual(
       rows.map((row) => row.entity.name),
-      shipped,
-      'this list and the Component Studio one route away must order one corpus one way'
+      orders.components,
+      'this list and the studios one route away must order one corpus one way'
     );
 
     // THE FIXTURE INCLUDES A CASE-ONLY PAIR ON PURPOSE. The sort key used to be lowercased,
@@ -354,7 +370,7 @@ describe('scopedEntityListModel filters', () => {
     });
     assert.notDeepEqual(
       codePoint,
-      shipped,
+      orders.components,
       'the fixture no longer distinguishes a locale compare from a code-point one'
     );
   });
