@@ -2009,7 +2009,10 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > READ ENTRY has run.
 > AUTHORITY has NOT: `## CraftingSystem` requirement 36 keeps the in-system arrays the source of truth, and requirement 15's dated sub-heading makes the union answer every KEY, every ROW and the row ORDER from them, re-derived at read time, while the world layer supplies only the keys they do not carry.
 > The SHED has NOT: nothing is removed from any of the eight shadowed keys, and `destructive-changes-and-migrations` still measures zero references disappearing.
-> `src/ui/**` is deliberately still outside the repoint, on the precedent this banner sets for the effective tool-breakage authority: with the ORDER and ROW SET rules adopted, an unwritten world corpus reads exactly as the previous release did.
+> `src/ui/**` was deliberately outside the repoint, on the precedent this banner sets for the effective tool-breakage authority: with the ORDER and ROW SET rules adopted, an unwritten world corpus reads exactly as the previous release did.
+> ONE UI READER HAS SINCE JOINED IT (issue 1373): the manager's selected-system `tools` projection, because the system Tool Rules screen is the surface a GM administers Tools from and reading the raw array there gave that one screen a SECOND answer to a question the read union already answers — one that could not see the world master switch of `### Tool scope` requirement 3a at all.
+> It is threaded the corpus EXPLICITLY rather than probing a global, and `null` — no world half — makes the seam hand back the in-system array itself, so an unmigrated world still reads exactly as the previous release did.
+> The rest of `src/ui/**` is unchanged and stays outside.
 >
 > **DELIVERED AT `1.30.0`** (epic 1357, PR 3): the migration itself, the world entity corpus, the membership model, and the WORLD tool-breakage authority (`### Tool scope` requirement 5), which the crafting-system normalizer's absence-preserving flip makes reachable.
 > The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections; component `tags` and the world tool-breakage authority are excluded for two different reasons, and FIVE constraints can decline an individual section.
@@ -2397,6 +2400,12 @@ It could the moment the in-system record stops deciding its own keys, which is w
    `updateWorldDefaultSection` refuses every name outside the scope's declared sections and `repairRequirements` is deliberately not one of them, so routing the write through it returns `false` and stores nothing.
    The seed's WRITE path and its READ path are therefore deliberately asymmetric: the world holds it and a tool-family-only action writes it, while the membership record alone answers it.
    Without that action the world Tool entry would display a seed source nobody could author, which is a screen stating a value the model makes unreachable.
+
+   **WHILE `## CraftingSystem` REQUIREMENT 36 HOLDS THE SEED IS TAKEN ONTO BOTH RECORDS, AND ONLY THE IN-SYSTEM COPY IS READ** (issue 1373).
+   `Tool.repairRequirements` is a shipped in-system field, so a normalized in-system record always carries it — and requirement 15's KEYS clause answers every key the in-system record carries FROM that record.
+   Measured: a membership record seeded with one repair group resolves to `[]` for a system whose in-system record carries the normalizer's empty array, so the membership seed alone is unreadable for the duration.
+   The copy the GM then edits is the in-system one, through the Tool editor, which is where requirement 2's "diverges freely" actually happens.
+   The membership copy is unchanged and remains the resolution source this requirement names; it becomes the READ one again when requirement 36 retires and the world layer re-takes precedence over the keys the in-system record carries.
 3. `enabled` KEEPS its shipped meaning verbatim, and it is a HARD block rather than the essence's soft disable: a reference to a tool that does not resolve, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED` (`## Tool` requirement 3).
    The two entities' meanings of one field name are deliberately different, and neither is derived from the other.
 
@@ -2433,6 +2442,16 @@ It could the moment the in-system record stops deciding its own keys, which is w
    The two halves are stated as a PAIR because forbidding the write says nothing about forbidding the erasure.
 
    The two inherited sections' every-member precondition, and the addressability rule the third rests on, likewise bind an IMPORT-TIME write of a carried world default and are RE-DECIDED against the destination's merged corpus (`import-export/spec.md` -> World-default constraint re-check on import).
+6. **ADOPTING a world Tool into a crafting system is TWO writes while `## CraftingSystem` requirement 36 holds, and the IN-SYSTEM one is what makes the Tool exist there** (issue 1373).
+   Requirement 15 clause 3 makes the read union's ROW SET the in-system array's row set — "the world layer contributes rows only after requirement 36 retires" — so a membership record written on its own names a Tool that NO reader can see: it is absent from the system's tool list, no recipe there can reference it, and the screen that offered to add it goes on offering.
+   Adoption therefore writes the membership record AND creates the in-system `Tool` record, from the world entity's identity.
+   The order is membership first, because that write owns the already-a-member rule; if the `Tool` record is then refused the membership record is REMOVED again, because a membership record with no in-system record is exactly the unreadable state above, while an in-system record with no membership record is an ordinary pre-migration Tool.
+   An in-system record that already exists is NEVER rewritten: requirement 36 keeps it authoritative, and a migrated world's in-system record and world entity share an id by construction.
+
+   **THE WORLD DEFAULTS' TWO INHERITED SECTIONS ARE COPIED ONTO THE RECORD IT CREATES.**
+   `breakage` and `onBreak` are shipped in-system `Tool` fields that a normalizer emits UNCONDITIONALLY, so an identity-only record wins requirement 15's KEYS contest for both with a value nobody authored — measured, a Tool whose world default was 25 uses adopted as `Unlimited uses` on a row stating "Inherits world defaults" beside it.
+   The copy is what makes that row's own claim true at the moment it is made, it is a SEED on requirement 2's pattern rather than a live parent, and it stops being read when requirement 36 retires and the world layer re-takes precedence.
+   `enabled` is deliberately NOT copied: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
 
 ## Tool
 

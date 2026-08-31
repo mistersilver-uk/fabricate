@@ -8078,6 +8078,24 @@
     return opened;
   }
 
+  /**
+   * Adopt a world Tool into this system, and MOVE THE SELECTION ONTO THE RECORD IT CREATED.
+   *
+   * The second half is not polish. `unadoptedToolId` is what routes this panel to the
+   * `No rules here` / `Add {tool} to {system}` branch, and nothing clears it on its own - so
+   * without this the GM presses the button, the Tool becomes a member row in the list behind
+   * the panel, and the panel goes on offering to add a Tool that is already there.
+   * `selectLibraryTool` is the one clearer: the draft now opens because the record exists.
+   *
+   * @param {string} entityId The world tool entity id.
+   * @returns {Promise<boolean>}
+   */
+  async function adoptWorldToolIntoSystem(entityId) {
+    const adopted = await store?.worldScope?.tool?.addToSystem?.(entityId, selectedSystemId);
+    if (adopted !== true) return false;
+    return selectLibraryTool(entityId);
+  }
+
   function backToToolsBrowser() {
     afterTruthyResult(confirmRouteExit('tools'), () => {
       activeView = 'tools';
@@ -14609,8 +14627,7 @@
             unadopted={unadoptedWorldTool}
             onEdit={openToolEditor}
             onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
-            onAddToSystem={(entityId) =>
-              store?.worldScope?.tool?.addToSystem?.(entityId, selectedSystemId)}
+            onAddToSystem={(entityId) => adoptWorldToolIntoSystem(entityId)}
           />
         {:else if currentView === 'component-edit'}
           <!-- NO RIGHT RAIL (issue 676, decision 4). The component editor is a single

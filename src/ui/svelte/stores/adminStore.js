@@ -116,7 +116,10 @@ import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 // The two authority tokens, imported rather than re-spelled (issue 1374): the world-scope
 // write path treats ANY third value as a CLEAR of the per-system override, so the set that
 // decides which arguments are tokens must be the same set the resolver and the normalizer use.
-import { TOOL_BREAKAGE_AUTHORITIES } from '../../../systems/toolScope.js';
+import {
+  seedToolRepairRequirements as _seedToolRepairRequirements,
+  TOOL_BREAKAGE_AUTHORITIES,
+} from '../../../systems/toolScope.js';
 import {
   defaultKnowledgeTab,
   projectKnowledgeSnapshot,
@@ -2059,6 +2062,24 @@ export function createAdminStore(services) {
     return true;
   }
 
+  /**
+   * Open an UNPERSISTED draft for a brand-new system Tool.
+   *
+   * NO SCREEN REACHES THIS TODAY, and that is a stated state rather than an oversight (issue
+   * 1373). Tool CREATION moved to the world Tools Catalogue, and a system Tool is now born by
+   * ADOPTION (`adoptWorldTool`), which persists through the manager and needs no draft. Its one
+   * remaining caller, `addToolFromUuidToDraft`, is unreached from `src/` for the same reason.
+   *
+   * It is RETAINED rather than deleted because it is the only entry into the draft layer's
+   * unpersisted state - `toolDraftBaseline === null` - which `saveToolDraft`'s create branch,
+   * `discardToolDraft`'s `cancelToolsDraft` fallback and `deleteToolDraft`'s `persisted` branch
+   * each fork on. Retiring it is retiring that state, which is a change to the draft layer and
+   * not the removal of one export.
+   *
+   * @param {object} [initialPatch]
+   * @param {string} [systemId]
+   * @returns {object|null} the created draft, or `null` with no system.
+   */
   function createToolDraft(initialPatch = {}, systemId = get(selectedSystemId)) {
     if (!systemId) return null;
     const patch = initialPatch && typeof initialPatch === 'object' ? initialPatch : {};
@@ -4663,7 +4684,8 @@ export function createAdminStore(services) {
         essenceDefinitions,
         availableScriptMacros,
         sceneOptions,
-        worldScopeState.worldScope?.tool?.toolBreakage ?? null
+        worldScopeState.worldScope?.tool?.toolBreakage ?? null,
+        _worldToolCorpus()
       );
       recipeListData = _buildRecipeList(
         systemManager,
@@ -4980,6 +5002,28 @@ export function createAdminStore(services) {
     });
   }
 
+  /**
+   * The published WORLD TOOL CORPUS, or `null` when there is no store to read (issue 1373).
+   *
+   * The selected-system projection unions its `tools` against this, so the Tool Rules screen
+   * and every non-UI reader answer "which tools does this system have" the same way. It is a
+   * READ of the store's published corpus rather than a projection of it: `resolvedToolsFor`
+   * memoizes on that object's identity, and the object is stable between saves, so this and
+   * `buildWorldScopeState` see the same snapshot within one publish.
+   *
+   * GUARDED, on `worldScopeProjection`'s own `readCorpus` rule: a store that throws must
+   * degrade to "no world half" and leave the GM a working Manager, never abort the publish.
+   *
+   * @returns {object|null}
+   */
+  function _worldToolCorpus() {
+    try {
+      return services.getToolScopeStore?.()?.corpus?.() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   // FOUR LEGS, AND THE FOURTH IS DELIBERATELY OPTIONAL. The World Vocabulary's corpus arrives
   // with PR 7 of epic 1357, and this file carries the producer leg ahead of it: it reads
   // through the same `services.getXScopeStore?.() ?? null` idiom as its three siblings, which
@@ -5024,6 +5068,146 @@ export function createAdminStore(services) {
       vocabulary: () => services.getVocabularyScopeStore?.() ?? null,
     },
   });
+
+  /**
+   * The in-system Tool record adoption creates: the world entity's IDENTITY, plus a COPY of the
+   * world defaults' three behaviour sections.
+   *
+   * ── WHY THE SECTIONS ARE COPIED AND NOT LEFT TO INHERIT ───────────────────────────────────
+   * They cannot be inherited while `## CraftingSystem` requirement 36 holds. The read union
+   * re-spreads the in-system record LAST, and a `Tool` normalizes with `breakage`, `onBreak` and
+   * `repairRequirements` ALWAYS present — so an identity-only record wins every one of those
+   * key contests with a value nobody authored. Measured in the View Lab: a Tool whose world
+   * default is 25 uses adopted as `Unlimited uses`, on a row that said `Inherits world defaults`
+   * beside it. Copying is what makes the row's own claim true at the moment it is made.
+   *
+   * ── IT IS A SEED, ON THE SHIPPED `seedToolRepairRequirements` PATTERN ─────────────────────
+   * A structural copy taken once, never a live parent, and the same call is what `addToSystem`
+   * already makes for the membership record's `repairRequirements`. When requirement 36 retires
+   * the world layer takes precedence over these keys again and the copy stops being read, so the
+   * seed cannot outlive the suspension it exists for.
+   *
+   * ── `enabled` IS DELIBERATELY NOT SEEDED ──────────────────────────────────────────────────
+   * The world master switch is a VETO applied over the merged rows (`applyWorldEnabledVeto`),
+   * not a value to copy. Copying it would freeze one moment's answer into the system record and
+   * let a later world enable read back as disabled.
+   *
+   * @param {object} entity The world tool roster record.
+   * @param {object|null} worldDefault That entity's world defaults record, or `null`.
+   * @returns {object}
+   */
+  function _worldToolAdoptionSeed(entity, worldDefault) {
+    const originItemUuid = entity?.originItemUuid ?? entity?.registeredItemUuid ?? null;
+    const repairRequirements = _seedToolRepairRequirements(worldDefault);
+    return {
+      id: String(entity?.id ?? ''),
+      name: entity?.name ?? null,
+      img: entity?.img ?? null,
+      description: entity?.description ?? '',
+      originItemUuid,
+      registeredItemUuid: entity?.registeredItemUuid ?? originItemUuid,
+      aliasItemUuids: Array.isArray(entity?.aliasItemUuids) ? [...entity.aliasItemUuids] : [],
+      ...(worldDefault?.breakage ? { breakage: _clonePlain(worldDefault.breakage) } : {}),
+      ...(worldDefault?.onBreak ? { onBreak: _clonePlain(worldDefault.onBreak) } : {}),
+      ...(repairRequirements.length > 0 ? { repairRequirements } : {}),
+    };
+  }
+
+  /**
+   * ADOPT a world Tool into a crafting system — BOTH halves of what membership means today.
+   *
+   * ── WHY THE MEMBERSHIP RECORD IS NOT ENOUGH ───────────────────────────────────────────────
+   * `## Scoped Entity Definitions` requirement 15 clause 3 makes the read union's ROW SET the
+   * IN-SYSTEM ARRAY'S row set for as long as `## CraftingSystem` requirement 36 holds — "the
+   * world layer contributes rows only after requirement 36 retires" — precisely so a membership
+   * record that outlives its in-system record cannot resurrect a deleted Tool. A membership-only
+   * adoption therefore writes a record that NOTHING can read: the Tool Rules list keeps drawing
+   * the row as an unadopted ghost, the button looks inert, and no recipe can name the Tool.
+   * Measured on this store: `resolveToolScope` answers `[]` for a corpus with the entity, the
+   * default and the membership record and an empty in-system array.
+   *
+   * So while requirement 36 holds, adopting is TWO writes and the in-system one is the load
+   * bearing half. This is the composition root for both — `worldScopeActions` is a pure world
+   * scope writer with no crafting-system manager, and by design reads no Foundry global.
+   *
+   * ── ORDER AND ROLLBACK ────────────────────────────────────────────────────────────────────
+   * The membership write goes first because it OWNS the already-a-member rule, so this action
+   * does not restate it. If the Tool record is then refused, the membership record is REMOVED
+   * again: leaving it would be the exact ghost state above, whereas an in-system record with no
+   * membership record is an ordinary, fully usable pre-migration Tool.
+   *
+   * ── AN EXISTING RECORD IS NEVER REWRITTEN ─────────────────────────────────────────────────
+   * A migrated world's in-system record and its world entity share an id by construction, so a
+   * system that already holds the record is adopting a Tool it already has. Requirement 36 keeps
+   * that record authoritative, so adoption adds the membership record and leaves the GM's own
+   * identity edits alone.
+   *
+   * ── NO `itemUuid`, SO NO ROLE FLAG IS STAMPED ─────────────────────────────────────────────
+   * `upsertTool`'s `{itemUuid}` option resolves the source Item to re-snapshot it and stamp the
+   * durable `roles[systemId].toolId`, and it THROWS when the uuid no longer resolves. Adoption
+   * must not fail because a world Tool's source Item was deleted, and the world entity's own
+   * identity is the authority for a world Tool anyway. Item matching still works: the durable
+   * flag is tier 1 of `resolveToolForItem` and the source references this seeds are tier 2.
+   *
+   * @param {string} entityId The world tool entity id.
+   * @param {string} [systemId] Defaults to the selected system.
+   * @returns {Promise<boolean>}
+   */
+  async function adoptWorldTool(entityId, systemId = get(selectedSystemId)) {
+    const target = String(entityId ?? '').trim();
+    const system = String(systemId ?? '').trim();
+    if (!target || !system) return false;
+    // ONE READ OF THE CORPUS for both halves of the seed, so the identity and the defaults
+    // cannot come from two different snapshots.
+    const corpus = _worldToolCorpus();
+    const byId = (records) =>
+      (Array.isArray(records) ? records : []).find(
+        (record) => String(record?.id ?? '').trim() === target
+      ) ?? null;
+    const entity = byId(corpus?.entities);
+    if (!entity) return false;
+
+    const systemManager = services.getCraftingSystemManager?.();
+    const needsRecord = !_systemTools(system).some((tool) => String(tool?.id ?? '') === target);
+    if (needsRecord && typeof systemManager?.upsertTool !== 'function') return false;
+    if ((await worldScope.tool.addToSystem(target, system)) !== true) return false;
+
+    if (needsRecord) {
+      try {
+        await systemManager.upsertTool(
+          system,
+          _worldToolAdoptionSeed(entity, byId(corpus?.defaults))
+        );
+      } catch (error) {
+        await worldScope.tool.removeFromSystem(target, system);
+        services.notify?.error?.(
+          services.localize?.('FABRICATE.Admin.Manager.Tools.AddToSystemFailed') ||
+            `The Tool could not be added to this system. ${error?.message || ''}`.trim()
+        );
+        await refresh();
+        return false;
+      }
+    }
+    await refresh();
+    return true;
+  }
+
+  // THE EXPOSED FAMILY, WITH TOOL ADOPTION COMPOSED OVER IT (issue 1373).
+  //
+  // `addToSystem` is REPLACED rather than added beside, because the three shipped call sites —
+  // the Tool Rules inspector's `Add {tool} to {system}`, the same screen's per-row add, and the
+  // world catalogue's generic system row — all reach it through this one key. A parallel
+  // `adoptWorldTool` would have left every one of them writing a record nothing can read, which
+  // is the whole defect. The world-scope leg is unchanged and still owns the membership rule;
+  // only the crafting-system leg is new.
+  //
+  // TOOL ONLY. Components and essences reach `worldScopeActions` untouched: neither has a
+  // crafting-system-manager write to compose, and inventing one here would be a write path no
+  // screen asked for.
+  const worldScopeApi = {
+    ...worldScope,
+    tool: { ...worldScope.tool, addToSystem: adoptWorldTool },
+  };
 
   // Read the world character libraries straight from their store on every publish, for the same
   // reasons: cheap, and honest when another GM edits a library, with no per-system cache to
@@ -10071,10 +10255,12 @@ export function createAdminStore(services) {
     resetActorAllKnowledge,
     // --- World scope: components, essences and tools (issue 1362, epic 1357) ---
     //
-    // EXPOSED BUT UNREACHABLE. Every world route this PR ships is a placeholder, so nothing
-    // in `src/` calls one of these yet. The key set is part of the contract: `setEnabled` is
-    // absent on `worldScope.component`, and `setWorldTags` / `setMutedTags` exist only there.
-    worldScope,
+    // The key set is part of the contract: `setEnabled` is absent on `worldScope.component`,
+    // and `setWorldTags` / `setMutedTags` exist only there. NO LONGER UNREACHABLE — the world
+    // Tools Catalogue, the world Tool entry and the system Tool Rules screen all call the tool
+    // family now (issue 1373); the component and essence families are still placeholder-bound.
+    // `tool.addToSystem` is `adoptWorldTool` rather than the raw world-scope write; see there.
+    worldScope: worldScopeApi,
     refresh,
     refreshGatheringConfig,
     refreshAccessRosters,

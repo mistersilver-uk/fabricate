@@ -3190,6 +3190,18 @@ describe('CraftingSystemManager source contract', () => {
       !rootSource.includes('onCreateToolDrop'),
       'the system Tool Rules route passes no creation drop callback'
     );
+    // AND ADOPTION IS A NAMED HANDLER, not the inline world-scope call it started as (issue
+    // 1373). The second half is what the inline version could not do: `unadoptedToolId` is what
+    // routes the inspector to `No rules here` / `Add {tool} to {system}`, and nothing else
+    // clears it - so without the selection move the GM presses the button, the Tool becomes a
+    // member row behind the panel, and the panel goes on offering to add a Tool it already has.
+    for (const snippet of [
+      'async function adoptWorldToolIntoSystem(entityId)',
+      'onAddToSystem={(entityId) => adoptWorldToolIntoSystem(entityId)}',
+      'return selectLibraryTool(entityId);',
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
+    }
     assert.ok(
       /onclick=\{\(\) => setView\('tools'\)\}/.test(rootSource),
       "root should wire a top-level Tools nav button to setView('tools')"

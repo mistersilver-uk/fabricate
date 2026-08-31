@@ -14,7 +14,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
+import { SETTING_KEYS } from '../src/config/settings.js';
 import { Tool } from '../src/models/Tool.js';
+import { createToolScopeStore } from '../src/systems/worldScopeStores.js';
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
 
 let generatedToolId = 0;
@@ -918,6 +920,225 @@ describe('adminStore library tools (system-owned)', () => {
         { toolBreakage: { authority: 'checkDriven' } },
         { toolBreakage: { authority: 'toolSpecific' } },
       ]);
+    });
+  });
+
+  // -------------------------------------------------------------------------------------
+  // Adopting a WORLD Tool into a crafting system (issue 1373)
+  // -------------------------------------------------------------------------------------
+
+  describe('world Tool adoption', () => {
+    /**
+     * A REAL tool scope store over an in-memory settings map, seeded with one world Tool.
+     *
+     * Real rather than doubled because adoption is a round trip: the membership write has to
+     * reach the setting, be re-normalized on publish, and come back out through the read union.
+     * A double that stored the record it was handed would pass whatever the write path did.
+     *
+     * @param {Array<object>} entities
+     * @param {Record<string, object>} [defaults] World defaults keyed by entity id.
+     * @returns {object}
+     */
+    function seededToolScope(entities, defaults = {}) {
+      const settings = new Map([
+        [SETTING_KEYS.TOOL_SCOPE, { entities, defaults, membership: {} }],
+      ]);
+      const store = createToolScopeStore({
+        getSetting: (key) => settings.get(key),
+        setSetting: async (key, value) => {
+          settings.set(key, value);
+        },
+      });
+      store.load();
+      return store;
+    }
+
+    const WORLD_HAMMER = {
+      id: 'wt-hammer',
+      name: 'World Hammer',
+      img: 'icons/tools/smithing/hammer-blue-grey.webp',
+      description: 'One hammer, every system.',
+      originItemUuid: 'Item.world-hammer',
+      registeredItemUuid: 'Item.world-hammer',
+    };
+
+    it('surfaces an adopted world Tool as a member row of the Tool Rules list', async () => {
+      // THE REGRESSION GUARD. `ToolsBrowserView` builds `memberRows` from the `tools` prop,
+      // which is `selectedSystem.tools` off this projection, and everything else it draws for
+      // that Tool is a GHOST row. So "the adoption landed" is only observable here.
+      const toolScopeStore = seededToolScope([WORLD_HAMMER]);
+      const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      assert.deepEqual(
+        get(store.viewState).selectedSystem.tools,
+        [],
+        'precondition: the system starts with no Tool rules at all'
+      );
+
+      assert.equal(
+        await store.worldScope.tool.addToSystem('wt-hammer', 'sys1'),
+        true,
+        'the adoption write reported success'
+      );
+
+      const tools = get(store.viewState).selectedSystem.tools;
+      const adopted = tools.find((tool) => tool.id === 'wt-hammer') || null;
+      assert.ok(
+        Boolean(adopted),
+        'the adopted world Tool is a MEMBER row of the list the Tool Rules screen reads'
+      );
+      assert.equal(adopted.name, 'World Hammer', 'the row carries the world identity');
+      assert.equal(adopted.registeredItemUuid, 'Item.world-hammer');
+    });
+
+    it('writes the membership record the world projection joins against', async () => {
+      // The other half of the pair: adoption must ALSO leave the world-scope membership record,
+      // because the row's `Inherits world defaults` / `Overrides …` state is read off the world
+      // projection's per-system join rather than off the tool record.
+      const toolScopeStore = seededToolScope([WORLD_HAMMER]);
+      const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.worldScope.tool.addToSystem('wt-hammer', 'sys1'), true);
+
+      const entry = (get(store.viewState).worldScope?.tool?.entries || []).find(
+        (row) => row.id === 'wt-hammer'
+      );
+      const membership = (entry?.systems || []).find((row) => row.systemId === 'sys1');
+      assert.equal(membership?.member, true, 'the world membership record was written');
+    });
+
+    it('refuses to adopt a world Tool the roster does not hold', async () => {
+      const toolScopeStore = seededToolScope([WORLD_HAMMER]);
+      const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.worldScope.tool.addToSystem('wt-ghost', 'sys1'), false);
+      assert.deepEqual(get(store.viewState).selectedSystem.tools, []);
+    });
+
+    it('is idempotent: adopting twice leaves ONE row', async () => {
+      const toolScopeStore = seededToolScope([WORLD_HAMMER]);
+      const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.worldScope.tool.addToSystem('wt-hammer', 'sys1'), true);
+      assert.equal(
+        await store.worldScope.tool.addToSystem('wt-hammer', 'sys1'),
+        false,
+        'a second adoption is refused by the existing membership record'
+      );
+      assert.equal(
+        get(store.viewState).selectedSystem.tools.filter((tool) => tool.id === 'wt-hammer').length,
+        1
+      );
+    });
+
+    it('carries the WORLD master switch onto the adopted row, through the read union', async () => {
+      // THE REPOINT'S OWN GUARD. `selectedSystem.tools` reads through `resolvedToolsFor` now, so
+      // a world-disabled Tool reads disabled on the screen a GM administers Tools from. Reading
+      // the raw in-system array answers `enabled: true` here — the normalized record carries its
+      // own `enabled` unconditionally and knows nothing of the world default.
+      const toolScopeStore = seededToolScope([WORLD_HAMMER]);
+      const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      assert.equal(await store.worldScope.tool.addToSystem('wt-hammer', 'sys1'), true);
+      assert.equal(
+        get(store.viewState).selectedSystem.tools[0].enabled,
+        true,
+        'precondition: an unauthored world master switch reads as enabled'
+      );
+
+      assert.equal(await store.worldScope.tool.setWorldEnabled('wt-hammer', false), true);
+      await store.refresh();
+
+      assert.equal(
+        get(store.viewState).selectedSystem.tools[0].enabled,
+        false,
+        'the world master switch vetoes the row the Tool Rules list draws'
+      );
+    });
+
+    it('leaves an unmigrated world reading its own in-system array, untouched', async () => {
+      // The compatibility half. With no tool scope store at all the read seam's unknown-half
+      // passthrough answers `system.tools` ITSELF, so this projection is byte-identical to the
+      // one this repo shipped before the repoint.
+      const services = createMockServices({
+        systemTools: [{ id: 't1', componentId: 'comp-axe', label: 'Axe' }],
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const tools = get(store.viewState).selectedSystem.tools;
+      assert.equal(tools.length, 1);
+      assert.equal(tools[0].id, 't1');
+      assert.equal(tools[0].label, 'Axe');
+      assert.equal(tools[0].enabled, true);
+      assert.ok(!('member' in tools[0]), 'no resolver key leaks into the gathering tool shape');
+      assert.ok(!('inherited' in tools[0]));
+    });
+
+    it('seeds the world default sections onto the record it creates', async () => {
+      // WITHOUT THIS the adopted row states a value NOBODY authored. The read union re-spreads
+      // the in-system record last while `## CraftingSystem` requirement 36 holds, and a `Tool`
+      // always normalizes with `breakage`, `onBreak` and `repairRequirements` present - so an
+      // identity-only record wins those key contests with the normalizer's own defaults, on a
+      // row whose inherit pill says `Inherits world defaults`.
+      const toolScopeStore = seededToolScope([WORLD_HAMMER], {
+        'wt-hammer': {
+          id: 'wt-hammer',
+          breakage: { mode: 'breakageChance', breakageChance: 25 },
+          onBreak: { mode: 'flagBroken' },
+        },
+      });
+      const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.worldScope.tool.addToSystem('wt-hammer', 'sys1'), true);
+
+      const adopted = get(store.viewState).selectedSystem.tools.find(
+        (tool) => tool.id === 'wt-hammer'
+      );
+      assert.deepEqual(adopted.breakage, { mode: 'breakageChance', breakageChance: 25 });
+      assert.deepEqual(adopted.onBreak, { mode: 'flagBroken' });
+    });
+
+    it('never seeds `enabled`, so the world master switch stays a read-time veto', async () => {
+      // The counter-case to the seed above. Copying the world `enabled` onto the record would
+      // freeze one moment's answer into the crafting system, and a later world ENABLE would read
+      // back disabled forever.
+      const toolScopeStore = seededToolScope([WORLD_HAMMER], {
+        'wt-hammer': { id: 'wt-hammer', enabled: false },
+      });
+      const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.worldScope.tool.addToSystem('wt-hammer', 'sys1'), true);
+      assert.equal(
+        services._systemTools().find((tool) => tool.id === 'wt-hammer').enabled,
+        true,
+        'the PERSISTED record is enabled; only the read union vetoes it'
+      );
+      assert.equal(
+        get(store.viewState).selectedSystem.tools.find((tool) => tool.id === 'wt-hammer').enabled,
+        false,
+        'and the projection the screen reads shows the veto'
+      );
+
+      assert.equal(await store.worldScope.tool.setWorldEnabled('wt-hammer', true), true);
+      await store.refresh();
+      assert.equal(
+        get(store.viewState).selectedSystem.tools.find((tool) => tool.id === 'wt-hammer').enabled,
+        true,
+        're-enabling in the world reaches a Tool adopted while it was off'
+      );
     });
   });
 });

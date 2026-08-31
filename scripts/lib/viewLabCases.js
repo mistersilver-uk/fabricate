@@ -5409,6 +5409,43 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-tool-adopted-world-tool-1280x720',
+    label: 'Manager — Tool rules, world Tool adopted 1280x720',
+    // BEYOND, and the empty smoke labels go with it: the live smoke walks no world-Tool
+    // adoption, so there is no counterpart frame to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    // THE ONLY STATE THAT PROVES THE LOOP CLOSES (issue 1373). Adopting a world Tool used to
+    // write a membership record the Tool Rules list could not read, so the row stayed a ghost
+    // and the button looked inert. `hb-tool-mortar` is a world entity whose only membership is
+    // Herbalism, so in Smithing it starts unadopted - which is why the filter has to be widened
+    // to `All world tools` before there is anything to press.
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      { selector: '[data-tool-add-to-system="hb-tool-mortar"]' },
+    ],
+    expectView: 'tools',
+    // A MEMBER ROW, named by the control only a member renders. `data-tool-add-to-system` and
+    // `data-tool-edit-rules` are the two halves of one `{#if entry.member}`, so asserting the
+    // second is asserting the first is gone.
+    expectSelector:
+      '.manager-tools-row[data-manager-tool-id="hb-tool-mortar"] [data-tool-edit-rules]',
+    expectContained: [
+      {
+        container: '.manager-tools-library-list',
+        target: '.manager-tools-row[data-manager-tool-id="hb-tool-mortar"]',
+      },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Tool/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+    ],
+  }),
+  managerCase({
     id: 'manager-tool-zero-state-empty-library-1280x720',
     label: 'Manager — Tool zero state empty library 1280x720',
     smokeLabels: ['manager-tool-zero-state-empty-library-1280x720'],

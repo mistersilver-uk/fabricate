@@ -36,6 +36,7 @@ import {
   TOOL_BREAKAGE_AUTHORITIES,
   resolveToolBreakageAuthority,
 } from '../../../systems/toolScope.js';
+import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
 import {
   recipeItemLabelFromUuid as _recipeItemLabelFromUuid,
   recipeItemTypeFromRecipeCount as _recipeItemTypeFromRecipeCount,
@@ -372,6 +373,10 @@ function _toolBreakageAuthoritySource(worldToolBreakage, systemToolBreakage) {
  * its refresh path would have been the first. This module is not itself `game.*`-free, and the
  * one probe it does hold (`globalThis.game?.actors`, for the learned-knowledge index) is
  * documented where it happens.
+ *
+ * `worldToolCorpus` arrives the same way and for the same reason (issue 1373): it is the world
+ * tool corpus the `tools` projection unions against, and `null` — the default — means there is
+ * no world half, which the read seam answers by handing back the in-system array itself.
  */
 export function buildSelectedSystemViewData(
   selectedSystem,
@@ -380,7 +385,8 @@ export function buildSelectedSystemViewData(
   essenceDefinitions,
   availableScriptMacros,
   sceneOptions,
-  worldToolBreakage = null
+  worldToolBreakage = null,
+  worldToolCorpus = null
 ) {
   if (!selectedSystem) return null;
 
@@ -441,12 +447,33 @@ export function buildSelectedSystemViewData(
     // overlapping-requirement detection. Empty when no component carries tags →
     // the overlap check no-ops.
     componentTagOptions,
-    // System-owned library Tools (canonical source). Surfaced here so the Tools
-    // browser and the gathering task editor's tool picker read the system's
-    // tools rather than the gathering-config copy.
-    tools: Array.isArray(selectedSystem.tools)
-      ? selectedSystem.tools.map((tool) => _normalizeGatheringLibraryTool(tool))
-      : [],
+    // The system's library Tools, THROUGH THE SHARED READ SEAM (issue 1373). Surfaced here so
+    // the Tools browser and the gathering task editor's tool picker read the system's tools
+    // rather than the gathering-config copy.
+    //
+    // ── WHY THE UNION AND NOT `selectedSystem.tools` ────────────────────────────────────────
+    // There must be ONE answer to "which tools does this system have", and `resolvedToolsFor`
+    // is it: every non-UI reader already enters there. Reading the raw array here gave the
+    // manager a SECOND answer that ignored the world layer entirely — so the world master
+    // switch was invisible on the one screen a GM administers Tools from, and a row could read
+    // `Inherits world defaults` while displaying the value it had NOT inherited.
+    //
+    // ── THE CORPUS IS PASSED, NEVER PROBED ─────────────────────────────────────────────────
+    // `resolvedToolsFor(system)` with no second argument reaches for `game.fabricate`; this
+    // module's caller holds no executable `game.*` and says so, and an explicit corpus is what
+    // makes this testable. `null` states there is no world half, and the seam's unknown-half
+    // passthrough then answers `selectedSystem.tools` ITSELF — the same array, same identity —
+    // so an unmigrated world reads exactly as it did before this change.
+    //
+    // ── STILL NORMALIZED, AND THE NORMALIZER IS THE SHAPE CONTRACT ─────────────────────────
+    // `normalizeGatheringLibraryTool` runs the row through `Tool.fromJSON().toJSON()`, a CLOSED
+    // shape. So the union's resolver keys (`member`, `inherited`, `worldEnabled`,
+    // `systemEnabled`) are dropped here and the gathering task editor downstream sees the
+    // identical field set it always did, while the world-resolved `enabled`, `breakage`,
+    // `onBreak` and `repairRequirements` — which ARE `Tool` fields — survive.
+    tools: resolvedToolsFor(selectedSystem, worldToolCorpus).map((tool) =>
+      _normalizeGatheringLibraryTool(tool)
+    ),
 
     // The character prerequisite library is NOT projected here any more (issue 1308). It is a
     // WORLD library now, so projecting it off the selected system would be a second, always-empty
