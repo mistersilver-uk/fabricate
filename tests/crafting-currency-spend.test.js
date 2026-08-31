@@ -495,6 +495,42 @@ test('engine: the insufficient-currency message names the unit, never its genera
   );
 });
 
+test('engine: an INCOMPLETE currency requirement does not render as a zero-amount cost', async () => {
+  // The engine twin of the resolver's incomplete-match test. Both call sites read the handler's
+  // own `isComplete`, so a match carrying a unit but no positive amount falls through to the
+  // generic description rather than telling the player they need "0 Coins" — which is the same
+  // class of confusing cost text this issue was filed for. Without this, dropping the engine
+  // guard survives the suite.
+  const system = makeCurrencySystem({
+    units: [
+      {
+        id: CURRENCY_UNIT_ID,
+        label: 'Coins of Crowns',
+        abbreviation: 'Coins',
+        actorPath: 'system.currency.gp',
+        contains: [],
+      },
+    ],
+  });
+  setupGame(system);
+  const set = makeSet([
+    [{ quantity: 1, match: { type: 'currency', unit: CURRENCY_UNIT_ID, amount: 0 } }],
+    [itemOption('comp-missing')],
+  ]);
+  const recipe = makeRecipe({ ingredientSet: set });
+  const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 1 } });
+  const engine = makeEngine(system, { actorPropertyCoinSpender: new ActorPropertyCoinSpender() });
+
+  const result = await engine.craft(craftingActor, [makeDnd5eActor({ id: 'src' })], recipe, null, {});
+
+  assert.equal(result.success, false, 'the craft still fails on the unsatisfiable item group');
+  assert.doesNotMatch(
+    result.message,
+    /Requires 0 /,
+    'an incomplete currency requirement must not be rendered as a zero-amount cost'
+  );
+});
+
 test('engine: half-consume — currency short aborts BEFORE the item is deleted', async () => {
   const system = makeCurrencySystem();
   setupGame(system);
