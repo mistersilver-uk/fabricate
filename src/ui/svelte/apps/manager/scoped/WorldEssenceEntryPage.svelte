@@ -51,6 +51,10 @@
   import EmptyState from '../EmptyState.svelte';
   import EssenceBehaviorPreview from '../essences/EssenceBehaviorPreview.svelte';
   import { essenceValidationPresentation } from '../essences/essenceStudio.js';
+  import IconPicker from '../../../components/IconPicker.svelte';
+  import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
+  import Medallion from '../../../components/Medallion.svelte';
+  import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import MembershipActions from './MembershipActions.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
@@ -95,6 +99,7 @@
     (scope?.entries ?? []).find((candidate) => candidate.id === entityId) ?? null
   );
   const entity = $derived(entry?.entity ?? null);
+  const normalizedIcon = $derived(normalizeEssenceIcon(entity?.icon || DEFAULT_ESSENCE_ICON));
   const defaults = $derived(entry?.defaults ?? null);
   const sections = $derived(Array.isArray(scope?.sections) ? scope.sections : []);
 
@@ -278,28 +283,57 @@
                 onchange={(event) => patchIdentity('name', event.currentTarget.value)}
               />
             </label>
-            <label class="manager-scoped-entry-field">
+            <!--
+              THE SAME THREE CONTROLS THE SYSTEM-SCOPE IDENTITY TAB USES, and for the reason the
+              shells were built on: a GM authors one essence's identity, and it must not be a
+              searchable picker in one scope and a text box in the other.
+
+              This shipped as `<input type="text">` for both, which asked a GM to type a
+              FontAwesome class (`fas fa-atom`) and a palette token (`lavender`) from memory,
+              with no validation and no way to discover either. `getEssenceIconOptions` and
+              `ESSENCE_COLOR_TOKENS` were already shipped and already unused.
+
+              `ManagerColorPopover` takes `layout="inline"` here exactly as
+              `EssenceIdentityTab` does: the popover chrome is applied by the global sheet,
+              which this lane may not open, and inline strips it and nothing else.
+            -->
+            <div class="manager-scoped-entry-identity-tile">
               <span class="manager-scoped-entry-label"
-                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldIcon', 'Icon class')}</span
+                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldIcon', 'Icon')}</span
               >
-              <input
-                type="text"
-                value={entity?.icon ?? ''}
-                data-scoped-entry-icon
-                onchange={(event) => patchIdentity('icon', event.currentTarget.value)}
+              <Medallion
+                icon={normalizedIcon}
+                tint={entity?.colorToken || ''}
+                size={96}
+                glyph={36}
               />
-            </label>
-            <label class="manager-scoped-entry-field">
+              <IconPicker
+                value={normalizedIcon}
+                buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
+                onChange={(iconClass) => patchIdentity('icon', iconClass)}
+              />
+            </div>
+            <div class="manager-scoped-entry-field" data-scoped-entry-colour>
               <span class="manager-scoped-entry-label"
-                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour token')}</span
+                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour')}</span
               >
-              <input
-                type="text"
-                value={entity?.colorToken ?? ''}
-                data-scoped-entry-colour
-                onchange={(event) => patchIdentity('colorToken', event.currentTarget.value)}
+              <ManagerColorPopover
+                layout="inline"
+                allowNone
+                allowCustom={false}
+                manageDismiss={false}
+                colorToken={entity?.colorToken || ''}
+                unset={!entity?.colorToken}
+                customColor=""
+                presetGridLabel={text(
+                  'FABRICATE.Admin.Manager.Essence.Colour.Presets',
+                  'Essence colour presets'
+                )}
+                noneLabel={text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')}
+                onClear={() => patchIdentity('colorToken', '')}
+                onChange={(next) => patchIdentity('colorToken', next?.colorToken || '')}
               />
-            </label>
+            </div>
             <label class="manager-scoped-entry-field is-wide">
               <span class="manager-scoped-entry-label"
                 >{text(
@@ -484,6 +518,17 @@
   .manager-scoped-entry-identity {
     display: flex;
     flex-wrap: wrap;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  /* The medallion and its picker travel together as one control, so the picker sits under the
+     swatch it changes rather than beside an unrelated field. Matches the system-scope identity
+     tab's tile, at the smaller size this panel's column allows. */
+  .manager-scoped-entry-identity-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: var(--fab-space-2);
     min-width: 0;
   }
