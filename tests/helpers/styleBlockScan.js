@@ -42,8 +42,14 @@
  * twice in docblock PROSE — explaining that it deliberately has none — with no closing tag
  * anywhere in its 268 lines, so a naive `indexOf('<style')` reads from that prose line to EOF
  * as CSS. Inert today only because that prose happens to contain no CSS-shaped text. Across
- * `src/`, 177 files carry a real block, no file carries two, and 17 prose mentions would be
- * read as openers by a naive extractor.
+ * `src/`, 177 files carry a real block, no file carries two, and 18 prose mentions across 16
+ * files would be read as openers by a naive extractor.
+ *
+ * The cost of the anchor is that a block whose opener is NOT alone on its line contributes
+ * nothing, silently — one `<style lang="postcss">.a{height:36px}</style>` would arrive with no
+ * baseline row and red nothing. Measured, the corpus has 177 openers, 177 closers and 177
+ * contributing files with no mismatch, and `style-block-scan.test.js` pins that equality
+ * against the real tree so the day it stops holding is a failure rather than a silent gap.
  *
  * ── OFFSETS ARE PRESERVED ───────────────────────────────────────────────────────────────
  * Masking and comment stripping both replace text with spaces rather than deleting it, so a
@@ -81,10 +87,16 @@ export const STYLE_CORPUS_EXTENSIONS = Object.freeze(['.svelte', '.css', '.scss'
 export const MAX_VAR_CHAIN_DEPTH = 8;
 
 /**
- * The cap on candidate texts produced for ONE declaration. A value naming k tokens, each
- * defined m times, expands to m**k texts per round; this corpus's worst case is a handful.
+ * The cap on the combinations produced from ONE text in ONE round. A value naming k tokens,
+ * each defined m times, expands to m**k texts per round; this corpus's worst case is a handful.
  * Exceeding it throws rather than truncating, because a truncated candidate set is a scanner
  * that answers "no banned value here" for the wrong reason.
+ *
+ * Read what it bounds precisely: it is NOT a bound on the candidate set. `expandFrontier` runs
+ * this expansion over every text in the frontier, so a round can grow the frontier by up to this
+ * factor and there are up to `maxDepth` rounds. Single-token heights make that distinction inert
+ * — one reference, a handful of definitions — but `padding: var(--a) var(--b) var(--c) var(--d)`
+ * is four references in one value, which is exactly the shape the spacing gate will bring.
  */
 const MAX_VALUE_CANDIDATES = 512;
 
@@ -101,8 +113,20 @@ const STYLE_CLOSE_LINE = /^\s*<\/style>\s*$/;
  * `height` and what keeps a media feature — `@media (min-height: 400px)` — out of the corpus:
  * a feature test sits inside parentheses, never after a `;`, `{` or `}`, and a breakpoint is
  * not a control height.
+ *
+ * `[a-zA-Z]` rather than `[a-z]` because CSS property names are ASCII case-insensitive, and the
+ * half of this corpus stylelint cannot reach is the half where a `HEIGHT:` could survive review.
+ * It costs nothing measured — the corpus holds 22,139 declarations under either spelling — and
+ * a gate that reads one casing is a gate with a one-keystroke bypass. Custom property NAMES stay
+ * case-sensitive, which is the spec's own rule: `--Foo` and `--foo` are two properties.
+ *
+ * WHAT IT DOES NOT READ, stated rather than left to be inferred: a single-dash vendor-prefixed
+ * property never matches, because the alternation requires a letter first and `--` is spelled
+ * out separately. `-webkit-appearance`, `-webkit-line-clamp` and `-webkit-box-orient` are the
+ * three the corpus holds and none of them sets a height, so the gap is inert here — but a
+ * `-webkit-` spelling of a property a future gate scans would pass unseen.
  */
-const DECLARATION = /(?:^|[;{}])\s*(--[\w-]+|[a-z][\w-]*)\s*:\s*([^;{}]*)/g;
+const DECLARATION = /(?:^|[;{}])\s*(--[\w-]+|[a-zA-Z][\w-]*)\s*:\s*([^;{}]*)/g;
 
 /**
  * A pixel literal, on a NUMERIC boundary.
@@ -111,18 +135,37 @@ const DECLARATION = /(?:^|[;{}])\s*(--[\w-]+|[a-z][\w-]*)\s*:\s*([^;{}]*)/g;
  * scanner shipped with, and it inflated the measured baseline by fourteen occurrences before
  * anyone read the output rather than the count.
  *
- * WHICH PART DOES WHICH JOB was itself got wrong, and only a falsification found it. `240px` is
- * protected by GREEDINESS, not by the lookbehind: leftmost-longest already consumes all three
- * digits, so deleting the lookbehind leaves that case correct and every naive test of it green.
- * What the lookbehind actually guards is a number glued to a word or to a decimal point —
- * `url(icon40px.svg)` and `.40px`, both of which read as a bare `40` without it. Those are the
- * cases the proof asserts, because they are the only ones that can fail.
+ * WHICH PART DOES WHICH JOB was got wrong twice, and only measurement settled it. Each claim
+ * below is the answer of a differential run — shipped, lookbehind deleted, `\.\d+` deleted — and
+ * not of reading the pattern.
  *
- * The `\.\d+` branch exists so a leading-dot decimal is READ rather than skipped: `.4px` is
- * valid CSS, and with the lookbehind alone it matched nothing at all — a safe answer but a
- * wrong one, and the wrong one in the direction this gate cannot afford.
+ * `240px` is protected by GREEDINESS, not by the lookbehind: leftmost-longest already consumes
+ * all three digits, so deleting the lookbehind leaves that case correct and every naive test of
+ * it green.
+ *
+ * The LOOKBEHIND guards a number glued to the identifier or filename in front of it, and both
+ * halves of `[\w.]` do real work: `url(icon40px.svg)` reads as a bare `40` without it, and
+ * `url(sprite.40px.png)` reads as four tenths of a pixel. Those two are the only shapes measured
+ * to flip when it is deleted, which is why they are the ones the proof asserts.
+ *
+ * The `\.\d+` BRANCH is a separate guard and rescues a different case — the one an earlier draft
+ * of this docblock credited to the lookbehind. `.40px` yields `0.4` with the lookbehind and
+ * without it, so the lookbehind is not what saves it; delete this branch instead and `.40px`
+ * matches nothing at all. `.4px` is valid CSS, and reading it as absent is the wrong answer in
+ * the direction this gate cannot afford.
+ *
+ * The `i` flag is there because CSS units are ASCII case-insensitive: `height: 40PX` is forty
+ * pixels and read `40` as nothing without it. The corpus holds zero uppercase `px` today across
+ * all 22,139 declarations, so this buys no occurrence — it closes a one-keystroke bypass sitting
+ * precisely in the Svelte half stylelint cannot reach.
+ *
+ * IT IS SIGN-BLIND, deliberately unfixed and stated here because the next customer is the
+ * spacing gate. `margin: -8px` tallies as `8px`: the lookbehind excludes `[\w.]` and a `-` is
+ * neither, so the minus is simply not part of the match. For a height that is unreachable — no
+ * control is negative pixels tall — but a negative margin is ordinary spacing, so a spacing gate
+ * that means to distinguish `-8px` from `8px` must change this pattern rather than assume it.
  */
-const PIXEL_LITERAL = /(?<![\w.])(\d+(?:\.\d+)?|\.\d+)px\b/g;
+const PIXEL_LITERAL = /(?<![\w.])(\d+(?:\.\d+)?|\.\d+)px\b/gi;
 
 /**
  * Replace `source` with same-length text in which everything OUTSIDE a `<style>` block is
@@ -180,6 +223,12 @@ export function stripCssComments(css) {
 
 /**
  * The CSS a single file contributes, offsets intact.
+ *
+ * Two calls, and each is proved to be MADE rather than merely to work: delete `maskNonStyleRegions`
+ * and `the ManagerButton prose trap stays shut` reds; delete `stripCssComments` and the
+ * composition assertion in `a comment is blanked, and its offsets are kept` reds. Both proofs
+ * route through this function for that reason — a test that calls either helper directly stays
+ * green when the call here is deleted, which is how the second one shipped unproven the first time.
  *
  * @param {string} file Repo-relative path, used only to pick the extraction rule.
  * @param {string} source The file's text.
@@ -283,6 +332,23 @@ export function collectCustomProperties(corpus) {
       addDefinition(definitions, declaration.property, declaration.value);
     }
   }
+  return definitions;
+}
+
+/**
+ * `collectCustomProperties` re-parses every declaration in the corpus, so a caller that scans
+ * several times over one corpus pays a full pass each time. Keyed on the corpus OBJECT and held
+ * weakly: a corpus is built once by `collectStyleCorpus` and never mutated, so identity is a
+ * sound key, and a caller that does mutate one in place must build a new object rather than
+ * expect this to notice.
+ */
+const definitionCache = new WeakMap();
+
+function definitionsFor(corpus) {
+  const held = definitionCache.get(corpus);
+  if (held !== undefined) return held;
+  const definitions = collectCustomProperties(corpus);
+  definitionCache.set(corpus, definitions);
   return definitions;
 }
 
@@ -505,7 +571,7 @@ function shortestCarriers(candidates, banned) {
 export function scanPixelValues({ corpus, properties, values, maxDepth = MAX_VAR_CHAIN_DEPTH }) {
   const wanted = new Set(properties);
   const banned = new Set(values);
-  const definitions = collectCustomProperties(corpus);
+  const definitions = definitionsFor(corpus);
   const declarations = [];
   const occurrences = [];
   const capReached = [];

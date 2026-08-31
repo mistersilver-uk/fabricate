@@ -169,15 +169,21 @@ test('both stylesheet corpora are still being scanned', () => {
 
 test('every live rung is still in use in BOTH corpora', () => {
   const { corpus } = scan();
+
+  // ONE pass for all six rungs, not one pass per rung. `scanPixelValues` re-reads every
+  // declaration in a 24,773-line stylesheet plus 177 Svelte blocks on each call, and every
+  // occurrence already carries the rung it matched on `record.value` — so six passes were six
+  // spellings of this group-by, over the same corpus, answering the same question.
+  const { occurrences } = scanPixelValues({
+    corpus,
+    properties: SCANNED_HEIGHT_PROPERTIES,
+    values: LADDER_RUNGS,
+  });
   const missing = [];
   for (const rung of LADDER_RUNGS) {
-    const { occurrences } = scanPixelValues({
-      corpus,
-      properties: SCANNED_HEIGHT_PROPERTIES,
-      values: [rung],
-    });
-    const inStylesheet = occurrences.some(isStylesheet);
-    const inSvelte = occurrences.some((record) => !isStylesheet(record));
+    const hits = occurrences.filter((record) => record.value === rung);
+    const inStylesheet = hits.some(isStylesheet);
+    const inSvelte = hits.some((record) => !isStylesheet(record));
     if (!inStylesheet) missing.push(`${rung}px is absent from styles/`);
     if (!inSvelte) missing.push(`${rung}px is absent from Svelte <style> blocks`);
   }
@@ -228,6 +234,14 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
   );
 });
 
+/**
+ * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name: it reads CSS
+ * declarations in `styles/**` and in Svelte scoped `<style>` blocks, and nothing else. A markup
+ * `style="height: 36px"` attribute and a JS `element.style.height = '36px'` are both retired
+ * control heights this gate is blind to. Neither exists in `src/` today, which is why the gap is
+ * a stated limit rather than a defect — but "no new retired control height has been introduced"
+ * is a claim about the two stylesheet corpora, not about the product.
+ */
 test('no new retired control height has been introduced', () => {
   const { retired } = scan();
   const observed = tallyByKey(
@@ -284,7 +298,12 @@ test('every baselined row still carries the raw and resolved text it was measure
   );
 });
 
-test('exactly the rows the source line cannot explain carry a note', () => {
+test('exactly the rows whose raw and resolved texts differ carry a note', () => {
+  // The predicate is `raw !== resolved`, and that is narrower than "the source line does not
+  // explain the value". A row whose raw text is `calc(36px + 2px)` explains itself and still
+  // differs from its resolved text; a row could in principle be unreadable while its two texts
+  // agree. Every row that qualifies today is genuinely token-mediated, so the two readings
+  // coincide — but the check is the textual one, so the name says the textual one.
   const indirect = KNOWN_RETIRED_HEIGHTS.filter((row) =>
     row.texts.some((pair) => {
       const [raw, resolved] = pair.split(' => ');
@@ -295,9 +314,9 @@ test('exactly the rows the source line cannot explain carry a note', () => {
   assert.deepEqual(
     indirect.sort(byCodePoint),
     Object.keys(INDIRECT_HEIGHT_NOTES).sort(byCodePoint),
-    'a row whose value is not written on the line it cites is unadjudicable without a note, and ' +
-      'a note for a row that has become direct is a stale explanation nobody will re-read. These ' +
-      'two sets must be the same set.'
+    'a row whose resolved text differs from the text on the line it cites is unadjudicable ' +
+      'without a note, and a note for a row that has become direct is a stale explanation ' +
+      'nobody will re-read. These two sets must be the same set.'
   );
 
   for (const [key, note] of Object.entries(INDIRECT_HEIGHT_NOTES)) {

@@ -36,7 +36,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { byCodePoint } from './helpers/ratchetBaseline.js';
-import { repoRoot } from './helpers/sourceScan.js';
+import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 import {
   MAX_VAR_CHAIN_DEPTH,
   collectCustomProperties,
@@ -70,6 +70,26 @@ test('a comment is blanked, and its offsets are kept', () => {
   // A comment spanning lines keeps every newline, or every line number below it slides up.
   const across = stripCssComments('.a {\n/* one\ntwo\nthree */\nheight: 30px;\n}');
   assert.equal(declarationsIn('a.css', across).at(-1).line, 5);
+
+  // The CALL SITE, not the function. Every assertion above reaches `stripCssComments` directly,
+  // so deleting the call from `styleTextFor` leaves all of them green — which is how that call
+  // shipped unproven while its sibling `maskNonStyleRegions(source)`, on the line above it, was
+  // proved by `the ManagerButton prose trap stays shut`. This goes through `styleTextFor`.
+  //
+  // The mechanism is live in the corpus rather than hypothetical: with stripping disabled the
+  // scan picks up commented-out declarations, `apps/manager/Chip.svelte:187` among them, whose
+  // interior `{` gives DECLARATION a real boundary to anchor on. None of them carries a RETIRED
+  // value today, so a corpus-level guard would be vacuous and this has to be a composition
+  // assertion.
+  const superseded = '/* superseded: .old-toolbar { min-height: 40px; } */\n.a { height: 28px; }';
+  assert.deepEqual(
+    declarationsIn('a.css', styleTextFor('a.css', superseded)).map(
+      (entry) => `${entry.property}:${entry.value}`
+    ),
+    ['height:28px'],
+    'styleTextFor must APPLY the stripping, not merely be defined next to it: a declaration ' +
+      'commented out is not a declaration, and a retired value inside one is documentation'
+  );
 });
 
 test('a pixel literal matches on a numeric boundary, never a substring', () => {
@@ -81,19 +101,56 @@ test('a pixel literal matches on a numeric boundary, never a substring', () => {
   assert.deepEqual(pixelValuesIn('calc(40px + 240px)'), [40, 240]);
   assert.deepEqual(pixelValuesIn('height: 40pxx'), [], 'a trailing letter is not the unit');
 
-  // The two cases above that a naive proof would MISS. `240px` is protected by greediness
-  // alone — delete the matcher's lookbehind and it stays correct, so asserting it proves
-  // nothing about the boundary. These two are the ones that flip, and they were found by
-  // deleting the lookbehind and watching every assertion stay green.
+  // ── THE LOOKBEHIND ──────────────────────────────────────────────────────────────────────
+  // `240px` above is protected by greediness alone — delete the lookbehind and it stays correct,
+  // so asserting it proves nothing about the boundary. These two are the ONLY shapes measured to
+  // flip when the lookbehind is deleted, and they cover a half of `[\w.]` each. Chosen by
+  // deleting it and reading which assertions reddened, not by reasoning about the pattern:
+  // reasoning is how the earlier draft came to credit it with a case it does not guard.
   assert.deepEqual(
     pixelValuesIn('background: url(icon40px.svg)'),
     [],
     'a number glued to a word is part of that word, not a length'
   );
   assert.deepEqual(
+    pixelValuesIn('background: url(sprite.40px.png)'),
+    [],
+    'a number glued to a DOT is part of that filename; without the lookbehind it reads as ' +
+      'four tenths of a pixel, because the `\\.\\d+` branch matches from the dot'
+  );
+
+  // ── THE `\.\d+` BRANCH ──────────────────────────────────────────────────────────────────
+  // This is the branch's proof, not the lookbehind's. Measured across all three variants,
+  // `.40px` yields 0.4 shipped AND with the lookbehind deleted; delete the branch instead and
+  // it yields nothing at all. `.4px` is valid CSS, and a length the scanner cannot see is the
+  // one direction of error this gate cannot afford.
+  assert.deepEqual(
     pixelValuesIn('height: .40px'),
     [0.4],
-    'a leading-dot decimal is four tenths of a pixel, not forty of them'
+    'a leading-dot decimal is four tenths of a pixel, not forty of them and not nothing'
+  );
+
+  // ── UNITS ARE CASE-INSENSITIVE, PROPERTIES TOO ──────────────────────────────────────────
+  // `40PX` is forty pixels by the CSS grammar. The corpus holds none today, which is exactly
+  // why nothing else would notice: the bypass costs one keystroke and it sits in the Svelte
+  // half stylelint cannot reach.
+  assert.deepEqual(pixelValuesIn('height: 40PX'), [40], 'a CSS unit is ASCII case-insensitive');
+  assert.deepEqual(
+    declarationsIn('a.css', '.a { HEIGHT: 40px; }').map((entry) => entry.property),
+    ['HEIGHT'],
+    'a property name is case-insensitive too, so an uppercase spelling must still be read'
+  );
+
+  // ── PINNED LIMIT: THE MATCHER IS SIGN-BLIND ─────────────────────────────────────────────
+  // `-8px` tallies as `8px` because a `-` is neither `\w` nor `.`, so the lookbehind does not
+  // exclude it. Unreachable for heights — no control is negative pixels tall — but ordinary for
+  // the spacing gate that comes next. Pinned so that making it sign-aware is a deliberate edit
+  // here rather than a surprise in a baseline.
+  assert.deepEqual(
+    pixelValuesIn('margin: -8px auto'),
+    [8],
+    'a negative length reads as its magnitude. A spacing gate that must tell -8px from 8px has ' +
+      'to change PIXEL_LITERAL, not assume this'
   );
 });
 
@@ -166,6 +223,33 @@ test('the ManagerButton prose trap stays shut', () => {
   assert.ok(
     !(file in collectStyleCorpus()),
     'a file contributing nothing must not appear in the corpus at all, or the gate can cite it'
+  );
+});
+
+test('every Svelte file carrying a real block is in the corpus, and only those', () => {
+  // The line anchor's COST, which nothing pinned until now. A block whose opener is not alone on
+  // its line contributes zero — one `<style lang="postcss">.a{height:36px}</style>` would drop a
+  // whole component's CSS out of the gate, arrive with no baseline row and red nothing, which is
+  // the failure shape this whole scanner exists to avoid. Measured today: 177 openers, 177
+  // closers, 177 contributing files, no mismatch in either direction.
+  const carriesBlock = Object.entries(collectWorkingTreeSources(['src'], ['.svelte']))
+    .filter(([, source]) => source.includes('</style>'))
+    .map(([file]) => file)
+    .sort(byCodePoint);
+  const contributes = Object.keys(collectStyleCorpus())
+    .filter((file) => file.endsWith('.svelte'))
+    .sort(byCodePoint);
+
+  assert.ok(
+    carriesBlock.length > 150,
+    `only ${carriesBlock.length} Svelte files carry a scoped block; retarget this proof`
+  );
+  assert.deepEqual(
+    contributes,
+    carriesBlock,
+    'a Svelte file with a closing </style> must contribute CSS, and only such a file may. A ' +
+      'file missing from the corpus has had its block silently dropped by the line-anchored ' +
+      'extractor — almost certainly an opener sharing its line with something else.'
   );
 });
 
