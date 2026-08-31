@@ -90,6 +90,28 @@ const SECTION_COPY = Object.freeze({
 });
 
 /**
+ * The label one section renders under, localized through the caller's `text` resolver.
+ *
+ * EXPORTED so a catalogue's per-section `inheritCounts` are labelled from the ONE list rather
+ * than a restated five (issue 1380). `SECTION_COPY` stays module-private: what a caller needs
+ * is the resolved label for a section it already holds, not the table — and handing out the
+ * table is how a second copy of these five strings gets written, which is the mirror rot the
+ * seeded-section note above guards against for its own list.
+ *
+ * An unknown section falls back to its own key rather than an empty string, so a section added
+ * to a scope before its copy lands renders its name instead of a blank cell.
+ *
+ * @param {string} section
+ * @param {(key: string, fallback: string) => string} text
+ * @returns {string}
+ */
+export function scopedSectionLabel(section, text) {
+  const copy = SECTION_COPY[section];
+  if (!copy) return section;
+  return text(copy.key, copy.label);
+}
+
+/**
  * The scope descriptor for one entity type, or `null`.
  *
  * @param {string} entityType
@@ -150,11 +172,10 @@ export function scopedTaggable(entityType) {
  */
 export function scopedInheritRows({ entityType, inherited = {}, notes = {}, text }) {
   return inheritableSections(entityType).map((section) => {
-    const copy = SECTION_COPY[section] ?? { key: '', label: section };
     const isInherited = inherited?.[section] !== false;
     return {
       section,
-      label: copy.key ? text(copy.key, copy.label) : copy.label,
+      label: scopedSectionLabel(section, text),
       inherited: isInherited,
       note: notes?.[section] ?? '',
       stateLabel: isInherited

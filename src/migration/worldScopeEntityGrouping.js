@@ -107,9 +107,15 @@ export const REKEYABLE_ENTITY_TYPES = Object.freeze(['components', 'tools']);
  * entity is that Item, every member of the group has already made its own claim, and the resolvers
  * intersect reference SETS rather than compare them, so a longer list resolves strictly more.
  *
+ * EXPORTED so the world-scope projection can DERIVE `sourceLinked` from it (issue 1380) rather
+ * than restate the three names beside {@link WORLD_IDENTITY_FIELDS}. An essence carries none of
+ * them and a component and a tool carry all three, so "does this entity type have a source item
+ * link" is exactly the intersection of the two lists — a second copy of these names in a UI
+ * store is the mirror rot the identity list beneath is already exported to avoid.
+ *
  * @type {readonly string[]}
  */
-const SOURCE_LINK_FIELDS = Object.freeze([
+export const SOURCE_LINK_FIELDS = Object.freeze([
   'originItemUuid',
   'registeredItemUuid',
   'aliasItemUuids',

@@ -22,6 +22,10 @@
  * arguments; nothing here reads a setting, a store or a Foundry global.
  */
 
+import {
+  SOURCE_LINK_FIELDS,
+  WORLD_IDENTITY_FIELDS,
+} from '../../../migration/worldScopeEntityGrouping.js';
 import { COMPONENT_SCOPE, COMPONENT_SECTIONS } from '../../../systems/componentScope.js';
 import { ESSENCE_SCOPE, ESSENCE_SECTIONS } from '../../../systems/essenceScope.js';
 import {
@@ -39,12 +43,81 @@ import { TOOL_SCOPE, TOOL_SECTIONS } from '../../../systems/toolScope.js';
 export const WORLD_SCOPE_ENTITY_TYPES = Object.freeze(['component', 'essence', 'tool']);
 
 /**
+ * THE KEY-SPACE BRIDGE, AND IT IS MANDATORY (issue 1380).
+ *
+ * `WORLD_IDENTITY_FIELDS` is keyed PLURAL — `components` / `essences` / `tools` — because it
+ * belongs to the migration that lifted those settings arrays. The descriptors below are keyed
+ * SINGULAR, because a descriptor describes one entity. So `WORLD_IDENTITY_FIELDS[entityType]`
+ * is `undefined` for all three, and a derivation that reached for it would answer `false`
+ * everywhere while looking exactly right — `sourceLinked: false` on a component is
+ * indistinguishable from the correct `false` on an essence, and nothing about the shape of the
+ * answer says which one you are looking at.
+ *
+ * The bridge is therefore WRITTEN OUT rather than derived from a pluralize rule, and
+ * `tests/world-scope-projection.test.js` pins each list it reads as NON-EMPTY before it asserts
+ * a single per-type answer.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+const IDENTITY_FIELD_KEY = Object.freeze({
+  component: 'components',
+  essence: 'essences',
+  tool: 'tools',
+});
+
+/**
+ * The identity fields one entity type lifts, reached through {@link IDENTITY_FIELD_KEY}.
+ *
+ * @param {string} entityType a SINGULAR descriptor key.
+ * @returns {readonly string[]}
+ */
+function identityFieldsOf(entityType) {
+  return WORLD_IDENTITY_FIELDS[IDENTITY_FIELD_KEY[entityType]] ?? [];
+}
+
+/**
+ * Whether this entity type's identity record carries a source item link.
+ *
+ * DERIVED, NEVER RESTATED. `src/migration/worldScopeEntityGrouping.js` owns both lists; this
+ * intersects them. True for a component and a tool, false for an essence — which is one of the
+ * THREE ways the three identity records differ (`data-models/spec.md` `### Properties`), and one
+ * of the two a shell's own markup reads.
+ *
+ * @param {string} entityType
+ * @returns {boolean}
+ */
+function derivedSourceLinked(entityType) {
+  const fields = identityFieldsOf(entityType);
+  return SOURCE_LINK_FIELDS.some((field) => fields.includes(field));
+}
+
+/**
+ * Whether this entity type's identity record carries a colour token.
+ *
+ * True for an essence alone. The scoped list shells tint the row medallion from it, which is why
+ * this is a descriptor answer rather than a call-site test of the entity type.
+ *
+ * @param {string} entityType
+ * @returns {boolean}
+ */
+function derivedHasColorToken(entityType) {
+  return identityFieldsOf(entityType).includes('colorToken');
+}
+
+/**
  * The per-entity-type UI descriptor: the scope the resolver reads through, the sections a GM
- * can switch, and the two structural capabilities a screen must not infer.
+ * can switch, the two structural capabilities a screen must not infer, and the two IDENTITY
+ * SHAPE facts a shared list shell reads before it draws a row.
  *
  * `enableable` and `taggable` are read from HERE rather than tested at a call site, because
  * both absences are structural: a component has no `enabled` flag at all (`resolveComponent`
  * omits the key), and only a component carries world tags with per-tag muting.
+ *
+ * `sourceLinked` and `hasColorToken` join them for the same reason and are named differently on
+ * purpose (issue 1380). The first two are capabilities a GM EXERCISES; these two are facts about
+ * the shape of the identity record, so a fourth `-able` key would assert a kinship that does not
+ * exist. Both are DERIVED from the lifted identity field lists above rather than restated here,
+ * so adding a field to one entity type cannot leave this table describing the old shape.
  *
  * @type {Readonly<Record<string, Readonly<object>>>}
  */
@@ -55,6 +128,8 @@ export const WORLD_SCOPE_DESCRIPTORS = Object.freeze({
     sections: COMPONENT_SECTIONS,
     enableable: false,
     taggable: true,
+    sourceLinked: derivedSourceLinked('component'),
+    hasColorToken: derivedHasColorToken('component'),
   }),
   essence: Object.freeze({
     entityType: 'essence',
@@ -62,6 +137,8 @@ export const WORLD_SCOPE_DESCRIPTORS = Object.freeze({
     sections: ESSENCE_SECTIONS,
     enableable: true,
     taggable: false,
+    sourceLinked: derivedSourceLinked('essence'),
+    hasColorToken: derivedHasColorToken('essence'),
   }),
   tool: Object.freeze({
     entityType: 'tool',
@@ -69,6 +146,8 @@ export const WORLD_SCOPE_DESCRIPTORS = Object.freeze({
     sections: TOOL_SECTIONS,
     enableable: true,
     taggable: false,
+    sourceLinked: derivedSourceLinked('tool'),
+    hasColorToken: derivedHasColorToken('tool'),
   }),
 });
 
@@ -88,6 +167,8 @@ export function emptyWorldScopeEntityState(entityType) {
     sections: descriptor ? [...descriptor.sections] : [],
     enableable: descriptor?.enableable === true,
     taggable: descriptor?.taggable === true,
+    sourceLinked: descriptor?.sourceLinked === true,
+    hasColorToken: descriptor?.hasColorToken === true,
     available: false,
     seeded: { entities: false, defaults: false, membership: false },
     entities: [],
@@ -309,6 +390,8 @@ export function projectWorldScopeEntity({ entityType, corpus, seeded = null, sys
     sections: [...descriptor.sections],
     enableable: descriptor.enableable,
     taggable: descriptor.taggable,
+    sourceLinked: descriptor.sourceLinked,
+    hasColorToken: descriptor.hasColorToken,
     available: true,
     seeded: {
       entities: seeded?.entities === true,
