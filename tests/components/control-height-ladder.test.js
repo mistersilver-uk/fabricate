@@ -5,18 +5,22 @@
  * 38 and 44 — and retired 32, 36 and 40 — since the design system landed. NOTHING checked it.
  * Worse, half the corpus could not have been checked by the tool that would normally do it:
  * `npm run lint:css` globs `styles/**` and Svelte scoped `<style>` blocks are not in it, so the
- * 433 height declarations most likely to drift were entirely unlinted. Measured against that
+ * 440 height declarations most likely to drift were entirely unlinted. Measured against that
  * silence: 86 occurrences of a retired value across 30 files, 26 of which carry exactly one —
  * the signature of a value copied once and never revisited rather than a deliberate system.
  *
  * This gate FREEZES that. It does not require the whole ladder, and the reason is in the
  * requirement's own wording rather than in the size of the finding: `spec.md` governs "a control
  * a spec marks touch-reachable", which is an authored fact in `openspec/specs/**` and not a
- * property CSS carries at all. No selector heuristic can adjudicate it — and classifying by
- * enclosing selector, then reading the result, confirms it: of the 88 off-ladder control-ish
- * declarations, roughly half are plainly not controls (a 6px slider track, a 14px toggle knob,
- * textarea minimums, native 16px checkboxes). The three retired values are a closed, explicitly
- * named prohibition, so every hit is either a regression or a non-control a reviewer can weigh.
+ * property CSS carries at all. No selector heuristic can adjudicate it, and reading a
+ * selector-classified sample confirms it: plenty of off-ladder heights are plainly not controls
+ * — a 6px slider track at `styles/fabricate.css:15949`, a 14px toggle knob at
+ * `apps/gathering/GatheringEnvironmentList.svelte:292`, textarea minimums at 68, 78 and 122,
+ * native radio and checkbox inputs at 16px. That classification was a one-off reading rather
+ * than something this gate re-derives, so its examples are cited and its headcount is not: a
+ * number no run reproduces is the kind of figure that goes stale unnoticed, which is the
+ * failure this whole change is about. The three retired values are a closed, explicitly named
+ * prohibition, so every hit is either a regression or a non-control a reviewer can weigh.
  *
  * The long-term rule is that a control height comes from `var(--fab-v2-control-height)`. That is
  * not yet reachable: the token is declared once, at `styles/fabricate.css:125`, and has zero
@@ -27,10 +31,13 @@
  * that, and they are independent on purpose rather than four spellings of one floor:
  *
  *   1. PER-CORPUS declaration floors. One total has slack and cannot see a partial loss — break
- *      the `<style>` extractor and 433 declarations vanish while 526 remain, which a combined
+ *      the `<style>` extractor and 440 declarations vanish while 530 remain, which a combined
  *      floor of, say, 850 would sail past.
- *   2. PER-CORPUS rung presence. All six live rungs appear in BOTH corpora, so this is a
- *      genuinely separate control rather than a restatement of the floor.
+ *   2. PER-CORPUS rung presence, PER RUNG. All six live rungs appear in BOTH corpora. The
+ *      per-rung part is the whole of its independence and it needs its own control: replace the
+ *      group-by with the unfiltered occurrence list and this degenerates into "some rung appears
+ *      in each corpus", which the floors already imply, at which point it stops being a separate
+ *      control while still passing. So the loop asserts that its group really is one rung's.
  *   3. RESOLUTION DEPTH above zero, and an indirect occurrence whose source line carries no
  *      pixel literal at all. If `var()` resolution silently stopped, both read zero while every
  *      other assertion here still passes.
@@ -56,19 +63,21 @@ import {
 } from '../helpers/styleBlockScan.js';
 
 import {
+  FLOOR_REFERENCE_STYLESHEET_DECLARATIONS,
+  FLOOR_REFERENCE_SVELTE_DECLARATIONS,
   INDIRECT_HEIGHT_NOTES,
   KNOWN_RETIRED_HEIGHTS,
   KNOWN_RETIRED_HEIGHT_TOTAL,
   LADDER_RUNGS,
-  MEASURED_STYLESHEET_DECLARATIONS,
-  MEASURED_SVELTE_DECLARATIONS,
   RETIRED_CONTROL_HEIGHTS,
   SCANNED_HEIGHT_PROPERTIES,
 } from './control-height-known-literals.js';
 
 /**
- * Floors with deliberate headroom below the measured 526 and 433, so deleting a screen does not
- * red this while a broken extractor — which takes a corpus to roughly zero — still does.
+ * Floors with deliberate headroom below the roughly 530 and 440 they were chosen against, so
+ * deleting a screen does not red this while a broken extractor — which takes a corpus to
+ * roughly zero — still does. These are the enforced figures; the reference counts they quote
+ * are not, and say so.
  */
 const STYLESHEET_DECLARATION_FLOOR = 470;
 const SVELTE_DECLARATION_FLOOR = 380;
@@ -150,16 +159,17 @@ test('both stylesheet corpora are still being scanned', () => {
 
   assert.ok(
     stylesheet >= STYLESHEET_DECLARATION_FLOOR,
-    `only ${stylesheet} height declarations found under styles/, against ${MEASURED_STYLESHEET_DECLARATIONS} ` +
-      `measured and a floor of ${STYLESHEET_DECLARATION_FLOOR}. The global sheet has not shrunk ` +
-      'by a fifth — the scan has stopped reading it.'
+    `only ${stylesheet} height declarations found under styles/, against roughly ` +
+      `${FLOOR_REFERENCE_STYLESHEET_DECLARATIONS} when the floor of ${STYLESHEET_DECLARATION_FLOOR} ` +
+      'was set. The global sheet has not shrunk by a fifth — the scan has stopped reading it.'
   );
   assert.ok(
     svelte >= SVELTE_DECLARATION_FLOOR,
-    `only ${svelte} height declarations found in Svelte <style> blocks, against ` +
-      `${MEASURED_SVELTE_DECLARATIONS} measured and a floor of ${SVELTE_DECLARATION_FLOOR}. This ` +
-      'is the corpus stylelint cannot reach, so nothing else in the repository would notice: the ' +
-      'likely cause is the line-anchored `<style>` extractor, not 50 deleted components.'
+    `only ${svelte} height declarations found in Svelte <style> blocks, against roughly ` +
+      `${FLOOR_REFERENCE_SVELTE_DECLARATIONS} when the floor of ${SVELTE_DECLARATION_FLOOR} was ` +
+      'set. This is the corpus stylelint cannot reach, so nothing else in the repository would ' +
+      'notice: the likely cause is the line-anchored `<style>` extractor, not 50 deleted ' +
+      'components.'
   );
   assert.ok(
     Object.keys(corpus).length > 150,
@@ -171,7 +181,7 @@ test('every live rung is still in use in BOTH corpora', () => {
   const { corpus } = scan();
 
   // ONE pass for all six rungs, not one pass per rung. `scanPixelValues` re-reads every
-  // declaration in a 24,773-line stylesheet plus 177 Svelte blocks on each call, and every
+  // declaration in a 24,949-line stylesheet plus 180 Svelte blocks on each call, and every
   // occurrence already carries the rung it matched on `record.value` — so six passes were six
   // spellings of this group-by, over the same corpus, answering the same question.
   const { occurrences } = scanPixelValues({
@@ -182,6 +192,19 @@ test('every live rung is still in use in BOTH corpora', () => {
   const missing = [];
   for (const rung of LADDER_RUNGS) {
     const hits = occurrences.filter((record) => record.value === rung);
+
+    // THE GROUP-BY IS WHAT MAKES THIS A PER-RUNG CONTROL, and until this line nothing checked
+    // it. Substitute the unfiltered `occurrences` for `hits` and the assertions below still
+    // pass — 7 pass, 0 fail — because every corpus holds SOME rung, so the check quietly
+    // weakens into a restatement of the floors above and control 2 in this file's own
+    // non-vacuity list stops being independent. The `values: [26]` falsification that stood
+    // for this proved the scan runs, not that it is being grouped.
+    assert.ok(
+      hits.every((record) => record.value === rung),
+      `the ${rung}px group holds an occurrence of another value, so "this rung appears in both ` +
+        'corpora" is being decided by some other rung. Every claim below is about this group.'
+    );
+
     const inStylesheet = hits.some(isStylesheet);
     const inSvelte = hits.some((record) => !isStylesheet(record));
     if (!inStylesheet) missing.push(`${rung}px is absent from styles/`);
@@ -236,11 +259,34 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
 
 /**
  * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name: it reads CSS
- * declarations in `styles/**` and in Svelte scoped `<style>` blocks, and nothing else. A markup
- * `style="height: 36px"` attribute and a JS `element.style.height = '36px'` are both retired
- * control heights this gate is blind to. Neither exists in `src/` today, which is why the gap is
- * a stated limit rather than a defect — but "no new retired control height has been introduced"
- * is a claim about the two stylesheet corpora, not about the product.
+ * declarations in `styles/**` and in Svelte scoped `<style>` blocks, and nothing else. There are
+ * three ways out of that, and only the first two are absent from `src/`.
+ *
+ * A literal markup attribute — `style="height: 36px"` — and a JS `element.style.height = '36px'`
+ * are both retired control heights the gate is blind to, and neither is written anywhere in
+ * `src/` today.
+ *
+ * THE THIRD IS LIVE, and it is the one carrying retired values: a custom property SET IN MARKUP
+ * from a JS prop, and read by a scanned declaration. `apps/crafting/CraftingThumb.svelte:37`
+ * writes `--crafting-thumb-size` onto a `style` attribute from its `size` prop, and its own
+ * block at line 53 reads `height: var(--crafting-thumb-size, 48px)`. `CraftingEssenceThumb`
+ * and `detail/InventoryDetailHeader` have the same shape. Fourteen call sites render the two
+ * crafting thumbs at a retired size — one at 32, one at 36, twelve at 40 — and none of those
+ * fourteen contributes an occurrence to the baseline below.
+ *
+ * The scanner does not merely miss them: for those two it reports a CONFIDENT WRONG ANSWER. The
+ * size lives in a JS prop, so there is no CSS definition of the token to find, resolution falls
+ * back to the declared fallback of `48px`, and 48 is tallied — a size no call site passes.
+ * A reader who trusts that 48 is reading a default that never renders. (The inventory header is
+ * the benign case of the same shape: nothing overrides its `size`, so its `64px` fallback is
+ * what renders and the scanner happens to be right.)
+ *
+ * ACCEPTED, on the requirement's own terms rather than for convenience: all three components
+ * size a THUMBNAIL, and the geometry requirement exempts art and portraits from the control
+ * ladder — the same clause that lets `BooksScrollsView.svelte:706` stay in the baseline. Closing
+ * it would also mean resolving a token through Svelte markup and a JS prop default, which is a
+ * different scanner from this one. So "no new retired control height has been introduced" is a
+ * claim about what the two stylesheet corpora DECLARE, not about what the product renders.
  */
 test('no new retired control height has been introduced', () => {
   const { retired } = scan();
@@ -300,10 +346,13 @@ test('every baselined row still carries the raw and resolved text it was measure
 
 test('exactly the rows whose raw and resolved texts differ carry a note', () => {
   // The predicate is `raw !== resolved`, and that is narrower than "the source line does not
-  // explain the value". A row whose raw text is `calc(36px + 2px)` explains itself and still
-  // differs from its resolved text; a row could in principle be unreadable while its two texts
-  // agree. Every row that qualifies today is genuinely token-mediated, so the two readings
-  // coincide — but the check is the textual one, so the name says the textual one.
+  // explain the value". The two readings ALREADY diverge, on a row in the baseline rather than
+  // on an invented one: `styles/fabricate.css min-height 40` writes its 40 literally on the
+  // line — `calc(40px + (2 * var(--fab-space-3)) + 2px)` — so the value is right there to read,
+  // and it qualifies only because a DIFFERENT token in the same calc resolves elsewhere. Its
+  // own note says exactly that. A row could equally be unreadable while its two texts agree.
+  // So the textual reading is not standing in for the semantic one; it is the check, and the
+  // name says the check.
   const indirect = KNOWN_RETIRED_HEIGHTS.filter((row) =>
     row.texts.some((pair) => {
       const [raw, resolved] = pair.split(' => ');

@@ -3,7 +3,7 @@
  *
  * `openspec/specs/design-system/spec.md` closes the control-height ladder at 26, 28, 30, 34, 38
  * and 44 and retires 32, 36 and 40. Nothing checked it, and half the corpus could not have been
- * checked: `npm run lint:css` globs `styles/**` only, so the ~433 height declarations inside
+ * checked: `npm run lint:css` globs `styles/**` only, so the ~440 height declarations inside
  * Svelte scoped `<style>` blocks were unreachable by stylelint entirely.
  *
  * `control-height-ladder.test.js` freezes what is here so nothing new arrives. This file is the
@@ -63,11 +63,27 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  */
 export const KNOWN_RETIRED_HEIGHT_TOTAL = 86;
 
-/** Height declarations scanned in `styles/**`, measured. The floor below sits under it. */
-export const MEASURED_STYLESHEET_DECLARATIONS = 526;
+/**
+ * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
+ * chose them: 530 under `styles/**` and 440 in Svelte scoped blocks.
+ *
+ * ILLUSTRATIVE, and named so, because nothing asserts them. They appear only inside a failure
+ * message, to tell a reader how far below the expected magnitude a broken scan has fallen —
+ * "only 12 found, against roughly 530 and a floor of 470" reads very differently from "only 12
+ * found". An earlier spelling called them MEASURED_*, which claims they are this tree's answer
+ * today; they are not, and cannot be, because ordinary work moves them by a handful and no test
+ * would notice. Both were already stale by four and seven when a rebase grew the corpus.
+ *
+ * They are NOT pinned like {@link KNOWN_RETIRED_HEIGHT_TOTAL}, and the difference is what each
+ * one is. The 86 is DEBT: it must not grow, so every movement is a thing to adjudicate. A
+ * declaration count moves whenever anyone adds a screen, so pinning it would red this gate on
+ * unrelated work and teach the next author to re-baseline a number without reading it. The
+ * enforced figures are the floors, which are the ones with a failure mode worth stopping.
+ */
+export const FLOOR_REFERENCE_STYLESHEET_DECLARATIONS = 530;
 
-/** Height declarations scanned in Svelte `<style>` blocks, measured. */
-export const MEASURED_SVELTE_DECLARATIONS = 433;
+/** The Svelte half of {@link FLOOR_REFERENCE_STYLESHEET_DECLARATIONS}. Illustrative likewise. */
+export const FLOOR_REFERENCE_SVELTE_DECLARATIONS = 440;
 
 /** `'file | property | value | count | raw => resolved [; …]'`, in code-point key order. */
 const ROWS = Object.freeze([
@@ -112,8 +128,10 @@ const ROWS = Object.freeze([
 ]);
 
 /**
- * The three rows whose value is NOT written on the line the gate cites, each with the reason a
- * reader needs before deciding how to pay it down.
+ * The three rows whose raw text differs from its resolved text, each with the reason a reader
+ * needs before deciding how to pay it down. Two carry no pixel value on the cited line at all;
+ * the third writes its 40 there and differs only because another token in the same `calc()`
+ * resolves elsewhere, which is why the gate's predicate is the textual one and says so.
  *
  * Keyed on the row key, and the gate asserts this object holds exactly the rows carrying an
  * indirect text — so an annotation cannot rot into a permission for a row that has become
@@ -130,7 +148,7 @@ export const INDIRECT_HEIGHT_NOTES = Object.freeze({
     'resolved text rather than replacing one by the other. Paying it down means choosing a rung ' +
     'for the unparented case, not deleting the fallback.',
   'styles/fabricate.css min-height 40':
-    'One of these five is not a 40px control. Line 19060 is ' +
+    'One of these five is not a 40px control. Line 19235 is ' +
     '`min-height: calc(40px + (2 * var(--fab-space-3)) + 2px)`, where the 40px is a CONTENT ' +
     'contribution inside a padded well and the resulting control is nowhere near 40px tall. It ' +
     'is baselined because a value scanner cannot tell a contribution from a height, and it is ' +

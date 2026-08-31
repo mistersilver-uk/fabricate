@@ -1,7 +1,7 @@
 /**
  * A CSS declaration scanner over BOTH stylesheets the product ships (issue 1391).
  *
- * `npm run lint:css` globs `styles/**` and nothing else, so the ~433 declarations living in
+ * `npm run lint:css` globs `styles/**` and nothing else, so the ~440 declarations living in
  * Svelte scoped `<style>` blocks are unreachable by stylelint — which is to say the half of
  * the corpus most likely to drift is entirely unlinted. Any gate that wants to police a CSS
  * VALUE therefore has to read both corpora itself, and this is the shared way to do it. Its
@@ -42,12 +42,12 @@
  * twice in docblock PROSE — explaining that it deliberately has none — with no closing tag
  * anywhere in its 268 lines, so a naive `indexOf('<style')` reads from that prose line to EOF
  * as CSS. Inert today only because that prose happens to contain no CSS-shaped text. Across
- * `src/`, 177 files carry a real block, no file carries two, and 18 prose mentions across 16
+ * `src/`, 180 files carry a real block, no file carries two, and 18 prose mentions across 16
  * files would be read as openers by a naive extractor.
  *
  * The cost of the anchor is that a block whose opener is NOT alone on its line contributes
  * nothing, silently — one `<style lang="postcss">.a{height:36px}</style>` would arrive with no
- * baseline row and red nothing. Measured, the corpus has 177 openers, 177 closers and 177
+ * baseline row and red nothing. Measured, the corpus has 180 openers, 180 closers and 180
  * contributing files with no mismatch, and `style-block-scan.test.js` pins that equality
  * against the real tree so the day it stops holding is a failure rather than a silent gap.
  *
@@ -88,9 +88,21 @@ export const MAX_VAR_CHAIN_DEPTH = 8;
 
 /**
  * The cap on the combinations produced from ONE text in ONE round. A value naming k tokens,
- * each defined m times, expands to m**k texts per round; this corpus's worst case is a handful.
- * Exceeding it throws rather than truncating, because a truncated candidate set is a scanner
- * that answers "no banned value here" for the wrong reason.
+ * each defined m times, expands to m**k texts per round. Exceeding it throws rather than
+ * truncating, because a truncated candidate set is a scanner that answers "no banned value
+ * here" for the wrong reason.
+ *
+ * MEASURED, over the whole corpus rather than over the heights this gate scans, because the
+ * two answers are not close and the reassuring one is the narrow one. Across the six height
+ * properties the widest candidate set is FOUR, at `components/Stepper.svelte:355`. Resolve
+ * every declaration in the corpus instead and one of them already EXCEEDS this cap and
+ * throws: `styles/fabricate.css:16025` builds a four-stop `linear-gradient` out of four colour
+ * tokens, each defined once per theme, and 512 is not enough for it. The widest that does
+ * resolve is 345, a `box-shadow` at `styles/fabricate.css:16070`.
+ *
+ * That is not a defect here — this gate scans heights, and a value gate should scan the
+ * properties it means to police rather than everything — but it is the fact the stated second
+ * customer has to plan around, so it is recorded rather than left to be discovered by a throw.
  *
  * Read what it bounds precisely: it is NOT a bound on the candidate set. `expandFrontier` runs
  * this expansion over every text in the frontier, so a round can grow the frontier by up to this
@@ -116,9 +128,19 @@ const STYLE_CLOSE_LINE = /^\s*<\/style>\s*$/;
  *
  * `[a-zA-Z]` rather than `[a-z]` because CSS property names are ASCII case-insensitive, and the
  * half of this corpus stylelint cannot reach is the half where a `HEIGHT:` could survive review.
- * It costs nothing measured — the corpus holds 22,139 declarations under either spelling — and
- * a gate that reads one casing is a gate with a one-keystroke bypass. Custom property NAMES stay
- * case-sensitive, which is the spec's own rule: `--Foo` and `--foo` are two properties.
+ * It costs nothing measured — the corpus holds 22,300 declarations under either spelling — and
+ * a gate that reads one casing is a gate with a one-keystroke bypass.
+ *
+ * WIDENING THIS PATTERN IS ONLY HALF OF THAT, and the half that reaches nothing on its own.
+ * Extraction is not selection: `scanPixelValues` matches the extracted name against the
+ * caller's property list, so an uppercase `HEIGHT` was extracted here and dropped one line
+ * later against an all-lowercase `wanted` set — an end-to-end run scored `HEIGHT: 40px` as
+ * zero occurrences while `declarationsIn` alone reported it perfectly. {@link propertyKey}
+ * folds both sides, and `style-block-scan.test.js` proves the casing through `scanPixelValues`
+ * rather than through this pattern, because the pattern passing proves nothing about the scan.
+ *
+ * Custom property NAMES stay case-sensitive on BOTH sides, which is the spec's own rule:
+ * `--Foo` and `--foo` are two properties. The corpus defines none that collide on case.
  *
  * WHAT IT DOES NOT READ, stated rather than left to be inferred: a single-dash vendor-prefixed
  * property never matches, because the alternation requires a letter first and `--` is spelled
@@ -156,8 +178,9 @@ const DECLARATION = /(?:^|[;{}])\s*(--[\w-]+|[a-zA-Z][\w-]*)\s*:\s*([^;{}]*)/g;
  *
  * The `i` flag is there because CSS units are ASCII case-insensitive: `height: 40PX` is forty
  * pixels and read `40` as nothing without it. The corpus holds zero uppercase `px` today across
- * all 22,139 declarations, so this buys no occurrence — it closes a one-keystroke bypass sitting
- * precisely in the Svelte half stylelint cannot reach.
+ * all 22,300 declarations, so this buys no occurrence — it closes a one-keystroke bypass sitting
+ * precisely in the Svelte half stylelint cannot reach. Unlike the property-name widening above,
+ * this one bites on its own: nothing downstream re-filters the unit.
  *
  * IT IS SIGN-BLIND, deliberately unfixed and stated here because the next customer is the
  * spacing gate. `margin: -8px` tallies as `8px`: the lookbehind excludes `[\w.]` and a `-` is
@@ -242,8 +265,9 @@ export function styleTextFor(file, source) {
 /**
  * Every shipped stylesheet as `{ repo-relative path: CSS text }`, in code-point path order.
  *
- * Files contributing no CSS at all — the 126 `.svelte` components with no scoped block — are
- * dropped, so `Object.keys()` is the set of files a gate can actually cite.
+ * Files contributing no CSS at all — the 126 `.svelte` components with no scoped block, being
+ * the 306 under `src/` less the 180 carrying one — are dropped, so `Object.keys()` is the set
+ * of files a gate can actually cite.
  *
  * @param {object} [options]
  * @param {readonly string[]} [options.roots]
@@ -550,8 +574,30 @@ function shortestCarriers(candidates, banned) {
 }
 
 /**
+ * The key a property name is MATCHED on, which is not the name it is REPORTED under.
+ *
+ * A standard property is folded to lower case, because CSS property names are ASCII
+ * case-insensitive and `HEIGHT` and `height` are one property. A custom property is not folded
+ * at all: `--Foo` and `--foo` are two properties by the spec's own rule, and folding them
+ * together would make a gate scanning one of them silently answer about both.
+ *
+ * The occurrence record keeps the name AS AUTHORED, which matters to the ratchet downstream: a
+ * `HEIGHT` row arrives as an unbaselined key and reds, rather than inflating the count of the
+ * `height` row it is not.
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+function propertyKey(name) {
+  return name.startsWith('--') ? name : name.toLowerCase();
+}
+
+/**
  * Scan a corpus for declarations of `properties` carrying any of `values` in pixels, through
  * `var()`.
+ *
+ * Property matching folds case on BOTH sides — see {@link propertyKey} — so widening
+ * {@link DECLARATION} to extract an uppercase spelling actually reaches this far.
  *
  * @param {object} options
  * @param {Record<string, string>} options.corpus From {@link collectStyleCorpus}.
@@ -569,7 +615,7 @@ function shortestCarriers(candidates, banned) {
  *   the source line does not contain.
  */
 export function scanPixelValues({ corpus, properties, values, maxDepth = MAX_VAR_CHAIN_DEPTH }) {
-  const wanted = new Set(properties);
+  const wanted = new Set([...properties].map(propertyKey));
   const banned = new Set(values);
   const definitions = definitionsFor(corpus);
   const declarations = [];
@@ -579,7 +625,7 @@ export function scanPixelValues({ corpus, properties, values, maxDepth = MAX_VAR
 
   for (const [file, css] of Object.entries(corpus)) {
     for (const declaration of declarationsIn(file, css)) {
-      if (!wanted.has(declaration.property)) continue;
+      if (!wanted.has(propertyKey(declaration.property))) continue;
       declarations.push(declaration);
       const resolution = resolveValueCandidates(declaration.value, definitions, { maxDepth });
       observedDepth = Math.max(observedDepth, resolution.depth);

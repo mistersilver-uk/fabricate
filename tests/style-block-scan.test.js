@@ -14,6 +14,8 @@
  *     SILENTLY PASSED two derived from the same token at two.
  *   - substituting a definition for `var(--x, 36px)` DELETED the fallback, and with it a real
  *     occurrence.
+ *   - the declaration pattern was widened to read `HEIGHT:`, and the scan then dropped it
+ *     against an all-lowercase property list one line later, so the widening reached nothing.
  *
  * None of those is hypothetical and none was caught by reading the code. Each was caught by
  * reading output, so each is pinned here.
@@ -130,16 +132,13 @@ test('a pixel literal matches on a numeric boundary, never a substring', () => {
     'a leading-dot decimal is four tenths of a pixel, not forty of them and not nothing'
   );
 
-  // ── UNITS ARE CASE-INSENSITIVE, PROPERTIES TOO ──────────────────────────────────────────
+  // ── UNITS ARE CASE-INSENSITIVE ──────────────────────────────────────────────────────────
   // `40PX` is forty pixels by the CSS grammar. The corpus holds none today, which is exactly
   // why nothing else would notice: the bypass costs one keystroke and it sits in the Svelte
-  // half stylelint cannot reach.
+  // half stylelint cannot reach. Nothing downstream re-filters the unit, so this one assertion
+  // does cover the whole scan — unlike the property casing, which needs the composition proof
+  // in `an uppercase property name survives the whole scan, not just the extraction`.
   assert.deepEqual(pixelValuesIn('height: 40PX'), [40], 'a CSS unit is ASCII case-insensitive');
-  assert.deepEqual(
-    declarationsIn('a.css', '.a { HEIGHT: 40px; }').map((entry) => entry.property),
-    ['HEIGHT'],
-    'a property name is case-insensitive too, so an uppercase spelling must still be read'
-  );
 
   // ── PINNED LIMIT: THE MATCHER IS SIGN-BLIND ─────────────────────────────────────────────
   // `-8px` tallies as `8px` because a `-` is neither `\w` nor `.`, so the lookbehind does not
@@ -170,6 +169,54 @@ test('a declaration is read only at a real declaration boundary', () => {
   assert.deepEqual(
     media.map((entry) => `${entry.property}:${entry.value}`),
     ['height:30px']
+  );
+});
+
+test('an uppercase property name survives the whole scan, not just the extraction', () => {
+  // EXTRACTION IS NOT SELECTION, and asserting the first as though it were the second is how the
+  // property-name widening shipped inert. `DECLARATION` was widened to `[a-zA-Z]` so a `HEIGHT:`
+  // could not evade the gate, and it does read the name perfectly — after which
+  // `scanPixelValues` dropped it against an all-lowercase property list one line later.
+  // Measured end to end BEFORE the fold: `height: 40px` and `height: 40PX` scored one occurrence
+  // each, `HEIGHT: 40px` and `MIN-HEIGHT: 36px` scored ZERO. The pattern was right and the gate
+  // still had the one-keystroke bypass the widening was written to close.
+  //
+  // Every assertion here therefore goes through `scanPixelValues`. The `declarationsIn`
+  // assertion that used to stand in for this one is green under that defect, which is the same
+  // helper-level-pass-presented-as-composition shape the `stripCssComments` call site had.
+  const occurrences = (css, properties, values) =>
+    scanPixelValues({ corpus: { 'a.css': css }, properties, values }).occurrences;
+
+  assert.deepEqual(
+    occurrences('.a { HEIGHT: 40PX; }', ['height'], [40]).map(
+      (record) => `${record.property}:${record.value}`
+    ),
+    ['HEIGHT:40'],
+    'an uppercase property and an uppercase unit must both reach the scan, and the record must ' +
+      'keep the name AS AUTHORED: a HEIGHT row then arrives at the ratchet as an unbaselined ' +
+      'key and reds, rather than silently inflating the count of the `height` row it is not'
+  );
+  assert.equal(
+    occurrences('.a { MIN-HEIGHT: 36px; }', ['min-height'], [36]).length,
+    1,
+    'a hyphenated property must fold too; the extractor reads it either way, so only the ' +
+      'property match can lose it'
+  );
+  assert.equal(
+    occurrences('.a { height: 40px; }', ['HEIGHT'], [40]).length,
+    1,
+    'the fold is on BOTH sides — a caller naming a property in upper case is asking for the ' +
+      'same property, and half a fold is a bypass with the sides swapped'
+  );
+
+  // Custom property names are NOT folded, which is the spec's own rule rather than an omission:
+  // `--Foo` and `--foo` are two properties, and folding them would make a gate scanning one of
+  // them silently answer about both.
+  assert.equal(occurrences('.a { --Foo: 40px; }', ['--Foo'], [40]).length, 1);
+  assert.equal(
+    occurrences('.a { --Foo: 40px; }', ['--foo'], [40]).length,
+    0,
+    'a custom property name is case-SENSITIVE, so the fold must not reach it'
   );
 });
 
@@ -230,8 +277,8 @@ test('every Svelte file carrying a real block is in the corpus, and only those',
   // The line anchor's COST, which nothing pinned until now. A block whose opener is not alone on
   // its line contributes zero — one `<style lang="postcss">.a{height:36px}</style>` would drop a
   // whole component's CSS out of the gate, arrive with no baseline row and red nothing, which is
-  // the failure shape this whole scanner exists to avoid. Measured today: 177 openers, 177
-  // closers, 177 contributing files, no mismatch in either direction.
+  // the failure shape this whole scanner exists to avoid. Measured today: 180 openers, 180
+  // closers, 180 contributing files, no mismatch in either direction.
   const carriesBlock = Object.entries(collectWorkingTreeSources(['src'], ['.svelte']))
     .filter(([, source]) => source.includes('</style>'))
     .map(([file]) => file)
