@@ -461,8 +461,18 @@ test('every component the library cites by filename still exists', () => {
  * silence one layer down: an unmatched citation is an unchecked citation, and this file exists
  * because unreachable configuration looks exactly like working configuration. Capturing the prefix
  * costs one group, needs no prefix-to-path registry — this change has already priced what a
- * hand-maintained registry costs — and turns the foreign case into a named failure. Group 1 is the
- * capability, absent when the citation is bare; group 2 is the heading.
+ * hand-maintained registry costs — and turns a SLASH-ADJACENT foreign prefix into a named failure.
+ * Group 1 is the capability, absent when the citation is bare; group 2 is the heading.
+ *
+ * That qualifier is deliberate rather than modest. Three foreign shapes still read as bare and are
+ * still resolved against this capability, and they are described here rather than written out
+ * because this file is itself scanned: a capability path closed in backticks before the notation
+ * begins, which matters because backticking paths is this corpus's own convention; a capability
+ * named as prose with a space where the slash would be; and a prefix wrapped at the slash across a
+ * JSDoc line break, which `unwrapped` rejoins with a space. None is a regression — the capture is
+ * a strict superset of the pattern it replaced, so nothing matches less than before — and none was
+ * closed by either remedy considered. Dropping the qualifier would be this file committing the
+ * defect it exists to report: a claim broader than the check behind it.
  */
 const REQUIREMENT_CITATION = /(?:([A-Za-z0-9._-]+)\/)?spec\.md requirement "([^"]+)"/g;
 
