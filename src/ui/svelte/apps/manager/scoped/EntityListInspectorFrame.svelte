@@ -88,7 +88,13 @@
      their navigation without either of them hand-writing a button run.
    - rowMeta(entry, ctx) / inspectorBody(entry, ctx) / bulk(selectedIds, ctx): see the ctx note
      on `rowContext` below.
-   - selectedId / onSelect(entityId): the inspected row, controllable by the page.
+   - selectedId / onSelect(entityId): the inspected row. GENUINELY CONTROLLED-OR-UNCONTROLLED —
+     a row click is the DEFAULT driver, and an owner that changes `selectedId` overrides it at any
+     time, including back to `''` to return the list to resting. Both halves are load-bearing: a
+     deep link, a route parameter restored on re-entry, a re-selection after a create or a delete,
+     and — the sharp one — a page whose route-exit guard REFUSES a navigation and has to put the
+     selection back, all drive it from outside. A frame that latched on the first click would leave
+     that last case unable to undo what it just refused.
    - armedToken: BINDABLE. The frame clears it on any selection, filter, sort or page change, so
      the owner's single-armed-token invariant holds across a re-projection.
 -->
@@ -174,7 +180,14 @@
   let pageIndex = $state(0);
   let pageSize = $state(DEFAULT_PAGE_SIZE);
   let selectedIds = $state(new Set());
+  // Driven by row clicks and re-synced from the owner by the effect below, which also seeds it:
+  // the sentinel starts at `null`, which no prop value can equal, so the first run adopts
+  // whatever the owner mounted with. Seeding it here instead would read a prop in a
+  // non-reactive position, which is the `state_referenced_locally` the compiler is right to
+  // warn about — and `$effect` runs before the browser paints, so nothing flashes.
   let inspectedId = $state('');
+  /** @type {string|null} The last `selectedId` this frame adopted; `null` until the first run. */
+  let ownerSelection = null;
   /** @type {HTMLElement|null} */
   let inspectorElement = $state(null);
 
@@ -225,9 +238,23 @@
 
   // A row that leaves the FILTERED set stops being inspected: the alternative is an inspector
   // rendering a record the list no longer shows, with no way back to it.
-  const inspectedEntry = $derived(
-    projected.rows.find((entry) => entry.id === (inspectedId || selectedId)) ?? null
-  );
+  const inspectedEntry = $derived(projected.rows.find((entry) => entry.id === inspectedId) ?? null);
+
+  // ── THE OWNER CAN ALWAYS TAKE THE SELECTION BACK ──────────────────────────────────────────
+  // `inspectedId || selectedId` looks like the same thing and is not: `inspectedId` is set on
+  // every row click and never cleared, so under that reading the owner's value is dead from the
+  // first click onward and the prop is initial-only. The page that most needs this is the one
+  // whose route-exit guard refused a navigation and has to restore the selection it just
+  // refused to leave.
+  //
+  // `ownerSelection` is a PLAIN local, not `$state`, on purpose: the effect must depend on the
+  // PROP and on nothing else, so writing the last-seen value cannot re-trigger it. A falsy
+  // `selectedId` is a real instruction — "return to resting" — and is not skipped.
+  $effect(() => {
+    if (selectedId === ownerSelection) return;
+    ownerSelection = selectedId;
+    inspectedId = selectedId;
+  });
 
   // The clamp writes back, so the owner's state and the footer cannot disagree on the next pass.
   // Converges in one tick: once they are equal the effect assigns nothing.
@@ -391,19 +418,17 @@
   /**
    * Whether this entity's identity record actually names a source Item.
    *
-   * Only asked when the DESCRIPTOR says the type has the fields at all: an essence carries none
-   * of them, so a badge on an essence row would state the absence of something it never had.
+   * READ FROM THE PROJECTION, never re-derived here. `buildEntry` answers it beside the ONE list
+   * of source-link field names. Restating those three names in this file would go on testing the
+   * old ones after a rename — `scope.sourceLinked` would stay correct, so every type-level gate
+   * would stay green, while each entity linked only by the renamed field started reporting
+   * itself unlinked. One directory apart is still a second copy.
    *
    * @param {object} entry
    * @returns {boolean}
    */
   function sourceLinkedRow(entry) {
-    const entity = entry?.entity ?? null;
-    return Boolean(
-      entity?.originItemUuid ||
-      entity?.registeredItemUuid ||
-      (Array.isArray(entity?.aliasItemUuids) && entity.aliasItemUuids.length > 0)
-    );
+    return entry?.hasSourceLink === true;
   }
 
   const membershipLabels = $derived({
@@ -436,7 +461,12 @@
   and the inner one is what the query lays out.
 -->
 <div class="manager-scoped-list-frame">
-  <div class="manager-scoped-list-layout" class:has-inspector={Boolean(inspectorBody)}>
+  <!--
+    `&& available` is load-bearing, not defensive. The unavailable branch renders ONE callout and
+    no inspector, so a two-track grid there reserves a 300px column beside a warning and paints a
+    void the width of the panel that is not there.
+  -->
+  <div class="manager-scoped-list-layout" class:has-inspector={Boolean(inspectorBody) && available}>
     {#if !available}
       <div class="manager-scoped-list-unavailable">
         <Callout
@@ -682,9 +712,16 @@
                 />
               </span>
               <span class="manager-inspector-copy">
-                <span class="manager-inspector-name" data-scoped-list-inspector-name>
+                <!--
+                  AN `<h2>`, as every shipped inspector renders it. `.manager-inspector-name`
+                  fully specifies its own appearance, so the element choice is free — and it is
+                  the entry point a screen-reader user browsing by heading needs into the panel
+                  focus was just moved to. It also puts the catalogue shell's own `<h3>` group
+                  head at a level that does not skip.
+                -->
+                <h2 class="manager-inspector-name" data-scoped-list-inspector-name>
                   {scopedEntryName(inspectedEntry)}
-                </span>
+                </h2>
                 <span class="manager-system-description">{descriptionOf(inspectedEntry)}</span>
               </span>
             </div>
@@ -711,9 +748,31 @@
      budget this frame lays out against is the main column's inline size, not the window's. A
      `container-type: inline-size` root and a container query are what make that measurable from
      here rather than from a closed stylesheet. */
+  /* A GRID WITH ONE `minmax(0, 1fr)` ROW, NEVER `display: block`, AND THAT IS THE WHOLE INSPECTOR.
+
+     `.manager-main` gives this element a definite height — `display: grid; grid-template-rows:
+     minmax(0, 1fr); overflow-y: auto` in `styles/fabricate.css` — but a `display: block` box does
+     not pass that height on, so the layout below it was content-sized and BOTH `overflow-y: auto`
+     declarations in this file were dead. Measured at 1400x900 on the default 25-row page: the
+     frame was 868px with a 1957px scroll height, and the inspector was a 1957px-tall panel
+     holding 175px of content, reporting `canScroll: false`.
+
+     WHAT THAT COSTS A GM IS THE AFFORDANCE, NOT A SCROLLBAR. Scroll to the twentieth row, click
+     its name, and `inspect()`'s focus call moves the page ONE pixel — the aside spans the entire
+     scroll region, so it is never out of view and never scrolled to. The identity header, the
+     inheriting-system counts and every Add / Remove / Enable control sit about a thousand pixels
+     above the fold, and the `.is-selected` ring is the only feedback there is.
+
+     The shipped `.manager-inspector` aside this column stands in for cannot do that: it is a
+     sibling of `main` inside `.manager-body { overflow: hidden }`, so it is always on screen.
+     Matching its 300px width while missing that is matching the wrong half.
+
+     `container-type` stays HERE and the container query still targets a descendant, so the
+     stacked layout is unaffected. */
   .manager-scoped-list-frame {
     container-type: inline-size;
-    display: block;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
   }
@@ -740,7 +799,22 @@
     min-height: 0;
   }
 
+  /* THE ROWS TAKE THE SLACK AND THE CHROME DOES NOT. Without the explicit pair the column hands
+     its height to whichever child grows, and the browse archetype's rule — the pagination bar
+     sits OUTSIDE the scroll area so it never moves — is the opposite of that. */
+  .manager-scoped-list-toolbar,
+  .manager-scoped-list-bulk {
+    flex: 0 0 auto;
+  }
+
+  /* `Pagination` renders its own `<section class="manager-pagination">`, so a scoped rule cannot
+     reach it and the sizing has to be stated from this side of the boundary. */
+  .manager-scoped-list-column > :global(.manager-pagination) {
+    flex: 0 0 auto;
+  }
+
   .manager-scoped-list-rows {
+    flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
@@ -770,8 +844,17 @@
     outline-offset: 2px;
   }
 
-  .manager-scoped-list-unavailable,
-  .manager-scoped-list-bulk {
+  .manager-scoped-list-unavailable {
+    min-width: 0;
+  }
+
+  /* The source badge's hook wrapper. It carried the attribute every row assertion reads and NO
+     rule at all, so the pill it wraps sat in the meta run as a bare inline box that could not
+     align with the chips beside it. */
+  .manager-scoped-list-source {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
     min-width: 0;
   }
 

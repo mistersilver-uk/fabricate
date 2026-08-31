@@ -57,6 +57,18 @@ const RAIL_PX = 220;
 const INSPECTOR_PX = 300;
 /** Sub-pixel tolerance; every defect this catches moves an edge by hundreds of pixels. */
 const EPSILON_PX = 1;
+/**
+ * A FULL DEFAULT PAGE OF ROWS, and the count is load-bearing.
+ *
+ * This fixture rendered four rows, which is short enough that the whole column fits the viewport
+ * — and a frame that never passes its height down is indistinguishable from one that does when
+ * nothing overflows. At 25 the list is taller than the window, which is the ordinary case for a
+ * world catalogue and the only one in which "the inspector is a bounded, scrollable column"
+ * differs from "the inspector is a panel spanning the whole scroll region".
+ */
+const ROW_COUNT = 25;
+/** The manager host's height, so the column has a definite one to be bounded by. */
+const HOST_HEIGHT_PX = 900;
 
 // Two REAL window widths, one comfortably either side of the threshold once the rail is taken
 // off. Asserted against the measured container width below rather than assumed.
@@ -112,7 +124,7 @@ function page(productMarkup, windowWidth) {
     <style>
       :root { --font-primary: Arial, sans-serif; }
       html, body { margin: 0; padding: 0; }
-      .probe-host { width: ${windowWidth}px; height: 900px; }
+      .probe-host { width: ${windowWidth}px; height: ${HOST_HEIGHT_PX}px; }
     </style></head>
     <body>
       <div class="probe-host">
@@ -138,9 +150,20 @@ function measure() {
   const frameBox = frame.getBoundingClientRect();
   const columnBox = column.getBoundingClientRect();
   const inspectorBox = inspector.getBoundingClientRect();
+  const rowsRegion = frame.querySelector('.manager-scoped-list-rows');
+  const list = frame.querySelector('.manager-scoped-list');
   return {
     frameRendered: true,
     inspectorRendered: true,
+    // The height chain. `frameHeight` is what `.manager-main` handed down; `inspectorHeight` is
+    // what the inspector took. They diverge by the whole overflow when the frame is a block box.
+    frameHeight: frameBox.height,
+    inspectorHeight: inspectorBox.height,
+    rowsHeight: rowsRegion ? rowsRegion.getBoundingClientRect().height : 0,
+    rowsScrollHeight: rowsRegion ? rowsRegion.scrollHeight : 0,
+    rowsCanScroll: rowsRegion ? rowsRegion.scrollHeight > rowsRegion.clientHeight + 1 : false,
+    listHeight: list ? list.getBoundingClientRect().height : 0,
+    viewportHeight: window.innerHeight,
     containerWidth: frameBox.width,
     columnRight: columnBox.right,
     columnBottom: columnBox.bottom,
@@ -151,7 +174,7 @@ function measure() {
   };
 }
 
-describe('the catalogue shell\'s inspector column, measured in a real browser', () => {
+describe("the catalogue shell's inspector column, measured in a real browser", () => {
   let browser = null;
   let markup = '';
 
@@ -165,7 +188,7 @@ describe('the catalogue shell\'s inspector column, measured in a real browser', 
     const scope = projectWorldScopeEntity({
       entityType: 'component',
       corpus: {
-        entities: Array.from({ length: 4 }, (unused, index) => ({
+        entities: Array.from({ length: ROW_COUNT }, (unused, index) => ({
           id: `component-${index}`,
           name: `Ash ${index}`,
           description: 'A component',
@@ -201,7 +224,7 @@ describe('the catalogue shell\'s inspector column, measured in a real browser', 
 
   async function measureAt(windowWidth) {
     const context = await browser.newContext({
-      viewport: { width: windowWidth, height: 900 },
+      viewport: { width: windowWidth, height: HOST_HEIGHT_PX },
     });
     const tab = await context.newPage();
     await tab.setContent(page(markup, windowWidth));
@@ -226,6 +249,47 @@ describe('the catalogue shell\'s inspector column, measured in a real browser', 
       Math.abs(box.inspectorWidth - INSPECTOR_PX) <= EPSILON_PX,
       `the inspector is ${box.inspectorWidth}px, not the ${INSPECTOR_PX}px of the shared aside ` +
         'it stands in for'
+    );
+  });
+
+  it('BOUNDS the inspector to the frame and gives the rows the overflow', async () => {
+    // ── WHAT A FOUR-ROW FIXTURE CANNOT SEE ──────────────────────────────────────────────────
+    // `.manager-main` hands this frame a definite height. A `display: block` frame does not pass
+    // it on, so the layout inside is content-sized, every `overflow-y: auto` in the component is
+    // inert, and the inspector becomes a panel as tall as the whole list — measured at 1957px
+    // holding 175px of content, reporting `canScroll: false`.
+    //
+    // The cost is the affordance, not a scrollbar: with the aside spanning the entire scroll
+    // region it is never out of view, so `inspect()`'s focus call scrolls the page by a pixel
+    // and the identity header, the inheriting-system counts and every Add / Remove / Enable
+    // control stay about a thousand pixels above the fold. The `.is-selected` ring on the row is
+    // the only feedback a GM gets.
+    //
+    // Four rows fit the viewport, so none of that is visible to a short fixture. This asserts
+    // the overflow EXISTS first, for exactly that reason.
+    const box = await measureAt(WIDE_WINDOW_PX);
+    assert.equal(box.inspectorRendered, true);
+    assert.ok(
+      box.listHeight > box.viewportHeight,
+      `the ${ROW_COUNT}-row list measured ${box.listHeight}px inside a ${box.viewportHeight}px ` +
+        'viewport and does not overflow, so nothing below distinguishes a bounded column from ' +
+        'an unbounded one'
+    );
+    assert.ok(
+      box.frameHeight <= box.viewportHeight + EPSILON_PX,
+      `the frame is ${box.frameHeight}px in a ${box.viewportHeight}px viewport, so it took its ` +
+        'height from its content rather than from `.manager-main`'
+    );
+    assert.ok(
+      box.inspectorHeight <= box.frameHeight + EPSILON_PX,
+      `the inspector is ${box.inspectorHeight}px inside a ${box.frameHeight}px frame — it spans ` +
+        'the whole scroll region, so clicking a row below the fold shows the GM nothing'
+    );
+    assert.equal(
+      box.rowsCanScroll,
+      true,
+      `the rows region is ${box.rowsHeight}px around ${box.rowsScrollHeight}px of rows and ` +
+        'cannot scroll, so its own `overflow-y: auto` is dead and the page scrolls instead'
     );
   });
 

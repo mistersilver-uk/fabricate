@@ -42,7 +42,8 @@
   Props:
    - scope: the entity type's `worldScope` projection.
    - actions: that entity type's write family from `worldScopeActions` — `addToSystem`,
-     `removeFromSystem`, `copyMembership`, and `setEnabled` only when `scope.enableable`.
+     `removeFromSystem`, and `setEnabled` only when `scope.enableable`. `copyMembership` is
+     deliberately NOT called; see `copyable` below.
    - systems: the crafting-system roster, for names only.
    - hookValue: the `data-scoped-list` value; the page still owns `<main>` and the route hook.
    - title / subtitle / icon / emptyTitle / emptyHint: pre-localized, from the lane.
@@ -123,14 +124,33 @@
   }
 
   /**
-   * Whether any OTHER system already holds this entity, which is the precondition for copy-from.
+   * COPY-FROM IS SUPPRESSED IN THIS SHELL, AND THAT IS A DECISION RATHER THAN AN OMISSION.
    *
-   * @param {object} entry
-   * @param {string} systemId
-   * @returns {boolean}
+   * `copyMembership(entityId, fromSystemId, toSystemIds)` needs a SOURCE and a list of
+   * DESTINATIONS. What a per-system row here knows is its own id, and — because
+   * `MembershipActions` renders Copy only inside its `member` branch — that id is the
+   * DESTINATION, the system that already has the entity. The source is whichever OTHER system
+   * the GM meant, and nothing on this screen asks them.
+   *
+   * The label is `Copy from…`, with the ellipsis that promises a chooser, and this shell has
+   * none. Offering the button anyway means one of two failures: a call missing its third
+   * argument, which `copyMembership` refuses before it writes anything and reports nothing — a
+   * button that silently does nothing on every click forever — or a guess at the source, which
+   * writes the wrong system's overrides onto a record and is worse.
+   *
+   * A "sometimes correct" version is available and is also refused: when exactly one other
+   * system holds the entity the source is unambiguous, and the control would then work on some
+   * rows and not others with nothing on screen saying which.
+   *
+   * SO THE AFFORDANCE IS NOT RENDERED, and the chooser is 6a-ii's — the lane that owns this
+   * screen's inspector body, where a source picker belongs. `tests/components/
+   * scoped-shell-prop-contract.test.js` bans a two-argument `copyMembership` call from this
+   * directory, so the lane that adds the picker cannot re-introduce the silent form.
+   *
+   * @returns {boolean} always `false`
    */
-  function copyable(entry, systemId) {
-    return (entry?.systems ?? []).some((row) => row.systemId !== systemId && row.member === true);
+  function copyable() {
+    return false;
   }
 </script>
 
@@ -199,13 +219,12 @@
           systemName={systemLabel(row)}
           member={row.member === true}
           enabled={row.enabled === true}
-          copyable={copyable(entry, row.systemId)}
+          copyable={copyable()}
           {armedToken}
           onArm={(token) => (armedToken = token)}
           onDisarm={() => (armedToken = '')}
           onAdd={() => actions?.addToSystem?.(entry.id, row.systemId)}
           onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
-          onCopyFrom={() => actions?.copyMembership?.(entry.id, row.systemId)}
           onToggleEnabled={(next) => actions?.setEnabled?.(entry.id, row.systemId, next)}
         />
       </li>

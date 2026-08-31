@@ -54,8 +54,8 @@ export const WORLD_SCOPE_ENTITY_TYPES = Object.freeze(['component', 'essence', '
  * answer says which one you are looking at.
  *
  * The bridge is therefore WRITTEN OUT rather than derived from a pluralize rule, and
- * `tests/world-scope-projection.test.js` pins each list it reads as NON-EMPTY before it asserts
- * a single per-type answer.
+ * `tests/scoped-entity-list-model.test.js` pins each list it reads as NON-EMPTY — and re-reads
+ * this very map out of THIS file's source — before it asserts a single per-type answer.
  *
  * @type {Readonly<Record<string, string>>}
  */
@@ -340,6 +340,14 @@ function buildSystemRow(descriptor, system, membership, worldDefault) {
  * @param {Map<string, object>} membershipIndex
  * @returns {object}
  */
+function entryHasSourceLink(entity) {
+  for (const field of SOURCE_LINK_FIELDS) {
+    const value = entity?.[field];
+    if (Array.isArray(value) ? value.length > 0 : Boolean(value)) return true;
+  }
+  return false;
+}
+
 function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex) {
   const inheritCounts = {};
   for (const section of descriptor.sections) inheritCounts[section] = 0;
@@ -361,6 +369,16 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex) 
     defaults: worldDefault,
     membershipCount,
     inheritCounts,
+    // WHETHER THIS RECORD ACTUALLY NAMES A SOURCE ITEM, answered HERE because this module already
+    // imports the one list of source-link field names (issue 1380). The descriptor's
+    // `sourceLinked` says whether the TYPE has the fields at all; this says whether this entity
+    // filled one in, and it is what decides which badge a GM sees on a row.
+    //
+    // A consumer that restated the three names would go on testing the old ones after a rename:
+    // the descriptor answer stays correct, so a type-level gate stays green, while every entity
+    // linked only by the renamed field starts reporting itself unlinked. One directory apart is
+    // still a second copy.
+    hasSourceLink: descriptor.sourceLinked ? entryHasSourceLink(entity) : false,
     systems: rows,
   };
 }

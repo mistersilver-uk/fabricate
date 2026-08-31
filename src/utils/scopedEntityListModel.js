@@ -299,6 +299,26 @@ export function createScopedEntityListModel() {
 }
 
 /**
+ * The name collator, built ONCE.
+ *
+ * ── A CODE-POINT COMPARE IS THE WRONG ORDER FOR A LIBRARY OF NAMES ────────────────────────────
+ * All three shipped browser models order names with `localeCompare`, and a scoped list sitting
+ * one route away from the Component Studio must agree with it: raw `<` and `>` over lowercased
+ * strings sorts "Écorce" after "Zinc", so the same corpus under the same label comes out in two
+ * different orders depending on which screen a GM is looking at.
+ *
+ * `numeric: true` fixes the second half of the same complaint — "Ash 10" belongs after "Ash 2",
+ * not between "Ash 1" and "Ash 2" — and `sensitivity: 'base'` matches the case-insensitive
+ * intent the lowercased keys already had.
+ *
+ * ONE INSTANCE PER MODEL, not one per comparison: constructing an `Intl.Collator` is the
+ * expensive part, and `collator.compare` is a bound function a sort can be handed directly.
+ *
+ * @type {Intl.Collator}
+ */
+const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
+/**
  * Order two entries by their PRE-DERIVED sort keys.
  *
  * The keys come out of the memo rather than off the entry, so a comparator never re-derives a
@@ -311,8 +331,5 @@ export function createScopedEntityListModel() {
  * @returns {number}
  */
 function compareKeys(sortKey, left, right) {
-  const a = sortKey.get(left.id) ?? '';
-  const b = sortKey.get(right.id) ?? '';
-  if (a < b) return -1;
-  return a > b ? 1 : 0;
+  return NAME_COLLATOR.compare(sortKey.get(left.id) ?? '', sortKey.get(right.id) ?? '');
 }

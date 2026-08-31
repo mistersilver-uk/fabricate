@@ -311,7 +311,7 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
       assert.deepEqual(
         cells.map((cell) => cell.getAttribute('data-scoped-list-inherit-count')),
         Object.keys(first.inheritCounts),
-        'the cells enumerate the projection\'s own section keys'
+        "the cells enumerate the projection's own section keys"
       );
       assert.deepEqual(
         cells.map((cell) => cell.getAttribute('data-scoped-list-inherit-count')),
@@ -366,7 +366,7 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
   });
 });
 
-describe('the composed selection toolbar wears the frame\'s own clothes', () => {
+describe("the composed selection toolbar wears the frame's own clothes", () => {
   before(() => catalogueHarness.setup());
   after(() => catalogueHarness.teardown());
   afterEach(() => catalogueHarness.remount());
@@ -773,12 +773,18 @@ describe('the shells own the list state machine', () => {
     root.querySelector('[data-scoped-list-select-all-page]').click();
     await catalogueHarness.setProps({});
     assert.equal(rows(root).length, 25, 'the default page size');
-    assert.match(root.querySelector('[data-scoped-list-selection-count]').textContent, /25 selected/);
+    assert.match(
+      root.querySelector('[data-scoped-list-selection-count]').textContent,
+      /25 selected/
+    );
     // Page two: the count survives paging, so it is the whole selection rather than the page's
     // intersection with it.
     root.querySelector('[data-pagination-next]').click();
     await catalogueHarness.setProps({});
-    assert.match(root.querySelector('[data-scoped-list-selection-count]').textContent, /25 selected/);
+    assert.match(
+      root.querySelector('[data-scoped-list-selection-count]').textContent,
+      /25 selected/
+    );
     assert.equal(
       root.querySelector('[data-scoped-list-select-all-page]').checked,
       false,
@@ -787,7 +793,10 @@ describe('the shells own the list state machine', () => {
     // …and the results link reaches the rows the page control cannot.
     root.querySelector('[data-scoped-list-select-all-results]').click();
     await catalogueHarness.setProps({});
-    assert.match(root.querySelector('[data-scoped-list-selection-count]').textContent, /60 selected/);
+    assert.match(
+      root.querySelector('[data-scoped-list-selection-count]').textContent,
+      /60 selected/
+    );
   });
 
   it('PRUNES the selection when a filter shrinks the list', async () => {
@@ -796,10 +805,16 @@ describe('the shells own the list state machine', () => {
     );
     root.querySelector('[data-scoped-list-select-all-page]').click();
     await catalogueHarness.setProps({});
-    assert.match(root.querySelector('[data-scoped-list-selection-count]').textContent, /5 selected/);
+    assert.match(
+      root.querySelector('[data-scoped-list-selection-count]').textContent,
+      /5 selected/
+    );
     await type(root, 'Ash 0');
     await type(root, 'Ash 03');
-    assert.match(root.querySelector('[data-scoped-list-selection-count]').textContent, /1 selected/);
+    assert.match(
+      root.querySelector('[data-scoped-list-selection-count]').textContent,
+      /1 selected/
+    );
   });
 
   it('DISARMS on any selection, filter, sort or page change', async () => {
@@ -912,5 +927,200 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     assert.ok(Boolean(root.querySelector('[data-pagination-summary]')));
     assert.ok(Boolean(root.querySelector('[data-pagination-prev]')));
     assert.equal(root.querySelector('[data-pagination-prev]').disabled, true);
+  });
+});
+
+// ── THE INSPECTED ROW IS CONTROLLABLE BY THE OWNER ──────────────────────────────────────────
+
+describe('the owner can drive the inspected row at any time', () => {
+  before(() => catalogueHarness.setup());
+  after(() => catalogueHarness.teardown());
+  afterEach(() => catalogueHarness.remount());
+
+  const inspected = (root) =>
+    root.querySelector('[data-scoped-list-inspector-name]')?.textContent.trim() ?? null;
+
+  it('CONTROL: an owner change propagates when the GM has clicked nothing', async () => {
+    // The control is what makes the two cases below measurements rather than harness artifacts:
+    // if a prop update did not propagate at all they would fail for a reason that has nothing to
+    // do with the component.
+    const root = await catalogueHarness.mount(catalogueProps('component'));
+    assert.equal(inspected(root), null, 'nothing is inspected on a bare mount');
+    await catalogueHarness.setProps({ selectedId: 'component-1' });
+    assert.equal(inspected(root), 'Ash 01');
+  });
+
+  it('the owner can MOVE the selection after the GM has clicked a row', async () => {
+    // The defect this replaces: the internal click state was never cleared and was read first,
+    // so one click made the prop dead for the lifetime of the mount. Every consumer that needs
+    // to DRIVE inspection loses — a deep link, a route parameter restored on re-entry, a
+    // re-selection after a create or a delete, and the sharp one, a page whose route-exit guard
+    // refused a navigation and has to put the selection back.
+    const root = await catalogueHarness.mount(catalogueProps('component'));
+    root.querySelector('[data-scoped-list-inspect="component-1"]').click();
+    await catalogueHarness.setProps({});
+    assert.equal(inspected(root), 'Ash 01', 'the click must land, or the case below is vacuous');
+    await catalogueHarness.setProps({ selectedId: 'component-2' });
+    assert.equal(inspected(root), 'Ash 02');
+  });
+
+  it('the owner can CLEAR the selection back to resting', async () => {
+    // A falsy value is a real instruction, not an absent one: "show nothing" is what a page
+    // returning to a list-level view needs to be able to say.
+    const root = await catalogueHarness.mount(
+      catalogueProps('component', { selectedId: 'component-1' })
+    );
+    assert.equal(inspected(root), 'Ash 01');
+    root.querySelector('[data-scoped-list-inspect="component-2"]').click();
+    await catalogueHarness.setProps({});
+    assert.equal(inspected(root), 'Ash 02');
+    await catalogueHarness.setProps({ selectedId: '' });
+    assert.equal(inspected(root), null, 'the inspector falls back to its resting panel');
+    assert.ok(Boolean(root.querySelector('[data-scoped-list-inspector-state="resting"]')));
+  });
+
+  it('a row click still drives it when the owner never sets the prop', async () => {
+    const root = await catalogueHarness.mount(catalogueProps('component'));
+    root.querySelector('[data-scoped-list-inspect="component-2"]').click();
+    await catalogueHarness.setProps({});
+    assert.equal(inspected(root), 'Ash 02', 'the internal click is still the default driver');
+  });
+});
+
+// ── THE OUTWARD CALLBACKS, WHICH ARE THE HALF THE CONSUMING LANES WIRE ──────────────────────
+
+describe('every callback the shells expose is actually invoked', () => {
+  // THIS PR SHIPS NO SCREEN, so its outward API is four callbacks and nothing else exercises
+  // them. Pinning the prop NAMES and the snippet invocations leaves the callbacks unmeasured,
+  // and one edit to the row action handler silently turns every pen and globe on every row of
+  // every scoped list into decoration while both shells stay green.
+  describe('catalogue', () => {
+    before(() => catalogueHarness.setup());
+    after(() => catalogueHarness.teardown());
+    afterEach(() => catalogueHarness.remount());
+
+    it('calls onSelect with the entity id when a row identity is clicked', async () => {
+      const selected = [];
+      const root = await catalogueHarness.mount(
+        catalogueProps('component', { onSelect: (id) => selected.push(id) })
+      );
+      root.querySelector('[data-scoped-list-inspect="component-1"]').click();
+      assert.deepEqual(selected, ['component-1']);
+    });
+
+    it('calls onOpenEntry with the entity id when the row pen is clicked', async () => {
+      const opened = [];
+      const root = await catalogueHarness.mount(
+        catalogueProps('component', { onOpenEntry: (id) => opened.push(id) })
+      );
+      const pen = rows(root)[1].querySelector('[data-scoped-list-action="open-entry"]');
+      assert.ok(Boolean(pen), 'the row renders no open-entry action at all');
+      pen.click();
+      assert.deepEqual(opened, ['component-1']);
+    });
+  });
+
+  describe('rules list', () => {
+    before(() => rulesHarness.setup());
+    after(() => rulesHarness.teardown());
+    afterEach(() => rulesHarness.remount());
+
+    it('calls onSelect, onOpenEditor and onOpenWorldEntry with the entity id', async () => {
+      const calls = { select: [], editor: [], world: [] };
+      const root = await rulesHarness.mount(
+        rulesProps('tool', {
+          onSelect: (id) => calls.select.push(id),
+          onOpenEditor: (id) => calls.editor.push(id),
+          onOpenWorldEntry: (id) => calls.world.push(id),
+        })
+      );
+      const row = rows(root)[2];
+      row.querySelector('[data-scoped-list-inspect="tool-2"]').click();
+      row.querySelector('[data-scoped-list-action="open-editor"]').click();
+      row.querySelector('[data-scoped-list-action="open-world-entry"]').click();
+      assert.deepEqual(calls, { select: ['tool-2'], editor: ['tool-2'], world: ['tool-2'] });
+    });
+  });
+});
+
+// ── COPY-FROM IS SUPPRESSED, AND THE SUPPRESSION IS THE ASSERTION ──────────────────────────
+
+describe('the catalogue offers no copy-from it cannot complete', () => {
+  before(() => catalogueHarness.setup());
+  after(() => catalogueHarness.teardown());
+  afterEach(() => catalogueHarness.remount());
+
+  it('renders NO copy affordance even when another system holds the entity', async () => {
+    // The fixture is deliberately the one where the shipped `MembershipActions` WOULD offer it:
+    // both systems hold the entity, so "some other system has a record" — the only precondition
+    // this shell can evaluate — is satisfied. What it still cannot evaluate is WHICH of them the
+    // GM meant as the source, and the write path needs that as its second argument.
+    const scope = projectWorldScopeEntity({
+      entityType: 'component',
+      corpus: {
+        entities: [entityOf('component', 0)],
+        defaults: [],
+        membership: [
+          { entityId: 'component-0', systemId: 'sys-a' },
+          { entityId: 'component-0', systemId: 'sys-b' },
+        ],
+      },
+      systems: ROSTER,
+      seeded: { entities: true, defaults: true, membership: true },
+    });
+    const root = await catalogueHarness.mount({
+      ...catalogueProps('component'),
+      scope,
+      selectedId: 'component-0',
+    });
+    const clusters = [...root.querySelectorAll('[data-scoped-membership-actions]')];
+    assert.equal(clusters.length, 2, 'both systems render a cluster, so the negative has teeth');
+    for (const cluster of clusters) {
+      assert.ok(
+        Boolean(cluster.querySelector('[data-arm-token]')),
+        'each cluster is in its member branch, which is where Copy would render'
+      );
+    }
+    assert.equal(
+      root.querySelectorAll('[data-scoped-membership-copy]').length,
+      0,
+      'a Copy button with no source chooser either refuses every click in silence or guesses ' +
+        'the source and writes the wrong overrides onto the record'
+    );
+  });
+});
+
+// ── AC-16(e), THE PAGE HALF ────────────────────────────────────────────────────────────────
+
+describe('a PAGE change disarms too, which the other four cases do not reach', () => {
+  before(() => catalogueHarness.setup());
+  after(() => catalogueHarness.teardown());
+  afterEach(() => catalogueHarness.remount());
+
+  const armed = (root) => Boolean(root.querySelector('[data-arm-token][data-armed="true"]'));
+
+  it('clears the armed token on a page change and on a page-SIZE change', async () => {
+    const root = await catalogueHarness.mount({
+      ...catalogueProps('essence'),
+      scope: scopeOf('essence', { count: 60 }),
+      selectedId: 'essence-0',
+    });
+    const arm = async () => {
+      root.querySelector('[data-scoped-list-system="sys-a"] [data-arm-token]').click();
+      await catalogueHarness.setProps({});
+      assert.equal(armed(root), true, 'the control did not arm, so the disarm below is vacuous');
+    };
+
+    await arm();
+    root.querySelector('[data-pagination-next]').click();
+    await catalogueHarness.setProps({});
+    assert.equal(armed(root), false, 'a page change left the control armed');
+
+    await arm();
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '50';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    await catalogueHarness.setProps({});
+    assert.equal(armed(root), false, 'a page-size change left the control armed');
   });
 });

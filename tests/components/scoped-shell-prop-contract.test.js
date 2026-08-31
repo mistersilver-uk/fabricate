@@ -381,26 +381,31 @@ describe('the host-sheet block is ADDITIVE and edits no existing rule', () => {
     );
   });
 
-  it('never APPENDS a scoped-list class to a rule that also serves another surface', () => {
-    // THE MUTATION THIS KILLS: appending `manager-scoped-list-filter-row` to the shipped
-    // `.is-selection` group instead of authoring a new rule. That is four fewer declarations
-    // and it changes what three shipped studios render, which is exactly the reopening
-    // requirement 7 forbids.
+  it('never APPENDS a scoped-list class to the SHIPPED multi-select row group', () => {
+    // THE MUTATION THIS KILLS: joining `manager-scoped-list-filter-row` onto the `.is-selection`
+    // group instead of authoring a new rule.
     //
-    // The test is about the COMMA-SEPARATED LIST, not about descendants. A rule may compose a
-    // shared class under one of these stems — `.manager-scoped-list-identity .manager-system-copy`
-    // is the same idiom the shipped component row already uses — because that adds a rule for
-    // markup this change renders. What it may not do is join a selector list some OTHER surface
-    // is already in, because every declaration in that rule then lands on that surface too.
-    const rules = rulesOf(readFileSync(resolve(repoRoot, CSS_PATH), 'utf8'));
-    const offenders = [];
-    for (const rule of rules) {
-      if (!rule.selector.includes(STEM)) continue;
-      const selectors = rule.selector.split(',').map((selector) => selector.trim());
-      const shared = selectors.filter((selector) => !selector.includes(STEM));
-      if (shared.length > 0) offenders.push(`${rule.selector} :: joins ${shared.join(' / ')}`);
+    // NARROWED TO THAT GROUP DELIBERATELY. The first version banned joining ANY selector list
+    // another surface was already in, which is a permanent rule for every future lane and much
+    // broader than the reasoning behind it. It is also broader than the harm: CSS specificity is
+    // per selector in a comma list, so appending a fourth name to that group would not change
+    // what the three studios render — the constraint is requirement 7's "edits no existing rule"
+    // EVIDENCE clause, which a restated rule satisfies and a join does not.
+    const css = readFileSync(resolve(repoRoot, CSS_PATH), 'utf8');
+    const joined = rulesOf(css).filter(
+      (rule) => rule.selector.includes('.is-selection') && rule.selector.includes(STEM)
+    );
+    for (const rule of joined) {
+      const others = rule.selector
+        .split(',')
+        .map((selector) => selector.trim())
+        .filter((selector) => !selector.includes(STEM));
+      assert.deepEqual(
+        others,
+        [],
+        `the scoped-list selection row joins ${others.join(' / ')}; author its own rule instead`
+      );
     }
-    assert.deepEqual(offenders, [], offenders.join(' | '));
   });
 
   it('leaves the shipped multi-select row group naming exactly its three studios', () => {
@@ -461,5 +466,84 @@ describe('the armed token crosses the shell boundary as a binding', () => {
       'nothing outside the catalogue arms anything on its route'
     );
     assert.match(sourceOf(CATALOGUE), /let armedToken = \$state\(''\)/);
+  });
+});
+
+describe('no scoped shell may call copyMembership without its destination list', () => {
+  // ── WHY A SOURCE BAN AND NOT ONLY A MOUNTED ASSERTION ─────────────────────────────────────
+  // `copyMembership(entityId, fromSystemId, toSystemIds)` refuses BEFORE it writes when the
+  // third argument is missing — `targets.length === 0` returns false — and reports nothing. So
+  // a two-argument call is a button that silently does nothing on every click forever, and no
+  // mounted assertion over a shell that renders no such button can see one re-appear.
+  //
+  // The mounted suite asserts the affordance is absent. This asserts the CALL cannot come back
+  // in a form that could not work, which is the half a lane adding the source picker will edit.
+  const CALL = /copyMembership\s*\??\.?\s*\(/g;
+
+  /**
+   * The argument list of the first `copyMembership(` call in `source`, split at top level.
+   *
+   * @param {string} source
+   * @returns {string[]|null} the arguments, or `null` when there is no call
+   */
+  function copyMembershipArgs(source) {
+    CALL.lastIndex = 0;
+    const match = CALL.exec(source);
+    if (!match) return null;
+    let depth = 0;
+    let current = '';
+    const args = [];
+    for (let cursor = match.index + match[0].length - 1; cursor < source.length; cursor += 1) {
+      const character = source[cursor];
+      if ('([{'.includes(character)) depth += 1;
+      else if (')]}'.includes(character)) {
+        depth -= 1;
+        if (depth === 0) {
+          args.push(current);
+          return args.map((entry) => entry.trim()).filter((entry) => entry !== '');
+        }
+      }
+      if (character === ',' && depth === 1) {
+        args.push(current);
+        current = '';
+      } else if (!(depth === 1 && current === '' && character === '(')) current += character;
+    }
+    return null;
+  }
+
+  it('reads a THREE-argument call off a fixture that has one', () => {
+    const fixture = `onCopyFrom={() => actions?.copyMembership?.(entry.id, source, [row.systemId])}`;
+    assert.deepEqual(copyMembershipArgs(fixture), ['entry.id', 'source', '[row.systemId]']);
+  });
+
+  it('reads a TWO-argument call off a fixture that has one, which is the defect shape', () => {
+    const fixture = `onCopyFrom={() => actions?.copyMembership?.(entry.id, row.systemId)}`;
+    assert.deepEqual(copyMembershipArgs(fixture), ['entry.id', 'row.systemId']);
+  });
+
+  it('answers null when there is no call, so a mention in prose is not a call', () => {
+    assert.equal(copyMembershipArgs('// `copyMembership` is deliberately not called here.'), null);
+  });
+
+  it('no shell calls it at all today, and any future call carries three arguments', () => {
+    for (const path of SHELLS) {
+      const args = copyMembershipArgs(sourceOf(path));
+      if (args === null) continue;
+      assert.equal(
+        args.length,
+        3,
+        `${path} calls copyMembership with ${args.length} argument(s): ${args.join(' | ')}. ` +
+          'The write path needs (entityId, fromSystemId, toSystemIds) and refuses before it ' +
+          'writes without the third, reporting nothing.'
+      );
+    }
+    // …and the affordance itself is suppressed, which is what the mounted suite measures. Stated
+    // here too so the two halves cannot drift: a lane that renders the button must also wire the
+    // call, and a lane that wires the call must render the button.
+    assert.match(
+      sourceOf(CATALOGUE),
+      /copyable\(\)\s*\{\s*return false;/,
+      'the catalogue must suppress copy-from while it has no source chooser'
+    );
   });
 });

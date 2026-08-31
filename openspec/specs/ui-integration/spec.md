@@ -1997,6 +1997,8 @@ The world catalogues and the system-scope rules lists share ONE list composition
 11. **A list has THREE no-content states, not two**: unavailable, empty, and filtered-to-nothing.
     Telling a GM their world holds nothing when a query matched nothing is the same class of harm as offering actions over an unreadable corpus.
 12. **The shells own the list state machine**: which row is inspected, the selection set across pages, the filter, the sort, the page, and the armed destructive token.
+    **The inspected row is nonetheless CONTROLLABLE BY THE OWNER**, and owning the machine is not in tension with that: a row click is the DEFAULT driver, an owner that sets the value overrides it at any time, and setting it to nothing returns the list to resting.
+    A deep link, a route parameter restored on re-entry, a re-selection after a create or a delete, and a page whose route-exit guard REFUSED a navigation and has to put the selection back all drive it from outside; a shell that latched on the first click leaves that last case unable to undo what it just refused.
     The selection count is the size of the whole selection rather than its intersection with the page; the tri-state box acts on rendered rows; select-all-results acts on the whole filtered set.
     A filter change prunes the selection and clamps the page, and any selection, filter, sort or page change disarms.
 13. **Filter, sort and paging arithmetic and selection reduction are COMPOSED from the shipped pure models, never restated.**
@@ -2008,7 +2010,11 @@ The world catalogues and the system-scope rules lists share ONE list composition
     The page owns the route; `normalizeMembership` discards a `from` key, so recording where a copy came from is a data-model change.
 17. **Generic chrome copy is noun-free.**
     A slot-filled noun cannot carry article or adjective agreement; strings that need a noun arrive pre-localized from the lane.
-18. **A CONTAINER QUERY MUST NOT BE WRITTEN ON THE ELEMENT THAT ESTABLISHES THE CONTAINER.**
+18. **AN INSPECTOR COLUMN THAT DOES NOT BOUND ITSELF IS NOT AN INSPECTOR.**
+    The route hands the list frame a definite height, and a frame that does not pass it on leaves every scroll region inside it inert: the panel grows to the height of the whole list, so it is never out of view, never scrolled to, and clicking a row below the fold moves the page by a pixel and shows the GM nothing but the selected ring.
+    The shipped shared aside cannot fail this way because it is a sibling of the content column inside a clipped body, so a scope that draws its own column matches that property as well as the width.
+    The gate measures it at a FULL PAGE of rows, because a fixture short enough to fit the viewport cannot tell a bounded column from an unbounded one.
+19. **A CONTAINER QUERY MUST NOT BE WRITTEN ON THE ELEMENT THAT ESTABLISHES THE CONTAINER.**
     `@container` resolves against the nearest ANCESTOR container, so a `container-type` and an `@container` rule on one element silently answer about something further up — here the manager window, which is a named container and is never narrow enough to trip a column-width threshold.
     The container and the element the query lays out are therefore two elements, and the gate measures BOTH sides of the query at real window widths: a harness sized to one side reports a breakpoint that is not there.
 
