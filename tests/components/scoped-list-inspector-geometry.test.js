@@ -178,6 +178,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   let browser = null;
   let markup = '';
   let unavailableMarkup = '';
+  let shortMarkup = '';
 
   before(async () => {
     assert.ok(
@@ -221,6 +222,27 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       inspectorBody: laneInspectorBody,
     });
     unavailableMarkup = unavailableTarget.innerHTML;
+    const shortTarget = await harness.mount({
+      scope: projectWorldScopeEntity({
+        entityType: 'component',
+        corpus: {
+          entities: [
+            { id: 'component-0', name: 'Ash 0', description: 'A component', img: 'icons/a.webp' },
+          ],
+          defaults: [],
+          membership: [],
+        },
+        systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      }),
+      actions: {},
+      systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      hookValue: 'world-components',
+      title: 'Component catalogue',
+      subtitle: 'One per world.',
+      selectedId: 'component-0',
+      inspectorBody: laneInspectorBody,
+    });
+    shortMarkup = shortTarget.innerHTML;
     harness.teardown();
     assert.ok(
       markup.includes('data-scoped-list-inspector'),
@@ -248,6 +270,29 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         layoutRight: layout.getBoundingClientRect().right,
         calloutRight: callout.getBoundingClientRect().right,
         columns: getComputedStyle(layout).gridTemplateColumns,
+      };
+    });
+    await context.close();
+    return result;
+  }
+
+  async function measureShort(windowWidth) {
+    const context = await browser.newContext({
+      viewport: { width: windowWidth, height: HOST_HEIGHT_PX },
+    });
+    const tab = await context.newPage();
+    await tab.setContent(page(shortMarkup, windowWidth));
+    const result = await tab.evaluate(() => {
+      const column = document.querySelector('.manager-scoped-list-column');
+      const rowsRegion = document.querySelector('.manager-scoped-list-rows');
+      const pagination = document.querySelector('.manager-pagination');
+      if (!column || !rowsRegion || !pagination) return { rendered: false };
+      return {
+        rendered: true,
+        columnBottom: column.getBoundingClientRect().bottom,
+        rowsBottom: rowsRegion.getBoundingClientRect().bottom,
+        paginationBottom: pagination.getBoundingClientRect().bottom,
+        listBottom: document.querySelector('.manager-scoped-list').getBoundingClientRect().bottom,
       };
     });
     await context.close();
@@ -340,6 +385,29 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       box.calloutRight >= box.layoutRight - EPSILON_PX,
       `the callout ends at ${box.calloutRight} inside a layout ending at ${box.layoutRight}, ` +
         `leaving a ${Math.round(box.layoutRight - box.calloutRight)}px void`
+    );
+  });
+
+  it('keeps the pagination bar at the FOOT of a short list rather than floating it up', async () => {
+    // WHAT THE ROWS REGION'S `flex: 1 1 auto` ACTUALLY BUYS, measured rather than assumed. With
+    // a list taller than the column every child is shrinking, so the declaration changes nothing
+    // and the overflow case above cannot see it — it survived a mutation run for exactly that
+    // reason. Its effect appears on a SHORT list: without it the rows region is content-sized,
+    // the pagination bar rides directly under the last row, and it moves up and down the screen
+    // as a filter changes how many rows there are. The browse archetype's rule is that the
+    // pagination bar sits outside the scroll area and never moves.
+    const box = await measureShort(WIDE_WINDOW_PX);
+    assert.equal(box.rendered, true);
+    assert.ok(
+      box.columnBottom - box.listBottom > 100,
+      `the fixture's single row already fills the column (${box.listBottom} against a column ` +
+        `bottom of ${box.columnBottom}), so there is no slack for the rows region to take and ` +
+        'this case proves nothing'
+    );
+    assert.ok(
+      box.paginationBottom >= box.columnBottom - EPSILON_PX,
+      `the pagination bar ends at ${box.paginationBottom} inside a column ending at ` +
+        `${box.columnBottom}: it floated up under the last row instead of staying at the foot`
     );
   });
 

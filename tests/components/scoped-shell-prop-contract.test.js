@@ -481,19 +481,57 @@ describe('no scoped shell may call copyMembership without its destination list',
   const CALL = /copyMembership\s*\??\.?\s*\(/g;
 
   /**
-   * The argument list of the first `copyMembership(` call in `source`, split at top level.
+   * `source` with every comment removed.
+   *
+   * MEASURED NECESSARY, not defensive. The first version of this scanned the raw text and found
+   * the THREE-argument example inside the catalogue's own docblock — `copyMembership(entityId,
+   * fromSystemId, toSystemIds)` — before the two-argument call injected below it, and passed.
+   * A gate that reads a file's prose as if it were its code is the vacuous-matcher shape.
    *
    * @param {string} source
-   * @returns {string[]|null} the arguments, or `null` when there is no call
+   * @returns {string}
    */
-  function copyMembershipArgs(source) {
+  function withoutComments(source) {
+    return source
+      .replaceAll(/<!--[\s\S]*?-->/g, '')
+      .replaceAll(/\/\*[\s\S]*?\*\//g, '')
+      .replaceAll(/\/\/[^\r\n]*/g, '');
+  }
+
+  /**
+   * The argument list of EVERY `copyMembership(` call in `source`, each split at top level.
+   *
+   * Every call rather than the first: a shell with a correct call and a silent one beside it is
+   * exactly the state a lane adding the source picker could reach.
+   *
+   * @param {string} source
+   * @returns {string[][]} one argument list per call; empty when there is none
+   */
+  function copyMembershipCalls(source) {
+    const code = withoutComments(source);
+    const calls = [];
     CALL.lastIndex = 0;
-    const match = CALL.exec(source);
-    if (!match) return null;
+    let match = CALL.exec(code);
+    while (match) {
+      const args = argsFrom(code, match.index + match[0].length - 1);
+      if (args) calls.push(args);
+      match = CALL.exec(code);
+    }
+    return calls;
+  }
+
+  /**
+   * Split one parenthesised argument list starting at `open`.
+   *
+   * @param {string} source
+   * @param {number} open index of the `(`
+   * @returns {string[]|null}
+   */
+  function argsFrom(source, open) {
     let depth = 0;
     let current = '';
     const args = [];
-    for (let cursor = match.index + match[0].length - 1; cursor < source.length; cursor += 1) {
+    for (let cursor = open; cursor < source.length; cursor += 1) {
       const character = source[cursor];
       if ('([{'.includes(character)) depth += 1;
       else if (')]}'.includes(character)) {
@@ -513,29 +551,50 @@ describe('no scoped shell may call copyMembership without its destination list',
 
   it('reads a THREE-argument call off a fixture that has one', () => {
     const fixture = `onCopyFrom={() => actions?.copyMembership?.(entry.id, source, [row.systemId])}`;
-    assert.deepEqual(copyMembershipArgs(fixture), ['entry.id', 'source', '[row.systemId]']);
+    assert.deepEqual(copyMembershipCalls(fixture), [['entry.id', 'source', '[row.systemId]']]);
   });
 
   it('reads a TWO-argument call off a fixture that has one, which is the defect shape', () => {
     const fixture = `onCopyFrom={() => actions?.copyMembership?.(entry.id, row.systemId)}`;
-    assert.deepEqual(copyMembershipArgs(fixture), ['entry.id', 'row.systemId']);
+    assert.deepEqual(copyMembershipCalls(fixture), [['entry.id', 'row.systemId']]);
   });
 
-  it('answers null when there is no call, so a mention in prose is not a call', () => {
-    assert.equal(copyMembershipArgs('// `copyMembership` is deliberately not called here.'), null);
+  it('IGNORES a call written in prose, which is what a raw scan reads first', () => {
+    // The catalogue's own docblock spells the signature out. A scanner that saw it would report
+    // a well-formed three-argument call and pass over a silent one on the next line.
+    const prose = [
+      '/**',
+      ' * `copyMembership(entityId, fromSystemId, toSystemIds)` needs a SOURCE.',
+      ' */',
+      '<!-- copyMembership(a, b, c) -->',
+      '// copyMembership(a, b, c)',
+      'const x = 1;',
+    ].join('\n');
+    assert.deepEqual(copyMembershipCalls(prose), []);
+    assert.deepEqual(
+      copyMembershipCalls(`${prose}
+actions.copyMembership(entry.id, row.systemId);`),
+      [['entry.id', 'row.systemId']],
+      'and the real call below the prose is still found'
+    );
+  });
+
+  it('finds EVERY call, not just the first', () => {
+    const both = ['actions.copyMembership(a, b, [c]);', 'actions.copyMembership(d, e);'].join('\n');
+    assert.equal(copyMembershipCalls(both).length, 2);
   });
 
   it('no shell calls it at all today, and any future call carries three arguments', () => {
     for (const path of SHELLS) {
-      const args = copyMembershipArgs(sourceOf(path));
-      if (args === null) continue;
-      assert.equal(
-        args.length,
-        3,
-        `${path} calls copyMembership with ${args.length} argument(s): ${args.join(' | ')}. ` +
-          'The write path needs (entityId, fromSystemId, toSystemIds) and refuses before it ' +
-          'writes without the third, reporting nothing.'
-      );
+      for (const args of copyMembershipCalls(sourceOf(path))) {
+        assert.equal(
+          args.length,
+          3,
+          `${path} calls copyMembership with ${args.length} argument(s): ${args.join(' | ')}. ` +
+            'The write path needs (entityId, fromSystemId, toSystemIds) and refuses before it ' +
+            'writes without the third, reporting nothing.'
+        );
+      }
     }
     // …and the affordance itself is suppressed, which is what the mounted suite measures. Stated
     // here too so the two halves cannot drift: a lane that renders the button must also wire the

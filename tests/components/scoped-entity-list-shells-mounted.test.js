@@ -111,10 +111,20 @@ function entityOf(entityType, index, overrides = {}) {
   if (entityType === 'essence') {
     return { ...base, icon: 'fas fa-flask', colorToken: 'sage', ...overrides };
   }
+  // EACH ENTRY IS LINKED BY A DIFFERENT ONE OF THE THREE SOURCE-LINK FIELDS, and that rotation
+  // is the fixture's real job. Stamping `originItemUuid` on every entry makes a row-level read
+  // of that ONE field indistinguishable from a read of the projection's published answer — so a
+  // consumer that restated the three names, and then went stale on a rename of the other two,
+  // would pass every assertion in this file.
+  const link = [
+    { originItemUuid: `Item.${entityType}${index}` },
+    { registeredItemUuid: `Item.${entityType}${index}` },
+    { aliasItemUuids: [`Item.${entityType}${index}`] },
+  ][index % 3];
   return {
     ...base,
     img: `icons/commodities/${entityType}-${index}.webp`,
-    originItemUuid: `Item.${entityType}${index}`,
+    ...link,
     ...overrides,
   };
 }
@@ -269,6 +279,16 @@ describe('the rules-list shell differentiates by entity type from ONE props fact
         root.querySelectorAll('[data-scoped-list-source]').length,
         listRows.length,
         'one badge per row'
+      );
+      // EVERY ROW READS AS LINKED, and the fixture links each one through a DIFFERENT field.
+      // A row-level read that restated only `originItemUuid` reports two rows in three as
+      // unlinked and shows the GM an amber "no source item" pill on records that have one.
+      assert.deepEqual(
+        [...root.querySelectorAll('[data-scoped-list-source]')].map((node) =>
+          node.getAttribute('data-scoped-list-source')
+        ),
+        listRows.map(() => 'linked'),
+        'each of the three source-link fields must count, not just the first'
       );
       const medallion = listRows[0].querySelector('[data-medallion]');
       assert.equal(medallion.getAttribute('data-medallion'), 'image');

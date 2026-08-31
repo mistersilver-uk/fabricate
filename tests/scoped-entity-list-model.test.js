@@ -141,6 +141,46 @@ describe('the two identity shape facts are derived, and the bridge is pinned', (
     assert.equal(emptyWorldScopeEntityState('essence').hasColorToken, true);
   });
 
+  it('publishes a PER-ENTRY source-link answer over all three fields', () => {
+    // The descriptor says whether the TYPE has the fields; this says whether this entity filled
+    // one in, and it is what decides which badge a GM sees. It is answered beside the ONE list of
+    // field names, so a consumer never restates them — a restatement goes stale on a rename while
+    // `sourceLinked` stays correct and every type-level gate stays green.
+    const projected = projectWorldScopeEntity({
+      entityType: 'component',
+      corpus: {
+        entities: [
+          { id: 'origin', originItemUuid: 'Item.a' },
+          { id: 'registered', registeredItemUuid: 'Item.b' },
+          { id: 'alias', aliasItemUuids: ['Item.c'] },
+          { id: 'empty-alias', aliasItemUuids: [] },
+          { id: 'none' },
+        ],
+        defaults: [],
+        membership: [],
+      },
+      systems: [],
+    });
+    assert.deepEqual(
+      projected.entries.map((entry) => [entry.id, entry.hasSourceLink]),
+      [
+        ['origin', true],
+        ['registered', true],
+        ['alias', true],
+        ['empty-alias', false],
+        ['none', false],
+      ]
+    );
+    // An essence has none of the fields, so the answer is structurally false rather than a
+    // question about its record.
+    const essence = projectWorldScopeEntity({
+      entityType: 'essence',
+      corpus: { entities: [{ id: 'ash', originItemUuid: 'Item.x' }], defaults: [], membership: [] },
+      systems: [],
+    });
+    assert.equal(essence.entries[0].hasSourceLink, false);
+  });
+
   it('leaves `enabled` ABSENT on a component row rather than false', () => {
     // `'enabled' in row` is the only correct read: a consumer branching on truthiness is
     // satisfied by an absent key today and by a persisted `false` tomorrow.
