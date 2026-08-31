@@ -104,6 +104,10 @@
     //    own comment gives: the guard reads it at click time and a snapshot published by an
     //    effect can be one turn behind.
     //  - onDirtyChange(dirty): the reactive half, for the header button's disabled state.
+    //  - onDraftNameChange(name): the other reactive half, for the header's TITLE. The shell's
+    //    heading names the essence being edited, and what is being edited is the draft — the
+    //    same value the player preview beside it already renders. Withdrawn the way the dirty
+    //    flag is: the shell drops it when `onDraftChange(null)` says there is no editor.
     //
     // There is deliberately NO `reseedNonce` prop, which is how `SystemEditView` spells discard:
     // the handle carries `discard()` directly, and a nonce the call site did not pass would fall
@@ -111,6 +115,7 @@
     // corpus — the hazard this file's header records.
     onDraftChange = () => {},
     onDirtyChange = () => {},
+    onDraftNameChange = () => {},
   } = $props();
 
   // Read by `manager-contract.test.js`'s SWAP DETECTOR against the title `viewTitle` renders for
@@ -318,6 +323,24 @@
   // deliberately never does.
   $effect(() => {
     onDirtyChange(dirty);
+  });
+
+  // THE HEADING ABOVE THIS PAGE FOLLOWS THE DRAFT (issue 1372, maintainer parity round 5).
+  //
+  // It named the PERSISTED essence while the name field and the player preview both showed the
+  // buffered one, so a GM mid-rename read `Aetherlight` in two places and `Aether` in a third on
+  // one screen. A heading names the thing being edited, and the thing being edited is the draft;
+  // the unsaved state is signalled by the enabled `Save essence` beside it, which is that
+  // control's whole job.
+  //
+  // REPORTED, not read off the handle: the handle is deliberately a live accessor that never
+  // re-renders, and a heading has to. It is `identity.name` rather than `draft?.identity?.name`
+  // so an unseeded editor reports the persisted name instead of blanking the header for a frame.
+  //
+  // The SUBTITLE stays on the projection, and that is not an oversight: it counts the systems
+  // using this essence, and a count of systems does not change until the write lands.
+  $effect(() => {
+    onDraftNameChange(String(identity.name ?? ''));
   });
 
   const normalizedIcon = $derived(normalizeEssenceIcon(identity.icon || DEFAULT_ESSENCE_ICON));
