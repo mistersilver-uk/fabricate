@@ -2046,9 +2046,16 @@ This is ONE cross-cutting section rather than three near-identical ones, on the 
 
 ```js
 // Layer 1 - identity. One per entity, world scoped, never editable from a crafting system.
-WorldComponent | WorldEssence | WorldTool = {
+// THE THREE RECORDS DIFFER IN THREE WAYS, and a screen that assumed one shape for all three
+// would draw the wrong thumbnail and the wrong badge on two of them.
+WorldComponent | WorldTool = {
   id: string,
-  // name, description, icon, colour and the source item link. Modelled by epic 1357 PR 2.
+  // name, description, `img`, and the three source item link fields
+  // (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`). NO colour.
+}
+WorldEssence = {
+  id: string,
+  // name, description, `icon` and `colorToken`. NO source item link at all.
 }
 
 // Layer 2 - the world defaults. The behaviour every system inherits until it overrides a section.
