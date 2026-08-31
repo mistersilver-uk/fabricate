@@ -235,210 +235,229 @@
       </ManagerButton>
     </EmptyState>
   {:else}
-    <EditorTabs
-      {tabs}
-      {activeTab}
-      {badges}
-      onSelect={(tab) => (activeTab = tab)}
-      ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Essence.EntryTabsLabel"
-      ariaLabel="Essence definition sections"
-      idStem="scoped-essence-entry"
-      hookAttribute="data-scoped-entry-tab"
-      badgeAttribute="data-scoped-entry-tab-badge"
-    />
+    <!--
+    ONE CHILD OF `<main>`, WITH ITS OWN TWO-ROW GRID.
 
-    <div
-      class="manager-scoped-entry-panel"
-      data-scoped-entry={PAGE_ID}
-      id={`scoped-essence-entry-panel-${activeTab}`}
-      role="tabpanel"
-      aria-labelledby={`scoped-essence-entry-tab-${activeTab}`}
-      tabindex="-1"
-    >
-      {#if activeTab === 'definition'}
-        <section class="manager-scoped-entry-identity" data-scoped-entry-identity={entry.id}>
-          <label class="manager-scoped-entry-field">
-            <span class="manager-scoped-entry-label"
-              >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldName', 'Name')}</span
-            >
-            <input
-              type="text"
-              value={entity?.name ?? ''}
-              data-scoped-entry-name
-              onchange={(event) => patchIdentity('name', event.currentTarget.value)}
-            />
-          </label>
-          <label class="manager-scoped-entry-field">
-            <span class="manager-scoped-entry-label"
-              >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldIcon', 'Icon class')}</span
-            >
-            <input
-              type="text"
-              value={entity?.icon ?? ''}
-              data-scoped-entry-icon
-              onchange={(event) => patchIdentity('icon', event.currentTarget.value)}
-            />
-          </label>
-          <label class="manager-scoped-entry-field">
-            <span class="manager-scoped-entry-label"
-              >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour token')}</span
-            >
-            <input
-              type="text"
-              value={entity?.colorToken ?? ''}
-              data-scoped-entry-colour
-              onchange={(event) => patchIdentity('colorToken', event.currentTarget.value)}
-            />
-          </label>
-          <label class="manager-scoped-entry-field is-wide">
-            <span class="manager-scoped-entry-label"
-              >{text(
-                'FABRICATE.Admin.Manager.Scoped.Essence.FieldDescription',
-                'Description'
-              )}</span
-            >
-            <textarea
-              rows="2"
-              value={entity?.description ?? ''}
-              data-scoped-entry-description
-              onchange={(event) => patchIdentity('description', event.currentTarget.value)}
-            ></textarea>
-          </label>
-        </section>
+    `.manager-main` is `display: grid` with a single `minmax(0, 1fr)` row for a full-width world
+    route, so TWO children land in the same grid area and paint over each other: measured in the
+    View Lab, the identity fields's label sat under the shell's search box and the tab strip sat under them. `styles/fabricate.css` is closed to this lane by
+    `### GM World Scoped Entity Routes` requirement 7, so the row split belongs here — and it
+    belongs here anyway, because it is this page's composition rather than the route's.
+  -->
+    <div class="manager-scoped-entry-page">
+      <EditorTabs
+        {tabs}
+        {activeTab}
+        {badges}
+        onSelect={(tab) => (activeTab = tab)}
+        ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Essence.EntryTabsLabel"
+        ariaLabel="Essence definition sections"
+        idStem="scoped-essence-entry"
+        hookAttribute="data-scoped-entry-tab"
+        badgeAttribute="data-scoped-entry-tab-badge"
+      />
 
-        <!-- THE TWO WORLD DEFAULTS. Each states how many member systems inherit it and how many
-             override it locally BEFORE the change lands, because that count is the whole reach of
-             the edit and a GM cannot recover it after the fact. -->
-        <section class="manager-scoped-entry-defaults">
-          {#each sections as section (section)}
-            {@const value = sectionValueName(section)}
-            <div
-              class="manager-scoped-entry-default"
-              data-scoped-world-default={section}
-              data-scoped-world-default-state={value ? 'set' : 'unset'}
-            >
-              <h3 class="manager-scoped-entry-default-head">{scopedSectionLabel(section, text)}</h3>
-              <p
-                class="manager-scoped-entry-default-value"
-                data-scoped-world-default-value={section}
+      <div
+        class="manager-scoped-entry-panel"
+        data-scoped-entry={PAGE_ID}
+        id={`scoped-essence-entry-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`scoped-essence-entry-tab-${activeTab}`}
+        tabindex="-1"
+      >
+        {#if activeTab === 'definition'}
+          <section class="manager-scoped-entry-identity" data-scoped-entry-identity={entry.id}>
+            <label class="manager-scoped-entry-field">
+              <span class="manager-scoped-entry-label"
+                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldName', 'Name')}</span
               >
-                {value ||
-                  text(
-                    'FABRICATE.Admin.Manager.Scoped.Essence.DefaultUnset',
-                    'No world default set'
-                  )}
-              </p>
-              <p class="manager-muted" data-scoped-world-default-inherit={section}>
-                {essenceInheritLine(entry, section, format)}
-              </p>
-              <div class="manager-scoped-entry-default-controls">
-                <input
-                  type="text"
-                  value={sectionDraft[section] ?? ''}
-                  data-scoped-world-default-input={section}
-                  aria-label={format(
-                    'FABRICATE.Admin.Manager.Scoped.Essence.DefaultInputLabel',
-                    'A document UUID for {section}',
-                    { section: scopedSectionLabel(section, text) }
-                  )}
-                  placeholder="Item.abc123"
-                  oninput={(event) =>
-                    (sectionDraft = { ...sectionDraft, [section]: event.currentTarget.value })}
-                />
-                <ManagerButton
-                  data-scoped-world-default-set={section}
-                  onclick={() => applySection(section)}
+              <input
+                type="text"
+                value={entity?.name ?? ''}
+                data-scoped-entry-name
+                onchange={(event) => patchIdentity('name', event.currentTarget.value)}
+              />
+            </label>
+            <label class="manager-scoped-entry-field">
+              <span class="manager-scoped-entry-label"
+                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldIcon', 'Icon class')}</span
+              >
+              <input
+                type="text"
+                value={entity?.icon ?? ''}
+                data-scoped-entry-icon
+                onchange={(event) => patchIdentity('icon', event.currentTarget.value)}
+              />
+            </label>
+            <label class="manager-scoped-entry-field">
+              <span class="manager-scoped-entry-label"
+                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour token')}</span
+              >
+              <input
+                type="text"
+                value={entity?.colorToken ?? ''}
+                data-scoped-entry-colour
+                onchange={(event) => patchIdentity('colorToken', event.currentTarget.value)}
+              />
+            </label>
+            <label class="manager-scoped-entry-field is-wide">
+              <span class="manager-scoped-entry-label"
+                >{text(
+                  'FABRICATE.Admin.Manager.Scoped.Essence.FieldDescription',
+                  'Description'
+                )}</span
+              >
+              <textarea
+                rows="2"
+                value={entity?.description ?? ''}
+                data-scoped-entry-description
+                onchange={(event) => patchIdentity('description', event.currentTarget.value)}
+              ></textarea>
+            </label>
+          </section>
+
+          <!-- THE TWO WORLD DEFAULTS. Each states how many member systems inherit it and how many
+               override it locally BEFORE the change lands, because that count is the whole reach of
+               the edit and a GM cannot recover it after the fact. -->
+          <section class="manager-scoped-entry-defaults">
+            {#each sections as section (section)}
+              {@const value = sectionValueName(section)}
+              <div
+                class="manager-scoped-entry-default"
+                data-scoped-world-default={section}
+                data-scoped-world-default-state={value ? 'set' : 'unset'}
+              >
+                <h3 class="manager-scoped-entry-default-head">
+                  {scopedSectionLabel(section, text)}
+                </h3>
+                <p
+                  class="manager-scoped-entry-default-value"
+                  data-scoped-world-default-value={section}
                 >
-                  {text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultSet', 'Set default')}
-                </ManagerButton>
-                {#if value}
+                  {value ||
+                    text(
+                      'FABRICATE.Admin.Manager.Scoped.Essence.DefaultUnset',
+                      'No world default set'
+                    )}
+                </p>
+                <p class="manager-muted" data-scoped-world-default-inherit={section}>
+                  {essenceInheritLine(entry, section, format)}
+                </p>
+                <div class="manager-scoped-entry-default-controls">
+                  <input
+                    type="text"
+                    value={sectionDraft[section] ?? ''}
+                    data-scoped-world-default-input={section}
+                    aria-label={format(
+                      'FABRICATE.Admin.Manager.Scoped.Essence.DefaultInputLabel',
+                      'A document UUID for {section}',
+                      { section: scopedSectionLabel(section, text) }
+                    )}
+                    placeholder="Item.abc123"
+                    oninput={(event) =>
+                      (sectionDraft = { ...sectionDraft, [section]: event.currentTarget.value })}
+                  />
                   <ManagerButton
-                    data-scoped-world-default-clear={section}
-                    onclick={() => clearSection(section)}
+                    data-scoped-world-default-set={section}
+                    onclick={() => applySection(section)}
                   >
-                    {text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultClear', 'Clear')}
+                    {text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultSet', 'Set default')}
                   </ManagerButton>
+                  {#if value}
+                    <ManagerButton
+                      data-scoped-world-default-clear={section}
+                      onclick={() => clearSection(section)}
+                    >
+                      {text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultClear', 'Clear')}
+                    </ManagerButton>
+                  {/if}
+                </div>
+                {#if sectionRefusal[section]}
+                  <p
+                    class="manager-muted manager-form-warning"
+                    role="alert"
+                    data-scoped-world-default-refused={section}
+                  >
+                    {sectionRefusal[section]}
+                  </p>
                 {/if}
               </div>
-              {#if sectionRefusal[section]}
-                <p
-                  class="manager-muted manager-form-warning"
-                  role="alert"
-                  data-scoped-world-default-refused={section}
-                >
-                  {sectionRefusal[section]}
-                </p>
-              {/if}
-            </div>
-          {/each}
-        </section>
-
-        <!-- THE MEMBERSHIP LIST. Rows come from `entry.systems` — the projection's JOIN — and
-             never from the `systems` prop, which is a narrowed `{id, name}` roster and cannot
-             answer `member`, `inherited` or `enabled`. -->
-        <section class="manager-scoped-entry-systems">
-          <h3 class="manager-scoped-entry-default-head">
-            {text('FABRICATE.Admin.Manager.Scoped.Essence.SystemsHead', 'Crafting systems')}
-          </h3>
-          <ul class="manager-scoped-entry-system-list" role="list">
-            {#each entry.systems ?? [] as row (row.systemId)}
-              <li class="manager-scoped-entry-system" data-scoped-entry-system={row.systemId}>
-                <span class="manager-scoped-entry-system-name">{systemLabel(row)}</span>
-                <MembershipActions
-                  entityType="essence"
-                  entityId={entry.id}
-                  systemId={row.systemId}
-                  entityName={entity?.name ?? entry.id}
-                  systemName={systemLabel(row)}
-                  member={row.member === true}
-                  enabled={row.enabled === true}
-                  {armedToken}
-                  onArm={(token) => (armedToken = token)}
-                  onDisarm={() => (armedToken = '')}
-                  onAdd={() => actions?.addToSystem?.(entry.id, row.systemId)}
-                  onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
-                  onToggleEnabled={(next) => actions?.setEnabled?.(entry.id, row.systemId, next)}
-                />
-              </li>
             {/each}
-          </ul>
-        </section>
+          </section>
 
-        <section class="manager-scoped-entry-preview" data-scoped-entry-preview>
-          <EssenceBehaviorPreview
-            essence={previewEssence}
-            effectTransferEnabled={Boolean(defaults?.effectSource)}
-            propertyMacrosEnabled={Boolean(defaults?.macro)}
-            sourceName={sectionValueName('effectSource')}
-            macroName={sectionValueName('macro')}
-            showLiveNote={false}
+          <!-- THE MEMBERSHIP LIST. Rows come from `entry.systems` — the projection's JOIN — and
+               never from the `systems` prop, which is a narrowed `{id, name}` roster and cannot
+               answer `member`, `inherited` or `enabled`. -->
+          <section class="manager-scoped-entry-systems">
+            <h3 class="manager-scoped-entry-default-head">
+              {text('FABRICATE.Admin.Manager.Scoped.Essence.SystemsHead', 'Crafting systems')}
+            </h3>
+            <ul class="manager-scoped-entry-system-list" role="list">
+              {#each entry.systems ?? [] as row (row.systemId)}
+                <li class="manager-scoped-entry-system" data-scoped-entry-system={row.systemId}>
+                  <span class="manager-scoped-entry-system-name">{systemLabel(row)}</span>
+                  <MembershipActions
+                    entityType="essence"
+                    entityId={entry.id}
+                    systemId={row.systemId}
+                    entityName={entity?.name ?? entry.id}
+                    systemName={systemLabel(row)}
+                    member={row.member === true}
+                    enabled={row.enabled === true}
+                    {armedToken}
+                    onArm={(token) => (armedToken = token)}
+                    onDisarm={() => (armedToken = '')}
+                    onAdd={() => actions?.addToSystem?.(entry.id, row.systemId)}
+                    onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
+                    onToggleEnabled={(next) => actions?.setEnabled?.(entry.id, row.systemId, next)}
+                  />
+                </li>
+              {/each}
+            </ul>
+          </section>
+
+          <section class="manager-scoped-entry-preview" data-scoped-entry-preview>
+            <EssenceBehaviorPreview
+              essence={previewEssence}
+              effectTransferEnabled={Boolean(defaults?.effectSource)}
+              propertyMacrosEnabled={Boolean(defaults?.macro)}
+              sourceName={sectionValueName('effectSource')}
+              macroName={sectionValueName('macro')}
+              showLiveNote={false}
+            />
+          </section>
+        {:else}
+          <ScopedValidationTab
+            stackClass="manager-scoped-tab-stack"
+            hookAttribute="data-scoped-entry-tab-panel"
+            hookValue="validation"
+            title={text('FABRICATE.Admin.Manager.Scoped.Essence.TabValidation', 'Validation')}
+            intro={text(
+              'FABRICATE.Admin.Manager.Scoped.Essence.ValidationIntro',
+              'A world essence always saves. These checks report what is unfinished for the systems that share it.'
+            )}
+            summary={{
+              status: summaryStatus,
+              icon: 'fas fa-clipboard-check',
+              title: text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.ValidationTitle',
+                'World defaults'
+              ),
+              sub: text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.ValidationSub',
+                'Every system that inherits reads what is set here.'
+              ),
+            }}
+            {counts}
+            groups={presentation.groups}
+            rowDataAttr="data-scoped-entry-validation-check"
+            blockLabel={text(
+              'FABRICATE.Admin.Manager.Essence.Validation.StatusBlock',
+              'INCOMPLETE'
+            )}
           />
-        </section>
-      {:else}
-        <ScopedValidationTab
-          stackClass="manager-scoped-tab-stack"
-          hookAttribute="data-scoped-entry-tab-panel"
-          hookValue="validation"
-          title={text('FABRICATE.Admin.Manager.Scoped.Essence.TabValidation', 'Validation')}
-          intro={text(
-            'FABRICATE.Admin.Manager.Scoped.Essence.ValidationIntro',
-            'A world essence always saves. These checks report what is unfinished for the systems that share it.'
-          )}
-          summary={{
-            status: summaryStatus,
-            icon: 'fas fa-clipboard-check',
-            title: text('FABRICATE.Admin.Manager.Scoped.Essence.ValidationTitle', 'World defaults'),
-            sub: text(
-              'FABRICATE.Admin.Manager.Scoped.Essence.ValidationSub',
-              'Every system that inherits reads what is set here.'
-            ),
-          }}
-          {counts}
-          groups={presentation.groups}
-          rowDataAttr="data-scoped-entry-validation-check"
-          blockLabel={text('FABRICATE.Admin.Manager.Essence.Validation.StatusBlock', 'INCOMPLETE')}
-        />
-      {/if}
+        {/if}
+      </div>
     </div>
   {/if}
 </main>
@@ -446,6 +465,14 @@
 <style>
   /* STATIC class names, so `lint:svelte:warnings` stays at zero and `styles/fabricate.css` —
      closed to this lane by `### GM World Scoped Entity Routes` requirement 7 — is not reopened. */
+  .manager-scoped-entry-page {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--fab-space-2);
+    min-width: 0;
+    min-height: 0;
+  }
+
   .manager-scoped-entry-panel {
     display: flex;
     flex-direction: column;
