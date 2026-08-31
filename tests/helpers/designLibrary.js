@@ -29,6 +29,15 @@
  *     nothing able to prove they landed on the right headings, is a new drift surface rather than
  *     a smaller one.
  *
+ * And one stated LIMIT of the anchor, which is not one of the three: a name written as literal
+ * markup, `<Whatsit>` rather than `&lt;Whatsit&gt;`, is invisible to every count below. The parser
+ * resolves it into an unknown element, so it never reaches `textContent` as text, and the residue
+ * check in `tests/design-system-coverage.test.js` cannot report it as an orphan citation. Recorded
+ * rather than closed, because the failure announces itself: a citation written that way is invisible
+ * to a READER too — it renders as nothing on the page — so it is caught by opening the file. The
+ * alternative is scanning raw markup, which cannot tell a citation from an element the page
+ * genuinely uses, and all 69 name-shaped tokens in the corpus are written as entities today.
+ *
  * DECODED TEXT, NOT RAW MARKUP
  * ----------------------------
  * Every string this module yields is the DECODED text of the element: `&lt;Stepper&gt;` becomes
