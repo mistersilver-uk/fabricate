@@ -584,12 +584,36 @@
           </button>
         </Chip>
       {/each}
+      <!-- THE BAR'S COUNT ANSWERS MEMBERSHIP, NOT PAGINATION (`proto:1550`, data at
+           `proto:4971`). The prototype writes `N shown · M of K in this system`: how many the
+           filters left, how many of the world's essences this system has rules for, and how
+           many there are. That is the one number this screen cannot get anywhere else — the
+           range it replaces was already rendered, verbatim, by `Pagination` at the foot of the
+           same list (`Showing 1–6 of 6`), so the bar was spending its far end restating the
+           pager.
+
+           It falls back to that range when the world corpus cannot answer membership. `M of K`
+           over an unreadable corpus would report every essence as absent from this system,
+           which is a false statement rather than an unavailable one — the same rule the
+           membership filter beside it already follows. -->
       <span class="manager-essence-count" data-essence-count>
-        {format('FABRICATE.Admin.Manager.Essence.CountRange', '{start}–{end} of {total}', {
-          start: model.rangeStart,
-          end: model.rangeEnd,
-          total: model.totalCount,
-        })}
+        {#if membershipAvailable}
+          {format(
+            'FABRICATE.Admin.Manager.Essence.CountInSystem',
+            '{shown} shown · {members} of {total} in this system',
+            {
+              shown: model.totalCount,
+              members: membershipCounts.in,
+              total: membershipCounts.all,
+            }
+          )}
+        {:else}
+          {format('FABRICATE.Admin.Manager.Essence.CountRange', '{start}–{end} of {total}', {
+            start: model.rangeStart,
+            end: model.rangeEnd,
+            total: model.totalCount,
+          })}
+        {/if}
       </span>
     </div>
 

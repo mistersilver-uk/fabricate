@@ -111,6 +111,131 @@ function staticAttributesAt(componentName) {
   return names;
 }
 
+// ── (1b) THE REQUIREMENT-7 CORRECTION, EVIDENCED ON THE REOPENING CHANGE'S OWN DIFF ───────────
+//
+// `### GM World Scoped Entity Routes` requirement 7 closes `CraftingSystemManagerRoot.svelte` to
+// this epic's later lanes, and its own amendment says the closure "is void for a seam the
+// enumeration does not name": reopening the file to supply a NAMED missing seam is a correction,
+// reopening it to build a screen is a violation, and "the distinction is not decidable from a
+// diff's file names, so a correction claim is EVIDENCED on the reopening change's own diff — by
+// an unchanged-render or import-surface assertion".
+//
+// The seam the enumeration missed is the inspector's deep link to the world definition
+// (`proto:1676`-`1678`): `EssenceBrowserInspector` is rendered by the shell with explicit props
+// and no bundle spread, so — unlike every scoped page — a prop declared on it would take its
+// default forever and no lane outside this file could reach it.
+//
+// These are the two evidence halves. The first is the IMPORT-SURFACE assertion: the correction
+// grew a seam, not a dependency, because it is wired from a shell function the file already owns
+// and already calls at three other sites. The second bounds the render change to one attribute on
+// one existing child, so "supplied a seam" and "built a screen here" are told apart mechanically.
+
+describe('requirement 7 correction — the reopened gateway grew a seam, not a dependency', () => {
+  /** Every module specifier the gateway imports, in source order. */
+  function gatewayImportSpecifiers() {
+    return [...rootSource.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
+  }
+
+  it('IMPORT SURFACE: the essence-family dependency set is unchanged by the correction', () => {
+    const specifiers = gatewayImportSpecifiers();
+    // NON-VACUITY first: an empty match set would make the equality below assert nothing.
+    assert.ok(specifiers.length > 50, 'the gateway import scan found no imports at all');
+    assert.deepEqual(
+      specifiers.filter((specifier) => /essence/i.test(specifier)).sort(),
+      [
+        '../../../../utils/essenceBrowserModel.js',
+        '../../../../utils/essenceBulkEditModel.js',
+        './EssenceBrowserView.svelte',
+        './EssenceEditView.svelte',
+        './essences/EssenceBehaviorPreview.svelte',
+        './essences/EssenceBrowserInspector.svelte',
+        './essences/EssenceBulkEditPanel.svelte',
+        './scoped/WorldEssenceCataloguePage.svelte',
+        './scoped/WorldEssenceEntryPage.svelte',
+      ],
+      'a correction that had to import something new would be building here, not carrying a seam'
+    );
+  });
+
+  it('the deep link is wired from a shell function that already served three other sites', () => {
+    assert.ok(
+      /function openWorldScopedEntry\(/.test(rootSource),
+      'the navigation the seam delegates to is the shell’s own, declared in this file'
+    );
+    const attributes = staticAttributesAt('EssenceBrowserInspector');
+    assert.ok(
+      attributes.includes('onOpenWorldDefinition'),
+      'the inspector call site carries the one callback the seam needs'
+    );
+    // The RENDER bound. Exactly one attribute more than the enumeration shipped, on a child that
+    // was already rendered here — no new element, no new branch, no screen.
+    assert.deepEqual(
+      attributes,
+      [
+        'essence',
+        'showSourceUi',
+        'showPropertyMacroUi',
+        'managedItemOptions',
+        'sourceUuid',
+        'onEdit',
+        'onOpenWorldDefinition',
+        'onDuplicate',
+        'onDelete',
+        'onEditComponent',
+        'onCopySource',
+        'onUnlinkSource',
+        'onSourceDrop',
+        'onSourceSelect',
+      ],
+      'the reopening adds ONE attribute to an existing call site and changes nothing else there'
+    );
+    // And the callback actually navigates, rather than being a declared-but-inert prop.
+    assert.match(
+      rootSource,
+      /onOpenWorldDefinition=\{\(id\) => openWorldScopedEntry\('world-essence-entry', id\)\}/,
+      'the seam routes to the world essence entry through the shared route-exit gate'
+    );
+  });
+});
+
+// ── (1c) THE ENTRY EDITOR'S LIVE-PREVIEW FOOTER ───────────────────────────────────────────────
+//
+// `EssenceBehaviorPreview` renders the footer strip by default and both essence sites choose
+// explicitly. The prototype draws it at the foot of the entry editor's preview panel
+// (`proto:3537`) as it does on all six of its editors (`proto:6138`, `6155`, `6209`), and
+// suppresses nothing there; the BROWSER INSPECTOR is the site that legitimately suppresses it,
+// because it is a read-only rail with nothing to type into.
+//
+// A source assertion rather than a mount, and the pairing is what makes it non-vacuous: a check
+// that the entry page merely lacks the prop would pass just as well if the prop had been deleted
+// from the primitive, so the inspector's surviving suppression is asserted in the same breath.
+
+describe('the world essence entry editor keeps the live-preview note', () => {
+  const entrySource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte'),
+    'utf8'
+  );
+  const inspectorSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte'),
+    'utf8'
+  );
+
+  it('does not suppress it, while the read-only inspector still does', () => {
+    assert.ok(
+      entrySource.includes('<EssenceBehaviorPreview'),
+      'NON-VACUITY: the entry page renders the preview at all'
+    );
+    assert.ok(
+      !entrySource.includes('showLiveNote'),
+      'the editor whose preview recomputes on every keystroke is the one that must say so'
+    );
+    assert.ok(
+      inspectorSource.includes('showLiveNote={false}'),
+      'and the inspector still suppresses it, so the prop is a live distinction'
+    );
+  });
+});
+
 describe('criterion 3 — no essence screen declares a prop its call site does not supply', () => {
   const SCREENS = [
     ['WorldEssenceCataloguePage', 'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte'],

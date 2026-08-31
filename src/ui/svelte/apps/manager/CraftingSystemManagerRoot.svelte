@@ -13829,6 +13829,7 @@
               managedItemOptions={selectedSystem?.managedItemOptions || []}
               sourceUuid={selectedEssenceSourceUuid()}
               onEdit={(id) => editEssence(id)}
+              onOpenWorldDefinition={(id) => openWorldScopedEntry('world-essence-entry', id)}
               onDuplicate={(id) => duplicateSelectedEssence(id)}
               onDelete={(id) => removeEssence(id)}
               onEditComponent={(id) => editComponent(id)}

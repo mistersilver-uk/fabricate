@@ -737,6 +737,14 @@
             </ul>
           </section>
 
+          <!-- THE LIVE NOTE IS ON (`proto:3537`). `EssenceBehaviorPreview` already renders the
+               footer strip — glyph plus "This preview updates live as you edit." — and the
+               prototype's essence-definition editor draws it at the foot of exactly this
+               panel, as every one of its six editors does (`proto:6138`, `6155`, `6209`).
+               It shipped suppressed here, which left the one panel on the page that DOES
+               recompute on every keystroke saying nothing about it; the browser inspector,
+               which is the site that legitimately suppresses it, is a read-only rail with
+               nothing to type into. -->
           <section class="manager-scoped-entry-preview" data-scoped-entry-preview>
             <EssenceBehaviorPreview
               essence={previewEssence}
@@ -744,7 +752,6 @@
               propertyMacrosEnabled={Boolean(defaults?.macro)}
               sourceName={sectionValueName('effectSource')}
               macroName={sectionValueName('macro')}
-              showLiveNote={false}
             />
           </section>
 

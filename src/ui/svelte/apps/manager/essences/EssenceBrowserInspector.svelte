@@ -42,6 +42,11 @@
     managedItemOptions = [],
     sourceUuid = '',
     onEdit = () => {},
+    // THE DEEP LINK OUT TO THE WORLD DEFINITION (issue 1372, `proto:1678`). One callback, and
+    // the only reason `CraftingSystemManagerRoot.svelte` is reopened at all: the shell already
+    // owns `openWorldScopedEntry`, and this site is the one place the seam can be attached
+    // because the inspector is rendered there with explicit props and no bundle spread.
+    onOpenWorldDefinition = () => {},
     onDuplicate = () => {},
     onDelete = () => {},
     onEditComponent = () => {},
@@ -129,6 +134,51 @@
     {description ||
       text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
   </p>
+</section>
+
+<!--
+  WHICH LAYER THE GM IS LOOKING AT, AND THE WAY OUT TO THE OTHER ONE (`proto:1676`-`1678`).
+
+  This inspector describes ONE system's rules for an essence whose name, icon and colour are a
+  world record every system shares. Nothing on the panel said so, and nothing offered a route
+  to the record — so `Edit essence` beside a shared name read as "edit the essence" when what
+  it opens is this system's rules. The prototype answers both with an info-toned block: the
+  kicker names the layer, a sentence says what is shared, and an accent link opens the world
+  definition.
+
+  THE SENTENCE IS SYSTEM-AGNOSTIC, AND THAT IS A STATED LIMIT rather than an oversight, and it
+  is the ONE place this block is not already shipped copy. `EssenceEditView` renders the SAME
+  sentence, counted and named, from `FABRICATE.Admin.Manager.Scoped.Essence.IdentityBanner`
+  ("shared with {count} other system(s). Everything below belongs to {system} alone."), which
+  is what the prototype draws at `proto:5091`. Rendering that key here needs the roster size
+  and the selected system's name, and both would have to arrive as further props from
+  `CraftingSystemManagerRoot.svelte` — a gateway file this change reopens for ONE callback and
+  nothing else. So this is the uncounted variant of one sentence, deliberately, and the two
+  keys collapse into that one the moment the inspector legitimately holds those two values.
+-->
+<section class="manager-inspector-card manager-essence-shared" data-essence-section="shared">
+  <p class="manager-kicker">
+    {text('FABRICATE.Admin.Manager.Essence.SharedDefinition', 'Shared definition')}
+  </p>
+  <p class="manager-muted">
+    {text(
+      'FABRICATE.Admin.Manager.Essence.SharedDefinitionNote',
+      'Name, icon and colour come from the Essence Catalogue and are shared by every system. Everything below belongs to this system alone.'
+    )}
+  </p>
+  <!-- `.manager-link-button` is the manager's shipped inline text-link button; only its
+       colour is restated below, because the prototype paints this one in the accent. -->
+  <button
+    type="button"
+    class="manager-link-button manager-essence-shared-link"
+    data-essence-action="open-world-definition"
+    onclick={() => onOpenWorldDefinition(essence.id)}
+  >
+    <span
+      >{text('FABRICATE.Admin.Manager.Essence.OpenWorldDefinition', 'Open world definition')}</span
+    >
+    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+  </button>
 </section>
 
 <!-- Two stats, two different questions. Components CARRY the essence, which is what blocks
@@ -349,6 +399,32 @@
      divergences, so the classes joined those selector lists in `styles/fabricate.css`
      instead — one shape, one definition, and the essence inspector's numbers now match the
      recipe and component inspectors a click away. */
+
+  /* The prototype's shared-definition block is INFO-toned — the one panel on the rail that is
+     an explanation rather than a control (`proto:1676`). It reuses the inspector card's own
+     geometry and restates only the tint, so no second card shape enters the rail. */
+  .manager-essence-shared {
+    border-color: var(--fab-info-border);
+    background: var(--fab-info-soft);
+  }
+
+  /* Colour only. `.manager-link-button` in `styles/fabricate.css` owns the shape, and it
+     paints muted; the prototype paints this link in the accent because it LEAVES the screen.
+     Compounded through `.manager-inspector-card` so the rule is (0,3,0) and beats the global
+     `.fabricate-manager .manager-link-button` outright instead of tying it at (0,2,0) and
+     being decided by stylesheet injection order. */
+  .manager-inspector-card .manager-essence-shared-link {
+    color: var(--fab-accent);
+    font-weight: 600;
+  }
+
+  .manager-inspector-card .manager-essence-shared-link:hover {
+    color: var(--fab-text);
+  }
+
+  .manager-inspector-card .manager-essence-shared-link i {
+    font-size: 0.6rem;
+  }
 
   .manager-essence-inspector-actions {
     display: flex;

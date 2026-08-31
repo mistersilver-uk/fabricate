@@ -1976,6 +1976,18 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
    Turning that section's switch off is the one action that unlocks it.
    With no membership record at all the editor states the block and offers the one action that fixes it, because nothing in that system reads any value the editor could otherwise present.
 6. **Neither essence screen renders a copy-provenance stamp**, because `copyMembership` writes none and normalization would discard one.
+7. **The System Essence Rules list row's edit affordance is LABELLED and marked as leaving the screen**, carrying the words `Edit rules` and the outbound `fa-arrow-up-right-from-square` glyph rather than a bare pencil.
+   The words are what say which layer the control opens: the row names a world-shared essence and the control opens this system's rules for it, so an unlabelled pencil beside a shared name reads as "edit the essence".
+   It stays a `.manager-icon-button` wearing a `title` that leads with `Edit`, and that is a contract rather than an inheritance — the View Lab essence-edit cases, the Foundry smoke's `.manager-icon-button[title*="Edit" i]` step and two mounted tests all address it by exactly that, and the smoke's step sits behind a presence guard, so losing either would stop producing the `manager-essence-edit-first-state` frame without failing anything.
+   The GRID presentation keeps the icon-only pencil: its footer is a two-slot strip beside the enable switch, and the reference draws no grid presentation for this screen to copy.
+8. **The System Essence Rules inspector states the SHARED layer and offers the one route out to it.**
+   It renders an info-toned block naming the shared definition, a sentence saying that name, icon and colour come from the Essence Catalogue while everything below belongs to this system alone, and an accent link that opens the world essence entry route on that essence.
+   That link is the only route from a system's rules to the record they resolve against, and without it the inspector's own `Edit essence` action was the loudest thing on a panel describing a layer it does not open.
+   Its sentence is the uncounted variant of the editor's `Scoped.Essence.IdentityBanner`; the counted form needs the system roster size and the selected system's name, which the inspector does not hold.
+9. **Both essence list screens state MEMBERSHIP in the toolbar count, and the world entry editor's preview states that it is live.**
+   The System Essence Rules bar reads `{shown} shown · {members} of {total} in this system`, which is the one count no other control on the screen answers; it falls back to the page range when the world corpus cannot answer membership, because `{members} of {total}` over an unreadable corpus reports every essence as absent from this system, which is false rather than unavailable.
+   The range it replaces is rendered verbatim by the pager at the foot of the same list, so the bar was restating it.
+   The world essence entry editor renders the shared preview's live-update note; the browser inspector is the one site that suppresses it, because that rail is read-only and has nothing to type into.
 
 ### Scoped entity editor patterns
 
