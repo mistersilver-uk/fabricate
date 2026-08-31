@@ -10,6 +10,7 @@
   import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     realm = null,
@@ -128,10 +129,9 @@
                   >{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip
                 >
               {/if}
-              <button
-                type="button"
-                class="manager-icon-button manager-realm-env-add"
-                aria-label={text(
+              <IconButton
+                class="manager-realm-env-add"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Travel.Realms.AddEnvironment',
                   'Add environment to realm'
                 )}
@@ -143,7 +143,7 @@
                 onclick={() => onAdd(environment.id, realmId)}
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </li>
           {/each}
         </ul>
@@ -207,10 +207,9 @@
                   >{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip
                 >
               {/if}
-              <button
-                type="button"
-                class="manager-icon-button is-danger manager-realm-env-remove"
-                aria-label={text(
+              <IconButton
+                class="is-danger manager-realm-env-remove"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Travel.Realms.RemoveEnvironment',
                   'Remove environment from realm'
                 )}
@@ -222,7 +221,7 @@
                 onclick={() => onRemove(environment.id, realmId)}
               >
                 <i class="fas fa-xmark" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </li>
           {/each}
         </ul>

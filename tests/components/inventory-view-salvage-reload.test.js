@@ -47,6 +47,7 @@ const harness = createMountedComponentHarness({
   runeModules: ['src/ui/svelte/stores/inventoryStore.svelte.js'],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',

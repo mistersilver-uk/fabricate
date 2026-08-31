@@ -25,6 +25,7 @@
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     recipe = null,
@@ -160,13 +161,12 @@
                 >{definitionName(def)}</button
               >
             {/if}
-            <button
-              type="button"
-              class="manager-icon-button is-danger"
-              aria-label={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
+            <IconButton
+              class="is-danger"
+              ariaLabel={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               title={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               onclick={() => unlinkDefinition(def)}
-              ><i class="fas fa-link-slash" aria-hidden="true"></i></button
+              ><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
             >
           </li>
         {/each}

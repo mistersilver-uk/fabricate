@@ -66,6 +66,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte',
   ],

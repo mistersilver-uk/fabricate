@@ -75,6 +75,10 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
 export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // The manager's ONE chip (issue 883).
   'src/ui/svelte/apps/manager/Chip.svelte',
+  // The manager's ONE icon-only push-button (issue 1422). `ComponentEditView` renders three
+  // of them for the salvage editor's removes, and `ItemDropZone` and `ComplicationSummaryRow`
+  // each render more, so every tree built on this list reaches it by several routes.
+  'src/ui/svelte/components/IconButton.svelte',
   // The shared no-state primitive (issue 785).
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   // Rendered by the salvage block.

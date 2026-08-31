@@ -145,6 +145,7 @@ describe('GatheringView mounted behavior', () => {
     writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     // GatheringView now renders the center-column detail tree; compile it too so

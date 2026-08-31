@@ -38,6 +38,7 @@
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     component = null,
@@ -128,16 +129,15 @@
   </span>
 
   <span class="manager-action-group">
-    <button
-      type="button"
-      class="manager-icon-button manager-component-edit"
+    <IconButton
+      class="manager-component-edit"
       data-component-edit={component?.id}
-      aria-label={editLabel}
+      ariaLabel={editLabel}
       title={editTitle}
       onclick={() => onEdit(component?.id)}
     >
       <i class="fas fa-pen" aria-hidden="true"></i>
-    </button>
+    </IconButton>
     <!-- AFTER the pen, per the prototype. `.manager-action-group` is a `<span>`, so the
          primitive renders its own `<label>` (`wrapper="label"`) — without it the visible
          box would have no label association and no click target. -->

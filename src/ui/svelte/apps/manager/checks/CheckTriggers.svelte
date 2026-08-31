@@ -43,6 +43,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import ToggleCard from '../ToggleCard.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     value = null,
@@ -640,18 +641,17 @@
               </span>
             </button>
 
-            <button
-              type="button"
-              class="manager-icon-button is-danger manager-checks-trigger-remove"
-              data-remove-trigger
-              aria-label={text(
+            <IconButton
+              class="is-danger manager-checks-trigger-remove"
+              data-remove-trigger=""
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Checks.Breakage.RemoveTrigger',
                 'Remove trigger'
               )}
               onclick={() => removeTrigger(trigger.id)}
             >
               <i class="fas fa-trash" aria-hidden="true"></i>
-            </button>
+            </IconButton>
           </div>
 
           {#if expanded}

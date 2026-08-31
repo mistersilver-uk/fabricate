@@ -36,6 +36,7 @@ const harness = createMountedComponentHarness({
     'src/utils/macroReference.js',
   ],
   compiledModules: [
+    'src/ui/svelte/components/IconButton.svelte',
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',

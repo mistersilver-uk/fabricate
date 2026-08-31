@@ -105,6 +105,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',

@@ -38,6 +38,7 @@
     appendModifierExpressionTerm,
     getModifierExpressionSuggestions,
   } from '../../../../../config/modifierExpressionSuggestions.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     library = [],
@@ -304,21 +305,17 @@
                     </span>
                   {/if}
                 </button>
-                <button
-                  type="button"
-                  class="manager-icon-button"
-                  aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+                <IconButton
+                  ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                   data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                   data-move-modifier-up={entry.id}
                   disabled={index === 0}
                   onclick={() => reorderEntry(index, -1, entry.label)}
                 >
                   <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                </button>
-                <button
-                  type="button"
-                  class="manager-icon-button"
-                  aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
+                </IconButton>
+                <IconButton
+                  ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                   data-tooltip={text(
                     'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
                     'Move down'
@@ -328,11 +325,9 @@
                   onclick={() => reorderEntry(index, 1, entry.label)}
                 >
                   <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                </button>
-                <button
-                  type="button"
-                  class="manager-icon-button"
-                  aria-label={text(
+                </IconButton>
+                <IconButton
+                  ariaLabel={text(
                     'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
                     'Copy to prerequisites'
                   )}
@@ -344,15 +339,14 @@
                   onclick={() => onCopyToPrerequisite(entry)}
                 >
                   <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
-                </button>
-                <button
-                  type="button"
-                  class="manager-icon-button is-danger"
-                  aria-label={text('FABRICATE.Admin.Manager.Modifiers.Delete', 'Delete modifier')}
+                </IconButton>
+                <IconButton
+                  class="is-danger"
+                  ariaLabel={text('FABRICATE.Admin.Manager.Modifiers.Delete', 'Delete modifier')}
                   onclick={() => handleDelete(entry.id)}
                 >
                   <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                </button>
+                </IconButton>
               </div>
 
               {#if boundsFault}

@@ -15,6 +15,7 @@
   import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     environments = [],
@@ -1040,10 +1041,8 @@
                   data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
                 >
                   <span class="manager-environment-action-grid">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
+                    <IconButton
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.EditNamed',
                         'Edit {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1051,11 +1050,9 @@
                       onclick={() => onEditEnvironment(environment.id)}
                     >
                       <i class="fas fa-edit" aria-hidden="true"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
+                    </IconButton>
+                    <IconButton
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.DuplicateNamed',
                         'Duplicate {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1066,11 +1063,10 @@
                       onclick={() => onDuplicateEnvironment(environment.id)}
                     >
                       <i class="fas fa-copy" aria-hidden="true"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="manager-icon-button is-danger"
-                      aria-label={text(
+                    </IconButton>
+                    <IconButton
+                      class="is-danger"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.DeleteNamed',
                         'Delete {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1081,7 +1077,7 @@
                       onclick={() => onDeleteEnvironment(environment.id)}
                     >
                       <i class="fas fa-trash" aria-hidden="true"></i>
-                    </button>
+                    </IconButton>
                   </span>
                 </span>
               </div>

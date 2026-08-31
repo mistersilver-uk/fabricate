@@ -13889,9 +13889,14 @@
    Force add in the automatic-mode Non-matching list, which is where overriding a filter — and
    therefore the word "warning" — actually means something. The `.manager-icon-button` half of
    these two selectors is retired with it: its only consumer was the manual-mode icon Force add
-   that 1315 deletes, `manager-icon-button` is hand-applied at call sites rather than emitted by
-   a primitive with a role, so nothing can write that pair again without deliberately reaching
-   for it.
+   that 1315 deletes.
+
+   The reason THAT retirement is safe changed at issue 1422, and the old one no longer holds:
+   `manager-icon-button` used to be hand-applied at call sites, so writing the pair again meant
+   typing both classes deliberately. It is now emitted by `IconButton.svelte`. What keeps the
+   pair unreachable is different and stronger — that primitive has NO role prop, so `is-warning-action`
+   can only arrive as a pass-through `class` string, and `tests/icon-button-source-contract.test.js`
+   is what would show it.
 
    The three declarations are paint only. That is what makes the role order-independent
    against `.manager-button.fab-manager-button`, which states geometry and no colour. */

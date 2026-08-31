@@ -27,6 +27,7 @@
   import ToggleCard from '../ToggleCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     name = '',
@@ -77,17 +78,16 @@
              have made unreachable without a pointer. -->
         <div class="manager-essence-icon-tile">
           <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} glyph={44} />
-          <button
-            type="button"
-            class="manager-icon-button manager-essence-icon-reset"
-            data-essence-icon-reset
+          <IconButton
+            class="manager-essence-icon-reset"
+            data-essence-icon-reset=""
             disabled={saving || normalizedIcon === DEFAULT_ESSENCE_ICON}
-            aria-label={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
             title={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
             onclick={() => onIconChange(DEFAULT_ESSENCE_ICON)}
           >
             <i class="fas fa-undo" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </div>
         <div class="manager-essence-icon-actions">
           <IconPicker
@@ -236,8 +236,21 @@
      NOT `visibility: hidden`: `visibility: hidden` removes the button from the tab order, so
      a keyboard user could never focus it and the `:focus-visible` reveal below could never
      fire — the exact catch-22 this design exists to avoid. `opacity: 0` keeps it focusable;
-     `pointer-events: none` stops the invisible corner intercepting a click until revealed. */
-  .manager-essence-icon-tile .manager-essence-icon-reset {
+     `pointer-events: none` stops the invisible corner intercepting a click until revealed.
+
+     The reset control is an `<IconButton>` as of issue 1422, so the CHILD half of each
+     selector is `:global` while the tile keeps its scoping — the tile is still an element
+     this component writes, and globalising it too would let these rules escape into any
+     other component that happens to draw a tile. Specificity is unchanged by construction:
+     Svelte compiled the scoped descendant to
+     `.manager-essence-icon-tile.svelte-<hash> .manager-essence-icon-reset:where(.svelte-<hash>)`,
+     and `:where()` contributes nothing, so (0,3,0) then and (0,3,0) now.
+
+     Unlike `GatheringEconomyView.svelte`'s pair, this one failed LOUDLY: the class token
+     appears nowhere on an element this component still writes, so the compiler pruned all
+     three selectors and `lint:svelte:warnings` named them. A repair verified only against
+     that gate would have missed the other file entirely. */
+  .manager-essence-icon-tile :global(.manager-essence-icon-reset) {
     position: absolute;
     top: var(--fab-space-1);
     right: var(--fab-space-1);
@@ -246,8 +259,8 @@
     transition: opacity 120ms ease;
   }
 
-  .manager-essence-icon-tile:hover .manager-essence-icon-reset,
-  .manager-essence-icon-tile .manager-essence-icon-reset:focus-visible {
+  .manager-essence-icon-tile:hover :global(.manager-essence-icon-reset),
+  .manager-essence-icon-tile :global(.manager-essence-icon-reset:focus-visible) {
     opacity: 1;
     pointer-events: auto;
   }

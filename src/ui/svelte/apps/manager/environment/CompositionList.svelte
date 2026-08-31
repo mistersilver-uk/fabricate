@@ -15,6 +15,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { ENVIRONMENT_INCLUDED_COMPOSITION_STATES } from '../../../../../systems/gatheringComposition.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     kind = 'task',
@@ -333,12 +334,11 @@
             </div>
             <div class="manager-environment-comp-actions">
               {#if mode === 'manual'}
-                <button
-                  type="button"
-                  class="manager-icon-button is-danger manager-environment-comp-quick-action"
+                <IconButton
+                  class="is-danger manager-environment-comp-quick-action"
                   data-quick-action="exclude"
                   data-action="exclude"
-                  aria-label={text(
+                  ariaLabel={text(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
                     'Remove'
                   )}
@@ -349,7 +349,7 @@
                   onclick={() => onExclude(kind, entry.id)}
                 >
                   <i class="fas fa-ban" aria-hidden="true"></i>
-                </button>
+                </IconButton>
               {/if}
               <div
                 class="manager-environment-comp-menu-wrap"
@@ -358,19 +358,17 @@
                   onDismiss: closeMenu,
                 }}
               >
-                <button
-                  type="button"
-                  class="manager-icon-button"
+                <IconButton
                   aria-haspopup="menu"
                   aria-expanded={openMenuId === entry.id}
-                  aria-label={text(
+                  ariaLabel={text(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
                     'More actions'
                   )}
                   onclick={() => toggleMenu(entry.id)}
                 >
                   <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                </button>
+                </IconButton>
                 {#if openMenuId === entry.id}
                   <div class="manager-environment-comp-menu" role="menu">
                     {#if showEventRankControls}
@@ -516,12 +514,11 @@
               </div>
               <div class="manager-environment-comp-actions">
                 {#if availableRowAction(entry) === 'include'}
-                  <button
-                    type="button"
-                    class="manager-icon-button is-primary manager-environment-comp-quick-action"
+                  <IconButton
+                    class="is-primary manager-environment-comp-quick-action"
                     data-quick-action="include"
                     data-action="include"
-                    aria-label={text(
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
                       'Add'
                     )}
@@ -532,7 +529,7 @@
                     onclick={() => onInclude(kind, entry.id)}
                   >
                     <i class="fas fa-circle-plus" aria-hidden="true"></i>
-                  </button>
+                  </IconButton>
                 {/if}
                 <div
                   class="manager-environment-comp-menu-wrap"
@@ -541,19 +538,17 @@
                     onDismiss: closeMenu,
                   }}
                 >
-                  <button
-                    type="button"
-                    class="manager-icon-button"
+                  <IconButton
                     aria-haspopup="menu"
                     aria-expanded={openMenuId === entry.id}
-                    aria-label={text(
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
                       'More actions'
                     )}
                     onclick={() => toggleMenu(entry.id)}
                   >
                     <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                  </button>
+                  </IconButton>
                   {#if openMenuId === entry.id}
                     <div class="manager-environment-comp-menu" role="menu">
                       {#if availableRowAction(entry) === 'include'}
@@ -678,19 +673,17 @@
                       onDismiss: closeMenu,
                     }}
                   >
-                    <button
-                      type="button"
-                      class="manager-icon-button"
+                    <IconButton
                       aria-haspopup="menu"
                       aria-expanded={openMenuId === entry.id}
-                      aria-label={text(
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
                         'More actions'
                       )}
                       onclick={() => toggleMenu(entry.id)}
                     >
                       <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                    </button>
+                    </IconButton>
                     {#if openMenuId === entry.id}
                       <div class="manager-environment-comp-menu" role="menu">
                         <button
@@ -819,19 +812,17 @@
                       onDismiss: closeMenu,
                     }}
                   >
-                    <button
-                      type="button"
-                      class="manager-icon-button"
+                    <IconButton
                       aria-haspopup="menu"
                       aria-expanded={openMenuId === entry.id}
-                      aria-label={text(
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
                         'More actions'
                       )}
                       onclick={() => toggleMenu(entry.id)}
                     >
                       <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                    </button>
+                    </IconButton>
                     {#if openMenuId === entry.id}
                       <div class="manager-environment-comp-menu" role="menu">
                         {#if entry.compositionState === 'notMatching'}
@@ -924,10 +915,8 @@
                       )}</span
                     >
                   {/if}
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={kind === 'event'
+                  <IconButton
+                    ariaLabel={kind === 'event'
                       ? text(
                           'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
                           'Open source event'
@@ -939,7 +928,7 @@
                     onclick={() => onOpenSource(kind, entry.id)}
                   >
                     <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
-                  </button>
+                  </IconButton>
                 {/if}
               </div>
             </li>

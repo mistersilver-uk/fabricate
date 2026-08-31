@@ -136,6 +136,7 @@
   import BulkSelectionToolbar from '../BulkSelectionToolbar.svelte';
   import Callout from '../Callout.svelte';
   import EmptyState from '../EmptyState.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     scope = null,
@@ -643,16 +644,14 @@
 
                   <span class="manager-action-group">
                     {#each rowActions as action (action.id)}
-                      <button
-                        type="button"
-                        class="manager-icon-button"
+                      <IconButton
                         data-scoped-list-action={action.id}
-                        aria-label={`${action.label} — ${name}`}
+                        ariaLabel={`${action.label} — ${name}`}
                         title={action.label}
                         onclick={() => action.run(entry)}
                       >
                         <i class={action.icon} aria-hidden="true"></i>
-                      </button>
+                      </IconButton>
                     {/each}
                     <SelectionCheckbox
                       size="lg"

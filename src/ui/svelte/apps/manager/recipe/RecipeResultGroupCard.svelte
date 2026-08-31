@@ -17,6 +17,7 @@
   import RecipeResultItemRow from './RecipeResultItemRow.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     group = {},
@@ -301,13 +302,12 @@
         />
       {/if}
       {#if !hideRemove && !reserved}
-        <button
-          type="button"
-          class="manager-icon-button is-danger"
+        <IconButton
+          class="is-danger"
           data-recipe-remove="result-set"
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
           title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
-          onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></button
+          onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></IconButton
         >
       {/if}
     </div>

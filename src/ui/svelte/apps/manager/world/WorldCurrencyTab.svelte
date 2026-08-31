@@ -24,6 +24,7 @@
   import { resolveDropData } from '../../../util/dropUtils.js';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     currencyUnits = [],
@@ -507,10 +508,9 @@
                         >{macroDoc.name || macroDoc.uuid}</span
                       >
                     {/if}
-                    <button
-                      type="button"
-                      class="manager-icon-button is-danger"
-                      aria-label={text(
+                    <IconButton
+                      class="is-danger"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
                         'Unlink macro'
                       )}
@@ -521,7 +521,7 @@
                       onclick={(event) => {
                         event.stopPropagation();
                         onClearCurrencyMacro(field.key);
-                      }}><i class="fas fa-link-slash" aria-hidden="true"></i></button
+                      }}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
                     >
                   </div>
                 {:else}
@@ -735,17 +735,15 @@
                               {/each}
                             </select>
                           </label>
-                          <button
-                            type="button"
-                            class="manager-icon-button"
-                            aria-label={text(
+                          <IconButton
+                            ariaLabel={text(
                               'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
                               'Add sub-unit'
                             )}
                             onclick={() => handleAddCurrencySubUnit(unit.id)}
                           >
                             <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                          </button>
+                          </IconButton>
                         </div>
                       {:else}
                         <div class="manager-field">
@@ -859,10 +857,8 @@
                     >{(unit.contains || []).length}
                     {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</Chip
                   >
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                     data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                     data-move-currency-up={unit.id}
                     disabled={index === 0}
@@ -876,14 +872,9 @@
                       )}
                   >
                     <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                      'Move down'
-                    )}
+                  </IconButton>
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                     data-tooltip={text(
                       'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
                       'Move down'
@@ -900,29 +891,26 @@
                       )}
                   >
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text(
+                  </IconButton>
+                  <IconButton
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.CurrencyUnits.Edit',
                       'Edit currency unit'
                     )}
                     onclick={() => (currencyExpandedUnitId = unit.id)}
                   >
                     <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button is-danger"
-                    aria-label={text(
+                  </IconButton>
+                  <IconButton
+                    class="is-danger"
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
                       'Delete currency unit'
                     )}
                     onclick={() => handleDeleteCurrencyUnit(unit.id)}
                   >
                     <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                  </button>
+                  </IconButton>
                 </div>
               {/if}
             </li>

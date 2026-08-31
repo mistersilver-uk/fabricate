@@ -13,6 +13,7 @@
   import { stepperLabels } from '../../components/stepperLabels.js';
   import { localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     task = null,
@@ -1165,12 +1166,11 @@
                     )}
                     onChange={(next) => updateStaminaCostModifier(index, { max: next })}
                   />
-                  <button
-                    type="button"
-                    class="manager-icon-button is-danger"
-                    aria-label={text('FABRICATE.Admin.Manager.Economy.RemoveModifier', 'Remove')}
+                  <IconButton
+                    class="is-danger"
+                    ariaLabel={text('FABRICATE.Admin.Manager.Economy.RemoveModifier', 'Remove')}
                     onclick={() => removeStaminaCostModifier(index)}
-                    ><i class="fas fa-times" aria-hidden="true"></i></button
+                    ><i class="fas fa-times" aria-hidden="true"></i></IconButton
                   >
                 </div>
               {/each}
@@ -2047,10 +2047,9 @@
                     class="manager-drop-cell manager-drop-rank-cell"
                     data-gathering-task-drop-rank-cell
                   >
-                    <button
-                      type="button"
-                      class="manager-icon-button manager-drop-rank-button"
-                      aria-label={text(
+                    <IconButton
+                      class="manager-drop-rank-button"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp',
                         'Move drop up'
                       )}
@@ -2067,14 +2066,13 @@
                       onkeydown={(event) => event.stopPropagation()}
                     >
                       <i class="fas fa-chevron-up" aria-hidden="true"></i>
-                    </button>
+                    </IconButton>
                     <span class="manager-drop-rank-value" data-gathering-task-drop-rank
                       >#{rankIndex + 1}</span
                     >
-                    <button
-                      type="button"
-                      class="manager-icon-button manager-drop-rank-button"
-                      aria-label={text(
+                    <IconButton
+                      class="manager-drop-rank-button"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown',
                         'Move drop down'
                       )}
@@ -2091,7 +2089,7 @@
                       onkeydown={(event) => event.stopPropagation()}
                     >
                       <i class="fas fa-chevron-down" aria-hidden="true"></i>
-                    </button>
+                    </IconButton>
                   </span>
                 {/if}
                 <span

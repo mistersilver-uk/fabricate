@@ -15,6 +15,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
   ],
   compiledModules: [
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
   ],

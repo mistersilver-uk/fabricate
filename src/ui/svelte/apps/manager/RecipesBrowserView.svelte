@@ -43,6 +43,7 @@
     deriveRecipeIo,
     deriveRecipeStatuses,
   } from '../../../../utils/recipeBrowserModel.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     recipes = [],
@@ -658,15 +659,14 @@
     <div class="manager-recipe-flash" role="alert" data-recipe-flash>
       <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
       <span class="manager-recipe-flash-message">{flashMessage}</span>
-      <button
-        type="button"
-        class="manager-icon-button manager-recipe-flash-dismiss"
-        data-recipe-flash-dismiss
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
+      <IconButton
+        class="manager-recipe-flash-dismiss"
+        data-recipe-flash-dismiss=""
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
         onclick={() => (flashMessage = '')}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
-      </button>
+      </IconButton>
     </div>
   {/if}
 
@@ -819,12 +819,11 @@
                         <span>{check.label}</span>
                       </Chip>
 
-                      <button
-                        type="button"
-                        class={`manager-icon-button manager-recipe-lock ${recipe.locked ? 'is-locked' : ''}`}
+                      <IconButton
+                        class={`manager-recipe-lock ${recipe.locked ? 'is-locked' : ''}`}
                         data-recipe-lock={recipe.locked === true}
                         aria-pressed={recipe.locked === true}
-                        aria-label={format(
+                        ariaLabel={format(
                           recipe.locked
                             ? 'FABRICATE.Admin.Manager.Recipe.UnlockNamed'
                             : 'FABRICATE.Admin.Manager.Recipe.LockNamed',
@@ -841,7 +840,7 @@
                           class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'}
                           aria-hidden="true"
                         ></i>
-                      </button>
+                      </IconButton>
 
                       <!--
                         No "On"/"Off" text IN THE ROW. The track colour already carries
@@ -877,11 +876,10 @@
                         toolbar and truncated the description; a single edit pencil next to
                         the enable switch is the row's primary action and does not.
                       -->
-                      <button
-                        type="button"
-                        class="manager-icon-button manager-recipe-edit"
+                      <IconButton
+                        class="manager-recipe-edit"
                         data-recipe-edit={recipe.id}
-                        aria-label={format(
+                        ariaLabel={format(
                           'FABRICATE.Admin.Manager.Recipe.EditNamed',
                           'Edit {name}',
                           { name: recipe.name }
@@ -890,7 +888,7 @@
                         onclick={() => onEditRecipe(recipe.id)}
                       >
                         <i class="fas fa-pen" aria-hidden="true"></i>
-                      </button>
+                      </IconButton>
 
                       <!--
                         The bulk selection box (issue 1010), AFTER the Edit pencil and
