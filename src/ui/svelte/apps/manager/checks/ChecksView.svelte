@@ -1252,7 +1252,7 @@
     if (result.data?.breakTools === true || (!success && breakToolsOnFail)) {
       facts.push({
         id: 'tools',
-        icon: 'fas fa-hammer-crash',
+        icon: 'fas fa-hammer',
         title: text('FABRICATE.Admin.Manager.Checks.Simulator.FactTools', 'Required tools break'),
         subtitle: '',
       });
@@ -1679,7 +1679,7 @@
               <div class="manager-checks-flag-list">
                 <ToggleCard
                   variant="is-info"
-                  icon="fas fa-book-sparkles"
+                  icon="fas fa-book"
                   section="alchemy-learn-on-craft"
                   field="learnOnCraft"
                   title={text(
@@ -1833,8 +1833,10 @@
                  suites' lookup and the alchemy absence check all keep resolving.
 
                  The glyphs are the prototype's `fa-fire` and `fa-hammer` — the arguably more
-                 precise `fa-hammer-crash` / `fa-fire-flame-curved` were an exemption, and it
-                 has been overruled: the prototype is the authority for appearance. -->
+                 precise `hammer-crash` / `fire-flame-curved` were an exemption, and it has
+                 been overruled: the prototype is the authority for appearance. Both are
+                 Pro-only names, so they are written here without the `fa-` class prefix that
+                 would make them a reference in code. -->
             <div class="manager-checks-flag-list" data-failure-consumption>
               <ToggleCard
                 icon="fas fa-fire"

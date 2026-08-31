@@ -38,7 +38,7 @@ const PROVIDER = 'Fabricate player navigation provider';
  *   permitted id charset.
  * @property {string} label Final visible tab label. Core renders it VERBATIM and localizes
  *   only its own tab labels, so this is display text and never a lang key.
- * @property {string} icon Full Font Awesome class list (for example `fas fa-anvil`),
+ * @property {string} icon Full Font Awesome class list (for example `fas fa-hammer`),
  *   rendered verbatim; Core prefixes the icon family only for its own tabs.
  * @property {string} [accessibleName] Accessible name for the rail button. It REPLACES the
  *   visible label as the control's accessible name, so it must contain the visible label

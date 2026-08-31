@@ -44,7 +44,7 @@
 //
 // `candle-holder` is the worked example, and it now runs the other way round. Foundry renders it,
 // a companion module offers it, and this catalogue deliberately does NOT — it is a Pro-only name,
-// so writing `fas fa-candle-holder` would be Fabricate referencing a Pro icon in code. It is not
+// so offering `candle-holder` would be Fabricate referencing a Pro icon in code. It is not
 // absent because it could not be measured; it was measured, and then declined.
 //
 // THE ENTRY SHAPE, and the three decisions behind it:

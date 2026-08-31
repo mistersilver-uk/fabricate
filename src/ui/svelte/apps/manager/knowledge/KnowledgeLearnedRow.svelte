@@ -133,7 +133,7 @@
     const granted =
       row.sourceKind === LEARNED_SOURCE_GRANTED ||
       row.sourceKind === LEARNED_SOURCE_GRANTED_UNLABELLED;
-    return granted ? 'fas fa-hand-holding' : 'fas fa-book-sparkles';
+    return granted ? 'fas fa-hand-holding' : 'fas fa-book';
   }
 
   // The refund clause is appended to the source line rather than rendered as its own

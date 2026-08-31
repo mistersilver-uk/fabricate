@@ -14,7 +14,7 @@ function playerProvider({ id = SURFACE, ids = ['board'], ...overrides } = {}) {
   return {
     apiVersion: 1,
     id,
-    tabs: ids.map((tabId) => ({ id: tabId, label: `Board ${tabId}`, icon: 'fas fa-anvil' })),
+    tabs: ids.map((tabId) => ({ id: tabId, label: `Board ${tabId}`, icon: 'fas fa-hammer' })),
     mount: () => undefined,
     ...overrides,
   };

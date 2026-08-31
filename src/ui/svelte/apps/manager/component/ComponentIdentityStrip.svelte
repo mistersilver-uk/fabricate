@@ -328,7 +328,7 @@
     onmousedown={onLinkedSourceMouseDown}
   >
     <i
-      class={dropActive ? 'fas fa-arrow-down-to-bracket' : 'fas fa-arrow-right-arrow-left'}
+      class={dropActive ? 'fas fa-download' : 'fas fa-arrow-right-arrow-left'}
       aria-hidden="true"
     ></i>
     {#if dropActive}

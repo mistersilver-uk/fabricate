@@ -321,6 +321,13 @@ Foundry ships Font Awesome Pro under Foundry Gaming LLC's own commercial licence
 So the catalogue Fabricate offers from is the INTERSECTION of the glyphs Foundry's bundle can draw with the names Font Awesome's free release publishes, and the committed file records which free release it was narrowed against, so the guard that enforces the intersection can name the release it is checking.
 Measured against Foundry's own bundle: 3768 of its classic glyphs are drawable at all, and 1420 of those also carry a free name and make up the catalogue.
 
+THE SECOND GATE BINDS FABRICATE'S OWN SOURCE AND NOT ONLY THE CATALOGUE.
+A component that hardcodes a Pro-only class is the same reference in code as a catalogue entry naming one, and it is the harder of the two to see, because Foundry's Pro bundle draws it perfectly on every machine the project can test — no rendering check, screenshot or smoke run can find it, and none did.
+Every Font Awesome class token in shipped source therefore resolves against the same pinned free release the catalogue was narrowed against, and a name that release does not publish fails the build.
+The rule covers the family and style token as well as the name, because a free name worn at a Pro weight is still a Pro reference, and it REFUSES a name assembled from fragments at runtime rather than passing silently over one it cannot read — a guard that skipped what it could not resolve would report the tree as protected while having read less of it than it claims.
+Its oracle is Font Awesome's own free release and never the stylesheet a Foundry install serves: that bundle is the Pro build, so a guard reading it would resolve every Pro name, certify it, and give the violation a green tick.
+Naming a Pro glyph in prose WITHOUT its class prefix is outside the rule by construction, so documentation can still say which glyph was declined and why.
+
 The catalogue is a committed artifact because CI has no Foundry install to read, and a checked-in generator regenerates it from a given install so the derivation is reproducible rather than archaeological.
 Both halves of the intersection move it, and separately: a Foundry upgrade means rerunning the generator against the new bundle, because names are added between releases and Font Awesome does retire and re-alias names between majors; a Font Awesome Free upgrade means rerunning it too, because Font Awesome promotes icons out of Pro and into the free release, and each promotion is a glyph Fabricate may now offer and does not until the generator runs again.
 
