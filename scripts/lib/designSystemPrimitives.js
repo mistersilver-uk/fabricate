@@ -21,6 +21,10 @@
  * `tests/design-system-coverage.test.js` resolves every one of these against `spec.md`'s own
  * `### Requirement:` headings.
  *
+ * The notation is scoped to the `design-system` capability — that is the only spec it resolves
+ * against — so do not write it with another capability's prefix. That guard reds on one rather
+ * than answering it from the wrong document; cite another capability by some other form.
+ *
  * WHY THIS IS A MODULE IN `scripts/lib/` AND NOT A LIST IN `tests/`
  * -----------------------------------------------------------------
  * The dependency direction is fixed: tests already import from `scripts/lib/`, and nothing in

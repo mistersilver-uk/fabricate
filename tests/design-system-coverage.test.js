@@ -447,8 +447,27 @@ test('every component the library cites by filename still exists', () => {
  * that says something else — including the one sentence that carries the whole distinction between
  * a BOUND requirement and a loose citation. A line number cannot be resolved by anything, so nothing
  * reported it; a heading can be, and the property below does.
+ *
+ * THE NOTATION IS CAPABILITY-SCOPED: it resolves against `design-system` and nothing else, because
+ * `SPEC_REQUIREMENTS` below reads that one file. Any other capability's `spec.md` may be cited in
+ * these artifacts — `library.html` names `ui-integration/spec.md` nine times, seven of them still by
+ * line — but not in THIS notation, which the property below would resolve against the wrong
+ * document in both directions: a heading absent from `design-system` reported as dangling when it
+ * is present where the citation actually points, and a heading present in `design-system` accepted
+ * for a capability whose spec has never carried it.
+ *
+ * That is why the capability is CAPTURED rather than excluded. A negative lookbehind on `/` would
+ * decline a foreign citation by not matching it, which closes the misresolution and reopens the
+ * silence one layer down: an unmatched citation is an unchecked citation, and this file exists
+ * because unreachable configuration looks exactly like working configuration. Capturing the prefix
+ * costs one group, needs no prefix-to-path registry — this change has already priced what a
+ * hand-maintained registry costs — and turns the foreign case into a named failure. Group 1 is the
+ * capability, absent when the citation is bare; group 2 is the heading.
  */
-const REQUIREMENT_CITATION = /spec\.md requirement "([^"]+)"/g;
+const REQUIREMENT_CITATION = /(?:([A-Za-z0-9._-]+)\/)?spec\.md requirement "([^"]+)"/g;
+
+/** The one capability the notation resolves against, and the implicit prefix of a bare citation. */
+const CITED_CAPABILITY = 'design-system';
 
 /**
  * Collapse a JSDoc line break — newline, optional `*` gutter, indentation — into a single space.
@@ -465,9 +484,10 @@ const unwrapped = (prose) => prose.replaceAll(/\n\s*\*?\s*/g, ' ');
 
 /** `### Requirement:` headings, which is what a citation has to land on. */
 const SPEC_REQUIREMENTS = [
-  ...readFileSync(path.join(REPO_ROOT, 'openspec/specs/design-system/spec.md'), 'utf8').matchAll(
-    /^### Requirement: (.+)$/gm
-  ),
+  ...readFileSync(
+    path.join(REPO_ROOT, `openspec/specs/${CITED_CAPABILITY}/spec.md`),
+    'utf8'
+  ).matchAll(/^### Requirement: (.+)$/gm),
 ].map((match) => match[1]);
 
 /**
@@ -487,7 +507,7 @@ const CITING_PROSE = [
   ['scripts/lib/designSystemPrimitives.json', MANIFEST_ROWS.map((row) => row.why).join('\n')],
 ];
 
-test('every spec.md citation names a requirement that still exists', () => {
+test('every spec.md citation names a design-system requirement that still exists', () => {
   const requirements = new Set(SPEC_REQUIREMENTS);
   assert.ok(
     requirements.size > 20,
@@ -495,7 +515,25 @@ test('every spec.md citation names a requirement that still exists', () => {
       'citation below would be reported as dangling'
   );
   for (const [label, prose] of CITING_PROSE) {
-    const cited = [...unwrapped(prose).matchAll(REQUIREMENT_CITATION)].map((match) => match[1]);
+    const citations = [...unwrapped(prose).matchAll(REQUIREMENT_CITATION)].map((match) => ({
+      capability: match[1] ?? CITED_CAPABILITY,
+      heading: match[2],
+    }));
+    // Before anything is resolved: every citation has to be ABOUT the capability this property can
+    // resolve. A foreign one is not a dangling heading and must not be reported as one — it is a
+    // citation written in a notation that cannot check it, which is the silence this file closes.
+    for (const { capability, heading } of citations) {
+      assert.equal(
+        capability,
+        CITED_CAPABILITY,
+        `${label} writes a requirement citation prefixed \`${capability}/\`, naming ` +
+          `${JSON.stringify(heading)}. This notation is capability-scoped: it resolves only ` +
+          `against \`openspec/specs/${CITED_CAPABILITY}/spec.md\`, so a citation carrying any ` +
+          `other prefix would be answered by the wrong document. Cite ${capability} by some ` +
+          'other form, or move the requirement.'
+      );
+    }
+    const cited = citations.map((citation) => citation.heading);
     assert.ok(
       cited.length > 0,
       `${label} cites no spec.md requirement in the notation this property reads. Either the ` +
@@ -506,8 +544,8 @@ test('every spec.md citation names a requirement that still exists', () => {
       assert.ok(
         requirements.has(heading),
         `${label} cites ${JSON.stringify(heading)}, which is no "### Requirement:" heading in ` +
-          'spec.md. A reader following the citation finds nothing, which is the defect this ' +
-          'change was opened to close.'
+          `\`openspec/specs/${CITED_CAPABILITY}/spec.md\`. A reader following the citation finds ` +
+          'nothing, which is the defect this change was opened to close.'
       );
     }
   }
