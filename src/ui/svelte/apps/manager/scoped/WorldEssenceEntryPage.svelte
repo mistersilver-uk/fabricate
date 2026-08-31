@@ -599,21 +599,36 @@
   .manager-scoped-entry-system-list {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
     margin: 0;
     padding: 0;
     list-style: none;
     min-width: 0;
   }
 
+  /*
+     NAME AND ACTIONS ON ONE LINE.
+
+     This stacked them, so each system cost roughly 68px and six systems pushed the preview and
+     everything below it off the screen. The membership row is a label and its controls, which is
+     the shape the shell's own membership rows use, and there is nothing in it that needs two
+     lines at this width. Wrapping is still allowed so a long system name breaks rather than
+     forcing the controls out of the panel.
+  */
   .manager-scoped-entry-system {
     display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-2);
     min-width: 0;
+    padding: var(--fab-space-chip) 0;
+  }
+
+  .manager-scoped-entry-system + .manager-scoped-entry-system {
+    border-top: 1px solid var(--fab-mv2-border);
   }
 
   .manager-scoped-entry-system-name {
+    flex: 1 1 auto;
     color: var(--fab-mv2-text);
     font-size: 0.78rem;
     font-weight: 600;

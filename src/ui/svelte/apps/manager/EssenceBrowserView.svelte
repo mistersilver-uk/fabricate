@@ -48,6 +48,7 @@
   } from '../../../../utils/essenceBulkEditModel.js';
   import { ESSENCE_STATUS_SEGMENTS, ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceSystemState, essenceValueSuffix } from './scoped/essenceScoped.js';
+  import { scopedSectionLabel } from './scoped/scopedStudio.js';
 
   let {
     // ── THE WORLD-SCOPE SEAM (issue 1374), READ HERE FROM ISSUE 1372 ────────────────────────
@@ -192,7 +193,12 @@
   }
 
   /**
-   * The `· world default` / `· overridden here` suffix run for one row.
+   * Where each world-default section's value came from, for one row.
+   *
+   * EACH ENTRY CARRIES ITS SECTION'S NAME. Without it the run rendered the state alone, once per
+   * section — so a row whose two sections were both overridden read `· overridden here·
+   * overridden here`: the same four words twice, with nothing saying which section either
+   * belonged to and no separator between them.
    *
    * IT IS ON THE ROW AND NOT IN THE INSPECTOR, and that is a recorded limit rather than a
    * placement preference. The browser inspector is rendered by `CraftingSystemManagerRoot.svelte`
@@ -208,10 +214,18 @@
     if (!membershipAvailable || !memberIds.has(essence?.id)) return [];
     const inherited = systemRows.get(essence?.id)?.inherited ?? null;
     if (!inherited) return [];
-    return (scope?.sections ?? []).map((section) => ({
-      section,
-      label: essenceValueSuffix(inherited[section] !== false, text),
-    }));
+    // ONLY THE SECTIONS THIS SYSTEM OVERRIDES. Inheriting is the default and the common case, so
+    // stating it on every row spent the row's width saying nothing changed — and on a row that
+    // also carries two capability chips, two counts, a switch, an edit button and a checkbox, it
+    // was the run that pushed the controls to the edge. An absent entry means inherited, which is
+    // what the editor's own state chip and note say in full.
+    return (scope?.sections ?? [])
+      .filter((section) => inherited[section] === false)
+      .map((section) => ({
+        section,
+        sectionLabel: scopedSectionLabel(section, text),
+        label: essenceValueSuffix(false, text),
+      }));
   }
 
   // The SEARCH is applied here rather than in the pure model, which says so in its own

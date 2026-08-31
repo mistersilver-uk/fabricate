@@ -192,7 +192,10 @@
   {#if inheritSuffixes.length > 0}
     <span class="manager-essence-inherit-readout" data-essence-inherit-readout={essence.id}>
       {#each inheritSuffixes as suffix (suffix.section)}
-        <span data-essence-inherit={suffix.section}>{`· ${suffix.label}`}</span>
+        <span class="manager-essence-inherit-item" data-essence-inherit={suffix.section}>
+          <span class="manager-essence-inherit-section">{suffix.sectionLabel}</span>
+          <span class="manager-essence-inherit-state">{suffix.label}</span>
+        </span>
       {/each}
     </span>
   {/if}
@@ -491,5 +494,28 @@
       flex: 1 1 100%;
       justify-content: flex-end;
     }
+  }
+  /* Each entry names its section, so two sections in the same state are still two readable
+     facts rather than the same words twice. */
+  .manager-essence-inherit-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--fab-space-1);
+  }
+
+  .manager-essence-inherit-item + .manager-essence-inherit-item::before {
+    content: '·';
+    margin-right: var(--fab-space-1);
+    margin-left: var(--fab-space-1);
+    color: var(--fab-mv2-text-subtle);
+  }
+
+  .manager-essence-inherit-section {
+    color: var(--fab-mv2-text-secondary);
+    font-weight: 600;
+  }
+
+  .manager-essence-inherit-state {
+    color: var(--fab-mv2-text-muted);
   }
 </style>

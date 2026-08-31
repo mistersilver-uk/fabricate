@@ -80,16 +80,27 @@
       data-scoped-inherit-toggle={row.section}
       aria-pressed={row.inherited}
       {disabled}
+      aria-label={text(
+        'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
+        'Fall back to the world default'
+      )}
+      title={text(
+        'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
+        'Fall back to the world default'
+      )}
       onclick={() => onToggle(row.section, !row.inherited)}
     >
+      <!--
+        THE SENTENCE IS THE ACCESSIBLE NAME, NOT VISIBLE TEXT.
+
+        `.manager-status-toggle-label` is `overflow: hidden` with `text-overflow: ellipsis`
+        inside a compact switch, so "Fall back to the world default" rendered as `Fall ...` —
+        a truncation with no meaning at all. It was also redundant three times over: this row
+        already shows the section name, a state chip reading Inherited or Overridden, and a note
+        naming the inherited value. The switch needs a name, not a caption.
+      -->
       <span class="manager-status-toggle-track" aria-hidden="true"
         ><span class="manager-status-toggle-knob"></span></span
-      >
-      <span class="manager-status-toggle-label"
-        >{text(
-          'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
-          'Fall back to the world default'
-        )}</span
       >
     </button>
   </div>
