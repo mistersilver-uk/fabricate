@@ -807,6 +807,68 @@
     flex: 0 0 auto;
   }
 
+  /*
+     THE IDENTITY CELL IS LEFT-ALIGNED, AND IT TAKES A RULE TO SAY SO.
+
+     It is a real `<button>`, and Foundry core's own button rule centres a button's flex content.
+     The global reset beside this one resets height, padding, border and background but never
+     `justify-content`, so a row whose meta run is wide enough to shrink the identity button below
+     its 260px basis centred the medallion and the name inside whatever width was left: measured
+     in the View Lab on the world essence catalogue, four of the five rows had their medallion
+     floating 70-130px in from the left edge while the first row, whose description was long
+     enough to fill the cell, sat flush. It reads as ragged data rather than as a layout fault,
+     which is why it survived three frames.
+
+     Declared HERE rather than in `styles/fabricate.css` — closed to this lane by
+     `### GM World Scoped Entity Routes` requirement 7 — and it wins anyway: Svelte compiles a
+     scoped selector to two classes, which ties the global `.fabricate-manager
+     .manager-scoped-list-identity` and wins on source order, and core's rule is inside a
+     cascade layer that any unlayered declaration beats outright.
+  */
+  .manager-scoped-list-identity {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  /*
+     THE ROW NAME IS THE PROTOTYPE'S 13.5px SERIF, matching the shipped precedent at
+     `.manager-component-row .manager-system-name`, which records the same figure and the same
+     reason: the shared `.manager-system-name` declares no base size, so a catalogue row's name
+     bleeds to the inherited 14px.
+
+     The WEIGHT is left at the shared 700 rather than taken to the prototype's 600. That single
+     step is inside the standing E-3 escalation about the prototype's card-name weight, and
+     re-typing it here alone would make the essence row's name a different weight from the
+     component row's directly above it in the same rail.
+  */
+  .manager-scoped-list-row .manager-system-name {
+    font-family: var(--fab-font-serif);
+    font-size: 0.76rem;
+  }
+
+  /*
+     THE FILTER ROW IS ONE LINE, AND IT TAKES A RULE TO SAY SO.
+
+     Foundry core sizes every `<select>` to `width: 100%`, and neither the global toolbar block
+     nor this one overrode it — so each of the three toolbar selects claimed the whole filter row
+     and wrapped onto a line of its own. Measured in the View Lab on the world essence catalogue:
+     a search field, a membership select and a sort select stacked as three full-width bars, about
+     100px of chrome above the first row, where the prototype puts all of them side by side on one
+     line (`proto:3159`).
+
+     `width: auto` sizes each to its longest option and `flex: 0 1 auto` lets a narrow column
+     shrink them before it shrinks the search field, which carries its own `flex: 1 1 260px`.
+
+     Scoped rather than global for the reason the block above gives, and it wins for the same two:
+     Svelte compiles this to two classes plus the element, which outranks the global
+     `.fabricate-manager .manager-scoped-list-toolbar select`, and core's rule is layered.
+  */
+  .manager-scoped-list-toolbar select {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
   .manager-scoped-list-rows {
     flex: 1 1 auto;
     min-width: 0;

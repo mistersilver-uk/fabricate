@@ -115,6 +115,36 @@
     })
   );
 
+  /**
+   * One usage sentence split into the NUMBER and the unit that names it.
+   *
+   * The prototype's row draws each count as a right-aligned figure over a tracked micro-label
+   * (`proto:1571`), not as a grey sentence - that is what makes two numbers read as a column
+   * down the list instead of as body copy jammed against the switch.
+   *
+   * IT SPLITS THE ALREADY-FORMATTED SENTENCE rather than composing from a second lang key, so
+   * the LIST and the GRID card cannot drift: both are the same string, and the row's rendered
+   * `textContent` stays byte-identical to the card's - which is exactly what
+   * `essence-browser-view-mounted.test.js` compares when it asserts the view toggle is a
+   * PRESENTATION toggle that removes no state.
+   *
+   * A translation that does not lead with the count degrades to the whole sentence as the value
+   * and no label - the shipped rendering - rather than to a mis-split.
+   *
+   * @param {string} sentence the localized count sentence.
+   * @param {number} count the count it was formatted from.
+   * @returns {{value: string, unit: string}}
+   */
+  function statParts(sentence, count) {
+    const value = String(count);
+    const lead = `${value} `;
+    if (!sentence.startsWith(lead)) return { value: sentence, unit: '' };
+    return { value, unit: sentence.slice(lead.length) };
+  }
+
+  const componentStat = $derived(statParts(componentUsage, essence?.componentUsageCount || 0));
+  const recipeStat = $derived(statParts(recipeUsage, essence?.recipeUsageCount || 0));
+
   // The GRID card's recessed well. BOTH counts read the same (maintainer round): they are two
   // readings of the same kind — how much of the library uses this essence — and emphasising
   // the first implied a precedence between them that does not exist. The prototype's leading
@@ -234,10 +264,17 @@
      confirm dialog and the bulk panel rather than as a padlock here. -->
 {#snippet usageReadout()}
   <span class="manager-essence-usage-readout" data-essence-usage>
-    <span class="manager-essence-usage-components" data-essence-usage-components
-      >{componentUsage}</span
+    <span
+      class="manager-essence-usage-components manager-essence-usage-stat"
+      data-essence-usage-components
     >
-    <span data-essence-usage-recipes>{recipeUsage}</span>
+      <span class="manager-essence-usage-value">{componentStat.value}</span>
+      <span class="manager-essence-usage-label">{componentStat.unit}</span>
+    </span>
+    <span class="manager-essence-usage-stat" data-essence-usage-recipes>
+      <span class="manager-essence-usage-value">{recipeStat.value}</span>
+      <span class="manager-essence-usage-label">{recipeStat.unit}</span>
+    </span>
   </span>
 {/snippet}
 
@@ -358,18 +395,34 @@
       {@render medallionTile()}
       <span class="manager-system-copy">
         {@render nameRow()}
-        <span
-          class="manager-system-description manager-essence-description"
-          title={essence.description}
-        >
-          {description}
-        </span>
+        <!--
+          THE SUMMARY LINE, WHICH IS THE INHERIT READOUT WHENEVER THERE IS ONE.
+
+          The prototype's row writes `member ? essSummary(essence, system) : description`
+          (`proto:5001`): a system that HAS rules for the essence is described by what those
+          rules resolve to, and only a system that does not falls back to the world description.
+
+          It also repairs a measured overflow. The readout shipped in the TRAILING CLUSTER,
+          which is `flex: 0 0 auto` and cannot shrink, and at two sections it is roughly 390px
+          of text - so on a 1280px window the first row's bulk checkbox was cropped by the
+          list's own edge while every shorter row below it fitted. Moving it into the identity
+          block, which does shrink, is both the prototype's layout and the repair.
+        -->
+        {#if inheritSuffixes.length > 0}
+          {@render inheritReadout()}
+        {:else}
+          <span
+            class="manager-system-description manager-essence-description"
+            title={essence.description}
+          >
+            {description}
+          </span>
+        {/if}
       </span>
     </button>
 
     <div class="manager-essence-cluster">
       {@render capabilityPills()}
-      {@render inheritReadout()}
       {#if absent}
         {@render addToSystemButton()}
       {:else}
@@ -456,14 +509,39 @@
     min-width: 0;
   }
 
+  /* TWO STAT CELLS SIDE BY SIDE, at the prototype's right-aligned figure-over-label rhythm
+     (`proto:1571`). A fixed `min-width` is what turns two per-row numbers into two columns down
+     the list; `tabular-nums` holds the digits on one advance so the same holds within a cell. */
   .manager-essence-usage-readout {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-3);
+    white-space: nowrap;
+  }
+
+  .manager-essence-usage-stat {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    color: var(--fab-text-muted);
-    font-size: 0.7rem;
-    line-height: 1.3;
-    white-space: nowrap;
+    gap: 1px;
+    min-width: 2.6rem;
+    text-align: right;
+  }
+
+  .manager-essence-usage-value {
+    color: var(--fab-text-secondary);
+    font-family: var(--fab-font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .manager-essence-usage-label {
+    color: var(--fab-text-subtle);
+    font-size: 0.46rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
   }
 
   /* A disabled essence is DIMMED as well as pilled — the pill is what carries the state,
@@ -507,15 +585,33 @@
     content: '·';
     margin-right: var(--fab-space-1);
     margin-left: var(--fab-space-1);
-    color: var(--fab-mv2-text-subtle);
+    color: var(--fab-text-subtle);
   }
 
+  /* `--fab-text-*`, NOT `--fab-mv2-text-subtle` / `--fab-mv2-text-secondary`. The manager alias
+     block declares only bg / surface-1..3 / border / border-strong / text / text-muted / accent
+     / info / warning / danger, so both of those names were UNDEFINED: each declaration was
+     invalid at computed-value time and the colour fell back to inheritance, which is why the
+     section name and the separator rendered in the row's body colour rather than at the two
+     weights this readout is built on. Nothing failed and no test caught it. */
   .manager-essence-inherit-section {
-    color: var(--fab-mv2-text-secondary);
+    color: var(--fab-text-secondary);
     font-weight: 600;
   }
 
   .manager-essence-inherit-state {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
+  }
+
+  /* The readout is the row's SUB-LINE now, so it takes the description's size and clamps to one
+     line rather than growing the row when both sections are overridden. */
+  .manager-essence-inherit-readout {
+    display: block;
+    overflow: hidden;
+    color: var(--fab-text-muted);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

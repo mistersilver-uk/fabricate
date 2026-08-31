@@ -1056,7 +1056,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     // unseeded world corpus looks like — and a frame of an empty catalogue is not evidence of a
     // catalogue.
     expectContained: [
-      { container: '[data-scoped-list]', target: '[data-scoped-essence-glyph]' },
+      {
+        container: '[data-scoped-list]',
+        target: '[data-scoped-list-row] [data-medallion="glyph"]',
+      },
       { container: '[data-scoped-list]', target: '[data-scoped-system-state]' },
     ],
     position: { width: 1280, height: 900 },

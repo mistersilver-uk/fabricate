@@ -695,6 +695,28 @@
      is why it floated centred with its `Clear` action stranded mid-row. A row class a shared
      primitive wears has to be authored where that primitive can see it. */
 
+  /*
+     THE MEMBERSHIP SELECT SIZES TO ITS CONTENT.
+
+     Its sibling `.manager-essence-source-filter` carries `flex: 0 0 auto; max-width: 180px` in
+     the shared filter-bar block, and this control was never joined to it - so Foundry core's
+     `select { width: 100% }` stood and the dropdown claimed the whole secondary filter row,
+     pushing the source filter and the result count down onto a row of their own. Measured in
+     the View Lab at 1280px: five toolbar rows above the first essence, where the prototype's
+     toolbar is three (`proto:1537`), which cost two list rows on a 900px window.
+
+     Scoped rather than joined to the shared block because `styles/fabricate.css` is closed to
+     this lane, and it wins anyway: core's rule is inside a cascade layer that any unlayered
+     declaration beats, and no global rule claims this class.
+  */
+  .manager-essence-membership-filter {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 220px;
+    text-overflow: ellipsis;
+  }
+
   .manager-essence-count {
     margin-left: auto;
     color: var(--fab-text-muted);

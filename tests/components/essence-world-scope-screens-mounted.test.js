@@ -165,7 +165,12 @@ describe('criterion 4 — the essence catalogue renders NO source-item affordanc
 
     // THE POSITIVE HALF FIRST, so the two negatives below are known to be measured over a screen
     // that actually rendered rows.
-    const glyphs = root.querySelectorAll('[data-scoped-essence-glyph]');
+    // MEASURED ON THE MEDALLION THE ROW ACTUALLY RENDERS, not on a second hook beside it. The
+    // catalogue used to draw its own tinted glyph in the meta run purely to carry this assertion,
+    // which put two identity glyphs on every row where the prototype has one. `Medallion`
+    // publishes `data-medallion="glyph"` exactly when it fell back from an image, so this is the
+    // same claim measured one element closer to the GM.
+    const glyphs = root.querySelectorAll('[data-scoped-list-row] [data-medallion="glyph"]');
     assert.equal(glyphs.length, 2, 'both world essences render their own identity glyph');
     assert.ok(glyphs[0].querySelector('i'), 'and the glyph is a Font Awesome class, not a path');
 

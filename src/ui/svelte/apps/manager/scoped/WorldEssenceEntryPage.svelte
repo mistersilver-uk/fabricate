@@ -9,19 +9,25 @@
   and takes none, so this screen draws no control for it. A switch over a field the resolver does
   not read through writes a key `normalizeMembership` discards on the next `load()`.
 
-  ── THE `effectSource` PICKER IS THE ENFORCEMENT POINT, AND NOTHING BELOW IT IS ───────────────
+  ── THE PICKER IS THE ENFORCEMENT POINT, AND IT IS A DROP TARGET ──────────────────────────────
   `updateWorldDefaultSection` writes the section value OPAQUELY by design and the normalizer
   coerces SHAPE rather than addressability, so neither can refuse a system-local component id.
   `### Essence scope` requirement 5 binds a world default's `effectSource` to a WORLD-ADDRESSABLE
-  referent, and the only place that can be met is where the value is chosen. This screen refuses a
-  non-addressable value at the control, states why, and writes nothing.
+  referent, and the only place that can be met is where the value is CHOSEN.
+
+  This shipped as a free-text `Item.abc123` box, which cannot meet that obligation: a GM types
+  whatever they like and the screen's only defence is a predicate run after the fact. The control
+  is the shared `ItemDropZone` now, so a value can only ever arrive from a real Foundry document
+  drag — which carries a `uuid` (world sidebar) or a `{pack, id}` pair (compendium), both of which
+  ARE world-addressable by construction. `acceptable()` still runs on the resolved uuid and still
+  refuses in words, because a refusal a GM can read is what turns the rule into a control rather
+  than a value that silently vanished.
 
   A KNOWN LIMIT, RECORDED RATHER THAN WORKED AROUND: `essenceScopeProps` carries the ESSENCE
   corpus alone, so this screen cannot ENUMERATE the world component catalogue and therefore cannot
-  offer its ids as options. What it offers is what it can address without that corpus — a document
-  UUID — and it validates anything entered through the same predicate the offer filter uses. The
-  rule is one function (`worldAddressableEffectSources`), unit-tested against a world component
-  roster, so the addressability decision is exercised even where this screen cannot enumerate one.
+  offer its ids as options. What it accepts is what it can address without that corpus — a dragged
+  document — and it validates through the same predicate the offer filter uses. The rule is one
+  function (`worldAddressableEffectSources`), unit-tested against a world component roster.
 
   ── TWO TABS, THROUGH THE SHARED `EditorTabs` ────────────────────────────────────────────────
   Definition and Validation. `EssenceEditorTabs` is the pre-promotion hand-rolled strip and is NOT
@@ -46,21 +52,26 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import EditorTabs from '../EditorTabs.svelte';
   import EmptyState from '../EmptyState.svelte';
   import EssenceBehaviorPreview from '../essences/EssenceBehaviorPreview.svelte';
+  import ItemDropZone from '../ItemDropZone.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import StatusPill from '../../../components/StatusPill.svelte';
   import { essenceValidationPresentation } from '../essences/essenceStudio.js';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
+  import { resolveDropUuid } from '../../../util/dropUtils.js';
   import MembershipActions from './MembershipActions.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
   import {
     essenceInheritLine,
     essenceSectionValueName,
+    essenceSystemState,
     isWorldAddressableEffectSource,
     isDocumentUuid,
   } from './essenceScoped.js';
@@ -73,6 +84,43 @@
   const PAGE_ICON = 'fas fa-vial';
   const TITLE_KEY = 'FABRICATE.Admin.Manager.Scoped.EssenceEntryTitle';
   const TITLE_FALLBACK = 'Essence entry';
+
+  /**
+   * PER-SECTION PRESENTATION, in ONE table rather than a chain of `section === 'macro'` tests.
+   *
+   * The prototype draws the two world defaults as two cards that differ in five ways at once —
+   * glyph, accepted document type, explanatory sentence, empty prompt and the "set" pill word —
+   * and a screen that answered those five with five separate ternaries would have five places to
+   * keep in step when a third section appears.
+   *
+   * The SECTION LABEL is deliberately NOT in here: it comes from `scopedSectionLabel`, the one
+   * list every scoped screen reads, so this screen structurally cannot name a section differently
+   * from the five sites that already render it.
+   */
+  const SECTION_UI = Object.freeze({
+    effectSource: Object.freeze({
+      glyph: 'fas fa-wand-sparkles',
+      documentType: 'Item',
+      blurbKey: 'FABRICATE.Admin.Manager.Scoped.Essence.EffectSourceBlurb',
+      blurb:
+        'The world default. Systems inherit it unless their own essence rules override it, and its active effects are copied onto anything crafted with this essence.',
+      promptKey: 'FABRICATE.Admin.Manager.Scoped.Essence.EffectSourcePrompt',
+      prompt: 'Drop the item whose active effects transfer by default',
+      setKey: 'FABRICATE.Admin.Manager.Scoped.Essence.EffectSourceSet',
+      set: 'Default transfer',
+    }),
+    macro: Object.freeze({
+      glyph: 'fas fa-code',
+      documentType: 'Macro',
+      blurbKey: 'FABRICATE.Admin.Manager.Scoped.Essence.MacroBlurb',
+      blurb:
+        'The world default macro. It runs against the crafted item data in every system that inherits it, before the item reaches the character.',
+      promptKey: 'FABRICATE.Admin.Manager.Scoped.Essence.MacroPrompt',
+      prompt: 'Drop the macro that runs by default',
+      setKey: 'FABRICATE.Admin.Manager.Scoped.Essence.MacroSet',
+      set: 'Default macro',
+    }),
+  });
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -90,8 +138,6 @@
   let activeTab = $state('definition');
   let armedToken = $state('');
   /** @type {{[section: string]: string}} */
-  let sectionDraft = $state({});
-  /** @type {{[section: string]: string}} */
   let sectionRefusal = $state({});
 
   const title = $derived(text(TITLE_KEY, TITLE_FALLBACK));
@@ -102,10 +148,12 @@
   const normalizedIcon = $derived(normalizeEssenceIcon(entity?.icon || DEFAULT_ESSENCE_ICON));
   const defaults = $derived(entry?.defaults ?? null);
   const sections = $derived(Array.isArray(scope?.sections) ? scope.sections : []);
+  const systemRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
+  const memberCount = $derived(Number(entry?.membershipCount) || 0);
 
   const validationContext = $derived({
     scope: 'world',
-    memberSystemCount: Number(entry?.membershipCount) || 0,
+    memberSystemCount: memberCount,
     worldEffectSource: defaults?.effectSource ?? null,
     worldMacro: defaults?.macro ?? null,
     worldEffectSourceName: essenceSectionValueName(defaults?.effectSource),
@@ -147,6 +195,32 @@
   const badges = $derived({ validation: validationBadge(counts) });
   const summaryStatus = $derived(worstStatus(counts));
 
+  const systemsCountText = $derived(
+    format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.SystemsCount',
+      '{count} of {total} systems have rules',
+      { count: memberCount, total: systemRows.length }
+    )
+  );
+
+  // THE CONSEQUENCE OF A DELETE, STATED BEFORE IT IS ARMED. The prototype's danger card says how
+  // many systems lose their rules, because that is the whole reach of the action and a GM cannot
+  // recover it afterwards. `membershipCount` is the projection's own member total, so this
+  // sentence and the inherit lines above it cannot disagree.
+  const deleteNote = $derived(
+    memberCount === 0
+      ? text(
+          'FABRICATE.Admin.Manager.Scoped.Essence.DeleteNoteUnused',
+          'No system has rules for it, so nothing else is affected.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Scoped.Essence.DeleteNote',
+          'Removes the definition and its rules in {count} systems. Component rules that carry a value for it lose that value.',
+          { count: memberCount }
+        )
+  );
+  const deleteToken = $derived(`world-essence-delete:${entityId}`);
+
   /**
    * The Validation tab's badge. An early-return chain rather than a nested ternary, which
    * SonarCloud reports as S3358.
@@ -181,6 +255,91 @@
   }
 
   /**
+   * The raw stored referent for one section, for the card's uuid sub-line.
+   *
+   * A section value is opaque by design and may be a bare string or `{id, name}`, so the display
+   * NAME and the ADDRESS are two different reads. Printing only the name would hide which
+   * document a default actually points at, which is the one fact a GM needs to check a link.
+   *
+   * @param {string} section
+   * @returns {string}
+   */
+  function sectionValueAddress(section) {
+    const value = defaults?.[section];
+    if (value && typeof value === 'object') return typeof value.id === 'string' ? value.id : '';
+    return typeof value === 'string' ? value : '';
+  }
+
+  /**
+   * The card's uuid SUB-LINE, or `''` when it would only restate the name above it.
+   *
+   * A section value is stored opaquely, so a bare uuid resolves to itself as its display name -
+   * and the card then printed `Macro.lab-aether-binding` twice, once in the serif title and once
+   * in the mono sub-line. The sub-line exists to say WHICH document a named default points at,
+   * so where there is no separate name there is nothing for it to add.
+   *
+   * @param {string} section
+   * @param {string} name the resolved display name, `''` when unset.
+   * @returns {string}
+   */
+  function sectionAddressLine(section, name) {
+    if (!name) return '';
+    const address = sectionValueAddress(section);
+    return address === name ? '' : address;
+  }
+
+  function sectionUi(section) {
+    return SECTION_UI[section] ?? null;
+  }
+
+  /**
+   * ONE SYSTEM ROW'S SUMMARY: what this essence resolves to in that system, in one line.
+   *
+   * The prototype's per-system row carries a summary beside the name, and without one the list
+   * is a stack of names with a switch — which says a system HAS the essence and nothing about
+   * what it does there. `row.inherited` is the resolver's own per-section map, so this sentence
+   * is read from the answer the resolver gives rather than recomputed beside it.
+   *
+   * @param {{member?: boolean, inherited?: object}} row
+   * @returns {string}
+   */
+  function systemSummary(row) {
+    if (row?.member !== true) {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.SystemNoRules',
+        'No rules here — it is not in this system.'
+      );
+    }
+    const overridden = sections.filter((section) => row?.inherited?.[section] === false);
+    if (overridden.length === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.SystemInheritsAll',
+        'Inherits every world default.'
+      );
+    }
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.SystemOverrides',
+      'Overrides {sections} locally.',
+      { sections: overridden.map((section) => scopedSectionLabel(section, text)).join(', ') }
+    );
+  }
+
+  /**
+   * The row's meta word: the authored state, not a second copy of the switch.
+   *
+   * @param {object} row
+   * @returns {string}
+   */
+  function systemMeta(row) {
+    const state = essenceSystemState(row);
+    if (state === 'enabled')
+      return text('FABRICATE.Admin.Manager.Scoped.Essence.StateEnabled', 'Enabled here');
+    if (state === 'disabled')
+      return text('FABRICATE.Admin.Manager.Scoped.Essence.StateDisabled', 'Disabled here');
+    return text('FABRICATE.Admin.Manager.Scoped.Essence.StateAbsent', 'Not in this system');
+  }
+
+  /**
    * Whether a candidate value may be written as this section's world default.
    *
    * `effectSource` goes through the addressability predicate; `macro` requires a document UUID
@@ -196,8 +355,20 @@
     return isDocumentUuid(value);
   }
 
-  async function applySection(section) {
-    const value = String(sectionDraft[section] ?? '').trim();
+  /**
+   * A dropped document becomes this section's world default.
+   *
+   * `ItemDropZone` has already refused a payload of the wrong DOCUMENT TYPE and one that names no
+   * document at all, so what reaches here is a real reference. It still passes the addressability
+   * predicate, because that predicate — not the drop — is what `### Essence scope` requirement 5
+   * binds, and a refusal a GM can read is what makes it a control rather than a value that
+   * disappeared.
+   *
+   * @param {string} section
+   * @param {object} data the raw drag payload.
+   */
+  async function dropSection(section, data) {
+    const value = resolveDropUuid(data);
     if (!acceptable(section, value)) {
       sectionRefusal = {
         ...sectionRefusal,
@@ -210,7 +381,6 @@
     }
     sectionRefusal = { ...sectionRefusal, [section]: '' };
     await actions?.updateWorldDefaultSection?.(entityId, section, value);
-    sectionDraft = { ...sectionDraft, [section]: '' };
   }
 
   async function clearSection(section) {
@@ -220,6 +390,11 @@
 
   async function patchIdentity(field, value) {
     await actions?.updateEntity?.(entityId, { [field]: value });
+  }
+
+  async function deleteEssence() {
+    await actions?.deleteEntity?.(entityId);
+    onBackToCatalogue();
   }
 </script>
 
@@ -272,18 +447,38 @@
         data-keyboard-focus="true"
       >
         {#if activeTab === 'definition'}
+          <!--
+            THE SCOPE BANNER. Everything under it is one record shared by every crafting system,
+            and this screen is reached from a system-scoped rail — so without it a GM has no
+            standing signal that the name they are editing changes in six places at once. The
+            prototype draws it at the top of the tab body for exactly that reason, and it is a
+            heading rather than a `Callout` because it introduces a region rather than warning
+            about one.
+          -->
+          <div class="manager-scoped-entry-kicker is-world" data-scoped-entry-world-banner>
+            <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
+              <i class="fas fa-globe"></i>
+            </span>
+            <h3 class="manager-scoped-entry-kicker-label">
+              {text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.WorldBanner',
+                'World definition · shared by every system'
+              )}
+            </h3>
+            <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
+          </div>
+
+          <!--
+            THE IDENTITY CARD, at the prototype's proportions: a FIXED narrow icon column and one
+            fluid field column beside it.
+
+            This shipped as a wrapping flex row of four equal-basis fields, which put Name on a
+            ~12rem basis beside the tile and left the rest of the row empty — the dead space the
+            maintainer rejected. A two-column grid is what the prototype specifies and is also the
+            only shape that keeps Name, Description and the colour palette on ONE measure, so a
+            long name and a long description align rather than stepping around the tile.
+          -->
           <section class="manager-scoped-entry-identity" data-scoped-entry-identity={entry.id}>
-            <label class="manager-scoped-entry-field">
-              <span class="manager-scoped-entry-label"
-                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldName', 'Name')}</span
-              >
-              <input
-                type="text"
-                value={entity?.name ?? ''}
-                data-scoped-entry-name
-                onchange={(event) => patchIdentity('name', event.currentTarget.value)}
-              />
-            </label>
             <!--
               THE SAME THREE CONTROLS THE SYSTEM-SCOPE IDENTITY TAB USES, and for the reason the
               shells were built on: a GM authors one essence's identity, and it must not be a
@@ -294,9 +489,9 @@
               with no validation and no way to discover either. `getEssenceIconOptions` and
               `ESSENCE_COLOR_TOKENS` were already shipped and already unused.
 
-              `ManagerColorPopover` takes `layout="inline"` here exactly as
-              `EssenceIdentityTab` does: the popover chrome is applied by the global sheet,
-              which this lane may not open, and inline strips it and nothing else.
+              The tile is SQUARE where the prototype's is 150x104, because a square essence tile
+              is the maintainer's own round-3 ruling on `EssenceIdentityTab` (issue 1036) and one
+              essence identity must not read as two different shapes across the two scopes.
             -->
             <div class="manager-scoped-entry-identity-tile">
               <span class="manager-scoped-entry-label"
@@ -305,8 +500,8 @@
               <Medallion
                 icon={normalizedIcon}
                 tint={entity?.colorToken || ''}
-                size={96}
-                glyph={36}
+                size={150}
+                glyph={48}
               />
               <IconPicker
                 value={normalizedIcon}
@@ -314,99 +509,146 @@
                 onChange={(iconClass) => patchIdentity('icon', iconClass)}
               />
             </div>
-            <div class="manager-scoped-entry-field" data-scoped-entry-colour>
-              <span class="manager-scoped-entry-label"
-                >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour')}</span
-              >
-              <ManagerColorPopover
-                layout="inline"
-                allowNone
-                allowCustom={false}
-                manageDismiss={false}
-                colorToken={entity?.colorToken || ''}
-                unset={!entity?.colorToken}
-                customColor=""
-                presetGridLabel={text(
-                  'FABRICATE.Admin.Manager.Essence.Colour.Presets',
-                  'Essence colour presets'
-                )}
-                noneLabel={text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')}
-                onClear={() => patchIdentity('colorToken', '')}
-                onChange={(next) => patchIdentity('colorToken', next?.colorToken || '')}
-              />
+
+            <div class="manager-scoped-entry-identity-fields">
+              <label class="manager-scoped-entry-field">
+                <span class="manager-scoped-entry-label"
+                  >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldName', 'Name')}</span
+                >
+                <input
+                  class="manager-scoped-entry-name"
+                  type="text"
+                  value={entity?.name ?? ''}
+                  data-scoped-entry-name
+                  onchange={(event) => patchIdentity('name', event.currentTarget.value)}
+                />
+              </label>
+
+              <label class="manager-scoped-entry-field">
+                <span class="manager-scoped-entry-label">
+                  {text('FABRICATE.Admin.Manager.Scoped.Essence.FieldDescription', 'Description')}
+                  <span class="manager-scoped-entry-label-aside"
+                    >{text(
+                      'FABRICATE.Admin.Manager.Scoped.Essence.FieldOptional',
+                      '· optional'
+                    )}</span
+                  >
+                </span>
+                <textarea
+                  rows="3"
+                  value={entity?.description ?? ''}
+                  data-scoped-entry-description
+                  placeholder={text(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.DescriptionPlaceholder',
+                    'What this quality means in your world, and where it comes from.'
+                  )}
+                  onchange={(event) => patchIdentity('description', event.currentTarget.value)}
+                ></textarea>
+              </label>
+
+              <div class="manager-scoped-entry-field" data-scoped-entry-colour>
+                <span class="manager-scoped-entry-label"
+                  >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour')}</span
+                >
+                <!--
+                  `ManagerColorPopover` takes `layout="inline"` here exactly as
+                  `EssenceIdentityTab` does: the popover chrome is applied by the global sheet,
+                  which this lane may not open, and inline strips it and nothing else.
+                -->
+                <ManagerColorPopover
+                  layout="inline"
+                  allowNone
+                  allowCustom={false}
+                  manageDismiss={false}
+                  colorToken={entity?.colorToken || ''}
+                  unset={!entity?.colorToken}
+                  customColor=""
+                  presetGridLabel={text(
+                    'FABRICATE.Admin.Manager.Essence.Colour.Presets',
+                    'Essence colour presets'
+                  )}
+                  noneLabel={text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')}
+                  onClear={() => patchIdentity('colorToken', '')}
+                  onChange={(next) => patchIdentity('colorToken', next?.colorToken || '')}
+                />
+              </div>
             </div>
-            <label class="manager-scoped-entry-field is-wide">
-              <span class="manager-scoped-entry-label"
-                >{text(
-                  'FABRICATE.Admin.Manager.Scoped.Essence.FieldDescription',
-                  'Description'
-                )}</span
-              >
-              <textarea
-                rows="2"
-                value={entity?.description ?? ''}
-                data-scoped-entry-description
-                onchange={(event) => patchIdentity('description', event.currentTarget.value)}
-              ></textarea>
-            </label>
           </section>
+
+          <div class="manager-scoped-entry-kicker" data-scoped-entry-defaults-banner>
+            <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
+              <i class="fas fa-globe"></i>
+            </span>
+            <h3 class="manager-scoped-entry-kicker-label">
+              {text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultsBanner', 'Default on craft')}
+            </h3>
+            <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
+          </div>
 
           <!-- THE TWO WORLD DEFAULTS. Each states how many member systems inherit it and how many
                override it locally BEFORE the change lands, because that count is the whole reach of
                the edit and a GM cannot recover it after the fact. -->
           <section class="manager-scoped-entry-defaults">
             {#each sections as section (section)}
+              {@const ui = sectionUi(section)}
               {@const value = sectionValueName(section)}
-              <div
+              {@const label = scopedSectionLabel(section, text)}
+              <article
                 class="manager-scoped-entry-default"
                 data-scoped-world-default={section}
                 data-scoped-world-default-state={value ? 'set' : 'unset'}
               >
-                <h3 class="manager-scoped-entry-default-head">
-                  {scopedSectionLabel(section, text)}
-                </h3>
-                <p
-                  class="manager-scoped-entry-default-value"
+                <header class="manager-scoped-entry-default-head">
+                  <span class="manager-scoped-entry-default-glyph" aria-hidden="true">
+                    <i class={ui?.glyph ?? PAGE_ICON}></i>
+                  </span>
+                  <h4 class="manager-scoped-entry-default-title">{label}</h4>
+                  <StatusPill
+                    tone={value ? 'success' : 'subtle'}
+                    icon={value ? 'fas fa-circle-check' : 'fas fa-circle-minus'}
+                    label={value
+                      ? text(ui?.setKey ?? '', ui?.set ?? label)
+                      : text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultNone', 'No default')}
+                  />
+                </header>
+
+                <p class="manager-scoped-entry-default-blurb">
+                  {text(ui?.blurbKey ?? '', ui?.blurb ?? '')}
+                </p>
+
+                <!--
+                  THE CONTROL IS THE SHARED DROP ZONE, not a uuid text box. `documentType` comes
+                  from the section table, so the effect source refuses a Macro drag and the macro
+                  refuses an Item drag before either reaches `dropSection`.
+                -->
+                <div
+                  class="manager-scoped-entry-default-slot"
                   data-scoped-world-default-value={section}
                 >
-                  {value ||
-                    text(
-                      'FABRICATE.Admin.Manager.Scoped.Essence.DefaultUnset',
-                      'No world default set'
+                  <ItemDropZone
+                    item={value ? { name: value } : null}
+                    title={text(ui?.promptKey ?? '', ui?.prompt ?? label)}
+                    hint={sectionAddressLine(section, value)}
+                    documentType={ui?.documentType ?? 'Item'}
+                    emptyIcon="fas fa-arrow-down-to-bracket"
+                    unlinkAttr="data-scoped-world-default-clear"
+                    unlinkLabel={format(
+                      'FABRICATE.Admin.Manager.Scoped.Essence.DefaultClearNamed',
+                      'Clear the world default for {section}',
+                      { section: label }
                     )}
-                </p>
-                <p class="manager-muted" data-scoped-world-default-inherit={section}>
+                    onDrop={(data) => dropSection(section, data)}
+                    onUnlink={value ? () => clearSection(section) : null}
+                  />
+                </div>
+
+                <p
+                  class="manager-scoped-entry-default-inherit"
+                  data-scoped-world-default-inherit={section}
+                >
                   {essenceInheritLine(entry, section, format)}
                 </p>
-                <div class="manager-scoped-entry-default-controls">
-                  <input
-                    type="text"
-                    value={sectionDraft[section] ?? ''}
-                    data-scoped-world-default-input={section}
-                    aria-label={format(
-                      'FABRICATE.Admin.Manager.Scoped.Essence.DefaultInputLabel',
-                      'A document UUID for {section}',
-                      { section: scopedSectionLabel(section, text) }
-                    )}
-                    placeholder="Item.abc123"
-                    oninput={(event) =>
-                      (sectionDraft = { ...sectionDraft, [section]: event.currentTarget.value })}
-                  />
-                  <ManagerButton
-                    data-scoped-world-default-set={section}
-                    onclick={() => applySection(section)}
-                  >
-                    {text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultSet', 'Set default')}
-                  </ManagerButton>
-                  {#if value}
-                    <ManagerButton
-                      data-scoped-world-default-clear={section}
-                      onclick={() => clearSection(section)}
-                    >
-                      {text('FABRICATE.Admin.Manager.Scoped.Essence.DefaultClear', 'Clear')}
-                    </ManagerButton>
-                  {/if}
-                </div>
+
                 {#if sectionRefusal[section]}
                   <p
                     class="manager-muted manager-form-warning"
@@ -416,21 +658,65 @@
                     {sectionRefusal[section]}
                   </p>
                 {/if}
-              </div>
+              </article>
             {/each}
           </section>
 
+          <div class="manager-scoped-entry-kicker" data-scoped-entry-systems-banner>
+            <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
+              <i class="fas fa-layer-group"></i>
+            </span>
+            <h3 class="manager-scoped-entry-kicker-label">
+              {text('FABRICATE.Admin.Manager.Scoped.Essence.SystemsBanner', 'Per-system rules')}
+            </h3>
+            <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
+          </div>
+
           <!-- THE MEMBERSHIP LIST. Rows come from `entry.systems` — the projection's JOIN — and
                never from the `systems` prop, which is a narrowed `{id, name}` roster and cannot
-               answer `member`, `inherited` or `enabled`. -->
-          <section class="manager-scoped-entry-systems">
-            <h3 class="manager-scoped-entry-default-head">
-              {text('FABRICATE.Admin.Manager.Scoped.Essence.SystemsHead', 'Crafting systems')}
-            </h3>
+               answer `member`, `inherited` or `enabled`.
+
+               Each row carries the prototype's three cells rather than a bare name: a fixed
+               NAME column with the authored state under it, a fluid SUMMARY of what the essence
+               resolves to in that system, and the shipped action cluster. A stack of names and
+               switches says a system HAS the essence and nothing about what it does there, which
+               is the whole subject of this screen. -->
+          <section class="manager-scoped-entry-systems" data-scoped-entry-systems>
+            <header class="manager-scoped-entry-systems-head">
+              <span class="manager-scoped-entry-default-glyph" aria-hidden="true">
+                <i class="fas fa-wand-sparkles"></i>
+              </span>
+              <div class="manager-scoped-entry-systems-copy">
+                <h4 class="manager-scoped-entry-default-title">
+                  {text(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.SystemsHead',
+                    'Systems using this essence'
+                  )}
+                </h4>
+                <p class="manager-scoped-entry-systems-sub">
+                  {text(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.SystemsSub',
+                    'The rules hold what the essence does on craft in that system: its active effect source item and its macro.'
+                  )}
+                </p>
+              </div>
+              <span class="manager-scoped-entry-systems-count" data-scoped-entry-systems-count>
+                {systemsCountText}
+              </span>
+            </header>
+
             <ul class="manager-scoped-entry-system-list" role="list">
-              {#each entry.systems ?? [] as row (row.systemId)}
-                <li class="manager-scoped-entry-system" data-scoped-entry-system={row.systemId}>
-                  <span class="manager-scoped-entry-system-name">{systemLabel(row)}</span>
+              {#each systemRows as row (row.systemId)}
+                <li
+                  class="manager-scoped-entry-system"
+                  data-scoped-entry-system={row.systemId}
+                  data-scoped-entry-system-state={essenceSystemState(row)}
+                >
+                  <span class="manager-scoped-entry-system-copy">
+                    <span class="manager-scoped-entry-system-name">{systemLabel(row)}</span>
+                    <span class="manager-scoped-entry-system-meta">{systemMeta(row)}</span>
+                  </span>
+                  <span class="manager-scoped-entry-system-summary">{systemSummary(row)}</span>
                   <MembershipActions
                     entityType="essence"
                     entityId={entry.id}
@@ -459,6 +745,36 @@
               sourceName={sectionValueName('effectSource')}
               macroName={sectionValueName('macro')}
               showLiveNote={false}
+            />
+          </section>
+
+          <!-- THE DANGER CARD. Deleting a world essence reaches every system that has rules for
+               it, so the reach is stated beside the control rather than only in a dialog — and the
+               control is the shipped `ArmedDangerButton`, which is this repository's one
+               destructive-confirm affordance. -->
+          <section class="manager-scoped-entry-danger" data-scoped-entry-delete>
+            <span class="manager-scoped-entry-danger-glyph" aria-hidden="true">
+              <i class="fas fa-triangle-exclamation"></i>
+            </span>
+            <div class="manager-scoped-entry-danger-copy">
+              <h4 class="manager-scoped-entry-danger-title">
+                {text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteTitle', 'Delete this essence')}
+              </h4>
+              <p class="manager-scoped-entry-danger-note">{deleteNote}</p>
+            </div>
+            <ArmedDangerButton
+              token={deleteToken}
+              armed={armedToken === deleteToken}
+              idleLabel={text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.DeleteAction',
+                'Delete essence'
+              )}
+              armedLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteConfirm', 'Confirm?')}
+              idleAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteAction', 'Delete essence')} — ${deleteNote}`}
+              armedAriaLabel={`${text('FABRICATE.Admin.Manager.Scoped.Essence.DeleteConfirm', 'Confirm?')} — ${deleteNote}`}
+              onArm={(token) => (armedToken = token)}
+              onDisarm={() => (armedToken = '')}
+              onConfirm={deleteEssence}
             />
           </section>
         {:else}
@@ -499,7 +815,13 @@
 
 <style>
   /* STATIC class names, so `lint:svelte:warnings` stays at zero and `styles/fabricate.css` —
-     closed to this lane by `### GM World Scoped Entity Routes` requirement 7 — is not reopened. */
+     closed to this lane by `### GM World Scoped Entity Routes` requirement 7 — is not reopened.
+
+     Every colour is a `--fab-*` token declared at `:root` or in the seven theme blocks, never a
+     `--fab-mv2-*` manager alias: the alias set defines only bg / surface-1..3 / border /
+     border-strong / text / text-muted / accent / info / warning / danger, so `--fab-mv2-text-subtle`
+     and `--fab-mv2-text-secondary` are INVALID AT COMPUTED-VALUE TIME and silently fall back to
+     inheritance. */
   .manager-scoped-entry-page {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
@@ -514,23 +836,115 @@
     gap: var(--fab-space-3);
     min-width: 0;
     min-height: 0;
+    overflow: auto;
   }
 
-  .manager-scoped-entry-identity {
+  /* EVERY REGION THE PANEL STACKS IS `flex: 0 0 auto`, and this is load-bearing rather than tidy.
+
+     The panel is a column flex container inside a `minmax(0, 1fr)` grid row, so its content
+     overflows on a 900px window — and a flex item's default `flex-shrink: 1` then compresses
+     each child toward zero. Measured in the View Lab: the per-system card, which carries
+     `overflow: hidden`, collapsed to NOTHING between its own section kicker and the preview
+     below it, so the whole membership list was simply not on the screen while every selector
+     that names it still matched. The prototype writes `flex:0 0 auto` on each child of the tab
+     body for exactly this reason.
+
+     Enumerated by class rather than written as `> *`, because a universal child selector would
+     have to be `:global` to survive scoping and this component owns every one of these six. */
+  .manager-scoped-entry-kicker,
+  .manager-scoped-entry-identity,
+  .manager-scoped-entry-defaults,
+  .manager-scoped-entry-systems,
+  .manager-scoped-entry-preview,
+  .manager-scoped-entry-danger {
+    flex: 0 0 auto;
+  }
+
+  /* THE SECTION KICKER: a 20px glyph tile, a tracked uppercase label, and a rule that runs to
+     the edge. Three of them divide this tab into the world identity, the two world defaults and
+     the per-system rules, which is the only thing that keeps a long scroll navigable. */
+  .manager-scoped-entry-kicker {
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
     gap: var(--fab-space-2);
     min-width: 0;
   }
 
+  .manager-scoped-entry-kicker-glyph {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--fab-border-strong);
+    border-radius: var(--fab-v2-radius-panel);
+    background: var(--fab-surface-raised);
+    color: var(--fab-text-secondary);
+    font-size: 0.56rem;
+  }
+
+  .manager-scoped-entry-kicker-label {
+    margin: 0;
+    color: var(--fab-text-secondary);
+    font-size: 0.59rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .manager-scoped-entry-kicker-rule {
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--fab-border);
+  }
+
+  /* The WORLD-SCOPE variant, in the info ramp. It is a different colour from its two siblings on
+     purpose: those two introduce regions, and this one states the scope everything below it is
+     authored at. */
+  .manager-scoped-entry-kicker.is-world .manager-scoped-entry-kicker-glyph {
+    border-color: var(--fab-info-border);
+    background: var(--fab-info-soft);
+    color: var(--fab-info);
+  }
+
+  .manager-scoped-entry-kicker.is-world .manager-scoped-entry-kicker-label {
+    color: var(--fab-info-text);
+  }
+
+  .manager-scoped-entry-kicker.is-world .manager-scoped-entry-kicker-rule {
+    background: var(--fab-info-border);
+    opacity: 0.5;
+  }
+
+  /* A FIXED icon column and one fluid field column. `minmax(0, 1fr)` on the second, so a long
+     name shrinks the column rather than widening the grid past the panel. */
+  .manager-scoped-entry-identity {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: var(--fab-space-4);
+    padding: var(--fab-space-4);
+    border: 1px solid var(--fab-border);
+    border-radius: 12px;
+    background: var(--fab-bg-2);
+    min-width: 0;
+  }
+
   /* The medallion and its picker travel together as one control, so the picker sits under the
-     swatch it changes rather than beside an unrelated field. Matches the system-scope identity
-     tab's tile, at the smaller size this panel's column allows. */
+     swatch it changes rather than beside an unrelated field. `align-items: stretch` makes the
+     picker fill the 150px column and share the tile's edges. */
   .manager-scoped-entry-identity-tile {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  .manager-scoped-entry-identity-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-3);
     min-width: 0;
   }
 
@@ -538,63 +952,133 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-chip);
-    flex: 1 1 12rem;
     min-width: 0;
   }
 
-  .manager-scoped-entry-field.is-wide {
-    flex: 1 1 100%;
+  .manager-scoped-entry-label {
+    color: var(--fab-text-subtle);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 
-  .manager-scoped-entry-label {
-    color: var(--fab-mv2-text);
-    font-size: 0.72rem;
+  /* "· optional" rides the same label without inheriting its tracking or its caps, exactly as
+     the prototype writes it: the field name is the label and this is an aside about it. */
+  .manager-scoped-entry-label-aside {
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* The essence NAME is an entity name, so it takes the serif at the card-name weight. */
+  .manager-scoped-entry-name {
+    font-family: var(--fab-font-serif);
+    font-size: 0.88rem;
     font-weight: 600;
   }
 
   .manager-scoped-entry-defaults {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    gap: var(--fab-space-2);
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    gap: var(--fab-space-3);
     min-width: 0;
   }
 
   .manager-scoped-entry-default {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-chip);
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-4);
+    border: 1px solid var(--fab-border);
+    border-radius: 12px;
+    background: var(--fab-bg-2);
     min-width: 0;
   }
 
   .manager-scoped-entry-default-head {
-    margin: 0;
-    color: var(--fab-mv2-text);
-    font-family: var(--fab-font-serif);
-    font-size: 0.85rem;
-    font-weight: 600;
-  }
-
-  .manager-scoped-entry-default-value {
-    margin: 0;
-    color: var(--fab-mv2-text);
-    font-size: 0.82rem;
-    font-weight: 600;
-    overflow-wrap: break-word;
-  }
-
-  .manager-scoped-entry-default-controls {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--fab-space-chip);
     align-items: center;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
+  .manager-scoped-entry-default-glyph {
+    flex: 0 0 auto;
+    color: var(--fab-accent);
+    font-size: 0.75rem;
+  }
+
+  .manager-scoped-entry-default-title {
+    margin: 0;
+    color: var(--fab-text);
+    font-family: var(--fab-font-serif);
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .manager-scoped-entry-default-blurb {
+    margin: 0;
+    color: var(--fab-text-muted);
+    font-size: 0.69rem;
+    line-height: 1.5;
+  }
+
+  .manager-scoped-entry-default-slot {
+    min-width: 0;
+  }
+
+  .manager-scoped-entry-default-inherit {
+    margin: 0;
+    color: var(--fab-text-subtle);
+    font-size: 0.63rem;
+    line-height: 1.45;
+  }
+
+  /* THE PER-SYSTEM CARD is one bordered panel with a header and hairline-divided rows, not a
+     bare stack: the header carries the count, and the divider is what makes a six-system list
+     scannable at row height. */
   .manager-scoped-entry-systems {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 12px;
+    background: var(--fab-bg-2);
     min-width: 0;
+    overflow: hidden;
+  }
+
+  .manager-scoped-entry-systems-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-3) var(--fab-space-4);
+    border-bottom: 1px solid var(--fab-border);
+    min-width: 0;
+  }
+
+  .manager-scoped-entry-systems-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2xs);
+    flex: 1 1 18rem;
+    min-width: 0;
+  }
+
+  .manager-scoped-entry-systems-sub {
+    margin: 0;
+    color: var(--fab-text-muted);
+    font-size: 0.63rem;
+    line-height: 1.45;
+  }
+
+  .manager-scoped-entry-systems-count {
+    flex: 0 0 auto;
+    color: var(--fab-text-subtle);
+    font-size: 0.66rem;
+    font-weight: 500;
   }
 
   .manager-scoped-entry-system-list {
@@ -607,36 +1091,104 @@
   }
 
   /*
-     NAME AND ACTIONS ON ONE LINE.
+     THREE CELLS ON ONE LINE: a fixed name column, a fluid summary, and the action cluster.
 
-     This stacked them, so each system cost roughly 68px and six systems pushed the preview and
-     everything below it off the screen. The membership row is a label and its controls, which is
-     the shape the shell's own membership rows use, and there is nothing in it that needs two
-     lines at this width. Wrapping is still allowed so a long system name breaks rather than
-     forcing the controls out of the panel.
+     An earlier revision stacked name over actions, so each system cost roughly 68px and six of
+     them pushed the preview and everything below it off the screen. Wrapping is still allowed so
+     a long system name breaks rather than forcing the controls out of the panel.
   */
   .manager-scoped-entry-system {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-4);
     min-width: 0;
-    padding: var(--fab-space-chip) 0;
   }
 
   .manager-scoped-entry-system + .manager-scoped-entry-system {
-    border-top: 1px solid var(--fab-mv2-border);
+    border-top: 1px solid var(--fab-border);
+  }
+
+  .manager-scoped-entry-system-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2xs);
+    flex: 0 0 12rem;
+    min-width: 0;
   }
 
   .manager-scoped-entry-system-name {
-    flex: 1 1 auto;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
+    font-family: var(--fab-font-serif);
     font-size: 0.78rem;
     font-weight: 600;
     overflow-wrap: break-word;
   }
 
+  .manager-scoped-entry-system-meta {
+    color: var(--fab-text-subtle);
+    font-size: 0.59rem;
+    font-weight: 500;
+  }
+
+  /* A NON-MEMBER's summary is the disabled ink, so the two states are told apart without
+     reading the sentence — which is exactly what the prototype's `summaryColor` does. */
+  .manager-scoped-entry-system-summary {
+    flex: 1 1 12rem;
+    color: var(--fab-text-muted);
+    font-size: 0.69rem;
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  .manager-scoped-entry-system[data-scoped-entry-system-state='absent']
+    .manager-scoped-entry-system-summary {
+    color: var(--fab-text-disabled);
+  }
+
   .manager-scoped-entry-preview {
     min-width: 0;
+  }
+
+  .manager-scoped-entry-danger {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3) var(--fab-space-4);
+    border: 1px solid var(--fab-danger-border);
+    border-radius: 12px;
+    background: var(--fab-danger-soft);
+    min-width: 0;
+  }
+
+  .manager-scoped-entry-danger-glyph {
+    flex: 0 0 auto;
+    color: var(--fab-danger-text);
+    font-size: 0.82rem;
+  }
+
+  .manager-scoped-entry-danger-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2xs);
+    flex: 1 1 18rem;
+    min-width: 0;
+  }
+
+  .manager-scoped-entry-danger-title {
+    margin: 0;
+    color: var(--fab-danger-text);
+    font-family: var(--fab-font-serif);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .manager-scoped-entry-danger-note {
+    margin: 0;
+    color: var(--fab-text-muted);
+    font-size: 0.66rem;
+    line-height: 1.5;
   }
 </style>
