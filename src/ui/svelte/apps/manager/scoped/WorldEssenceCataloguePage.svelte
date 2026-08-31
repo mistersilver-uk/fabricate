@@ -45,6 +45,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
+  import StatusPill from '../../../components/StatusPill.svelte';
   import {
     essenceInheritLine,
     essenceSectionValueName,
@@ -110,16 +111,6 @@
     return notes;
   }
 
-  function glyphOf(entry) {
-    const icon = entry?.entity?.icon;
-    return typeof icon === 'string' && icon ? icon : PAGE_ICON;
-  }
-
-  function tintOf(entry) {
-    const token = entry?.entity?.colorToken;
-    return typeof token === 'string' && token.trim() ? token.trim() : '';
-  }
-
   function systemLabel(row) {
     const named = typeof row?.systemName === 'string' ? row.systemName.trim() : '';
     return named || String(row?.systemId ?? '');
@@ -143,6 +134,53 @@
     disabled: text('FABRICATE.Admin.Manager.Scoped.Essence.StateDisabled', 'Disabled here'),
     enabled: text('FABRICATE.Admin.Manager.Scoped.Essence.StateEnabled', 'Enabled here'),
   });
+
+  /**
+   * The ROLL-UP of one essence's per-system states, as the prototype's single row pill.
+   *
+   * Four outcomes, and the fourth is the one a pair of states cannot express: an essence that is
+   * ON in some member systems and OFF in others. Collapsing that to either word tells a GM the
+   * opposite of the truth for half its systems, so it renders as the split count instead.
+   *
+   * An EARLY-RETURN CHAIN rather than a nested ternary, which SonarCloud reports as S3358 in a
+   * file it indexes.
+   *
+   * @param {{systems?: Array<{member?: boolean, enabled?: boolean}>}} entry
+   * @returns {{tone: string, icon: string, label: string}}
+   */
+  function rollupState(entry) {
+    const members = (entry?.systems ?? []).filter((row) => row.member === true);
+    const on = members.filter((row) => row.enabled === true).length;
+    if (members.length === 0) {
+      return {
+        tone: 'subtle',
+        icon: 'fas fa-circle-minus',
+        label: text('FABRICATE.Admin.Manager.Scoped.Essence.RollupUnused', 'Unused'),
+      };
+    }
+    if (on === members.length) {
+      return {
+        tone: 'success',
+        icon: 'fas fa-circle-check',
+        label: text('FABRICATE.Admin.Manager.Scoped.Essence.RollupEnabled', 'Enabled'),
+      };
+    }
+    if (on === 0) {
+      return {
+        tone: 'subtle',
+        icon: 'fas fa-circle-pause',
+        label: text('FABRICATE.Admin.Manager.Scoped.Essence.RollupDisabled', 'Disabled'),
+      };
+    }
+    return {
+      tone: 'warning',
+      icon: 'fas fa-circle-half-stroke',
+      label: format('FABRICATE.Admin.Manager.Scoped.Essence.RollupSplit', '{on} on / {off} off', {
+        on,
+        off: members.length - on,
+      }),
+    };
+  }
 
   async function createEssence() {
     const name = draftName.trim();
@@ -234,26 +272,69 @@
 </main>
 
 <!--
-  The row's meta run: the identity GLYPH with its colour, the membership count, and the
-  three-state per-system strip. The glyph is rendered HERE and not left to the frame's medallion
-  because the medallion is the frame's identity thumbnail for all three entity types, and this is
-  the hook that says an essence identity is a glyph rather than an image — the assertion that
-  proves "no `<img>` anywhere on this screen" is a measurement rather than a sentence about a
-  selector that matches nothing.
+  The row's meta run: the three prototype stats, the membership roll-up, and the three-state
+  per-system strip.
+
+  ── THE IDENTITY GLYPH IS NOT DRAWN HERE, AND THAT IS A CORRECTION ────────────────────────────
+  It was. The row rendered a SECOND tinted glyph in the meta run beside the stats, on the reading
+  that the frame's medallion is a shared thumbnail and this screen needed its own hook to prove an
+  essence identity is a glyph rather than an image. Both halves of that were wrong. The medallion
+  reads `entry.icon` and `entry.colorToken` and publishes `data-medallion="glyph"` and
+  `data-medallion-tint` itself, so the proof was already on the screen — and the extra glyph landed
+  immediately left of the Components stat, where it read as a stat icon rather than as the row's
+  identity. The prototype's row carries ONE chip (`proto:3172`); this one carried two.
+
+  The criterion-4 assertion and the capture case's `expectContained` both moved onto
+  `[data-scoped-list-row] [data-medallion="glyph"]`, which is a STRICTER measurement of the same
+  claim: it is the element a GM actually sees, not a hook rendered beside it.
 -->
 {#snippet essenceRowMeta(entry)}
-  <span
-    class="manager-scoped-essence-glyph"
-    data-scoped-essence-glyph={entry.id}
-    data-scoped-essence-colour={tintOf(entry) || 'unset'}
-  >
-    <i class={glyphOf(entry)} aria-hidden="true"></i>
+  <!--
+    THE PROTOTYPE'S THREE ROW STATS: components, recipes, and systems as `{n}/{total}` — a right
+    aligned value over a tracked micro-label, at `min-width: 3.25rem` so three of them form a
+    column across the list rather than shuffling with each row's digits.
+
+    The two USAGE counts are world-wide, across every crafting system, and they are read from
+    `entry.componentCount` / `entry.recipeCount` — published by the world-scope projection. They
+    fall back to `0` rather than being hidden when absent: a stat that vanishes changes the row's
+    geometry, and a row that is a different shape depending on whether a count arrived is worse
+    than one that says zero.
+  -->
+  <span class="manager-scoped-essence-stats">
+    <span class="manager-scoped-essence-stat" data-scoped-essence-stat="components">
+      <span class="manager-scoped-essence-stat-value" data-scoped-essence-component-count={entry.id}
+        >{Number(entry.componentCount) || 0}</span
+      >
+      <span class="manager-scoped-essence-stat-label"
+        >{text('FABRICATE.Admin.Manager.Scoped.Essence.StatComponents', 'Components')}</span
+      >
+    </span>
+    <span class="manager-scoped-essence-stat" data-scoped-essence-stat="recipes">
+      <span class="manager-scoped-essence-stat-value" data-scoped-essence-recipe-count={entry.id}
+        >{Number(entry.recipeCount) || 0}</span
+      >
+      <span class="manager-scoped-essence-stat-label"
+        >{text('FABRICATE.Admin.Manager.Scoped.Essence.StatRecipes', 'Recipes')}</span
+      >
+    </span>
+    <span class="manager-scoped-essence-stat" data-scoped-essence-stat="systems">
+      <span
+        class="manager-scoped-essence-stat-value"
+        data-scoped-essence-membership-count={entry.id}
+        title={format(
+          'FABRICATE.Admin.Manager.Scoped.Essence.MemberCount',
+          '{count} of {total} systems',
+          { count: Number(entry.membershipCount) || 0, total: systems.length }
+        )}>{Number(entry.membershipCount) || 0}/{systems.length}</span
+      >
+      <span class="manager-scoped-essence-stat-label"
+        >{text('FABRICATE.Admin.Manager.Scoped.Essence.StatSystems', 'Systems')}</span
+      >
+    </span>
   </span>
-  <span class="manager-scoped-essence-count" data-scoped-essence-membership-count={entry.id}>
-    {format('FABRICATE.Admin.Manager.Scoped.Essence.MemberCount', '{count} of {total} systems', {
-      count: Number(entry.membershipCount) || 0,
-      total: systems.length,
-    })}
+  {@const rollup = rollupState(entry)}
+  <span class="manager-scoped-essence-rollup" data-scoped-essence-rollup={entry.id}>
+    <StatusPill tone={rollup.tone} icon={rollup.icon} label={rollup.label} />
   </span>
   <span class="manager-scoped-essence-states" role="list">
     {#each entry.systems ?? [] as row (row.systemId)}
@@ -324,19 +405,48 @@
     font-weight: 600;
   }
 
-  .manager-scoped-essence-glyph {
-    display: inline-flex;
+  /* THE STAT COLUMN. A fixed `min-width` on each cell is what turns three per-row numbers into
+     three readable columns down the list; without it a row with a three-digit component count is
+     wider than its neighbours and the labels stop lining up. `tabular-nums` holds the digits on
+     one advance so the same is true within a cell. */
+  .manager-scoped-essence-stats {
+    display: flex;
+    flex: 0 0 auto;
     align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: var(--fab-v2-radius-control);
-    color: var(--fab-accent);
+    gap: var(--fab-space-2);
   }
 
-  .manager-scoped-essence-count {
-    color: var(--fab-mv2-text-muted);
+  .manager-scoped-essence-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    min-width: 2.6rem;
+    text-align: right;
+  }
+
+  .manager-scoped-essence-stat-value {
+    color: var(--fab-text-secondary);
+    font-family: var(--fab-font-mono);
     font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .manager-scoped-essence-stat-label {
+    color: var(--fab-text-subtle);
+    font-size: 0.46rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .manager-scoped-essence-rollup {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
   }
 
   /*
@@ -356,7 +466,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--fab-space-1);
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -367,8 +477,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--fab-space-chip);
-    color: var(--fab-mv2-text-muted);
-    font-size: 0.68rem;
+    color: var(--fab-text-muted);
+    font-size: 0.58rem;
   }
 
   .manager-scoped-essence-state[data-scoped-system-state='enabled'] {
