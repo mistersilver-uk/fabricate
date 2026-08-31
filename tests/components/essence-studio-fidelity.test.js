@@ -371,7 +371,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     );
     assert.ok(
       globalCss.includes(
-        'grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);'
+        'grid-template-columns: 124px minmax(0, 1fr);'
       ),
       'in a column narrowed to the square tile width so the controls sit under it'
     );

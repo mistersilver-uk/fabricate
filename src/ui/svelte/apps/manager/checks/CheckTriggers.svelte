@@ -837,7 +837,7 @@
                      leaves the control's POSITION and BOX SIZE unchanged — which is the
                      guarantee the spec actually makes, and all the no-movement rule needs.
                      Radius and fill still differ (the stepper paints 8px /
-                     `--fab-surface-soft`, a `.manager-field` control 6px / `--fab-mv2-bg`);
+                     `--fab-surface-soft`, a `.manager-field` control 6px / `--fab-bg-1`);
                      claiming otherwise was an overclaim corrected alongside the spec text.
                      `data-trigger-tier-step-steps` rides `inputProps` onto the real
                      `<input>` — the smoke harness calls Playwright's `fill()` and

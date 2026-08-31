@@ -14,7 +14,7 @@ const themeIds = Object.values(FABRICATE_THEME_IDS);
 // The bulk edit panels' muted copy is SVELTE-SCOPED, not in the global sheet — `grep -c
 // fab-bulk-edit styles/fabricate.css` returns 0. Injecting only `styles/fabricate.css` and
 // then adding a `.fab-bulk-edit-*` node to the fixture would match no rule at all: the node
-// would inherit `--fab-mv2-text`, score the contrast of a colour this panel never renders,
+// would inherit `--fab-text`, score the contrast of a colour this panel never renders,
 // and pass no matter what the panel's own declarations said. So this gate reproduces what
 // Svelte actually ships, exactly as the font-size gates do — the component's real compiled
 // CSS appended AFTER the global sheet (matching `css: 'injected'` ordering in
@@ -23,12 +23,12 @@ const themeIds = Object.values(FABRICATE_THEME_IDS);
 //
 // ── WHAT THESE TWO SAMPLES DO AND DO NOT COVER ───────────────────────────────────────
 // Issue 1015 moved EIGHT declarations across three components from `--fab-text-subtle` to
-// `--fab-mv2-text-muted`. All eight land on the same token, so what actually varies between
+// `--fab-text-muted`. All eight land on the same token, so what actually varies between
 // them is the COLUMN they render on, and that is what is sampled here: one probe per
 // distinct backdrop, not one probe per declaration.
-//  - `--fab-mv2-surface-1`, the inspector rail's own fill, where the shell's and
+//  - `--fab-bg-2`, the inspector rail's own fill, where the shell's and
 //    `BulkEditSection`'s copy renders — sampled through `.fab-bulk-edit-subhint`.
-//  - `--fab-mv2-bg`, the Recipe Studio pick card's fill, a DIFFERENT colour inside the same
+//  - `--fab-bg-1`, the Recipe Studio pick card's fill, a DIFFERENT colour inside the same
 //    rail — sampled through `.fab-bulk-book-pick-meta`, nested two levels inside the card.
 // NEITHER background is restated by this fixture. Both are resolved by walking the probe's
 // own ancestors to the first opaque fill, so both come from the rule that actually ships —
@@ -126,7 +126,7 @@ function themePage(theme, width, height, body) {
             line-height: 1.35;
           }
           /* NO preview helper stands in for a bulk panel's background. There used to be one
-             (.preview-bulk-surface, --fab-mv2-surface-1) because contrastSample jumped
+             (.preview-bulk-surface, --fab-bg-2) because contrastSample jumped
              straight from a sample's own fill to [data-surface-backdrop], so a probe with no
              fill of its own was scored against the manager root's column rather than the
              rail's. inspectRenderedSurface now walks ancestors to the first opaque fill, so
@@ -164,7 +164,7 @@ function managerRows() {
 
 /*
  * The bulk edit panel's STANDING SENTENCE, rendered on the inspector's own fill — which is
- * `.manager-inspector`'s shipped `--fab-mv2-surface-1` rule in the global sheet, resolved by
+ * `.manager-inspector`'s shipped `--fab-bg-2` rule in the global sheet, resolved by
  * the ancestor walk rather than restated by the fixture.
  *
  * It carries its OWN `data-contrast-*` hook rather than reusing one: `contrastSample` reads
@@ -187,7 +187,7 @@ function bulkEditSubhint() {
 
 /*
  * The Recipe Studio pick card's muted meta line — the SECOND column the issue 1015 recolour
- * has to clear. It sits in the same rail as the sub-hint above but on `--fab-mv2-bg`, and
+ * has to clear. It sits in the same rail as the sub-hint above but on `--fab-bg-1`, and
  * six of the seven themes failed AA on it before the recolour, so a gate that sampled only
  * the rail's own fill would have called that pass.
  *
@@ -197,7 +197,7 @@ function bulkEditSubhint() {
  * it jumped straight to `[data-surface-backdrop]`, the transparent meta line composited to
  * the backdrop unchanged and the card was skipped entirely, so recolouring
  * `.fab-bulk-book-pick` to its own text colour rendered the card unreadable and moved this
- * ratio by nothing. It read right only because `--fab-mv2-bg` happens to compute to the same
+ * ratio by nothing. It read right only because `--fab-bg-1` happens to compute to the same
  * value as the manager root in all seven themes — a coincidence, unasserted, and the ratio
  * of a card this gate was not actually looking at.
  *
@@ -281,7 +281,7 @@ function managerFixture(theme, width, height) {
                fab-on-danger exists at all. -->
           <button type="button" class="manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
           <!-- The two QUIET roles (issue 1118). Both paint muted ink on no fill at all -
-               is-ghost takes fab-mv2-text-muted, is-dashed takes fab-text-muted at 11px -
+               is-ghost and is-dashed both take fab-text-muted, is-dashed at 11px -
                and between them they are now the treatment for every navigational verb and
                every content-authoring append verb in the manager, across every theme.
                Nothing measured either: the three probes above sample surface text, a chip
@@ -389,7 +389,7 @@ function assertScopedSamplePassesAA(result, selector, label) {
   assert.notEqual(
     sample.color,
     sample.inheritedColor,
-    `${label} computed the inherited --fab-mv2-text (${sample.color}) — its scoped rule did not apply, so the ratio would prove nothing`
+    `${label} computed the inherited --fab-text (${sample.color}) — its scoped rule did not apply, so the ratio would prove nothing`
   );
   assert.ok(contrastSample(result, selector) >= 4.5, `${label} contrast should pass WCAG AA`);
 }
@@ -429,7 +429,7 @@ async function inspectRenderedSurface(page) {
     // to the backdrop's, which made a probe with no fill of its own score against a column
     // it does not render on — and, worse, made the fill of every intermediate CARD invisible
     // to the gate: `.fab-bulk-book-pick-meta` declares no background, so the pick card's
-    // `--fab-mv2-bg` could be changed to the same colour as its own text, rendering the card
+    // `--fab-bg-1` could be changed to the same colour as its own text, rendering the card
     // unreadable, without moving the ratio by 0.001. The walk is what makes each nested
     // probe's real card fill load-bearing.
     //
@@ -457,7 +457,7 @@ async function inspectRenderedSurface(page) {
         selector,
         color: style.color,
         backgroundLayers: backgroundLayersUnder(element),
-        // What the node would read as with no rule of its own — the inherited `--fab-mv2-text`
+        // What the node would read as with no rule of its own — the inherited `--fab-text`
         // from `.fabricate-manager`. A probe whose scoped rule silently stopped applying
         // computes exactly this, so comparing against it is what keeps the sample honest.
         inheritedColor: getComputedStyle(element.parentElement).color

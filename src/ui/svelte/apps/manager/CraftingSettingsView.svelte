@@ -334,7 +334,7 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    border-right: 1px solid var(--fab-mv2-border);
+    border-right: 1px solid var(--fab-border);
     overflow-y: auto;
   }
 
@@ -355,7 +355,7 @@
 
   .crafting-settings-section:not(:last-child) {
     padding-bottom: var(--fab-space-5);
-    border-bottom: 1px solid var(--fab-mv2-border);
+    border-bottom: 1px solid var(--fab-border);
   }
 
   .crafting-settings-section-head {
@@ -366,7 +366,7 @@
   }
 
   .crafting-settings-section-head > i {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.85rem;
   }
 
@@ -375,7 +375,7 @@
     font-family: var(--font-primary);
     font-size: 1rem;
     font-weight: 600;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
   }
 
   .crafting-settings-section-intro {
@@ -408,7 +408,7 @@
     min-width: 0;
     min-height: 0;
     padding: var(--fab-space-4);
-    background: var(--fab-mv2-surface-2);
+    background: var(--fab-bg-3);
     overflow-y: auto;
   }
 
@@ -425,7 +425,7 @@
     }
 
     .crafting-settings-context {
-      border-top: 1px solid var(--fab-mv2-border);
+      border-top: 1px solid var(--fab-border);
     }
   }
 </style>

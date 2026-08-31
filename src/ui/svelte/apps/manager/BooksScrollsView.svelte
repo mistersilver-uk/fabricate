@@ -564,9 +564,9 @@
        success-soft fill + 8px radius mirror `.manager-component-drop-zone`. */
     margin: var(--fab-space-3);
     padding: var(--fab-space-3) var(--fab-space-3);
-    border: 1px dashed var(--fab-mv2-border-strong);
+    border: 1px dashed var(--fab-border-strong);
     border-radius: 8px;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     background: var(--fab-success-soft);
   }
 
@@ -586,9 +586,9 @@
     justify-content: center;
     width: 34px;
     height: 34px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 6px;
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     background: var(--fab-overlay-dark-16);
   }
 
@@ -662,8 +662,8 @@
 
   .manager-books-scrolls-listitem {
     padding: var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: var(--fab-v2-radius-panel);
+    border: 1px solid var(--fab-border);
+    border-radius: var(--fab-books-panel-radius);
     background: var(--fab-bg-2);
   }
 
@@ -698,13 +698,13 @@
   .manager-books-scrolls-identity:focus-visible {
     outline: 2px solid var(--fab-accent-border);
     outline-offset: 3px;
-    border-radius: var(--fab-v2-radius-control);
+    border-radius: var(--fab-books-control-radius);
   }
 
   .manager-books-scrolls-thumb {
-    width: var(--fab-v2-thumb-sm);
-    height: var(--fab-v2-thumb-sm);
-    border-radius: var(--fab-v2-radius-control);
+    width: 40px;
+    height: 40px;
+    border-radius: var(--fab-books-control-radius);
     object-fit: cover;
     flex: none;
   }

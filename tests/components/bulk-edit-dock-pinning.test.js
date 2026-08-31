@@ -5,7 +5,7 @@
  * The dock is the whole deliverable of issue 1015, and when it shipped it SURVIVED EVERY
  * MUTATION. `npm test` stayed green with `position: sticky` deleted from
  * `.fab-bulk-edit-dock`, with `bottom: calc(-1 * var(--fab-space-3))` reverted to
- * `bottom: 0`, with `background: var(--fab-mv2-surface-1)` changed to `transparent`, and
+ * `bottom: 0`, with `background: var(--fab-bg-2)` changed to `transparent`, and
  * with the `<div class="fab-bulk-edit-dock">` wrapper deleted from the product markup
  * outright. The pin in `component-studio-font-size.test.js` measures the BUTTON's
  * `min-height` and `font-size` — the two values the dock is designed NOT to touch — so it
@@ -164,10 +164,11 @@ const stagedAxes = createRawSnippet(() => ({
 /**
  * The shell's real rendered markup, dropped into the rail it actually ships in.
  *
- * The three wrapper levels are the shipped ones — `.fabricate-manager` declares the
- * `--fab-mv2-*` tokens AND the `fabricate-manager` container the width branch above reads,
- * `.manager-body` supplies the three-column grid, and `.manager-inspector` is the scrollport
- * whose padding box the dock is asserted against.
+ * The three wrapper levels are the shipped ones — `.fabricate-manager` is the area root and
+ * carries the `fabricate-manager` container the width branch above reads, `.manager-body`
+ * supplies the three-column grid, and `.manager-inspector` is the scrollport whose padding box
+ * the dock is asserted against. The area's own custom properties are declared INSIDE it, on
+ * descendants, not on this element; none of them is read here.
  *
  * The two empty `.probe-shell-band` divs are load-bearing, not filler. `.fabricate-manager`
  * is `grid-template-rows: auto auto 1fr`, and the app fills the first two rows with its

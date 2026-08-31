@@ -385,7 +385,7 @@
 </div>
 
 <style>
-  /* Theme-ROOT tokens only (`--fab-mv2-*` is declared on `.fabricate-manager`). The
+  /* Theme-ROOT tokens only (`--fab-manager-*` is declared inside `.fabricate-manager`). The
      content child is the pane's scroller; the paginator remains its sibling below. */
   .manager-travel-parties {
     display: flex;

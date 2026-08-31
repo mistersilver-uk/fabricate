@@ -152,16 +152,17 @@ describe('inspector action button layout', () => {
   // any more. The invariant it protected — the row actions never get squeezed —
   // now lives on the control cluster: it does not shrink, and the identity cell is
   // the only thing that gives way.
+  //
+  // The companion assertion that the retired `--fab-mv2-recipe-grid` column template does
+  // not come back is GONE, and deliberately (issue 1399). It named a token the sheet had
+  // already stopped declaring, so it could only ever pass; `tests/token-generation-gate.test.js`
+  // now bans that whole name shape across `src/` and `styles/` from a population that is
+  // not empty, which is the same guarantee from a gate that can actually fail.
   it('never shrinks the row control cluster', () => {
     const start = css.indexOf('.fabricate-manager .manager-recipe-cluster {');
     assert.ok(start >= 0, 'the recipe row control cluster should own a rule');
     const block = css.slice(start, css.indexOf('}', start));
     assert.ok(block.includes('flex-shrink: 0'), 'the control cluster must not shrink');
-    assert.equal(
-      css.includes('--fab-mv2-recipe-grid'),
-      false,
-      'the card row must not resurrect the retired column grid'
-    );
   });
 
   it('adds a recipe-edit manager-main grid override', () => {

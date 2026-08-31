@@ -64,7 +64,7 @@
              the column WIDTH and kept `size` only as its height, so a widened column
              stretched the tile into a rectangle. The maintainer's note is that the icon must
              read as a square: `size={124}` alone sets both dimensions, and the column below
-             is narrowed to that same 124px (`--fab-mv2-essence-icon-column`) so the picker
+             is narrowed to that same 124px so the picker
              row shrinks to fit beneath the tile rather than hanging past it. `glyph`
              stays: at the shared 0.9rem (~14px) default the flame was a speck in a 124px
              tile, and the prototype's flame fills roughly a third of the tile's edge.

@@ -327,7 +327,7 @@
      exact multi-line selector text in `manager-layout.test.js`.
 
      The row LEAVES the narrow `@container` join and the `display: grid` +
-     `--fab-mv2-essence-grid` join: the first sets `align-items: stretch`, a live flex
+     essence-grid join: the first sets `align-items: stretch`, a live flex
      property that would stretch the medallion and the controls to full card height, and
      the second has no table head left to serve. The replacement narrow behaviour is
      specified below and photographed. */

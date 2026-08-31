@@ -559,8 +559,10 @@
      Scoped to this component, never `styles/fabricate.css`: the band's whole point is
      that it adds no shared rule, which is also what keeps a change here mapped to the
      views that draw it rather than to the broad `theme-or-global-ui` screenshot recipe.
-     Theme-ROOT tokens only, on `Chip.svelte`'s note — this row renders under
-     `.fabricate-app`, where the manager's `--fab-mv2-*` aliases are not in scope. */
+     Theme-ROOT tokens only, on `Chip.svelte`'s note — no scoped `<style>` may reach an
+     area-scoped `--fab-manager-*` property, from any directory and whichever area its host
+     happens to render under. This row renders under `.fabricate-app`, where such a property
+     is not in scope; that is the consequence here, not the reason for the rule. */
 
   /* `display: contents` in the common case, so a row with no band is the flex container
      it has always been and every rule keyed on its children still matches. */

@@ -21,11 +21,15 @@
  *
  * ── WHY EACH ROW CARRIES ITS RESOLVED TEXT ──────────────────────────────────────────────
  * The scan resolves `var()` to a fixed point, so it MANUFACTURES literals the source line does
- * not contain. Without the resolved text beside the raw, a future reader opens
- * `BooksScrollsView.svelte:706`, finds `height: var(--fab-v2-thumb-sm)` with no pixel value
- * anywhere on the line, and has no way to adjudicate the row. Pinning both texts also closes
- * the ratchet's cheapest escape: moving a baselined literal into a new custom property and
- * reading it back leaves the count identical — with the texts pinned, it reds.
+ * not contain. Without the resolved text beside the raw, a future reader opens a row whose cited
+ * line carries no pixel value anywhere on it and has no way to adjudicate it. Pinning both texts
+ * also closes the ratchet's cheapest escape: moving a baselined literal into a new custom
+ * property and reading it back leaves the count identical — with the texts pinned, it reds.
+ *
+ * The corpus held one row of the first kind — a thumbnail sized through a legacy token — until
+ * issue 1399 inlined that token, so every row's raw text now carries its own pixel value except
+ * the two annotated below. The CAPABILITY the annotation exists for is unchanged and is proved
+ * on a synthetic corpus of real files by `tests/style-block-scan.test.js`.
  *
  * ── THE ROWS ARE STRINGS ────────────────────────────────────────────────────────────────
  * One `'file | property | value | count | raw => resolved [; raw => resolved]'` per line,
@@ -103,7 +107,7 @@ const ROWS = Object.freeze([
   'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte | min-height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/journal/HistoryRow.svelte | height | 40 | 1 | 40px => 40px',
-  'src/ui/svelte/apps/manager/BooksScrollsView.svelte | height | 40 | 1 | var(--fab-v2-thumb-sm) => 40px',
+  'src/ui/svelte/apps/manager/BooksScrollsView.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte | height | 36 | 1 | 36px => 36px',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/manager/EmptyState.svelte | height | 32 | 1 | 32px => 32px',
@@ -128,10 +132,20 @@ const ROWS = Object.freeze([
 ]);
 
 /**
- * The three rows whose raw text differs from its resolved text, each with the reason a reader
- * needs before deciding how to pay it down. Two carry no pixel value on the cited line at all;
- * the third writes its 40 there and differs only because another token in the same `calc()`
- * resolves elsewhere, which is why the gate's predicate is the textual one and says so.
+ * The two rows whose raw text differs from its resolved text, each with the reason a reader
+ * needs before deciding how to pay it down. One carries no DECLARED height on the cited line —
+ * a token fallback the corpus never satisfies; the other writes its 40 there and differs only
+ * because another token in the same `calc()` resolves elsewhere, which is why the gate's
+ * predicate is the textual one and says so.
+ *
+ * There were three. `BooksScrollsView.svelte height 40` reached its value only through a legacy
+ * token, and issue 1399 inlined that token, so the row's raw text is now `40px` and it needs no
+ * note. Its ENTRY IS DELETED rather than reworded: `control-height-ladder.test.js` asserts this
+ * object's keys are exactly the rows carrying an indirect text, so a rewritten note would keep
+ * the key and red that `deepEqual`. The thumbnail EXEMPTION it also recorded — art and portraits
+ * are outside the control ladder — survives in the ratchet guidance and in the docblock above
+ * `no new retired control height has been introduced`, which is where it belongs now that the
+ * row is an ordinary literal.
  *
  * Keyed on the row key, and the gate asserts this object holds exactly the rows carrying an
  * indirect text — so an annotation cannot rot into a permission for a row that has become
@@ -154,12 +168,6 @@ export const INDIRECT_HEIGHT_NOTES = Object.freeze({
     'is baselined because a value scanner cannot tell a contribution from a height, and it is ' +
     'called out here so nobody "fixes" it by snapping the 40 to 38 and shrinking the content ' +
     'box. The other four in this row are plain `40px`.',
-  'src/ui/svelte/apps/manager/BooksScrollsView.svelte height 40':
-    'REACHED ONLY THROUGH A TOKEN: line 706 is `height: var(--fab-v2-thumb-sm)`, which ' +
-    '`styles/fabricate.css:127` defines as 40px, so the line carries no pixel value at all and ' +
-    'a text-only scan cannot see it. It is also the one row here that may legitimately stay: it ' +
-    'sizes a THUMBNAIL, and the same requirement exempts art and portraits from the control ' +
-    'ladder. Retiring it means retiring the token, not editing this line.',
 });
 
 /**

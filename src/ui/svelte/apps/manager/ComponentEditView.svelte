@@ -2072,7 +2072,7 @@
      Component-SCOPED rather than added to `styles/fabricate.css`, matching every other
      surface this feature ships: `ComplicationSummaryRow` and the authoring section both
      carry their own `<style>`, and the strip's whole point is that it changes no shared
-     rule. Theme-ROOT tokens only (`--fab-warning*`, never a `--fab-mv2-*` alias), on
+     rule. Theme-ROOT tokens only (`--fab-warning*`, never a `--fab-manager-*` property), on
      `Chip.svelte`'s note, so the band renders the same wherever this row shape is reused.
 
      THE BAND IS ATTACHED, and that overrides the prototype. The Component Studio document

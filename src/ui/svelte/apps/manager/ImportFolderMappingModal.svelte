@@ -530,7 +530,7 @@
      `:global()` sufficient: `<input>` and `<span class="fab-selection-check">` are
      siblings in the component's `wrapper="contents"` mode. */
   .manager-import-mapping-match :global(.fab-selection-input:focus-visible + .fab-selection-check) {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 </style>

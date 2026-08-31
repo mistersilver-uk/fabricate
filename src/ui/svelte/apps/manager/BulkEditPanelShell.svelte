@@ -5,9 +5,11 @@
   for issue 1010).
 
   It lives under `apps/manager/` rather than `apps/manager/components/` for the reason
-  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves, this chrome is
-  manager-scoped, and staying here keeps `--fab-mv2-*` in scope so the extraction is a pure
-  move rather than a re-tokenisation.
+  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves and this chrome
+  is manager-scoped. The token half of that reason — that the placement keeps an
+  area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
+  may not reach one from any directory. The extraction was a pure move regardless: the
+  block below reads theme-root tokens only.
 
   It renders in a browser's existing `.manager-inspector` column and REPLACES that
   browser's single-row inspector for as long as the selection is non-empty. The chrome is
@@ -114,9 +116,13 @@
 </section>
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives
-     HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory, because a component is placed
+     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
+     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
+     any scoped block that tries. The placement's surviving consequence is the screenshot
+     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that actually
      render it instead of matching the broad `theme-or-global-ui` recipe. Because it sits
      OUTSIDE both `apps/manager/components/` and `apps/manager/recipes/`, it is enumerated
@@ -142,7 +148,7 @@
      it is for, and that is the first thing the GM must read. */
   .fab-bulk-edit-eyebrow {
     margin: 0;
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -165,7 +171,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-family: inherit;
     font-size: 0.62rem;
     font-weight: 600;
@@ -174,11 +180,11 @@
   }
 
   .fab-bulk-edit-clear:hover {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
   }
 
   .fab-bulk-edit-clear:focus-visible {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 
@@ -208,7 +214,7 @@
     height: 36px;
     border-radius: 9px;
     background: var(--fab-bg-0);
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.86rem;
   }
 
@@ -220,7 +226,7 @@
   }
 
   .fab-bulk-edit-hero-title {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-family: var(--fab-font-serif);
     font-size: 0.92rem;
     font-weight: 700;
@@ -228,7 +234,7 @@
   }
 
   .fab-bulk-edit-hero-hint {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.62rem;
     line-height: 1.35;
   }
@@ -334,8 +340,8 @@
     margin-bottom: calc(-1 * var(--fab-space-3));
     padding-inline: var(--fab-space-3);
     padding-bottom: var(--fab-space-3);
-    border-top: 1px solid var(--fab-mv2-border);
-    background: var(--fab-mv2-surface-1);
+    border-top: 1px solid var(--fab-border);
+    background: var(--fab-bg-2);
     box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
   }
 
@@ -403,7 +409,7 @@
   }
 
   :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:disabled) {
-    border-color: var(--fab-mv2-border);
+    border-color: var(--fab-border);
     color: var(--fab-text-disabled);
     background: var(--fab-surface-soft);
     cursor: default;
@@ -425,7 +431,7 @@
      wins on specificity rather than on which sheet was injected last, and it is the only one
      of Apply's four rules that does not restate the ancestor its siblings all name. */
   :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:focus-visible) {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 </style>

@@ -607,7 +607,7 @@
     flex-direction: column;
     gap: 14px;
     padding: 14px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-overlay-light-035);
   }
@@ -623,7 +623,7 @@
     align-items: center;
     gap: 8px;
     margin: 0;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.95rem;
     font-weight: 700;
     line-height: 1.2;
@@ -631,12 +631,12 @@
 
   .manager-economy-card-title i,
   .manager-economy-subtitle i {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
   }
 
   .manager-economy-card-hint {
     margin: -2px 0 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.78rem;
     line-height: 1.35;
   }
@@ -653,17 +653,22 @@
     gap: 8px;
     padding: 8px 14px;
     border-radius: 8px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     background: var(--fab-overlay-light-035);
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     cursor: pointer;
     font-weight: 600;
   }
 
+  /* The fill is a NEUTRAL overlay, not an accent tint, and that is the shipped pixel rather
+     than an oversight: this rule asked for a soft accent with the overlay as its fallback,
+     the soft accent was never declared anywhere, and so the overlay is what every theme has
+     always painted. Issue 1399 wrote the surviving branch down. Tinting it is a visible
+     change and needs `--fab-accent-soft`, which does exist. */
   .manager-economy-mode-option.is-active {
-    border-color: var(--fab-mv2-accent);
-    background: var(--fab-mv2-accent-soft, var(--fab-overlay-light-035));
-    color: var(--fab-mv2-text);
+    border-color: var(--fab-accent);
+    background: var(--fab-overlay-light-035);
+    color: var(--fab-text);
   }
 
   .manager-economy-subsection {
@@ -691,7 +696,7 @@
     align-items: center;
     gap: 8px;
     margin: 0;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.85rem;
     font-weight: 700;
   }
@@ -713,10 +718,10 @@
     box-sizing: border-box;
     height: 34px;
     padding: 0 10px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 6px;
-    color: var(--fab-mv2-text);
-    background: var(--fab-mv2-bg);
+    color: var(--fab-text);
+    background: var(--fab-bg-1);
   }
 
   /* Scrollable character list (paginated above 6). Right padding insets the rows
@@ -758,7 +763,7 @@
     align-items: center;
     gap: 8px;
     padding: 6px 8px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-overlay-light-035);
   }
@@ -771,8 +776,8 @@
     padding: 4px 8px;
     border: 0;
     border-radius: 0;
-    background: var(--fab-mv2-surface-2);
-    color: var(--fab-mv2-text-muted);
+    background: var(--fab-bg-3);
+    color: var(--fab-text-muted);
     font-size: 0.7rem;
     text-transform: uppercase;
     font-weight: 700;
@@ -848,11 +853,14 @@
     justify-self: center;
   }
 
-  /* Emphasise the dice button on characters that have not been rolled yet. */
+  /* Emphasise the dice button on characters that have not been rolled yet. The fill is a
+     NEUTRAL overlay for the reason `.manager-economy-mode-option.is-active` records above:
+     the soft accent this rule once deferred to was never declared, so the fallback is the
+     shipped pixel and issue 1399 wrote it down in place of the dead branch. */
   .manager-economy-actor-roll.is-roll-needed {
-    color: var(--fab-mv2-accent);
-    border-color: var(--fab-mv2-accent);
-    background: var(--fab-mv2-accent-soft, var(--fab-overlay-light-035));
+    color: var(--fab-accent);
+    border-color: var(--fab-accent);
+    background: var(--fab-overlay-light-035);
   }
 
   /* Keep the actor-list pagination compact and on a single line. */

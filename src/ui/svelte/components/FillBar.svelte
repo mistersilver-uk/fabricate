@@ -36,8 +36,8 @@
    - size: 'sm' (6px) or 'md' (8px, default) track height.
    - dataAttr / dataValue: an optional test/screenshot hook.
 
-  A component under `components/` may not reference `--fab-mv2-*` or any other alias
-  declared on `.fabricate-manager`; every token below is declared in `:root` and in all
+  A component under `components/` may not reference `--fab-manager-*` or any other property
+  declared inside `.fabricate-manager`; every token below is declared in `:root` and in all
   seven theme blocks.
 -->
 <script>

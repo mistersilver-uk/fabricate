@@ -274,13 +274,13 @@
   }
 
   .manager-scoped-catalogue-fact-label {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.72rem;
     font-weight: 600;
   }
 
   .manager-scoped-catalogue-fact-value {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.72rem;
   }
 
@@ -302,7 +302,7 @@
   }
 
   .manager-scoped-catalogue-system-name {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.74rem;
     font-weight: 600;
     overflow-wrap: break-word;
