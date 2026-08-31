@@ -60,14 +60,16 @@ The six theme ids are `fabricate`, `mythwright`, `ironblood-forge`, `hearth-herb
 
 | Layer | Holds |
 |---|---|
-| **Base `:root`** | non-colour tokens only — spacing `--fab-space-*`, radii, control heights. There is no colour-alias layer: a forwarding alias re-themes nothing and hides its target from every surface outside its own selector, so a surface reads its foundation token directly (design-system spec, *The token namespace is one generation and names its purpose*) |
+| **Base `:root`** | non-colour tokens only — the fonts, spacing `--fab-space-*`, the icon-picker chip/row pair, and the two off-ladder Books & Scrolls radii. There is no control-height token (§1.3) and no colour-alias layer: a forwarding alias re-themes nothing and hides its target from every surface outside its own selector, so a surface reads its foundation token directly (design-system spec, *The token namespace is one generation and names its purpose*) |
 | **`[data-fabricate-theme="…"]` block** | the colour *literals* only — bg, text, accent, semantics, tags, drop-rates, shadows |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Colour *literals* live only in the theme blocks.
-The `:root` layer holds no literals, but it does hold the alias tokens that resolve to them —
-so "base `:root` is colour-free" is about literals, not tokens.
+Colour *literals* live only in the theme blocks — including the default one, whose selector list
+names `:root` itself so an untagged root still themes.
+The BASE `:root` block above those holds no colour of either kind.
+The layer of forwarding colour aliases that used to sit there is gone, so "base `:root` is
+colour-free" is now true of tokens as well as of literals.
 Every theme block defines the **identical** token surface: the contract test asserts each theme
 declares the same >100 token names plus its own palette anchors, and that no `var(--fab-*)`
 reference is left dangling.
@@ -90,8 +92,8 @@ The spacing scale is canonically specified in `openspec/specs/ui-integration/spe
   /* radius — the two the Books & Scrolls tab and the item-page inspector share.
      BOTH ARE OFF the canonical ladder below; they are carried at their shipped
      values because correcting them moves pixels. */
-  --fab-radius-control:5px;      /* inputs, selects, chips */
-  --fab-radius-panel:6px;        /* cards, panels, wells   */
+  --fab-books-control-radius:5px;      /* inputs, selects, chips */
+  --fab-books-panel-radius:6px;        /* cards, panels, wells   */
 }
 ```
 
@@ -199,8 +201,9 @@ sans; mono is only for dice formulas and run IDs.
 - **Radius:** the canonical ladder is in `openspec/specs/design-system/spec.md` — **6** for chips
   at or below 24px, **7** for controls of 26–32px, **9** for controls of 34–38px and for rows and
   wells, **11** for a 44px control and for cards and panels, **999** for pills and tracks.
-  Two shipped tokens, `--fab-radius-control` (5px) and `--fab-radius-panel` (6px), are OFF that
-  ladder and are recorded as debt rather than as a second ladder to design against.
+  Two shipped tokens, `--fab-books-control-radius` (5px) and `--fab-books-panel-radius` (6px),
+  are OFF that ladder; they are named for the surface that carries them, not for a control
+  class, precisely so they read as that surface's debt rather than as a second ladder.
 - **Sizing rhythm:** control and icon-button **34** · thumb-sm **40** · thumb-md **58** ·
   row **72**, written as literals.
 - **Elevation** (`--fab-shadow-*`): `-sm` 0 8 18 · `-md` 0 10 24 · `-lg` 0 14 38 (windows).
@@ -573,7 +576,9 @@ Critical/Warning count pills + a green-check / red-x checklist.
 5. **One loud thing per panel.**
    The primary number and its action win; everything else supports.
 6. **Snap to the scale.**
-   Space in 4px steps; radius 5 / 8 / 10 / 12 / 999; controls on the 34 / 40 / 42 rhythm.
+   Space in 4px steps; radius and control height come from the two ladders in
+   `openspec/specs/design-system/spec.md`, which this file points at in §4 rather than
+   restating — 32 / 36 / 40 are RETIRED control heights, and 40 is a thumbnail size.
 7. **No colour literals in UI.**
    Only `var(--fab-*)`; verify the screen reskins under all six themes before calling it done.
 8. **When it renders correctly in isolation but wrong in Foundry, read the runtime.**

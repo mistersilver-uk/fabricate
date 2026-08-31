@@ -79,21 +79,29 @@ A card that merely sits on the page uses a border and no shadow.
 
 ### Requirement: The token namespace is one generation and names its purpose
 
-The `--fab-*` namespace holds three kinds of custom property and this requirement governs the first.
-THEME FOUNDATIONS are declared in every theme block and re-theme on a swap.
-CALLER-SET PARAMETERS are given a default in the stylesheet and set per instance from markup or script.
-LOCAL LAYOUT PLUMBING is declared on one selector and read by its own descendants.
+The `--fab-*` namespace holds more than one kind of custom property, and a rule that does not say which kind it binds legislates over an undefined subject.
+Three matter here: THEME FOUNDATIONS, declared in every theme block and re-themed on a swap; CALLER-SET PARAMETERS, given a default in the stylesheet and set per instance from markup or script; and AREA-SCOPED PROPERTIES, declared on one or more selectors under a single area's root and undefined outside it.
+The generation rule below binds token NAMES across the whole namespace; the area-scoping rule binds the third kind.
 
-A foundation token name MUST NOT carry a version or generation marker.
+A token name MUST NOT carry a version or generation marker.
 `--fab-v2-*`, `--fab-mv2-*` and `--fab-editor-*` are retired and MUST NOT be reintroduced, and no name of the shape `--fab-v<N>-` or `--fab-mv<N>-` may be minted.
-This is a rule about NAMES and does not bear on the library's own version, which `The primitive set is a closed, versioned vocabulary` governs.
+This bars a marker from a PROPERTY name and decides nothing about the shared primitive vocabulary, whose membership and closure `The primitive set is a closed, versioned vocabulary` governs — nothing in that requirement turns on a token name, and nothing here turns on what the set contains.
 `tests/token-generation-gate.test.js` scans the raw text of every `.css`, `.svelte` and `.js` file under `src/` and `styles/` for those three shapes, so a declaration, a read and a bare mention in a comment all fail alike.
 
 Area scoping is spelled out rather than numbered.
-`--fab-manager-` is the prefix for an area-scoped custom property, and such a property MUST NOT be read outside `.fabricate-manager`, because a shared primitive that reads one renders correctly in the manager and unstyled everywhere else.
-A Svelte scoped `<style>` MUST NOT reach one at all: a component is placed in a directory, not in a DOM subtree, so its own CSS cannot guarantee where its host renders.
+An AREA-SCOPED property is one declared only under the root of a single area, and it MUST NOT be declared or read outside that area, because a shared primitive that reads one renders correctly inside the area and unstyled everywhere else — an out-of-scope custom property makes the declaration invalid at computed-value time rather than failing.
+Every compound of a rule's selector list is judged separately, since the cascade applies a comma-joined rule to each of them.
+`--fab-manager-` is the prefix a NEW area-scoped property under `.fabricate-manager` takes, and carrying the prefix is SUFFICIENT to be governed by this rule but NOT necessary: a set of properties declared exclusively under `.fabricate-manager` selectors predates the convention, carries no prefix, and is bound by the rule all the same — `--fab-recipe-cluster-cols` and `--fab-env-comp-grid` are the same species as the five that do carry it.
+Only the prefixed ones are gated, because a gate reading names cannot tell an unprefixed manager-only property from a foundation token; the prefix is what makes the rule machine-decidable, which is why a new one takes it.
+A Svelte scoped `<style>` MUST NOT reach an area-scoped property at all: a component is placed in a directory, not in a DOM subtree, so its own CSS cannot guarantee where its host renders.
+Nor may a `.js` module or a `.svelte` template spell one into a string, which is the channel a CSS-only scan cannot see and the one that has actually occurred; `tests/token-generation-gate.test.js` reads the global sheet and every scoped `<style>` as CSS, and matches a `var()` read or a `name:` declaration in `src/**` `.js` and `.svelte` text.
 
-#### Scenario: a surface wants its own colour vocabulary
+The forwarding-alias rule below is scoped to COLOUR, and that is narrower than a namespace-wide ban on the single-declaration alias shape.
+The narrowing is deliberate and is recorded rather than left to be inferred: the five `--fab-space-*` semantic aliases are exactly that shape, they are a PUBLISHED vocabulary that `ui-integration` names value by value, and a namespace-wide ban would have made them a carve-out instead of a consistent case.
+A colour alias is different in kind because the value it forwards is the one thing a theme swap must be able to change.
+No gate decides the colour case on its own; what a gate can decide is that the retired names do not return, which is what `tests/token-generation-gate.test.js` holds.
+
+#### Scenario: A surface wants its own colour vocabulary
 
 - **WHEN** a surface wants to name a colour it already gets from a foundation token
 - **THEN** the surface reads the foundation token directly
@@ -109,7 +117,9 @@ A fully rounded radius is for a shape whose contents are text alone.
 A pill that CONTAINS a square element — an icon chip, a thumbnail — takes the control radius for its height instead, and any button inside it squares off to match, because a circle wrapped around a square reads as two competing shapes.
 
 Padding, margin and gap MUST derive from the spacing scale in `ui-integration`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
-Radius, width, height, border widths, font sizes, grid track sizes and breakpoints are NOT spacing-scale members and remain literal.
+Radius, width, height, border widths, font sizes, grid track sizes and breakpoints are NOT spacing-scale members and MUST NOT be derived from `--fab-space-*`.
+They are written as literals by default, and a token is minted for one of them only where the value is SHARED across surfaces or DERIVED from another, in which case the token's declaration MUST record which it is — the shipped cases are `--fab-icon-picker-chip`/`--fab-icon-picker-row`, whose row height is computed from the chip, and `--fab-books-control-radius`/`--fab-books-panel-radius`, which carry two off-ladder radii shared by the Books & Scrolls tab and the item-page inspector so that correcting them onto the ladder stays a one-line edit.
+A token of this kind is a local convenience and never a ladder: naming one for a control class rather than for its surface asserts a rung, and 5px is not one.
 
 Type follows the ladder in `ui-integration`: the serif face names things, the mono face carries every number a GM compares or tunes, and the interface face stays host-owned and untokenized.
 The mono face ships weights 400 and 500 ONLY, so a mono step MUST NOT specify 600 or 700 — those synthesize as faux-bold.
