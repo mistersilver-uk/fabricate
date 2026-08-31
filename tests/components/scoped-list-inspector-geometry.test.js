@@ -292,6 +292,8 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         columnBottom: column.getBoundingClientRect().bottom,
         rowsBottom: rowsRegion.getBoundingClientRect().bottom,
         paginationBottom: pagination.getBoundingClientRect().bottom,
+        paginationHeight: pagination.getBoundingClientRect().height,
+        rowsHeight: rowsRegion.getBoundingClientRect().height,
         listBottom: document.querySelector('.manager-scoped-list').getBoundingClientRect().bottom,
       };
     });
@@ -408,6 +410,18 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       box.paginationBottom >= box.columnBottom - EPSILON_PX,
       `the pagination bar ends at ${box.paginationBottom} inside a column ending at ` +
         `${box.columnBottom}: it floated up under the last row instead of staying at the foot`
+    );
+    // ── AND THE PAGER IS NOT THE THING THAT GREW ────────────────────────────────────────────
+    // `.manager-scoped-list-column > :global(.manager-pagination) { flex: 0 0 auto }` was
+    // ungated: mutating it to `1 1 auto` stretched the pager to 364px on this fixture and the
+    // assertion above STILL PASSED, because a pager that fills the column also ends at the
+    // column's foot. The slack belongs to the rows region — that is what puts the footer at the
+    // bottom rather than making the footer tall — so both halves are stated.
+    assert.ok(
+      box.rowsHeight > box.paginationHeight * 2,
+      `the rows region is ${Math.round(box.rowsHeight)}px against a ${Math.round(
+        box.paginationHeight
+      )}px pager: the pagination bar took the column's slack instead of the list`
     );
   });
 

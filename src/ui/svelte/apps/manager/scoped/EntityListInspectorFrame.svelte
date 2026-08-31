@@ -88,13 +88,20 @@
      their navigation without either of them hand-writing a button run.
    - rowMeta(entry, ctx) / inspectorBody(entry, ctx) / bulk(selectedIds, ctx): see the ctx note
      on `rowContext` below.
-   - selectedId / onSelect(entityId): the inspected row. GENUINELY CONTROLLED-OR-UNCONTROLLED —
-     a row click is the DEFAULT driver, and an owner that changes `selectedId` overrides it at any
-     time, including back to `''` to return the list to resting. Both halves are load-bearing: a
-     deep link, a route parameter restored on re-entry, a re-selection after a create or a delete,
-     and — the sharp one — a page whose route-exit guard REFUSES a navigation and has to put the
-     selection back, all drive it from outside. A frame that latched on the first click would leave
-     that last case unable to undo what it just refused.
+   - selectedId: the inspected row, and BINDABLE — the same idiom `armedToken` uses two lines
+     below, for the same reason. A row click writes it, so the owner and this frame never hold
+     different values, and an owner that sets it overrides the click at any time including back
+     to `''` to return the list to resting. A deep link, a route parameter restored on re-entry,
+     a re-selection after a create or a delete, and — the sharp one — a page whose route-exit
+     guard REFUSES a navigation and has to put the selection back all drive it from outside.
+     THAT LAST CASE IS WHY IT IS A BINDING RATHER THAN A VALUE PLUS INTERNAL STATE. A page that
+     refuses a navigation never adopted the refused id — refusing is exactly not adopting it — so
+     its own value still holds the PREVIOUS one, and "putting the selection back" means writing
+     the value it last pushed. Against a frame holding separate internal state that write is a
+     no-op, and no flip-flop rescues it: signals settle before effects run, so an effect sees
+     only the final value and finds it unchanged. With the click written through, the refused
+     click leaves the owner holding the new id and the restore is a genuine change.
+   - onSelect(entityId): called after the write, so an owner may also react without binding.
    - armedToken: BINDABLE. The frame clears it on any selection, filter, sort or page change, so
      the owner's single-armed-token invariant holds across a re-projection.
 -->
@@ -139,7 +146,7 @@
     rowMeta = undefined,
     inspectorBody = undefined,
     bulk = undefined,
-    selectedId = '',
+    selectedId = $bindable(''),
     onSelect = () => {},
     armedToken = $bindable(''),
   } = $props();
@@ -180,14 +187,6 @@
   let pageIndex = $state(0);
   let pageSize = $state(DEFAULT_PAGE_SIZE);
   let selectedIds = $state(new Set());
-  // Driven by row clicks and re-synced from the owner by the effect below, which also seeds it:
-  // the sentinel starts at `null`, which no prop value can equal, so the first run adopts
-  // whatever the owner mounted with. Seeding it here instead would read a prop in a
-  // non-reactive position, which is the `state_referenced_locally` the compiler is right to
-  // warn about — and `$effect` runs before the browser paints, so nothing flashes.
-  let inspectedId = $state('');
-  /** @type {string|null} The last `selectedId` this frame adopted; `null` until the first run. */
-  let ownerSelection = null;
   /** @type {HTMLElement|null} */
   let inspectorElement = $state(null);
 
@@ -238,23 +237,7 @@
 
   // A row that leaves the FILTERED set stops being inspected: the alternative is an inspector
   // rendering a record the list no longer shows, with no way back to it.
-  const inspectedEntry = $derived(projected.rows.find((entry) => entry.id === inspectedId) ?? null);
-
-  // ── THE OWNER CAN ALWAYS TAKE THE SELECTION BACK ──────────────────────────────────────────
-  // `inspectedId || selectedId` looks like the same thing and is not: `inspectedId` is set on
-  // every row click and never cleared, so under that reading the owner's value is dead from the
-  // first click onward and the prop is initial-only. The page that most needs this is the one
-  // whose route-exit guard refused a navigation and has to restore the selection it just
-  // refused to leave.
-  //
-  // `ownerSelection` is a PLAIN local, not `$state`, on purpose: the effect must depend on the
-  // PROP and on nothing else, so writing the last-seen value cannot re-trigger it. A falsy
-  // `selectedId` is a real instruction — "return to resting" — and is not skipped.
-  $effect(() => {
-    if (selectedId === ownerSelection) return;
-    ownerSelection = selectedId;
-    inspectedId = selectedId;
-  });
+  const inspectedEntry = $derived(projected.rows.find((entry) => entry.id === selectedId) ?? null);
 
   // The clamp writes back, so the owner's state and the footer cannot disagree on the next pass.
   // Converges in one tick: once they are equal the effect assigns nothing.
@@ -323,7 +306,10 @@
   }
 
   function inspect(entityId) {
-    inspectedId = entityId;
+    // THE WRITE IS THE WHOLE MECHANISM. It goes to the binding rather than to internal state, so
+    // this frame and its owner can never hold different ideas of what is inspected — which is
+    // what makes a later restore to a previous id a real change rather than a no-op.
+    selectedId = entityId;
     disarm();
     onSelect(entityId);
     // `tabindex="-1"` makes the inspector a focus TARGET without a tab stop, so the keyboard

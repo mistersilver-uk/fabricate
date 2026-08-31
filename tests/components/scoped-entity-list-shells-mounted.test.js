@@ -274,7 +274,14 @@ describe('the rules-list shell differentiates by entity type from ONE props fact
     it(`a ${entityType.toUpperCase()} renders one source badge per row and resolves img`, async () => {
       const root = await rulesHarness.mount(rulesProps(entityType));
       const listRows = rows(root);
-      assert.ok(listRows.length >= 1);
+      // `>= 3`, NOT `>= 1`. The badge assertion below depends on the fixture rotating all three
+      // source-link fields, which needs three rows — it gets them only from `scopeOf`'s default
+      // `count = 3`. At `>= 1` a later two-row fixture would silently stop exercising
+      // `aliasItemUuids` while this guard went on passing.
+      assert.ok(
+        listRows.length >= 3,
+        `only ${listRows.length} row(s): the source-link rotation needs three to reach all three fields`
+      );
       assert.equal(
         root.querySelectorAll('[data-scoped-list-source]').length,
         listRows.length,
@@ -1142,5 +1149,49 @@ describe('a PAGE change disarms too, which the other four cases do not reach', (
     size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
     await catalogueHarness.setProps({});
     assert.equal(armed(root), false, 'a page-size change left the control armed');
+  });
+});
+
+describe('QE PROBE: the route-exit guard case the spec names', () => {
+  before(() => catalogueHarness.setup());
+  after(() => catalogueHarness.teardown());
+  afterEach(() => catalogueHarness.remount());
+
+  const inspected = (root) =>
+    root.querySelector('[data-scoped-list-inspector-name]')?.textContent.trim() ?? null;
+
+  it('the owner RE-ASSERTS the value it last pushed, after a click it never adopted', async () => {
+    // ── WHY THIS IS THE HARD CASE AND THE OTHER FOUR ARE NOT ────────────────────────────────
+    // A page that REFUSES a navigation never adopted the refused id — refusing is exactly not
+    // adopting it — so its own state still holds the PREVIOUS value. "Putting the selection
+    // back" therefore means writing the value it last pushed, which against a frame holding
+    // separate internal state is a no-op: the prop never changed, so nothing re-runs.
+    //
+    // No flip-flop rescues it either. Signals settle before effects run, so setting the value
+    // away and back within one turn leaves an effect seeing only the final value, equal to what
+    // it last adopted.
+    //
+    // The other four cases all move the prop to a value the frame has not seen, which is why
+    // they passed while this failed.
+    const root = await catalogueHarness.mount(
+      catalogueProps('component', { selectedId: 'component-0' })
+    );
+    assert.equal(inspected(root), 'Ash 00');
+
+    // The GM clicks another row. The page is running its route-exit confirm, so it does NOT
+    // set `selectedId` — it has not decided yet.
+    root.querySelector('[data-scoped-list-inspect="component-1"]').click();
+    await catalogueHarness.setProps({});
+    assert.equal(inspected(root), 'Ash 01', 'the click must land, or this case is vacuous');
+
+    // The confirm is REFUSED. The page puts the selection back to the value it still holds.
+    await catalogueHarness.setProps({ selectedId: 'component-0' });
+    assert.equal(
+      inspected(root),
+      'Ash 00',
+      'the guard could not put the selection back: `selectedId` is bindable and the click ' +
+        'writes it, so the owner holds `component-1` after the click and this restore is a ' +
+        'genuine change rather than a no-op'
+    );
   });
 });

@@ -42,7 +42,8 @@
    - scope / actions / systems: as the catalogue shell, plus `setSectionInherited`.
    - systemId / systemName: the system these rules belong to; the row set is resolved against it.
    - hookValue / title / subtitle / icon / emptyTitle / emptyHint: as the catalogue shell.
-   - filters / sorts / searchOf / sectionNotes / selectedId / onSelect: as the catalogue shell.
+   - filters / sorts / searchOf / sectionNotes / onSelect: as the catalogue shell.
+   - selectedId: BINDABLE, threaded straight through to the frame; see the catalogue shell.
    - onOpenEditor(entityId): the row's pen, into this system's editor for that entity.
    - onOpenWorldEntry(entityId): out to the WORLD entry, because the world default is the thing a
      GM is deciding whether to override and it is one route away.
@@ -68,7 +69,7 @@
     sorts = [],
     searchOf = undefined,
     sectionNotes = {},
-    selectedId = '',
+    selectedId = $bindable(''),
     onSelect = () => {},
     onOpenEditor = () => {},
     onOpenWorldEntry = () => {},
@@ -133,7 +134,7 @@
     {searchOf}
     {rowActions}
     {bulk}
-    {selectedId}
+    bind:selectedId
     {onSelect}
     bind:armedToken
     rowMeta={rulesRowMeta}

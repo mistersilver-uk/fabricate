@@ -51,7 +51,10 @@
    - sectionNotes: `{[section]: string}` — the one-line summary of what each world default
      resolves to. Without it a count reads "Category · 3" and never says WHAT three systems are
      inheriting, and a row-count criterion passes green over every note empty.
-   - selectedId / onSelect(entityId): the inspected row.
+   - selectedId: the inspected row, BINDABLE and threaded straight through to the frame, which
+     writes it on every row click. An owner that binds can never hold a different value from the
+     list, which is what lets a refused navigation restore the selection it declined to leave.
+   - onSelect(entityId): called after the write, for an owner that reacts without binding.
    - onOpenEntry(entityId): the row's pen, into that entity's world entry editor.
    - rowMeta / inspectorBody / bulk: the lane's three snippets.
 -->
@@ -73,7 +76,7 @@
     sorts = [],
     searchOf = undefined,
     sectionNotes = {},
-    selectedId = '',
+    selectedId = $bindable(''),
     onSelect = () => {},
     onOpenEntry = () => {},
     rowMeta = undefined,
@@ -169,7 +172,7 @@
     {rowActions}
     {rowMeta}
     {bulk}
-    {selectedId}
+    bind:selectedId
     {onSelect}
     bind:armedToken
     inspectorBody={catalogueInspector}

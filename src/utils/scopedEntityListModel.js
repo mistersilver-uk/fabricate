@@ -299,24 +299,34 @@ export function createScopedEntityListModel() {
 }
 
 /**
- * The name collator, built ONCE.
+ * The name collator.
  *
- * ── A CODE-POINT COMPARE IS THE WRONG ORDER FOR A LIBRARY OF NAMES ────────────────────────────
- * All three shipped browser models order names with `localeCompare`, and a scoped list sitting
- * one route away from the Component Studio must agree with it: raw `<` and `>` over lowercased
- * strings sorts "Écorce" after "Zinc", so the same corpus under the same label comes out in two
- * different orders depending on which screen a GM is looking at.
+ * ── IT CARRIES NO OPTIONS, AND THE ABSENCE IS THE POINT ───────────────────────────────────────
+ * A raw code-point compare over lowercased keys is the wrong order for a library of names — it
+ * sorts an accented "Ecorce" after "Zinc" — so the comparison has to be locale-aware. What it
+ * must ALSO be is the SAME order the shipped browser models produce, because a scoped list sits
+ * one route away from the Component Studio and the same corpus under the same label must not
+ * come out two different ways depending on which screen a GM is looking at.
  *
- * `numeric: true` fixes the second half of the same complaint — "Ash 10" belongs after "Ash 2",
- * not between "Ash 1" and "Ash 2" — and `sensitivity: 'base'` matches the case-insensitive
- * intent the lowercased keys already had.
+ * All three of those models call BARE `localeCompare` — `componentBrowserModel.js`,
+ * `essenceBrowserModel.js` and `recipeBrowserModel.js` — and a bare `localeCompare` is an
+ * `Intl.Collator` with default options. So the options list here is empty on purpose, and
+ * `tests/scoped-entity-list-model.test.js` pins the order against `localeCompare` ITSELF rather
+ * than against a literal, so the two cannot drift.
  *
- * ONE INSTANCE PER MODEL, not one per comparison: constructing an `Intl.Collator` is the
- * expensive part, and `collator.compare` is a bound function a sort can be handed directly.
+ * `numeric: true` WAS SET HERE AND WAS REMOVED. It is the better reading of "Ash 2" against
+ * "Ash 10" and it has no precedent in this repository, and adding it did not remove the
+ * divergence this collator exists to remove — it MOVED it: the scoped list would order
+ * `Ash 2, Ash 10` while the studio one route away still ordered `Ash 10, Ash 2`, which is the
+ * original complaint in the opposite direction. Ordering the studios numerically is a change
+ * with its own frames and its own three call sites, not a side effect of this one.
+ *
+ * ONE MODULE-LEVEL INSTANCE, shared by every model: constructing a collator is the expensive
+ * part, and `compare` is stateless.
  *
  * @type {Intl.Collator}
  */
-const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+const NAME_COLLATOR = new Intl.Collator();
 
 /**
  * Order two entries by their PRE-DERIVED sort keys.

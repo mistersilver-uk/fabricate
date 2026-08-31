@@ -478,6 +478,20 @@ describe('no scoped shell may call copyMembership without its destination list',
   //
   // The mounted suite asserts the affordance is absent. This asserts the CALL cannot come back
   // in a form that could not work, which is the half a lane adding the source picker will edit.
+  // ── WHAT THIS BAN DOES NOT REACH, RECORDED SO THE NEXT LANE KNOWS ITS EDGES ──────────────
+  // Four bounds, all judged low because the mounted suppression assertion is the second half of
+  // this pair and because every one of them requires writing the call in a shape nothing in this
+  // directory uses:
+  //
+  //  1. `SHELLS` is a hand-maintained three-file list rather than a walk of `scoped/`, so a
+  //     FOURTH shell added later is not scanned until it is added here too;
+  //  2. computed and aliased access — `actions['copyMembership'](a, b)`, or
+  //     `const copy = actions.copyMembership` and then `copy(a, b)` — does not match;
+  //  3. `withoutComments` strips from `//` to end of line unconditionally, so a URL inside a
+  //     string literal sharing a line with a call would hide that call;
+  //  4. an argument that is itself a string or template literal containing a top-level comma
+  //     inflates the count, so a two-argument call could read as three. These arguments are ids
+  //     and expressions in every shipped form.
   const CALL = /copyMembership\s*\??\.?\s*\(/g;
 
   /**

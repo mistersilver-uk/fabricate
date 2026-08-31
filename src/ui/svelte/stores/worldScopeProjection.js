@@ -326,6 +326,33 @@ function buildSystemRow(descriptor, system, membership, worldDefault) {
 }
 
 /**
+ * Whether this identity record actually names a source Item.
+ *
+ * ── A NEW HELPER GOES ABOVE THE DOCBLOCK ABOVE IT, NEVER BETWEEN THE TWO ────────────────────
+ * This function was first inserted between `buildEntry`'s docblock and `buildEntry`, which
+ * silently re-attached a five-parameter contract to a one-parameter helper and left the
+ * function it described undocumented. Nothing catches that: there is no `eslint-plugin-jsdoc`
+ * in this repository's config, so a JSDoc block is a comment and a comment cannot be wrong.
+ *
+ * IT IS THE THIRD TIME THIS SHAPE HAS LANDED IN THIS PROGRAMME — the same insertion happened in
+ * `CraftingSystemManager.js` and again in `worldScopeEntityNotice.js` — which is why the rule is
+ * written at the site rather than left to be rediscovered a fourth time.
+ *
+ * The FIELD LIST is the migration's, imported rather than restated: a rename there must not
+ * leave a second copy here answering about names nothing declares.
+ *
+ * @param {object} entity
+ * @returns {boolean}
+ */
+function entryHasSourceLink(entity) {
+  for (const field of SOURCE_LINK_FIELDS) {
+    const value = entity?.[field];
+    if (Array.isArray(value) ? value.length > 0 : Boolean(value)) return true;
+  }
+  return false;
+}
+
+/**
  * One world entity's entry: its identity record, its world defaults, a row per crafting
  * system, and the counts every world-defaults editor states before an edit lands.
  *
@@ -340,14 +367,6 @@ function buildSystemRow(descriptor, system, membership, worldDefault) {
  * @param {Map<string, object>} membershipIndex
  * @returns {object}
  */
-function entryHasSourceLink(entity) {
-  for (const field of SOURCE_LINK_FIELDS) {
-    const value = entity?.[field];
-    if (Array.isArray(value) ? value.length > 0 : Boolean(value)) return true;
-  }
-  return false;
-}
-
 function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex) {
   const inheritCounts = {};
   for (const section of descriptor.sections) inheritCounts[section] = 0;
