@@ -61,10 +61,19 @@
      `label` is the English fallback, matching the `text()` contract everywhere else.
    - activeTab / onSelect(tabId).
    - badges: per tab id, one mark or an array of them. A mark is a plain value, or
-     `{vehicle, label, tone, name, suppressZero}` — `vehicle` ∈ count/issue/dot (default
+     `{vehicle, label, tone, name, icon, suppressZero}` — `vehicle` ∈ count/issue/dot (default
      `issue`), `tone` ∈ neutral/success/warning/danger and applies to the chip, `name` is
-     the accessible name (REQUIRED by `dot`, which renders no text), and `suppressZero`
-     defaults true so a mark reading `0` is omitted rather than stated as zero.
+     the accessible name (REQUIRED by any mark that renders no text — the `dot`, and the
+     glyph-only chip below), and `suppressZero` defaults true so a mark reading `0` is
+     omitted rather than stated as zero.
+     `icon` is a leading Font Awesome glyph drawn through `Chip`'s own `icon` prop, and is
+     what lets an ISSUE mark be a GLYPH rather than a number — the scoped entry editors'
+     passing Validation tab is a tick, not a count, and a chip reading `0` would state the
+     opposite of what it means. It is a PROPERTY OF THE CHIP and not a fourth vehicle: the
+     chip is still the drawing, the caller supplies no markup, class or shape of its own,
+     and `count` and `dot` drop it because their classes are their drawing. An icon-only
+     chip (empty `label`) is drawn rather than filtered away as empty, and takes `name` for
+     exactly the reason the dot does.
    - ariaLabelKey / ariaLabel: the strip's own accessible name.
    - idStem: builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`.
    - buttonIdStem / panelIdStem: override either half of that pair for a site whose ids do
@@ -128,10 +137,15 @@
   function normalizeMark(tab, mark) {
     const fallbackTone = tab.id === 'validation' ? 'danger' : 'neutral';
     if (mark && typeof mark === 'object') {
+      const vehicle = VEHICLES.has(mark.vehicle) ? mark.vehicle : 'issue';
       return {
-        vehicle: VEHICLES.has(mark.vehicle) ? mark.vehicle : 'issue',
+        vehicle,
         label: mark.label ?? mark.value ?? '',
         tone: mark.tone || fallbackTone,
+        // The glyph belongs to the CHIP alone. `count` and `dot` drop it rather than drawing
+        // it, because their classes ARE their drawing and a caller-chosen shape on either is
+        // the style divergence this capability exists to remove.
+        icon: vehicle === 'issue' && typeof mark.icon === 'string' ? mark.icon : '',
         name: mark.name ?? '',
         suppressZero: mark.suppressZero !== false,
       };
@@ -140,17 +154,19 @@
       vehicle: 'issue',
       label: mark,
       tone: fallbackTone,
+      icon: '',
       name: '',
       suppressZero: true,
     };
   }
 
-  // A dot carries no text, so emptiness is judged on its NAME; every other vehicle is judged
-  // on its label. The zero rule is the caller's to state, because the canonical text settles
-  // it per surface rather than per vehicle: the rail's record counts render `0` and the
-  // Checks strip's do not.
+  // A mark that renders no text is judged on what it DOES render: the dot on its name, the
+  // glyph-only chip on its icon. Everything else is judged on its label. The zero rule is the
+  // caller's to state, because the canonical text settles it per surface rather than per
+  // vehicle: the rail's record counts render `0` and the Checks strip's do not.
   function isDrawable(mark) {
     if (mark.vehicle === 'dot') return mark.name !== '';
+    if (mark.icon !== '') return true;
     if (mark.label === '' || mark.label === null || mark.label === undefined) return false;
     return !(mark.label === 0 && mark.suppressZero);
   }
@@ -193,8 +209,15 @@
   function markAttributes(tab, mark) {
     if (mark.vehicle === 'count') return countAttribute ? { [countAttribute]: tab.id } : {};
     if (mark.vehicle === 'dot') return dotAttribute ? { [dotAttribute]: tab.id } : {};
-    if (!badgeAttribute) return {};
-    return { [badgeAttribute]: tab.id, 'data-badge-tone': mark.tone };
+    // A GLYPH chip renders no text, so without this it would contribute nothing to the tab's
+    // accessible name while a COUNT chip contributes its number: a screen reader would hear
+    // `Validation` for a passing tab and `Validation 3` for a failing one, which is the
+    // difference between the two states being announced and one of them being silent. It
+    // rides the chip rather than the button so the tab's own label stays first. The `dot`
+    // states the same thing on its own element two branches down in the template.
+    const named = mark.name ? { 'aria-label': mark.name } : {};
+    if (!badgeAttribute) return named;
+    return { ...named, [badgeAttribute]: tab.id, 'data-badge-tone': mark.tone };
   }
 
   // Arrow / Home / End, the four the ARIA tablist pattern asks a horizontal strip for. Home
@@ -254,8 +277,11 @@
             {...markAttributes(tab, mark)}
           ></span>
         {:else}
-          <Chip tone={badgeTone(mark.tone)} class={badgeClass} {...markAttributes(tab, mark)}
-            >{mark.label}</Chip
+          <Chip
+            tone={badgeTone(mark.tone)}
+            icon={mark.icon}
+            class={badgeClass}
+            {...markAttributes(tab, mark)}>{mark.label}</Chip
           >
         {/if}
       {/each}

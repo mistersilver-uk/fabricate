@@ -264,13 +264,33 @@
    * The Validation tab's badge. An early-return chain rather than a nested ternary, which
    * SonarCloud reports as S3358.
    *
+   * THE CLEAN STATE IS A TICK, NOT AN ABSENCE (issue 1372). The prototype's tab strip reads
+   * `Validation ✓` (`essEntry.png`) and this returned `''` for it, so the one state a
+   * finished essence is normally in was the one state the strip said nothing about — a GM
+   * could not tell "everything passes" from "the checks have not been considered". The badge
+   * is honest because `essenceValidationPresentation` already resolves all three outcomes:
+   * `counts.blocking` and `counts.warnings` are the other two branches here, and their being
+   * zero IS the pass, which is the same fact `worstStatus` returns as `pass` for the summary
+   * row on the tab's own panel. Nothing is invented to render it.
+   *
+   * It is a GLYPH rather than the word, because the other two branches are counts and a chip
+   * that reads `0` states the opposite of what it means.
+   *
    * @param {{blocking: number, warnings: number}} current
-   * @returns {{label: string, tone: string}|string}
+   * @returns {{label: string, tone: string, icon?: string, name?: string}}
    */
   function validationBadge(current) {
     if (current.blocking > 0) return { label: String(current.blocking), tone: 'danger' };
     if (current.warnings > 0) return { label: String(current.warnings), tone: 'warning' };
-    return '';
+    return {
+      label: '',
+      tone: 'success',
+      icon: 'fas fa-check',
+      name: text(
+        'FABRICATE.Admin.Manager.Scoped.Essence.ValidationPassBadge',
+        'Everything passes'
+      ),
+    };
   }
 
   /**
