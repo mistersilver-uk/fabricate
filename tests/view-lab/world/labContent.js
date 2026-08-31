@@ -3907,6 +3907,12 @@ export function buildLabContent() {
         })),
         {
           id: 'lab-tool-unlinked',
+          // A REAL FOUNDRY PATH, verified against the harvested `icons/` tree rather than
+          // guessed from the naming convention. The earlier `tools/smithing/bellows-tan.webp`
+          // reads like one and does not exist in 14.365: `img` is unvalidated, so the record
+          // rendered its fallback and the only symptom was a 404 the capture harness fails the
+          // whole case on — behind the layout assertion, so nothing reported it until that
+          // assertion passed.
           name: 'Unclaimed Bellows',
           img: `${ICON_BASE}/tools/smithing/furnace-boiler-steel.webp`,
           description: 'A world record no game-world Item stands behind yet.',

@@ -593,9 +593,23 @@
      shipped `.manager-main`, `.manager-kicker`, `.manager-muted`, `.manager-field` and
      `.manager-editor-tabs` treatments are reused rather than restated.
 
-     The rows are SPANNED rather than the template redeclared, for the reason the catalogue
-     page records: the shipped `.manager-main` template is `auto auto 1fr` and a scoped
-     redeclaration is a specificity tie resolved on injection order. */
+     == THE THREE-TRACK TEMPLATE IS REDECLARED, BECAUSE THE SPANS HAD NOTHING TO SPAN =======
+     An earlier revision spanned rows only, on the premise that the shipped `.manager-main`
+     template is `auto auto 1fr` and that a scoped redeclaration is a specificity tie resolved
+     on injection order. Both halves were wrong here.
+
+     `styles/fabricate.css:9589-9601` names `world-tool-entry` among the world-scope views and
+     overrides every one of them to `grid-template-rows: minmax(0, 1fr)` — ONE track. Against
+     one track the head took the whole `1fr`, the mode card and the body opened implicit rows
+     below it, and the screen rendered as a 700px void with the tab panel pushed under it.
+
+     And the tie is settled by adding the element selector: `main.manager-main[data-scoped-page]`
+     is (0,3,1) against the shipped rule's (0,3,0), so it wins wherever it is injected. The
+     catalogue page carries the identical rule for the identical reason. */
+  main.manager-main[data-scoped-page='world-tool-entry'] {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
   .manager-world-tool-entry-head {
     display: flex;
     grid-row: 1;
