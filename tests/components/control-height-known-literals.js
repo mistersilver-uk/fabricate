@@ -1,0 +1,165 @@
+/**
+ * The measured, frozen debt in retired CONTROL HEIGHTS (issue 1391).
+ *
+ * `openspec/specs/design-system/spec.md` closes the control-height ladder at 26, 28, 30, 34, 38
+ * and 44 and retires 32, 36 and 40. Nothing checked it, and half the corpus could not have been
+ * checked: `npm run lint:css` globs `styles/**` only, so the ~433 height declarations inside
+ * Svelte scoped `<style>` blocks were unreachable by stylelint entirely.
+ *
+ * `control-height-ladder.test.js` freezes what is here so nothing new arrives. This file is the
+ * baseline it freezes. It is DEBT, not permission: every row is a control that should move onto
+ * a rung, and the gate fails just as loudly when a row is paid down without being banked.
+ *
+ * ── THE KEY IS (file, property, value), NOT file ────────────────────────────────────────
+ * A per-file count absorbs a swap INSIDE a file, and `styles/fabricate.css` holds 51 of the 86:
+ * turn a 36 into a 40 there, or move a retired value off a card and onto a control, and a
+ * per-file count is unchanged and ships green. Three files hold more than one distinct
+ * (property, value) pair and carry 58 of the 86 between them, so the finer key is not
+ * theoretical. `tests/manager-button-source-contract.test.js` made the same choice, for the
+ * reason its own docblock gives: "counted, so that deleting one of two identical probes is not
+ * silently absorbed". It costs 38 rows instead of 30.
+ *
+ * ── WHY EACH ROW CARRIES ITS RESOLVED TEXT ──────────────────────────────────────────────
+ * The scan resolves `var()` to a fixed point, so it MANUFACTURES literals the source line does
+ * not contain. Without the resolved text beside the raw, a future reader opens
+ * `BooksScrollsView.svelte:706`, finds `height: var(--fab-v2-thumb-sm)` with no pixel value
+ * anywhere on the line, and has no way to adjudicate the row. Pinning both texts also closes
+ * the ratchet's cheapest escape: moving a baselined literal into a new custom property and
+ * reading it back leaves the count identical — with the texts pinned, it reds.
+ *
+ * ── THE ROWS ARE STRINGS ────────────────────────────────────────────────────────────────
+ * One `'file | property | value | count | raw => resolved [; raw => resolved]'` per line,
+ * following `tests/scripts-known-ungated.js`. Thirty-eight uniform object literals would be
+ * thirty-eight identical token runs, and SonarCloud's duplication detector reads `tests/**`
+ * with `sonar.cpd.exclusions` inert — a change earlier in this programme failed that gate at
+ * 23% for exactly this shape. Two tokens a line cannot collide with anything.
+ */
+
+/** The rungs the spec publishes. Also asserted to appear, individually, in the spec text. */
+export const LADDER_RUNGS = Object.freeze([26, 28, 30, 34, 38, 44]);
+
+/** The heights the spec retires. The gate bans these three and nothing else. */
+export const RETIRED_CONTROL_HEIGHTS = Object.freeze([32, 36, 40]);
+
+/**
+ * The six properties that can set a control's height.
+ *
+ * The logical trio contributes ZERO today and is scanned anyway, so a logical-property rewrite
+ * cannot walk around the gate. Every pinned figure below depends on this set being exactly
+ * these six.
+ */
+export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
+  'height',
+  'min-height',
+  'max-height',
+  'block-size',
+  'min-block-size',
+  'max-block-size',
+]);
+
+/**
+ * The headline. Pinned exactly rather than derived, so a hand edit to one row's count that
+ * forgets this number fails rather than quietly re-baselining.
+ */
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 86;
+
+/** Height declarations scanned in `styles/**`, measured. The floor below sits under it. */
+export const MEASURED_STYLESHEET_DECLARATIONS = 526;
+
+/** Height declarations scanned in Svelte `<style>` blocks, measured. */
+export const MEASURED_SVELTE_DECLARATIONS = 433;
+
+/** `'file | property | value | count | raw => resolved [; …]'`, in code-point key order. */
+const ROWS = Object.freeze([
+  'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte | height | 36 | 2 | 36px => 36px',
+  'src/ui/svelte/apps/alchemy/Workbench.svelte | height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | height | 40 | 2 | 40px => 40px',
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | min-height | 40 | 2 | 40px => 40px',
+  'src/ui/svelte/apps/crafting/RecipeListRow.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/crafting/RecipeListRow.svelte | min-height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/crafting/ShoppingList.svelte | min-height | 36 | 1 | 36px => 36px',
+  'src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte | height | 36 | 1 | 36px => 36px',
+  'src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte | height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/inventory/InventoryFilters.svelte | min-height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte | min-height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte | height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/journal/HistoryRow.svelte | height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/manager/BooksScrollsView.svelte | height | 40 | 1 | var(--fab-v2-thumb-sm) => 40px',
+  'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte | height | 36 | 1 | 36px => 36px',
+  'src/ui/svelte/apps/manager/BulkEditSelect.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/manager/EmptyState.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/manager/InspectorActionButton.svelte | min-height | 36 | 1 | 36px => 36px',
+  'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/manager/RosterRow.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/manager/SearchablePopover.svelte | min-height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte | height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/apps/manager/library/LibraryCard.svelte | min-height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte | min-height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte | min-height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/components/ActorSelectTopBar.svelte | height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/components/CollapsibleGroupHeader.svelte | min-height | 32 | 1 | 32px => 32px',
+  'src/ui/svelte/components/Stepper.svelte | height | 36 | 1 | var(--fab-stepper-fill-height, 36px) => 36px',
+  'styles/fabricate.css | height | 32 | 5 | 32px => 32px',
+  'styles/fabricate.css | height | 36 | 15 | 36px => 36px',
+  'styles/fabricate.css | height | 40 | 7 | 40px => 40px',
+  'styles/fabricate.css | min-height | 32 | 11 | 32px => 32px',
+  'styles/fabricate.css | min-height | 36 | 8 | 36px => 36px',
+  'styles/fabricate.css | min-height | 40 | 5 | 40px => 40px ; calc(40px + (2 * var(--fab-space-3)) + 2px) => calc(40px + (2 * 12px) + 2px)',
+]);
+
+/**
+ * The three rows whose value is NOT written on the line the gate cites, each with the reason a
+ * reader needs before deciding how to pay it down.
+ *
+ * Keyed on the row key, and the gate asserts this object holds exactly the rows carrying an
+ * indirect text — so an annotation cannot rot into a permission for a row that has become
+ * direct, and a new indirect row cannot arrive without one.
+ */
+export const INDIRECT_HEIGHT_NOTES = Object.freeze({
+  'src/ui/svelte/components/Stepper.svelte height 36':
+    'A TOKEN FALLBACK, not a declared height: line 355 is ' +
+    '`height: var(--fab-stepper-fill-height, 36px)`, and the retired value is reachable only ' +
+    'when no ancestor sets the token. The token is defined four times in this corpus and NONE ' +
+    'of them is 36px — twice at 28px and twice at 34px — while the docblock above it, at ' +
+    'line 332 documents 36px as the live default wherever nothing sets it. Substituting a ' +
+    'definition would DELETE this row, which is why the scan unions the raw text with the ' +
+    'resolved text rather than replacing one by the other. Paying it down means choosing a rung ' +
+    'for the unparented case, not deleting the fallback.',
+  'styles/fabricate.css min-height 40':
+    'One of these five is not a 40px control. Line 19060 is ' +
+    '`min-height: calc(40px + (2 * var(--fab-space-3)) + 2px)`, where the 40px is a CONTENT ' +
+    'contribution inside a padded well and the resulting control is nowhere near 40px tall. It ' +
+    'is baselined because a value scanner cannot tell a contribution from a height, and it is ' +
+    'called out here so nobody "fixes" it by snapping the 40 to 38 and shrinking the content ' +
+    'box. The other four in this row are plain `40px`.',
+  'src/ui/svelte/apps/manager/BooksScrollsView.svelte height 40':
+    'REACHED ONLY THROUGH A TOKEN: line 706 is `height: var(--fab-v2-thumb-sm)`, which ' +
+    '`styles/fabricate.css:127` defines as 40px, so the line carries no pixel value at all and ' +
+    'a text-only scan cannot see it. It is also the one row here that may legitimately stay: it ' +
+    'sizes a THUMBNAIL, and the same requirement exempts art and portraits from the control ' +
+    'ladder. Retiring it means retiring the token, not editing this line.',
+});
+
+/**
+ * The baseline as parsed rows.
+ *
+ * @returns {ReadonlyArray<{key: string, file: string, property: string, value: number,
+ *   count: number, texts: string[]}>}
+ */
+export const KNOWN_RETIRED_HEIGHTS = Object.freeze(
+  ROWS.map((row) => {
+    const [file, property, value, count, texts] = row.split(' | ');
+    return Object.freeze({
+      key: `${file} ${property} ${value}`,
+      file,
+      property,
+      value: Number(value),
+      count: Number(count),
+      texts: Object.freeze(texts.split(' ; ')),
+    });
+  })
+);
