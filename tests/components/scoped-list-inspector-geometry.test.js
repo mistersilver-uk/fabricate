@@ -177,6 +177,7 @@ function measure() {
 describe("the catalogue shell's inspector column, measured in a real browser", () => {
   let browser = null;
   let markup = '';
+  let unavailableMarkup = '';
 
   before(async () => {
     assert.ok(
@@ -210,6 +211,16 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       inspectorBody: laneInspectorBody,
     });
     markup = target.innerHTML;
+    const unavailableTarget = await harness.mount({
+      scope: projectWorldScopeEntity({ entityType: 'component', corpus: null }),
+      actions: {},
+      systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      hookValue: 'world-components',
+      title: 'Component catalogue',
+      subtitle: 'One per world.',
+      inspectorBody: laneInspectorBody,
+    });
+    unavailableMarkup = unavailableTarget.innerHTML;
     harness.teardown();
     assert.ok(
       markup.includes('data-scoped-list-inspector'),
@@ -221,6 +232,27 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   after(async () => {
     if (browser) await browser.close();
   });
+
+  async function measureUnavailable(windowWidth) {
+    const context = await browser.newContext({
+      viewport: { width: windowWidth, height: HOST_HEIGHT_PX },
+    });
+    const tab = await context.newPage();
+    await tab.setContent(page(unavailableMarkup, windowWidth));
+    const result = await tab.evaluate(() => {
+      const layout = document.querySelector('.manager-scoped-list-layout');
+      const callout = document.querySelector('[data-scoped-list-state="unavailable"]');
+      if (!layout || !callout) return { rendered: false };
+      return {
+        rendered: true,
+        layoutRight: layout.getBoundingClientRect().right,
+        calloutRight: callout.getBoundingClientRect().right,
+        columns: getComputedStyle(layout).gridTemplateColumns,
+      };
+    });
+    await context.close();
+    return result;
+  }
 
   async function measureAt(windowWidth) {
     const context = await browser.newContext({
@@ -290,6 +322,24 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       true,
       `the rows region is ${box.rowsHeight}px around ${box.rowsScrollHeight}px of rows and ` +
         'cannot scroll, so its own `overflow-y: auto` is dead and the page scrolls instead'
+    );
+  });
+
+  it('reserves NO inspector track on the unavailable branch', async () => {
+    // The unavailable branch renders ONE callout and no inspector, so a two-track grid there
+    // paints a 300px void beside a warning. Measured before the fix: the layout was
+    // `836px 300px` and the callout stopped 312px short of the frame's right edge.
+    const box = await measureUnavailable(WIDE_WINDOW_PX);
+    assert.equal(box.rendered, true, 'the unavailable callout is absent from the page');
+    assert.equal(
+      box.columns.split(' ').length,
+      1,
+      `the layout is \`${box.columns}\` — a second track beside a warning with nothing in it`
+    );
+    assert.ok(
+      box.calloutRight >= box.layoutRight - EPSILON_PX,
+      `the callout ends at ${box.calloutRight} inside a layout ending at ${box.layoutRight}, ` +
+        `leaving a ${Math.round(box.layoutRight - box.calloutRight)}px void`
     );
   });
 

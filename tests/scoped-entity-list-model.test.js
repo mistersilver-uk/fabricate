@@ -251,6 +251,27 @@ describe('scopedEntityListModel filters', () => {
     );
   });
 
+  it('orders names the way the three shipped browser models do', () => {
+    // A raw code-point compare over lowercased keys sorts "Ecorce" with an accent AFTER "Zinc",
+    // so the same corpus comes out in two different orders depending on whether a GM is looking
+    // at a scoped list or the Component Studio one route away. `numeric: true` is the other half
+    // of the same complaint: "Ash 10" belongs after "Ash 2", not between "Ash 1" and "Ash 2".
+    const named = (id, name) => ({ id, entity: { name }, membershipCount: 0, systems: [] });
+    const model = createScopedEntityListModel();
+    const { rows } = model.project({
+      entries: [
+        named('1', 'Zinc'),
+        named('2', 'Écorce'),
+        named('3', 'Ash 10'),
+        named('4', 'Ash 2'),
+      ],
+    });
+    assert.deepEqual(
+      rows.map((row) => row.entity.name),
+      ['Ash 2', 'Ash 10', 'Écorce', 'Zinc']
+    );
+  });
+
   it('falls back to the id when an entry has no name', () => {
     assert.equal(scopedEntryName({ id: 'ash', entity: {} }), 'ash');
     assert.equal(scopedEntryName({ id: 'ash', entity: { name: '  ' } }), 'ash');
