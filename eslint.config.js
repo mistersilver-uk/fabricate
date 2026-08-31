@@ -250,6 +250,7 @@ export default [
       globals: { ...svelteRuneGlobals },
     },
   },
+
   // 5. Browser + Foundry runtime globals for shipped module code.
   {
     files: ['src/**/*.js', 'main.js'],

@@ -76,15 +76,16 @@ export const DEFAULT_TOOL_BREAKAGE_AUTHORITY = 'toolSpecific';
  * not import: `GatheringEngine.js` (its private `DEFAULT_BLOCKED_REASON_KEYS` map plus four
  * `_blockedReason` call sites), the player app's `gatheringBlockedReasons.js` label and callout
  * maps, and `GatheringTaskRequirements.svelte`, which filters the token out of the requirement
- * callouts. Importing this module into any of them would drag a Foundry consumer, or a UI leaf,
+ * callouts. Importing any of them into this module would drag a Foundry consumer, or a UI leaf,
  * into a deliberate leaf that has neither - which is the reason, and it is about what this
  * module may DEPEND ON rather than about what depends on it. Eight modules import it, this
  * file's own header calls it live, and the read seam of issue 1370 is one of them. So the
  * shipped copies are held together by a drift guard in `tests/entity-scope-resolvers.test.js`
- * that fails if the literal stops matching this constant. That guard scrapes the first two files only; the Svelte
- * leaf is named here so the count is honest. Issue 1370's READ repointing did NOT converge the
- * three onto this export - it repointed readers of the ENTITY ARRAYS, which is a different set -
- * so the convergence is still owed, and the lane that takes it must not work from an undercount.
+ * that fails if the literal stops matching this constant. That guard scrapes the first two
+ * files only; the Svelte leaf is named here so the count is honest. Issue 1370’s READ
+ * repointing did NOT converge the three onto this export - it repointed readers of the ENTITY
+ * ARRAYS, which is a different set - so the convergence is still owed, and the lane that takes
+ * it must not work from an undercount.
  *
  * @type {string}
  */
