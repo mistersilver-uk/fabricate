@@ -24,6 +24,38 @@
  */
 
 /**
+ * The value one attribute is given on the FIRST `<Component …>` tag in `source`.
+ *
+ * ── WHY THIS EXISTS BESIDE THE SPREAD DETECTOR ────────────────────────────────────────────────
+ * `paginateRows` clamps the index it RETURNS, and both the row slice and the pagination footer
+ * have to read that returned value rather than the frame's own state. The frame ALSO writes the
+ * clamped value back — which is correct, and which makes the defect unobservable in a settled
+ * DOM: within one flush the two indices agree by construction, so a mounted assertion cannot see
+ * the single wrong frame in between. Measured: handing `Pagination` the frame's raw `pageIndex`
+ * left the whole mounted suite green.
+ *
+ * So the footer's input is pinned structurally instead, and — like the spread detector — the
+ * parse is proved against a positive and a negative fixture before it is applied, because a
+ * source probe that matched nothing would report exactly the same green.
+ *
+ * @param {string} source
+ * @param {string} component the component's local binding name
+ * @param {string} attribute the prop name
+ * @returns {string|null} the raw attribute value, `''` for a shorthand `{pageIndex}`, or `null`
+ *   when the tag or the attribute is absent
+ */
+export function attributeValueOn(source, component, attribute) {
+  const start = source.indexOf(`<${component}`);
+  if (start === -1) return null;
+  const tag = openTagAt(source, start);
+  const named = new RegExp(String.raw`\b${attribute}=\{([^{}]*(?:\{[^{}]*\})?[^{}]*)\}`).exec(tag);
+  if (named) return named[1].trim();
+  // Svelte's shorthand: `{pageIndex}` passes the local of that name, and it is exactly the
+  // mutation — a probe that only understood the named form would answer `null` for it and pass.
+  return new RegExp(String.raw`\{\s*${attribute}\s*\}`).test(tag) ? '' : null;
+}
+
+/**
  * The open tag beginning at `start`, brace-aware.
  *
  * A naive `[^>]*` stops at the first `>` in the tag, and Svelte call sites are full of arrow

@@ -25,7 +25,11 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { listSvelteComponents } from '../../scripts/lib/svelteComponentFiles.js';
-import { detectShellSpreads, shellBindingsIn } from '../helpers/scopedShellSpread.js';
+import {
+  attributeValueOn,
+  detectShellSpreads,
+  shellBindingsIn,
+} from '../helpers/scopedShellSpread.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SCOPED_DIR = 'src/ui/svelte/apps/manager/scoped';
@@ -294,5 +298,52 @@ describe('the spread detector, proved against fixtures before it is applied', ()
         'nothing and would stay green with the detector removed'
     );
     assert.equal(offenders.length, 0, offenders.join('\n'));
+  });
+});
+
+describe('the pagination footer is fed the CLAMPED index', () => {
+  // ── WHY THIS IS A SOURCE PIN AND NOT A MOUNTED ASSERTION ────────────────────────────────
+  // The frame renders `Pagination` from `paginateRows`' returned index AND writes that index
+  // back to its own state. The write-back is correct and it is also what makes the defect
+  // invisible at rest: within one flush the frame's `pageIndex` and the returned one agree, so
+  // a settled DOM cannot tell them apart. Measured — handing `Pagination` the raw `pageIndex`
+  // left all 33 mounted cases green. The behaviour the CLAMP itself protects is measured in
+  // the mounted suite, by shrinking the corpus under a GM sitting on a later page; this pins
+  // the one thing that suite structurally cannot see.
+  const FIXTURE_CLAMPED = `<Pagination
+  persistent={true}
+  totalCount={page.totalCount}
+  pageIndex={page.pageIndex}
+  onPageChange={(next) => go(next)}
+/>`;
+  const FIXTURE_RAW = `<Pagination
+  persistent={true}
+  onPageChange={(next) => go(next)}
+  {pageIndex}
+/>`;
+
+  it('reads the clamped value off a fixture that has one', () => {
+    assert.equal(attributeValueOn(FIXTURE_CLAMPED, 'Pagination', 'pageIndex'), 'page.pageIndex');
+  });
+
+  it('reads the SHORTHAND raw value off a fixture that has that instead', () => {
+    // `{pageIndex}` is the shorthand for `pageIndex={pageIndex}` and is exactly the mutation;
+    // a probe that only understood the named form would report `null` for it and pass.
+    assert.equal(attributeValueOn(FIXTURE_RAW, 'Pagination', 'pageIndex'), '');
+  });
+
+  it('answers null when the component or the attribute is absent', () => {
+    assert.equal(attributeValueOn('<Pagination persistent={true} />', 'Pagination', 'pageIndex'), null);
+    assert.equal(attributeValueOn(FIXTURE_CLAMPED, 'Medallion', 'pageIndex'), null);
+  });
+
+  it('and the FRAME feeds it the returned index', () => {
+    assert.equal(
+      attributeValueOn(sourceOf(FRAME), 'Pagination', 'pageIndex'),
+      'page.pageIndex',
+      "`Pagination` computes its displayed range from the index its OWNER hands it, so a frame " +
+        'that clamped for slicing and passed its own raw state states a range the list does not ' +
+        'show for the frame before the write-back lands'
+    );
   });
 });

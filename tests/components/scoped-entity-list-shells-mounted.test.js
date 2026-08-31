@@ -845,35 +845,64 @@ describe('the page index is clamped and the footer reads the clamped value', () 
   after(() => catalogueHarness.teardown());
   afterEach(() => catalogueHarness.remount());
 
-  it('shows the rows AND a range that agree after a filter shrinks the list', async () => {
+  it('clamps when the CORPUS shrinks under a GM sitting on a later page', async () => {
+    // THE FILTER PATH DOES NOT REACH THE CLAMP, and finding that out is what this test is for.
+    // Every filter, sort and membership change in the frame resets the page to zero itself, so
+    // driving the search box can never leave a stale index for `paginateRows` to clamp. The path
+    // that DOES reach it is a re-projection: another client deletes rows, `worldScope` republishes
+    // a shorter corpus, and the GM is still on page three. Measured — with the clamp weakened to
+    // `Math.max(0, ...)` the search-box version of this test stayed green, which is why it was
+    // replaced rather than kept beside this one.
     const root = await catalogueHarness.mount(
       catalogueProps('component', { scope: scopeOf('component', { count: 60 }) })
     );
-    // Page three of three, then a query matching three rows.
     root.querySelector('[data-pagination-next]').click();
     await catalogueHarness.setProps({});
     root.querySelector('[data-pagination-next]').click();
     await catalogueHarness.setProps({});
-    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 3 of 3/);
+    assert.match(
+      root.querySelector('[data-pagination-page]').textContent,
+      /Page 3 of 3/,
+      'the fixture never reached page three, so nothing below has a stale index to clamp'
+    );
 
-    const search = root.querySelector('[data-scoped-list-search]');
-    search.value = 'Ash 0';
-    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
-    await catalogueHarness.setProps({});
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 10 }) });
 
-    assert.equal(rows(root).length, 10, 'Ash 00–Ash 09');
+    assert.equal(
+      rows(root).length,
+      10,
+      'an unclamped index slices past the end of the shorter corpus and renders ZERO rows — ' +
+        'under a set that is not empty, and therefore with no empty state to explain it'
+    );
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 1/);
     assert.match(
       root.querySelector('[data-pagination-summary]').textContent,
       /Showing 1–10 of 10/,
-      'a footer fed the frame\'s OWN unclamped index states a range the list does not show, ' +
-        'under a filtered set that is not empty and therefore renders no empty state'
+      'the footer states a range the list does not show'
     );
     assert.equal(
       root.querySelector('.manager-scoped-list-rows').querySelectorAll('.manager-empty').length,
       0,
-      'the filtered set is not empty, so nothing in the LIST region must claim it is'
+      'the corpus is not empty, so nothing in the LIST region must claim it is'
     );
+  });
+
+  it('resets the page itself on a filter change, which is why the case above shrinks the corpus', async () => {
+    // Stated as its own assertion rather than left as a comment: it is the reason the clamp is
+    // unreachable from the search box, and if it ever stops holding the case above is measuring
+    // something else.
+    const root = await catalogueHarness.mount(
+      catalogueProps('component', { scope: scopeOf('component', { count: 60 }) })
+    );
+    root.querySelector('[data-pagination-next]').click();
+    await catalogueHarness.setProps({});
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 3/);
+    const search = root.querySelector('[data-scoped-list-search]');
+    search.value = 'Ash 0';
+    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await catalogueHarness.setProps({});
+    assert.equal(rows(root).length, 10, 'Ash 00–Ash 09');
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 1/);
   });
 
   it('keeps the pagination footer present below one page of rows', async () => {
