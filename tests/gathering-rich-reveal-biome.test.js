@@ -19,6 +19,28 @@ function makeService({ config = {}, userId = 'user-1' } = {}) {
   return { service, settings };
 }
 
+// Foundry `expandObject`s flag data on write: EVERY dotted key, at every depth, is split
+// into nested objects. This fixture used to store the value verbatim — a LOOSER double
+// than the real thing, and the reason every test in this file passed while blind reveals
+// never once worked in the game. A reveal keyed by the dotted actor uuid was silently
+// re-shaped into `reveals["actor:Actor"]["actor-1:env-a:task-1"]`, which no reader can
+// find, and the verbatim double hid that completely.
+function expandDottedKeys(value) {
+  if (Array.isArray(value)) return value.map(entry => expandDottedKeys(entry));
+  if (!value || typeof value !== 'object') return value;
+  const expanded = {};
+  for (const [key, entry] of Object.entries(value)) {
+    const segments = String(key).split('.');
+    let cursor = expanded;
+    for (const segment of segments.slice(0, -1)) {
+      if (!cursor[segment] || typeof cursor[segment] !== 'object') cursor[segment] = {};
+      cursor = cursor[segment];
+    }
+    cursor[segments.at(-1)] = expandDottedKeys(entry);
+  }
+  return expanded;
+}
+
 // Minimal actor that stores fabricate gathering flag state in memory, matching
 // the getFlag/setFlag surface the reveal helpers read and write.
 function makeActor({ id = 'actor-1', uuid = 'Actor.actor-1' } = {}) {
@@ -28,11 +50,43 @@ function makeActor({ id = 'actor-1', uuid = 'Actor.actor-1' } = {}) {
     uuid,
     getFlag: (ns, key) => flags[`${ns}.${key}`],
     setFlag: (ns, key, value) => {
-      flags[`${ns}.${key}`] = value;
+      flags[`${ns}.${key}`] = expandDottedKeys(value);
       return Promise.resolve(value);
     }
   };
 }
+
+test('a reveal is filed under a key Foundry cannot take apart', async () => {
+  const { service } = makeService();
+  const actor = makeActor({ id: 'actor-1', uuid: 'Actor.actor-1' });
+
+  await service.revealTask(actor, { environmentId: 'env-a', taskId: 'task-1', scope: 'actor' });
+
+  const keys = Object.keys(actor.getFlag('fabricate', 'gatheringState').reveals);
+  assert.equal(keys.length, 1, 'exactly one reveal is filed');
+  assert.ok(
+    !keys[0].includes('.'),
+    `the reveal key must carry no dot for expandObject to split on (got ${keys[0]})`
+  );
+  assert.deepEqual(
+    service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'actor' }),
+    ['task-1'],
+    'and it reads back — a reveal that cannot be read is a reveal that never happened'
+  );
+});
+
+test('a reveal survives a dotted task id', async () => {
+  const { service } = makeService();
+  const actor = makeActor();
+
+  await service.revealTask(actor, { environmentId: 'env-a', taskId: 'task.one', scope: 'actor' });
+
+  assert.deepEqual(
+    service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'actor' }),
+    ['task.one'],
+    'the REAL id comes back, not the sanitised key segment it was filed under'
+  );
+});
 
 test('countRevealedTasks counts distinct actor-scoped reveals for one environment', async () => {
   const { service } = makeService();

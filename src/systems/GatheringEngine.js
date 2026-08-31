@@ -1931,7 +1931,7 @@ export class GatheringEngine {
         diagnostic: visibility.diagnostic ?? null,
       },
       resolutionMode: stringOrNull(task.resolutionMode),
-      hasTimeRequirement: Boolean(task.timeRequirement),
+      hasTimeRequirement: hasTimeRequirement(task),
       successChance:
         typeof this.richState?.taskSuccessChance === 'function'
           ? this.richState.taskSuccessChance(task, environment)
@@ -2014,6 +2014,44 @@ export class GatheringEngine {
 
   _isOpaqueBlindTask({ environment, viewer }) {
     return environment.selectionMode === 'blind' && viewer?.isGM !== true;
+  }
+
+  /**
+   * Whether this viewer must still be told WHICH task an attempt resolved to via the
+   * generic blind label rather than its real name.
+   *
+   * Distinct from {@link GatheringEngine#_isOpaqueBlindTask}, which answers only "is this
+   * a non-GM in a blind environment" and therefore stays true forever, even for a task the
+   * reveal policy has already disclosed. Identity is hidden while BOTH hold: the task is
+   * opaque to this viewer AND the actor has no reveal recorded for it at the environment's
+   * reveal scope. Reading the recorded reveal — rather than re-deriving the policy — is
+   * what keeps the chat card in step with the listing: the same reveal the listing renders
+   * as a named `discoveredTasks` row is the one that lets the card name the task, and a
+   * reveal write that failed (it is advisory and swallowed) leaves both generic instead of
+   * a card naming a task the listing still hides.
+   *
+   * @private
+   * @param {object} args
+   * @param {object} args.environment Composed environment.
+   * @param {?object} args.viewer Active viewer payload.
+   * @param {?object} args.actor Acting actor, whose flag holds the reveal state.
+   * @param {?object} args.task Resolved task.
+   * @returns {boolean} True when the real task identity must not be disclosed.
+   */
+  _isBlindIdentityHidden({ environment, viewer, actor, task }) {
+    if (!this._isOpaqueBlindTask({ environment, viewer })) return false;
+    const taskId = stringOrNull(task?.id);
+    const environmentId = stringOrNull(environment?.id);
+    if (!taskId || !environmentId) return true;
+    if (typeof this.richState?.listRevealedTaskIds !== 'function') return true;
+    const { scope } = this._resolveRevealPolicy(environment);
+    try {
+      return normalizeList(
+        this.richState.listRevealedTaskIds({ actor, environmentId, scope })
+      ).every((id) => String(id) !== taskId);
+    } catch {
+      return true;
+    }
   }
 
   _gamePaused() {
@@ -3278,6 +3316,17 @@ export class GatheringEngine {
       environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
     );
 
+    // A blind draw the reveal policy has not disclosed yet must not be named to ANYONE —
+    // not in the roll prompt this player is about to read, and not in the flavour of the
+    // pooled `Nd100` message, which `toMessage` posts to the whole table. The label is the
+    // same generic one the listing shows, so the roll says no more than the button did.
+    // Resolved BEFORE the attempt, so it reflects what the player knew when they clicked;
+    // a reveal this attempt earns names the task on the result card instead.
+    const identityHidden = this._isBlindIdentityHidden({ environment, viewer, actor, task });
+    const rollLabel = identityHidden
+      ? this.localize(BLIND_TASK_LABEL_KEY)
+      : (task?.name ?? 'Gathering');
+
     // Interactive d100 (opt-in): the d100 path does NOT use a Foundry `Roll` DC —
     // each drop row / event is an independent percentile check. So there is no DC
     // to show; the prompt just confirms the attempt and collects an optional flat
@@ -3288,10 +3337,10 @@ export class GatheringEngine {
       // No DC is passed: the d100 path has no single DC (each row/event is an
       // independent percentile check), so the dialog shows no DC line.
       const choice = await promptCheckRoll({
-        label: `${task?.name ?? 'Gathering'} — Gathering`,
-        name: task?.name,
+        label: `${rollLabel} — Gathering`,
+        name: identityHidden ? rollLabel : task?.name,
         activity: 'Gathering',
-        img: task?.img,
+        img: identityHidden ? null : task?.img,
       });
       if (!choice || choice.confirmed === false) {
         return { status: 'cancelled', resultGroups: [], checkResult: null };
@@ -3317,7 +3366,7 @@ export class GatheringEngine {
       extraModifier,
       rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
       speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
-      flavor: `${task?.name ?? 'Gathering'} — Gathering check`,
+      flavor: `${rollLabel} — Gathering check`,
     });
     if (resolved?.status === 'misconfigured') {
       return misconfiguredOutcome({
@@ -3646,6 +3695,10 @@ export class GatheringEngine {
   }) {
     await this._maybeRevealBlindTask({ actor, environment, task, status });
     const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    // Read AFTER `_maybeRevealBlindTask`, so an attempt that earns its own reveal
+    // (`onAttempt`, or `onSuccess` on a success) names the task on the card it produced,
+    // while `never` — and `onSuccess` on a failure — keep the generic label.
+    const identityHidden = this._isBlindIdentityHidden({ environment, viewer, actor, task });
     const publicRun = opaqueBlind
       ? redactBlindTerminalRun(run)
       : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), {
@@ -3676,20 +3729,29 @@ export class GatheringEngine {
       // set only when something fired, so a transparent attempt with no complications
       // returns exactly the response it did before this feature existed.
       if (complications.length > 0) response.complications = complications;
-
-      // Blind tasks are redacted; only post the rich summary for transparent runs.
-      await this._postGatheringChatMessage({
-        actor,
-        system,
-        task,
-        status,
-        createdResults,
-        usedTools,
-        checkResult,
-        run,
-        complications,
-      });
     }
+
+    // Posted for EVERY terminal attempt, blind included. Suppressing it for blind runs
+    // made a successful blind gather indistinguishable from nothing happening: the items
+    // were created and the stamina and node were spent, but the player's only artefact
+    // was the bare percentile pool, and the start response withholds `createdResults` by
+    // design. The card is the outcome channel the whole gathering UI relies on (the view
+    // notifies only on an explicit rejection), so a blind attempt without one reports
+    // nothing at all. Blindness is about WHICH task was drawn, not about whether the
+    // player may see what landed in their own inventory, so the card carries the real
+    // haul and withholds only the identity.
+    await this._postGatheringChatMessage({
+      actor,
+      system,
+      task,
+      status,
+      createdResults,
+      usedTools,
+      checkResult,
+      run,
+      complications,
+      identityHidden,
+    });
 
     // Publish the documented public completion hook(s) for other module authors,
     // after side effects (item creation, tool breakage, chat) are committed so
@@ -3759,6 +3821,7 @@ export class GatheringEngine {
     checkResult,
     run,
     complications = [],
+    identityHidden = false,
   }) {
     if (!system || system.features?.chatOutput !== true) return;
 
@@ -3834,7 +3897,9 @@ export class GatheringEngine {
         {
           status,
           actorName: stringOrEmpty(actor?.name),
-          taskName: stringOrEmpty(task?.name),
+          taskName: identityHidden
+            ? this.localize(BLIND_TASK_LABEL_KEY)
+            : stringOrEmpty(task?.name),
           components,
           events,
           brokenTools,
@@ -3844,8 +3909,12 @@ export class GatheringEngine {
           // this client only guessed. When the depletion was relayed to the active GM
           // the evidence is flagged non-authoritative and the stat is omitted rather
           // than published wrong (`renderStat` drops a null value).
+          // The in-memory run carries UNREDACTED rich evidence (`_commitRichAttempt`'s
+          // return is merged onto it after the redacted history write), so a hidden-identity
+          // blind card would otherwise publish the drawn task's own node count — a number
+          // a non-GM is never shown for a blind task — into a permanent world document.
           nodesRemaining:
-            run?.economyEvidence?.node?.authoritative === false
+            identityHidden || run?.economyEvidence?.node?.authoritative === false
               ? null
               : (run?.economyEvidence?.node?.remaining ?? null),
         },
@@ -4512,8 +4581,11 @@ function validateTaskConfiguration(task, system = null) {
     }
   }
 
-  if (hasTimeRequirement(task) && !normalizeTimeRequirement(task.timeRequirement)) {
-    errors.push('Gathering time requirement must include at least one positive duration field');
+  const unusableDurations = unusableTimeRequirementFields(task?.timeRequirement);
+  if (unusableDurations.length > 0) {
+    errors.push(
+      `Gathering time requirement fields must be non-negative numbers: ${unusableDurations.join(', ')}`
+    );
   }
 
   if (task?.failureOutcome) {
@@ -4567,8 +4639,41 @@ function validateResultGroupNames(resultGroups) {
   return errors;
 }
 
+/**
+ * Whether a task actually takes time — i.e. carries at least one POSITIVE duration field.
+ *
+ * This used to ask only whether the `timeRequirement` key was present, which made an empty
+ * or all-zero object — exactly what the editor persists once a duration has been opened and
+ * cleared back to nothing — read as "this task is timed". Every consumer then drew the wrong
+ * conclusion: validation demanded a positive field and rejected the task as misconfigured,
+ * blocking the player on a shape that plainly means "no duration"; the start path routed an
+ * immediate task down the waiting branch; and the listing advertised a delay that never came.
+ * "No duration" is authoring, not misconfiguration, so it must resolve immediately.
+ *
+ * @param {?object} task
+ * @returns {boolean}
+ */
 function hasTimeRequirement(task) {
-  return task?.timeRequirement !== null && task?.timeRequirement !== undefined;
+  return normalizeTimeRequirement(task?.timeRequirement) !== null;
+}
+
+/**
+ * Duration fields a GM authored but that cannot be used — present and non-blank, yet not a
+ * finite non-negative number. An ABSENT or zero field is not one of these: it is the ordinary
+ * way to say "no duration". This is the only part of the old validation worth keeping, and it
+ * is what separates a typo worth reporting from an immediate task worth running.
+ *
+ * @param {?object} timeRequirement
+ * @returns {string[]} Offending field names.
+ */
+function unusableTimeRequirementFields(timeRequirement) {
+  if (!timeRequirement || typeof timeRequirement !== 'object') return [];
+  return ['minutes', 'hours', 'days', 'months', 'years'].filter((field) => {
+    const raw = timeRequirement[field];
+    if ([undefined, null, ''].includes(raw)) return false;
+    const value = Number(raw);
+    return !Number.isFinite(value) || value < 0;
+  });
 }
 
 /**
