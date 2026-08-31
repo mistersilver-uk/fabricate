@@ -96,7 +96,7 @@ export const MAX_VAR_CHAIN_DEPTH = 8;
  * two answers are not close and the reassuring one is the narrow one. Across the six height
  * properties the widest candidate set is FOUR, at `components/Stepper.svelte:355`. Resolve
  * every declaration in the corpus instead and one of them already EXCEEDS this cap and
- * throws: `styles/fabricate.css:16025` builds a four-stop `linear-gradient` out of four colour
+ * throws: `styles/fabricate.css:16026` builds a four-stop `linear-gradient` out of four colour
  * tokens, each defined once per theme, and 512 is not enough for it. The widest that does
  * resolve is 345, a `box-shadow` at `styles/fabricate.css:16070`.
  *
