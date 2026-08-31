@@ -192,7 +192,16 @@ export function createScopedEntityListModel() {
     const sortKey = new Map();
     for (const entry of entries) {
       text.set(entry.id, String(searchOf(entry) ?? '').toLowerCase());
-      sortKey.set(entry.id, scopedEntryName(entry).toLowerCase());
+      // THE SORT KEY IS THE RAW NAME. It was lowercased, which was doing the case-insensitivity
+      // work back when this compared with `<` and `>`; a collator does that itself at the
+      // primary level and uses case only as a tertiary tiebreak. Keeping the lowercase left
+      // this list disagreeing with the three studios on names that differ only in case —
+      // ["Ash","ash"] came out ["Ash","ash"] here and ["ash","Ash"] there — which is the exact
+      // divergence the collator exists to remove, reintroduced one line above it.
+      //
+      // The SEARCH string is still lowercased, two lines up: matching a query is a different
+      // job from ordering a library, and it is case-insensitive on purpose.
+      sortKey.set(entry.id, scopedEntryName(entry));
     }
     searchCache = { entries, searchOf, text, sortKey };
     return searchCache;
@@ -310,9 +319,15 @@ export function createScopedEntityListModel() {
  *
  * All three of those models call BARE `localeCompare` — `componentBrowserModel.js`,
  * `essenceBrowserModel.js` and `recipeBrowserModel.js` — and a bare `localeCompare` is an
- * `Intl.Collator` with default options. So the options list here is empty on purpose, and
- * `tests/scoped-entity-list-model.test.js` pins the order against `localeCompare` ITSELF rather
- * than against a literal, so the two cannot drift.
+ * `Intl.Collator` with default options. So the options list here is empty on purpose.
+ *
+ * THE GATE IMPORTS `sortEssences` AND SORTS WITH IT, which is a stronger claim than the one this
+ * comment used to make. It said the order was pinned against `localeCompare` itself; it was
+ * pinned against a hand-written restatement of what `localeCompare` was believed to do, in the
+ * test file. That is proof against ICU moving under the repository and no proof at all against
+ * the browser models moving — measured: giving `componentBrowserModel` a `numeric` collator
+ * created exactly the divergence this collator answers, and the suite stayed green. Importing
+ * the shipped sort makes the drift claim true in the direction that can actually drift.
  *
  * `numeric: true` WAS SET HERE AND WAS REMOVED. It is the better reading of "Ash 2" against
  * "Ash 10" and it has no precedent in this repository, and adding it did not remove the

@@ -101,6 +101,13 @@
      no-op, and no flip-flop rescues it: signals settle before effects run, so an effect sees
      only the final value and finds it unchanged. With the click written through, the refused
      click leaves the owner holding the new id and the restore is a genuine change.
+     AN OWNER'S BOUND STATE MUST BE INITIALISED. Svelte 5 THROWS `props_invalid_value` when a
+     bindable prop has a setter and the incoming value is `undefined`, rather than falling back
+     to the default here — so `let selected = $state();` with no initialiser kills the whole
+     mount, where `let selected = $state('');` is fine. It is loud, immediate and carries a
+     documented code, and `armedToken` below has carried the identical shape since it shipped,
+     which is why this is recorded rather than defended against: a runtime guard would turn a
+     named crash into a silently ignored binding.
    - onSelect(entityId): called after the write, so an owner may also react without binding.
    - armedToken: BINDABLE. The frame clears it on any selection, filter, sort or page change, so
      the owner's single-armed-token invariant holds across a re-projection.

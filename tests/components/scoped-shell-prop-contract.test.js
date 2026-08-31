@@ -483,8 +483,10 @@ describe('no scoped shell may call copyMembership without its destination list',
   // this pair and because every one of them requires writing the call in a shape nothing in this
   // directory uses:
   //
-  //  1. `SHELLS` is a hand-maintained three-file list rather than a walk of `scoped/`, so a
-  //     FOURTH shell added later is not scanned until it is added here too;
+  //  1. `SHELLS` is a hand-maintained three-file list rather than a walk of `scoped/`, and that
+  //     directory already holds TWELVE unscanned `.svelte` siblings — among them
+  //     `MembershipActions.svelte`, which is the natural home for the copy-from control this
+  //     ban is about. The reach is smaller than "the shells" reads;
   //  2. computed and aliased access — `actions['copyMembership'](a, b)`, or
   //     `const copy = actions.copyMembership` and then `copy(a, b)` — does not match;
   //  3. `withoutComments` strips from `//` to end of line unconditionally, so a URL inside a

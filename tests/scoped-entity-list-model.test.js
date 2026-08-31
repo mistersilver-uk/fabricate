@@ -33,6 +33,9 @@ import {
   WORLD_SCOPE_DESCRIPTORS,
 } from '../src/ui/svelte/stores/worldScopeProjection.js';
 import { paginateRows } from '../src/utils/browserPagination.js';
+// THE SHIPPED SORT ITSELF, not a restatement of what it is believed to do. See the ordering
+// case below for what the restatement failed to catch.
+import { sortEssences } from '../src/utils/essenceBrowserModel.js';
 import {
   describeBulkSelection,
   pruneBulkSelection,
@@ -201,9 +204,19 @@ describe('the two identity shape facts are derived, and the bridge is pinned', (
 
 describe('scopedEntityListModel filters', () => {
   const entries = [
-    { id: 'a', entity: { name: 'Ash', description: 'Grey powder' }, membershipCount: 2, systems: [] },
+    {
+      id: 'a',
+      entity: { name: 'Ash', description: 'Grey powder' },
+      membershipCount: 2,
+      systems: [],
+    },
     { id: 'b', entity: { name: 'Bone', description: 'White' }, membershipCount: 0, systems: [] },
-    { id: 'c', entity: { name: 'Coal', description: 'Ashen black' }, membershipCount: 1, systems: [] },
+    {
+      id: 'c',
+      entity: { name: 'Coal', description: 'Ashen black' },
+      membershipCount: 1,
+      systems: [],
+    },
   ];
 
   it('matches the search over the derived string, not just the name', () => {
@@ -244,7 +257,9 @@ describe('scopedEntityListModel filters', () => {
       ['a', 'c']
     );
     assert.deepEqual(
-      model.project({ entries: scoped, systemId: 'sys-a', membership: 'out' }).rows.map((r) => r.id),
+      model
+        .project({ entries: scoped, systemId: 'sys-a', membership: 'out' })
+        .rows.map((r) => r.id),
       ['b']
     );
     // The SAME entries against a different system, so the answer is the row's and not the entry's.
@@ -292,14 +307,19 @@ describe('scopedEntityListModel filters', () => {
   });
 
   it('orders names EXACTLY as the three shipped browser models do', () => {
-    // PINNED AGAINST THE SHIPPED COMPARATOR, not against a literal. Both sides of a hand-written
-    // expectation go stale together — that is the mirror rot this repository guards everywhere
-    // else — and the property that matters is not "this list is in a particular order" but
-    // "this list is in the SAME order as the Component Studio one route away".
+    // ── PINNED BY RUNNING THE SHIPPED SORT, NOT BY RESTATING IT ─────────────────────────────
+    // This case previously built its expectation from a hand-written `localeCompare` inside
+    // this file and claimed that pinned the order "against the shipped comparator". It did not.
+    // Measured: giving `componentBrowserModel.js` a `{ numeric: true }` collator — creating the
+    // exact scoped-list-versus-studio divergence this collator exists to answer — left this
+    // suite at 19 passed, 0 failed. A restatement is proof against ICU moving under the
+    // repository and no proof whatsoever against the browser models moving, which is the only
+    // direction that has ever moved.
     //
-    // `componentBrowserModel.js`, `essenceBrowserModel.js` and `recipeBrowserModel.js` all sort
-    // names with a BARE `localeCompare`, so that is what this compares against.
-    const NAMES = ['Zinc', 'Écorce', 'Ash 10', 'Ash 2', 'ash 1', 'Birch'];
+    // `sortEssences` is imported and RUN. Its `name` key falls through `SORT_VALUES` to the bare
+    // `localeCompare` all three studios share, so the expectation is now produced by the code
+    // the claim is about.
+    const NAMES = ['Zinc', 'Écorce', 'Ash 10', 'Ash 2', 'Ash', 'ash', 'Birch'];
     const named = (name, index) => ({
       id: `e-${index}`,
       entity: { name },
@@ -309,25 +329,28 @@ describe('scopedEntityListModel filters', () => {
     const model = createScopedEntityListModel();
     const { rows } = model.project({ entries: NAMES.map((name, index) => named(name, index)) });
 
-    // The shipped comparator, over the same lowercased keys this model sorts on.
-    const shipped = [...NAMES].sort((left, right) =>
-      String(left || '')
-        .toLowerCase()
-        .localeCompare(String(right || '').toLowerCase())
-    );
+    const shipped = sortEssences(NAMES.map((name) => ({ name }))).map((essence) => essence.name);
     assert.deepEqual(
       rows.map((row) => row.entity.name),
-      shipped
+      shipped,
+      'this list and the Component Studio one route away must order one corpus one way'
+    );
+
+    // THE FIXTURE INCLUDES A CASE-ONLY PAIR ON PURPOSE. The sort key used to be lowercased,
+    // which made the two compare equal here and kept their input order while the studios put
+    // the lowercase one first — the divergence this collator exists to remove, reintroduced one
+    // line above it. A fixture without such a pair cannot see that.
+    assert.ok(
+      NAMES.filter((name) => name.toLowerCase() === 'ash').length === 2,
+      'the case-only pair is gone, so the lowercased-key regression is unobservable here'
     );
 
     // NON-VACUITY. A raw code-point compare is what this collator replaced, and it must produce
-    // a DIFFERENT answer on this fixture — otherwise the assertion above is satisfied by the
-    // thing it exists to reject.
+    // a DIFFERENT answer on this fixture, or the assertion above is satisfied by the thing it
+    // exists to reject.
     const codePoint = [...NAMES].sort((left, right) => {
-      const a = left.toLowerCase();
-      const b = right.toLowerCase();
-      if (a < b) return -1;
-      return a > b ? 1 : 0;
+      if (left < right) return -1;
+      return left > right ? 1 : 0;
     });
     assert.notDeepEqual(
       codePoint,
@@ -339,7 +362,10 @@ describe('scopedEntityListModel filters', () => {
   it('falls back to the id when an entry has no name', () => {
     assert.equal(scopedEntryName({ id: 'ash', entity: {} }), 'ash');
     assert.equal(scopedEntryName({ id: 'ash', entity: { name: '  ' } }), 'ash');
-    assert.equal(defaultScopedSearchText({ entity: { name: 'Ash', description: 'Grey' } }), 'ash grey');
+    assert.equal(
+      defaultScopedSearchText({ entity: { name: 'Ash', description: 'Grey' } }),
+      'ash grey'
+    );
   });
 });
 

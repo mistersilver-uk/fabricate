@@ -54,6 +54,8 @@
    - selectedId: the inspected row, BINDABLE and threaded straight through to the frame, which
      writes it on every row click. An owner that binds can never hold a different value from the
      list, which is what lets a refused navigation restore the selection it declined to leave.
+     The state an owner binds must be INITIALISED — an uninitialised `$state()` throws
+     `props_invalid_value` on mount; see the frame's own note.
    - onSelect(entityId): called after the write, for an owner that reacts without binding.
    - onOpenEntry(entityId): the row's pen, into that entity's world entry editor.
    - rowMeta / inspectorBody / bulk: the lane's three snippets.

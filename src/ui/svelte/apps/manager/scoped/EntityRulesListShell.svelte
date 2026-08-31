@@ -44,6 +44,7 @@
    - hookValue / title / subtitle / icon / emptyTitle / emptyHint: as the catalogue shell.
    - filters / sorts / searchOf / sectionNotes / onSelect: as the catalogue shell.
    - selectedId: BINDABLE, threaded straight through to the frame; see the catalogue shell.
+     The state an owner binds must be INITIALISED, as `armedToken` below already required.
    - onOpenEditor(entityId): the row's pen, into this system's editor for that entity.
    - onOpenWorldEntry(entityId): out to the WORLD entry, because the world default is the thing a
      GM is deciding whether to override and it is one route away.
