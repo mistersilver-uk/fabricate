@@ -367,7 +367,7 @@ function entryHasSourceLink(entity) {
  * @param {Map<string, object>} membershipIndex
  * @returns {object}
  */
-function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex) {
+function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, usage = null) {
   const inheritCounts = {};
   for (const section of descriptor.sections) inheritCounts[section] = 0;
   const rows = [];
@@ -398,6 +398,14 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex) 
     // linked only by the renamed field starts reporting itself unlinked. One directory apart is
     // still a second copy.
     hasSourceLink: descriptor.sourceLinked ? entryHasSourceLink(entity) : false,
+    // HOW MUCH OF THE WORLD REFERENCES THIS ENTITY, across every crafting system.
+    //
+    // Supplied by the caller rather than derived here: the counts are over corpora this module is
+    // not handed — every system's components and every recipe in the world — and the functions
+    // that count them already exist beside the admin store's own essence cards. An absent `usage`
+    // answers 0, which is what a caller that has not wired it sees.
+    componentCount: Number(usage?.[entity.id]?.componentCount) || 0,
+    recipeCount: Number(usage?.[entity.id]?.recipeCount) || 0,
     systems: rows,
   };
 }
@@ -411,9 +419,17 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex) 
  *   options.corpus The store's published corpus.
  * @param {{entities: boolean, defaults: boolean, membership: boolean}|null} [options.seeded]
  * @param {unknown} [options.systems] The crafting-system roster.
+ * @param {Record<string, {componentCount: number, recipeCount: number}>|null} [options.usage]
+ *   World-wide reference counts per entity id, supplied by the caller; see `buildEntry`.
  * @returns {object}
  */
-export function projectWorldScopeEntity({ entityType, corpus, seeded = null, systems = [] }) {
+export function projectWorldScopeEntity({
+  entityType,
+  corpus,
+  seeded = null,
+  systems = [],
+  usage = null,
+}) {
   const descriptor = WORLD_SCOPE_DESCRIPTORS[entityType];
   if (!descriptor || !corpus || typeof corpus !== 'object') {
     return emptyWorldScopeEntityState(entityType);
@@ -442,7 +458,8 @@ export function projectWorldScopeEntity({ entityType, corpus, seeded = null, sys
         entity,
         defaultsIndex.get(entity.id) ?? null,
         projectedSystems,
-        membershipIndex
+        membershipIndex,
+        usage
       )
     ),
   };
@@ -502,12 +519,13 @@ function readCorpus(store) {
  * @param {unknown} [options.systems] The crafting-system roster.
  * @returns {{worldScope: object}}
  */
-export function buildWorldScopeState({ stores = {}, systems = [] } = {}) {
+export function buildWorldScopeState({ stores = {}, systems = [], usage = {} } = {}) {
   const worldScope = {};
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
     worldScope[entityType] = projectWorldScopeEntity({
       entityType,
       systems,
+      usage: usage?.[entityType] ?? null,
       ...readCorpus(stores?.[entityType] ?? null),
     });
   }
