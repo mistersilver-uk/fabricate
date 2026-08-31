@@ -434,12 +434,17 @@ test('the real corpus is both stylesheets, and its custom properties come from b
 
   assert.ok(stylesheetOnly.size > 0, 'the global sheet declares custom properties');
   assert.ok(svelteOnly.size > 0, 'Svelte scoped blocks declare custom properties too');
-  for (const name of [...stylesheetOnly.keys()]) {
-    assert.ok(defined.has(name), `${name} is declared in the global sheet but missing from the map`);
-  }
-  for (const name of [...svelteOnly.keys()]) {
-    assert.ok(defined.has(name), `${name} is declared in a Svelte block but missing from the map`);
-  }
+
+  // THOSE TWO FLOORS ARE THE CHECK. `defined ⊇ stylesheetOnly` and `defined ⊇ svelteOnly` hold
+  // BY CONSTRUCTION — `defined` is built over a superset of each input — so the two containment
+  // loops that stood here could not fail in any tree, and they have been removed rather than
+  // left reading as verification. What can fail is a walker going quiet: either half dropping to
+  // zero satisfies every downstream absence gate built on this corpus.
+  //
+  // The one MERGE property a text scan can get wrong is discarding a repeat definition, which is
+  // why the name below is asserted rather than the map's shape. `--fab-stepper-fill-height` is
+  // declared at two different heights, and a merge that overwrote instead of appending would
+  // leave one — silently making `resolveValueCandidates` certain where it should be ambiguous.
   assert.ok(
     (defined.get('--fab-stepper-fill-height') ?? []).length > 1,
     'a token defined at more than one height must keep every definition'
@@ -459,13 +464,18 @@ test('the scan reaches a value written only into a token', () => {
   // the `.svelte` proves `maskNonStyleRegions` runs, because the markup above its block carries
   // `height: 36px` as PROSE which must NOT be scanned — so the assertion on the matched values
   // fails if the mask is dropped, rather than only the assertion on the resolved text.
+  //
+  // The SEMICOLON in that prose is doing the work. `DECLARATION` requires `^` or one of `;{}`
+  // before a property name, so the earlier wording — "docblock writes height: 36px in PROSE" —
+  // could never have matched with the mask off either, and the trap it claimed to set was shut
+  // from both sides. Do not tidy the punctuation away.
   const root = mkdtempSync(join(tmpdir(), 'fabricate-style-corpus-'));
   try {
     writeFileSync(join(root, 'tokens.css'), ':root {\n  --fixture-thumb: 40px;\n}\n');
     writeFileSync(
       join(root, 'Reader.svelte'),
       [
-        '<!-- This docblock writes height: 36px in PROSE, outside any style block. -->',
+        '<!-- Prose, outside any style block; height: 36px is not a declaration here. -->',
         '<div class="thumb"></div>',
         '',
         '<style>',

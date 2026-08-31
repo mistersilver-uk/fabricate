@@ -164,11 +164,11 @@ const stagedAxes = createRawSnippet(() => ({
 /**
  * The shell's real rendered markup, dropped into the rail it actually ships in.
  *
- * The three wrapper levels are the shipped ones — `.fabricate-manager` declares the
- * `--fab-manager-*` properties AND the `fabricate-manager` container the width branch above
- * reads,
- * `.manager-body` supplies the three-column grid, and `.manager-inspector` is the scrollport
- * whose padding box the dock is asserted against.
+ * The three wrapper levels are the shipped ones — `.fabricate-manager` is the area root and
+ * carries the `fabricate-manager` container the width branch above reads, `.manager-body`
+ * supplies the three-column grid, and `.manager-inspector` is the scrollport whose padding box
+ * the dock is asserted against. The area's own custom properties are declared INSIDE it, on
+ * descendants, not on this element; none of them is read here.
  *
  * The two empty `.probe-shell-band` divs are load-bearing, not filler. `.fabricate-manager`
  * is `grid-template-rows: auto auto 1fr`, and the app fills the first two rows with its

@@ -22,7 +22,7 @@
  * `scripts/lib/viewLabCases.js`, `.agents/skills/**` — sits outside the scanned roots, so the
  * gate does not contradict its own spec text.
  *
- * ── THREE TRAPS, EACH ONE MEASURED RATHER THAN REASONED ABOUT ───────────────────────────
+ * ── FIVE TRAPS, EACH ONE MEASURED RATHER THAN REASONED ABOUT ────────────────────────────
  *   1. `--fab-v<N>-` does NOT match `--fab-mv2-`: the character before `v2` is `m`. Both shapes
  *      are therefore banned explicitly, not as one pattern with a wildcard in front of the `v`.
  *   2. THE EXTENSION LIST MUST INCLUDE `.js`. `collectWorkingTreeSources` takes an explicit list
@@ -33,12 +33,36 @@
  *   3. Falsification is a MATRIX, not one probe: 3 name shapes x {declaration, read} x
  *      {`.css`, `.svelte`, `.js`}. A single probe proves the regex compiles, not that the scan
  *      reaches the file the next mistake will be made in.
+ *   4. A RULE'S SELECTOR IS A LIST, and `String#includes` over the whole list is satisfied by any
+ *      ONE compound. `.fabricate-app .oops, .fabricate-manager .ok { … var(--fab-manager-…) }`
+ *      is the motivating defect written as one rule, and a comma-joined rule shared between the
+ *      two areas is the most likely way it recurs, because sharing primitives across areas is
+ *      what the collapse was for. Every selector test here therefore runs per COMPOUND, and the
+ *      area compound carries a right-hand boundary so `.fabricate-manager-widget` does not pass
+ *      on a prefix collision.
+ *   5. A NON-VACUITY FLOOR MUST NOT BE WRITTEN AGAINST THE CONSTANT IT POLICES. Looping over
+ *      `SCANNED_EXTENSIONS` to prove each extension arrived narrows the check in step with the
+ *      list, and the file-count floor does not cover the gap because `.css` contributes exactly
+ *      ONE of the 688 files — while `styles/fabricate.css` is where all 41 deleted declarations
+ *      and all 13 forwarders lived, so it is the single file the ban most needs to reach. The
+ *      floors below are hard-coded per extension for that reason.
  *
  * ── WHAT THIS GATE DOES NOT CLAIM ───────────────────────────────────────────────────────
  * It bans three NAME SHAPES. It does not and cannot stop a fourth generation being minted under
  * a name it does not match — `--fab-gen3-` passes here. The requirement in the spec is the rule;
  * this is the part of it a text scan can decide, and saying so is the point of the change that
  * added it.
+ *
+ * The area-scoping rule is likewise enforced by SHAPE and not by intent. The global sheet and the
+ * Svelte scoped `<style>` are policed as CSS; the remaining channel is a token spelled into a
+ * STRING — `chanceColorScale.js` is the one that actually happened, and a template's
+ * `style="… var(--fab-manager-x)"` is the same mistake in a `.svelte` file's markup rather than
+ * in its `<style>`. Test 5 scans both file kinds' raw text for the two USE shapes, a `var()` read
+ * and a `name:` declaration, rather than for the name alone. That is a deliberate departure from
+ * the raw-name scan test 1 uses: `--fab-manager-` is a LIVE prefix, and twenty-nine comments
+ * under `src/` correctly name it to tell a reader which properties a component may not reach.
+ * Banning the name would delete the rule's own documentation. A module that assembles the name
+ * from fragments still passes, and no text scan can help that.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -54,6 +78,20 @@ const SCANNED_ROOTS = Object.freeze(['src', 'styles']);
  * template-literal `style=` channel; `.css` carries the global sheet.
  */
 const SCANNED_EXTENSIONS = Object.freeze(['.css', '.svelte', '.js']);
+
+/**
+ * How many files of each extension the raw-text scan must actually reach, HARD-CODED — see trap 5.
+ *
+ * These are floors and not counts: `.svelte` and `.js` sit at 306 and 381 today and may move
+ * freely. `.css` is `1` because `styles/fabricate.css` is the whole global sheet, which is also
+ * exactly why the floor cannot be inferred from the corpus — one file out of 688 is invisible to
+ * any total.
+ */
+const CORPUS_FLOORS = Object.freeze([
+  { extension: '.css', minimum: 1 },
+  { extension: '.svelte', minimum: 100 },
+  { extension: '.js', minimum: 100 },
+]);
 
 /**
  * The three retired shapes, as RAW TEXT patterns rather than as `var()` reads, so a declaration,
@@ -111,12 +149,38 @@ const AREA_SCOPED_PREFIX = '--fab-manager-';
 const AREA_SELECTOR = '.fabricate-manager';
 
 /**
+ * One compound that puts a rule inside the area — see trap 4 for why the boundary is not optional.
+ *
+ * `(?![\w-])` is what separates `.fabricate-manager` from `.fabricate-manager-widget`: a class name
+ * continues through word characters and hyphens, so anything else — end of string, whitespace, a
+ * combinator, `[`, `.`, `:` — ends the name and means the compound really is the area. Derived from
+ * `AREA_SELECTOR` rather than spelled again, so renaming the area cannot leave the two disagreeing.
+ */
+const AREA_COMPOUND = new RegExp(`${AREA_SELECTOR.replace(/\./gu, '\\.')}(?![\\w-])`, 'u');
+
+/**
+ * The two shapes that USE an area-scoped property, for the channels that are not CSS.
+ *
+ * A read and a declaration, rather than the bare name: see the closing paragraph of the header.
+ */
+const AREA_USE_SHAPES = Object.freeze([
+  { label: 'read', pattern: new RegExp(`var\\(\\s*${AREA_SCOPED_PREFIX}`, 'u') },
+  { label: 'declaration', pattern: new RegExp(`${AREA_SCOPED_PREFIX}[\\w-]*\\s*:`, 'u') },
+]);
+
+/**
  * Every rule in one comment-stripped stylesheet, as `{ selector, body, line }`.
  *
  * At-rule preludes (`@media`, `@container`, `@supports`, `@layer`) are NOT selectors, so a rule
  * nested inside one reports the inner prelude — which is what both callers need, since a
  * container query around a manager rule must not be read as that rule's selector. An at-rule with
  * no block of its own (`@import`, `@charset`) never opens a brace and is skipped by construction.
+ *
+ * `line` is the line the SELECTOR starts on, tracked by a `preludeStarted` flag rather than by
+ * `prelude === ''`: the prelude accumulates the whitespace between two rules, so the emptiness
+ * test only ever fired at offset zero and every rule was cited at the previous `}`. In a Svelte
+ * file, where `maskNonStyleRegions` replaces the entire template with spaces, that put every
+ * offence at line 1.
  *
  * @param {string} css Comment-stripped CSS, offsets intact.
  * @returns {Array<{selector: string, body: string, line: number}>}
@@ -125,15 +189,17 @@ function rulesIn(css) {
   const rules = [];
   const stack = [];
   let prelude = '';
+  let preludeStarted = false;
   let line = 1;
   let preludeLine = 1;
   for (let index = 0; index < css.length; index += 1) {
     const character = css[index];
     if (character === '\n') line += 1;
     if (character === '{') {
-      const trimmed = prelude.trim().replace(/\s+/g, ' ');
+      const trimmed = prelude.trim().replace(/\s+/gu, ' ');
       stack.push({ selector: trimmed, start: index + 1, line: preludeLine });
       prelude = '';
+      preludeStarted = false;
       preludeLine = line;
       continue;
     }
@@ -143,25 +209,56 @@ function rulesIn(css) {
         rules.push({ selector: open.selector, body: css.slice(open.start, index), line: open.line });
       }
       prelude = '';
+      preludeStarted = false;
       preludeLine = line;
       continue;
     }
     if (character === ';' && stack.length === 0) {
       prelude = '';
+      preludeStarted = false;
       preludeLine = line;
       continue;
     }
-    if (prelude === '' && !/\s/.test(character)) preludeLine = line;
+    if (!preludeStarted && !/\s/u.test(character)) {
+      preludeStarted = true;
+      preludeLine = line;
+    }
     prelude += character;
   }
   return rules;
 }
 
-/** Every rule in the global sheet, walked once. */
+/**
+ * True when EVERY compound of a selector LIST satisfies `predicate` — trap 4.
+ *
+ * `rulesIn` reports a rule's whole selector list as one string, so any test written with
+ * `String#includes` over that string is satisfied by one compound and blind to its siblings.
+ * Both selector assertions in this file route through here so neither can drift back.
+ *
+ * @param {string} selector A rule's whole selector list.
+ * @param {(compound: string) => boolean} predicate
+ * @returns {boolean}
+ */
+function everyCompound(selector, predicate) {
+  return selector
+    .split(',')
+    .map((part) => part.trim())
+    .every((compound) => predicate(compound));
+}
+
+/**
+ * Every rule in BOTH shipped stylesheets — the global sheet and every Svelte scoped `<style>`.
+ *
+ * It reads both because the licence for the inline is a claim about the whole cascade, and
+ * `styles/**` is the only half stylelint globs (`tests/helpers/styleBlockScan.js:4-7`), which
+ * makes the scoped blocks the half most likely to drift. A walk of `styles/` alone left the
+ * second premise-guard blind to 180 files: inserting `--fab-text-muted: rgb(255 0 0 / 50%)` into
+ * a scoped block whose next line reads `color: var(--fab-text-muted)` was green.
+ */
 let cachedRules = null;
-function globalSheetRules() {
+function shippedStyleRules() {
   if (cachedRules === null) {
-    const corpus = collectStyleCorpus({ roots: ['styles'], extensions: ['.css'] });
+    const corpus = collectStyleCorpus({ roots: ['src', 'styles'], extensions: ['.css', '.svelte'] });
     cachedRules = Object.entries(corpus).flatMap(([file, css]) =>
       rulesIn(css).map((rule) => ({ ...rule, file }))
     );
@@ -169,25 +266,52 @@ function globalSheetRules() {
   return cachedRules;
 }
 
+/**
+ * Floor {@link shippedStyleRules} on BOTH halves, so neither can silently stop contributing.
+ *
+ * Written as file counts rather than rule counts because the failure being guarded against is a
+ * root or an extension dropping out of the walk, which takes one side to zero while the other
+ * keeps every assertion below it green.
+ */
+function assertBothCorporaReached(rules) {
+  const files = [...new Set(rules.map((rule) => rule.file))];
+  const globalSheets = files.filter((file) => file.endsWith('.css')).length;
+  const scopedBlocks = files.filter((file) => file.endsWith('.svelte')).length;
+  assert.ok(
+    globalSheets >= 1,
+    'no `.css` file contributed a rule, so the global sheet — where all 41 deleted declarations ' +
+      'and all 13 forwarders lived — is not being walked at all.'
+  );
+  assert.ok(
+    scopedBlocks > 100,
+    `only ${scopedBlocks} Svelte scoped blocks contributed a rule, against the ~180 this tree ` +
+      'holds. That is the half stylelint never globs, so it is the half a gate must not lose.'
+  );
+}
+
 test('no retired token generation survives anywhere under src/ or styles/', () => {
   const sources = collectWorkingTreeSources([...SCANNED_ROOTS], [...SCANNED_EXTENSIONS]);
   const files = Object.keys(sources);
 
   // NOT VACUOUS, and this is the whole reason the assertion below can be trusted: an absence
-  // gate over an empty corpus passes forever. Both halves are floored — a root that stopped
-  // being walked, or an extension silently dropped from the list, takes one of them to zero.
+  // gate over an empty corpus passes forever. The per-extension floors are HARD-CODED rather
+  // than derived from `SCANNED_EXTENSIONS` — see trap 5. A floor written as a loop over the
+  // constant under test narrows itself when the constant narrows, and dropping `.css` costs the
+  // total exactly one file out of 688 while blinding the gate to the entire global sheet.
   assert.ok(
     files.length > 600,
     `the scanned corpus fell to ${files.length} files, which is far below the ~690 this repository ` +
       'holds under `src/` and `styles/` at these three extensions. An absence gate over an empty ' +
       'corpus passes forever, so this is a broken scan rather than a clean tree.'
   );
-  for (const extension of SCANNED_EXTENSIONS) {
+  for (const { extension, minimum } of CORPUS_FLOORS) {
+    const reached = files.filter((file) => file.endsWith(extension)).length;
     assert.ok(
-      files.some((file) => file.endsWith(extension)),
-      `no ${extension} file reached the scan, so this gate is blind to that half of the corpus. ` +
-        'The `.js` case is the one that has actually happened: a module returned a token as a ' +
-        'string literal, which no CSS-only pass can see.'
+      reached >= minimum,
+      `only ${reached} ${extension} files reached the scan, against a floor of ${minimum}, so this ` +
+        'gate is blind to that channel. `.css` is the global sheet, which every retired ' +
+        'declaration and every forwarder lived in; `.js` is the channel that has actually ' +
+        'happened, a module returning a token as a string literal, which no CSS-only pass can see.'
     );
   }
 
@@ -215,16 +339,22 @@ test('no retired token generation survives anywhere under src/ or styles/', () =
 });
 
 test('every inline target is declared only at theme root', () => {
+  const allRules = shippedStyleRules();
+  assertBothCorporaReached(allRules);
+
   const declaring = new Map(INLINE_TARGETS.map((name) => [name, []]));
-  for (const rule of globalSheetRules()) {
+  for (const rule of allRules) {
     for (const declaration of declarationsIn(rule.file, rule.body)) {
       const held = declaring.get(declaration.property);
       if (held) held.push(rule);
     }
   }
 
-  // Non-vacuity: seven theme blocks x fourteen tokens. A drop here means the walker stopped
-  // finding the theme blocks, at which point the allow-list below is satisfied by an empty set.
+  // Non-vacuity: seven theme blocks x fourteen tokens, all fourteen from the global sheet — the
+  // Svelte half contributes ZERO today, which is the fact this assertion exists to keep true, so
+  // the floor for that half is the file count in `assertBothCorporaReached` and not this total.
+  // A drop here means the walker stopped finding the theme blocks, at which point the allow-list
+  // below is satisfied by an empty set.
   const total = [...declaring.values()].reduce((sum, rules) => sum + rules.length, 0);
   assert.ok(
     total >= 90,
@@ -239,8 +369,7 @@ test('every inline target is declared only at theme root', () => {
   const offences = [];
   for (const [name, rules] of declaring) {
     for (const rule of rules) {
-      const compounds = rule.selector.split(',').map((part) => part.trim());
-      if (compounds.every((compound) => THEME_ROOT_COMPOUND.test(compound))) continue;
+      if (everyCompound(rule.selector, (compound) => THEME_ROOT_COMPOUND.test(compound))) continue;
       offences.push(`${name} declared on \`${rule.selector}\` (${rule.file}:${rule.line})`);
     }
   }
@@ -258,7 +387,9 @@ test('every inline target is declared only at theme root', () => {
 });
 
 test('an area-scoped manager property is declared and read only inside its area', () => {
-  const rules = globalSheetRules().filter((rule) => rule.body.includes(AREA_SCOPED_PREFIX));
+  const allRules = shippedStyleRules();
+  assertBothCorporaReached(allRules);
+  const rules = allRules.filter((rule) => rule.body.includes(AREA_SCOPED_PREFIX));
 
   // Non-vacuity, and it is the reason this gate is written against the requirement's own words
   // rather than against a directory. The obvious proxy — "no file outside `apps/manager/**`
@@ -267,23 +398,29 @@ test('an area-scoped manager property is declared and read only inside its area'
   // arrival. Manager CSS living in the global stylesheet is the design, not the defect.
   assert.ok(
     rules.length >= 10,
-    `only ${rules.length} rules in the global sheet mention \`${AREA_SCOPED_PREFIX}\`, against the ` +
-      'fourteen — carrying sixteen declaration and read sites — this sheet holds. With none, the ' +
-      'assertion below is vacuous.'
+    `only ${rules.length} rules mention \`${AREA_SCOPED_PREFIX}\`, against the fourteen — carrying ` +
+      'sixteen declaration and read sites — the global sheet holds. With none, the assertion ' +
+      'below is vacuous.'
   );
 
+  // EVERY compound, with a boundary, and both halves are load-bearing — see trap 4. A rule whose
+  // selector list is `.fabricate-app .oops, .fabricate-manager .ok` reads a manager property from
+  // a player surface under its first compound, which is this change's motivating defect written
+  // as one rule; and `.fabricate-manager-widget` is a different class that merely starts the same.
   const offences = rules
-    .filter((rule) => !rule.selector.includes(AREA_SELECTOR))
+    .filter((rule) => !everyCompound(rule.selector, (compound) => AREA_COMPOUND.test(compound)))
     .map((rule) => `${rule.file}:${rule.line} \`${rule.selector}\``);
 
   assert.deepEqual(
     offences,
     [],
     `\`${AREA_SCOPED_PREFIX}*\` is the prefix for an AREA-SCOPED custom property and must not be ` +
-      `declared or read outside \`${AREA_SELECTOR}\`. Outside the area it is undefined, the ` +
-      'declaration is invalid at computed-value time, and the value falls back to inheritance — ' +
-      'nothing fails, it just looks wrong. If the rule genuinely belongs to every area, it is ' +
-      'reading a foundation token, not an area-scoped one:\n  ' + offences.join('\n  ')
+      `declared or read outside \`${AREA_SELECTOR}\` — by EVERY compound of the rule's selector ` +
+      'list, because the cascade applies a comma-joined rule to each of them separately. Outside ' +
+      'the area the property is undefined, the declaration is invalid at computed-value time, and ' +
+      'the value falls back to inheritance — nothing fails, it just looks wrong. If the rule ' +
+      'genuinely belongs to every area, it is reading a foundation token, not an area-scoped ' +
+      'one; if only one compound belongs to the manager, it is two rules:\n  ' + offences.join('\n  ')
   );
 });
 
@@ -322,5 +459,52 @@ test('no Svelte scoped style reaches an area-scoped manager property', () => {
       'property is undefined and the declaration silently falls back to inheritance. Read a ' +
       'foundation token, or move the rule into the global sheet under an area selector:\n  ' +
       offences.join('\n  ')
+  );
+});
+
+test('no module or template under src/ spells an area-scoped manager property into a string', () => {
+  // The CHANNEL THAT ACTUALLY HAPPENED, generalised. `chanceColorScale.js` returned
+  // `'var(--fab-mv2-accent)'` as a string literal, and a `.js` module returning
+  // `'var(--fab-manager-task-drop-grid)'` is the same mistake against a live prefix: tests 3 and 4
+  // both read CSS, so neither can see it, and `--fab-manager-` is deliberately absent from
+  // `RETIRED_NAME_SHAPES` because the prefix is the rule rather than the offence. A `.svelte`
+  // TEMPLATE is the same channel — `style="… var(--fab-manager-x)"` sits outside every `<style>`
+  // block, so `collectStyleCorpus` masks it away — which is why both extensions are scanned here.
+  //
+  // Scanned by USE SHAPE, not by name: twenty-nine comments under `src/` name the prefix in order
+  // to say a component may NOT reach it, and a raw-name ban would delete the rule's own
+  // documentation. `styles/` is excluded because the global sheet is where these properties
+  // legitimately live; test 3 is what polices it.
+  const sources = collectWorkingTreeSources(['src'], ['.js', '.svelte']);
+  const files = Object.keys(sources);
+
+  for (const extension of ['.js', '.svelte']) {
+    const reached = files.filter((file) => file.endsWith(extension)).length;
+    assert.ok(
+      reached > 100,
+      `only ${reached} ${extension} files reached the scan, against the ~380 and ~306 this tree ` +
+        'holds. An absence gate over an empty corpus passes forever.'
+    );
+  }
+
+  const offences = [];
+  for (const [file, source] of Object.entries(sources)) {
+    for (const [index, text] of source.split('\n').entries()) {
+      for (const { label, pattern } of AREA_USE_SHAPES) {
+        if (pattern.test(text)) offences.push(`${file}:${index + 1} (${label}) ${text.trim()}`);
+      }
+    }
+  }
+
+  assert.deepEqual(
+    offences,
+    [],
+    `a module or template under \`src/\` spells a \`${AREA_SCOPED_PREFIX}*\` property into a ` +
+      'string. A JavaScript module and a Svelte template are placed in a directory, not in a DOM ' +
+      `subtree, so neither can guarantee that the element it styles renders under ` +
+      `\`${AREA_SELECTOR}\` — and where it does not, the property is undefined, the declaration is ` +
+      'invalid at computed-value time, and the value falls back to inheritance. Return a ' +
+      'foundation token, or put the rule in the global sheet under an area selector. Naming the ' +
+      'prefix in a COMMENT is fine and is not what this matches:\n  ' + offences.join('\n  ')
   );
 });

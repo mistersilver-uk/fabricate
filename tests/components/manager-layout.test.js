@@ -1163,7 +1163,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
     'the no-state panel should be a rounded 1.5px dashed panel'
   );
   // A shared primitive must be portable across app areas. `--fab-manager-*` is the prefix
-  // for an AREA-SCOPED custom property, declared on `.fabricate-manager` only, so
+  // for an AREA-SCOPED custom property, declared inside `.fabricate-manager` only, so
   // referencing it makes the declaration invalid at computed-value time anywhere else
   // (`.fabricate-app`, `.fabricate-admin`, `.fabricate-interactables-manager`) and the
   // value silently falls back to inheritance. Nothing fails; it just looks wrong, and the
@@ -1173,8 +1173,10 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   // The failure mode is NARROWED by issue 1399, not removed: the manager's twelve colour
   // aliases are inlined onto their foundation tokens, but five layout properties are still
   // declared inside `.fabricate-manager`, so a primitive that reads one still renders
-  // unstyled in the player app. `tests/token-generation-gate.test.js` cannot catch it —
-  // `--fab-manager-` is not a banned name shape — which is why this guard stays.
+  // unstyled in the player app. `tests/token-generation-gate.test.js` DOES catch that now —
+  // its scoped-style test scans every `<style>` under `src/` for the prefix, a strict
+  // superset of these five primitives — and this guard stays because it is the narrower,
+  // louder one: it names the primitive that broke and the token it reached for.
   for (const [name, styles] of Object.entries({
     EmptyState: emptyStateStyles,
     Callout: calloutStyles,
@@ -6548,7 +6550,9 @@ test('the manager themes select options, not just the closed select', () => {
   assert.match(
     optionRule,
     /background:\s*var\(--fab-bg-3\)/,
-    'an option list without a painted background falls back to the browser default white'
+    'an option list must take its background from `--fab-bg-3`, so it re-themes with the ' +
+      'rest of the manager; unpainted, it falls back to whatever the browser draws, which ' +
+      'in every engine tested is a light list inside a dark app'
   );
   assert.match(optionRule, /color:\s*var\(--fab-text\)/);
 
