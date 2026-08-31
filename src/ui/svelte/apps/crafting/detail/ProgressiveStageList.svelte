@@ -560,7 +560,7 @@
      that it adds no shared rule, which is also what keeps a change here mapped to the
      views that draw it rather than to the broad `theme-or-global-ui` screenshot recipe.
      Theme-ROOT tokens only, on `Chip.svelte`'s note — this row renders under
-     `.fabricate-app`, where the manager's `--fab-mv2-*` aliases are not in scope. */
+     `.fabricate-app`, where an area-scoped `--fab-manager-*` property is not in scope. */
 
   /* `display: contents` in the common case, so a row with no band is the flex container
      it has always been and every rule keyed on its children still matches. */

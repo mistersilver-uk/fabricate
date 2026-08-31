@@ -163,8 +163,9 @@
 
 <style>
   /* Theme-root tokens ONLY. This component is area-agnostic, so it must not reference
-     `--fab-mv2-*` or any other alias declared on `.fabricate-manager` (styles/fabricate.css
-     declares those inside that area block). Outside the manager — `.fabricate-app`,
+     `--fab-manager-*` or any other custom property declared on `.fabricate-manager`
+     (styles/fabricate.css declares those inside that area block). Outside the manager —
+     `.fabricate-app`,
      `.fabricate-admin`, `.fabricate-interactables-manager` — such a property is not in
      scope, the declaration becomes invalid at computed-value time and the colour silently
      falls back to inheritance. Nothing fails; it just looks wrong, and the trigger is
@@ -435,9 +436,9 @@
 
   /* An item TAG (issue 772). Purple, through the same `--fab-chip-color` + `color-mix`
      vehicle `.manager-availability-pill.is-tag` already uses, so the tag tone is defined
-     once for the whole manager. `--fab-bg-3` stands in for the manager alias the retired
-     `.manager-component-tag-toggle.is-on` rule mixed against (`--fab-mv2-surface-2` IS
-     `--fab-bg-3`), because this component is area-agnostic and must reach theme root. */
+     once for the whole manager. `--fab-bg-3` is the shade the retired
+     `.manager-component-tag-toggle.is-on` rule mixed against, named here at theme root
+     because this component is area-agnostic. */
   .manager-chip.is-tag {
     --fab-chip-color: var(--fab-purple);
 

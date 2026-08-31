@@ -11,9 +11,9 @@
   description association, the live region, the label-in-name rule and the busy state.
 
   It lives under `apps/manager/` rather than in either studio's folder, beside
-  `BulkEditPanelShell`, for that file's reason: `--fab-mv2-*` is declared on
-  `.fabricate-manager` and staying here keeps it in scope. Two consequences of that placement
-  are load-bearing and both are hand-maintained mirrors:
+  `BulkEditPanelShell`, for that file's reason: an area-scoped `--fab-manager-*` property is
+  declared on `.fabricate-manager`, and staying here keeps it in scope. Two consequences of
+  that placement are load-bearing and both are hand-maintained mirrors:
 
    - `scripts/lib/viewLabCases.js` must CLAIM this file, or `view-lab-source-coverage.test.js`
      fails: a component a mounted window renders that no case claims does not produce no
@@ -321,8 +321,8 @@
 
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives HERE
-     rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is in
+     scope. Its appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the studios that actually
      render it instead of matching the broad `theme-or-global-ui` recipe.
 
@@ -378,7 +378,7 @@
      not read as a fourth thing being counted. */
   .fab-bulk-delete-hint {
     margin: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.66rem;
     font-weight: 600;
     line-height: 1.35;

@@ -196,7 +196,7 @@
 {/if}
 
 <style>
-  /* Theme-ROOT tokens only (`--fab-mv2-*` is declared on `.fabricate-manager` and is
+  /* Theme-ROOT tokens only (`--fab-manager-*` is declared on `.fabricate-manager` and is
      not in scope for an area-agnostic block). Geometry is the prototype's:
      radius 9, `--fab-bg-1` fill, 26px tiles, 8px/10px row padding. */
   .manager-party-member-row {

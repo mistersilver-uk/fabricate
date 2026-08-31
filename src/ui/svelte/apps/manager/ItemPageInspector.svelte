@@ -363,8 +363,8 @@
 
   .manager-books-scrolls-stat {
     padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: var(--fab-v2-radius-panel);
+    border: 1px solid var(--fab-border);
+    border-radius: var(--fab-radius-panel);
     background: var(--fab-bg-1);
     text-align: center;
   }
@@ -403,8 +403,8 @@
     align-items: center;
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: var(--fab-v2-radius-panel);
+    border: 1px solid var(--fab-border);
+    border-radius: var(--fab-radius-panel);
     background: var(--fab-bg-1);
     min-width: 0;
   }
@@ -416,7 +416,7 @@
     width: 24px;
     height: 24px;
     flex: none;
-    border-radius: var(--fab-v2-radius-control);
+    border-radius: var(--fab-radius-control);
     background: var(--fab-bg-3);
     color: var(--fab-accent);
     font-size: 0.65rem;

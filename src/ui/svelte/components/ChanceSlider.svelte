@@ -8,7 +8,7 @@
     numberLabel = 'Percentage',
     rangeLabel = 'Percentage',
     unit = '%',
-    resolveColor = () => 'var(--fab-mv2-accent)',
+    resolveColor = () => 'var(--fab-accent)',
     trackGradient = '',
     controlClass = '',
     stopPropagation = false,

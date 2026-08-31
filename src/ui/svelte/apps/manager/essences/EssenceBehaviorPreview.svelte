@@ -235,7 +235,7 @@
     align-items: flex-start;
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-overlay-light-03);
     color: var(--fab-text-muted);

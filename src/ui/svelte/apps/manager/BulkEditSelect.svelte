@@ -5,8 +5,8 @@
 
   It lives under `apps/manager/` rather than `apps/manager/components/` for the reason
   `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves, this control is
-  manager-scoped, and staying here keeps `--fab-mv2-*` in scope so the extraction is a pure
-  move rather than a re-tokenisation — which matters more here than anywhere else in the
+  manager-scoped, and staying here keeps any area-scoped `--fab-manager-*` property in
+  scope, so the extraction is a pure move rather than a re-tokenisation — which matters more here than anywhere else in the
   set, since the whole point of the rule below is a specific opaque manager background.
 
   The OPTIONS are the caller's, passed as `children`: the sentinel's meaning differs per
@@ -50,8 +50,8 @@
 
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives
-     HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is in
+     scope. Its appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that actually
      render it. Because it sits OUTSIDE both `apps/manager/components/` and
      `apps/manager/recipes/`, it is enumerated BY NAME in that map's browser match lists. */
@@ -60,7 +60,7 @@
     Full width, and wearing the Fabricate select treatment rather than Foundry core's
     default light chrome — the same treatment the toolbar's filter selects carry.
 
-    The background MUST be opaque, and `--fab-mv2-bg` specifically (issue 772).
+    The background MUST be opaque, and `--fab-bg-1` specifically (issue 772).
 
     A native `<select>`'s option popup is painted by the browser, which derives its surface
     from the control's own COMPUTED background. This rule originally used
@@ -68,7 +68,7 @@
     looks right on the closed control because it composites over the dark rail, but the
     popup has nothing to composite against, so it opened light while every other manager
     dropdown opened dark. `color-scheme: dark` does not rescue it: the author background
-    wins. The toolbar filters and the pagination size select both use `--fab-mv2-bg`
+    wins. The toolbar filters and the pagination size select both use `--fab-bg-1`
     (`styles/fabricate.css:4255`, `:3436`) and open dark, which is the look to match.
 
     Those two siblings are deliberately NOT converted onto this component: both are
@@ -81,17 +81,17 @@
     min-width: 0;
     height: 32px;
     padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border-strong);
+    border: 1px solid var(--fab-border-strong);
     border-radius: 8px;
-    color: var(--fab-mv2-text);
-    background: var(--fab-mv2-bg);
+    color: var(--fab-text);
+    background: var(--fab-bg-1);
     font-family: inherit;
     font-size: 0.72rem;
     cursor: pointer;
   }
 
   .fab-bulk-edit-select:focus-visible {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 </style>

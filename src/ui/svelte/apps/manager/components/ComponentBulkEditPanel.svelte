@@ -716,8 +716,8 @@
 
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives
-     HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is in
+     scope. Its appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the components views that
      actually render it instead of matching the broad `theme-or-global-ui` recipe.
 
@@ -742,21 +742,21 @@
     align-items: center;
     min-width: 0;
     padding: var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 10px;
-    background: var(--fab-mv2-bg);
+    background: var(--fab-bg-1);
   }
 
   .manager-component-bulk-dc-row > i {
     flex: 0 0 auto;
-    color: var(--fab-mv2-info);
+    color: var(--fab-info);
     font-size: 0.8rem;
   }
 
   .manager-component-bulk-dc-copy {
     flex: 1 1 auto;
     min-width: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.62rem;
     line-height: 1.3;
   }

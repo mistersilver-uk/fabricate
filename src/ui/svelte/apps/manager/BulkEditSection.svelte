@@ -6,8 +6,8 @@
 
   It lives under `apps/manager/` rather than `apps/manager/components/` for the reason
   `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves, this scale is
-  manager-scoped, and staying here keeps `--fab-mv2-*` in scope so the extraction is a pure
-  move rather than a re-tokenisation.
+  manager-scoped, and staying here keeps any area-scoped `--fab-manager-*` property in
+  scope, so the extraction is a pure move rather than a re-tokenisation.
 
   IT WRAPS NOTHING. The heading, the hint and the sub-hint are emitted as SIBLINGS, not
   inside a section element, because `BulkEditPanelShell`'s uniform flex `gap` is what
@@ -59,8 +59,8 @@
 
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives
-     HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is in
+     scope. Its appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that actually
      render it. Because it sits OUTSIDE both `apps/manager/components/` and
      `apps/manager/recipes/`, it is enumerated BY NAME in that map's browser match lists. */
@@ -77,7 +77,7 @@
      inner spacing, and this extra `space-2` is what turns the flat run back into groups. */
   .fab-bulk-edit-label {
     margin: var(--fab-space-2) 0 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -122,7 +122,7 @@
      copy is 0.62rem. */
   .fab-bulk-edit-hint {
     margin: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.58rem;
     font-weight: 400;
     line-height: 1.4;
@@ -130,7 +130,7 @@
 
   .fab-bulk-edit-subhint {
     margin: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.62rem;
     font-weight: 400;
     line-height: 1.4;

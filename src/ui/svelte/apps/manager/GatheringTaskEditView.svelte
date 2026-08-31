@@ -2276,9 +2276,9 @@
     flex-direction: column;
     gap: var(--fab-space-3);
     padding: 13px 16px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
-    background: var(--fab-mv2-surface-2);
+    background: var(--fab-bg-3);
     box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
   }
 
@@ -2356,7 +2356,7 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     padding-top: var(--fab-space-3);
-    border-top: 1px solid var(--fab-mv2-border);
+    border-top: 1px solid var(--fab-border);
   }
 
   .manager-task-depleted-behavior h4 {

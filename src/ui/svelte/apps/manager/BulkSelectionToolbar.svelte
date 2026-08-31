@@ -7,10 +7,10 @@
   It lives under `apps/manager/` — beside `Chip`, `Callout` and `SegmentedControl` — and
   NOT under `apps/manager/components/`, which holds the area-agnostic leaves. That is
   deliberate and load-bearing: this component's root class is `manager-*`, both of its
-  consumers are manager views, and staying inside `apps/manager/` keeps `--fab-mv2-*`
-  (declared on `.fabricate-manager`) in scope, so the extraction needed no token swap. A
-  `components/` leaf can be rendered outside `.fabricate-manager`, where those properties
-  are undefined and the colours silently fall back to inheritance.
+  consumers are manager views, and staying inside `apps/manager/` keeps `--fab-manager-*`
+  (declared on `.fabricate-manager`) in scope. A `components/` leaf can be rendered outside
+  `.fabricate-manager`, where such a property is undefined and the colours silently fall
+  back to inheritance.
 
   Its root JOINS the host browser's own filter-row class so it inherits that toolbar's row
   metrics (flex, wrap, gap, full width) rather than declaring a bespoke bar; `is-selection`
@@ -157,8 +157,8 @@
 
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is always in scope here. That is the
-     opposite of `SelectionCheckbox`, which is area-agnostic and reaches theme root only;
+     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is always
+     in scope here. That is the opposite of `SelectionCheckbox`, which is area-agnostic and reaches theme root only;
      do not carry this over to a shared `components/` primitive.
 
      The row itself is NOT styled here. `.<rowClass>.is-selection` in the global sheet owns
@@ -170,7 +170,7 @@
     gap: var(--fab-space-2);
     align-items: center;
     flex: 0 0 auto;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.68rem;
     font-weight: 600;
     cursor: pointer;
@@ -206,7 +206,7 @@
      same markup sits in the Playwright fixture in
      `tests/components/component-studio-font-size.test.js`. */
   .fab-bulk-selection-all :global(.fab-selection-input:focus-visible + .fab-selection-check) {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 
@@ -214,7 +214,7 @@
     flex: 0 0 auto;
     width: 1px;
     height: 16px;
-    background: var(--fab-mv2-border);
+    background: var(--fab-border);
   }
 
   /* The selection count is the one ACCENT thing in the row: it is the fact the rest of the
@@ -224,7 +224,7 @@
     gap: var(--fab-space-chip);
     align-items: center;
     flex: 0 0 auto;
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.68rem;
     font-weight: 700;
   }
@@ -259,7 +259,7 @@
   }
 
   .fab-bulk-selection-link {
-    color: var(--fab-mv2-info);
+    color: var(--fab-info);
     border-bottom: 1px solid var(--fab-info-border);
     border-radius: 0;
   }
@@ -273,12 +273,12 @@
 
   .fab-bulk-selection-clear:hover,
   .fab-bulk-selection-link:hover {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
   }
 
   .fab-bulk-selection-link:focus-visible,
   .fab-bulk-selection-clear:focus-visible {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 

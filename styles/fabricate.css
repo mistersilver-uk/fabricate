@@ -65,8 +65,10 @@
   /* Fabricate product UI design-system tokens.
      See the UI design-system requirements in openspec/specs/ui-integration/spec.md.
      Theme colour literals live only in `[data-fabricate-theme]` blocks below.
-     Existing `--fab-v2-*` aliases map through canonical `--fab-*` tokens until
-     each component migrates intentionally. */
+     The namespace is ONE generation: a foundation token name carries no version or
+     generation marker, and `tests/token-generation-gate.test.js` fails the build for any
+     name that does. An area-scoped property takes the `--fab-manager-` prefix and must
+     not be read outside `.fabricate-manager`. */
 
   /* Typographic faces (issue 643). These live in `:root`, NOT in a theme block:
      `tests/components/theme-colour-contract.test.js` asserts every theme block
@@ -102,66 +104,15 @@
      again; `tests/components/icon-picker-layout.test.js` fails if this arithmetic is broken. */
   --fab-icon-picker-chip: 28px;
   --fab-icon-picker-row: calc(var(--fab-icon-picker-chip) + (2 * var(--fab-space-1)) + 2px);
-  --fab-v2-bg: var(--fab-bg-0);
-  --fab-v2-surface-1: var(--fab-bg-1);
-  --fab-v2-surface-2: var(--fab-bg-2);
-  --fab-v2-surface-3: var(--fab-bg-3);
-  --fab-v2-border: var(--fab-border);
-  --fab-v2-border-strong: var(--fab-border-strong);
-  --fab-v2-text: var(--fab-text);
-  --fab-v2-text-muted: var(--fab-text-muted);
-  --fab-v2-text-subtle: var(--fab-text-subtle);
-  --fab-v2-accent: var(--fab-accent);
-  --fab-v2-accent-strong: var(--fab-accent-strong);
-  --fab-v2-accent-soft: var(--fab-accent-soft);
-  --fab-v2-warning: var(--fab-warning);
-  --fab-v2-warning-soft: var(--fab-warning-soft);
-  --fab-v2-danger: var(--fab-danger);
-  --fab-v2-danger-soft: var(--fab-danger-soft);
-  --fab-v2-info: var(--fab-info);
-  --fab-v2-info-soft: var(--fab-info-soft);
-  --fab-v2-radius-control: 5px;
-  --fab-v2-radius-panel: 6px;
-  --fab-v2-control-height: 34px;
-  --fab-v2-icon-button: 34px;
-  --fab-v2-thumb-sm: 40px;
-  --fab-v2-thumb-md: 58px;
-  --fab-v2-row-height: 72px;
-  --fab-v2-panel-gap: var(--fab-space-2);
-  --fab-v2-shadow: var(--fab-shadow-lg);
-  --fab-action-text: var(--fab-on-accent);
-  --fab-status-success-text: var(--fab-success-text);
-  --fab-status-warning-text: var(--fab-warning-text);
-  --fab-status-danger-text: var(--fab-danger-text);
-  --fab-status-info-text: var(--fab-info-text);
-  --fab-status-success-bg: var(--fab-success-soft);
-  --fab-status-warning-bg: var(--fab-warning-soft);
-  --fab-status-danger-bg: var(--fab-danger-soft);
-  --fab-status-info-bg: var(--fab-info-soft);
-  --fab-status-success-border: var(--fab-success-border);
-  --fab-status-warning-border: var(--fab-warning-border);
-  --fab-status-danger-border: var(--fab-danger-border);
-  --fab-status-info-border: var(--fab-info-border);
-  --fab-editor-surface: var(--fab-overlay-dark-16);
-  --fab-editor-surface-strong: var(--fab-overlay-dark-24);
-  --fab-editor-surface-soft: var(--fab-surface-soft);
-  --fab-editor-border: var(--fab-border);
-  --fab-editor-border-strong: var(--fab-border-strong);
-  --fab-editor-border-danger: var(--fab-danger-border);
-  --fab-editor-text: var(--fab-text);
-  --fab-editor-muted: var(--fab-text-muted);
-  --fab-editor-muted-strong: var(--fab-text-secondary);
-  --fab-editor-placeholder: var(--fab-text-disabled);
-  --fab-editor-input-bg: var(--fab-surface-soft);
-  --fab-editor-input-bg-hover: var(--fab-surface-raised);
-  --fab-editor-input-bg-active: var(--fab-surface-active);
-  --fab-editor-menu-bg: var(--fab-bg-3);
-  --fab-editor-menu-selected: var(--fab-info-strong);
-  --fab-editor-accent: var(--fab-info);
-  --fab-editor-accent-soft: var(--fab-info-soft);
-  --fab-editor-danger: var(--fab-danger-text);
-  --fab-editor-danger-soft: var(--fab-danger-soft);
-  --fab-editor-shadow: var(--fab-shadow-md);
+
+  /* The two radii the Books & Scrolls tab and the item-page inspector share (issue 1399).
+     Both values are OFF the published radius ladder (6/7/9/11/999, panels take 11), and
+     they are carried across at their shipped values rather than corrected here: bringing
+     them onto the ladder moves pixels, which is a visible change and a separate decision.
+     They stay tokenised precisely so that correction remains a one-line edit instead of
+     six scattered literals across two files. */
+  --fab-radius-control: 5px;
+  --fab-radius-panel: 6px;
 
   /* Component Studio token mapping (issue 676) — kept as the record of the calls,
    * since the studio introduces no tokens of its own to hang them on.
@@ -1275,8 +1226,8 @@
 
 /* Theme player-app <select> controls (and their open option list) so they read
    as Fabricate dropdowns instead of Foundry's default yellow-on-light text. The
-   solid --fab-bg-1 background matches the GM manager selects (which use
-   --fab-mv2-bg, itself --fab-bg-1); the option rule themes the popup list. The
+   solid --fab-bg-1 background matches the GM manager selects, which read the
+   same token; the option rule themes the popup list. The
    app root's `color-scheme: dark` makes the native popup chrome + highlight dark
    too. Tokenized; namespaced under .fabricate-app. */
 .fabricate-app select {
@@ -1405,15 +1356,15 @@
   justify-content: flex-start;
   height: 36px;
   padding: 0 var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-20);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   cursor: pointer;
 }
 
 .fabricate-manager .image-path-picker.is-button-only .image-path-picker-button:hover:not(:disabled) {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
   background: var(--fab-overlay-dark-32);
 }
 
@@ -1463,19 +1414,6 @@
   */
   color-scheme: dark;
 
-  --fab-mv2-bg: var(--fab-bg-1);
-  --fab-mv2-surface-1: var(--fab-bg-2);
-  --fab-mv2-surface-2: var(--fab-bg-3);
-  --fab-mv2-surface-3: var(--fab-surface-raised);
-  --fab-mv2-border: var(--fab-border);
-  --fab-mv2-border-strong: var(--fab-border-strong);
-  --fab-mv2-text: var(--fab-text);
-  --fab-mv2-text-muted: var(--fab-text-muted);
-  --fab-mv2-accent: var(--fab-accent);
-  --fab-mv2-info: var(--fab-info);
-  --fab-mv2-warning: var(--fab-warning);
-  --fab-mv2-danger: var(--fab-danger);
-
   /* One control-text scale shared by the recipe browser filter bar (search + selects)
      and the recipe editor overview fields (name, flavour, selects), so both read at
      the same size (issue 643). */
@@ -1506,8 +1444,8 @@
      container at all, so there is nothing for focus to scroll. Nothing scrolls this root
      programmatically; the real scrollers are further in and are untouched. */
   overflow: clip;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 
   /* THE SCROLLERS (issue 1096, maintainer parity round 2). Nothing in this sheet ever
      selected a colour for a scrollbar, so every scrolling region in the manager inherited
@@ -1598,10 +1536,10 @@
   -webkit-appearance: none;
   min-height: 34px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager textarea {
@@ -1651,14 +1589,14 @@
 */
 .fabricate-manager select {
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager select:disabled {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
 }
@@ -1682,8 +1620,8 @@
   selected row as black-on-grey against these surfaces.
 */
 .fabricate-manager select option {
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-2);
+  color: var(--fab-text);
+  background: var(--fab-bg-3);
 }
 
 /*
@@ -1698,7 +1636,7 @@
   different designs depending on the browser.
 */
 .fabricate-manager select option:checked {
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-overlay-light-08);
 }
 
@@ -1751,9 +1689,9 @@
   .fabricate-manager select::picker(select) {
     appearance: base-select;
     padding: var(--fab-space-1);
-    border: 1px solid var(--fab-mv2-border-strong);
+    border: 1px solid var(--fab-border-strong);
     border-radius: 9px;
-    background: var(--fab-mv2-surface-2);
+    background: var(--fab-bg-3);
     box-shadow: var(--fab-shadow-lg);
   }
 
@@ -1772,19 +1710,19 @@
   }
 
   .fabricate-manager select option:checked {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     background: var(--fab-overlay-light-08);
   }
 
   /* The tick the customizable select reserves space for on every row: hidden until the
      row is the selected one, so the list does not gain a ragged empty gutter. */
   .fabricate-manager select option::checkmark {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     content: '\2713';
   }
 
   .fabricate-manager select::picker-icon {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     transition: transform 120ms ease;
   }
 
@@ -1800,7 +1738,7 @@
 .fabricate-manager input[type="password"]:disabled,
 .fabricate-manager input:not([type]):disabled,
 .fabricate-manager textarea:disabled {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
 }
@@ -1833,7 +1771,7 @@
 .fabricate-manager select:focus-visible,
 .fabricate-manager textarea:focus-visible,
 .fabricate-manager [tabindex]:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -1853,7 +1791,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-4);
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
   background: var(--fab-bg-0);
 }
 
@@ -1875,14 +1813,14 @@
   gap: var(--fab-space-chip);
   min-width: 0;
   margin-left: auto;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.7rem;
   font-weight: 500;
 }
 
 .fabricate-manager .manager-titlebar-status-icon {
   flex: 0 0 auto;
-  color: var(--fab-mv2-info);
+  color: var(--fab-info);
   font-size: 0.72rem;
 }
 
@@ -1900,8 +1838,8 @@
   gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-3) var(--fab-space-4);
-  border-bottom: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
+  border-bottom: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
 }
 
 /*
@@ -1918,7 +1856,7 @@
 
 .fabricate-manager .manager-kicker {
   margin: 0 0 var(--fab-space-2xs);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -2031,9 +1969,8 @@
    role's paint belongs to the role, and the container keeps only its own scale.
 
    `.manager-header-actions .manager-button.is-ghost` stated the same three values through
-   `--fab-border` and `--fab-text-muted`, which are what `--fab-mv2-border` and
-   `--fab-mv2-text-muted` alias, so which of the two (0,4,0) rules won was a zero-pixel
-   question decided by source order.
+   `--fab-border` and `--fab-text-muted` — the same two tokens this role reads — so which
+   of the two (0,4,0) rules won was a zero-pixel question decided by source order.
 
    `.manager-tool-edit-actions .manager-button.is-ghost` was the SAME rule one container
    over, and retiring it is not cosmetic: at (0,4,0) and unqualified it beat
@@ -2045,8 +1982,8 @@
    now probes this invariant in every container the sheet styles, not just one, because a
    probe scoped to one container is what let this survive a whole review round. */
 .fabricate-manager .manager-button.fab-manager-button.is-ghost:not(:disabled) {
-  border-color: var(--fab-mv2-border);
-  color: var(--fab-mv2-text-muted);
+  border-color: var(--fab-border);
+  color: var(--fab-text-muted);
   background: transparent;
 }
 
@@ -2134,7 +2071,7 @@
 
 .fabricate-manager .manager-subtitle {
   margin: var(--fab-space-2xs) 0 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 
   /* 0.72rem (~11.5px) matches the prototype's subtitle scale; 0.82rem read ~2px hot
      against the design (issue 643 font-size audit). */
@@ -2199,7 +2136,7 @@
   gap: var(--fab-space-chip);
   min-width: 0;
   margin: 0 0 var(--fab-space-chip);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   font-weight: 700;
 }
@@ -2210,7 +2147,7 @@
   min-width: 0;
   padding: 0;
   border: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   font: inherit;
   text-align: left;
@@ -2219,7 +2156,7 @@
 
 .fabricate-manager .manager-breadcrumbs button:hover,
 .fabricate-manager .manager-breadcrumbs button:focus-visible {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-breadcrumbs span,
@@ -2254,7 +2191,7 @@
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
-  border-right: 1px solid var(--fab-mv2-border);
+  border-right: 1px solid var(--fab-border);
   background: var(--fab-bg-0);
 
   /* The backstop under the nav's own scroller (see `.manager-nav`), and inert in normal use:
@@ -2280,21 +2217,21 @@
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-rail-toggle:hover {
-  color: var(--fab-mv2-text);
-  border-color: var(--fab-mv2-border-strong);
+  color: var(--fab-text);
+  border-color: var(--fab-border-strong);
   background: var(--fab-overlay-light-06);
 }
 
 .fabricate-manager .manager-rail-toggle:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -2382,7 +2319,7 @@
 .fabricate-manager .manager-main {
   display: grid;
   grid-template-rows: auto auto 1fr;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-system-edit-main {
@@ -3282,7 +3219,7 @@
   cursor: pointer;
 }
 
-/* THE PANE'S OWN SURFACE. `.manager-main` paints `--fab-mv2-surface-1` (`--fab-bg-2`) for
+/* THE PANE'S OWN SURFACE. `.manager-main` paints `--fab-bg-2` for
    the whole manager, which is the CARD shade in the prototype — so the studio's cards were
    sitting on their own colour and every border between them disappeared. The prototype's
    pane is the app-window shade, `--fab-bg-1`, one step darker than the cards on it.
@@ -4316,7 +4253,7 @@
    select — `.manager-field select`, `.manager-recipe-field select` — states an opaque fill.
    This rule brings the trigger dropdowns back onto it. */
 .fabricate-manager .manager-checks-trigger-body .manager-field select {
-  background: var(--fab-mv2-bg);
+  background: var(--fab-bg-1);
 }
 
 /* The threshold is the one number on this row a GM reads back, so it takes the heavier
@@ -4409,11 +4346,11 @@
 }
 
 .fabricate-manager .manager-checks-trigger-step-operand.is-invalid select {
-  border-color: var(--fab-mv2-danger);
+  border-color: var(--fab-danger);
 }
 
 .fabricate-manager .manager-checks-trigger-step-operand input:disabled {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
   opacity: 0.62;
@@ -4459,7 +4396,7 @@
    crit-ineligibility hint (see issue 443). Reuses the muted-copy treatment so it
    wraps cleanly at narrow widths. */
 .fabricate-manager .manager-checks-crit-hint {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 /* ── The FORMULA card (issue 1096) ───────────────────────────────────────────────────
@@ -4640,9 +4577,9 @@
   min-width: 0;
   min-height: 32px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   font-size: 0.76rem;
   font-weight: 700;
@@ -4673,7 +4610,7 @@
 
 .fabricate-manager .manager-checks-outcome-head {
   padding: 0 var(--fab-space-2) var(--fab-space-2xs);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -4681,12 +4618,12 @@
 
 .fabricate-manager .manager-checks-outcome-row {
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
 }
 
 .fabricate-manager .manager-checks-outcome-row.is-invalid {
-  border-color: var(--fab-mv2-danger);
+  border-color: var(--fab-danger);
 }
 
 /* `:not(.fab-stepper-input)` — same collision, same reason as the `.manager-field` rule at
@@ -4700,10 +4637,10 @@
   min-width: 0;
   height: 36px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-checks-validation {
@@ -4731,10 +4668,10 @@
 /*
   ONE right-hand-panel surface for the whole manager (issue 881).
 
-  This rail used to sit on `--fab-mv2-surface-2`, with the Recipe Studio views carved out
-  onto `--fab-mv2-surface-1` (issue 643) and the Tool Studio's own preview column written
-  as a third, bespoke `--fab-bg-2` aside. Two of those three were already the same shade —
-  `--fab-mv2-surface-1` IS `--fab-bg-2` — so the odd one out was the shared rule, which is
+  This rail used to sit on `--fab-bg-3`, with the Recipe Studio views carved out
+  onto `--fab-bg-2` (issue 643) and the Tool Studio's own preview column written
+  as a third, bespoke aside. Two of those three were already the same shade —
+  they named `--fab-bg-2` by two spellings — so the odd one out was the shared rule, which is
   why the Tags & Categories rail read visibly lighter than the Tool Studio panel it is
   supposed to match. Unifying on the darker shade removes the per-view exception rather
   than adding a `[data-manager-view="tags"]` one.
@@ -4744,8 +4681,8 @@
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
-  border-left: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
+  border-left: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
   overflow-y: auto;
   max-height: 100%;
   min-height: 0;
@@ -4844,14 +4781,14 @@
 }
 
 .fabricate-manager .manager-prerequisite-item {
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
   overflow: hidden;
 }
 
 .fabricate-manager .manager-prerequisite-item.is-open {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
 }
 
 .fabricate-manager .manager-prerequisite-header {
@@ -4879,7 +4816,7 @@
 .fabricate-manager .manager-prerequisite-chevron {
   flex: 0 0 auto;
   width: 12px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-prerequisite-icon {
@@ -4889,7 +4826,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-prerequisite-name {
@@ -4905,7 +4842,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-1);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-family: var(--fab-font-mono, monospace);
   font-size: 0.8rem;
   white-space: nowrap;
@@ -4941,7 +4878,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-prerequisite-condition {
@@ -4968,9 +4905,9 @@
   align-items: center;
   gap: var(--fab-space-1);
   padding-left: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 5px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
 }
 
 .fabricate-manager .manager-prerequisite-path-input input {
@@ -4981,7 +4918,7 @@
 }
 
 .fabricate-manager .manager-prerequisite-at {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-family: var(--fab-font-mono, monospace);
 }
 
@@ -5003,9 +4940,9 @@
   flex-direction: column;
   gap: var(--fab-space-chip);
   padding: var(--fab-space-3) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-character-modifier-summary {
@@ -5035,14 +4972,14 @@
   row classes (also used by the currency-unit list) keep their existing layout.
 */
 .fabricate-manager .manager-modifier-item {
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
   overflow: hidden;
 }
 
 .fabricate-manager .manager-modifier-item.is-open {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
 }
 
 .fabricate-manager .manager-modifier-header {
@@ -5087,7 +5024,7 @@
 .fabricate-manager .manager-modifier-chevron {
   flex: 0 0 auto;
   width: 12px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-modifier-icon {
@@ -5097,7 +5034,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-modifier-label {
@@ -5114,7 +5051,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-1);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-family: var(--fab-font-mono, monospace);
   font-size: 0.8rem;
   white-space: nowrap;
@@ -5196,19 +5133,19 @@
    lose on source order. Only the fill survives — the tag's own `font-size: 0.7rem` went
    with the second chip scale, since size is exactly what the primitive unifies. */
 .fabricate-manager .manager-chip.manager-character-modifier-roll-tag {
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
 }
 
 .fabricate-manager .manager-character-modifier-customized-badge {
   font-size: 0.7rem;
-  border: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
+  border: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
   padding: var(--fab-space-2xs) var(--fab-space-chip);
   border-radius: 999px;
 }
 
 .fabricate-manager .manager-character-modifier-stale-warning {
-  color: var(--fab-mv2-danger);
+  color: var(--fab-danger);
   font-size: 0.75rem;
 }
 
@@ -5241,8 +5178,8 @@
    are loose controls and have to read as controls before hover. */
 .fabricate-manager .manager-tag-suggestion.manager-modifier-expression-suggestion {
   flex: 0 1 auto;
-  border: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
+  border: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
   font-family: var(--fab-font-mono, monospace);
   font-size: 0.72rem;
 }
@@ -5303,7 +5240,7 @@
   border-left: 3px solid var(--fab-warning);
   border-radius: 6px;
   background: var(--fab-warning-soft);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.35;
@@ -5329,7 +5266,7 @@
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border-color: color-mix(in srgb, var(--fab-info) 50%, transparent);
   border-radius: 5px;
-  background: color-mix(in srgb, var(--fab-info) 16%, var(--fab-mv2-surface-2));
+  background: color-mix(in srgb, var(--fab-info) 16%, var(--fab-bg-3));
 }
 
 .fabricate-manager .manager-availability-pill.is-currency > i {
@@ -5341,10 +5278,10 @@
   min-width: 0;
   height: 25px;
   padding: 0 var(--fab-space-2xs);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 4px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-size: 0.74rem;
   font-weight: 700;
   text-align: center;
@@ -5404,7 +5341,7 @@
 }
 
 .fabricate-manager .manager-currency-readonly-label {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -5413,7 +5350,7 @@
 }
 
 .fabricate-manager .manager-currency-readonly-value {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -5437,7 +5374,7 @@
   width: calc(100% + 24px);
   height: 1px;
   margin: var(--fab-space-3) calc(-1 * var(--fab-space-3)) 0;
-  background: var(--fab-mv2-border);
+  background: var(--fab-border);
 }
 
 .fabricate-manager .manager-drop-inspector-scroll {
@@ -5454,8 +5391,8 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--fab-mv2-surface-1);
-  border-bottom: 1px solid var(--fab-mv2-border);
+  background: var(--fab-bg-2);
+  border-bottom: 1px solid var(--fab-border);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   box-shadow: 0 2px 6px var(--fab-overlay-dark-25);
@@ -5530,9 +5467,9 @@
   flex-direction: column;
   gap: var(--fab-space-2);
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-character-modifier-row-reference-header {
@@ -5548,16 +5485,16 @@
 
 .fabricate-manager .manager-condition-modifier-row-reference.is-positive {
   border-color: var(--fab-success-border);
-  background: color-mix(in srgb, var(--fab-success-soft) 40%, var(--fab-mv2-surface-1));
+  background: color-mix(in srgb, var(--fab-success-soft) 40%, var(--fab-bg-2));
 }
 
 .fabricate-manager .manager-condition-modifier-row-reference.is-negative {
   border-color: var(--fab-danger-border);
-  background: color-mix(in srgb, var(--fab-danger-soft) 40%, var(--fab-mv2-surface-1));
+  background: color-mix(in srgb, var(--fab-danger-soft) 40%, var(--fab-bg-2));
 }
 
 .fabricate-manager .manager-condition-modifier-row-reference.is-zero {
-  border-color: var(--fab-mv2-border);
+  border-color: var(--fab-border);
 }
 
 .fabricate-manager .manager-condition-modifier-value {
@@ -5574,10 +5511,10 @@
   min-height: 28px;
   padding: var(--fab-space-2xs) var(--fab-space-4) var(--fab-space-2xs) var(--fab-space-1);
   text-align: center;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-1);
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
   font: inherit;
   font-variant-numeric: tabular-nums;
@@ -5589,7 +5526,7 @@
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  color: var(--fab-mv2-text-muted, var(--fab-mv2-text));
+  color: var(--fab-text-muted, var(--fab-text));
 }
 
 .fabricate-manager .manager-condition-modifier-add-row {
@@ -5612,7 +5549,7 @@
 .fabricate-manager .manager-character-modifier-operator-select {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 4px;
   padding: 0;
 }
@@ -5622,7 +5559,7 @@
   height: 28px;
   min-height: 28px;
   border: none;
-  background: var(--fab-mv2-bg);
+  background: var(--fab-bg-1);
   color: inherit;
   font-size: 0.75rem;
   padding: 0 var(--fab-space-chip);
@@ -5630,8 +5567,8 @@
 }
 
 .fabricate-manager .manager-character-modifier-operator-select select option {
-  background: var(--fab-mv2-bg);
-  color: var(--fab-mv2-text);
+  background: var(--fab-bg-1);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-character-modifier-operator-select.is-positive {
@@ -5707,7 +5644,7 @@
 .fabricate-manager .manager-toolbar {
   min-width: 0;
   padding: var(--fab-space-3);
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-section-header {
@@ -5771,7 +5708,7 @@
   align-items: center;
   gap: var(--fab-space-chip);
   min-width: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -5781,19 +5718,19 @@
   min-width: 0;
   height: 34px;
   padding: 0 34px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-filter select {
   min-width: 128px;
   height: 34px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-tag-search {
@@ -5814,10 +5751,10 @@
 .fabricate-manager .manager-tag-search input {
   min-width: 0;
   height: 34px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-tag-suggestions {
@@ -5830,9 +5767,9 @@
   gap: var(--fab-space-2xs);
   max-height: 148px;
   padding: var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
   box-shadow: 0 12px 24px var(--fab-overlay-dark-32);
   overflow-y: auto;
 }
@@ -5847,7 +5784,7 @@
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 0;
   border-radius: 4px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: transparent;
   text-align: left;
 }
@@ -5860,7 +5797,7 @@
 
 .fabricate-manager .manager-tag-no-matches {
   padding: var(--fab-space-1) var(--fab-space-2);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
   font-weight: 600;
 }
@@ -5894,7 +5831,7 @@
   padding: 0;
   border: 0;
   border-radius: 4px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
 }
 
@@ -5909,7 +5846,7 @@
   top: 50%;
   left: 11px;
   transform: translateY(-50%);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   pointer-events: none;
 }
 
@@ -5937,7 +5874,7 @@
 }
 
 .fabricate-manager .manager-button.fab-manager-button.manager-clear-filters:not(:disabled) {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
 }
 
@@ -5948,9 +5885,9 @@
   flex-wrap: wrap;
   gap: var(--fab-space-3);
   padding: var(--fab-space-2) var(--fab-space-3);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-03);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
 }
 
@@ -5967,7 +5904,7 @@
 .fabricate-manager .manager-pagination-page {
   min-width: 96px;
   text-align: center;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-weight: 700;
 }
 
@@ -5980,10 +5917,10 @@
 .fabricate-manager .manager-pagination-size select {
   height: 28px;
   min-width: 64px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font: inherit;
 }
 
@@ -6062,7 +5999,7 @@
   width: 100%;
   min-width: 0;
   padding: 0 13px var(--fab-space-2xs);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -6209,7 +6146,7 @@
 }
 
 .fabricate-manager .manager-environments-table {
-  --fab-mv2-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;
+  --fab-manager-environment-grid: minmax(0, 1fr) 120px 56px 88px 116px;
 
   display: flex;
   flex-direction: column;
@@ -6218,7 +6155,7 @@
 }
 
 .fabricate-manager .manager-gathering-tasks-table {
-  --fab-mv2-gathering-task-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
+  --fab-manager-gathering-task-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
 
   display: flex;
   flex-direction: column;
@@ -6226,7 +6163,7 @@
   min-width: 0;
 }
 
-/* The essence library's list container (issue 1036). The `--fab-mv2-essence-grid` column
+/* The essence library's list container (issue 1036). The essence-grid column
    template and its `.has-no-source` variant are RETIRED with the table head they served:
    the row is a flex card that wraps, so a `grid-template-columns` on it would place
    nothing. `min-width: 0` stays — the container is a grid child of the route shell and
@@ -6246,7 +6183,7 @@
 
 .fabricate-manager .manager-table-head {
   padding: 0 var(--fab-space-2) var(--fab-space-2xs);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -6269,7 +6206,7 @@
   min-width: 0;
   min-height: 62px;
   padding: 11px 12px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-recipe-row.is-off {
@@ -6413,7 +6350,7 @@
 
 .fabricate-manager .manager-recipe-lock.is-locked {
   border-color: var(--fab-accent-border);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-accent-soft);
 }
 
@@ -6451,7 +6388,7 @@
 
 .fabricate-manager .manager-icon-button.is-ghost:not(:disabled):hover,
 .fabricate-manager .manager-icon-button.is-ghost:focus-visible {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-surface-raised);
 }
 
@@ -6528,16 +6465,16 @@
   min-width: 0;
   height: 34px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-size: var(--fab-recipe-control-font);
   cursor: pointer;
 }
 
 .fabricate-manager .manager-recipe-field select:disabled {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
 }
@@ -6844,7 +6781,7 @@
 .fabricate-manager .manager-essence-filter-row.is-selection {
   gap: var(--fab-space-2);
   padding-top: var(--fab-space-2);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 /* Both recipe-filter dropdowns (category + sort) wear the Fabricate select treatment —
@@ -6857,10 +6794,10 @@
 .fabricate-manager .manager-essence-toolbar select {
   height: 34px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   cursor: pointer;
 }
 
@@ -6911,7 +6848,7 @@
   flex: 0 0 auto;
   width: 1px;
   height: 20px;
-  background: var(--fab-mv2-border);
+  background: var(--fab-border);
 }
 
 /* The grouping switch is a FILTER control, not a row's On/Off status cell, so it opts
@@ -7053,10 +6990,10 @@
   height: 30px;
   margin-top: var(--fab-space-1);
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-size: var(--fab-recipe-control-font);
   cursor: pointer;
 }
@@ -7082,7 +7019,7 @@
 .fabricate-manager .manager-recipe-browser-inspector-flavour,
 .fabricate-manager .manager-component-browser-inspector-flavour {
   margin: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 400;
   line-height: 1.5;
@@ -7142,8 +7079,8 @@
   .manager-button.fab-manager-button.manager-component-browser-inspector-copy:not(:disabled),
 .fabricate-manager
   .manager-button.fab-manager-button.manager-component-browser-inspector-unlink:not(:disabled) {
-  border-color: var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
+  border-color: var(--fab-border);
+  background: var(--fab-bg-2);
 }
 
 /* Accent primary: the loudest control on the panel. Both rows stay role-LESS (issue 1118):
@@ -7200,7 +7137,7 @@
   .manager-button.fab-manager-button.manager-recipe-browser-inspector-delete:not(:disabled),
 .fabricate-manager
   .manager-button.fab-manager-button.manager-component-browser-inspector-delete:not(:disabled) {
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
 }
 
 /* `:focus-visible` ONLY. The hover half was byte-identical to
@@ -7233,7 +7170,7 @@
   gap: var(--fab-space-2xs);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-bg-1);
 }
@@ -7244,7 +7181,7 @@
 .fabricate-manager .manager-component-stat-value,
 .fabricate-manager .manager-essence-stat-value {
   overflow: hidden;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-size: 0.92rem;
   font-variant-numeric: tabular-nums;
@@ -7265,7 +7202,7 @@
 }
 
 .fabricate-manager .manager-recipe-stat-value.is-muted {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-recipe-stat-label,
@@ -7291,7 +7228,7 @@
   align-items: center;
   min-width: 0;
   padding: var(--fab-space-1) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-bg-1);
 }
@@ -7431,7 +7368,7 @@
   gap: var(--fab-space-2);
   margin-top: var(--fab-space-2);
   padding: var(--fab-space-1) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-04);
 }
@@ -7450,7 +7387,7 @@
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.72rem;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -7509,9 +7446,9 @@
   width: 100%;
   min-width: 0;
   padding: var(--fab-space-1) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-04);
   font-size: 0.72rem;
   font-weight: 600;
@@ -7531,7 +7468,7 @@
 .fabricate-manager .manager-recipe-produces-tier-head > i {
   flex: 0 0 auto;
   font-size: 0.6rem;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-recipe-produces-tier-name {
@@ -7605,7 +7542,7 @@
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-danger-border);
   border-radius: 10px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-bg-0);
   box-shadow: 0 12px 40px var(--fab-overlay-dark-48);
 }
@@ -7643,7 +7580,7 @@
   min-width: 0;
   min-height: 62px;
   padding: 11px 12px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-component-row .manager-component-identity {
@@ -7667,7 +7604,7 @@
 .fabricate-manager .manager-environment-table-head,
 .fabricate-manager .manager-environment-row {
   display: grid;
-  grid-template-columns: var(--fab-mv2-environment-grid);
+  grid-template-columns: var(--fab-manager-environment-grid);
   gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
@@ -7677,7 +7614,7 @@
 .fabricate-manager .manager-gathering-task-table-head,
 .fabricate-manager .manager-gathering-task-row {
   display: grid;
-  grid-template-columns: var(--fab-mv2-gathering-task-grid);
+  grid-template-columns: var(--fab-manager-gathering-task-grid);
   gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
@@ -7696,7 +7633,7 @@
   width: 100%;
   min-height: 72px;
   padding: var(--fab-space-3);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   cursor: pointer;
 }
 
@@ -7772,7 +7709,7 @@
   padding: 0;
   border: 0;
   border-radius: 999px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: none;
   white-space: nowrap;
   cursor: pointer;
@@ -7789,7 +7726,7 @@
   --fab-toggle-track-border: var(--fab-border-strong);
   --fab-toggle-knob: var(--fab-text-secondary);
 
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 /* Danger-active state: the depleted "delete the token" toggle carries `is-danger`
@@ -7828,7 +7765,7 @@
 }
 
 .fabricate-manager .manager-status-toggle:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -7876,8 +7813,8 @@
 }
 
 .fabricate-manager .manager-system-row:hover {
-  border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-mv2-surface-3);
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
 }
 
 /* The selected system card is the same identity cue as a selected browser row, so it
@@ -7885,7 +7822,7 @@
 .fabricate-manager .manager-system-row.is-selected {
   border-color: var(--fab-accent-border);
   background: var(--fab-surface-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  box-shadow: inset 3px 0 0 var(--fab-accent);
 }
 
 .fabricate-manager .manager-system-row:focus {
@@ -7893,7 +7830,7 @@
 }
 
 .fabricate-manager .manager-system-row:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 3px;
 }
 
@@ -7908,12 +7845,12 @@
    row and value card joins this rule instead of restating it. Before this, eight
    surfaces declared the same three properties eight times over and had already drifted
    to three corner radii (8px, 9px, 10px) and two fills (the translucent overlay and a
-   solid `--fab-mv2-surface-2`), which is exactly how a set of copies decays.
+   solid `--fab-bg-3`), which is exactly how a set of copies decays.
 
    Only the SKIN is shared, and deliberately so. Each surface keeps its own display
    model, column template, padding and height below, because those genuinely differ: the
    systems row is a four-column grid, the recipe and component rows are flex cards, the
-   gathering and essence rows key off their own `--fab-mv2-*-grid` custom properties, the
+   gathering and essence rows key off their own `--fab-manager-*-grid` custom properties, the
    Tool Studio row is a flex COLUMN wrapping a body plus an inline editor, and the
    vocabulary card is a container holding several rows behind `overflow: hidden`.
 
@@ -7938,7 +7875,7 @@
 .fabricate-manager .manager-gathering-task-row,
 .fabricate-manager .manager-gathering-event-row,
 .fabricate-manager .manager-essence-row {
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
 }
@@ -7952,7 +7889,7 @@
   width: 100%;
   min-height: 76px;
   padding: var(--fab-space-2) var(--fab-space-2);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 /* ── THE FOUNDRY `<li>` MARGIN LEAK, AND WHY IT ONLY SHOWS ON THE GRID CARD ──────────
@@ -7996,8 +7933,8 @@
 .fabricate-manager .manager-environment-row:hover,
 .fabricate-manager .manager-gathering-task-row:hover,
 .fabricate-manager .manager-essence-row:hover {
-  border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-mv2-surface-3);
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
 }
 
 /* Selection is an IDENTITY cue ("you are here"), never a status (issue 643). It
@@ -8016,7 +7953,7 @@
 .fabricate-manager .manager-essence-row.is-selected {
   border-color: var(--fab-accent-border);
   background: var(--fab-surface-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  box-shadow: inset 3px 0 0 var(--fab-accent);
 }
 
 /* The component row joins the recipe row's opt-out (issue 676): it now leads with the
@@ -8111,7 +8048,7 @@
 .fabricate-manager .manager-environment-identity:focus-visible,
 .fabricate-manager .manager-gathering-task-identity:focus-visible,
 .fabricate-manager .manager-essence-identity:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 3px;
   border-radius: 6px;
 }
@@ -8134,7 +8071,7 @@
   width: 100%;
   min-width: 0;
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 9px;
   color: inherit;
   background: var(--fab-bg-2);
@@ -8175,10 +8112,10 @@
   min-width: 0;
   height: 32px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-family: var(--fab-font-serif);
   font-size: 0.8rem;
   font-weight: 600;
@@ -8200,7 +8137,7 @@
   padding: var(--fab-space-2xs) var(--fab-space-1);
   border: 0;
   border-radius: 6px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   font-size: 0.68rem;
   font-weight: 600;
@@ -8222,7 +8159,7 @@
 
 .fabricate-manager .manager-scope-return:hover,
 .fabricate-manager .manager-scope-return:focus-visible {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-surface-soft);
 }
 
@@ -8230,7 +8167,7 @@
    inert — never a live control (issue 643). `pointer-events: none` stops hover/click,
    and the muted colour + reduced opacity read it as unavailable. */
 .fabricate-manager .manager-scope-return.is-disabled {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   opacity: 0.45;
   pointer-events: none;
@@ -8395,7 +8332,7 @@
 .fabricate-manager .manager-availability-pill.is-tag,
 .fabricate-manager .manager-availability-pill.is-modifier,
 .fabricate-manager .manager-availability-pill.is-biome {
-  background: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 16%, var(--fab-mv2-surface-2));
+  background: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 16%, var(--fab-bg-3));
   border-color: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 50%, transparent);
 }
 
@@ -8406,9 +8343,9 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-overlay-light-06);
   flex: 0 0 auto;
 }
@@ -8426,7 +8363,7 @@
 .fabricate-manager .manager-environment-preview {
   width: 46px;
   height: 46px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-06);
   object-fit: cover;
@@ -8437,7 +8374,7 @@
 .fabricate-manager .manager-recipe-preview {
   width: 56px;
   height: 56px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-06);
   object-fit: cover;
@@ -8501,7 +8438,7 @@
 .fabricate-manager .manager-system-description,
 .fabricate-manager .manager-muted {
   margin: var(--fab-space-2xs) 0 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
   line-height: 1.35;
   overflow-wrap: break-word;
@@ -8579,9 +8516,9 @@
   min-width: 0;
   margin: var(--fab-space-3);
   padding: var(--fab-space-3) var(--fab-space-3);
-  border: 1px dashed var(--fab-mv2-border-strong);
+  border: 1px dashed var(--fab-border-strong);
   border-radius: 8px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-success-soft);
 }
 
@@ -8602,9 +8539,9 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-overlay-dark-16);
 }
 
@@ -8623,7 +8560,7 @@
 
 .fabricate-manager .manager-component-drop-zone small {
   margin-top: var(--fab-space-2xs);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   line-height: 1.35;
 }
@@ -8719,13 +8656,13 @@
   border-radius: 9px;
   border: 1px solid var(--fab-accent-border);
   background: var(--fab-accent-soft);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-vocabulary-icon.is-locked-icon {
-  border: 1px dashed var(--fab-mv2-border-strong);
+  border: 1px dashed var(--fab-border-strong);
   background: var(--fab-overlay-light-035);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-vocabulary-icon-field {
@@ -8759,7 +8696,7 @@
   padding: 0;
   border: 1px solid var(--fab-accent-border);
   border-radius: 9px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-accent-soft);
   cursor: pointer;
 }
@@ -8795,7 +8732,7 @@
 .fabricate-manager .manager-vocabulary-confirm-copy {
   flex: 1;
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-vocabulary-confirm > i {
@@ -8813,9 +8750,9 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 11px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
 }
 
 .fabricate-manager .manager-vocabulary-form-fields {
@@ -8883,12 +8820,12 @@
    order — an unused row would silently repaint itself as a default chip. */
 .fabricate-manager .manager-chip.manager-vocabulary-chip-unused {
   background: transparent;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-chip.manager-vocabulary-chip-locked {
   background: var(--fab-overlay-light-035);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-vocabulary-main {
@@ -8965,7 +8902,7 @@
    `EssenceIdentityTab.svelte`. */
 .fabricate-manager .manager-essence-edit-grid {
   display: grid;
-  grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);
+  grid-template-columns: 124px minmax(0, 1fr);
   gap: var(--fab-space-3);
   min-width: 0;
 }
@@ -8979,7 +8916,7 @@
    nothing emits those classes at all. */
 
 .fabricate-manager .manager-essence-field-label {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.2;
@@ -9019,7 +8956,7 @@
 }
 
 .fabricate-manager .manager-form-warning {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   line-height: 1.35;
   overflow-wrap: break-word;
@@ -9030,7 +8967,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding-top: var(--fab-space-3);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-essence-source-stack {
@@ -9053,7 +8990,7 @@
   align-items: center;
   min-width: 0;
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-dark-14);
 }
@@ -9080,9 +9017,9 @@
   width: 54px;
   height: 54px;
   min-width: 54px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-05);
   object-fit: cover;
 }
@@ -9117,9 +9054,9 @@
 .fabricate-manager .essence-source-picker-option {
   appearance: none;
   -webkit-appearance: none;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-06);
 }
 
@@ -9148,7 +9085,7 @@
   width: var(--fab-icon-picker-chip);
   height: var(--fab-icon-picker-chip);
   border-radius: 6px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-overlay-dark-16);
 }
 
@@ -9193,7 +9130,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--fab-space-chip);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   line-height: 1.25;
   text-align: center;
@@ -9253,9 +9190,9 @@
      nothing here can loosen it. */
   max-height: 380px;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
   box-shadow: 0 16px 36px var(--fab-overlay-dark-34);
   overflow: hidden;
 }
@@ -9266,10 +9203,10 @@
   min-width: 0;
   height: 34px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .essence-icon-picker-options,
@@ -9333,7 +9270,7 @@
 .fabricate-manager .essence-source-picker-option:hover,
 .fabricate-manager .essence-icon-picker-option:focus-visible,
 .fabricate-manager .essence-source-picker-option:focus-visible {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
   background: var(--fab-success-soft);
 }
 
@@ -9347,7 +9284,7 @@
 }
 
 .fabricate-manager .manager-environment-task-count {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.86rem;
   font-weight: 800;
   line-height: 1;
@@ -9374,7 +9311,7 @@
   align-items: center;
   gap: var(--fab-space-chip);
   min-width: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   font-weight: 700;
 }
@@ -9383,7 +9320,7 @@
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
-  accent-color: var(--fab-mv2-accent);
+  accent-color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-requirements-list,
@@ -9401,7 +9338,7 @@
   align-items: center;
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-14);
 }
@@ -9432,7 +9369,7 @@
   min-width: 0;
   min-height: 38px;
   padding: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-05);
   overflow: hidden;
@@ -9440,7 +9377,7 @@
 
 .fabricate-manager .manager-essence-usage-item:hover,
 .fabricate-manager .manager-essence-usage-item:focus-visible {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
   background: var(--fab-success-soft);
 }
 
@@ -9636,7 +9573,7 @@
 .fabricate-manager .manager-scoped-preview-identity > img {
   width: 46px;
   height: 46px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
   object-fit: cover;
 }
@@ -9658,7 +9595,7 @@
   font-family: var(--fab-font-serif);
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -9716,7 +9653,7 @@
 .fabricate-manager .manager-scoped-inherit-label {
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -9792,7 +9729,7 @@
 .fabricate-manager .manager-scoped-list-filter-row.is-selection {
   gap: var(--fab-space-2);
   padding-top: var(--fab-space-2);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 /* The control type scale. See reason 2 in the block header. */
@@ -9808,10 +9745,10 @@
 .fabricate-manager .manager-scoped-list-toolbar select {
   height: 34px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   cursor: pointer;
 }
 
@@ -9837,9 +9774,9 @@
   min-width: 0;
   min-height: 62px;
   padding: 11px 12px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-03);
 }
 
@@ -9848,8 +9785,8 @@
 }
 
 .fabricate-manager .manager-scoped-list-row:hover {
-  border-color: var(--fab-mv2-border-strong);
-  background: var(--fab-mv2-surface-3);
+  border-color: var(--fab-border-strong);
+  background: var(--fab-surface-raised);
 }
 
 /* TWO INDEPENDENT STATES, AND A ROW CARRIES BOTH. `.is-selected` is "you are here" — an identity
@@ -9896,7 +9833,7 @@
 }
 
 .fabricate-manager .manager-scoped-list-identity:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 3px;
   border-radius: 6px;
 }
@@ -9939,11 +9876,11 @@
    shell: a fixed tab bar above a bounded, scrollable workspace. Like the
    environment editor, SystemEditView is wrapped by the parent in a
    `<main class="manager-main manager-environment-edit-main">` (the
-   header-coloured `--fab-mv2-surface-1` band) and a
+   header-coloured `--fab-bg-2` band) and a
    `.manager-environment-editor-shell` that owns the `var(--fab-space-3)` padding
    around the whole editor. This view therefore carries NO padding of its own:
    the tab bar (`.manager-environment-tabs`, `background: none`) fills the shell's
-   content box edge-to-edge and shows the surface-1 band through it, exactly like
+   content box edge-to-edge and shows the `--fab-bg-2` band through it, exactly like
    the environment editor's tab bar, while the card breathing room comes from the
    workspace/tab-panel gaps and the shared `.manager-environment-tab-panel`
    right-edge buffer below the bar. */
@@ -9963,7 +9900,7 @@
 .fabricate-manager .manager-environment-task-rail,
 .fabricate-manager .manager-environment-task-editor {
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
 }
@@ -9993,16 +9930,16 @@
   min-height: 32px;
   min-width: 0;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-dark-16);
   font-weight: 700;
 }
 
 .fabricate-manager .manager-task-tabs button.active {
-  border-color: var(--fab-mv2-border-strong);
-  color: var(--fab-mv2-text);
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text);
   background: var(--fab-success-soft);
 }
 
@@ -10049,7 +9986,7 @@
   height: 100%;
   min-height: 154px;
   object-fit: cover;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-24);
 }
@@ -10076,17 +10013,17 @@
   gap: var(--fab-space-2);
   padding: var(--fab-space-4);
   min-height: 96px;
-  border: 1px dashed var(--fab-mv2-border-strong);
+  border: 1px dashed var(--fab-border-strong);
   border-radius: 6px;
   background: var(--fab-overlay-dark-12);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   text-align: center;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-scene-drop-zone:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -10102,9 +10039,9 @@
 }
 
 .fabricate-manager .manager-scene-drop-zone.is-active {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
   background: var(--fab-success-soft);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-scene-drop-zone.is-linked {
@@ -10147,7 +10084,7 @@
 }
 
 .fabricate-manager .manager-environment-status-meta small {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.8rem;
   line-height: 1.3;
 }
@@ -10170,14 +10107,14 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-environment-validation-toggle:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -10187,7 +10124,7 @@
 }
 
 .fabricate-manager .manager-environment-validation-band.is-open .manager-environment-validation-toggle {
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
@@ -10220,14 +10157,14 @@
   align-items: center;
   min-width: 0;
   padding: var(--fab-space-chip);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-14);
 }
 
 .fabricate-manager .manager-task-rail-row.is-active {
-  border-color: var(--fab-mv2-border-strong);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  border-color: var(--fab-border-strong);
+  box-shadow: inset 3px 0 0 var(--fab-accent);
 }
 
 .fabricate-manager .manager-task-rail-row[data-environment-invalid="true"] {
@@ -10244,7 +10181,7 @@
   min-width: 0;
   padding: 0;
   border: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: transparent;
   text-align: left;
 }
@@ -10266,7 +10203,7 @@
 
 .fabricate-manager .manager-task-rail-select small,
 .fabricate-manager .manager-task-rail-handle {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
 }
 
@@ -10283,7 +10220,7 @@
   width: 58px;
   height: 58px;
   object-fit: cover;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-24);
 }
@@ -10322,7 +10259,7 @@
 .fabricate-manager .manager-environment-task-panel .environment-failure-authoring {
   min-width: 0;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-dark-14);
 }
@@ -10353,7 +10290,7 @@
   flex-direction: column;
   gap: var(--fab-space-1);
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -10363,10 +10300,10 @@
 .fabricate-manager .form-group textarea {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .form-group input,
@@ -10386,14 +10323,14 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.82rem;
 }
 
 .fabricate-manager .checkbox-label input {
   width: 18px;
   height: 18px;
-  accent-color: var(--fab-mv2-accent);
+  accent-color: var(--fab-accent);
 }
 
 .fabricate-manager .environment-task-header,
@@ -10409,12 +10346,12 @@
 .fabricate-manager .environment-task-header h5,
 .fabricate-manager .environment-result-group-title {
   margin: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.86rem;
 }
 
 .fabricate-manager .hint {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   line-height: 1.35;
 }
@@ -10437,9 +10374,9 @@
   align-items: center;
   min-width: 0;
   padding: var(--fab-space-3);
-  border: 1px dashed var(--fab-mv2-border);
+  border: 1px dashed var(--fab-border);
   border-radius: 8px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-03);
 }
 
@@ -10471,7 +10408,7 @@
   align-items: center;
   min-width: 0;
   padding: var(--fab-space-2) 0;
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .environment-catalyst-row {
@@ -10503,7 +10440,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-14);
 }
@@ -10549,7 +10486,7 @@
   gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
 }
@@ -10574,7 +10511,7 @@
   flex-direction: column;
   gap: var(--fab-space-chip);
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -10628,7 +10565,7 @@
 }
 
 .fabricate-manager .manager-currency-macro-note {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.82rem;
 }
 
@@ -10643,14 +10580,14 @@
   min-width: 0;
   margin: 0;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
 }
 
 .fabricate-manager .manager-resolution-mode-legend {
   padding: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -10676,7 +10613,7 @@
 
 .fabricate-manager .manager-resolution-mode-note i {
   margin-top: 0.1rem;
-  color: var(--fab-mv2-warning);
+  color: var(--fab-warning);
 }
 
 .fabricate-manager .manager-resolution-mode-options {
@@ -10702,9 +10639,9 @@
 }
 
 .fabricate-manager .manager-resolution-option.is-active {
-  border-color: var(--fab-mv2-border);
+  border-color: var(--fab-border);
   background: var(--fab-accent-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  box-shadow: inset 3px 0 0 var(--fab-accent);
 }
 
 /* Custom radio: strip Foundry's orange native control and draw a circular, themed control. The
@@ -10719,7 +10656,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-mv2-border);
+  border: 1.5px solid var(--fab-border);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
@@ -10737,8 +10674,8 @@
 }
 
 .fabricate-manager .manager-resolution-option input[type='radio']:checked {
-  border-color: var(--fab-mv2-accent);
-  box-shadow: inset 0 0 0 3px var(--fab-mv2-bg), inset 0 0 0 16px var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
+  box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
 .fabricate-manager .manager-resolution-option input[type='radio']:focus {
@@ -10750,11 +10687,11 @@
    above zeroes box-shadow, which is also what paints the dot, so a checked radio
    loses its dot the moment it is clicked/focused without this restore. */
 .fabricate-manager .manager-resolution-option input[type='radio']:checked:focus {
-  box-shadow: inset 0 0 0 3px var(--fab-mv2-bg), inset 0 0 0 16px var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
 .fabricate-manager .manager-resolution-option input[type='radio']:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -10792,13 +10729,13 @@
   align-items: flex-start;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 10px;
   background: var(--fab-overlay-light-04);
 }
 
 .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
   background: var(--fab-overlay-light-08);
   box-shadow: none;
 }
@@ -10813,7 +10750,7 @@
   height: 40px;
   border-radius: 9px;
   background: var(--fab-bg-3);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   font-size: 0.95rem;
 }
 
@@ -10843,13 +10780,13 @@
 }
 
 .fabricate-manager .manager-resolution-option-name {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .fabricate-manager .manager-resolution-option-desc {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   font-weight: 500;
   line-height: 1.35;
@@ -10875,9 +10812,9 @@
   display: inline-block;
   margin-left: var(--fab-space-2);
   padding: 0.05rem 0.4rem;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 999px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -10915,7 +10852,7 @@
    f4402c27 fixed (issue 883). A chance slider paints a 6px track and a coloured fill BEHIND
    a transparent range input. This rule computes to (0,4,1) and beats the slider's own
    (0,3,1) reset, so the gathering EVENT editor's "Drop rate" field — a `.manager-field` that
-   neither edit-view rule reached — took an opaque `--fab-mv2-bg` fill across a 518x36 box
+   neither edit-view rule reached — took an opaque `--fab-bg-1` fill across a 518x36 box
    and covered a 402px fill completely, leaving only the thumb. That is the reported symptom
    of issue 883 surviving in a third place. The gathering drop inspector escaped it only
    because `.manager-drop-editor-card [data-gathering-drop-inspector-rate] … input[type="range"]`
@@ -10931,10 +10868,10 @@
 .fabricate-manager .manager-component-inline-control {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood
@@ -10948,7 +10885,7 @@
 
 .fabricate-manager .manager-field select:disabled,
 .fabricate-manager select.manager-component-inline-control:disabled {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
   opacity: 0.62;
@@ -10964,14 +10901,14 @@
 }
 
 .fabricate-manager .manager-recipe-steps-row {
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-04);
   overflow: hidden;
 }
 
 .fabricate-manager .manager-recipe-steps-row.is-expanded {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-recipe-steps-row-head {
@@ -11004,7 +10941,7 @@
 .fabricate-manager .manager-recipe-steps-chevron {
   flex: 0 0 auto;
   margin-left: auto;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 /* Multi-step header number (issue 643): a larger rounded-square numeral badge — matching
@@ -11029,10 +10966,10 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
-  color: var(--fab-mv2-text);
+  background: var(--fab-bg-3);
+  color: var(--fab-text);
   font-size: 0.82rem;
 }
 
@@ -11055,7 +10992,7 @@
 }
 
 .fabricate-manager .manager-recipe-steps-requirements .manager-chip.is-empty {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   opacity: 0.75;
 }
 
@@ -11080,7 +11017,7 @@
 }
 
 .fabricate-manager .manager-recipe-duration-trigger.is-empty {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-recipe-duration-popover {
@@ -11092,9 +11029,9 @@
   width: max-content;
   max-width: none;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
   box-shadow: var(--fab-shadow-lg);
 }
 
@@ -11130,7 +11067,7 @@
 .fabricate-manager .manager-recipe-duration-unit {
   margin-bottom: var(--fab-space-2xs);
   overflow: hidden;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   line-height: 1.2;
   text-align: center;
@@ -11153,7 +11090,7 @@
   flex-direction: column;
   gap: var(--fab-space-2);
   padding: var(--fab-space-3);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-recipe-steps-add {
@@ -11186,7 +11123,7 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-04);
 }
@@ -11942,7 +11879,7 @@
   padding: var(--fab-space-chip) var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-mv2-bg);
+  background: var(--fab-bg-1);
 }
 
 /* A recipe stage row that draws a complication strip hands its PADDING to the row's own
@@ -12081,7 +12018,7 @@
   padding: 0;
   border: 1px solid var(--fab-border);
   border-radius: 4px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-surface-soft);
   font-size: 0.68rem;
   line-height: 1;
@@ -12090,8 +12027,8 @@
 
 .fabricate-manager .manager-salvage-stage-move:hover:not(:disabled),
 .fabricate-manager .manager-recipe-stage-move:hover:not(:disabled) {
-  color: var(--fab-mv2-text);
-  border-color: var(--fab-mv2-accent);
+  color: var(--fab-text);
+  border-color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-salvage-stage-move:disabled,
@@ -12120,7 +12057,7 @@
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-surface-soft);
   font-family: inherit;
   font-size: 0.8125rem;
@@ -12137,7 +12074,7 @@
 
 .fabricate-manager .manager-salvage-stage-edit:hover:not(:disabled),
 .fabricate-manager .manager-recipe-stage-edit:hover:not(:disabled) {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
 }
 
 /* The order badge: mono, on a raised surface, so it reads as an index rather than a
@@ -12213,7 +12150,7 @@
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 /* The OR/AND label reads as a small pill so the divider looks like `[ — OR — ]`
@@ -12242,7 +12179,7 @@
   content: '';
   flex: 1 1 auto;
   height: 1px;
-  background: var(--fab-mv2-border);
+  background: var(--fab-border);
 }
 
 .fabricate-manager .manager-recipe-ingredient-set {
@@ -12250,7 +12187,7 @@
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
 }
@@ -12273,7 +12210,7 @@
   font-family: var(--font-primary);
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--fab-mv2-text, var(--fab-text));
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-recipe-result-set-static-label.is-warning {
@@ -12300,10 +12237,10 @@
   min-width: 0;
   height: 36px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  background: var(--fab-mv2-bg);
-  color: var(--fab-mv2-text);
+  background: var(--fab-bg-1);
+  color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-weight: 700;
 }
@@ -12345,7 +12282,7 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   opacity: 0.7;
 }
 
@@ -12514,7 +12451,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-surface-soft);
 }
@@ -12522,7 +12459,7 @@
 /* Inside an ANY-ONE-OF box the alternatives read as nested cards on the tinted
    background. */
 .fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives .manager-recipe-ingredient-option-row {
-  background: var(--fab-mv2-bg);
+  background: var(--fab-bg-1);
 }
 
 /* The small type-tinted lead chip that opens each requirement row. */
@@ -12582,7 +12519,7 @@
   flex: 0 0 auto;
   align-items: center;
   padding: 2px var(--fab-space-chip);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 5px;
   color: var(--fab-text-subtle);
   font-size: 0.56rem;
@@ -12600,7 +12537,7 @@
    inert, and its unit/amount render as static muted text (no picker, no stepper). */
 .fabricate-manager .manager-recipe-req-tag.is-disabled {
   color: var(--fab-text-subtle);
-  border-color: var(--fab-mv2-border);
+  border-color: var(--fab-border);
   opacity: 0.85;
 }
 
@@ -12624,7 +12561,7 @@
   flex: 0 0 auto;
   width: 1px;
   height: 22px;
-  background: var(--fab-mv2-border);
+  background: var(--fab-border);
 }
 
 /* The tag editing detail wraps to its own full-width line below the row. */
@@ -12728,7 +12665,7 @@
   box-sizing: border-box;
   min-width: 0;
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
 }
@@ -12891,7 +12828,7 @@
 
 .fabricate-manager .manager-field small,
 .fabricate-manager .manager-feature-tile small {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   font-weight: 500;
   line-height: 1.35;
@@ -12945,16 +12882,16 @@
 
 .fabricate-manager .manager-feature-tile-icon.is-on {
   background: var(--fab-bg-3);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 /* Off reads as a hollow, dashed outline. Every theme hues its text tokens, so a
    colour-only shift is too weak to signal state — filled vs hollow is not. */
 .fabricate-manager .manager-feature-tile-icon.is-off {
-  border-color: var(--fab-mv2-border);
+  border-color: var(--fab-border);
   border-style: dashed;
   background: transparent;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   opacity: 0.6;
 }
 
@@ -13028,7 +12965,7 @@
   gap: var(--fab-space-1);
   margin-top: calc(var(--fab-space-3) + var(--fab-space-2xs));
   padding-top: var(--fab-space-3);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-world-heading-row {
@@ -13053,7 +12990,7 @@
 }
 
 .fabricate-manager .manager-world-heading-row span {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-weight: 500;
 }
 
@@ -13070,7 +13007,7 @@
 .fabricate-manager .manager-rail-title,
 .fabricate-manager .manager-card-title {
   margin: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-family: var(--fab-font-serif);
   font-size: 0.74rem;
   font-weight: 700;
@@ -13098,14 +13035,14 @@
   padding: var(--fab-space-2) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 7px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   font-weight: 500;
   text-align: left;
 }
 
 .fabricate-manager .manager-nav-button:hover:not(:disabled) {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-04);
 }
 
@@ -13113,8 +13050,8 @@
    shared by every system-specific direct, parent, and child route so changing scope does
    not change the meaning of an active navigation row. */
 .fabricate-manager .manager-nav-button.is-active {
-  color: var(--fab-mv2-text);
-  border-color: var(--fab-mv2-border-strong);
+  color: var(--fab-text);
+  border-color: var(--fab-border-strong);
   background: var(--fab-surface-active);
   box-shadow: none;
   font-weight: 600;
@@ -13141,7 +13078,7 @@
   gap: var(--fab-space-chip);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-border);
+  box-shadow: inset 0 0 0 1px var(--fab-border);
 }
 
 /*
@@ -13162,7 +13099,7 @@
 }
 
 .fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent.is-active {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-surface-active);
 }
 
@@ -13183,7 +13120,7 @@
   padding: 0;
   border: 1px solid transparent;
   border-radius: 5px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   cursor: pointer;
 }
@@ -13192,8 +13129,8 @@
    sub-tab renders this control genuinely disabled (issue 1185), and a hover treatment on a
    control that cannot act is the same lie the silently-swallowed click used to tell. */
 .fabricate-manager .manager-nav-toggle:not(:disabled):hover {
-  color: var(--fab-mv2-text);
-  border-color: var(--fab-mv2-border);
+  color: var(--fab-text);
+  border-color: var(--fab-border);
   background: var(--fab-overlay-light-06);
 }
 
@@ -13201,7 +13138,7 @@
    collapse still surfaces on hover — the counter-example is `.manager-scope-return.is-disabled`
    above, which has no reason to convey and can afford `pointer-events: none`. */
 .fabricate-manager .manager-nav-toggle:disabled {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   border-color: transparent;
   background: transparent;
   opacity: 0.45;
@@ -13214,7 +13151,7 @@
 }
 
 .fabricate-manager .manager-nav-toggle:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -13255,20 +13192,20 @@
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 5px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   text-align: left;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-nav-subitem:hover {
-  color: var(--fab-mv2-text);
-  border-color: var(--fab-mv2-border);
+  color: var(--fab-text);
+  border-color: var(--fab-border);
   background: var(--fab-overlay-light-04);
 }
 
 .fabricate-manager .manager-nav-subitem.is-active {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   border-color: transparent;
   background: var(--fab-surface-active);
   box-shadow: none;
@@ -13285,17 +13222,17 @@
 }
 
 .fabricate-manager .manager-nav-subitem:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
 .fabricate-manager .manager-nav-button:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
 .fabricate-manager .manager-nav-button:disabled {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   cursor: default;
   opacity: 0.72;
 }
@@ -13385,7 +13322,7 @@
 .fabricate-manager .manager-nav-lock {
   flex: 0 0 auto;
   margin-left: auto;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   font-size: 9px;
   line-height: 1;
 }
@@ -13436,7 +13373,7 @@
   padding: 9px 10px;
   border: 1px solid var(--fab-accent-border);
   border-radius: 8px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.6rem;
   line-height: 1.4;
 }
@@ -13445,7 +13382,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.09em;
@@ -13558,7 +13495,7 @@
   the row's label on one line in both states.
 */
 .fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium.is-installed {
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-accent-soft);
   font-weight: 600;
 }
@@ -13607,7 +13544,7 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--fab-mv2-accent);
+  background: var(--fab-accent);
 }
 
 /*
@@ -13627,7 +13564,7 @@
 */
 .fabricate-manager .manager-checks-section-count {
   flex: 0 0 auto;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-family: var(--fab-font-mono);
   font-size: 0.625rem;
   font-weight: 600;
@@ -13635,7 +13572,7 @@
 }
 
 .fabricate-manager .manager-environment-tab-button.is-active .manager-checks-section-count {
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 /*
@@ -13661,9 +13598,9 @@
   height: auto;
   min-height: 22px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   font-family: var(--fab-font-mono);
   font-size: 0.66rem;
@@ -13672,8 +13609,8 @@
 }
 
 .fabricate-manager .manager-checks-formula-token:hover {
-  border-color: var(--fab-mv2-accent);
-  color: var(--fab-mv2-text);
+  border-color: var(--fab-accent);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-checks-section-dot {
@@ -13687,7 +13624,7 @@
 
 .fabricate-manager .manager-inspector-card {
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
 }
@@ -13708,7 +13645,7 @@
   width: 100%;
   max-width: 100%;
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-14);
 }
@@ -13732,7 +13669,7 @@
   display: inline;
   min-width: 0;
   max-width: 100%;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   line-height: 1.25;
   overflow-wrap: break-word;
@@ -13743,7 +13680,7 @@
 }
 
 .fabricate-manager .manager-fact strong {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-fact strong.is-disabled {
@@ -13774,13 +13711,13 @@
   align-items: center;
   gap: var(--fab-space-chip);
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   line-height: 1.25;
 }
 
 .fabricate-manager .manager-condition-shortcut-label i {
   width: 16px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   text-align: center;
 }
 
@@ -13799,9 +13736,9 @@
   gap: var(--fab-space-chip);
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-06);
   line-height: 1;
   cursor: pointer;
@@ -13834,7 +13771,7 @@
 .fabricate-manager .manager-button:disabled,
 .fabricate-manager .manager-icon-button:disabled {
   border-color: var(--fab-overlay-light-12);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
   opacity: 0.62;
@@ -13928,7 +13865,7 @@
 
 .fabricate-manager .manager-button:not(:disabled):hover,
 .fabricate-manager .manager-icon-button:not(:disabled):hover {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
   background: var(--fab-overlay-light-10);
 }
 
@@ -14027,7 +13964,7 @@
 }
 
 .fabricate-manager .manager-gathering-events-table {
-  --fab-mv2-gathering-event-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
+  --fab-manager-gathering-event-grid: minmax(180px, 0.8fr) minmax(260px, 1.6fr) 72px 116px;
 
   display: flex;
   flex-direction: column;
@@ -14038,7 +13975,7 @@
 .fabricate-manager .manager-gathering-event-table-head,
 .fabricate-manager .manager-gathering-event-row {
   display: grid;
-  grid-template-columns: var(--fab-mv2-gathering-event-grid);
+  grid-template-columns: var(--fab-manager-gathering-event-grid);
   gap: var(--fab-space-2);
   align-items: center;
   align-content: center;
@@ -14055,16 +13992,16 @@
   width: 100%;
   min-height: 76px;
   padding: var(--fab-space-2) var(--fab-space-2);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-gathering-event-row:hover {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
 }
 
 .fabricate-manager .manager-gathering-event-row.is-selected {
-  border-color: var(--fab-mv2-accent);
-  background: var(--fab-mv2-surface-1);
+  border-color: var(--fab-accent);
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-gathering-event-row .manager-status-cell {
@@ -14089,7 +14026,7 @@
 }
 
 .fabricate-manager .manager-gathering-event-identity:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -14171,10 +14108,10 @@
   min-height: 28px;
   max-width: 100%;
   padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 5px;
-  background: var(--fab-mv2-surface-1);
-  color: var(--fab-mv2-text);
+  background: var(--fab-bg-2);
+  color: var(--fab-text);
   font-family: inherit;
   font-size: 0.76rem;
   font-weight: 700;
@@ -14222,7 +14159,7 @@
 .fabricate-manager .manager-danger-tag-pill.is-suggestion {
   background: transparent;
   border-style: dashed;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   cursor: pointer;
 }
 
@@ -14230,7 +14167,7 @@
 .fabricate-manager .manager-danger-tag-pill.is-suggestion:focus-visible {
   background: var(--fab-overlay-light-06);
   border-style: solid;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-danger-tag-input-row {
@@ -14284,17 +14221,17 @@
   gap: var(--fab-space-2);
   min-height: 48px;
   padding: var(--fab-space-3) var(--fab-space-3);
-  border: 1px dashed var(--fab-mv2-border);
+  border: 1px dashed var(--fab-border);
   border-radius: 8px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.82rem;
   text-align: center;
 }
 
 .fabricate-manager .manager-gathering-event-scene-dropzone.is-drop-active {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
   background: var(--fab-success-soft);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-gathering-event-scene-linked {
@@ -14303,9 +14240,9 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-gathering-event-scene-thumb {
@@ -14315,10 +14252,10 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   object-fit: cover;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
 }
 
@@ -14334,7 +14271,7 @@
   padding: 0;
   margin: 0;
   text-align: left;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -14352,10 +14289,10 @@
   :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-1);
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
   font: inherit;
 }
@@ -14386,9 +14323,9 @@
   align-items: end;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
 }
 
 .fabricate-manager .manager-gathering-event-character-modifier-summary {
@@ -14433,7 +14370,7 @@
    a range input is drawn by the chance slider, which paints its own 6px track and a
    coloured fill BEHIND the input and relies on the input itself being transparent. This
    blanket field rule computes to (0,4,1) and beats the slider's own (0,3,1) reset, so
-   without the exclusion the input takes an opaque `--fab-mv2-surface-1` fill at 121x32 and
+   without the exclusion the input takes an opaque `--fab-bg-2` fill at 121x32 and
    covers the bar completely — leaving only the thumb visible, which reads as "the slider
    renders a dot and no bar" (issue 883). */
 .fabricate-manager
@@ -14441,10 +14378,10 @@
   :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-1);
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
   font: inherit;
 }
@@ -14472,11 +14409,11 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  accent-color: var(--fab-mv2-accent);
+  accent-color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-gathering-task-edit-view input[type="checkbox"] {
-  accent-color: var(--fab-mv2-accent);
+  accent-color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-task-workspace-header {
@@ -14493,13 +14430,13 @@
   min-height: 30px;
   padding: 0;
   border: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   font-size: 0.86rem;
 }
 
 .fabricate-manager .manager-link-button:hover {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-task-title-row {
@@ -14534,7 +14471,7 @@
   width: 100%;
   padding: 0;
   border: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: transparent;
   box-shadow: none;
 }
@@ -14557,7 +14494,7 @@
 .fabricate-manager .manager-task-description-input {
   min-height: 34px;
   resize: none;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.9rem;
 }
 
@@ -14574,7 +14511,7 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-height: 32px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.85rem;
   font-weight: 700;
 }
@@ -14584,7 +14521,7 @@
   align-items: center;
   gap: var(--fab-space-4);
   min-width: 0;
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-task-editor-tabs button {
@@ -14592,7 +14529,7 @@
   padding: 0 var(--fab-space-2xs);
   border: 0;
   border-bottom: 2px solid transparent;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
   font-weight: 700;
 }
@@ -14609,9 +14546,9 @@
 .fabricate-manager .manager-task-drops-card,
 .fabricate-manager .manager-selected-drop-editor {
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
   box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
 }
 
@@ -14674,7 +14611,7 @@
 
 .fabricate-manager .manager-task-card-heading h3 {
   margin: 0 0 var(--fab-space-2xs);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 1rem;
 }
 
@@ -14706,9 +14643,9 @@
   width: 96px;
   height: 96px;
   padding: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
   overflow: hidden;
 }
 
@@ -14732,10 +14669,10 @@
   justify-content: center;
   width: 22px;
   height: 22px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 50%;
   color: var(--fab-warning-text);
-  background: var(--fab-mv2-surface-3);
+  background: var(--fab-surface-raised);
   font-size: 0.72rem;
 }
 
@@ -14752,7 +14689,7 @@
   align-items: center;
   justify-content: center;
   font-size: 1.8rem;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 /* When a scene (or recipe item) is linked, the identity image mirrors the
@@ -14774,7 +14711,7 @@
 .fabricate-manager .manager-task-image-picker.is-scene-linked .fa-lock,
 .fabricate-manager .manager-task-image-picker.is-source-linked .fa-pen,
 .fabricate-manager .manager-task-image-picker.is-source-linked .fa-lock {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-task-identity-fields {
@@ -14831,10 +14768,10 @@
   width: 100%;
   min-height: 34px;
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -14856,10 +14793,10 @@
   gap: var(--fab-space-1);
   max-height: 190px;
   padding: var(--fab-space-chip);
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-2);
-  box-shadow: var(--fab-v2-shadow);
+  background: var(--fab-bg-3);
+  box-shadow: var(--fab-shadow-lg);
   overflow-y: auto;
 }
 
@@ -14872,7 +14809,7 @@
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
   border-radius: 5px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: transparent;
   text-align: left;
 }
@@ -14892,7 +14829,7 @@
 
 .fabricate-manager .manager-availability-empty {
   padding: var(--fab-space-chip) var(--fab-space-2);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
 }
 
@@ -14912,7 +14849,7 @@
   padding: var(--fab-space-2xs) var(--fab-space-1) var(--fab-space-2xs) var(--fab-space-2);
   border: 1px solid var(--fab-warning-border);
   border-radius: 5px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-warning-soft);
   font-size: 0.76rem;
   font-weight: 700;
@@ -14934,7 +14871,7 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
 }
 
@@ -14952,10 +14889,10 @@
 }
 
 .fabricate-manager .manager-task-drops-card {
-  --fab-mv2-task-drop-table-visible-height: 262px;
+  --fab-manager-task-drop-table-visible-height: 262px;
 
   display: grid;
-  grid-template-rows: auto var(--fab-mv2-task-drop-table-visible-height) auto;
+  grid-template-rows: auto var(--fab-manager-task-drop-table-visible-height) auto;
   height: 410px;
   min-height: 410px;
   max-height: 410px;
@@ -14971,8 +14908,8 @@
 
 /* The drops summary card has no rule of its own (issue 883). It used to restate the whole
    `.manager-inspector-card` contract — a stack with `gap: var(--fab-space-2)`, a 1px
-   `--fab-mv2-border` edge and an 8px radius were all the same values the shell already
-   declares — and then diverged on the only two it changed: `--fab-mv2-surface-2` instead of
+   `--fab-border` edge and an 8px radius were all the same values the shell already
+   declares — and then diverged on the only two it changed: `--fab-bg-3` instead of
    the shell's `--fab-overlay-light-04` fill, and 16px of horizontal padding instead of 12px.
    So it read as a different card from the "Gathering task details" and "Used in
    environments" cards immediately above and below it in the same rail, for no reason anyone
@@ -14990,10 +14927,10 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-1) var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-1);
-  color: var(--fab-mv2-text);
+  background: var(--fab-bg-2);
+  color: var(--fab-text);
   min-width: 0;
 }
 
@@ -15016,7 +14953,7 @@
 .fabricate-manager .manager-task-drop-summary-percent {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-task-environment-usage-grid,
@@ -15048,7 +14985,7 @@
   border-radius: 6px;
   object-fit: cover;
   background: var(--fab-overlay-dark-12);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-task-environment-usage-name,
@@ -15057,7 +14994,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.82rem;
   text-align: center;
 }
@@ -15080,7 +15017,7 @@
 
 .fabricate-manager .manager-task-availability-summary,
 .fabricate-manager .manager-task-status-summary {
-  border-left: 1px solid var(--fab-mv2-border);
+  border-left: 1px solid var(--fab-border);
   padding-left: var(--fab-space-4);
 }
 
@@ -15093,7 +15030,7 @@
 .fabricate-manager .manager-selected-drop-editor h3,
 .fabricate-manager .manager-drop-modifier-panel h4 {
   margin: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 1rem;
 }
 
@@ -15110,7 +15047,7 @@
 }
 
 .fabricate-manager .manager-task-overview-card h3 span {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
 }
 
@@ -15134,14 +15071,14 @@
   min-width: 0;
   margin: 0;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
 }
 
 .fabricate-manager .manager-chip-field legend {
   padding: 0 var(--fab-space-1);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -15153,9 +15090,9 @@
   gap: var(--fab-space-chip);
   min-height: 26px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 999px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-06);
   font-size: 0.78rem;
   font-weight: 700;
@@ -15168,7 +15105,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-3) var(--fab-space-3);
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-task-drop-header-copy {
@@ -15243,7 +15180,7 @@
 .fabricate-manager .manager-task-component-pills {
   min-height: 0;
   padding: var(--fab-space-2) var(--fab-space-3) 0;
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-task-component-browser-scroll {
@@ -15315,7 +15252,7 @@
   display: block;
   min-width: 0;
   padding: var(--fab-space-2) 0 0;
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: transparent;
 }
 
@@ -15362,10 +15299,10 @@
   min-width: 0;
   min-height: 72px;
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-1);
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
   cursor: grab;
   user-select: none;
 }
@@ -15379,7 +15316,7 @@
   height: 38px;
   border-radius: 6px;
   object-fit: cover;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
 }
 
 .fabricate-manager .manager-task-component-card-copy {
@@ -15406,7 +15343,7 @@
 
 .fabricate-manager .manager-task-component-card-copy > span:not(.manager-task-component-card-tags) {
   -webkit-line-clamp: 1;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.74rem;
   line-height: 1.2;
 }
@@ -15423,9 +15360,9 @@
   min-width: 0;
   max-width: 72px;
   padding: 1px var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 999px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
   font-size: 0.66rem;
   line-height: 1.25;
@@ -15436,7 +15373,7 @@
 
 .fabricate-manager .manager-task-component-card-grip {
   justify-self: end;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 1rem;
   line-height: 1;
   letter-spacing: 0;
@@ -15451,7 +15388,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-03);
 }
 
@@ -15469,9 +15406,9 @@
   height: 340px;
   min-height: 340px;
   max-height: 340px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
   box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
   overflow: hidden;
 }
@@ -15499,7 +15436,7 @@
   height: 18px;
   border-radius: 4px;
   object-fit: cover;
-  background: var(--fab-mv2-surface-3);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-required-tool-pill.is-stale {
@@ -15554,7 +15491,7 @@
 .fabricate-manager .manager-task-required-tools-card-item {
   grid-template-columns: 38px minmax(0, 1fr) 22px;
   text-align: left;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
 }
@@ -15578,17 +15515,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 50%;
   color: var(--fab-warning-text);
-  background: var(--fab-mv2-surface-3);
+  background: var(--fab-surface-raised);
   font-size: 0.7rem;
 }
 
 .fabricate-manager .manager-task-required-tools-card-item:hover .manager-task-required-tools-add-icon,
 .fabricate-manager .manager-task-required-tools-card-item:focus-visible .manager-task-required-tools-add-icon {
   border-color: var(--fab-warning-border);
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
 }
 
 .fabricate-manager .manager-task-required-tools-footer {
@@ -15620,7 +15557,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-03);
 }
 
@@ -15646,7 +15583,7 @@
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-warning-border);
   border-radius: 8px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-warning-soft);
 }
 
@@ -15656,7 +15593,7 @@
 }
 
 .fabricate-manager .manager-gathering-task-drops-table {
-  --fab-mv2-task-drop-grid: minmax(0, 1.05fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);
+  --fab-manager-task-drop-grid: minmax(0, 1.05fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);
 
   display: flex;
   flex-direction: column;
@@ -15668,7 +15605,7 @@
 }
 
 .fabricate-manager .manager-gathering-task-drops-table.is-ranked-mode {
-  --fab-mv2-task-drop-grid: 44px minmax(0, 0.92fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);
+  --fab-manager-task-drop-grid: 44px minmax(0, 0.92fr) minmax(220px, 1.35fr) 56px minmax(180px, 1.65fr);
 }
 
 .fabricate-manager .manager-drop-rank-header {
@@ -15690,7 +15627,7 @@
   font-weight: 600;
   font-size: 0.75rem;
   line-height: 1;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   text-align: center;
   margin: var(--fab-space-2xs) 0;
 }
@@ -15704,8 +15641,8 @@
 }
 
 .fabricate-manager .manager-task-drops-card .manager-table-scroll {
-  height: var(--fab-mv2-task-drop-table-visible-height);
-  max-height: var(--fab-mv2-task-drop-table-visible-height);
+  height: var(--fab-manager-task-drop-table-visible-height);
+  max-height: var(--fab-manager-task-drop-table-visible-height);
   padding: var(--fab-space-3) 0 0;
   overflow: hidden auto;
 }
@@ -15713,7 +15650,7 @@
 .fabricate-manager .manager-gathering-task-drop-table-head,
 .fabricate-manager .manager-gathering-task-drop-row {
   display: grid;
-  grid-template-columns: var(--fab-mv2-task-drop-grid);
+  grid-template-columns: var(--fab-manager-task-drop-grid);
   gap: 0;
   align-items: center;
   align-content: center;
@@ -15726,16 +15663,16 @@
 .fabricate-manager .manager-gathering-task-drop-table-head {
   min-height: 36px;
   padding: 0;
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-gathering-task-drop-row {
   min-height: 72px;
   padding: 0;
   border: 0;
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   border-radius: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: transparent;
   cursor: pointer;
 }
@@ -15753,7 +15690,7 @@
 
 .fabricate-manager .manager-gathering-task-drop-table-head > * + *,
 .fabricate-manager .manager-gathering-task-drop-row > * + * {
-  border-left: 1px solid var(--fab-mv2-border);
+  border-left: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-drop-cell {
@@ -15766,7 +15703,7 @@
 }
 
 .fabricate-manager .manager-gathering-task-drop-row:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: -3px;
 }
 
@@ -15784,7 +15721,7 @@
 .fabricate-manager .manager-drop-empty-component {
   min-height: 52px;
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px dashed var(--fab-mv2-border-strong);
+  border: 1px dashed var(--fab-border-strong);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
 }
@@ -15833,7 +15770,7 @@
 .fabricate-manager .manager-drop-rate-percent {
   position: relative;
   display: block;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -15843,9 +15780,9 @@
   height: 28px;
   box-sizing: border-box;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-dark-18);
   font: inherit;
   font-variant-numeric: tabular-nums;
@@ -15996,7 +15933,7 @@
   width: 14px;
   height: 14px;
   margin-top: calc(-1 * var(--fab-space-1));
-  border: 2px solid var(--fab-mv2-bg);
+  border: 2px solid var(--fab-bg-1);
   border-radius: 999px;
   background: var(--fab-drop-rate-color);
 }
@@ -16017,7 +15954,7 @@
 .fabricate-manager .manager-drop-rate-control input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  border: 2px solid var(--fab-mv2-bg);
+  border: 2px solid var(--fab-bg-1);
   border-radius: 999px;
   background: var(--fab-drop-rate-color);
 }
@@ -16055,22 +15992,22 @@
 }
 
 .fabricate-manager .manager-gathering-task-drop-row:hover {
-  background: var(--fab-mv2-surface-3);
+  background: var(--fab-surface-raised);
 }
 
 .fabricate-manager .manager-gathering-task-drop-row.is-drop-active {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
   background: var(--fab-success-soft);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-manager .manager-gathering-task-drop-row.is-selected {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
   background: var(--fab-success-soft);
   box-shadow:
-    inset 3px 0 0 var(--fab-mv2-accent),
-    inset 0 1px 0 var(--fab-mv2-border-strong),
-    inset 0 -1px 0 var(--fab-mv2-border-strong);
+    inset 3px 0 0 var(--fab-accent),
+    inset 0 1px 0 var(--fab-border-strong),
+    inset 0 -1px 0 var(--fab-border-strong);
 }
 
 .fabricate-manager .manager-inline-drop-zone {
@@ -16081,9 +16018,9 @@
   width: 100%;
   min-height: 46px;
   padding: var(--fab-space-2);
-  border: 1px dashed var(--fab-mv2-border-strong);
+  border: 1px dashed var(--fab-border-strong);
   border-radius: 8px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
   text-align: center;
 }
@@ -16110,9 +16047,9 @@
   align-items: center;
   min-height: 30px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-04);
   font-size: 0.74rem;
   font-weight: 700;
@@ -16132,12 +16069,12 @@
 }
 
 .fabricate-manager .manager-quantity-input span {
-  color: var(--fab-v2-text-subtle);
+  color: var(--fab-text-subtle);
   font-size: 0.68rem;
 }
 
 .fabricate-manager .manager-inline-drop-zone.is-drop-active {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
 }
@@ -16158,21 +16095,21 @@
 
 .fabricate-manager .manager-drop-modifier-pill {
   max-width: 100%;
-  border-color: var(--fab-mv2-border);
-  color: var(--fab-mv2-text);
+  border-color: var(--fab-border);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-06);
   white-space: nowrap;
 }
 
 .fabricate-manager .manager-drop-modifier-pill.is-positive {
   border-color: var(--fab-success-border);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-06);
 }
 
 .fabricate-manager .manager-drop-modifier-pill.is-negative {
   border-color: var(--fab-danger-border);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-06);
 }
 
@@ -16235,7 +16172,7 @@
 
 .fabricate-manager .manager-drop-modifier-panel {
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
 }
@@ -16286,10 +16223,10 @@
   height: 28px;
   min-height: 28px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-1);
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
   font: inherit;
 }
@@ -16345,7 +16282,7 @@
   height: 28px;
   min-height: 28px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-18);
   box-sizing: border-box;
@@ -16442,7 +16379,7 @@
 .fabricate-manager .manager-task-summary-card h4,
 .fabricate-manager .manager-drop-preview-card h4 {
   margin: var(--fab-space-3) 0 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -16465,7 +16402,7 @@
   gap: var(--fab-space-2);
   margin: 0;
   padding-left: var(--fab-space-4);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-gathering-placeholder {
@@ -16489,7 +16426,7 @@
   height: 100%;
   min-width: 0;
   padding: var(--fab-space-4);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
 }
@@ -16512,14 +16449,14 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .fabricate-manager .manager-condition-panel-title i {
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .sr-only {
@@ -16554,7 +16491,7 @@
 
 .fabricate-manager .manager-condition-panel-hint {
   margin: calc(-1 * var(--fab-space-2xs)) 0 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
   line-height: 1.35;
 }
@@ -16620,10 +16557,10 @@
   min-width: 0;
   min-height: 34px;
   padding: var(--fab-space-2xs);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   overflow: hidden;
 }
 
@@ -16703,7 +16640,7 @@
 
 .fabricate-manager .manager-condition-add .manager-color-picker-trigger {
   height: 36px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-06);
 }
 
@@ -16711,7 +16648,7 @@
 .fabricate-manager .manager-color-picker-trigger:focus-visible,
 .fabricate-manager .manager-color-preset:hover,
 .fabricate-manager .manager-color-preset:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 1px;
 }
 
@@ -16723,10 +16660,10 @@
   gap: var(--fab-space-2);
   width: 220px;
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-2);
-  box-shadow: var(--fab-v2-shadow);
+  background: var(--fab-bg-3);
+  box-shadow: var(--fab-shadow-lg);
 }
 
 .fabricate-manager .manager-color-preset-grid {
@@ -16737,17 +16674,17 @@
 
 .fabricate-manager .manager-color-preset {
   aspect-ratio: 1;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-color-preset.is-selected {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-color-custom {
   display: grid;
   gap: var(--fab-space-1);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.72rem;
   font-weight: 600;
 }
@@ -16763,7 +16700,7 @@
 
 .fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only {
   height: 36px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-06);
 }
 
@@ -16790,7 +16727,7 @@
   max-height: 20px;
   padding: 0 var(--fab-space-1);
   border: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: transparent;
   line-height: 18px;
   overflow: hidden;
@@ -16809,7 +16746,7 @@
   width: 22px;
   height: 22px;
   border: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: transparent;
 }
 
@@ -16844,7 +16781,7 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   color: var(--fab-warning-text);
   background: var(--fab-overlay-dark-20);
@@ -16855,7 +16792,7 @@
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.82rem;
   line-height: 1.3;
 }
@@ -16866,7 +16803,7 @@
 }
 
 .fabricate-manager .manager-rule-copy span {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.75rem;
 }
 
@@ -16876,7 +16813,7 @@
   flex-direction: column;
   gap: var(--fab-space-chip);
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.82rem;
   font-weight: 400;
 }
@@ -16893,10 +16830,10 @@
   min-width: 0;
   height: 36px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-weight: 400;
 }
 
@@ -16949,7 +16886,7 @@
 }
 
 .fabricate-manager .manager-recipe-visibility-subheading {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -16978,7 +16915,7 @@
   gap: var(--fab-space-2);
   margin-top: var(--fab-space-2xs);
   padding-top: var(--fab-space-2);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 /* Enabled + Delete-exhausted toggles share one row, splitting the width evenly. */
@@ -17039,7 +16976,7 @@
 
 .fabricate-manager .manager-recipe-visibility-subcard-desc {
   margin: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.75rem;
   line-height: 1.3;
 }
@@ -17051,7 +16988,7 @@
 
 /* Label above each stacked control inside the Limited-uses card. */
 .fabricate-manager .manager-recipe-visibility-nested-label {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -17061,10 +16998,10 @@
   min-width: 0;
   height: 36px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-weight: 400;
 }
 
@@ -17080,10 +17017,10 @@
   min-width: 0;
   height: 36px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-weight: 400;
   text-align: center;
 }
@@ -17101,7 +17038,7 @@
   gap: var(--fab-space-3);
   align-content: start;
   padding: var(--fab-space-4);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-035);
 }
@@ -17120,15 +17057,15 @@
   justify-content: center;
   width: 38px;
   height: 38px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-success-soft);
 }
 
 .fabricate-manager .manager-setup-card h3 {
   margin: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.98rem;
   font-weight: 650;
   line-height: 1.25;
@@ -17140,7 +17077,7 @@
   gap: var(--fab-space-2);
   margin: 0;
   padding-left: var(--fab-space-4);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.82rem;
   line-height: 1.35;
 }
@@ -17186,11 +17123,11 @@
   }
 
   .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-gathering-task-drops-table {
-    --fab-mv2-task-drop-grid: minmax(0, 1.18fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);
+    --fab-manager-task-drop-grid: minmax(0, 1.18fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);
   }
 
   .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-gathering-task-drops-table.is-ranked-mode {
-    --fab-mv2-task-drop-grid: 44px minmax(0, 0.96fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);
+    --fab-manager-task-drop-grid: 44px minmax(0, 0.96fr) minmax(154px, 1.04fr) 54px minmax(150px, 1.38fr);
   }
 
   .fabricate-manager[data-manager-view="gathering-task-edit"] .manager-task-drops-card .manager-task-card-header {
@@ -17266,7 +17203,7 @@
     max-height: 232px;
     overflow: hidden auto;
     border-right: 0;
-    border-bottom: 1px solid var(--fab-mv2-border);
+    border-bottom: 1px solid var(--fab-border);
   }
 
   /* Hand the scrolling back to the rail here. Stacked, the rail is already a bounded 232px
@@ -17281,7 +17218,7 @@
 
   .fabricate-manager .manager-inspector {
     border-left: 0;
-    border-top: 1px solid var(--fab-mv2-border);
+    border-top: 1px solid var(--fab-border);
   }
 
   .fabricate-manager .manager-main {
@@ -17413,7 +17350,7 @@
 
   .fabricate-manager .manager-gathering-task-drop-table-head,
   .fabricate-manager .manager-gathering-task-drop-row {
-    grid-template-columns: var(--fab-mv2-task-drop-grid);
+    grid-template-columns: var(--fab-manager-task-drop-grid);
     align-items: center;
   }
 
@@ -17426,7 +17363,7 @@
 
   .fabricate-manager .manager-labeled-cell::before {
     content: attr(data-label);
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -17469,7 +17406,7 @@
   .fabricate-manager[data-manager-view="world-downtime"] .manager-rail {
     max-height: none;
     overflow: hidden auto;
-    border-right: 1px solid var(--fab-mv2-border);
+    border-right: 1px solid var(--fab-border);
     border-bottom: 0;
   }
 
@@ -17499,7 +17436,7 @@
   .fabricate-manager .manager-inspector {
     border-right: 0;
     border-left: 0;
-    border-bottom: 1px solid var(--fab-mv2-border);
+    border-bottom: 1px solid var(--fab-border);
   }
 
   .fabricate-manager .manager-toolbar-primary,
@@ -17592,7 +17529,7 @@
 .fabricate-manager[data-manager-view="tool-edit"] .manager-rail,
 .fabricate-manager[data-manager-view="tools"] .manager-rail {
   max-height: none;
-  border-right: 1px solid var(--fab-mv2-border);
+  border-right: 1px solid var(--fab-border);
   border-bottom: 0;
 }
 
@@ -17623,8 +17560,8 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-4) 10px;
-  border-bottom: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
+  border-bottom: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
   grid-column: 1 / -1;
   grid-row: 1;
 }
@@ -17668,7 +17605,7 @@
   flex: 0 0 44px;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   object-fit: cover;
 }
@@ -17682,7 +17619,7 @@
 .fabricate-manager .manager-tool-edit-identity h2 {
   min-width: 0;
   margin: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-size: 1.125rem;
   font-weight: 600;
@@ -17695,7 +17632,7 @@
 .fabricate-manager .manager-tool-edit-identity p {
   min-width: 0;
   margin: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   line-height: 1.25;
   overflow: hidden;
@@ -17788,8 +17725,8 @@
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-4);
-  border-left: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-surface-1);
+  border-left: 1px solid var(--fab-border);
+  background: var(--fab-bg-2);
   grid-column: 3;
   grid-row: 2 / 4;
 }
@@ -17806,7 +17743,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-bg-1);
 }
@@ -17814,7 +17751,7 @@
 .fabricate-manager .manager-tool-preview-identity > img {
   width: 46px;
   height: 46px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
   object-fit: cover;
 }
@@ -17837,7 +17774,7 @@
 
 .fabricate-manager .manager-tool-preview-identity p {
   margin: var(--fab-space-2xs) 0 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.68rem;
   line-height: 1.25;
 }
@@ -17863,7 +17800,7 @@
   gap: var(--fab-space-3);
   min-width: 0;
   padding: 10px var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
   font-size: 0.78rem;
@@ -17891,14 +17828,14 @@
   gap: var(--fab-space-3);
   min-height: 70px;
   padding: 14px 15px;
-  border: 1px dashed var(--fab-mv2-border);
+  border: 1px dashed var(--fab-border);
   border-radius: 11px;
   background: var(--fab-surface-soft);
 }
 
 .fabricate-manager .manager-tool-source-card.is-drop-active {
-  border-color: var(--fab-mv2-accent);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-manager .manager-tool-source-card > img {
@@ -17925,7 +17862,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--fab-space-1);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.64rem;
   line-height: 1.3;
 }
@@ -17933,7 +17870,7 @@
 .fabricate-manager .manager-tool-source-copy > small > i {
   flex: 0 0 auto;
   margin-top: 0.15em;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-tool-source-actions {
@@ -17949,9 +17886,9 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   background: var(--fab-overlay-light-04);
   cursor: pointer;
   list-style: none;
@@ -17968,7 +17905,7 @@
   right: 0;
   width: 260px;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-bg-1);
   box-shadow: var(--fab-shadow-md);
@@ -17984,7 +17921,7 @@
   overflow: hidden;
   background: transparent;
   box-shadow: none;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-family: var(--fab-font-mono);
   font-size: 0.64rem;
   line-height: 1.2;
@@ -18026,7 +17963,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
 }
@@ -18044,7 +17981,7 @@
   min-width: 0;
   margin: 0;
   padding: var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
 }
 
@@ -18059,7 +17996,7 @@
 
 .fabricate-manager .manager-tool-segments > label.is-selected {
   background: var(--fab-accent-soft);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 /* `align-items: end` bottom-aligns the two fields, so the migrated Break-below stepper
@@ -18091,7 +18028,7 @@
   max-width: 100%;
   margin: 0;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   overflow-x: clip;
 }
@@ -18108,7 +18045,7 @@
   align-items: end;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
 }
 
@@ -18156,14 +18093,14 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
   background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-tool-prerequisite-list small {
   display: block;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-tool-validation-checks {
@@ -18179,7 +18116,7 @@
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.72rem;
   font-weight: 400;
   line-height: 1.3;
@@ -18216,10 +18153,10 @@
   gap: var(--fab-space-2);
   margin-top: auto;
   padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
   background: var(--fab-bg-1);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.66rem;
   line-height: 1.35;
 }
@@ -18266,16 +18203,16 @@
   width: 100%;
   min-height: 70px;
   padding: var(--fab-space-3);
-  border: 1px dashed var(--fab-mv2-border-strong);
+  border: 1px dashed var(--fab-border-strong);
   border-radius: 10px;
   box-sizing: border-box;
   background: var(--fab-overlay-light-04);
 }
 
 .fabricate-manager .manager-item-drop-zone.is-drop-active {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
   background: var(--fab-accent-soft);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-manager .manager-item-drop-zone.is-disabled {
@@ -18291,7 +18228,7 @@
   border-radius: 8px;
   overflow: hidden;
   background: var(--fab-bg-3);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-item-drop-zone-icon img {
@@ -18313,7 +18250,7 @@
 }
 
 .fabricate-manager .manager-item-drop-zone-copy small {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.68rem;
   line-height: 1.35;
 }
@@ -18326,10 +18263,10 @@
 .fabricate-manager .manager-tool-source-description {
   min-height: 58px;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.76rem;
   line-height: 1.5;
 }
@@ -18342,14 +18279,14 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-overlay-light-03);
   cursor: pointer;
 }
 
 .fabricate-manager .manager-checklist-card-row.is-selected {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
   background: var(--fab-overlay-light-08);
 }
 
@@ -18365,12 +18302,12 @@
    primitives rule keeps global. The `sm` size renders the same 18px/radius-5 box against
    the same resolved colours, so the Tool Studio is unchanged. */
 .fabricate-manager .manager-checklist-card-row:has(input:focus-visible) {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
 .fabricate-manager .manager-checklist-card-icon {
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   text-align: center;
 }
 
@@ -18381,7 +18318,7 @@
 }
 
 .fabricate-manager .manager-checklist-card-copy small {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-family: var(--fab-font-mono);
   font-size: 0.68rem;
   overflow-wrap: anywhere;
@@ -18432,7 +18369,7 @@
 .fabricate-manager .manager-tool-section-heading p,
 .fabricate-manager .manager-tool-requirements-section p {
   margin: var(--fab-space-1) 0 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.68rem;
   line-height: 1.35;
 }
@@ -18455,7 +18392,7 @@
   height: 34px;
   border-radius: 8px;
   background: var(--fab-surface-active);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-tool-section-heading {
@@ -18469,7 +18406,7 @@
 }
 
 .fabricate-manager .manager-tool-section-heading h3 > i {
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-tool-breakage-config {
@@ -18478,27 +18415,27 @@
   justify-content: space-between;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-tool-breakage-config small {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-tool-breakage-chance-card {
   display: grid;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-tool-breakage-chance-card > div > p:last-child {
   margin: var(--fab-space-1) 0 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.68rem;
 }
 
@@ -18513,7 +18450,7 @@
   height: 0;
   margin: 0;
   border: 0;
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: none;
   box-shadow: none;
 }
@@ -18547,18 +18484,18 @@
   min-width: 0;
   height: 34px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
   box-sizing: border-box;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-tool-on-break {
   margin: 0;
   padding: var(--fab-space-4) 0 0;
   border: 0;
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-tool-on-break > legend {
@@ -18575,14 +18512,14 @@
   padding: var(--fab-space-2xs) var(--fab-space-chip);
   border-radius: 999px;
   background: var(--fab-surface-active);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-family: var(--font-primary);
   font-size: 0.58rem;
 }
 
 .fabricate-manager .manager-tool-on-break > p {
   margin: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.68rem;
 }
 
@@ -18592,7 +18529,7 @@
   height: 0;
   margin: var(--fab-space-1) 0 0;
   border: 0;
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: none;
   box-shadow: none;
 }
@@ -18620,7 +18557,7 @@
 
 .fabricate-manager .manager-tool-requirements-summary {
   margin: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.66rem;
 }
 
@@ -18630,7 +18567,7 @@
   height: 0;
   margin: 0;
   border: 0;
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: none;
   box-shadow: none;
 }
@@ -18646,7 +18583,7 @@
 }
 
 .fabricate-manager .manager-tool-bonus-field > small {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.68rem;
   line-height: 1.4;
 }
@@ -18714,7 +18651,7 @@
 }
 
 .fabricate-manager .manager-tool-setting-toggle:has(.manager-tool-setting-toggle-input:focus-visible) {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -18779,7 +18716,7 @@
     grid-column: 1;
     grid-row: 5;
     overflow: visible;
-    border-top: 1px solid var(--fab-mv2-border);
+    border-top: 1px solid var(--fab-border);
     border-left: 0;
   }
 }
@@ -18842,7 +18779,7 @@
 
 /* ── The component editor's panel surface (issue 676) ──────────────────────────────
    The editor's panels used to be `.manager-task-core-card` — GATHERING's card, on
-   `--fab-mv2-surface-2`. That is the wrong design system: the Component Studio's
+   `--fab-bg-3`. That is the wrong design system: the Component Studio's
    sibling is the RECIPE Studio, which is already migrated and whose editor panels are
    `--fab-surface-soft` on `--fab-border` at radius 12 (see `.manager-recipe-duration-card`).
    This is that treatment, in a component-scoped class rather than a re-skin of the
@@ -18915,8 +18852,8 @@
   height: 60px;
   border: 1px solid var(--fab-border-strong);
   border-radius: 12px;
-  background: var(--fab-mv2-bg);
-  color: var(--fab-mv2-text-muted);
+  background: var(--fab-bg-1);
+  color: var(--fab-text-muted);
   font-size: 1.4rem;
   overflow: hidden;
 }
@@ -18954,7 +18891,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-size: 1.125rem;
   font-weight: 600;
@@ -18970,7 +18907,7 @@
 }
 
 .fabricate-manager button.manager-component-identity-name:hover {
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   text-decoration: underline;
 }
 
@@ -18990,10 +18927,10 @@
   margin: 0;
 
   /* The prototype's `--text2`. Fabricate's manager palette has no second-tier text
-     token; `--fab-mv2-text-muted` is what the component browser inspector's flavour
+     token; `--fab-text-muted` is what the component browser inspector's flavour
      text already uses for this exact content (the item's description as prose), so the
      two surfaces render the same string the same way. */
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.8125rem;
   font-weight: 400;
   line-height: 1.65;
@@ -19006,7 +18943,7 @@
   align-items: baseline;
   gap: var(--fab-space-chip);
   margin: var(--fab-space-chip) 0 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.625rem;
   font-weight: 400;
   line-height: 1.5;
@@ -19032,8 +18969,8 @@
   padding: var(--fab-space-3);
   border: 1.5px dashed var(--fab-border-strong);
   border-radius: 10px;
-  background: var(--fab-mv2-bg);
-  color: var(--fab-mv2-text-muted);
+  background: var(--fab-bg-1);
+  color: var(--fab-text-muted);
   font-size: 0.625rem;
   font-weight: 600;
   line-height: 1.4;
@@ -19059,7 +18996,7 @@
 
 .fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target {
   border-color: var(--fab-accent);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 /* The custom salvage DC is the only numeric control in this block; its siblings are a
@@ -19096,7 +19033,7 @@
 .fabricate-manager .manager-component-heading-divider {
   width: 1px;
   height: 20px;
-  background: var(--fab-mv2-border);
+  background: var(--fab-border);
 }
 
 .fabricate-manager .manager-salvage-mode-pill {
@@ -19130,7 +19067,7 @@
   border: 1px solid var(--fab-info-border);
   border-radius: 8px;
   background: var(--fab-info-soft);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.66rem;
   font-weight: 500;
   line-height: 1.4;
@@ -19185,7 +19122,7 @@
 .fabricate-manager .manager-component-overflow-trigger {
   flex: 0 0 auto;
   height: auto;
-  min-height: var(--fab-v2-icon-button);
+  min-height: 34px;
   justify-content: center;
   line-height: normal;
 }
@@ -19202,7 +19139,7 @@
 }
 
 .fabricate-manager .manager-component-readonly-label .fa-lock {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.7rem;
   opacity: 0.85;
 }
@@ -19214,17 +19151,17 @@
   gap: var(--fab-space-2);
   min-height: 48px;
   padding: var(--fab-space-3) var(--fab-space-3);
-  border: 1px dashed var(--fab-mv2-border);
+  border: 1px dashed var(--fab-border);
   border-radius: 8px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.82rem;
   text-align: center;
 }
 
 .fabricate-manager .manager-component-source-drop-zone.is-drop-active {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
   background: var(--fab-success-soft);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 /* The empty currency-macro drop zone must match the height of the linked-macro card
@@ -19315,7 +19252,7 @@
 /* Selection moves the EDGE only: the fill is already the shared treatment's, so
    restating it here would be the same statement made twice. */
 .fabricate-manager .manager-tools-row.is-selected {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
   box-shadow: none;
 }
 
@@ -19358,22 +19295,22 @@
 
 .fabricate-manager .manager-tools-identity.is-component-drop-zone {
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px dashed var(--fab-mv2-border-strong);
+  border: 1px dashed var(--fab-border-strong);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
 }
 
 .fabricate-manager .manager-tools-identity.is-component-drop-zone.is-drop-active {
-  border-color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
   background: var(--fab-success-soft);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-manager .manager-tools-thumb {
   width: 42px;
   height: 42px;
   border-radius: 6px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-04);
   object-fit: cover;
 }
@@ -19388,7 +19325,7 @@
 .fabricate-manager .manager-tools-name {
   font-weight: 600;
   font-size: 0.95rem;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -19396,7 +19333,7 @@
 
 .fabricate-manager .manager-tools-secondary {
   font-size: 0.82rem;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-tools-row-summary {
@@ -19439,7 +19376,7 @@
 .fabricate-manager .manager-tools-dirty-chip {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
   gap: var(--fab-space-1);
   white-space: nowrap;
   box-shadow:
@@ -19460,14 +19397,14 @@
   flex-direction: column;
   gap: var(--fab-space-4);
   padding: var(--fab-space-4);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-04);
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
 }
 
 .fabricate-manager .manager-tools-section {
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   padding: var(--fab-space-3);
   display: flex;
@@ -19481,7 +19418,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   padding: 0 var(--fab-space-1);
 }
 
@@ -19515,7 +19452,7 @@
 .fabricate-manager .manager-radio-option-desc {
   font-size: 0.82rem;
   line-height: 1.35;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-tools-inline-field {
@@ -19563,7 +19500,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-chip);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.8rem;
   line-height: 1.35;
 }
@@ -19623,10 +19560,10 @@
   width: 100%;
   min-height: 58px;
   padding: var(--fab-space-4) var(--fab-space-4);
-  border: 1px dashed var(--fab-mv2-border);
+  border: 1px dashed var(--fab-border);
   border-radius: 8px;
   background: transparent;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-weight: 600;
   cursor: pointer;
   transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
@@ -19636,7 +19573,7 @@
 .fabricate-manager .manager-tools-empty-stub:focus-visible,
 .fabricate-manager .manager-tools-empty-stub.is-drop-active {
   border-color: var(--fab-accent);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-04);
   outline: none;
 }
@@ -19646,7 +19583,7 @@
  * ========================================================================== */
 
 .fabricate-manager .manager-radio-group {
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   padding: var(--fab-space-3) var(--fab-space-3);
   margin: 0;
@@ -19660,7 +19597,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   padding: 0 var(--fab-space-1);
 }
 
@@ -19676,10 +19613,10 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-3) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
 }
@@ -19702,7 +19639,7 @@
 .fabricate-manager .manager-radio-option.is-selected {
   border-color: var(--fab-accent);
   background: var(--fab-accent-soft);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-radio-option:focus-within {
@@ -19771,7 +19708,7 @@
   gap: var(--fab-space-1);
   flex-wrap: wrap;
   min-width: 0;
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-environment-tab-button {
@@ -19786,19 +19723,19 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   border-radius: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: none;
   font-weight: 700;
   cursor: pointer;
 }
 
 .fabricate-manager .manager-environment-tab-button:hover {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-environment-tab-button.is-active {
-  color: var(--fab-mv2-text);
-  border-bottom-color: var(--fab-mv2-accent);
+  color: var(--fab-text);
+  border-bottom-color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-environment-tab-badge {
@@ -19857,9 +19794,9 @@
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
 }
 
 .fabricate-manager .manager-environment-tab-intro {
@@ -19880,7 +19817,7 @@
 
 .fabricate-manager .manager-environment-card {
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
   padding: var(--fab-space-3);
@@ -19919,7 +19856,7 @@
   gap: var(--fab-space-2xs);
   padding: var(--fab-space-2xs);
   min-width: 0;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
 }
@@ -19937,20 +19874,20 @@
   border: none;
   border-radius: 4px;
   background: none;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .fabricate-manager .manager-environment-mode-option:hover:not(.is-selected) {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-environment-mode-option.is-selected {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   background: var(--fab-overlay-light-04);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-manager .manager-environment-mode-head {
@@ -19978,7 +19915,7 @@
 }
 
 .fabricate-manager .manager-environment-mode-option.is-locked:hover {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 /* A single ingredient/result set renders CHROMELESS: complexity is emergent, so with
@@ -20026,7 +19963,7 @@
 .fabricate-manager .manager-environment-section-head h4 {
   margin: 0;
   font-size: 0.95em;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -20046,7 +19983,7 @@
 }
 
 .fabricate-manager .manager-environment-diagnostics {
-  border: 1px dashed var(--fab-mv2-border);
+  border: 1px dashed var(--fab-border);
   border-radius: 6px;
 }
 
@@ -20058,7 +19995,7 @@
   padding: var(--fab-space-2) var(--fab-space-2);
   background: none;
   border: none;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-weight: 700;
   cursor: pointer;
 }
@@ -20111,12 +20048,12 @@
 
 .fabricate-manager .manager-environment-layer.is-ok > i,
 .fabricate-manager .manager-environment-check.is-satisfied > i {
-  color: var(--fab-success, var(--fab-mv2-accent));
+  color: var(--fab-success, var(--fab-accent));
 }
 
 .fabricate-manager .manager-environment-layer.is-warn > i,
 .fabricate-manager .manager-environment-check.is-unsatisfied > i {
-  color: var(--fab-mv2-warning);
+  color: var(--fab-warning);
 }
 
 .fabricate-manager .manager-environment-issue {
@@ -20124,7 +20061,7 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
 }
@@ -20143,7 +20080,7 @@
   gap: var(--fab-space-1);
   flex-wrap: wrap;
   min-width: 0;
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-editor-tab-button {
@@ -20158,7 +20095,7 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   border-radius: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: none;
 
   /* A notch below body text so the tab strip reads as chrome, not content, matching
@@ -20169,12 +20106,12 @@
 }
 
 .fabricate-manager .manager-editor-tab-button:hover {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-editor-tab-button.is-active {
-  color: var(--fab-mv2-text);
-  border-bottom-color: var(--fab-mv2-accent);
+  color: var(--fab-text);
+  border-bottom-color: var(--fab-accent);
 }
 
 /* Editor tab badges are counts — issue counts, item counts — so they take the mono
@@ -20224,11 +20161,11 @@
 }
 
 .fabricate-manager .manager-editor-check.is-satisfied > i {
-  color: var(--fab-success, var(--fab-mv2-accent));
+  color: var(--fab-success, var(--fab-accent));
 }
 
 .fabricate-manager .manager-editor-check.is-unsatisfied > i {
-  color: var(--fab-mv2-warning);
+  color: var(--fab-warning);
 }
 
 .fabricate-manager .manager-editor-issue {
@@ -20236,7 +20173,7 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
 }
@@ -20327,14 +20264,14 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-3);
-  border: 1px dashed var(--fab-mv2-border);
+  border: 1px dashed var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-environment-scene-dropzone.is-drop-active {
-  border-color: var(--fab-mv2-accent);
-  color: var(--fab-mv2-text);
+  border-color: var(--fab-accent);
+  color: var(--fab-text);
 }
 
 /* Recipe-item inspector: the list of books teaching this recipe (issue 511
@@ -20358,7 +20295,7 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-3);
-  border: 1px dashed var(--fab-mv2-border);
+  border: 1px dashed var(--fab-border);
   border-radius: 6px;
 
   /* Allow the linked card to shrink below its content width inside the flex
@@ -20367,8 +20304,8 @@
 }
 
 .fabricate-manager .manager-environment-scene-linked.is-drop-active {
-  border-color: var(--fab-mv2-accent);
-  color: var(--fab-mv2-text);
+  border-color: var(--fab-accent);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-environment-scene-thumb {
@@ -20378,10 +20315,10 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   object-fit: cover;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   background: var(--fab-overlay-light-06);
 }
 
@@ -20397,7 +20334,7 @@
   text-align: left;
   background: none;
   border: none;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -20435,15 +20372,15 @@
   gap: var(--fab-space-2);
   margin: 0 0 var(--fab-space-4);
   padding: var(--fab-space-3) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
-  border-left: 3px solid var(--fab-mv2-accent);
+  border: 1px solid var(--fab-border);
+  border-left: 3px solid var(--fab-accent);
   border-radius: 6px;
   background: var(--fab-overlay-light-04);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-environment-comp-callout i {
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   margin-top: var(--fab-space-2xs);
 }
 
@@ -20474,20 +20411,20 @@
   align-items: center;
   gap: var(--fab-space-3);
   padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-04);
 }
 
 .fabricate-manager .manager-system-overview-entity {
   font-weight: 600;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-system-overview-message {
   flex: 1 1 auto;
   min-width: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-system-overview-link {
@@ -20495,12 +20432,12 @@
 }
 
 .fabricate-manager .manager-system-overview-blocker {
-  border-left-color: var(--fab-mv2-danger, var(--fab-mv2-accent));
+  border-left-color: var(--fab-danger);
 }
 
 .fabricate-manager .manager-system-edit-blocker {
   align-items: center;
-  border-left-color: var(--fab-mv2-danger, var(--fab-mv2-accent));
+  border-left-color: var(--fab-danger);
 }
 
 .fabricate-manager .manager-system-edit-blocker-copy {
@@ -20547,12 +20484,12 @@
 .fabricate-manager .manager-environment-comp-band h4 {
   margin: 0;
   font-size: 0.95em;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-environment-comp-count {
   font-size: 0.78rem;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-environment-comp-head {
@@ -20565,8 +20502,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--fab-mv2-text-muted);
-  border-bottom: 1px solid var(--fab-mv2-border);
+  color: var(--fab-text-muted);
+  border-bottom: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-environment-comp-rows {
@@ -20584,7 +20521,7 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
 }
@@ -20595,12 +20532,12 @@
 }
 
 .fabricate-manager .manager-environment-comp-row.is-selected {
-  border-color: var(--fab-mv2-accent);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-manager .manager-environment-comp-row.is-unavailable {
-  border-color: var(--fab-mv2-warning);
+  border-color: var(--fab-warning);
 }
 
 .fabricate-manager .manager-environment-comp-row.is-excluded,
@@ -20613,7 +20550,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--fab-space-2xs);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   cursor: grab;
   transform: translateY(3px);
 }
@@ -20628,7 +20565,7 @@
 .fabricate-manager .manager-recipe-tools-steps-title {
   margin: var(--fab-space-2) 0 0;
   font-size: 0.95em;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -20655,7 +20592,7 @@
 }
 
 .fabricate-manager .manager-environment-comp-task:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -20677,7 +20614,7 @@
 
 .fabricate-manager .manager-environment-comp-name {
   font-weight: 700;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -20685,7 +20622,7 @@
 
 .fabricate-manager .manager-environment-comp-sub {
   font-size: 0.8em;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -20738,7 +20675,7 @@
 
 .fabricate-manager .manager-environment-comp-weight-label {
   font-size: 0.72rem;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 /* The bare-input box treatment that used to live here is deleted, not guarded: the
@@ -20750,7 +20687,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
 }
@@ -20760,7 +20697,7 @@
 }
 
 .fabricate-manager .manager-environment-comp-none {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-environment-comp-actions {
@@ -20791,9 +20728,9 @@
   gap: var(--fab-space-2xs);
   padding: var(--fab-space-1);
   box-sizing: border-box;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
   box-shadow: var(--fab-shadow-md);
 }
 
@@ -20809,7 +20746,7 @@
   border: none;
   border-radius: 4px;
   background: none;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
@@ -20839,7 +20776,7 @@
 }
 
 .fabricate-manager .manager-environment-comp-menu button.is-danger {
-  color: var(--fab-mv2-danger);
+  color: var(--fab-danger);
 }
 
 .fabricate-manager .manager-environment-comp-menu-note {
@@ -20851,7 +20788,7 @@
   width: 100%;
   min-width: 0;
   padding: var(--fab-space-chip) var(--fab-space-2);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   white-space: nowrap;
   font-size: 0.82rem;
   font-weight: 500;
@@ -20883,19 +20820,19 @@
   padding: 1px var(--fab-space-chip);
   border-radius: 4px;
   font-size: 0.72rem;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   background: var(--fab-overlay-dark-16);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-environment-evidence-chip.is-positive {
-  border-color: var(--fab-mv2-accent);
-  color: var(--fab-mv2-text);
+  border-color: var(--fab-accent);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-environment-evidence-chip.is-danger {
-  border-color: var(--fab-mv2-danger);
-  color: var(--fab-mv2-danger);
+  border-color: var(--fab-danger);
+  color: var(--fab-danger);
 }
 
 .fabricate-manager .manager-environment-evidence-chip.is-warning {
@@ -20910,7 +20847,7 @@
 
 .fabricate-manager .manager-environment-evidence-summary {
   font-size: 0.78rem;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -20922,13 +20859,13 @@
   margin: 0;
   border-collapse: collapse;
   table-layout: fixed;
-  border-top: 1px solid var(--fab-mv2-border);
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
+  border-bottom: 1px solid var(--fab-border);
   background: transparent;
 }
 
 .fabricate-manager .manager-environment-evidence-row {
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
   background: transparent;
 }
 
@@ -20954,7 +20891,7 @@
   width: 82px;
   padding-right: var(--fab-space-3);
   font-weight: 700;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.75rem;
   text-align: left;
 }
@@ -20973,10 +20910,10 @@
   max-width: 100%;
   min-width: 0;
   padding: 1px var(--fab-space-chip);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 4px;
   background: transparent;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.74rem;
   font-weight: 650;
   line-height: 1.3;
@@ -21023,7 +20960,7 @@
 
 .fabricate-manager .manager-environment-drop-adjustment-heading {
   margin: var(--fab-space-3) 0 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.84rem;
   font-weight: 700;
   line-height: 1.2;
@@ -21065,7 +21002,7 @@
   align-items: end;
   gap: var(--fab-space-2);
   padding: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-dark-16);
 }
@@ -21084,16 +21021,16 @@
 
 .fabricate-manager .manager-environment-drop-adjustment-row.is-task-drop.is-positive {
   border-color: var(--fab-success-border);
-  background: color-mix(in srgb, var(--fab-success-soft) 40%, var(--fab-mv2-surface-1));
+  background: color-mix(in srgb, var(--fab-success-soft) 40%, var(--fab-bg-2));
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-row.is-task-drop.is-negative {
   border-color: var(--fab-danger-border);
-  background: color-mix(in srgb, var(--fab-danger-soft) 40%, var(--fab-mv2-surface-1));
+  background: color-mix(in srgb, var(--fab-danger-soft) 40%, var(--fab-bg-2));
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-row.is-task-drop.is-zero {
-  border-color: var(--fab-mv2-border);
+  border-color: var(--fab-border);
   background: var(--fab-overlay-dark-16);
 }
 
@@ -21113,7 +21050,7 @@
 .fabricate-manager .manager-environment-drop-adjustment-thumb {
   width: 34px;
   height: 34px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-06);
   object-fit: cover;
@@ -21152,14 +21089,14 @@
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-rate span {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.68rem;
   font-weight: 650;
   text-transform: uppercase;
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-rate strong {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
 }
@@ -21179,7 +21116,7 @@
 }
 
 .fabricate-manager .manager-environment-drop-adjustment-copy span {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.82rem;
 }
 
@@ -21208,10 +21145,10 @@
   min-height: 28px;
   padding: var(--fab-space-2xs) var(--fab-space-4) var(--fab-space-2xs) var(--fab-space-1);
   text-align: center;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-surface-1);
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
   box-shadow: inset 0 1px 0 var(--fab-overlay-dark-18);
   font: inherit;
   font-variant-numeric: tabular-nums;
@@ -22050,7 +21987,7 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
@@ -22071,14 +22008,14 @@
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
 .fabricate-manager .manager-map-link-row:hover {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
 }
 
 .fabricate-manager .manager-map-link-row.is-selected {
@@ -22111,7 +22048,7 @@
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
 
   /* Themed default; the scene region's own colour overrides this inline. */
   background: var(--fab-overlay-light-04);
@@ -22121,7 +22058,7 @@
 .fabricate-manager .manager-map-link-name {
   font-weight: 600;
   font-size: 0.95rem;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -22158,7 +22095,7 @@
 }
 
 .fabricate-manager .manager-map-link-inspector-swatch {
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   background: var(--fab-overlay-light-04);
 }
 
@@ -22179,7 +22116,7 @@
 }
 
 .fabricate-manager .manager-travel-realms-row:hover {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
 }
 
 .fabricate-manager .manager-travel-realms-header {
@@ -22220,16 +22157,16 @@
   width: 38px;
   height: 38px;
   border-radius: 6px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-04);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   flex: 0 0 auto;
 }
 
 .fabricate-manager .manager-travel-realms-name {
   font-weight: 600;
   font-size: 0.95rem;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   flex: 0 1 auto;
   min-width: 3ch;
   overflow: hidden;
@@ -22252,14 +22189,14 @@
   justify-content: center;
   width: 20px;
   margin-left: auto;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   flex: 0 0 auto;
 }
 
 .fabricate-manager .manager-travel-realms-editor {
   min-height: 56px;
   padding: var(--fab-space-4);
-  border-top: 1px solid var(--fab-mv2-border);
+  border-top: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-04);
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
@@ -22301,7 +22238,7 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
 }
@@ -22320,13 +22257,13 @@
 }
 
 .fabricate-manager .manager-realm-env-column[data-realm-env-column="available"] .manager-realm-env-row {
-  box-shadow: inset 3px 0 0 var(--fab-mv2-border);
+  box-shadow: inset 3px 0 0 var(--fab-border);
   opacity: 0.92;
 }
 
 .fabricate-manager .manager-realm-env-add {
-  color: var(--fab-mv2-accent);
-  border-color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
+  border-color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-realm-env-column .manager-card-subtitle {
@@ -22341,7 +22278,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
 }
 
 .fabricate-manager .manager-realm-env-row .manager-icon-button {
@@ -22371,10 +22308,10 @@
   align-items: center;
   gap: var(--fab-space-2);
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.88rem;
 }
 
@@ -22386,9 +22323,9 @@
   height: 28px;
   flex: 0 0 auto;
   border-radius: 5px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   background: var(--fab-overlay-light-04);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   overflow: hidden;
 }
 
@@ -22609,8 +22546,8 @@
   .fabricate-manager .manager-party-add-search:has(.manager-party-add-query:focus-visible),
   .fabricate-manager
     .manager-travel-parties-search:has(.manager-travel-parties-query:focus-visible) {
-    border-color: var(--fab-mv2-accent);
-    box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+    border-color: var(--fab-accent);
+    box-shadow: inset 0 0 0 1px var(--fab-accent);
   }
 
   /* 2px, not 1px. This row rests on `--fab-accent-border` — the accent at partial alpha —
@@ -22619,8 +22556,8 @@
      Two pixels restores parity with the manager's 2px focus standard, and inset it still
      cannot exceed the field. */
   .fabricate-manager .manager-travel-picker-inline:has(input:focus-visible) {
-    border-color: var(--fab-mv2-accent);
-    box-shadow: inset 0 0 0 2px var(--fab-mv2-accent);
+    border-color: var(--fab-accent);
+    box-shadow: inset 0 0 0 2px var(--fab-accent);
   }
 }
 
@@ -22949,9 +22886,9 @@
   min-width: 240px;
   max-width: 340px;
   max-height: min(50vh, 360px);
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 8px;
-  background: var(--fab-mv2-surface-2);
+  background: var(--fab-bg-3);
   box-shadow: var(--fab-shadow-lg);
   overflow: hidden;
 }
@@ -22966,16 +22903,16 @@
   box-sizing: border-box;
   height: 32px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-travel-popover-search input:focus-visible {
   outline: none;
-  border-color: var(--fab-mv2-accent);
-  box-shadow: 0 0 0 1px var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
+  box-shadow: 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-manager .manager-travel-popover-options {
@@ -23873,7 +23810,7 @@
 .fabricate-manager .manager-tools-context-header {
   align-items: flex-start;
   padding: 14px var(--fab-space-6) var(--fab-space-4);
-  background: var(--fab-mv2-bg);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-tools-context-header .manager-breadcrumbs {
@@ -23911,7 +23848,7 @@
 
 .fabricate-manager[data-manager-view="tools"] .manager-inspector {
   padding: 18px;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
 }
 
 .fabricate-manager .manager-tools-authority-card,
@@ -23920,7 +23857,7 @@
   flex-direction: column;
   gap: var(--fab-space-2);
   padding: 10px var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-04);
 }
@@ -23974,7 +23911,7 @@
   grid-template-columns: 20px minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--fab-space-2);
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.72rem;
 }
 
@@ -23984,7 +23921,7 @@
   justify-content: center;
   width: 20px;
   height: 20px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-tools-authority-heading .manager-chip {
@@ -23999,13 +23936,13 @@
   gap: var(--fab-space-2xs);
   max-width: none;
   padding: 3px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-overlay-dark-08);
 }
 
 .fabricate-manager .manager-tools-authority-caption {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.62rem;
   text-align: left;
 }
@@ -24031,7 +23968,7 @@
 }
 
 .fabricate-manager .manager-tools-authority-segments label.is-selected {
-  background: var(--fab-mv2-accent);
+  background: var(--fab-accent);
   color: var(--fab-on-accent);
 }
 
@@ -24048,8 +23985,8 @@
 }
 
 .fabricate-manager .manager-tools-create-card.is-drop-active {
-  border-color: var(--fab-mv2-accent);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+  border-color: var(--fab-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
 .fabricate-manager .manager-tools-create-card {
@@ -24080,7 +24017,7 @@
   width: 28px;
   height: 28px;
   border-radius: 5px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   cursor: pointer;
   list-style: none;
 }
@@ -24122,7 +24059,7 @@
   height: 38px;
   border-radius: 8px;
   background: var(--fab-surface-active);
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
 }
 
 .fabricate-manager .manager-tools-create-prompt > div {
@@ -24136,7 +24073,7 @@
 }
 
 .fabricate-manager .manager-tools-create-prompt span:not(.manager-tools-create-icon) {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.64rem;
   line-height: 1.25;
 }
@@ -24175,7 +24112,7 @@
   max-width: 142px;
   min-height: 24px;
   padding: var(--fab-space-2xs) var(--fab-space-chip);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   background: var(--fab-overlay-light-03);
   color: inherit;
@@ -24204,7 +24141,7 @@
 
 .fabricate-manager .manager-tools-result-summary {
   margin: 0 0 var(--fab-space-1);
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.64rem;
   line-height: 1.2;
 }
@@ -24239,14 +24176,14 @@
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   background: var(--fab-overlay-light-03);
   min-height: 68px;
 }
 
 .fabricate-manager .manager-tools-library-list > article.is-selected {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
   background: var(--fab-surface-soft);
   box-shadow: none;
 }
@@ -24270,14 +24207,14 @@
 
 .fabricate-manager .manager-tools-select-target:focus-visible,
 .fabricate-manager .manager-tools-enabled-toggle:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
 .fabricate-manager .manager-tools-select-target > img {
   width: 40px;
   height: 40px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
   object-fit: cover;
 }
@@ -24291,7 +24228,7 @@
 
 .fabricate-manager .manager-tools-library-copy > strong {
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-size: 0.82rem;
   font-weight: 600;
@@ -24345,9 +24282,9 @@
   display: block;
   width: 34px;
   height: 20px;
-  border: 1px solid var(--fab-mv2-border-strong);
+  border: 1px solid var(--fab-border-strong);
   border-radius: 999px;
-  background: var(--fab-mv2-text-muted);
+  background: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-tools-enabled-toggle > span:first-child > span {
@@ -24357,7 +24294,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--fab-mv2-bg);
+  background: var(--fab-bg-1);
   transition: transform 120ms ease;
 }
 
@@ -24399,7 +24336,7 @@
 .fabricate-manager .manager-tool-inspector-hero img {
   width: 52px;
   height: 52px;
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   object-fit: cover;
 }
@@ -24440,7 +24377,7 @@
   flex-direction: column;
   gap: var(--fab-space-1);
   padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
 }
 
@@ -24450,7 +24387,7 @@
 
 .fabricate-manager .manager-tool-inspector-facts span,
 .fabricate-manager .manager-tool-inspector-mini-list {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 .fabricate-manager .manager-tool-inspector-facts span {
@@ -24488,13 +24425,13 @@
   gap: var(--fab-space-2);
   min-height: 42px;
   padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 6px;
 }
 
 .fabricate-manager .manager-tool-inspector-details > div > i {
   width: 16px;
-  color: var(--fab-mv2-accent);
+  color: var(--fab-accent);
   text-align: center;
 }
 
@@ -24506,13 +24443,13 @@
 }
 
 .fabricate-manager .manager-tool-inspector-details strong {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-size: 0.72rem;
 }
 
 .fabricate-manager .manager-tool-inspector-details small {
   overflow: hidden;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.62rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -24603,8 +24540,8 @@
   min-width: 0;
   min-height: 0;
   padding: var(--fab-space-3);
-  border-right: 1px solid var(--fab-mv2-border);
-  background: var(--fab-mv2-bg);
+  border-right: 1px solid var(--fab-border);
+  background: var(--fab-bg-1);
   overflow: hidden;
 }
 
@@ -24641,7 +24578,7 @@
   min-width: 0;
   min-height: 52px;
   padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 8px;
   color: inherit;
   background: var(--fab-overlay-light-03);
@@ -24653,12 +24590,12 @@
 }
 
 .fabricate-manager .manager-knowledge-roster-row.is-selected {
-  border-color: var(--fab-mv2-border-strong);
+  border-color: var(--fab-border-strong);
   background: var(--fab-surface-soft);
 }
 
 .fabricate-manager .manager-knowledge-roster-row:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
 
@@ -24671,7 +24608,7 @@
 
 .fabricate-manager .manager-knowledge-roster-name {
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-size: 0.8rem;
   font-weight: 600;
@@ -24682,7 +24619,7 @@
 
 .fabricate-manager .manager-knowledge-roster-meta {
   min-width: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.62rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -24700,7 +24637,7 @@
   grid-template-rows: max-content max-content minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  background: var(--fab-mv2-surface-1);
+  background: var(--fab-bg-2);
   overflow: hidden;
 }
 
@@ -24712,7 +24649,7 @@
   gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-3) var(--fab-space-4);
-  border-bottom: 1px solid var(--fab-mv2-border);
+  border-bottom: 1px solid var(--fab-border);
 }
 
 .fabricate-manager .manager-knowledge-detail-identity {
@@ -24731,7 +24668,7 @@
   min-width: 0;
   margin: 0;
   border: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-size: 1rem;
   font-weight: 700;
@@ -24773,7 +24710,7 @@
 }
 
 .fabricate-manager .manager-knowledge-panel:focus-visible {
-  outline: 2px solid var(--fab-mv2-accent);
+  outline: 2px solid var(--fab-accent);
   outline-offset: -2px;
 }
 
@@ -24808,7 +24745,7 @@
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-mv2-border);
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-overlay-light-03);
 }
@@ -24838,7 +24775,7 @@
 
 .fabricate-manager .manager-knowledge-copy-name {
   min-width: 0;
-  color: var(--fab-mv2-text);
+  color: var(--fab-text);
   font-family: var(--fab-font-serif);
   font-size: 0.82rem;
   font-weight: 600;
@@ -24865,7 +24802,7 @@
   align-items: center;
   gap: var(--fab-space-1);
   min-width: 0;
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
   font-size: 0.62rem;
   line-height: 1.35;
 }
@@ -24906,7 +24843,7 @@
    opacity — `.manager-button:disabled` already carries `opacity: 0.62`, and the
    "Spent" chip already carries the state as icon + word. */
 .fabricate-manager .manager-knowledge-copy-row.is-spent .manager-knowledge-copy-name {
-  color: var(--fab-mv2-text-muted);
+  color: var(--fab-text-muted);
 }
 
 @container fabricate-manager (max-width: 831px) {
@@ -24925,7 +24862,7 @@
   .fabricate-manager .manager-knowledge-roster {
     max-height: 280px;
     border-right: 0;
-    border-bottom: 1px solid var(--fab-mv2-border);
+    border-bottom: 1px solid var(--fab-border);
   }
 
   .fabricate-manager .manager-knowledge-detail {

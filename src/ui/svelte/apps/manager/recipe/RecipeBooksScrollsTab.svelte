@@ -277,7 +277,7 @@
   }
 
   .manager-recipe-book-name.is-link {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     cursor: pointer;
   }
 

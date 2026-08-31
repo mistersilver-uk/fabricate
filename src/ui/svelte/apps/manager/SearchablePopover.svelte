@@ -638,13 +638,13 @@
   }
 
   /* Pointer feedback, restated for this mode. The compact row's resting
-     `background: var(--fab-mv2-surface-2)` below computes to (0,4,0) and so OUTRANKS the
+     `background: var(--fab-bg-3)` below computes to (0,4,0) and so OUTRANKS the
      global `.fabricate-manager .manager-travel-option:hover` at (0,2,0) — meaning the
      shared hover silently stopped landing the moment a caller opted in. The actor picker
      had already lost it; opting the realm-override picker in would have taken pointer
      feedback off ten clickable realms as well. */
   .manager-travel-popover.is-compact-option-rows .manager-travel-option:hover {
-    border-color: var(--fab-mv2-border-strong);
+    border-color: var(--fab-border-strong);
     background: var(--fab-surface-raised);
   }
 
@@ -713,8 +713,8 @@
   }
 
   .manager-travel-popover-search.is-compact:focus-within {
-    border-color: var(--fab-mv2-accent);
-    box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+    border-color: var(--fab-accent);
+    box-shadow: inset 0 0 0 1px var(--fab-accent);
   }
 
   .manager-travel-popover-search.is-compact input:focus-visible {
@@ -755,9 +755,9 @@
     min-height: 40px;
     padding: 7px;
     gap: 7px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 7px;
-    background: var(--fab-mv2-surface-2);
+    background: var(--fab-bg-3);
   }
 
   .manager-travel-popover.is-compact-option-rows .manager-travel-portrait {

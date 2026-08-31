@@ -189,7 +189,7 @@
 
 <style>
   /* Theme-ROOT tokens only, on `Chip.svelte`'s recorded rule: this card renders under
-     `.fabricate-app`, where the manager's `--fab-mv2-*` aliases are not in scope and a
+     `.fabricate-app`, where an area-scoped `--fab-manager-*` property is not in scope and a
      declaration referencing one silently falls back to inheritance. */
 
   /* A WARNING card, which the queue rows below it deliberately are not. The prototype
