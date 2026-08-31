@@ -25011,9 +25011,9 @@
 /* THE PAGE HEADER BAND IS PART OF THE SAME FLAT SURFACE, and it was the one region the block
    above could not reach. `.manager-header` is a SIBLING of `.manager-main`, not a descendant, so
    the `.manager-main` rule never applied to it and the strip carrying the breadcrumb, the title
-   and the subtitle went on painting `--fab-mv2-surface-1` (`--fab-bg-2`) while the pane directly
-   beneath it moved to `--fab-bg-0`. Sampled at three heights on all three screens the band read
-   this theme's `--fab-bg-2` where the prototype's reads its `--fab-bg-0` equivalent — a two-rung
+   and the subtitle went on painting `--fab-bg-2` while the pane directly beneath it moved to
+   `--fab-bg-0`. Sampled at three heights on all three screens the band read this theme's
+   `--fab-bg-2` where the prototype's reads its `--fab-bg-0` equivalent — a two-rung
    step across the top ~90px of every screen, which is the first thing on it. (The measured
    values are not written here: this file's colour-literal gate,
    `tests/components/theme-colour-contract.test.js`, scans comments too, and rightly so — a hex

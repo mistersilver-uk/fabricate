@@ -1167,11 +1167,11 @@
   /* STATIC class names, so `lint:svelte:warnings` stays at zero and `styles/fabricate.css` —
      closed to this lane by `### GM World Scoped Entity Routes` requirement 7 — is not reopened.
 
-     Every colour is a `--fab-*` token declared at `:root` or in the seven theme blocks, never a
-     `--fab-mv2-*` manager alias: the alias set defines only bg / surface-1..3 / border /
-     border-strong / text / text-muted / accent / info / warning / danger, so `--fab-mv2-text-subtle`
-     and `--fab-mv2-text-secondary` are INVALID AT COMPUTED-VALUE TIME and silently fall back to
-     inheritance. */
+     Every colour is a `--fab-*` token DECLARED at `:root` or in the seven theme blocks, and that
+     is the whole check: a custom property that is not declared there is invalid at computed-value
+     time and falls back to inheritance silently rather than failing, so an invented name costs a
+     wrong colour and no error. `--fab-text-subtle` and `--fab-text-secondary`, both read below,
+     are declared. */
   .manager-scoped-entry-page {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
@@ -1265,7 +1265,8 @@
     width: 20px;
     height: 20px;
     border: 1px solid var(--fab-border-strong);
-    border-radius: var(--fab-v2-radius-panel);
+    /* The chip rung: this glyph is 20px, at or below the 24px bound the radius ladder sets. */
+    border-radius: 6px;
     background: var(--fab-surface-raised);
     color: var(--fab-text-secondary);
     font-size: 0.56rem;

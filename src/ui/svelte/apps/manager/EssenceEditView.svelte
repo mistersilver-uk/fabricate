@@ -617,14 +617,14 @@
     min-width: 0;
     margin-bottom: var(--fab-space-3);
     padding: var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: var(--fab-radius-card, 12px);
-    background: var(--fab-mv2-surface-2);
+    background: var(--fab-bg-3);
   }
 
   .manager-essence-scope-note {
     margin: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.74rem;
     line-height: 1.55;
   }
