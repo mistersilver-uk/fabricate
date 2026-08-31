@@ -51,9 +51,11 @@ import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
+  getCurrencyRequirementConfig,
   refundCurrencySpends,
   spendCurrencySpends,
 } from './currencyAffordance.js';
+import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import {
   hasStackQuantity,
   readStackQuantity,
@@ -5371,8 +5373,28 @@ export class CraftingEngine {
    *   component display names via {@link _getSystemComponents}
    * @returns {string}
    */
+  /**
+   * The recipe's normalized currency units, or `[]` when the recipe names no system, currency is
+   * unconfigured, or the read throws. Never fails a craft message: an unresolvable ladder degrades
+   * to `formatCurrencyRequirement`'s documented last resort, the raw id, which still reads better
+   * than a blank cost.
+   * @private
+   */
+  _missingItemsCurrencyUnits(recipe) {
+    try {
+      const units = getCurrencyRequirementConfig(recipe, this._currencySeams())?.units || [];
+      return units.map((unit) => normalizeCurrencyUnit(unit)).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
   _formatMissingItems(missing, recipe = null) {
     const components = this._getSystemComponents(recipe);
+    // Resolved ONCE for the whole message, not per line: `getCurrencyRequirementConfig` is a
+    // corpus-scaled read the performance programme instruments (see its own comment), and a
+    // missing-items list can carry many ingredients.
+    const currencyUnits = this._missingItemsCurrencyUnits(recipe);
     const lines = [];
 
     for (const { ingredient, have, need } of missing.ingredients) {
@@ -5384,6 +5406,20 @@ export class CraftingEngine {
         if (name) {
           line = `${need}x ${name}: have ${have}, need ${need}`;
         }
+      }
+      // Currency needs the same name resolution components get (issue 1410), and this is the
+      // likeliest surface of the whole bug: it renders precisely when the player CANNOT AFFORD
+      // the cost, which is when they go looking for what it is. Falling through to
+      // `Ingredient.getDescription()` prints `match.unit` verbatim — a generated id for any unit
+      // the currency editor created — so the player was told "Requires 1 9KJkn2dfmziq29Gq".
+      // The model cannot fix that itself: it has no access to the unit ladder, and only this
+      // call site does.
+      if (!line && ingredient?.match?.type === 'currency' && ingredient.match.unit) {
+        // Deliberately the SAME sentence `Ingredient.getDescription` produces, with only the unit
+        // resolved: the shipped message shape is asserted by an existing contract test, and this
+        // hotfix is fixing an opaque id, not rewording a player-facing failure message.
+        const cost = formatCurrencyRequirement(ingredient.match, currencyUnits);
+        line = `Insufficient currency. Requires ${cost}.: have ${have}, need ${need}`;
       }
       if (!line) {
         const description =

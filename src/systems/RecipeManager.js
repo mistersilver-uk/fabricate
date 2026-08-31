@@ -2308,7 +2308,10 @@ export class RecipeManager {
     // lines away, so the two stop disagreeing about one unit: it resolves the id through the
     // recipe's own units to `abbreviation` -> `label`, and keeps the raw id only for a genuinely
     // orphaned reference, where a stale id still reads better than a blank cost.
-    if (match?.type === 'currency' && match.unit) {
+    // Guarded on the HANDLER's own completeness test, not merely on `unit` being present, so an
+    // incomplete match (no unit, or a non-positive amount) still falls through to exactly the
+    // description it produced before this branch existed.
+    if (match?.type === 'currency' && getMatchHandler(match).isComplete(match)) {
       return formatCurrencyRequirement(match, this._resolveNormalizedCurrencyUnits(recipe));
     }
     return ingredient.getDescription?.() || '';

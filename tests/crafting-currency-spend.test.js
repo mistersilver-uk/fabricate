@@ -211,6 +211,9 @@ function itemOption(componentId, quantity = 1) {
   return { quantity, match: { type: 'component', componentId } };
 }
 
+// The reporter's own generated unit id (issue 1410), shared by every test below that needs one.
+const CURRENCY_UNIT_ID = '9KJkn2dfmziq29Gq';
+
 function makeSet(groups) {
   return new IngredientSet({
     id: 'set-1',
@@ -458,6 +461,38 @@ test('engine: insufficient currency aborts with an Insufficient-currency message
   assert.equal(craftingActor.system.currency.gp, 1, 'no currency spent');
   assert.equal(craftingActor.createdItems.length, 0, 'no result created');
   assert.equal(craftingActor.updateCalls.length, 0, 'no actor.update ran');
+});
+
+test('engine: the insufficient-currency message names the unit, never its generated id', async () => {
+  // Issue 1410's likeliest surface: `_formatMissingItems` renders precisely when the player CANNOT
+  // AFFORD the cost — which is when they go looking for what it is — and it calls
+  // `Ingredient.getDescription()` directly, bypassing RecipeManager's resolvers entirely. The
+  // model cannot fix itself: only this call site can reach the unit ladder.
+  const system = makeCurrencySystem({
+    units: [
+      {
+        id: CURRENCY_UNIT_ID,
+        label: 'Coins of Crowns',
+        abbreviation: 'Coins',
+        actorPath: 'system.currency.gp',
+        contains: [],
+      },
+    ],
+  });
+  setupGame(system);
+  const recipe = makeRecipe({ ingredientSet: makeSet([[currencyOption(CURRENCY_UNIT_ID, 50)]]) });
+  const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 1 } });
+  const engine = makeEngine(system, { actorPropertyCoinSpender: new ActorPropertyCoinSpender() });
+
+  const result = await engine.craft(craftingActor, [makeDnd5eActor({ id: 'src' })], recipe, null, {});
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /Insufficient currency/i, 'the shipped message shape is unchanged');
+  assert.match(result.message, /50 Coins/, 'the unit resolves to its abbreviation');
+  assert.ok(
+    !result.message.includes(CURRENCY_UNIT_ID),
+    'the raw generated unit id must never reach the player'
+  );
 });
 
 test('engine: half-consume — currency short aborts BEFORE the item is deleted', async () => {
@@ -727,7 +762,7 @@ test('RecipeManager.evaluateCraftability: currency option NAME and group name re
   // fed by the DESCRIPTION path still printed the raw id, so one unit rendered two different ways
   // in the same view. The reporter's shape: a generated id, an authored label, and an
   // abbreviation, which takes display precedence.
-  const generatedUnitId = '9KJkn2dfmziq29Gq';
+  const generatedUnitId = CURRENCY_UNIT_ID;
   const system = makeCurrencySystem({
     units: [
       {
@@ -764,11 +799,75 @@ test('RecipeManager.evaluateCraftability: currency option NAME and group name re
   // And the sibling cost row still agrees with it, which is the whole complaint.
   assert.equal(currencyOption_.costLabel, '1 Coins');
 
-  // The group name comes from the same description path (`_defaultGroupName`).
+});
+
+// A group with NO authored name, so `_defaultGroupName` actually runs. `makeSet` always authors
+// one, which is why an assertion against its groupName proves nothing about the fallback.
+function makeUnnamedSet(groups) {
+  return new IngredientSet({
+    id: 'set-1',
+    ingredientGroups: groups.map((options, idx) => ({ id: `g${idx}`, options })),
+  });
+}
+
+function coinsSystem() {
+  return makeCurrencySystem({
+    units: [
+      {
+        id: CURRENCY_UNIT_ID,
+        label: 'Coins of Crowns',
+        abbreviation: 'Coins',
+        actorPath: 'system.gold.coins',
+        contains: [],
+      },
+    ],
+  });
+}
+
+function evaluateCoins(ingredientSets) {
+  setupGame(coinsSystem());
+  globalThis.game.fabricate.getActorPropertyCoinSpender = () => new ActorPropertyCoinSpender();
+  const manager = new RecipeManager();
+  const recipe = { craftingSystemId: 'sys-cur', ingredientSets };
+  const actor = makeDnd5eActor({ id: 'a', items: [makeItem({ id: 'a', componentId: 'comp-a' })] });
+  return manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
+}
+
+test('RecipeManager: an UNNAMED currency group falls back to a resolved default name', () => {
+  // Exercises `_defaultGroupName`, which an authored group name skips entirely.
+  const result = evaluateCoins([
+    makeUnnamedSet([[currencyOption(CURRENCY_UNIT_ID, 1), itemOption('comp-a')]]),
+  ]);
+  const optionChoice = result.ingredientChoices.find((choice) => choice.kind === 'option');
+  assert.equal(optionChoice.groupName, '1 Coins');
+});
+
+test('RecipeManager: a single-option currency group resolves BOTH its tile name and description', () => {
+  // One group, one currency option, so the currency IS the chosen option and no option choice is
+  // emitted at all. That makes this the only fixture that reaches two paths the multi-option test
+  // cannot: `_resolveGroupDescription`'s chosen-option branch (the GM summary caption) and
+  // `_resolveIngredientVisual` at its second call site (the tile name). A full revert of the
+  // visual edit survives every other test in this file; it does not survive this one.
+  const result = evaluateCoins([makeSet([[currencyOption(CURRENCY_UNIT_ID, 3)]])]);
+  const state = (result.ingredientStates || [])[0];
+  assert.ok(state, 'a single-option currency group still emits an ingredient state');
+  assert.equal(state.description, '3 Coins', 'the GM summary caption resolves the unit');
+  assert.equal(state.name, '3 Coins', 'the tile name resolves the unit');
   assert.ok(
-    !String(optionChoice.groupName || '').includes(generatedUnitId),
-    'the raw generated unit id must never leak into the group name'
+    !`${state.name}${state.description}`.includes(CURRENCY_UNIT_ID),
+    'the raw generated unit id must never leak into either'
   );
+});
+
+test('RecipeManager: an INCOMPLETE currency match keeps its pre-fix description', () => {
+  // The guard reads the handler's own `isComplete`, so a match with a unit but no positive amount
+  // is NOT rendered as "0 Coins" — it falls through exactly as it did before the branch existed.
+  const result = evaluateCoins([
+    makeSet([[{ quantity: 1, match: { type: 'currency', unit: CURRENCY_UNIT_ID, amount: 0 } }]]),
+  ]);
+  const state = result.ingredientStates[0];
+  assert.ok(state, 'an incomplete currency group still emits a state');
+  assert.notEqual(state.description, '0 Coins', 'an incomplete match must not render as a cost');
 });
 
 test('RecipeManager: an orphaned currency unit id still renders, rather than blanking the cost', () => {
