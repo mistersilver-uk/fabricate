@@ -78,7 +78,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
+      # `contents: write`, not `read`, ONLY because this job asserts the version's DRAFT release
+      # exists: GitHub exposes a draft release to tokens with push access alone, so a read-scoped
+      # GITHUB_TOKEN gets a 404 from `gh release view` and the guard fails EVERY promotion, on a
+      # release that is present and correct. `release.yml`'s assetless-draft assertion carries the
+      # same grant for the same reason. The guard still writes nothing: the un-draft belongs to
+      # job 4 and stays the LAST step of the chain.
+      contents: write
       id-token: write
     outputs:
       # The public head BEFORE this promotion — the lower bound for aggregating superseded drafts'
