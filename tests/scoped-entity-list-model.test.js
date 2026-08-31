@@ -91,6 +91,36 @@ describe('the two identity shape facts are derived, and the bridge is pinned', (
     }
   });
 
+  it('reads the bridge OUT OF THE PRODUCTION MODULE, and every key it names is non-empty', () => {
+    // THE PIN ABOVE USES THIS FILE'S OWN COPY of the bridge, so it cannot see production drop
+    // its own. This one reads the map the derivation actually indexes with, so deleting the
+    // bridge — and reading `WORLD_IDENTITY_FIELDS[entityType]` singular — reds HERE, before the
+    // set equalities below get a chance to report a plausible all-`false` answer.
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/stores/worldScopeProjection.js'),
+      'utf8'
+    );
+    const block = /const IDENTITY_FIELD_KEY = Object\.freeze\(\{([^}]*)\}\)/.exec(source)?.[1];
+    assert.ok(
+      block,
+      'the projection declares no `IDENTITY_FIELD_KEY` bridge, so the derivation is indexing ' +
+        'the plural identity lists with a singular descriptor key and answers false everywhere'
+    );
+    const pairs = [...block.matchAll(/(\w+):\s*'([^']+)'/g)].map((match) => [match[1], match[2]]);
+    assert.deepEqual(
+      pairs.map(([singular]) => singular).sort(),
+      [...ENTITY_TYPES].sort(),
+      'the bridge must name every singular descriptor key'
+    );
+    for (const [singular, plural] of pairs) {
+      const fields = WORLD_IDENTITY_FIELDS[plural];
+      assert.ok(
+        Array.isArray(fields) && fields.length > 0,
+        `the bridge maps ${singular} to ${plural}, which names no identity field list`
+      );
+    }
+  });
+
   it('answers sourceLinked TRUE for exactly the component and the tool', () => {
     const linked = ENTITY_TYPES.filter((type) => projectionOf(type).sourceLinked === true);
     assert.deepEqual(linked, ['component', 'tool']);
