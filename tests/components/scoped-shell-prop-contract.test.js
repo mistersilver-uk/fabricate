@@ -420,3 +420,46 @@ describe('the host-sheet block is ADDITIVE and edits no existing rule', () => {
     );
   });
 });
+
+describe('the armed token crosses the shell boundary as a binding', () => {
+  // ── WHY THIS HALF IS STRUCTURAL ─────────────────────────────────────────────────────────
+  // The frame's disarm is proved BEHAVIOURALLY in the mounted suite, on the catalogue, where
+  // the arming control is on screen: arm a Remove, search, and the control is disarmed. The
+  // rules-list shell renders no arming control at all — the cluster belongs beside the entry,
+  // which for a system-scope route is the shared aside outside this shell — so the thing that
+  // matters there is that the OWNER's token reaches the frame and comes back. That is a
+  // binding, and a binding's write-back is not observable from a mounted target.
+  //
+  // Dropping the `bind:` prefix is silent: the frame still clears its own copy, the owner's
+  // stays armed, and a Remove staged in the aside survives a search that re-projected the row
+  // it was staged against.
+  it('the frame declares it bindable and clears it', () => {
+    const frame = sourceOf(FRAME);
+    assert.match(frame, /armedToken = \$bindable\(''\)/);
+    assert.match(frame, /if \(armedToken\) armedToken = '';/);
+  });
+
+  it('both shells BIND it through rather than passing a value', () => {
+    for (const shell of [CATALOGUE, RULES]) {
+      const source = sourceOf(shell);
+      assert.match(source, /bind:armedToken/, `${shell} passes the token without binding it`);
+      assert.equal(
+        /[^:]\barmedToken=\{/.test(source),
+        false,
+        `${shell} passes armedToken by value somewhere, which cannot carry the write-back`
+      );
+    }
+  });
+
+  it('the RULES shell exposes it to its owner, and the catalogue keeps it internal', () => {
+    // The asymmetry is deliberate: a rules list shares its owner's single-armed-token invariant
+    // with the shared aside beside it, and a catalogue draws the only inspector on its route.
+    assert.match(sourceOf(RULES), /armedToken = \$bindable\(''\)/);
+    assert.equal(
+      /armedToken = \$bindable\(/.test(sourceOf(CATALOGUE)),
+      false,
+      'nothing outside the catalogue arms anything on its route'
+    );
+    assert.match(sourceOf(CATALOGUE), /let armedToken = \$state\(''\)/);
+  });
+});
