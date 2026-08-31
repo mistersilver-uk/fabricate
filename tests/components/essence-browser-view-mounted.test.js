@@ -37,6 +37,22 @@ const harness = createMountedComponentHarness({
     // three-state membership answer and the inherit suffix from it; it imports nothing, so this
     // one entry closes the graph. An omission does not fail this suite, it CANCELS it.
     'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
+    // The scope-to-section mapping (issue 1372). `EssenceBrowserView` reads ONE function from it,
+    // `scopedSectionLabel`, and unlike `essenceScoped.js` this one is not a leaf: it reaches the
+    // world-scope projection, which reaches the scope vocabularies and the grouping migration.
+    // The seven entries below are that closure, and the harness reports only its frontier, so
+    // they were converged by re-running rather than read off the import graph. Seven modules to
+    // render a browser row is worth noticing rather than normalising — the label is presentation
+    // and could live in a UI-free leaf beside `essenceScoped.js`, which is what keeps that one
+    // entry to a single line. Left as-is here because the import is issue 1372's to place.
+    'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
+    'src/systems/toolScope.js',
+    'src/ui/svelte/stores/worldScopeProjection.js',
+    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/componentScope.js',
+    'src/systems/essenceScope.js',
+    'src/systems/scopedDefinitionStore.js',
+    'src/systems/scopedDefinitions.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',

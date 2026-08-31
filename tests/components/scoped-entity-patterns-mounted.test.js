@@ -270,7 +270,13 @@ describe('InheritRow (mounted)', () => {
 
   it('says "fall back", never "discard" — the override is retained', async () => {
     const root = await inheritHarness.mount({ entityType: 'component' });
-    const label = root.querySelector('.manager-status-toggle-label').textContent.toLowerCase();
+    // THE ACCESSIBLE NAME, not a visible caption. The caption span was removed because
+    // `.manager-status-toggle-label` is `overflow: hidden` inside a compact switch, so the
+    // sentence rendered as `Fall ...` — and the row already states the section, the state and
+    // the inherited value. What this test protects is the WORDING, which still has to say the
+    // override is kept, so it follows the sentence to where the sentence now lives.
+    const toggle = root.querySelector('[data-scoped-inherit-toggle]');
+    const label = toggle.getAttribute('aria-label').toLowerCase();
     assert.match(label, /fall back/);
     assert.equal(label.includes('discard'), false);
   });
