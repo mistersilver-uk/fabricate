@@ -113,7 +113,9 @@ World:
   THREE keys rather than one, because `isSeeded()` cannot be honest per entity type on a shared key: a store writes the whole object, so one entity type's first write persists the others as empty and turns an UNKNOWN Valid Id Basis into a real, empty, prunable one.
   THE `1.30.0` WORLD-SCOPE MIGRATION WRITES THEM, plus one fully-overriding membership record per original definition.
   COMPONENTS AND TOOLS get one world entity per resolved SOURCE ITEM, with every other member re-keyed onto it; ESSENCES group by trimmed `id` instead, and essence ids are NEVER re-keyed.
-  It ELECTS each world default from the OLDEST contributing system, and it does NOT shed a crafting system's own `components`, `essenceDefinitions` and `tools`, which stay LIVE AND AUTHORITATIVE until the consumer sweep repoints their readers.
+  It ELECTS each world default from the OLDEST contributing system, and it does NOT shed a crafting system's own `components`, `essenceDefinitions` and `tools`, which stay LIVE AND AUTHORITATIVE while `## CraftingSystem` requirement 36 in `data-models` holds.
+  THE THREE SCOPES ARE NOW READ THROUGH ONE SHARED SEAM: every non-UI consumer of a system's components, essence definitions or tools enters through the read union rather than touching the array.
+  READING IS NOT AUTHORITY — the in-system arrays still decide every field, every row and the row ORDER, re-derived from them at read time — so a world that has authored no world entity reads exactly as the previous release did.
   Every membership record is created fully OVERRIDING, so resolved behaviour is unchanged and a world default matters only for a system added later.
   All three ride along with crafting-system import/export as their own envelope slices, at schema `6` — but unlike the three world-scope slices above them they are FILTERED BY MEMBERSHIP to the exported system, because here there IS an owning relation and it is membership.
   An import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination's three settings stay absent and it behaves exactly as the previous schema does.

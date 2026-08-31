@@ -51,6 +51,7 @@ import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
 import { readStoredStackQuantity } from './itemStackQuantity.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
@@ -413,7 +414,7 @@ export class GatheringEngine {
           resultId: stringOrNull(result?.id),
           componentId,
           component: componentId
-            ? (normalizeList(system?.components).find((entry) => entry?.id === componentId) ?? null)
+            ? (resolvedComponentsFor(system).find((entry) => entry?.id === componentId) ?? null)
             : null,
         };
       });
@@ -1239,7 +1240,7 @@ export class GatheringEngine {
     const recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
     const { blocksSystem } = computeSystemVisibility(system, {
       recipes,
-      components: system.components || [],
+      components: resolvedComponentsFor(system),
     });
     cache.set(systemId, blocksSystem === true);
     return blocksSystem === true;
@@ -1786,10 +1787,20 @@ export class GatheringEngine {
 
   _componentsById(system) {
     const map = new Map();
-    if (!system?.id || typeof this.systemManager?.getItems !== 'function') return map;
+    if (!system?.id) return map;
+    // MOVED OFF `getItems` at issue 1370. `getItems` is the AUTHORING and browse accessor and
+    // stays on the persisted record; `getComponentsForSystem` is the repointed READ accessor.
+    // A manager double that stubs only `getItems` still answers, and a record-only fixture
+    // falls through to the shared read seam.
     let components;
     try {
-      components = normalizeList(this.systemManager.getItems(system.id));
+      if (typeof this.systemManager?.getComponentsForSystem === 'function') {
+        components = normalizeList(this.systemManager.getComponentsForSystem(system.id));
+      } else if (typeof this.systemManager?.getItems === 'function') {
+        components = normalizeList(this.systemManager.getItems(system.id));
+      } else {
+        components = resolvedComponentsFor(system);
+      }
     } catch {
       return map;
     }
@@ -4381,7 +4392,7 @@ function resolveProgressiveAward({ system, task, checkResult }) {
 function difficultyForResult(system, result) {
   const componentId = stringOrNull(result?.componentId ?? result?.systemItemId);
   if (!componentId) return null;
-  const component = normalizeList(system?.components).find((entry) => entry?.id === componentId);
+  const component = resolvedComponentsFor(system).find((entry) => entry?.id === componentId);
   const difficulty = Number(component?.difficulty);
   return Number.isFinite(difficulty) ? difficulty : null;
 }

@@ -175,6 +175,30 @@
         "listedRecipes": 100,
         "availableRecipes": 5
       }
+    },
+    "craftingSystemManager.getComponentsForSystem.worldScoped": {
+      "description": "THE REPOINTED READ ACCESSOR (issue 1370). `getComponentsForSystem` is the door every manager-holding reader now enters through, and this reads it 25 times against a SEEDED 2,500-entity world corpus unioned with the 5,000-component in-system library. identityIndexBuilds must stay at 1: the accessor is called once per read and a memo rebuilt per call would be 25 builds, each O(world entities + memberships), on a path the crafting UI opens on.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 1,
+        "scopedUnionReads": 25,
+        "scopedUnionRows": 5000,
+        "scopedUnionMergedRows": 2500,
+        "worldScopeEntities": 2500,
+        "worldScopeBytes": 656382
+      }
+    },
+    "scopedEntityReads.resolvedComponentsFor.worldScoped": {
+      "description": "THE OTHER SPELLING of the same door (issue 1370): the shared read seam, taken by the readers that hold a system RECORD and no manager. Same corpus, same read count, and the same committed identityIndexBuilds of 1 — the two spellings share ONE body, so a change that memoized only the manager path would move this number and not the other.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 1,
+        "scopedUnionReads": 25,
+        "scopedUnionRows": 5000,
+        "scopedUnionMergedRows": 2500,
+        "worldScopeEntities": 2500,
+        "worldScopeBytes": 656382
+      }
     }
   }
 }

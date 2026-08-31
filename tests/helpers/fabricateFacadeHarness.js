@@ -58,6 +58,7 @@ import {
 import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from '../../src/systems/companionKnowledgeGrant.js';
 import { consumePooledHoldings as consumePooledHoldingsFromActors } from '../../src/systems/companionPooledConsumption.js';
 import { readPooledHoldings as readPooledHoldingsAcrossActors } from '../../src/systems/companionPooledHoldings.js';
+import { resolvedComponentsFor } from '../../src/systems/scopedEntityReads.js';
 import {
   checkWorldCurrencyAffordability,
   creditWorldCurrency,
@@ -831,7 +832,7 @@ export class FabricateFacadeUnderTest {
   // fidelity has to be checkable, not merely asserted in a comment.
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component = findById(getDefinitionIndex(system?.components), target?.componentId);
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId);
     return {
       actorId: target?.actorId ?? null,
       actorName: '',

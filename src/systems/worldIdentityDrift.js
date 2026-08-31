@@ -2,18 +2,23 @@
  * THE WORLD IDENTITY SNAPSHOT DRIFT DETECTOR (issue 1363, epic 1357, PR 3).
  *
  * The `1.30.0` migration makes two copies of every entity's identity: the in-system record,
- * which stays **LIVE AND AUTHORITATIVE** until the consumer sweep (PR 8a, the READ repointing half), and the WORLD IDENTITY
+ * which stays **LIVE AND AUTHORITATIVE** while `## CraftingSystem` requirement 36 holds, and the WORLD IDENTITY
  * SNAPSHOT held on `fabricate.componentScope` / `essenceScope` / `toolScope`. The two are EQUAL
  * AT MIGRATION TIME BY CONSTRUCTION — the migration writes the merged identity back onto every
  * in-system record — and the snapshot goes stale on the GM's first post-migration identity edit,
  * because every shipped identity writer writes the in-system copy and nothing writes the
  * snapshot.
  *
- * **THIS MODULE IS PURE AND HAS NO PRODUCTION CONSUMER AT `1.30.0`.** It ships now because the
- * claim it makes executable — "the two copies are equal at migration time" — is the whole reason
- * the deferred shed is reconcilable, and an unchecked claim of that kind is exactly the acceptance
- * criterion this programme has already shipped twice unable to fail. The migration's own output
- * must produce ZERO entries, over every corpus in the acceptance set.
+ * **THIS MODULE IS PURE, AND SINCE ISSUE 1370 IT HAS A PRODUCTION CONSUMER.** `initialize()`
+ * calls it once per session on the ACTIVE GM alone, after the three scope stores load and
+ * before either manager is constructed, and composes the report into an INFORMATIONAL notice.
+ * The report is a DISCLOSURE obligation and not a correctness one: the read union already
+ * resolves every divergence in the safe direction, and this tells the GM which of their own
+ * edits the snapshot no longer reflects. It repairs nothing and writes nothing.
+ * The claim it makes executable — "the two copies are equal at migration time" — is the whole
+ * reason the deferred shed is reconcilable, and an unchecked claim of that kind is exactly the
+ * acceptance criterion this programme has already shipped twice unable to fail. The migration's
+ * own output must produce ZERO entries, over every corpus in the acceptance set.
  *
  * ## IT IS DELIBERATELY NOT NAMED `reportScopeMirrorDrift`
  *
@@ -26,8 +31,9 @@
  *
  * ## THE IDENTITY-WRITER SET, ENUMERATED BY NAME
  *
- * PR 8a - the READ repointing half of the split consumer sweep - must run this detector before repointing any reader, and must REPORT every divergence
- * rather than silently resolve it. These are the writers that make divergence reachable:
+ * Issue 1370 repointed the readers and wired this detector into `initialize()`, where it REPORTS
+ * every divergence rather than silently resolving it. These are the writers that make divergence
+ * reachable, and the list is kept because they are what keeps it reachable SESSION AFTER SESSION:
  *
  *   - `CraftingSystemManager#createItem`
  *   - `CraftingSystemManager#addItemFromUuid`
@@ -44,12 +50,18 @@
  * way for PR 8 to inherit a wrong enumeration, and it would miss
  * `refreshComponentMetadataForUpdatedItem` outright.
  *
- * ## RESOLUTION DIRECTION, when PR 8 acts on this
+ * ## RESOLUTION DIRECTION, as issue 1370 settled it
  *
- * The read union resolves `{ ...legacyEntry, ...entity, ...resolved }`, which makes the STALE
- * snapshot identity beat the FRESH in-system one. Because the in-system record is authoritative
- * until the sweep, PR 8 must re-derive world identity FROM the in-system copy at sweep time,
- * using the same transform the migration uses — never adopt the snapshot's value.
+ * The read union used to resolve `{ ...legacyEntry, ...entity, ...resolved }`, which made the
+ * STALE snapshot identity beat the FRESH in-system one. It now RE-APPLIES the whole in-system
+ * record last and DELETES every lifted identity field that record does not carry, re-derived AT
+ * READ TIME rather than by a one-shot pass — which could not hold anyway, because the component
+ * metadata refresh rewrites `name`, `img` and `description` in place at any point in a session.
+ *
+ * **NOT "the same transform the migration uses".** That spelling names an IDENTITY projection,
+ * which re-applies none of the behaviour keys and would leave a GM-disabled tool reading back
+ * usable. The identity projection supplies the DELETE key-set ONLY; the re-application is a
+ * re-spread of the whole record.
  */
 
 import { WORLD_IDENTITY_FIELDS } from '../migration/worldScopeEntityGrouping.js';

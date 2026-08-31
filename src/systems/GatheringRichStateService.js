@@ -20,6 +20,7 @@ import {
   writeState,
 } from './gatheringRichStateInternals.js';
 import { GatheringStaminaService } from './GatheringStaminaService.js';
+import { resolvedToolsFor } from './scopedEntityReads.js';
 
 const DEFAULT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_VOCABULARIES = Object.freeze({
@@ -384,10 +385,11 @@ export class GatheringRichStateService {
     // live lookup via the global registry when a caller did not pass one. The
     // gathering-config `tools` copy is no longer the source (a reconciliation
     // migration moves any UI-authored tools onto the system).
-    const toolSource =
-      (Array.isArray(system?.tools) && system.tools) ||
-      globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)?.tools ||
-      [];
+    const toolSource = Array.isArray(system?.tools)
+      ? resolvedToolsFor(system)
+      : resolvedToolsFor(
+          globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)
+        );
     const libraryTools = new Map();
     for (const tool of normalizeList(toolSource)) {
       if (tool?.id) libraryTools.set(String(tool.id), cloneJson(tool));

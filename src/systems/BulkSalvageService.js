@@ -44,6 +44,7 @@ import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 import { buildBulkSalvageChatContent, sumChatEntriesByName } from './BulkSalvageChatCard.js';
 import { awardedQuantityOf } from './componentStacking.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /**
  * The maximum number of targets one bulk gesture may carry.
@@ -145,7 +146,7 @@ function firstFinite(...values) {
 function brokenToolEntries(salvageRun, system) {
   const broken = (salvageRun?.usedTools || []).filter((record) => record?.broken === true);
   if (broken.length === 0) return [];
-  const index = getDefinitionIndex(system?.components);
+  const index = getDefinitionIndex(resolvedComponentsFor(system));
   return broken.map((record) => {
     const component = record.componentId ? findById(index, record.componentId) : null;
     return { name: component?.name || '', img: component?.img || '' };
@@ -444,7 +445,7 @@ export class BulkSalvageService {
     if (unsupportedMode || mode !== 'progressive') return [];
     const results = this._forecastStageResults(entry);
     if (results.length === 0) return [];
-    const componentIndex = getDefinitionIndex(entry.system?.components);
+    const componentIndex = getDefinitionIndex(resolvedComponentsFor(entry.system));
     const checkTriggerIds = checkTriggerIdsOf(config?.checkBreakage);
     const forecast = [];
     for (const result of results) {
@@ -748,7 +749,7 @@ export class BulkSalvageService {
 
 /** Resolve a component id against a system's managed components. */
 function findComponent(system, componentId) {
-  return findById(getDefinitionIndex(system?.components), componentId);
+  return findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
 }
 
 /** The plain, document-free report row for one target. */

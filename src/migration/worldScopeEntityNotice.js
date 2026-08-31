@@ -6,10 +6,11 @@
  * semantic mutations to the `1.21.0` notice's arithmetic survived a green suite while it lived
  * inline. What stays at the Foundry edge is the GM gate, the localizer and the channel.
  *
- * TWO notices, because the two facts arrive at different moments and on different clients'
- * timelines: the migration's own report is available the moment `run()` returns, while the
+ * THREE notices, because the facts arrive at different moments and on different clients'
+ * timelines: the migration's own report is available the moment `run()` returns, the
  * identity-flag remap runs later in the same `ready` body and can only report what it found once
- * it has walked every actor.
+ * it has walked every actor, and the world identity DRIFT audit (issue 1370) runs on EVERY
+ * session, long after any migration, once the three world-scope stores have loaded.
  */
 
 function arrayOf(value) {
@@ -185,4 +186,145 @@ export function buildWorldScopeIdentityRemapNotice(summary, localize) {
     );
   }
   return clauses.join(' ');
+}
+
+/**
+ * How many drifted records the TOAST names before deferring to the console.
+ *
+ * A NOTIFICATION IS NOT A REPORT SURFACE, and Foundry's own CSS is why. `.notification` has no
+ * `max-height` and no `overflow`, and carries `pointer-events: all`, at roughly 60% viewport
+ * width for a `LIFETIME_MS` of 5000. Verified at V14.365. An uncapped join over a bulk edit to a
+ * 200-component library is about 18 KB of text in one fixed-position block: it overflows the
+ * viewport and swallows pointer events over the canvas and the sidebar for five seconds, and the
+ * GM cannot clear the underlying drift because no world scoped-entity editor exists yet.
+ *
+ * NOTHING IS LOST BY CAPPING, BUT ONLY BECAUSE FABRICATE LOGS THE FULL LIST ITSELF, AT A LEVEL
+ * THE CONSOLE SHOWS BY DEFAULT. Two earlier forms of this note each stopped one step short.
+ *
+ * The first reasoned that `ui.notifications.info` defaults `console: true` and therefore the
+ * whole enumeration reached the console anyway. FALSE: core logs `el.textContent` - the message
+ * it was handed, which is the CAPPED one - because the cap is applied here, before `notify` is
+ * ever called. That holds for every version in the declared range, whatever level core picks.
+ *
+ * The second added {@link describeWorldIdentityDrift} and logged it from the call site, which is
+ * NECESSARY BUT NOT SUFFICIENT. It logged at `console.debug`, and `debug` maps to DevTools'
+ * VERBOSE level, which Chromium's default level filter excludes - so a GM following the copy's
+ * own "press F12" instruction would still not have seen it. The call site logs at `console.info`
+ * for that reason, which is also the level core logs the toast at, so the two lines sit together.
+ * The level is therefore not a free choice, and lowering it back to `debug` silently re-breaks
+ * the copy; `tests/world-scope-consumer-sweep.test.js` pins it.
+ *
+ * The count and field total stay exact in the sentence either way.
+ * The cap is on the ENUMERATION only - the notice still NAMES records rather than counting them,
+ * because a bare count tells a GM something is stale and gives them no way to find it.
+ */
+const IDENTITY_DRIFT_NOTICE_RECORD_CAP = 5;
+
+/**
+ * The drift report, grouped per `(system, entity)` with its fields collected.
+ *
+ * THE SHARED BODY, and that is the point of it: the toast and the console dump must never
+ * disagree about what drifted, so they group once here and differ only in how much of the
+ * result each one enumerates.
+ *
+ * @param {Array<{systemId: string, entityType: string, entityId: string, field: string}>}
+ *   driftEntries The detector's report.
+ * @returns {{records: Array<object>, fieldCount: number}}
+ */
+function groupWorldIdentityDrift(driftEntries) {
+  const byRecord = new Map();
+  let fieldCount = 0;
+  for (const entry of arrayOf(driftEntries)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const key = `${entry.systemId}\u{0}${entry.entityType}\u{0}${entry.entityId}`;
+    if (!byRecord.has(key)) {
+      byRecord.set(key, {
+        systemId: entry.systemId,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        fields: [],
+      });
+    }
+    const record = byRecord.get(key);
+    if (typeof entry.field === 'string' && !record.fields.includes(entry.field)) {
+      record.fields.push(entry.field);
+      fieldCount += 1;
+    }
+  }
+  return { records: [...byRecord.values()], fieldCount };
+}
+
+/** One drifted record, as the toast and the console both name it. */
+function describeDriftRecord(record) {
+  return `${record.entityId} (${record.entityType}: ${record.fields.join(', ')}) in ${record.systemId}`;
+}
+
+/**
+ * EVERY drifted record, uncapped - the list the notice's own copy points the GM at.
+ *
+ * THE NOTIFICATION CANNOT PROVIDE THIS. `ui.notifications.info` defaults `console: true`, but what
+ * core logs is `el.textContent` - the message it was HANDED, which is the CAPPED one, because the
+ * cap is applied before `notify` is called. So a notice that says "the full list is in the
+ * console" is false unless Fabricate logs the full list itself, which is what this exists for.
+ *
+ * LOGGING IT IS NECESSARY, NOT SUFFICIENT: the LEVEL has to be one the console shows. The call
+ * site uses `console.info`, because `console.debug` maps to DevTools' VERBOSE level and
+ * Chromium's default filter excludes it - a dump nobody can see is the same failure as no dump.
+ * Verified against V14.365.0.
+ *
+ * @param {Array<{systemId: string, entityType: string, entityId: string, field: string}>}
+ *   driftEntries The detector's report.
+ * @returns {string} the full enumeration, or `''` when there is nothing to say.
+ */
+export function describeWorldIdentityDrift(driftEntries) {
+  return groupWorldIdentityDrift(driftEntries).records.map(describeDriftRecord).join('; ');
+}
+
+/**
+ * The per-session notice naming the entities whose world identity snapshot has gone stale.
+ *
+ * A DISCLOSURE OBLIGATION, NOT A CORRECTION. The read union re-derives identity from the
+ * in-system record on every read, so the divergence is already resolved safely by the time this
+ * runs; what the GM cannot see without being told is WHICH of their own edits the world snapshot
+ * no longer reflects, before the world catalogue editors arrive and start writing that snapshot.
+ * Nothing here changes any data, and the copy says so.
+ *
+ * IT NAMES THE RECORDS AND THE FIELDS, never a bare count. A count tells a GM that something is
+ * stale and gives them no way to find it; the detector already reports one row per
+ * `(entityId, field)`, and collapsing that to a number throws the whole answer away. Rows are
+ * grouped per `(system, entity)` so one record with three stale fields reads as one clause with
+ * three fields rather than as three unrelated records. The ENUMERATION is capped at
+ * {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} records with an explicit remainder clause; the counts
+ * in the sentence stay exact, and the console keeps the whole list.
+ *
+ * IDENTITY ONLY, AND IT SAYS SO. `WORLD_IDENTITY_FIELDS` covers names, images, descriptions and
+ * source links; the detector is BLIND to `tags`, `category`, `breakage`, `onBreak`,
+ * `repairRequirements` and `enabled`, so a notice implying it had checked behaviour would be
+ * making a claim the detector cannot support.
+ *
+ * @param {Array<{systemId: string, entityType: string, entityId: string, field: string}>}
+ *   driftEntries The detector's report.
+ * @param {(key: string, data?: object) => string|undefined} localize
+ * @returns {string} the message, or `''` when there is nothing to say.
+ */
+export function buildWorldIdentityDriftNotice(driftEntries, localize) {
+  const { records, fieldCount } = groupWorldIdentityDrift(driftEntries);
+  if (records.length === 0) return '';
+  const shown = records.slice(0, IDENTITY_DRIFT_NOTICE_RECORD_CAP);
+  const withheld = records.length - shown.length;
+  let named = shown.map(describeDriftRecord).join('; ');
+  if (withheld > 0) {
+    named += ` ${localizeWith(
+      localize,
+      'FABRICATE.Migration.WorldScopeEntities.IdentityDriftOverflow',
+      { count: withheld },
+      `...and ${withheld} more - the full list is in the console`
+    )}`;
+  }
+  return localizeWith(
+    localize,
+    'FABRICATE.Migration.WorldScopeEntities.IdentityDrift',
+    { records: records.length, fields: fieldCount, entities: named },
+    `Fabricate's world catalogue snapshot is out of date for ${records.length} record(s) across ${fieldCount} field(s): ${named}. Each crafting system's own copy is what every reader answers from, so nothing is wrong and nothing has been changed - this is identity only (names, images, descriptions and source links), not behaviour.`
+  );
 }

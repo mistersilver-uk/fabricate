@@ -10,8 +10,10 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 /**
  * The component half of Scoped Entity Definitions (issue 1358, part of epic 1357).
  *
- * `## Component` describes the shipped per-system shape and stays authoritative until the
- * CONSUMER SWEEP (epic 1357, PR 8a - the READ repointing half) repoints the readers. The `1.30.0` world-scope migration
+ * `## Component` describes the shipped per-system shape and stays authoritative while `## CraftingSystem` requirement 36 holds. Issue 1370
+ * repointed every non-UI reader at the read union, and READING IS NOT AUTHORITY: while that
+ * requirement holds the in-system record decides every key it carries, the row order and the
+ * row set, so the arrays did not lose authority when the readers moved. The `1.30.0` world-scope migration
  * (PR 3) makes this module's read union correct for a migrated world and seeds the world corpus
  * it reads; it deliberately does NOT shed the in-system array, because every lifted field still
  * has live production readers.
@@ -247,11 +249,19 @@ export function resolveComponent(worldDefault, membership) {
 /**
  * THE READ UNION for a component: what a crafting system's components list IS (issue 1359).
  *
- * The world components whose membership record for this system is PRESENT, each RESOLVED through the
- * three-layer resolver above, unioned with the system's surviving in-system array, WORLD WINNING
- * FIELD BY FIELD on an id collision (issue 1363) rather than replacing the in-system record: the
- * surviving record supplies every field no world layer owns — `essences`, `salvage`, `difficulty` and `complications` — and the world layer
- * still wins every field it authors.
+ * The system's surviving in-system array, merged with the world components whose membership
+ * record for this system is PRESENT, each RESOLVED through the three-layer resolver above.
+ *
+ * **While `## CraftingSystem` requirement 36 holds, the IN-SYSTEM RECORD DECIDES: the union
+ * answers every KEY that record carries, its ROW ORDER and its ROW SET, re-derived from it at
+ * read time, and the world layer supplies only the keys it does not carry. The world-wins
+ * precedence below is the TARGET contract and is SUSPENDED, not consumed, for the duration; it
+ * re-arms when requirement 36 retires.**
+ * So the surviving record supplies `essences`, `salvage`, `difficulty` and `complications` as it always did, AND every
+ * identity and behaviour key it carries; a lifted identity field it does NOT carry is DELETED
+ * from the merged row, because absence is a value. A lane adding a world-scope WRITER here
+ * must not implement against world-wins precedence: doing so reverts the GM's own edits on
+ * the very next read, which is the defect this inversion exists to prevent.
  *
  * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
  * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent
@@ -271,5 +281,6 @@ export function resolveComponentScope(worldCorpus, systemId, systemComponents) {
     systemId,
     systemDefinitions: systemComponents,
     resolve: resolveComponent,
+    entityType: 'components',
   });
 }

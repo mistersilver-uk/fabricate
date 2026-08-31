@@ -14,6 +14,8 @@ import {
   routedSuccessTierOptions,
 } from '../utils/routedOutcomeKeywords.js';
 
+import { resolvedComponentsFor } from './scopedEntityReads.js';
+
 /**
  * The progressive `meta` for a resolution that awarded nothing because the recipe
  * authors no result group. Present in FULL rather than abbreviated: a consumer that
@@ -863,7 +865,7 @@ export class ResolutionModeService {
     const allGroups = this._allResultGroups({ recipe, step });
     const group = allGroups[0];
     if (!group) return [];
-    const index = getDefinitionIndex(system?.components);
+    const index = getDefinitionIndex(resolvedComponentsFor(system));
     return this._orderProgressiveResults(recipe, group.results || []).map((result) => {
       const componentId = result?.componentId || result?.systemItemId || null;
       return {
@@ -1027,7 +1029,7 @@ export class ResolutionModeService {
 
   _getDifficulty(system, componentId) {
     if (!componentId) return null;
-    const item = findById(getDefinitionIndex(system?.components), componentId);
+    const item = findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
     const difficulty = Number(item?.difficulty);
     return Number.isFinite(difficulty) ? difficulty : null;
   }

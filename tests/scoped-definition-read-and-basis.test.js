@@ -389,6 +389,11 @@ describe('the READ union and the BASIS union', () => {
       components: [
         { id: 'legacy-only', name: 'Legacy Only', category: 'reagent' },
         { id: 'shared', name: 'Legacy Shared', category: 'general' },
+        // A member whose in-system record carries identity but authors no `category`, so the
+        // world default is still observable through it (issue 1370). It has to exist in the
+        // in-system array at all: the read union's ROW SET is that array's row set while
+        // `## CraftingSystem` requirement 36 holds.
+        { id: 'w-member', name: 'Legacy Member' },
       ],
     };
     return { manager, store, system };
@@ -402,6 +407,11 @@ describe('the READ union and the BASIS union', () => {
       read.map((entry) => entry.id).sort(),
       ['legacy-only', 'shared', 'w-member'],
       'membership-FILTERED: `w-stranger` is a member of sys-b, so sys-a never sees it'
+    );
+    assert.deepEqual(
+      read.map((entry) => entry.id),
+      system.components.map((entry) => entry.id),
+      'and the ROW SET and ORDER are the in-system array’s, not the world roster’s'
     );
 
     const { componentIds } = manager._scopeBasis(system);
@@ -430,12 +440,34 @@ describe('the READ union and the BASIS union', () => {
     assert.equal('enabled' in member, false, 'a component carries no enabled flag at all');
   });
 
-  it('lets the WORLD win on an id collision', () => {
+  it('lets the IN-SYSTEM record win an id collision while requirement 36 holds', () => {
+    // INVERTED at issue 1370. `1363` had the world entity win `name` and the resolved section win
+    // `category`, which reverts the GM's own edit: every shipped identity writer writes the
+    // in-system copy and nothing writes the world entity.
     const { manager, system } = pairFixture();
     const shared = manager.resolveScopedComponents(system).filter((e) => e.id === 'shared');
     assert.equal(shared.length, 1, 'one entry, not two');
-    assert.equal(shared[0].name, 'World Shared');
-    assert.equal(shared[0].category, 'ingot');
+    assert.equal(shared[0].name, 'Legacy Shared');
+    assert.equal(shared[0].category, 'general');
+    assert.equal(shared[0].member, true, 'and the membership facts the record cannot carry remain');
+  });
+
+  it('does not RESURRECT a world entity the in-system array no longer carries', () => {
+    // `_deleteComponentSet` removes the in-system record and leaves the world entity and its
+    // membership behind, so a row-set rule taken from the world roster would hand the component
+    // back beside the recipes that same delete disabled.
+    const { manager, system } = pairFixture();
+    system.components = system.components.filter((entry) => entry.id !== 'w-member');
+    advanceDefinitionRevision(system.components);
+    const read = manager.resolveScopedComponents(system);
+    assert.equal(
+      read.some((entry) => entry.id === 'w-member'),
+      false
+    );
+    assert.deepEqual(
+      read.map((entry) => entry.id),
+      ['legacy-only', 'shared']
+    );
   });
 
   it('answers the surviving legacy array alone when no world corpus exists', () => {
@@ -470,7 +502,11 @@ describe('the READ union and the BASIS union', () => {
         toolScopeStore: createToolScopeStore(seam),
       }
     );
-    const system = { id: SYSTEM_ID, essenceDefinitions: [], tools: [] };
+    const system = {
+      id: SYSTEM_ID,
+      essenceDefinitions: [{ id: 'w-ess', name: 'Legacy Essence' }],
+      tools: [{ id: 'w-tool', name: 'Legacy Tool' }],
+    };
     const [essence] = manager.resolveScopedEssences(system);
     assert.equal(essence.macro, 'Macro.world');
     assert.equal(essence.enabled, true, 'a record that authored none defaults to on');
@@ -498,7 +534,13 @@ describe('the resolved-union memo', () => {
       { getRecipes: () => [] },
       { componentScopeStore: store }
     );
-    const system = { id: 'sys-a', components: [{ id: 'l1', name: 'Legacy Before' }] };
+    const system = {
+      id: 'sys-a',
+      components: [
+        { id: 'l1', name: 'Legacy Before' },
+        { id: 'w1', name: 'System W1' },
+      ],
+    };
     return { manager, store, system };
   }
 
@@ -510,8 +552,11 @@ describe('the resolved-union memo', () => {
   // Asserted on CONTENT rather than on index-build counts, because a caching bug that skips a
   // rebuild looks like an IMPROVEMENT to a count-based assertion while serving wrong data.
   it('is invalidated by a WORLD-scope edit', async () => {
+    // Asserted on `category` rather than on `name`: `name` is a LIFTED IDENTITY field, so the
+    // in-system record decides it outright while requirement 36 holds, and a world edit to it is
+    // (correctly) invisible. `category` is resolved behaviour and is the world half's to move.
     const { manager, store, system } = memoFixture();
-    assert.equal(manager.resolveScopedComponents(system).find((e) => e.id === 'w1').name, 'Before');
+    assert.equal(manager.resolveScopedComponents(system).find((e) => e.id === 'w1').category, 'ore');
 
     await store.save({
       entities: [{ id: 'w1', name: 'After' }],
@@ -520,7 +565,7 @@ describe('the resolved-union memo', () => {
     });
 
     const resolved = manager.resolveScopedComponents(system).find((e) => e.id === 'w1');
-    assert.equal(resolved.name, 'After');
+    assert.equal(resolved.name, 'System W1', 'the in-system identity is unmoved by a world edit');
     assert.equal(resolved.category, 'ingot');
   });
 
@@ -625,6 +670,13 @@ describe('the _scopeBasis call sites', () => {
 
 // ---------------------------------------------------------------------------------------------
 // Criterion 7 — construction order in src/main.js
+//
+// THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO PRs. Issue 1363's criterion 7 is the three
+// world-scope stores' position; issue 1370's criterion 7(a) is the world identity drift audit's
+// position and its active-GM gate, and its 8(b) is the absence of a repair write between the
+// audit and its notice. They share this describe because they share one fact — the exact point in
+// `initialize()` at which the three stores are loaded and nothing has yet read the union — and
+// splitting them across two files would let the two halves of that fact drift apart.
 // ---------------------------------------------------------------------------------------------
 
 describe('src/main.js construction order', () => {
@@ -679,5 +731,76 @@ describe('src/main.js construction order', () => {
     for (const store of ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore']) {
       assert.match(MAIN_SOURCE, new RegExp(`${store}: fabricate\\.${store},`));
     }
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // Issue 1370 criterion 7(a) — the world identity drift audit's position and its gate
+  // -------------------------------------------------------------------------------------------
+
+  it('runs the world identity drift audit after the three loads and before either manager', () => {
+    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
+    assert.ok(at('this.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
+    assert.ok(
+      audit < at('this.recipeManager = new RecipeManager('),
+      'and before the recipe manager, which is the first thing that can read the union'
+    );
+    assert.ok(audit < at('this.craftingSystemManager = new CraftingSystemManager('));
+  });
+
+  it('gates the audit on the ACTIVE GM, not on isGM', () => {
+    // `User#isGM` is `hasRole(ASSISTANT)` and `SETTINGS_MODIFY.defaultRole` is ASSISTANT, so an
+    // `isGM` gate posts this notice once for the full GM AND once per assistant.
+    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
+    const gate = MAIN_SOURCE.lastIndexOf(
+      'game.users?.activeGM?.id === game.user?.id',
+      audit
+    );
+    assert.notEqual(gate, -1, 'the audit must sit under an active-GM gate');
+    assert.ok(
+      MAIN_SOURCE.slice(gate, audit).includes('{'),
+      'and the gate must OPEN a block the audit is inside, not merely precede it'
+    );
+    assert.equal(
+      MAIN_SOURCE.slice(gate, audit).includes('game.user?.isGM'),
+      false,
+      'an isGM gate would run the audit on every assistant GM as well'
+    );
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // Issue 1370 criterion 8(b) — the audit REPORTS, and repairs nothing
+  // -------------------------------------------------------------------------------------------
+
+  it('sites the audit OUTSIDE _runMigrations and off the migration report guard', () => {
+    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
+    assert.ok(
+      audit < at('  async _runMigrations() {'),
+      'the audit is inside initialize(), which is declared before _runMigrations()'
+    );
+    const line = MAIN_SOURCE.slice(MAIN_SOURCE.lastIndexOf('\n', audit) + 1, audit);
+    assert.equal(
+      line.includes('worldScopeEntityReport'),
+      false,
+      'drift is not a migration event: guarding on the migration report would silence the audit ' +
+        'on every session after the one the migration ran in'
+    );
+  });
+
+  it('writes NOTHING between the audit and its notice dispatch', () => {
+    // 8(a) calls the detector twice to prove it is pure, and that only reds if a repair went
+    // INSIDE the detector — the least likely placement. A repair would land HERE, at the call
+    // site, which no unit test can execute. So the absence is asserted by source text.
+    const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
+    const dispatch = at('ui.notifications?.info?.(driftNotice)');
+    assert.ok(audit < dispatch, 'the notice is dispatched after the audit');
+    const between = MAIN_SOURCE.slice(audit, dispatch);
+    assert.equal(between.includes('setSetting'), false, 'the audit must not write a setting');
+    assert.equal(between.includes('.save('), false, 'nor persist a store');
+    assert.equal(
+      between.includes('ui.notifications?.warn'),
+      false,
+      'and the notice is INFO: nothing is wrong, and a permanent warning would redden every ' +
+        'View Lab capture, which runs this path on every build'
+    );
   });
 });

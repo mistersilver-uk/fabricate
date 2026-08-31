@@ -856,6 +856,11 @@ Issue 1363 (epic 1357, PR 3) gives the world ONE record per component, essence a
 The pass (`src/migration/migrateWorldScopeEntities.js`) creates a WORLD ENTITY per resolved source item across every system, re-keys every other member of the group to that id, rewrites every reference the re-key invalidates, and writes one fully-overriding SYSTEM MEMBERSHIP RECORD per original definition.
 It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL object for any key it did not change.
 
+**The identity divergence this migration accepts is REPAIRED BY THE READ UNION, not by a second pass.**
+The world entity and the in-system record are equal at migration time by construction, and they diverge on the first post-migration identity edit, because every shipped identity writer writes the in-system copy.
+While `## CraftingSystem` requirement 36 holds, the read union re-derives world identity FROM the in-system record at READ TIME, so the divergence is resolved on every read by the same mechanism that answers it — never by a boot-time rewrite of the three settings, which could not hold anyway: the component metadata refresh bound to the item-update hook rewrites `name`, `img` and `description` in place at any point in a session.
+The divergence is also REPORTED once per session to the active GM, as a disclosure; nothing is written by that report.
+
 1. **GROUPING: components and tools by TRANSITIVE CLOSURE over source-reference sets; essences by trimmed `id`.**
    The key is deliberately not a single canonical field, because two systems that registered the same Item by different routes carry different ones — so the pass unions over `{originItemUuid, registeredItemUuid, ...aliasItemUuids}` and their pre-#560 aliases.
    Union-find is permutation-invariant, so the entity PARTITION is set-equal under a shuffled corpus.
@@ -901,8 +906,10 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    Electing a donor value for a section some member left unauthored would therefore hand that member the donor's category, breakage mode or on-break action at migration time, which is the exact condition this election was granted on.
    **Why an empty override is inexpressible differs between `category` and the two tool sections, and both reasons are stated because only one of them generalizes.**
    For `category` it is the shape rule: `coerceComponentSection` coerces `''` to ABSENCE, so an empty category cannot be stored at all.
-   For `breakage` and `onBreak` it is a NAME COLLISION with the surviving in-system record rather than a normalizer quirk - both are spelled identically at world scope and on the shipped `Tool`, and the read union spreads the RESOLVED sections LAST over that in-system record (`## Scoped Entity Definitions` requirement 15), so an override of `{}` would ERASE a live in-system block instead of meaning "no breakage".
-   `## CraftingSystem` requirement 36 keeps those in-system records authoritative until the consumer sweep, so that block is still where a GM's post-migration edits land, which is what makes the erasure durable rather than cosmetic.
+   For `breakage` and `onBreak` it is a NAME COLLISION with the surviving in-system record rather than a normalizer quirk - both are spelled identically at world scope and on the shipped `Tool`, so an override of `{}` would ERASE a live in-system block instead of meaning "no breakage".
+   **That erasure is DORMANT while `## CraftingSystem` requirement 36 holds and RE-ARMS when it retires, so the decline is kept rather than relaxed.**
+   The read union no longer spreads the resolved sections LAST: for the duration of requirement 36 it re-applies the whole in-system record over them (`## Scoped Entity Definitions` requirement 15), so a `{}` override cannot reach a live in-system block today.
+   Requirement 36 keeps those in-system records authoritative, so that block is still where a GM's post-migration edits land, which is what would make the erasure durable rather than cosmetic the moment the record stops deciding its own keys.
    `effectSource` and `macro` are exempt for exactly the converse reason: they are NEW section names that collide with nothing the in-system record carries, so `{}` and `null` are storable overrides, both are written UNCONDITIONALLY onto every membership record, and no member is ever left falling back.
    `repairRequirements` is exempt because it is not a resolver section at all - `### Tool scope` requirement 2 answers it from the membership record alone and never reads the world defaults.
    (a) `category` is NEVER the reserved `general` (`### Component scope` requirement 2), because an absence-preserving world category that mints it resets every inheriting system on the first resolve.

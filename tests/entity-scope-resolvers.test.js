@@ -315,10 +315,13 @@ test('a non-list repairRequirements value is DROPPED rather than persisted', () 
 
 test('TOOL_BLOCKED matches the code the two shipped consumers already write as a bare literal', async () => {
   // A hand-maintained mirror guard. Neither consumer is imported here: GatheringEngine drags the
-  // Foundry runtime in, and gatheringBlockedReasons is a player-app UI leaf — and the point of
-  // this module is that nothing depends on it yet. Epic 1357's consumer sweep (PR 8) converges
-  // them onto this export; until then, a rename here fails loudly instead of silently forking the
-  // vocabulary into two codes that mean the same refusal.
+  // Foundry runtime in, and gatheringBlockedReasons is a player-app UI leaf — and `toolScope.js`
+  // is a deliberate leaf with neither in its closure. That is about what it may DEPEND ON, not
+  // about what depends on it: eight modules import it, the read seam of issue 1370 among them.
+  // Issue 1370's READ repointing did NOT converge these two onto this export — it repointed
+  // readers of the entity ARRAYS, a different set — so the convergence is still owed, and until
+  // it happens a rename here fails loudly instead of silently forking the vocabulary into two
+  // codes that mean the same refusal.
   const mirrors = [
     ['src/systems/GatheringEngine.js', /^\s{2}TOOL_BLOCKED: 'FABRICATE\.Gathering\.Blocked\./m],
     [

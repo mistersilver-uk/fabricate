@@ -15,6 +15,7 @@ import {
   resolveEnvironmentDangerLevel,
 } from './gatheringMatch.js';
 import { normalizeNodeRuntime } from './gatheringNodeConfig.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
 const VALID_COMPOSITION_MODES = new Set(['automatic', 'manual']);
@@ -504,12 +505,20 @@ export class GatheringEnvironmentStore {
 
   _getSystemItem(systemId, componentId) {
     if (!systemId || !componentId) return null;
+    // Repointed at issue 1370 onto the READ accessor, with `getItems` kept as the fallback for
+    // a manager double that stubs only the older name.
+    if (this.systemManager?.getComponentsForSystem) {
+      return (
+        this.systemManager
+          .getComponentsForSystem(systemId)
+          .find((item) => item?.id === componentId) || null
+      );
+    }
     if (this.systemManager?.getItems) {
       return this.systemManager.getItems(systemId).find((item) => item?.id === componentId) || null;
     }
     const system = this._getSystem(systemId);
-    const items = Array.isArray(system?.components) ? system.components : [];
-    return items.find((item) => item?.id === componentId) || null;
+    return resolvedComponentsFor(system).find((item) => item?.id === componentId) || null;
   }
 
   async _removeRunsForSystem(systemId) {

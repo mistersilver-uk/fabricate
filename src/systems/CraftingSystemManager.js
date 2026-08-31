@@ -28,7 +28,6 @@ import {
   advanceDefinitionRevision,
   findById,
   getDefinitionIndex,
-  getScopedDefinitionUnion,
   indexedMembershipLookups,
 } from '../utils/definitionIndex.js';
 import { normalizeFailureResultPolicy } from '../utils/failureResultPolicy.js';
@@ -70,7 +69,6 @@ import {
   resolveActiveCraftingCheckFormula,
   resolveMaxModifierPicks,
 } from './checkModifierResolver.js';
-import { resolveComponentScope } from './componentScope.js';
 import {
   craftingDataChange,
   domainsForRecord,
@@ -78,7 +76,6 @@ import {
   PendingChangeDomains,
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
-import { resolveEssenceScope } from './essenceScope.js';
 import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
 import { normalizeModifierLibrary } from './modifierLibrary.js';
@@ -92,10 +89,10 @@ import {
   REVISION_SCOPES,
   RevisionRegistry,
 } from './revisionTokens.js';
+import { resolveScopedEntityRead } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
-import { resolveToolScope } from './toolScope.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
@@ -134,6 +131,26 @@ function _resolveStoreSeam(seam) {
   if (!seam) return null;
   try {
     return typeof seam === 'function' ? (seam() ?? null) : seam;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One scope store's published corpus, or `null` when there is no readable world half.
+ *
+ * `_resolveStoreSeam` catches a throwing GETTER; this also catches a throwing `corpus()`.
+ * `## Scoped Entity Definitions` requirement 16 says an UNREADABLE world half must answer the
+ * in-system array ITSELF, and without this the manager spelling would take
+ * `getComponentsForSystem` down where the module spelling degrades. The two share one body
+ * precisely so they cannot disagree, and this closes the last place they could.
+ *
+ * @param {object|(() => object|null)|null} seam
+ * @returns {object|null}
+ */
+function _resolveStoreCorpus(seam) {
+  try {
+    return _resolveStoreSeam(seam)?.corpus?.() ?? null;
   } catch {
     return null;
   }
@@ -439,9 +456,9 @@ export class CraftingSystemManager {
    * a MEMBER of, resolved through the three-layer resolver, unioned with its surviving in-system
    * array, world winning on an id collision.
    *
-   * Additive and unwired: `_normalizeSystem` still emits `components` exactly as it does today, and
-   * epic 1357's consumer sweep is what routes readers here. It exists now because the store, the
-   * memo and the basis have to be provably correct together before anything depends on them.
+   * WIRED SINCE issue 1370: `getComponentsForSystem` and the rest of the non-UI reader set enter
+   * through this answer, while `_normalizeSystem` still emits `components` exactly as it does
+   * today and `## CraftingSystem` requirement 36 keeps that array authoritative.
    *
    * MEMOIZED on `(world corpus, system array)` — never on a system id. See
    * `getScopedDefinitionUnion`.
@@ -450,12 +467,7 @@ export class CraftingSystemManager {
    * @returns {Array<object>}
    */
   resolveScopedComponents(system) {
-    return this._resolveScopedUnion(
-      system,
-      this._componentScopeStore,
-      'components',
-      (corpus, record) => resolveComponentScope(corpus, record.id, record.components)
-    );
+    return this._resolveScopedUnion(system, this._componentScopeStore, 'components');
   }
 
   /**
@@ -465,12 +477,7 @@ export class CraftingSystemManager {
    * @returns {Array<object>}
    */
   resolveScopedEssences(system) {
-    return this._resolveScopedUnion(
-      system,
-      this._essenceScopeStore,
-      'essenceDefinitions',
-      (corpus, record) => resolveEssenceScope(corpus, record.id, record.essenceDefinitions)
-    );
+    return this._resolveScopedUnion(system, this._essenceScopeStore, 'essenceDefinitions');
   }
 
   /**
@@ -480,26 +487,28 @@ export class CraftingSystemManager {
    * @returns {Array<object>}
    */
   resolveScopedTools(system) {
-    return this._resolveScopedUnion(system, this._toolScopeStore, 'tools', (corpus, record) =>
-      resolveToolScope(corpus, record.id, record.tools)
-    );
+    return this._resolveScopedUnion(system, this._toolScopeStore, 'tools');
   }
 
   /**
-   * The shared body of the three read unions: resolve the system, resolve the store, then memoize.
+   * The shared body of the three read unions: resolve the system, resolve the injected store, then
+   * hand both to the ONE implementation in `scopedEntityReads.js`.
+   *
+   * IT DELEGATES RATHER THAN MIRRORS, and that is load-bearing rather than tidy. This method used
+   * to carry its own `if (!record?.id) return []` branch and its own memo call; delegating only
+   * the BUILD would leave the manager spelling reallocating and blanking an id-less record while
+   * the module spelling passed every arm of the unknown-half rule. Both spellings answer the same
+   * object for the same input because there is only one body left.
    *
    * @param {object|string} system
    * @param {object|(() => object|null)|null} seam
    * @param {'components'|'essenceDefinitions'|'tools'} field
-   * @param {(corpus: object|null, system: object) => Array<object>} union
    * @returns {Array<object>}
    * @private
    */
-  _resolveScopedUnion(system, seam, field, union) {
+  _resolveScopedUnion(system, seam, field) {
     const record = typeof system === 'string' ? this.getSystem(system) : system;
-    if (!record?.id) return [];
-    const corpus = _resolveStoreSeam(seam)?.corpus?.() ?? null;
-    return getScopedDefinitionUnion(corpus, record[field], () => union(corpus, record));
+    return resolveScopedEntityRead(record, _resolveStoreCorpus(seam), field);
   }
 
   /**
@@ -3018,18 +3027,47 @@ export class CraftingSystemManager {
    * and a per-call O(components) allocation on the exact scan this issue exists to
    * bound. Callers must not mutate it.
    *
+   * ANSWERS THROUGH THE READ UNION since issue 1370, and the "live array" contract survives it:
+   * a world half that is absent, unloaded, empty or unreadable returns `system.components`
+   * ITSELF, and a world half that is present returns a memoized union whose identity is stable
+   * for as long as neither half changes.
+   *
    * @param {string} systemId
    * @returns {object[]}
    */
   getComponentsForSystem(systemId) {
-    const system = this.getSystem(systemId);
-    return Array.isArray(system?.components) ? system.components : [];
+    return this.resolveScopedComponents(this.getSystem(systemId));
   }
 
+  /**
+   * The essence definitions of a system.
+   *
+   * KEEPS ITS DEFENSIVE COPY (issue 1370). The read union's unknown-half passthrough answers the
+   * in-system array itself, which this spread then discards — deliberately, because the copy is a
+   * shipped contract of this accessor, no counter or memo depends on the identity it returns, and
+   * removing it would be a silent behaviour change to every caller that sorts or splices the
+   * answer.
+   *
+   * @param {string} systemId
+   * @returns {object[]}
+   */
   getEssenceDefinitions(systemId) {
-    const system = this.getSystem(systemId);
-    if (!system) return [];
-    return Array.isArray(system.essenceDefinitions) ? [...system.essenceDefinitions] : [];
+    return [...this.resolveScopedEssences(this.getSystem(systemId))];
+  }
+
+  /**
+   * The first-class tool library of a system, the tool-side twin of
+   * {@link getComponentsForSystem} (issue 1370).
+   *
+   * NEW WITH THE CONSUMER SWEEP. No tool accessor existed, so every tool reader held a system
+   * record and indexed `system.tools` directly; this is the one manager-side entry the sweep
+   * adds. Like the component accessor it returns the LIVE array when there is no world half.
+   *
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  getToolsForSystem(systemId) {
+    return this.resolveScopedTools(this.getSystem(systemId));
   }
 
   /**
@@ -3046,7 +3084,7 @@ export class CraftingSystemManager {
   getEssenceDefinition(systemId, essenceId) {
     const system = this.getSystem(systemId);
     if (!system || !essenceId) return null;
-    return findById(getDefinitionIndex(system.essenceDefinitions), essenceId);
+    return findById(getDefinitionIndex(this.resolveScopedEssences(system)), essenceId);
   }
 
   getRecipeItemDefinitions(systemId) {
@@ -3081,6 +3119,19 @@ export class CraftingSystemManager {
     );
   }
 
+  /**
+   * The authoring and browse accessor for a system's managed items.
+   *
+   * DELIBERATELY NOT REPOINTED at issue 1370. This is the surface the GM authors against and the
+   * one the world catalogue routes take over, so it answers the PERSISTED record rather than a
+   * merged read row: repointing it would have the manager offer a row for editing that no writer
+   * can save back. {@link getComponentsForSystem} is the repointed read accessor, and
+   * `GatheringEngine` moved onto it rather than onto this one.
+   *
+   * @param {string} systemId
+   * @param {string} [search]
+   * @returns {object[]}
+   */
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
@@ -4131,6 +4182,14 @@ export class CraftingSystemManager {
     const recipeJson = recipes.map((recipe) =>
       typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
     );
+    // DELIBERATELY NOT REPOINTED at issue 1370, and the consequence is stated rather than left to
+    // be discovered. This runs PRE-PERSIST, against the PROPOSED merged record: validating a
+    // not-yet-saved system against a union that does not yet contain it would validate the wrong
+    // subject. The engine-side twin in `CraftingEngine` IS repointed, so after the sweep the same
+    // alchemy uniqueness invariant is evaluated against the union at craft time and against the
+    // raw proposed array at authoring time. The read union's ROW SET is the in-system array's row
+    // set while `## CraftingSystem` requirement 36 holds, which is what keeps the two answers in
+    // agreement; a union that could resurrect a deleted row would make the divergence reachable.
     const components = Array.isArray(system.components) ? system.components : [];
     const validator = new SignatureValidator({
       getSystem: (id) => (id === systemId ? system : null),
@@ -5203,6 +5262,8 @@ export class CraftingSystemManager {
       // resolve via raw refs). Fresh ids are validated at creation/import.
       const flagKey = this._componentRoleFlagKey(system.id);
       if (!flagKey) continue;
+      // DELIBERATELY NOT REPOINTED at issue 1370: the subject of the restamp is the PERSISTED
+      // record whose durable identity is being repaired, not a merged read row.
       kinds.push({
         bucket: 'components',
         flagKey,
@@ -5215,6 +5276,8 @@ export class CraftingSystemManager {
       // via their own source references (owned copies through `resolveToolForItem`).
       const toolFlagKey = this._toolRoleFlagKey(system.id);
       if (toolFlagKey) {
+        // DELIBERATELY NOT REPOINTED at issue 1370, for the same reason as the component kind
+        // above.
         kinds.push({
           bucket: 'tools',
           flagKey: toolFlagKey,

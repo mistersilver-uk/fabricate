@@ -228,6 +228,35 @@ describe('readPooledHoldings — components', () => {
     assert.equal(reading.available, 4);
   });
 
+  it('reports an ID that answers in two systems as ambiguous AFTER the 1.30.0 re-key', async () => {
+    // ISSUE 1370 criterion 9, and the BEHAVIOUR here is unchanged while the FILE is not: this
+    // measurement is taken after `systemComponents` was repointed at the shared read seam.
+    //
+    // The id tier runs across EVERY system. Before `1.30.0` one real item authored in two systems
+    // had two DIFFERENT ids, so an id-keyed cost could only ever answer in one of them. The
+    // migration re-keys both in-system definitions to ONE world id, so the same read now answers
+    // in two - which is exactly why `companion-api`'s ambiguity obligation STANDS even though its
+    // stated reason ("a component id is not unique across crafting systems") is retracted. The two
+    // candidate systems still resolve DIFFERENT DOCUMENT SETS, because `findComponentItems` is
+    // system-scoped through the durable identity roles map.
+    const party = [makeActor('Idrin', { items: [new HeldItem('Ember Dust', { quantity: 4 })] })];
+
+    const beforeMigration = makeSystems();
+    const beforeReading = (
+      await read(party, [cost('component', 'ember', 1)], {}, beforeMigration)
+    ).readings[0];
+    assert.equal(beforeReading.ambiguous, false, 'two DIFFERENT ids, so only one system answered');
+
+    const afterMigration = makeSystems();
+    afterMigration[1].components[0].id = 'ember';
+    const afterReading = (
+      await read(party, [cost('component', 'ember', 1)], {}, afterMigration)
+    ).readings[0];
+    assert.equal(afterReading.ambiguous, true, 'ONE world id, so both member systems answer');
+    assert.equal(afterReading.componentId, 'ember');
+    assert.equal(afterReading.systemId, SMITHING, 'and the seam order still decides which wins');
+  });
+
   it('refuses ONE reading, not the call, for a name no system knows', async () => {
     const party = [makeActor('Idrin')];
 
