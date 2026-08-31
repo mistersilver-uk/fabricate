@@ -803,6 +803,61 @@ test('startAttempt rejects invalid timed task gate before waiting run creation',
   assert.deepEqual(calls.createWaitingRun, []);
 });
 
+// "No duration" is authoring, not misconfiguration. The editor persists an empty or
+// all-zero `timeRequirement` once a duration has been opened and cleared back to nothing,
+// and the engine used to read the mere PRESENCE of the key as "this task is timed" —
+// so it demanded a positive field, found none, and blocked the player on a task whose
+// configuration was entirely valid.
+for (const [label, timeRequirement] of [
+  ['an empty object', {}],
+  ['an all-zero object', { minutes: 0, hours: 0, days: 0, months: 0, years: 0 }]
+]) {
+  test(`startAttempt treats ${label} timeRequirement as an immediate task`, async () => {
+    const calls = {};
+    const engine = makeEngine({
+      environments: [environment({ tasks: [task({ id: 'zero-task', timeRequirement })] })],
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'zero-task' });
+
+    assert.equal(result.accepted, true, 'a task with no duration is not misconfigured');
+    assert.deepEqual(calls.createWaitingRun, [], 'and it resolves now rather than waiting');
+  });
+}
+
+test('a zero-duration task does not advertise a delay in the listing', async () => {
+  const engine = makeEngine({
+    environments: [environment({ tasks: [task({ id: 'zero-task', timeRequirement: {} })] })]
+  });
+
+  const listing = await engine.listForActor({ viewer, actor });
+  const [model] = listing.environments[0].tasks;
+
+  assert.equal(model.hasTimeRequirement, false);
+});
+
+test('startAttempt names the duration field it cannot use', async () => {
+  const calls = {};
+  const engine = makeEngine({
+    environments: [environment({
+      tasks: [task({ id: 'timed-task', timeRequirement: { days: -3 } })]
+    })],
+    calls
+  });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'timed-task' });
+
+  assert.equal(result.accepted, false);
+  assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+  assert.match(
+    result.blockedReasons[0].data.errors.join(' '),
+    /days/,
+    'the offending field is named so the GM can find it'
+  );
+  assert.deepEqual(calls.createWaitingRun, []);
+});
+
 test('non-GM blind hidden start response does not expose task identity or visibility details', async () => {
   const calls = {};
   const blindTask = task({

@@ -1779,7 +1779,7 @@ export class GatheringEngine {
         diagnostic: visibility.diagnostic ?? null,
       },
       resolutionMode: stringOrNull(task.resolutionMode),
-      hasTimeRequirement: Boolean(task.timeRequirement),
+      hasTimeRequirement: hasTimeRequirement(task),
       successChance:
         typeof this.richState?.taskSuccessChance === 'function'
           ? this.richState.taskSuccessChance(task, environment)
@@ -4369,8 +4369,11 @@ function validateTaskConfiguration(task, system = null) {
     }
   }
 
-  if (hasTimeRequirement(task) && !normalizeTimeRequirement(task.timeRequirement)) {
-    errors.push('Gathering time requirement must include at least one positive duration field');
+  const unusableDurations = unusableTimeRequirementFields(task?.timeRequirement);
+  if (unusableDurations.length > 0) {
+    errors.push(
+      `Gathering time requirement fields must be non-negative numbers: ${unusableDurations.join(', ')}`
+    );
   }
 
   if (task?.failureOutcome) {
@@ -4424,8 +4427,41 @@ function validateResultGroupNames(resultGroups) {
   return errors;
 }
 
+/**
+ * Whether a task actually takes time — i.e. carries at least one POSITIVE duration field.
+ *
+ * This used to ask only whether the `timeRequirement` key was present, which made an empty
+ * or all-zero object — exactly what the editor persists once a duration has been opened and
+ * cleared back to nothing — read as "this task is timed". Every consumer then drew the wrong
+ * conclusion: validation demanded a positive field and rejected the task as misconfigured,
+ * blocking the player on a shape that plainly means "no duration"; the start path routed an
+ * immediate task down the waiting branch; and the listing advertised a delay that never came.
+ * "No duration" is authoring, not misconfiguration, so it must resolve immediately.
+ *
+ * @param {?object} task
+ * @returns {boolean}
+ */
 function hasTimeRequirement(task) {
-  return task?.timeRequirement !== null && task?.timeRequirement !== undefined;
+  return normalizeTimeRequirement(task?.timeRequirement) !== null;
+}
+
+/**
+ * Duration fields a GM authored but that cannot be used — present and non-blank, yet not a
+ * finite non-negative number. An ABSENT or zero field is not one of these: it is the ordinary
+ * way to say "no duration". This is the only part of the old validation worth keeping, and it
+ * is what separates a typo worth reporting from an immediate task worth running.
+ *
+ * @param {?object} timeRequirement
+ * @returns {string[]} Offending field names.
+ */
+function unusableTimeRequirementFields(timeRequirement) {
+  if (!timeRequirement || typeof timeRequirement !== 'object') return [];
+  return ['minutes', 'hours', 'days', 'months', 'years'].filter((field) => {
+    const raw = timeRequirement[field];
+    if ([undefined, null, ''].includes(raw)) return false;
+    const value = Number(raw);
+    return !Number.isFinite(value) || value < 0;
+  });
 }
 
 /**
