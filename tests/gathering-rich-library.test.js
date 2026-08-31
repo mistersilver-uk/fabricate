@@ -560,7 +560,10 @@ test('paused gathering stays listable but marks tasks non-attemptable', async ()
 
 test('d100 resolution supports all-drops items and failure-with-event policy', async () => {
   const { service } = makeRichState({
-    rolls: [95, 25, 95],
+    // ONE roll for the attempt, then one per event: 95 clears both rows (thresholds 91
+    // and 21) and the second 95 clears the event's 91. The rows used to take a roll each,
+    // which is why this queue was three long.
+    rolls: [95, 95],
     config: {
       systems: {
         'system-a': {
@@ -597,6 +600,57 @@ test('d100 resolution supports all-drops items and failure-with-event policy', a
   assert.equal(calls.created.length, 0);
   assert.deepEqual(calls.terminal[0].payload.checkResult.events.map(row => row.id), ['event-snake']);
   assert.deepEqual(calls.terminal[0].payload.checkResult.items.map(row => row.id), ['drop-common', 'drop-rare']);
+});
+
+test('one d100 decides every drop row, while events roll independently', async () => {
+  const { service } = makeRichState({
+    // One attempt roll, then one per event. 50 clears the rare row's threshold of 21 but
+    // not the common row's 91, so the SAME number sorts the haul by rarity. The two
+    // events share a rate — and so a threshold — yet only the one handed 95 fires, which
+    // is only possible if they did not share the attempt's roll.
+    rolls: [50, 95, 5],
+    config: {
+      systems: {
+        'system-a': {
+          rules: {
+            rewardSelectionMode: 'allDrops',
+            eventSelectionMode: 'allDrops',
+            eventPolicy: 'successWithEvent'
+          },
+          tasks: [{
+            id: 'task-d100',
+            name: 'Forage',
+            dropRows: [
+              { id: 'drop-common', componentId: 'herb', quantity: 1, dropRate: 10 },
+              { id: 'drop-rare', componentId: 'root', quantity: 1, dropRate: 80 }
+            ]
+          }],
+          events: [
+            { id: 'event-a', name: 'Snakebite', dropRate: 10 },
+            { id: 'event-b', name: 'Rockfall', dropRate: 10 }
+          ]
+        }
+      }
+    }
+  });
+  const calls = {};
+  const engine = makeEngine({ richState: service, env: environment(), calls });
+
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-d100' });
+
+  assert.equal(result.accepted, true);
+  const { items, events } = calls.terminal[0].payload.checkResult;
+  assert.deepEqual(items.map(row => row.id), ['drop-rare'], 'only the row the one roll cleared');
+  assert.deepEqual(
+    [...new Set(items.map(row => row.roll))],
+    [50],
+    'every row was tested against the SAME attempt roll'
+  );
+  assert.deepEqual(
+    events.map(row => row.id),
+    ['event-a'],
+    'two events at one rate split, so they did not share the attempt roll'
+  );
 });
 
 test('d100 resolution applies system gathering rules over legacy task and environment fields', async () => {
