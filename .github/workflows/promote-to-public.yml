@@ -544,7 +544,15 @@ jobs:
           const prevPublic = process.env.PREV_PUBLIC || '';
           const repo = process.env.GITHUB_REPOSITORY;
 
-          const releases = JSON.parse(execSync(`gh api repos/${repo}/releases --paginate`, { encoding: 'utf8' }));
+          // `maxBuffer` is EXPLICIT because the default is not enough and silently kills the run.
+          // This listing carries every release's full changelog body, and the 179 legacy `v*-rc.*`
+          // prereleases keep theirs: it measured 1,286,324 bytes at 190 releases, past `execSync`'s
+          // 1 MiB default, which SIGTERMs the child and throws ENOBUFS. It only grows. Trimming the
+          // payload server-side is NOT the alternative: `--jq 'select(.draft)'` loses the promoted
+          // release's own body on a re-run after the un-draft, when it is no longer a draft, and gh
+          // refuses `--slurp` together with `--jq`. Keep this call on ONE line — the regression test
+          // in tests/promote-to-public-workflow.test.js matches it per line and fails loudly if not.
+          const releases = JSON.parse(execSync(`gh api repos/${repo}/releases --paginate`, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
           const tagVersion = (tag) => (typeof tag === 'string' && tag.startsWith('v') ? tag.slice(1) : tag);
           const majorMinor = (parsed) => `${parsed.major}.${parsed.minor}`;
 
