@@ -357,6 +357,7 @@
       role="tabpanel"
       aria-labelledby={`essence-tab-${activeTab}`}
       tabindex="-1"
+      data-keyboard-focus="true"
     >
       {#if activeTab === 'identity'}
         <EssenceIdentityTab

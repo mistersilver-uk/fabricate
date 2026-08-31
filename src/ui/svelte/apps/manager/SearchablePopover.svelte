@@ -460,6 +460,7 @@
       style={popoverStyle}
       role="dialog"
       tabindex="-1"
+      data-keyboard-focus="true"
       aria-label={dialogAriaLabel || undefined}
       use:portal={() => getPopoverHost()}
       onclick={stop}

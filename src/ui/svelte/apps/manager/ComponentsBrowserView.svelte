@@ -540,6 +540,7 @@
   <section
     class="manager-toolbar manager-component-toolbar"
     tabindex="-1"
+    data-keyboard-focus="true"
     data-component-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
   >

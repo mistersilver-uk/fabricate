@@ -278,6 +278,7 @@
         class="manager-editor-tab-panel manager-knowledge-panel"
         role="tabpanel"
         tabindex="-1"
+        data-keyboard-focus="true"
         bind:this={panelElement}
         id={`knowledge-panel-${activeTab}`}
         aria-labelledby={`knowledge-tab-${activeTab}`}

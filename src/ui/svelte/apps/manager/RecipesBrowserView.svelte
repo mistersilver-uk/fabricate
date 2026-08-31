@@ -445,6 +445,7 @@
   <section
     class="manager-toolbar manager-recipe-toolbar"
     tabindex="-1"
+    data-keyboard-focus="true"
     data-recipe-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
   >

@@ -265,6 +265,7 @@
   <section
     class="manager-toolbar manager-essence-toolbar"
     tabindex="-1"
+    data-keyboard-focus="true"
     data-essence-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}
   >
