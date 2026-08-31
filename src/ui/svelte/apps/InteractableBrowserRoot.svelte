@@ -327,7 +327,7 @@
                       'Place region only (no marker)'
                     )}
                   >
-                    <i class="fas fa-vector-square" aria-hidden="true"></i>
+                    <i class="fas fa-draw-polygon" aria-hidden="true"></i>
                   </button>
                 </div>
               </li>
@@ -392,7 +392,7 @@
                       'Place region only (no marker)'
                     )}
                   >
-                    <i class="fas fa-vector-square" aria-hidden="true"></i>
+                    <i class="fas fa-draw-polygon" aria-hidden="true"></i>
                   </button>
                 </div>
               </li>

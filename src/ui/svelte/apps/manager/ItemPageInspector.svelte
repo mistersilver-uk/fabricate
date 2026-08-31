@@ -133,7 +133,7 @@
 <div class="manager-books-scrolls-inspector" data-item-page-inspector>
   {#if !item}
     <div class="manager-inspector-empty" data-item-page-empty>
-      <i class="fas fa-book-sparkles" aria-hidden="true"></i>
+      <i class="fas fa-book" aria-hidden="true"></i>
       <p class="manager-muted">
         {text(
           'FABRICATE.Admin.Manager.BooksScrolls.SelectHint',

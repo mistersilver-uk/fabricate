@@ -180,6 +180,9 @@ const GATE_TARGETS = [
   'scripts/lib/fontAwesomeBundle.js',
   'scripts/lib/fontAwesomeCompatibility.js',
   'scripts/lib/fontAwesomeSmokeExpectations.js',
+  // The source licensing guard (issue 1290): the other half of the same rule, resolving what a
+  // COMPONENT writes rather than what the catalogue offers, against the same free oracle.
+  'scripts/lib/iconLicensing.js',
   'scripts/foundry-icon-bundle-assert.mjs',
   'scripts/generate-icon-catalogue.mjs',
   // The documentation screenshot generator (issue 958). Another maintainer-only entry point: it

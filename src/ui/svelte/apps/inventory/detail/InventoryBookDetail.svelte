@@ -195,7 +195,7 @@
     >
       <i
         class="fas"
-        class:fa-book-sparkles={learningRecipeId !== recipe.id}
+        class:fa-book={learningRecipeId !== recipe.id}
         class:fa-spinner={learningRecipeId === recipe.id}
         class:fa-spin={learningRecipeId === recipe.id}
         aria-hidden="true"

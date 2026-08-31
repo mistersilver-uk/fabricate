@@ -88,9 +88,10 @@
         {/each}
       </div>
       <!--
-        The design leads this footnote with `fa-sparkles`, a Font Awesome PRO name that
-        renders 0x0 in FA Free — the prototype itself draws nothing there, and Foundry
-        ships Free too. `fa-wand-magic-sparkles` is the Free glyph closest to the intent.
+        The design leads this footnote with `sparkles`, a Font Awesome PRO name that renders
+        0x0 in FA Free — the prototype itself draws nothing there, and Foundry ships Free too.
+        `fa-wand-magic-sparkles` is the Free glyph closest to the intent. The Pro name is
+        written without the `fa-` class prefix that would make it a reference in code.
       -->
       <p class="downtime-board-note" data-downtime-board-note>
         <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>

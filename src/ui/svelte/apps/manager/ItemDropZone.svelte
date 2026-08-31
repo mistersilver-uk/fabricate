@@ -34,7 +34,7 @@
     title = '',
     hint = '',
     subline = '',
-    emptyIcon = 'fas fa-arrow-down-to-bracket',
+    emptyIcon = 'fas fa-download',
     kind = '',
     documentType = 'Item',
     state = 'linked',
