@@ -14,7 +14,7 @@ Make behavior changes here, not in the bindings.
 - current git diff
 - changed source files
 - existing docs for the affected area
-- `openspec/specs/design-system/spec.md` and its `library.html` companion when the change added or altered a shared primitive, so the entry and its specimen stay in step with what shipped
+- `openspec/specs/design-system/spec.md` for the rules the shared primitive set obeys, and `library.html` plus `scripts/lib/designSystemPrimitives.json` when the change added or altered a shared primitive, so the specimen and its manifest row stay in step with what shipped
 - the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)
 
 ## Scope

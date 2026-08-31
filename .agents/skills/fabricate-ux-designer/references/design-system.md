@@ -7,10 +7,13 @@ attribute chooses which of the six themes is live.
 Build to this reference and the output drops into either app and reskins with every theme.
 
 > **The `design-system` capability is the authority on the primitive set.**
-> `openspec/specs/design-system/spec.md` is the canonical, versioned record of WHICH shared
-> primitives exist, their geometry ladders, their Svelte APIs, the rules that route a
-> near-neighbour case, and the screen recipes; `openspec/specs/design-system/library.html`
-> renders every one of them.
+> `openspec/specs/design-system/spec.md` is the canonical, versioned record of the rules the
+> shared primitive set obeys: the two-caller membership bar, the geometry ladders, the Svelte
+> APIs, the rules that route a near-neighbour case, and the screen recipes.
+> The set itself is enumerated in `openspec/specs/design-system/library.html`, one primitive
+> per `div.spec-head > h4` heading, which also renders each at its geometry.
+> `scripts/lib/designSystemPrimitives.json` is the machine-readable half, one row per shipped
+> primitive.
 > Where this document and that capability disagree, the capability wins.
 > This file remains the working reference for theming architecture, the two token layers, and
 > the shipped inventory as it stands.

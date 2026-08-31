@@ -24,7 +24,7 @@ The driver honours it only from a lane with zero commits, an empty `git status -
 - the work's GitHub issue and its `openspec-delta` block, via `gh issue view`
 - relevant `openspec/specs/`, `src/`, and `tests/` files
 - `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, API shape, or test seams
-- `openspec/specs/design-system/spec.md` BEFORE writing any UI code when the task changes `src/ui/**`, `styles/**`, or any `*.svelte` — reuse the primitive that owns the meaning, extend it with a prop when it lacks the behaviour, and add a new primitive only with two or more independent callers, updating that capability and `openspec/specs/design-system/library.html` in the same change
+- `openspec/specs/design-system/spec.md` BEFORE writing any UI code when the task changes `src/ui/**`, `styles/**`, or any `*.svelte` — reuse the primitive that owns the meaning, extend it with a prop when it lacks the behaviour, and add a new primitive only with two or more independent callers, adding its specimen to `openspec/specs/design-system/library.html` and, once it ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change
 - `.agents/skills/fabricate-ux-designer/references/design-system.md` for the `--fab-*` token, theming-architecture and shipped-inventory reference; where it and the `design-system` capability disagree, the capability wins
 - current git diff when continuing existing work
 - the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)

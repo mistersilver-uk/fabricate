@@ -142,7 +142,7 @@
       "path": "src/ui/svelte/apps/manager/ToggleCard.svelte",
       "library": null,
       "evidence": "broad",
-      "why": "A titled card wrapping a binary control (7 callers). `<Toggle>` (`library.html:595`) is the bare control and `<Card>` (`:941`) is the container, so a card-plus-toggle is a COMPOSITION of two entries under `spec.md:28` rather than an entry itself. Recorded here because it SHIPS with seven callers; whether the set should contain it is the conformance change's question."
+      "why": "A titled card wrapping a binary control (7 callers). `<Toggle>` (`library.html:595`) is the bare control and `<Card>` (`:941`) is the container, so a card-plus-toggle is a COMPOSITION of two entries under spec.md requirement \"The primitive set is a closed, versioned vocabulary\" rather than an entry itself. Recorded here because it SHIPS with seven callers; whether the set should contain it is the conformance change's question."
     },
     {
       "path": "src/ui/svelte/components/ChanceSlider.svelte",

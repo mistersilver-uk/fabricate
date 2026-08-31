@@ -27,8 +27,9 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 
 ## Required context
 
-- `openspec/specs/design-system/spec.md` FIRST for any visual or component work — the canonical primitive set, its geometry ladders, its Svelte APIs, the near-neighbour routing rules, and the browse/editor/player screen recipes
-- `openspec/specs/design-system/library.html` — the visual companion rendering every primitive at that geometry; open it in a browser when a written value needs to be seen rather than read
+- `openspec/specs/design-system/spec.md` FIRST for any visual or component work — the rules the canonical primitive set obeys, its geometry ladders, its Svelte APIs, the near-neighbour routing rules, and the browse/editor/player screen recipes
+- `openspec/specs/design-system/library.html` — where the set ITSELF is enumerated, one primitive per `div.spec-head > h4` heading, each rendered at its canonical geometry; open it in a browser when a written value needs to be seen rather than read
+- `scripts/lib/designSystemPrimitives.json` — the machine-readable half of that enumeration, one row per shipped primitive keyed on the implementation path a diff names
 - `openspec/specs/ui-integration/spec.md` next, then other UI-related specs as needed
 - `.agents/skills/fabricate-ux-designer/references/design-system.md` — the `--fab-*` token, theming-architecture and shipped-inventory reference; where it and the `design-system` capability disagree, the capability wins
 - `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md` — the mandatory reference matrix, reuse-inventory, provenance, and maintainer-manual-evidence procedure for non-trivial UI work
@@ -45,7 +46,7 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 4. Route every control in the proposal through the design system before designing anything new: **reuse** the primitive that owns the meaning, **extend** it with a prop when it lacks the behaviour, and **add** a primitive only when neither holds and two or more independent callers justify it.
 Cite the entry you relied on, by name, in the recommendation.
 A proposal that introduces a control the set already covers is a finding against the proposal.
-When the work genuinely does add a primitive, the same change adds its entry to `openspec/specs/design-system/spec.md` and its specimen to `openspec/specs/design-system/library.html`; a candidate that decomposes into existing members goes to that capability's ruled-out register instead.
+When the work genuinely does add a primitive, the same change adds its specimen to `openspec/specs/design-system/library.html` and, once the primitive ships, its row to `scripts/lib/designSystemPrimitives.json`; a candidate that decomposes into existing members goes to that capability's ruled-out register instead.
 5. For non-trivial UI work, open every supplied prototype, screenshot, defect matrix, named sibling, and CSS record, then complete the per-control/state reference matrix and `Reference surfaces / reuse inventory` before approval.
 6. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
 7. If no live dev session is available, generate fresh frames yourself with the **View Lab** — it is the default producer and needs no container, no driver hand-off, and no Docker: `node scripts/view-lab-screenshots.mjs apps <comma-separated-case-ids>` writes PNGs into `ui-screenshot-artifact/apps/` in seconds (one case ~22s, five ~36s), and `ui-screenshot-artifact/apps/index.html` browses them grouped by screen with a multi-tag filter.

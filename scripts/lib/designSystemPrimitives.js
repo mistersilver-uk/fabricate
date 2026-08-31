@@ -4,11 +4,26 @@
  * The machine-readable half of the `design-system` capability: one row per shared UI primitive,
  * keyed on the implementation path a diff names.
  *
- * `openspec/specs/design-system/spec.md` says the shared primitive set "MUST be the set enumerated
- * in this capability" and that a primitive enters it by "adding its entry to this capability". The
- * prose states the rule; it enumerates nothing. The vocabulary lives only in `library.html`, as
- * names inside its `div.spec-head > h4` blocks, which no gate and no script can consult. This
- * module is the enumeration those sentences point at.
+ * `openspec/specs/design-system/spec.md` states the rules and enumerates nothing; the vocabulary
+ * lives in `library.html`, as names inside its `div.spec-head > h4` blocks. Neither of them carries
+ * the correspondence between a name and the file that implements it, which is what a diff needs to
+ * be attributed to a primitive. This module is that correspondence, and
+ * `tests/design-system-coverage.test.js` reads it against the library so the two cannot describe
+ * different vocabularies without failing.
+ *
+ * HOW THIS FILE CITES `spec.md`
+ * -----------------------------
+ * By REQUIREMENT HEADING — the words `spec.md requirement` followed by the heading in double quotes
+ * — and never by line number. Line citations here rotted the first time anything was inserted above
+ * them: issue 1383 added six lines to the Purpose and the vocabulary requirement, and every one of
+ * this module's eight `spec.md:NNN` citations then pointed at prose that said something else.
+ * Nothing caught it, because a line number cannot be resolved. A heading can, and
+ * `tests/design-system-coverage.test.js` resolves every one of these against `spec.md`'s own
+ * `### Requirement:` headings.
+ *
+ * The notation is scoped to the `design-system` capability — that is the only spec it resolves
+ * against — so do not write it with another capability's prefix. That guard reds on one rather
+ * than answering it from the wrong document; cite another capability by some other form.
  *
  * WHY THIS IS A MODULE IN `scripts/lib/` AND NOT A LIST IN `tests/`
  * -----------------------------------------------------------------
@@ -125,11 +140,12 @@
  *
  * ── THE MEMBERSHIP BAR ─────────────────────────────────────────────────────────────────────────
  *
- * `spec.md:29` — two or more INDEPENDENT callers. An importer is any other file under `src/` that
- * imports the component by path. Six ADJUDICATED candidates fall below the bar and are recorded in
- * {@link NOT_A_PRIMITIVE} rather than omitted, because `spec.md:30` requires a candidate with fewer
- * to be "recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the
- * absence is a decision rather than an oversight".
+ * spec.md requirement "The primitive set is a closed, versioned vocabulary" — two or more
+ * INDEPENDENT callers. An importer is any other file under `src/` that imports the component by
+ * path. Six ADJUDICATED candidates fall below the bar and are recorded in {@link NOT_A_PRIMITIVE}
+ * rather than omitted, because that same requirement obliges a candidate with fewer to be "recorded
+ * as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a
+ * decision rather than an oversight".
  *
  * ADJUDICATED is the bound, and it is load-bearing: 48 top-level files under `apps/manager/` sit
  * below the two-caller bar, and {@link NOT_A_PRIMITIVE} is emphatically not a list of all of them.
@@ -227,9 +243,10 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
 /**
  * ADJUDICATED candidates that sit in a primitive directory and are NOT members of the set.
  *
- * Recorded rather than omitted because `spec.md:30` requires it: a candidate below the two-caller
- * bar is "recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so
- * the absence is a decision rather than an oversight, and so a later reader can re-test the count
+ * Recorded rather than omitted because the capability requires it: per spec.md requirement "The
+ * primitive set is a closed, versioned vocabulary", a candidate below the two-caller bar is
+ * "recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the
+ * absence is a decision rather than an oversight, and so a later reader can re-test the count
  * rather than re-derive it".
  *
  * ── WHAT BELONGS HERE, AND WHY IT IS NOT EVERY NON-MEMBER IN THE DIRECTORY ─────────────────────
@@ -240,7 +257,8 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * mounted-harness hang guard. It is NOT a census of the directory. 48 of the 72 top-level files
  * under `apps/manager/` sit below the two-caller bar, and `components/` holds screen regions and
  * dead code besides; listing all of them would bury the six judgements that were actually made in
- * dozens that were not, and `spec.md:30` asks for recorded DECISIONS, not for an inventory.
+ * dozens that were not, and the requirement cited above asks for recorded DECISIONS, not for an
+ * inventory.
  *
  * So the next reader has two wrong moves available and neither is what this list wants: adding the
  * other 47 manager files, and deleting `InspectorActionButton` as inconsistent with them. The
@@ -264,17 +282,18 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
 export const NOT_A_PRIMITIVE = frozenTable(MANIFEST.notAPrimitive);
 
 /**
- * The ruled-out register, mirroring `spec.md:586-597` and `library.html:1802-1818`.
+ * The ruled-out register, mirroring spec.md requirement "The ruled-out register is part of the
+ * specification" and `library.html:1802-1818`.
  *
- * Part of the specification, not commentary: `spec.md:588` requires declined candidates to be
- * recorded with the reasoning that declined them "so that the absence of a primitive is legible as
- * a decision", and `spec.md:599` says a re-proposal must address the recorded reasoning and,
- * absent new evidence, use the composition instead.
+ * Part of the specification, not commentary: that requirement has declined candidates recorded
+ * with the reasoning that declined them "so that the absence of a primitive is legible as a
+ * decision", and has a re-proposal address that reasoning and, absent new evidence, use the
+ * composition instead.
  *
  * GUARDED, because a hand-typed mirror shipped inside a change whose thesis is that unguarded
  * mirrors rot would be self-refuting. `tests/design-system-primitives.test.js` checks every `name`
  * against `library.html`, the same spelling guard the `library` column gets. `library.html` is the
- * only anchor: `spec.md:586-597` states the same ten judgements in PROSE ("a member row", "an actor
+ * only anchor: the requirement states the same ten judgements in PROSE ("a member row", "an actor
  * picker") and contains none of these names as a token, so a guard pointed there would be a guard
  * that could only be satisfied by rewriting the specification. What is asserted is spelling, not
  * that the verdict recorded here is the verdict recorded there — the conformance gate that reads
