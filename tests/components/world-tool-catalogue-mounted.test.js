@@ -20,6 +20,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -42,6 +43,12 @@ const harness = createMountedComponentHarness({
     'src/systems/scopedDefinitionStore.js',
     'src/systems/scopedDefinitions.js',
     'src/systems/toolScope.js',
+    // THE DROP ZONE'S TWO LEAVES (issue 1373). The catalogue now renders `ItemDropZone`, whose
+    // `use:dragDrop` action and `resolveDropUuid` helper are ordinary modules: a compiled child
+    // missing from this list does not fail loudly, it HANGS, and `node --test` reports the
+    // whole suite as `# cancelled` with no message.
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
@@ -58,6 +65,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
@@ -205,6 +213,102 @@ describe('world Tools Catalogue (issue 1373)', () => {
       'and it counts only the system whose AUTHORED token DIFFERS: a system that authored the ' +
         'same token the world did is unaffected by a world change either way'
     );
+  });
+
+  // ── THE CREATION SURFACE MOVED HERE (issue 1373) ───────────────────────────────────────
+  //
+  // The design opens this list with `Drag an Item here to make it a Tool`, and puts NO such
+  // zone on the system Tool Rules list. Ours had it exactly inverted. These cases are the
+  // BEHAVIOURAL half of the move - the system route's own tests now assert the zone's absence
+  // there, and asserting only that would leave the control untested at the moment it moved.
+  describe('the create-from-drop zone', () => {
+    it('raises a world-sidebar Item payload to the page owner, RAW', async () => {
+      const dropped = [];
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: SYSTEMS,
+        actions: {},
+        onCreateFromItemDrop: (data) => dropped.push(data),
+      });
+      const zone = target.querySelector('[data-item-drop-zone="tool-create"]');
+      assert.ok(Boolean(zone), 'the world catalogue carries the creation zone');
+
+      dispatchDrop(zone, { type: 'Item', uuid: 'Item.hammer' });
+      assert.deepEqual(
+        dropped,
+        [{ type: 'Item', uuid: 'Item.hammer' }],
+        'the RAW payload reaches the owner: resolution needs a Foundry seam no page can hold'
+      );
+    });
+
+    it('raises a COMPENDIUM payload, which carries no `uuid` at all', async () => {
+      // The common case for module-shipped content, and the one a `data.uuid` guard silently
+      // refuses. `ItemDropZone` resolves `{pack, id}` before it decides, so the zone is not
+      // stricter than the consumer it feeds.
+      const dropped = [];
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: SYSTEMS,
+        actions: {},
+        onCreateFromItemDrop: (data) => dropped.push(data),
+      });
+      dispatchDrop(target.querySelector('[data-item-drop-zone="tool-create"]'), {
+        type: 'Item',
+        pack: 'fabricate.items',
+        id: 'pick',
+      });
+      assert.equal(dropped.length, 1);
+      assert.equal(dropped[0].pack, 'fabricate.items');
+    });
+
+    it('refuses every non-Item payload', async () => {
+      const dropped = [];
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: SYSTEMS,
+        actions: {},
+        onCreateFromItemDrop: (data) => dropped.push(data),
+      });
+      dispatchRejectedDrops(target.querySelector('[data-item-drop-zone="tool-create"]'));
+      assert.equal(dropped.length, 0, 'an Actor, a Macro or a Folder never makes a Tool');
+    });
+  });
+
+  // ── THE WORLD MASTER SWITCH ON THE ROW (issue 1373) ────────────────────────────────────
+  describe('the row master switch', () => {
+    it('draws ON for a record that has never authored the flag', async () => {
+      const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      const toggle = target.querySelector('[data-world-tool-row-enabled="hammer"]');
+      assert.ok(Boolean(toggle), 'every world tool row carries the switch');
+      assert.equal(
+        toggle.getAttribute('aria-pressed'),
+        'true',
+        'ABSENT reads as enabled, so no existing world sees its Tools drawn off'
+      );
+    });
+
+    it('draws OFF and writes the INVERSE through the tool-family action', async () => {
+      const calls = [];
+      const target = await harness.mount({
+        scope: projectWorldScopeEntity({
+          entityType: 'tool',
+          corpus: {
+            ...corpus(),
+            defaults: [
+              { id: 'hammer', enabled: false, breakage: { mode: 'limitedUses', maxUses: 2 } },
+              { id: 'orphan' },
+            ],
+          },
+          systems: SYSTEMS,
+        }),
+        systems: SYSTEMS,
+        actions: { setWorldEnabled: (id, enabled) => calls.push([id, enabled]) },
+      });
+      const toggle = target.querySelector('[data-world-tool-row-enabled="hammer"]');
+      assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+      toggle.click();
+      assert.deepEqual(calls, [['hammer', true]], 'the click writes the OPPOSITE of what is drawn');
+    });
   });
 
   it('forwards the chosen world authority to the tool-family write action', async () => {

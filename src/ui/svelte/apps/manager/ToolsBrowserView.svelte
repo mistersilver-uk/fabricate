@@ -4,7 +4,6 @@
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ItemDropZone from './ItemDropZone.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
   import {
     breakModeSourcePill,
@@ -15,6 +14,12 @@
   let {
     tools = [],
     selectedToolId = '',
+    // THE WORLD TOOL SELECTED THAT THIS SYSTEM HAS NO RULES RECORD FOR. It is a second id
+    // rather than a widening of `selectedToolId`, because that one is derived from the OPEN
+    // TOOL DRAFT and an unadopted Tool has no draft to be derived from. Held by the root,
+    // because the inspector it fills is rendered by the shell's aside rather than by this
+    // view; see `selectLibraryTool` there.
+    selectedUnadoptedToolId = '',
     managedItemOptions = [],
     breakageAuthority = 'toolSpecific',
     // THE WORLD SCOPE'S OWN PROJECTION and the AUTHORING LAYER of the resolved token above
@@ -40,13 +45,12 @@
     breakageSource = 'default',
     onSelectTool = () => {},
     onEditTool = () => {},
-    // STILL DECLARED, and the drop zone it feeds is still on this screen. The prototype
-    // creates a Tool from the WORLD catalogue instead, and moving it is not a layout move:
-    // world-scope creation needs the dropped Item RESOLVED to a name, image and uuid, which
-    // only `services.resolveToolSource` answers, and `worldScopeActions` deliberately reads
-    // no Foundry global. Removing the zone before that action exists would delete the only
-    // Tool-creation surface in the manager, so the inversion is reported rather than half-made.
-    onCreateToolDrop = () => {},
+    // NO `onCreateToolDrop`, AND NO DROP ZONE. Creation moved to the WORLD Tools Catalogue,
+    // which is where the design puts it and where it belongs: a Tool is one world record every
+    // system adopts, and this screen can only ever author RULES for a record the world already
+    // holds. `WorldToolCataloguePage` carries the zone now, and the root resolves the dropped
+    // Item through `services.resolveToolSource` before creating the world entity - the seam
+    // that did not exist when the zone was parked here.
     onToggleToolEnabled = () => {},
     onSetBreakageAuthority = () => {},
   } = $props();
@@ -109,6 +113,25 @@
       ])
     )
   );
+
+  /**
+   * How many of THIS system's recipes require one Tool.
+   *
+   * READ OFF THE PROJECTION'S PER-SYSTEM ROW, never counted here. `adminStore` walks every
+   * recipe in every system once per publish - across a recipe's top-level `toolIds`, each
+   * ingredient set's, and both again per step - and keys the answer by `(tool, system)`. This
+   * screen has no recipe corpus at all, so counting here would mean threading one in and
+   * recounting it per row on every re-render.
+   *
+   * `0` for a world Tool this system has no rules for is a real answer rather than a fallback:
+   * a recipe here cannot reference a Tool the system is not a member of.
+   *
+   * @param {string} toolId
+   * @returns {number}
+   */
+  function recipeCount(toolId) {
+    return Number(worldRowsByToolId.get(String(toolId || ''))?.recipeCount) || 0;
+  }
 
   /**
    * What one row says about its relationship to the world defaults, or `null` when the world
@@ -245,7 +268,25 @@
     if (pageIndex > 0 && pageIndex * pageSize >= filteredTools.length) pageIndex = 0;
   });
 
+  /**
+   * Whether one row is the inspected one, across BOTH selection kinds.
+   *
+   * @param {string} toolId
+   * @returns {boolean}
+   */
+  function rowSelected(toolId) {
+    return selectedUnadoptedToolId ? selectedUnadoptedToolId === toolId : selectedToolId === toolId;
+  }
+
   $effect(() => {
+    // A DELIBERATE UNADOPTED SELECTION SUPPRESSES THE AUTO-SELECT. Without this the effect
+    // sees an id that is not in `tools`, decides nothing is selected, and re-selects the first
+    // adopted Tool - which would snap the panel away from the row the GM just clicked, on the
+    // one row whose whole purpose is the `Add {tool} to {system}` action.
+    if (selectedUnadoptedToolId) {
+      autoSelectedToolId = '';
+      return;
+    }
     if (tools.some((tool) => tool.id === selectedToolId)) {
       autoSelectedToolId = '';
       return;
@@ -257,20 +298,18 @@
   });
 
   /**
-   * Select a row, IF it is one this screen's inspector can describe.
+   * Select a row, ADOPTED OR NOT.
    *
-   * A world Tool with no rules record here is listed so a GM can adopt it, but the inspector
-   * beside the list is fed `selectedLibraryTool` - a lookup over THIS system's tools - so
-   * selecting an unadopted row would empty the panel rather than describe the row. The
-   * prototype's inspector answers that state with a `No rules here` pill, which needs the
-   * membership flag and the system name at the inspector's call site; until it has them the
-   * row's own `Add to system` button is the whole affordance.
+   * It used to refuse a world Tool with no rules record here, because the inspector was fed
+   * `selectedLibraryTool` alone - a lookup over THIS system's tools - so selecting one emptied
+   * the panel rather than describing the row. The panel now takes the world entry too and
+   * answers that state with the design's `No rules here` pill and its `Add {tool} to {system}`
+   * action, so refusing the click would withhold the one affordance the row exists for.
    *
-   * @param {{id: string, member: boolean}} entry
+   * @param {{id: string}} entry
    * @returns {void}
    */
   function chooseTool(entry) {
-    if (!entry.member) return;
     onSelectTool(entry.id);
   }
 
@@ -446,19 +485,6 @@
       <span class="manager-tools-result-summary" data-tool-result-count>{resultCountText}</span>
     </div>
 
-    <ItemDropZone
-      kind="tool-create"
-      title={text(
-        'FABRICATE.Admin.Manager.Tools.CreateDropTitle',
-        'Drag an Item here to make it a Tool'
-      )}
-      hint={text(
-        'FABRICATE.Admin.Manager.Tools.CreateDropHint',
-        'Drop an Item from the Items directory or a compendium.'
-      )}
-      onDrop={onCreateToolDrop}
-    />
-
     <section class="manager-tools-library-card" data-manager-tools-browser>
       <div class="manager-tools-library-scroll" data-tool-library-scroll>
         {#if tools.length === 0}
@@ -466,8 +492,8 @@
             icon="fas fa-screwdriver-wrench"
             title={text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}
             hint={text(
-              'FABRICATE.Admin.Manager.Tools.EmptyHintDrop',
-              'Create an unlinked Tool or drop an Item above.'
+              'FABRICATE.Admin.Manager.Tools.EmptyHintWorld',
+              'Add a Tool from the world Tools Catalogue, where Tools are created.'
             )}
             dataAttr="data-tool-library-empty"
           />
@@ -484,7 +510,7 @@
               {@const inherit = inheritState(entry.id)}
               <article
                 class="manager-tools-row"
-                class:is-selected={selectedToolId === entry.id}
+                class:is-selected={rowSelected(entry.id)}
                 class:is-unadopted={!entry.member}
                 data-manager-tool-id={entry.id}
                 data-tool-row-member={entry.member ? 'member' : 'absent'}
@@ -493,8 +519,7 @@
                 <button
                   type="button"
                   class="manager-tools-select-target"
-                  aria-pressed={selectedToolId === entry.id}
-                  disabled={!entry.member}
+                  aria-pressed={rowSelected(entry.id)}
                   onclick={() => chooseTool(entry)}
                 >
                   <img src={entry.img} alt="" />
@@ -552,6 +577,18 @@
                   </span>
                 </button>
                 <div class="manager-tools-library-actions">
+                  <!-- HOW MANY RECIPES HERE REQUIRE IT, which is the fact the design ends this
+                       row with. It sits before the action rather than among the chips because
+                       it is not a property of the Tool: it is how much of this system leans on
+                       it, and it is the number a GM checks before disabling or removing one. -->
+                  <span class="manager-tools-row-recipes" data-tool-row-recipes={entry.id}>
+                    <strong>{recipeCount(entry.id)}</strong>
+                    <small
+                      >{recipeCount(entry.id) === 1
+                        ? text('FABRICATE.Admin.Manager.Tools.RowRecipeOne', 'Recipe')
+                        : text('FABRICATE.Admin.Manager.Tools.RowRecipeCount', 'Recipes')}</small
+                    >
+                  </span>
                   {#if entry.member}
                     <!--
                       THE TOGGLE STAYS, AND THE PROTOTYPE'S `Enabled` PILL IS THEREFORE NOT
@@ -686,6 +723,32 @@
      The SELECT is the one exception, and its own block says why: a translucent background on
      a `<select>` opens a light native popup, so it inherits the shipped opaque fill instead
      of the design's composited one. */
+  /* THE PER-ROW RECIPE COUNT, stacked as a figure over its unit exactly as the design draws
+     it: the number is what a GM scans down the column, and the word beneath it is what tells
+     them what the number counts. Right-aligned so the figures line up row to row. */
+  .manager-tools-row-recipes {
+    display: inline-flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.1;
+    text-align: right;
+  }
+
+  .manager-tools-row-recipes strong {
+    color: var(--fab-mv2-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .manager-tools-row-recipes small {
+    color: var(--fab-mv2-text-muted);
+    font-size: 0.52rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
   .manager-tools-membership-filter {
     display: flex;
     flex: 0 1 auto;

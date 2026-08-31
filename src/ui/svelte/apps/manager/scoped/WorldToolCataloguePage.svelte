@@ -51,6 +51,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
   import IconFactRow from '../IconFactRow.svelte';
+  import ItemDropZone from '../ItemDropZone.svelte';
   import { toolBreakageSummary, toolOnBreakSummary } from '../tools/toolStudio.js';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import {
@@ -61,7 +62,23 @@
     worldToolSorts,
   } from './worldToolStudio.js';
 
-  let { scope = null, actions = null, systems = [], onOpenEntry = () => {} } = $props();
+  let {
+    scope = null,
+    actions = null,
+    systems = [],
+    onOpenEntry = () => {},
+    // CREATE A WORLD TOOL FROM A DROPPED ITEM. The zone is on THIS screen because a Tool is a
+    // world record: it exists once, every system adopts the same one, and the system Tool
+    // Rules list — which is where the zone used to live — can only ever author RULES for a
+    // record the world already holds.
+    //
+    // The resolution is the SHELL's, not this page's. Turning a dropped payload into
+    // `{name, img, description, originItemUuid}` needs `services.resolveToolSource`, which
+    // reads a Foundry global; `worldScopeActions` deliberately reads none, and a page cannot
+    // reach the services bag. So the page raises the raw drag data and the root resolves,
+    // creates and navigates.
+    onCreateFromItemDrop = () => {},
+  } = $props();
 
   // INITIALISED, and that is not optional: `EntityCatalogueShell` declares `selectedId` as a
   // bindable prop, and Svelte 5 THROWS `props_invalid_value` when a bindable prop has a setter
@@ -290,64 +307,104 @@
 </script>
 
 <main class="manager-main" data-scoped-page="world-tools" aria-label={catalogueTitle}>
-  <section class="manager-inspector-card manager-world-tool-break-card" data-world-tool-break-mode>
-    <div class="manager-world-tool-break-head">
-      <i class="fas fa-sliders" aria-hidden="true"></i>
-      <span class="manager-world-tool-break-title"
-        >{text('FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle', 'World breakage default')}</span
-      >
-      {#if overridesKnown}
-        <span class="manager-world-tool-break-count" data-world-tool-break-overrides>
-          {format(
-            overrideCount === 1
-              ? 'FABRICATE.Admin.Manager.Tools.WorldAuthorityOverrideOne'
-              : 'FABRICATE.Admin.Manager.Tools.WorldAuthorityOverrideCount',
-            overrideCount === 1 ? '{count} system overrides it' : '{count} systems override it',
-            { count: overrideCount }
-          )}
-        </span>
-      {/if}
-    </div>
-    <div
-      class="manager-world-tool-break-segments"
-      role="radiogroup"
-      aria-label={text(
-        'FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle',
-        'World breakage default'
-      )}
+  <!--
+    THE SCOPE BAND: the world break mode and the creation surface, side by side.
+
+    == WHY THEY SHARE A ROW, WHICH IS NOT WHERE THE DESIGN DRAWS THE ZONE ====================
+    The design opens the LIST with the dashed zone, immediately under the toolbar.
+    `EntityListInspectorFrame` takes no before-rows snippet and both shared shells are closed to
+    this lane, so the zone can only be a sibling of the shell - and stacked ABOVE it as its own
+    band it costs the column 86px, which is measured rather than guessed: the View Lab reported
+    `[data-world-tool-defaults] is clipped or extends outside [data-scoped-list-inspector]` on
+    the first render of the stacked version, because the shell's inspector floors its roster at
+    120px and pins its lane panel at `flex: 0 0 auto`, so the panel a GM reads the world
+    defaults in was pushed below the fold.
+
+    Sharing the row with a card that is already taller than the zone costs the column NOTHING,
+    which is what keeps the inspector intact. Both are page-level statements rather than list
+    rows, so the band reads as one: what breakage means for every Tool, and how a new Tool is
+    made. Moving the zone INTO the list is a shell prop, not a page change, and belongs to
+    whichever lane next opens those two files.
+  -->
+  <div class="manager-world-tool-scope-band">
+    <section
+      class="manager-inspector-card manager-world-tool-break-card"
+      data-world-tool-break-mode
     >
-      {#each breakModeOptions as option (option.value)}
-        <label class:is-selected={option.selected} data-world-tool-break-segment={option.value}>
-          <input
-            type="radio"
-            name="world-tool-breakage-authority"
-            value={option.value}
-            checked={option.selected}
-            onchange={() => actions?.setWorldToolBreakage?.(option.value)}
-          />
-          <span class="manager-world-tool-break-option">
-            <i class={option.icon} aria-hidden="true"></i>
-            <span>{option.label}</span>
+      <div class="manager-world-tool-break-head">
+        <i class="fas fa-sliders" aria-hidden="true"></i>
+        <span class="manager-world-tool-break-title"
+          >{text(
+            'FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle',
+            'World breakage default'
+          )}</span
+        >
+        {#if overridesKnown}
+          <span class="manager-world-tool-break-count" data-world-tool-break-overrides>
+            {format(
+              overrideCount === 1
+                ? 'FABRICATE.Admin.Manager.Tools.WorldAuthorityOverrideOne'
+                : 'FABRICATE.Admin.Manager.Tools.WorldAuthorityOverrideCount',
+              overrideCount === 1 ? '{count} system overrides it' : '{count} systems override it',
+              { count: overrideCount }
+            )}
           </span>
-        </label>
-      {/each}
-    </div>
-    <!-- WHAT THE SELECTED MODE MEANS, not a sentence naming the segment already highlighted
+        {/if}
+      </div>
+      <div
+        class="manager-world-tool-break-segments"
+        role="radiogroup"
+        aria-label={text(
+          'FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle',
+          'World breakage default'
+        )}
+      >
+        {#each breakModeOptions as option (option.value)}
+          <label class:is-selected={option.selected} data-world-tool-break-segment={option.value}>
+            <input
+              type="radio"
+              name="world-tool-breakage-authority"
+              value={option.value}
+              checked={option.selected}
+              onchange={() => actions?.setWorldToolBreakage?.(option.value)}
+            />
+            <span class="manager-world-tool-break-option">
+              <i class={option.icon} aria-hidden="true"></i>
+              <span>{option.label}</span>
+            </span>
+          </label>
+        {/each}
+      </div>
+      <!-- WHAT THE SELECTED MODE MEANS, not a sentence naming the segment already highlighted
          two lines above it. The old copy read `Every crafting system uses Tool-specific unless
          it overrides the break mode in its own Tool Rules`, which restates the control and the
          override count on either side of it and says nothing about the rule itself. -->
-    <p class="manager-muted manager-world-tool-break-note">
-      {(worldAuthority || 'toolSpecific') === 'checkDriven'
-        ? text(
-            'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteCheckDriven',
-            'The active check decides breakage \u00b7 world default for every system'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteToolSpecific',
-            'Each Tool tracks its own breakage \u00b7 world default for every system'
-          )}
-    </p>
-  </section>
+      <p class="manager-muted manager-world-tool-break-note">
+        {(worldAuthority || 'toolSpecific') === 'checkDriven'
+          ? text(
+              'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteCheckDriven',
+              'The active check decides breakage \u00b7 world default for every system'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteToolSpecific',
+              'Each Tool tracks its own breakage \u00b7 world default for every system'
+            )}
+      </p>
+    </section>
+
+    <ItemDropZone
+      kind="tool-create"
+      title={text(
+        'FABRICATE.Admin.Manager.Tools.CreateDropTitle',
+        'Drag an Item here to make it a Tool'
+      )}
+      hint={text(
+        'FABRICATE.Admin.Manager.Tools.CreateDropHint',
+        'Drop an Item from the Items directory or a compendium.'
+      )}
+      onDrop={onCreateFromItemDrop}
+    />
+  </div>
 
   <div class="manager-world-tool-catalogue-body">
     <EntityCatalogueShell
@@ -393,6 +450,36 @@
         { count: memberCount(entry) }
       )}
     </span>
+    <!--
+      THE WORLD MASTER SWITCH, which is a DIFFERENT control from the per-system toggle the
+      inspector's membership rows carry. This one is the world record's own: off here means the
+      Tool is off in every crafting system that has it, whatever each of them says, because
+      `resolveScopedDefinition` ANDs the two flags and world off wins.
+
+      It is the compact pill the system Tool Rules row already wears, so a GM sees one shape for
+      "this Tool is on" across the two scopes. `.manager-tools-enabled-toggle` is a shipped
+      global-sheet class rather than one authored here.
+    -->
+    {#if scope?.worldEnableable}
+      <button
+        type="button"
+        class={`manager-tools-enabled-toggle ${entry.worldEnabled === false ? '' : 'is-on'}`}
+        data-world-tool-row-enabled={entry.id}
+        aria-pressed={entry.worldEnabled !== false}
+        aria-label={format(
+          entry.worldEnabled === false
+            ? 'FABRICATE.Admin.Manager.Tools.WorldEnableAria'
+            : 'FABRICATE.Admin.Manager.Tools.WorldDisableAria',
+          entry.worldEnabled === false
+            ? 'Enable {name} for every crafting system'
+            : 'Disable {name} for every crafting system',
+          { name: entry.entity?.name || entry.id }
+        )}
+        onclick={() => actions?.setWorldEnabled?.(entry.id, entry.worldEnabled === false)}
+      >
+        <span aria-hidden="true"><span></span></span>
+      </button>
+    {/if}
   </span>
 {/snippet}
 
@@ -439,10 +526,28 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
+  /* Two page-level statements on ONE row, so the creation surface costs the list column no
+     height at all; see the band's own note. It WRAPS under a narrow pane rather than crushing
+     either half, and the zone takes the smaller basis because the card carries three lines. */
+  .manager-world-tool-scope-band {
+    display: flex;
+    flex-wrap: wrap;
+    grid-row: 1;
+    align-items: stretch;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  .manager-world-tool-scope-band > :global(.manager-item-drop-zone) {
+    flex: 1 1 18rem;
+    width: auto;
+    min-width: 0;
+  }
+
   .manager-world-tool-break-card {
     display: flex;
+    flex: 2 1 26rem;
     flex-direction: column;
-    grid-row: 1;
     gap: var(--fab-space-2);
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
@@ -559,6 +664,7 @@
   .manager-world-tool-row-badges {
     display: inline-flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--fab-space-chip);
     min-width: 0;
   }

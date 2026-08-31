@@ -3157,7 +3157,13 @@ describe('CraftingSystemManager source contract', () => {
       'saveSelectedToolDraft',
       'deleteSelectedLibraryTool',
       'confirmToolsRouteExit',
-      'store.createToolDraft?.',
+      // `store.createToolDraft?.` IS GONE FROM THIS LIST, and its absence is the change rather
+      // than an omission (issue 1373). Tool CREATION moved to the world Tools Catalogue: the
+      // root now resolves a dropped Item and writes a WORLD entity through
+      // `worldScope.tool.createEntity`, because a Tool is one world record every system
+      // adopts. The system Tool Rules route creates nothing, so a root that still referenced
+      // the system-scope draft creator would be carrying the surface this change removed.
+      // `createWorldToolFromItemDrop` below is what replaced it.
       'store?.openToolDraft',
       'store?.saveToolDraft',
       'store?.deleteToolDraft',
@@ -3165,6 +3171,25 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
     }
+    // TOOL CREATION IS A WORLD-SCOPE WRITE NOW. All four halves are pinned, because dropping
+    // any one of them leaves a drop that silently does nothing: the resolver seam that turns a
+    // drag payload into a name and an image, the world-scope create, the world-catalogue prop
+    // that raises the drop, and the navigation that lands the GM on the record just made.
+    for (const snippet of [
+      'createWorldToolFromItemDrop',
+      'services?.resolveToolSource',
+      'store?.worldScope?.tool?.createEntity',
+      'onCreateFromItemDrop={createWorldToolFromItemDrop}',
+      "openWorldScopedEntry('world-tool-entry', entityId)",
+    ]) {
+      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
+    }
+    // AND THE SYSTEM ROUTE NO LONGER CARRIES ONE. The two screens had the drop zone exactly
+    // inverted against the design, so this is the half that proves the move rather than a copy.
+    assert.ok(
+      !rootSource.includes('onCreateToolDrop'),
+      'the system Tool Rules route passes no creation drop callback'
+    );
     assert.ok(
       /onclick=\{\(\) => setView\('tools'\)\}/.test(rootSource),
       "root should wire a top-level Tools nav button to setView('tools')"

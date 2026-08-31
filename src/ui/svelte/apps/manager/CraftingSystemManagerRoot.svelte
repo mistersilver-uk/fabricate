@@ -4251,6 +4251,19 @@
     libraryToolsList.find((tool) => tool.id === focusedToolDraft?.id) || null
   );
 
+  // WHICH WORLD TOOL THE RULES LIST HAS SELECTED THAT THIS SYSTEM HAS NO RECORD FOR.
+  //
+  // Root state because the inspector is rendered by the SHELL's shared aside rather than by
+  // `ToolsBrowserView`, so a selection held inside that view could never reach the panel it is
+  // meant to fill. Cleared by `selectLibraryTool` the moment an adopted Tool is chosen.
+  let unadoptedToolId = $state('');
+  const unadoptedWorldTool = $derived(
+    unadoptedToolId
+      ? ((worldScopeState.tool?.entries ?? []).find((entry) => entry.id === unadoptedToolId) ??
+          null)
+      : null
+  );
+
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
     selectedComponentId = '';
@@ -7630,17 +7643,50 @@
     return true;
   }
 
-  async function addToolFromDrop(data) {
+  /**
+   * Create a WORLD Tool from an Item dropped on the world Tools Catalogue, and open its entry.
+   *
+   * ── WHY THE RESOLUTION HAPPENS HERE ─────────────────────────────────────────────────────
+   * `worldScopeActions` reads no Foundry global by design, and a page cannot reach the
+   * services bag, so nothing below this file can turn a drag payload into a name, an image and
+   * a description. `services.resolveToolSource` is the seam that can; this is the one call
+   * site that has it AND can navigate afterwards.
+   *
+   * ── A DROPPED ITEM MAY BE A COMPENDIUM DOCUMENT ─────────────────────────────────────────
+   * `resolveDropUuid` covers both shipped drag shapes - `{uuid}` from the world sidebar and
+   * `{pack, id}` from a compendium, which carries NO `uuid` at all - and the snapshot resolver
+   * accepts either, because `documentName === 'Item'` is true of a pack document too. A guard
+   * that read `data.uuid` would refuse exactly the module-shipped content this is most often
+   * used on.
+   *
+   * ── NO INVENTED FALLBACK IMAGE ──────────────────────────────────────────────────────────
+   * `img` is written through from the resolved Item or left EMPTY. It is unvalidated by
+   * Foundry, so a guessed path 404s silently and leaves a broken tile with nothing to say why;
+   * an empty `img` makes `Medallion` draw the Tool glyph, which is a real answer.
+   *
+   * @param {object} data The raw drag payload.
+   * @returns {Promise<boolean>}
+   */
+  async function createWorldToolFromItemDrop(data) {
     if (!data) return false;
     const uuid = resolveDropUuid(data);
     if (!uuid) return false;
     const source = await services?.resolveToolSource?.(uuid);
     if (!source) return false;
-    const created = store.createToolDraft?.({}, selectedSystemId);
-    if (!created) return false;
-    store.stageToolDraftSource?.(source.uuid || uuid, source);
-    toolEditorActiveTab = 'overview';
-    activeView = 'tool-edit';
+    const entityId = String(store?.randomID?.() || '');
+    if (!entityId) return false;
+    const created = await store?.worldScope?.tool?.createEntity?.({
+      id: entityId,
+      name: source.name || '',
+      img: source.img || '',
+      description: source.description || '',
+      originItemUuid: source.uuid || uuid,
+      registeredItemUuid: source.uuid || uuid,
+    });
+    if (created !== true) return false;
+    // CHAINED, so the drop lands the GM on the record it just made rather than on a list they
+    // then have to find it in. Routed through the same guard every other entry navigation uses.
+    openWorldScopedEntry('world-tool-entry', entityId);
     return true;
   }
 
@@ -8021,7 +8067,15 @@
 
   function selectLibraryTool(toolId) {
     if (!toolId) return false;
-    return store?.openToolDraft?.(toolId, selectedSystemId) ?? false;
+    const id = String(toolId);
+    const opened = store?.openToolDraft?.(id, selectedSystemId) ?? false;
+    // A WORLD TOOL THIS SYSTEM HAS NO RULES RECORD FOR CANNOT OPEN A DRAFT, and that is not a
+    // failure to swallow: it is precisely the state the inspector's `Add {tool} to {system}`
+    // action exists to answer. The subject is therefore RECORDED rather than discarded, so the
+    // panel can describe the Tool a GM just clicked instead of going empty on the one row that
+    // needs an affordance. Selecting an adopted Tool clears it, so only one is ever inspected.
+    unadoptedToolId = opened === false ? id : '';
+    return opened;
   }
 
   function backToToolsBrowser() {
@@ -11119,6 +11173,7 @@
       <WorldToolCataloguePage
         {...toolScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+        onCreateFromItemDrop={createWorldToolFromItemDrop}
       />
     {:else if currentView === 'world-tool-entry'}
       <WorldToolEntryPage
@@ -11517,9 +11572,9 @@
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         breakageSource={selectedSystem?.toolBreakage?.source || 'default'}
+        selectedUnadoptedToolId={unadoptedToolId}
         onSelectTool={selectLibraryTool}
         onEditTool={openToolEditor}
-        onCreateToolDrop={addToolFromDrop}
         onToggleToolEnabled={(id, enabled) =>
           store.toggleToolEnabled?.(id, enabled, selectedSystemId)}
         onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
@@ -14550,7 +14605,12 @@
             managedItems={selectedSystem?.managedItemOptions || []}
             prerequisiteOptions={selectedCharacterPrerequisites}
             authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+            systemName={selectedSystem?.name || ''}
+            unadopted={unadoptedWorldTool}
             onEdit={openToolEditor}
+            onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+            onAddToSystem={(entityId) =>
+              store?.worldScope?.tool?.addToSystem?.(entityId, selectedSystemId)}
           />
         {:else if currentView === 'component-edit'}
           <!-- NO RIGHT RAIL (issue 676, decision 4). The component editor is a single

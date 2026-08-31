@@ -30,6 +30,7 @@ import { COMPONENT_SCOPE, COMPONENT_SECTIONS } from '../../../systems/componentS
 import { ESSENCE_SCOPE, ESSENCE_SECTIONS } from '../../../systems/essenceScope.js';
 import {
   isSectionInherited,
+  isWorldEnabled,
   membershipKey,
   resolveScopedDefinition,
 } from '../../../systems/scopedDefinitions.js';
@@ -113,6 +114,11 @@ function derivedHasColorToken(entityType) {
  * both absences are structural: a component has no `enabled` flag at all (`resolveComponent`
  * omits the key), and only a component carries world tags with per-tag muting.
  *
+ * `worldEnableable` is the WORLD MASTER SWITCH and is DERIVED from the scope descriptor rather
+ * than restated, exactly as the two identity-shape facts below are: `defineScope` decides which
+ * entity types have one, and a screen that tested the entity type here would answer the old
+ * shape the day a second type declares it.
+ *
  * `sourceLinked` and `hasColorToken` join them for the same reason and are named differently on
  * purpose (issue 1380). The first two are capabilities a GM EXERCISES; these two are facts about
  * the shape of the identity record, so a fourth `-able` key would assert a kinship that does not
@@ -127,6 +133,7 @@ export const WORLD_SCOPE_DESCRIPTORS = Object.freeze({
     scope: COMPONENT_SCOPE,
     sections: COMPONENT_SECTIONS,
     enableable: false,
+    worldEnableable: COMPONENT_SCOPE.worldEnableable === true,
     taggable: true,
     sourceLinked: derivedSourceLinked('component'),
     hasColorToken: derivedHasColorToken('component'),
@@ -136,6 +143,7 @@ export const WORLD_SCOPE_DESCRIPTORS = Object.freeze({
     scope: ESSENCE_SCOPE,
     sections: ESSENCE_SECTIONS,
     enableable: true,
+    worldEnableable: ESSENCE_SCOPE.worldEnableable === true,
     taggable: false,
     sourceLinked: derivedSourceLinked('essence'),
     hasColorToken: derivedHasColorToken('essence'),
@@ -145,6 +153,7 @@ export const WORLD_SCOPE_DESCRIPTORS = Object.freeze({
     scope: TOOL_SCOPE,
     sections: TOOL_SECTIONS,
     enableable: true,
+    worldEnableable: TOOL_SCOPE.worldEnableable === true,
     taggable: false,
     sourceLinked: derivedSourceLinked('tool'),
     hasColorToken: derivedHasColorToken('tool'),
@@ -166,6 +175,7 @@ export function emptyWorldScopeEntityState(entityType) {
     entityType,
     sections: descriptor ? [...descriptor.sections] : [],
     enableable: descriptor?.enableable === true,
+    worldEnableable: descriptor?.worldEnableable === true,
     taggable: descriptor?.taggable === true,
     sourceLinked: descriptor?.sourceLinked === true,
     hasColorToken: descriptor?.hasColorToken === true,
@@ -307,21 +317,40 @@ function indexDefaults(defaults) {
  * `resolveComponent` omits it. A row that carried `enabled: false` would hand a later screen
  * the value it would read to draw the toggle the epic's ruling removes.
  *
+ * ── `enabled` IS THE PER-SYSTEM FLAG AND `resolvedEnabled` IS THE TRUTH ─────────────────────
+ * On a `worldEnableable` scope the resolver answers three values, and this row carries two of
+ * them under names that say which is which. `enabled` is the LAYER THIS ROW AUTHORS — the
+ * per-system flag the membership toggle writes — and `resolvedEnabled` is `world && system`,
+ * which is what the entity actually does.
+ *
+ * They are not collapsed, and the reason is a control that would otherwise lie: a per-system
+ * toggle painted from the resolved AND reads OFF for every system the moment the world master
+ * switch goes off, and clicking it then appears to do nothing. `enabled` is therefore exactly
+ * what it was before the master switch existed, so nothing reading it changed meaning.
+ *
  * @param {object} descriptor
  * @param {{id: string, name: string}} system
  * @param {object|null} membership
  * @param {object|null} worldDefault
+ * @param {number} [recipeCount] Recipes in THIS system that reference the entity.
  * @returns {object}
  */
-function buildSystemRow(descriptor, system, membership, worldDefault) {
+function buildSystemRow(descriptor, system, membership, worldDefault, recipeCount = 0) {
   const resolved = resolveScopedDefinition(worldDefault, membership, descriptor.scope);
   const row = {
     systemId: system.id,
     systemName: system.name,
     member: membership !== null,
     inherited: resolved.inherited,
+    // HOW MANY OF THIS SYSTEM'S RECIPES REFERENCE THE ENTITY. Per system rather than
+    // world-wide, because the only row that states it is a SYSTEM-scope row: a world-wide
+    // number under a system's own list would be a wrong number rather than a missing one.
+    recipeCount: Number(recipeCount) || 0,
   };
-  if (descriptor.enableable) row.enabled = resolved.enabled === true;
+  if (descriptor.enableable) {
+    row.enabled = descriptor.worldEnableable ? resolved.systemEnabled === true : resolved.enabled === true;
+    row.resolvedEnabled = resolved.enabled === true;
+  }
   return row;
 }
 
@@ -365,12 +394,14 @@ function entryHasSourceLink(entity) {
  * @param {object|null} worldDefault
  * @param {Array<{id: string, name: string}>} systems
  * @param {Map<string, object>} membershipIndex
+ * @param {Record<string, object>|null} [usage] World-wide reference counts per entity id.
  * @returns {object}
  */
 function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, usage = null) {
   const inheritCounts = {};
   for (const section of descriptor.sections) inheritCounts[section] = 0;
   const rows = [];
+  const entityUsage = usage?.[entity.id] ?? null;
   let membershipCount = 0;
   for (const system of systems) {
     const membership = membershipIndex.get(membershipKey(entity.id, system.id)) ?? null;
@@ -380,7 +411,15 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
         if (isSectionInherited(membership, section)) inheritCounts[section] += 1;
       }
     }
-    rows.push(buildSystemRow(descriptor, system, membership, worldDefault));
+    rows.push(
+      buildSystemRow(
+        descriptor,
+        system,
+        membership,
+        worldDefault,
+        entityUsage?.recipeCountBySystem?.[system.id]
+      )
+    );
   }
   return {
     id: entity.id,
@@ -388,6 +427,18 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
     defaults: worldDefault,
     membershipCount,
     inheritCounts,
+    // HOW MUCH OF THE WORLD REFERENCES THIS ENTITY, across every crafting system.
+    //
+    // Supplied by the caller rather than derived here: the counts are over corpora this module
+    // is not handed — every system's components and every recipe in the world — and the
+    // functions that count them already live beside the admin store's own cards. An absent
+    // `usage` answers 0, which is what a caller that has not wired it sees.
+    componentCount: Number(entityUsage?.componentCount) || 0,
+    recipeCount: Number(entityUsage?.recipeCount) || 0,
+    // WHETHER THE WORLD MASTER SWITCH LEAVES THIS ENTITY ON. Read through `isWorldEnabled`, so
+    // an ABSENT flag — every record in every world that has never touched the switch — answers
+    // `true` here and the screens draw the state they always drew.
+    worldEnabled: descriptor.worldEnableable ? isWorldEnabled(worldDefault) : true,
     // WHETHER THIS RECORD ACTUALLY NAMES A SOURCE ITEM, answered HERE because this module already
     // imports the one list of source-link field names (issue 1380). The descriptor's
     // `sourceLinked` says whether the TYPE has the fields at all; this says whether this entity
@@ -398,14 +449,6 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
     // linked only by the renamed field starts reporting itself unlinked. One directory apart is
     // still a second copy.
     hasSourceLink: descriptor.sourceLinked ? entryHasSourceLink(entity) : false,
-    // HOW MUCH OF THE WORLD REFERENCES THIS ENTITY, across every crafting system.
-    //
-    // Supplied by the caller rather than derived here: the counts are over corpora this module is
-    // not handed — every system's components and every recipe in the world — and the functions
-    // that count them already exist beside the admin store's own essence cards. An absent `usage`
-    // answers 0, which is what a caller that has not wired it sees.
-    componentCount: Number(usage?.[entity.id]?.componentCount) || 0,
-    recipeCount: Number(usage?.[entity.id]?.recipeCount) || 0,
     systems: rows,
   };
 }
@@ -419,8 +462,9 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
  *   options.corpus The store's published corpus.
  * @param {{entities: boolean, defaults: boolean, membership: boolean}|null} [options.seeded]
  * @param {unknown} [options.systems] The crafting-system roster.
- * @param {Record<string, {componentCount: number, recipeCount: number}>|null} [options.usage]
- *   World-wide reference counts per entity id, supplied by the caller; see `buildEntry`.
+ * @param {Record<string, {componentCount?: number, recipeCount?: number,
+ *   recipeCountBySystem?: Record<string, number>}>|null} [options.usage] World-wide reference
+ *   counts per entity id, supplied by the caller; see `buildEntry`.
  * @returns {object}
  */
 export function projectWorldScopeEntity({
@@ -442,6 +486,7 @@ export function projectWorldScopeEntity({
     entityType,
     sections: [...descriptor.sections],
     enableable: descriptor.enableable,
+    worldEnableable: descriptor.worldEnableable,
     taggable: descriptor.taggable,
     sourceLinked: descriptor.sourceLinked,
     hasColorToken: descriptor.hasColorToken,
@@ -517,6 +562,8 @@ function readCorpus(store) {
  * @param {Record<string, object|null>} [options.stores] `{component, essence, tool, vocabulary}`
  *   scope stores; `vocabulary` may be absent.
  * @param {unknown} [options.systems] The crafting-system roster.
+ * @param {Record<string, Record<string, object>>} [options.usage] Per-entity-type reference
+ *   counts, keyed by entity type then entity id.
  * @returns {{worldScope: object}}
  */
 export function buildWorldScopeState({ stores = {}, systems = [], usage = {} } = {}) {

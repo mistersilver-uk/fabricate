@@ -4893,11 +4893,90 @@ export function createAdminStore(services) {
     return usage;
   }
 
+  /**
+   * Every tool id one recipe requires, from BOTH places a recipe names them.
+   *
+   * FOUR PLACES, not one. A recipe carries a top-level `toolIds`, each of its ingredient sets
+   * carries its own, and a MULTI-STEP recipe repeats both per step (`Recipe#toJSON` emits all
+   * four). A scan of the top level alone reports 0 for every per-set and every stepped recipe,
+   * which is precisely the population a Tool requirement is most often authored on.
+   *
+   * Ids are trimmed and de-duplicated, so one recipe naming a tool in two of the four places
+   * counts once.
+   *
+   * @param {object} recipe
+   * @returns {Set<string>}
+   */
+  function _recipeToolIds(recipe) {
+    const ids = new Set();
+    const lists = [recipe?.toolIds];
+    const setLists = [
+      ...(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []),
+      ...(Array.isArray(recipe?.steps) ? recipe.steps : []).flatMap((step) => [
+        step,
+        ...(Array.isArray(step?.ingredientSets) ? step.ingredientSets : []),
+      ]),
+    ];
+    for (const set of setLists) lists.push(set?.toolIds);
+    for (const list of lists) {
+      for (const raw of Array.isArray(list) ? list : []) {
+        const trimmed = String(raw ?? '').trim();
+        if (trimmed) ids.add(trimmed);
+      }
+    }
+    return ids;
+  }
+
+  /**
+   * How many recipes require each world Tool, PER CRAFTING SYSTEM.
+   *
+   * ── WHY PER SYSTEM RATHER THAN WORLD-WIDE ────────────────────────────────────────────────
+   * The only row that states this number is on the SYSTEM Tool Rules list, under a heading
+   * that already says which system a GM is looking at. A world-wide total there would read as
+   * "recipes in this system" and be a wrong number rather than a missing one — which is the
+   * failure this epic keeps hitting. The world-wide total is carried too, on the entry, for a
+   * surface that asks the world-scope question.
+   *
+   * ── WHY IT IS COMPUTED HERE ──────────────────────────────────────────────────────────────
+   * `worldScopeProjection` is handed a corpus and a roster and no recipes at all, and the
+   * recipe manager is already on this store's injected services bag. So the counting lives
+   * where the corpus does and the projection attaches the answer, keyed by entity id.
+   *
+   * A tool id is the same string in every system that has the world Tool — the read union
+   * matches an in-system record to its world entity BY ID — so scanning each system's own
+   * recipes and keying by that id needs no membership join.
+   *
+   * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>}>}
+   */
+  function _worldToolUsage() {
+    const usage = {};
+    const recipeManager = services.getRecipeManager?.();
+    const record = (toolId, systemId) => {
+      const entry = (usage[toolId] ??= { recipeCount: 0, recipeCountBySystem: {} });
+      entry.recipeCount += 1;
+      entry.recipeCountBySystem[systemId] = (entry.recipeCountBySystem[systemId] || 0) + 1;
+    };
+    for (const system of _allSystems()) {
+      const systemId = String(system?.id ?? '');
+      if (!systemId) continue;
+      let recipes = [];
+      try {
+        recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
+      } catch {
+        recipes = [];
+      }
+      for (const recipe of recipes) {
+        for (const toolId of _recipeToolIds(recipe)) record(toolId, systemId);
+      }
+    }
+    return usage;
+  }
+
   function buildWorldScopeState() {
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
       systems: _allSystems(),
-      usage: { essence: _worldEssenceUsage() },
+      usage: { essence: _worldEssenceUsage(), tool: _worldToolUsage() },
     });
   }
 
@@ -9838,6 +9917,13 @@ export function createAdminStore(services) {
     deleteGatheringLibraryTool,
     validateGatheringLibraryTool,
     createToolDraft,
+    // THE ID MINTER, EXPOSED (issue 1373). A world-scope create needs an id, and
+    // `worldScopeActions` refuses to mint one: it reads no Foundry global by design, so it
+    // takes the id it is given. The root is the only place a world Tool is created from a
+    // dropped Item, and a fourth hand-rolled copy of this ladder there would reach the
+    // `Math.random()` rung SonarCloud fails as S2245. `_randomID` already prefers the injected
+    // seam, then Foundry's own, so exposing it hands every caller the same order of preference.
+    randomID: _randomID,
     openToolDraft,
     patchToolDraft,
     stageToolDraftSource,

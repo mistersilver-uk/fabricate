@@ -845,6 +845,7 @@ function compileManagerRoot() {
     // …and issue 1118 gave it another: the deterministic average a rolling modifier is
     // ranked by, which is also what tells the resolver that a modifier rolls at all.
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     // …and issue 1095 gave it a THIRD import: `resolveActiveSalvageCheckFormula` delegates
     // to the one salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
     'src/systems/salvageCheckUsability.js',
@@ -19179,14 +19180,8 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('keeps the compact Tool library hierarchy callback-complete and selects a row once', async () => {
     const selections = [];
     const authorityChanges = [];
-    const dropped = [];
     const edits = [];
     const enabledChanges = [];
-    const worldItem = {
-      uuid: 'Item.hammer',
-      name: 'Smith Hammer',
-      img: 'icons/tools/hand/hammer-cobbler-steel.webp',
-    };
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(ToolsBrowserViewComponent, {
@@ -19195,9 +19190,6 @@ describe('CraftingSystemManager mounted behavior', () => {
         tools: [toolRouteFixture],
         managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
         onSelectTool: (id) => selections.push(id),
-        onCreateToolDrop: (data) => {
-          dropped.push(data);
-        },
         onSetBreakageAuthority: (authority) => {
           authorityChanges.push(authority);
         },
@@ -19211,6 +19203,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     flushSync();
 
+    // THREE BANDS AND A LIST (issue 1373). The `create` band is GONE, and its absence is the
+    // change: the design puts the `Drag an Item here to make it a Tool` zone on the WORLD
+    // Tools Catalogue and puts NONE here, and the two screens carried it exactly inverted. A
+    // Tool is one world record every system adopts, so this screen can only ever author RULES
+    // for a record the world already holds.
     assert.deepEqual(
       [...target.querySelector('.manager-tools-main-content').children].map((element) =>
         element.hasAttribute('data-manager-tools-authority')
@@ -19219,11 +19216,9 @@ describe('CraftingSystemManager mounted behavior', () => {
             ? 'search'
             : element.hasAttribute('data-manager-tools-sort')
               ? 'sort'
-              : element.hasAttribute('data-tool-create-card')
-                ? 'create'
-                : 'list'
+              : 'list'
       ),
-      ['authority', 'search', 'sort', 'create', 'list']
+      ['authority', 'search', 'sort', 'list']
     );
     const authority = target.querySelector('[data-manager-tools-authority]');
     // THREE, not two (issue 1373): `Inherit`, `Tool-specific`, `Check-driven`. This count is
@@ -19250,12 +19245,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     authority.querySelector('input[value="checkDriven"]').click();
     assert.deepEqual(authorityChanges, ['checkDriven']);
 
-    const createCard = target.querySelector('[data-tool-create-card]');
-    assert.ok(createCard.hasAttribute('data-tool-create-drop-prompt'));
-    assert.equal(
-      createCard.parentElement?.hasAttribute('data-tool-create-card'),
-      false,
-      'the shared drop zone is the sole creation surface rather than a nested dashed card'
+    assert.ok(
+      !target.querySelector('[data-item-drop-zone="tool-create"]'),
+      'the system Tool Rules list offers no creation surface at all'
     );
     assert.equal(
       target.querySelector('[data-manager-tools-search] .manager-chip'),
@@ -19274,20 +19266,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       ['in', 'all', 'over']
     );
-    assert.equal(createCard.querySelector('summary, select, button'), null);
-    dispatchDrop(createCard, { type: 'Item', uuid: worldItem.uuid });
-    await tick();
-    flushSync();
-    assert.deepEqual(dropped, [{ type: 'Item', uuid: worldItem.uuid }]);
-
-    // Issue 1036/7, at THIS call site: `ItemDropZone`'s guard now reads
-    // `resolveDropUuid(data)` rather than `data.uuid`, so the document-type check is what
-    // keeps a non-Item out of the Tool creation surface. Asserted per call site, because
-    // the criterion is about the SITES rather than about the primitive in isolation.
-    dispatchRejectedDrops(createCard);
-    await tick();
-    flushSync();
-    assert.equal(dropped.length, 1, 'the tool create zone still refuses every non-Item payload');
+    // The drop behaviour itself moved WITH the control, to
+    // `tests/components/world-tool-catalogue-mounted.test.js`, which drives the zone on the
+    // screen that now owns it - including the compendium `{pack, id}` payload that carries no
+    // `uuid` and the non-Item payloads the zone must refuse.
 
     target.querySelector('.manager-tools-enabled-toggle').click();
     target.querySelector('.manager-tools-library-actions [data-tool-edit-rules]').click();
@@ -19347,6 +19329,63 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.deepEqual(selections, []);
+  });
+
+  it('ends each rules row with the count of THIS system\u2019s recipes that require it', () => {
+    // C5 (issue 1373). The design's row ends `[N RECIPES] [Edit rules]`, and ours ended at the
+    // action. The number is READ OFF THE PROJECTION'S PER-SYSTEM ROW rather than counted here:
+    // this screen holds no recipe corpus, and a world-wide total under a heading that already
+    // names one system would be a wrong number rather than a missing one.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        tools: [toolRouteFixture],
+        managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
+        systemId: 'sys-forge',
+        scope: {
+          entityType: 'tool',
+          available: true,
+          entries: [
+            {
+              id: 'tool-catalyst',
+              entity: { id: 'tool-catalyst', name: 'Artisan Catalyst' },
+              systems: [
+                { systemId: 'sys-forge', member: true, inherited: {}, recipeCount: 2 },
+                { systemId: 'sys-alchemy', member: true, inherited: {}, recipeCount: 9 },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    flushSync();
+
+    const cell = target.querySelector('[data-tool-row-recipes="tool-catalyst"]');
+    assert.ok(Boolean(cell), 'the row states how much of this system leans on the Tool');
+    assert.equal(
+      cell.querySelector('strong').textContent,
+      '2',
+      'the ADDRESSED system\u2019s count, never the other system\u2019s and never their sum'
+    );
+    assert.match(cell.textContent, /Recipes/);
+  });
+
+  it('reads a MISSING per-system count as zero rather than as blank', () => {
+    // A world Tool this system has no rules record for cannot be referenced by a recipe here,
+    // so `0` is a real answer. Rendering nothing would leave the column ragged and say nothing.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: { tools: [toolRouteFixture], managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }] },
+    });
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-tool-row-recipes="tool-catalyst"] strong').textContent,
+      '0'
+    );
   });
 
   it('shows canonical validation status on every Tool row and preserves a long label', () => {
@@ -19691,7 +19730,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(editor.querySelector('footer'), null);
   });
 
-  it('keeps Tool creation drag-only and replacement authoring Component-only', async () => {
+  it('keeps replacement authoring Component-only, with no creation surface on this route', async () => {
     const calls = await mountToolRoute({
       storeOptions: {
         gatheringLibraryTools: [
@@ -19703,8 +19742,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    assert.ok(target.querySelector('[data-item-drop-zone="tool-create"]'));
-    assert.equal(target.querySelector('[data-tool-create-card] select'), null);
+    // NO CREATION SURFACE ON THIS ROUTE (issue 1373): it moved to the world Tools Catalogue,
+    // where the design puts it. What this test still governs is the half in its own name -
+    // replacement authoring stays Component-only.
+    assert.ok(!target.querySelector('[data-item-drop-zone="tool-create"]'));
 
     await openFixtureToolEditor(calls);
     target.querySelector('#tool-tab-breakage').click();
@@ -19748,7 +19789,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(document.querySelector('[data-recipe-add="alternative-currency"]'));
   });
 
-  it('a dropped Item opens one linked focused Tool draft instead of an inline row editor', async () => {
+  it('offers NO Tool creation on the system Tool Rules route, on any drop target', async () => {
+    // RETARGETED, NOT DELETED (issue 1373). This test used to drop an Item on this route's own
+    // creation zone and assert a system-scope draft opened. Creation moved to the world Tools
+    // Catalogue, so what remains to govern here is the half a regression would quietly undo:
+    // that this route grew the zone back. The drop BEHAVIOUR moved with the control, to
+    // `tests/components/world-tool-catalogue-mounted.test.js`.
     const calls = await mountToolRoute({
       services: {
         resolveToolSource: async (uuid) => ({
@@ -19759,19 +19805,14 @@ describe('CraftingSystemManager mounted behavior', () => {
         }),
       },
     });
-    const drop = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(drop, 'dataTransfer', {
-      value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.hammer' }) },
-    });
-    target.querySelector('[data-item-drop-zone="tool-create"]').dispatchEvent(drop);
-    await Promise.resolve();
-    await tick();
-    flushSync();
 
-    assert.ok(calls.some((call) => call[0] === 'createToolDraft'));
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tool-edit');
-    assert.ok(target.querySelector('[data-tool-editor-dirty]'));
-    assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
+    assert.ok(!target.querySelector('[data-item-drop-zone="tool-create"]'));
+    assert.ok(!target.querySelector('[data-tool-create-drop-prompt]'));
+    assert.ok(
+      !calls.some((call) => call[0] === 'createToolDraft'),
+      'nothing on this route opens a system-scope Tool draft from a drop'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tools');
   });
 
   it('always resolves a Tool source replacement and stages the complete snapshot only on success', async () => {
