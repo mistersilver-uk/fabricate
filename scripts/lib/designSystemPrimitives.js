@@ -139,8 +139,8 @@
  * spec.md requirement "The primitive set is a closed, versioned vocabulary" — two or more
  * INDEPENDENT callers. An importer is any other file under `src/` that imports the component by
  * path. Six ADJUDICATED candidates fall below the bar and are recorded in {@link NOT_A_PRIMITIVE}
- * rather than omitted, because that same requirement asks a candidate with fewer to be "recorded as
- * ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a
+ * rather than omitted, because that same requirement obliges a candidate with fewer to be "recorded
+ * as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a
  * decision rather than an oversight".
  *
  * ADJUDICATED is the bound, and it is load-bearing: 48 top-level files under `apps/manager/` sit
@@ -281,9 +281,9 @@ export const NOT_A_PRIMITIVE = frozenTable(MANIFEST.notAPrimitive);
  * The ruled-out register, mirroring spec.md requirement "The ruled-out register is part of the
  * specification" and `library.html:1802-1818`.
  *
- * Part of the specification, not commentary: that requirement has declined candidates recorded with
- * the reasoning that declined them "so that the absence of a primitive is legible as a decision",
- * and has a re-proposal address the recorded reasoning and, absent new evidence, use the
+ * Part of the specification, not commentary: that requirement has declined candidates recorded
+ * with the reasoning that declined them "so that the absence of a primitive is legible as a
+ * decision", and has a re-proposal address that reasoning and, absent new evidence, use the
  * composition instead.
  *
  * GUARDED, because a hand-typed mirror shipped inside a change whose thesis is that unguarded
