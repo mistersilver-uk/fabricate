@@ -65,10 +65,16 @@
   /* Fabricate product UI design-system tokens.
      See the UI design-system requirements in openspec/specs/ui-integration/spec.md.
      Theme colour literals live only in `[data-fabricate-theme]` blocks below.
-     The namespace is ONE generation: a foundation token name carries no version or
-     generation marker, and `tests/token-generation-gate.test.js` fails the build for any
-     name that does. An area-scoped property takes the `--fab-manager-` prefix and must
-     not be read outside `.fabricate-manager`. */
+     The namespace is ONE generation: a token name carries no version or generation
+     marker, and `tests/token-generation-gate.test.js` fails the build for any name that
+     does. A property declared only under `.fabricate-manager` is AREA-SCOPED and must not
+     be declared or read outside it, by every compound of a rule's selector list. A NEW
+     one takes the `--fab-manager-` prefix; the prefix is SUFFICIENT to be governed by
+     that rule and not necessary, because properties that predate the convention carry no
+     prefix and are bound by it all the same — `--fab-recipe-cluster-cols` and
+     `--fab-env-comp-grid` are the same species as the five that do. Only the prefixed
+     ones are gated, since a gate cannot tell an unprefixed manager-only property from a
+     foundation token by its name. */
 
   /* Typographic faces (issue 643). These live in `:root`, NOT in a theme block:
      `tests/components/theme-colour-contract.test.js` asserts every theme block
@@ -110,9 +116,15 @@
      they are carried across at their shipped values rather than corrected here: bringing
      them onto the ladder moves pixels, which is a visible change and a separate decision.
      They stay tokenised precisely so that correction remains a one-line edit instead of
-     six scattered literals across two files. */
-  --fab-radius-control: 5px;
-  --fab-radius-panel: 6px;
+     six scattered literals across two files.
+
+     THE SURFACE IS IN THE NAME because the values are not the system's answer. Named
+     `--fab-radius-control`, a 5px token contradicts the ladder it sits beside — control
+     radius is 7/9/11 — and reads as the rule rather than as one surface's outstanding
+     debt. These two are read by `BooksScrollsView` and `ItemPageInspector` and by
+     nothing else; a third surface reaching for one is reaching for the ladder instead. */
+  --fab-books-control-radius: 5px;
+  --fab-books-panel-radius: 6px;
 
   /* Component Studio token mapping (issue 676) — kept as the record of the calls,
    * since the studio introduces no tokens of its own to hang them on.

@@ -660,6 +660,11 @@
     font-weight: 600;
   }
 
+  /* The fill is a NEUTRAL overlay, not an accent tint, and that is the shipped pixel rather
+     than an oversight: this rule asked for a soft accent with the overlay as its fallback,
+     the soft accent was never declared anywhere, and so the overlay is what every theme has
+     always painted. Issue 1399 wrote the surviving branch down. Tinting it is a visible
+     change and needs `--fab-accent-soft`, which does exist. */
   .manager-economy-mode-option.is-active {
     border-color: var(--fab-accent);
     background: var(--fab-overlay-light-035);
@@ -848,7 +853,10 @@
     justify-self: center;
   }
 
-  /* Emphasise the dice button on characters that have not been rolled yet. */
+  /* Emphasise the dice button on characters that have not been rolled yet. The fill is a
+     NEUTRAL overlay for the reason `.manager-economy-mode-option.is-active` records above:
+     the soft accent this rule once deferred to was never declared, so the fallback is the
+     shipped pixel and issue 1399 wrote it down in place of the dead branch. */
   .manager-economy-actor-roll.is-roll-needed {
     color: var(--fab-accent);
     border-color: var(--fab-accent);

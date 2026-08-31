@@ -663,7 +663,7 @@
   .manager-books-scrolls-listitem {
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: var(--fab-radius-panel);
+    border-radius: var(--fab-books-panel-radius);
     background: var(--fab-bg-2);
   }
 
@@ -698,13 +698,13 @@
   .manager-books-scrolls-identity:focus-visible {
     outline: 2px solid var(--fab-accent-border);
     outline-offset: 3px;
-    border-radius: var(--fab-radius-control);
+    border-radius: var(--fab-books-control-radius);
   }
 
   .manager-books-scrolls-thumb {
     width: 40px;
     height: 40px;
-    border-radius: var(--fab-radius-control);
+    border-radius: var(--fab-books-control-radius);
     object-fit: cover;
     flex: none;
   }

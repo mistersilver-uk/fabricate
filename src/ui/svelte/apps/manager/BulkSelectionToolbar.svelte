@@ -6,11 +6,13 @@
 
   It lives under `apps/manager/` — beside `Chip`, `Callout` and `SegmentedControl` — and
   NOT under `apps/manager/components/`, which holds the area-agnostic leaves. That is
-  deliberate and load-bearing: this component's root class is `manager-*`, both of its
-  consumers are manager views, and staying inside `apps/manager/` keeps `--fab-manager-*`
-  (declared on `.fabricate-manager`) in scope. A `components/` leaf can be rendered outside
-  `.fabricate-manager`, where such a property is undefined and the colours silently fall
-  back to inheritance.
+  deliberate and load-bearing, but NOT for the reason first recorded here. "Staying inside
+  `apps/manager/` keeps `--fab-manager-*` in scope" has LAPSED: a scoped `<style>` may not
+  reach an area-scoped property from ANY directory, because a component is placed in a
+  directory and not in a DOM subtree (design-system spec, *The token namespace is one
+  generation and names its purpose*). What survives is what the placement really decides:
+  this component's root class is `manager-*`, both of its consumers are manager views, and
+  `components/` is the area-agnostic leaf set, which this is not.
 
   Its root JOINS the host browser's own filter-row class so it inherits that toolbar's row
   metrics (flex, wrap, gap, full width) rather than declaring a bespoke bar; `is-selection`
@@ -156,10 +158,12 @@
 </div>
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is always
-     in scope here. That is the opposite of `SelectionCheckbox`, which is area-agnostic and reaches theme root only;
-     do not carry this over to a shared `components/` primitive.
+  /* THEME-ROOT tokens only, like every scoped `<style>` in the product. The reason once
+     recorded here — that living under `apps/manager/` puts an area-scoped
+     `--fab-manager-*` property in scope — has LAPSED: a scoped block may not reach one from
+     ANY directory (design-system spec, *The token namespace is one generation and names its
+     purpose*). `SelectionCheckbox` records the same rule for the same reason; it is no
+     longer the opposite case.
 
      The row itself is NOT styled here. `.<rowClass>.is-selection` in the global sheet owns
      the row metrics and the hairline that separates this register from the filter rows

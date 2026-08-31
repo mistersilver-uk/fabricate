@@ -100,7 +100,7 @@
 <style>
   /* Theme-ROOT tokens ONLY. This primitive is area-agnostic — it lives in
      `src/ui/svelte/components/`, beside `Stepper` and `Medallion` — so it must not
-     reference `--fab-manager-*`, which `styles/fabricate.css` declares on
+     reference `--fab-manager-*`, which `styles/fabricate.css` declares inside
      `.fabricate-manager`. Outside the manager the property is not in scope, the
      declaration becomes invalid at computed-value time, and the colour silently falls back
      to inheritance. Nothing fails; it just looks wrong. `Chip.svelte` records the same rule

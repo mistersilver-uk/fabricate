@@ -5,9 +5,11 @@
   for issue 1010).
 
   It lives under `apps/manager/` rather than `apps/manager/components/` for the reason
-  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves, this chrome is
-  manager-scoped, and staying here keeps any area-scoped `--fab-manager-*` property in
-  scope, so the extraction is a pure move rather than a re-tokenisation.
+  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves and this chrome
+  is manager-scoped. The token half of that reason — that the placement keeps an
+  area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
+  may not reach one from any directory. The extraction was a pure move regardless: the
+  block below reads theme-root tokens only.
 
   It renders in a browser's existing `.manager-inspector` column and REPLACES that
   browser's single-row inspector for as long as the selection is non-empty. The chrome is
@@ -114,9 +116,13 @@
 </section>
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is in
-     scope. Its appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory, because a component is placed
+     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
+     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
+     any scoped block that tries. The placement's surviving consequence is the screenshot
+     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that actually
      render it instead of matching the broad `theme-or-global-ui` recipe. Because it sits
      OUTSIDE both `apps/manager/components/` and `apps/manager/recipes/`, it is enumerated

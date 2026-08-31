@@ -1180,9 +1180,11 @@
 />
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is in
-     scope. It sits here rather than in `styles/fabricate.css` so `VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs`
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory (design-system spec, *The token
+     namespace is one generation and names its purpose*). It sits here rather than in
+     `styles/fabricate.css` so `VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs`
      routes a change to the views that actually render it, exactly as `BulkEditSection`
      records for the same reason. */
 

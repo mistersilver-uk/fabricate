@@ -4,10 +4,12 @@
   panel stages a single-valued axis with (issue 772, extracted for issue 1010).
 
   It lives under `apps/manager/` rather than `apps/manager/components/` for the reason
-  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves, this control is
-  manager-scoped, and staying here keeps any area-scoped `--fab-manager-*` property in
-  scope, so the extraction is a pure move rather than a re-tokenisation — which matters more here than anywhere else in the
-  set, since the whole point of the rule below is a specific opaque manager background.
+  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves and this control
+  is manager-scoped. The token half of that reason — that the placement keeps an
+  area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
+  may not reach one from any directory. The extraction was still a pure move, and it had to
+  be: the whole point of the rule below is a specific opaque background, which the block
+  takes from a theme-root token and would take identically from any other directory.
 
   The OPTIONS are the caller's, passed as `children`: the sentinel's meaning differs per
   studio and per axis, and a primitive that owned the list would have to own those
@@ -49,9 +51,13 @@
 </select>
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager`) is in
-     scope. Its appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory, because a component is placed
+     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
+     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
+     any scoped block that tries. The placement's surviving consequence is the screenshot
+     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that actually
      render it. Because it sits OUTSIDE both `apps/manager/components/` and
      `apps/manager/recipes/`, it is enumerated BY NAME in that map's browser match lists. */

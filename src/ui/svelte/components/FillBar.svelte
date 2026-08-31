@@ -37,7 +37,7 @@
    - dataAttr / dataValue: an optional test/screenshot hook.
 
   A component under `components/` may not reference `--fab-manager-*` or any other property
-  declared on `.fabricate-manager`; every token below is declared in `:root` and in all
+  declared inside `.fabricate-manager`; every token below is declared in `:root` and in all
   seven theme blocks.
 -->
 <script>

@@ -85,10 +85,11 @@
 </article>
 
 <style>
-  /* Manager-scoped by PLACEMENT: this component lives under `apps/manager/`, so
-     an area-scoped `--fab-manager-*` property (declared on `.fabricate-manager` in
-     styles/fabricate.css) is always in scope for it. That is the opposite of `SelectionCheckbox`, which is area-agnostic and
-     may use theme-root tokens only — do not carry that rule over to here.
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory (design-system spec, *The token
+     namespace is one generation and names its purpose*). `SelectionCheckbox` records the
+     same rule for the same reason; it is no longer the opposite case.
 
      TWO rows — identity (tile + label) above, the stepper below — not a single run. The
      card is TINTED by whether the component contributes this essence at all, so a GM

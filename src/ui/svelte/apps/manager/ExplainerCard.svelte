@@ -131,15 +131,14 @@
 
 <style>
   /* Theme-root tokens ONLY. This component is area-agnostic, so it must not reference
-     `--fab-manager-*` or any other custom property declared on `.fabricate-manager`
+     `--fab-manager-*` or any other custom property declared inside `.fabricate-manager`
      (styles/fabricate.css declares those inside that area block). Outside the manager —
-     `.fabricate-app`,
-     `.fabricate-admin`, `.fabricate-interactables-manager` — such a property is not in
-     scope, the declaration becomes invalid at computed-value time and the colour silently
-     falls back to inheritance. Nothing fails; it just looks wrong, and the trigger is
-     exactly the reuse this primitive exists to enable. Every token below is declared in
-     `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks, which every
-     Fabricate surface carries. */
+     `.fabricate-app`, `.fabricate-admin`, `.fabricate-interactables-manager` — such a
+     property is not in scope, the declaration becomes invalid at computed-value time and
+     the colour silently falls back to inheritance. Nothing fails; it just looks wrong, and
+     the trigger is exactly the reuse this primitive exists to enable. Every token below is
+     declared in `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks,
+     which every Fabricate surface carries. */
 
   /* The title's SCALE, WEIGHT, COLOUR and FAMILY come from `.manager-card-title` in the
      global sheet — the manager's one card-title contract. This rule adds only the glyph
