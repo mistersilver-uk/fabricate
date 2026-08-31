@@ -38,3 +38,33 @@ test('every promote-to-public job that reads the release can SEE a draft', () =>
     );
   }
 });
+
+// Node's `execSync` buffers the child's whole stdout and defaults to 1 MiB, and when a child
+// exceeds it Node SIGTERMs the child and throws ENOBUFS. A paginated `gh api` listing is exactly
+// the call that outgrows that default silently: the promotion's notes aggregation reads every
+// release with its full changelog body, which measured 1,286,324 bytes at 190 releases and grows
+// with each one. That failed the first real promotion of v1.9.0 two steps before the un-draft. The
+// buffer therefore has to be stated, not inherited.
+//
+// This matches PER LINE, which is deliberate: the call is one line, and a reformat that split it
+// across lines would make the check pass by matching nothing. The non-vacuity assertion below is
+// what turns that into a loud failure instead of a quiet one.
+test('a paginated gh api call buffered through execSync states its own maxBuffer', () => {
+  const source = readFileSync(WORKFLOW, 'utf8');
+  const paginatedExecSync = source
+    .split('\n')
+    .filter((line) => line.includes('execSync(') && line.includes('--paginate'));
+
+  assert.ok(
+    paginatedExecSync.length > 0,
+    'no single-line execSync of a paginated gh api call was found — if one was reformatted across lines, this check can no longer see it'
+  );
+
+  for (const line of paginatedExecSync) {
+    assert.match(
+      line,
+      /maxBuffer:/,
+      `a paginated gh api call is buffered through execSync without an explicit maxBuffer, so it dies with ENOBUFS once the listing passes 1 MiB: ${line.trim()}`
+    );
+  }
+});
