@@ -5178,6 +5178,9 @@
           "WorldAuthorityOverrideCount": "{count} systems override it",
           "WorldAuthorityOverrideOne": "{count} system overrides it",
           "WorldAuthorityNote": "Every crafting system uses {label} unless it overrides the break mode in its own Tool Rules.",
+          "WorldAuthorityNoteToolSpecific": "Each Tool tracks its own breakage · world default for every system",
+          "WorldAuthorityNoteCheckDriven": "The active check decides breakage · world default for every system",
+          "WorldDefaultsKicker": "World defaults",
           "WorldAuthorityReadOnly": "World default, set once for every Tool on the Tools Catalogue. Systems may override it.",
           "WorldAuthorityPreview": "The world break mode, unless a system overrides it.",
           "SortBreakage": "Breakage",
@@ -5868,7 +5871,6 @@
             "DisplayLabel": "Display label",
             "DisplayLabelHint": "The name every crafting system shows for this Tool.",
             "InheritCountOne": "{count} crafting system inherits this world default today.",
-            "Name": "Name",
             "Description": "Description",
             "InheritCount": "{count} crafting systems inherit this world default today.",
             "Missing": "This world record is no longer in the corpus. Return to the catalogue to pick another.",
@@ -5886,8 +5888,7 @@
             "Preview": "Player preview",
             "PreviewKicker": "What a player sees",
             "PreviewContext": "In {count} crafting systems",
-            "PreviewRules": "The world defaults, resolved",
-            "PreviewInheriting": "{count} systems inherit it"
+            "PreviewRules": "The world defaults, resolved"
           },
           "Inherit": {
             "StateInherited": "Inherited",
@@ -6016,6 +6017,9 @@
             "SystemRulesHead": "System rules",
             "SourceLinked": "Linked",
             "SourceUnlinked": "No source item",
+            "SystemCount": "{count} systems",
+            "SystemCountOne": "{count} system",
+            "SystemCountNote": "Each one inherits these defaults until it overrides a section",
             "Unavailable": "This world corpus could not be read, so nothing here can be listed or edited. Reload the world once its settings are readable."
           },
           "Membership": {

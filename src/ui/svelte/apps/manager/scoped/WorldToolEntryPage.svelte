@@ -63,7 +63,8 @@
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import Chip from '../Chip.svelte';
   import EditorTabs from '../EditorTabs.svelte';
-  import { toolBreakageSummary, toolOnBreakSummary } from '../tools/toolStudio.js';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import { toolBreakageSummary } from '../tools/toolStudio.js';
   import ScopedEntityPreview from './ScopedEntityPreview.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
@@ -196,7 +197,6 @@
   const breakageSummary = $derived(
     toolBreakageSummary(worldDefaultTool(), worldAuthority || DEFAULT_BREAK_MODE)
   );
-  const onBreakSummary = $derived(toolOnBreakSummary(worldDefaultTool()));
 
   /**
    * What the breakage section RESOLVES TO, in words.
@@ -234,11 +234,77 @@
   });
 
   /**
-   * What one on-break mode DOES, in words, for the summary line under its control.
+   * The two mode choices as RADIO CARDS rather than a segmented track.
+   *
+   * A SEGMENTED TRACK WAS THE WRONG CONTROL, and the design's picture is what says so: it
+   * offers each mode as a card carrying a glyph, a bold name and the sentence explaining what
+   * it does. A three-segment track states three bare labels and asks a GM to already know
+   * which of `Limited uses`, `Breakage chance` and `Dice expression` they want.
+   *
+   * `RadioCardGroup` is the shipped primitive for exactly this, and `tools/ToolBreakageTab`
+   * already renders these same two groups through it at SYSTEM scope. Reusing it - and the
+   * hint and glyph vocabulary it reads - is what stops world scope describing the same three
+   * modes differently from the system editor a GM reaches from the row beside it.
    */
-  const onBreakSummaryLabel = $derived(
-    onBreakModeLabel(onBreakSummary) || onBreakModeLabel('destroy')
+  const breakageModeOptions = $derived(
+    BREAKAGE_MODES.map((mode) => ({
+      value: mode,
+      label: breakageModeLabel(mode),
+      description: breakageModeDescription(mode),
+      icon: {
+        limitedUses: 'fas fa-hourglass-half',
+        breakageChance: 'fas fa-percent',
+        diceExpression: 'fas fa-dice-d20',
+      }[mode],
+    }))
   );
+
+  const onBreakOptions = $derived(
+    ON_BREAK_MODES.map((mode) => ({
+      value: mode,
+      label: onBreakModeLabel(mode),
+      description: onBreakModeDescription(mode),
+      icon: {
+        destroy: 'fas fa-trash',
+        flagBroken: 'fas fa-triangle-exclamation',
+        replaceWith: 'fas fa-right-left',
+      }[mode],
+    }))
+  );
+
+  function breakageModeDescription(mode) {
+    return {
+      limitedUses: text(
+        'FABRICATE.Admin.Manager.Tools.BreakageLimitedUsesHint',
+        'A fixed number of uses, then it breaks.'
+      ),
+      breakageChance: text(
+        'FABRICATE.Admin.Manager.Tools.BreakageChanceHint',
+        'A % chance to break each use.'
+      ),
+      diceExpression: text(
+        'FABRICATE.Admin.Manager.Tools.BreakageDiceHint',
+        'Roll a separate breakage check.'
+      ),
+    }[mode];
+  }
+
+  function onBreakModeDescription(mode) {
+    return {
+      destroy: text(
+        'FABRICATE.Admin.Manager.Tools.OnBreakDestroyHint',
+        'The tool is consumed and removed.'
+      ),
+      flagBroken: text(
+        'FABRICATE.Admin.Manager.Tools.OnBreakFlagHint',
+        'Sets a broken flag; appends " (Broken)".'
+      ),
+      replaceWith: text(
+        'FABRICATE.Admin.Manager.Tools.OnBreakReplaceHint',
+        'Replace it with a managed Component that can participate in repair routes.'
+      ),
+    }[mode];
+  }
 
   function breakageModeLabel(mode) {
     return {
@@ -624,27 +690,20 @@
             <p class="manager-kicker">
               {text('FABRICATE.Admin.Manager.Tools.Editor.HowItBreaks', 'How this Tool breaks')}
             </p>
-            <div
-              class="manager-world-tool-entry-modes"
-              role="radiogroup"
-              aria-label={sectionLabel('breakage')}
-            >
-              {#each BREAKAGE_MODES as mode (mode)}
-                <label
-                  class:is-selected={(defaults.breakage?.mode ?? 'limitedUses') === mode}
-                  data-world-tool-entry-breakage-mode={mode}
-                >
-                  <input
-                    type="radio"
-                    name="world-tool-breakage-mode"
-                    value={mode}
-                    checked={(defaults.breakage?.mode ?? 'limitedUses') === mode}
-                    onchange={() => patchSection('breakage', { mode })}
-                  />
-                  <span>{breakageModeLabel(mode)}</span>
-                </label>
-              {/each}
-            </div>
+            <RadioCardGroup
+              options={breakageModeOptions}
+              selectedValue={defaults.breakage?.mode ?? 'limitedUses'}
+              groupName="world-tool-breakage-mode"
+              columns={3}
+              legend={sectionLabel('breakage')}
+              dataGroup="world-tool-breakage-mode"
+              optionDataAttr="data-world-tool-entry-breakage-mode"
+              onChange={(mode) => patchSection('breakage', { mode })}
+            />
+            <!-- THE VALUE, not the mode. The card above already names the mode; this states
+                 what it currently resolves to, which no card can. The on-break section has no
+                 counterpart line because its mode IS its whole answer, and a line repeating
+                 the selected card's own label under it said nothing. -->
             <p class="manager-muted" data-world-tool-entry-breakage-summary>
               {breakageSummaryLabel}
             </p>
@@ -665,30 +724,16 @@
             <p class="manager-kicker">
               {text('FABRICATE.Admin.Manager.Tools.Editor.WhenItBreaks', 'When it breaks')}
             </p>
-            <div
-              class="manager-world-tool-entry-modes"
-              role="radiogroup"
-              aria-label={sectionLabel('onBreak')}
-            >
-              {#each ON_BREAK_MODES as mode (mode)}
-                <label
-                  class:is-selected={(defaults.onBreak?.mode ?? 'destroy') === mode}
-                  data-world-tool-entry-onbreak-mode={mode}
-                >
-                  <input
-                    type="radio"
-                    name="world-tool-onbreak-mode"
-                    value={mode}
-                    checked={(defaults.onBreak?.mode ?? 'destroy') === mode}
-                    onchange={() => patchSection('onBreak', { mode })}
-                  />
-                  <span>{onBreakModeLabel(mode)}</span>
-                </label>
-              {/each}
-            </div>
-            <p class="manager-muted" data-world-tool-entry-onbreak-summary>
-              {onBreakSummaryLabel}
-            </p>
+            <RadioCardGroup
+              options={onBreakOptions}
+              selectedValue={defaults.onBreak?.mode ?? 'destroy'}
+              groupName="world-tool-onbreak-mode"
+              columns={3}
+              legend={sectionLabel('onBreak')}
+              dataGroup="world-tool-onbreak-mode"
+              optionDataAttr="data-world-tool-entry-onbreak-mode"
+              onChange={(mode) => patchSection('onBreak', { mode })}
+            />
             <p class="manager-muted" data-world-tool-entry-inherit-count="onBreak">
               {format(
                 inheritCount('onBreak') === 1
@@ -880,6 +925,16 @@
   /* ── THE TAB BODY'S CARDS ──────────────────────────────────────────────────────────────
      One bordered panel per decision, which is what fills a pane the segmented control alone
      left two thirds empty. */
+  /* ── THIS ONE KEEPS A FILL, AND THAT IS ALSO MEASURED ───────────────────────────────────
+     The flattening pass that removed the fills from the segmented tracks does NOT apply
+     here. Sampled out of the design's own tool-editor frame, its three editor cards sit one
+     full ramp rung above the pane — a real surface, not a border on the page colour — while
+     the catalogue's list rows and inspector cards in the same design are flat ON the pane.
+     The two answers differ because the surfaces differ, so each was checked against its own
+     frame rather than against a rule of thumb.
+
+     `--fab-bg-1` lands on the sampled value to the byte, so this is an index-aligned token
+     rather than a new raw colour, and the seven themes keep their own ramps. */
   .manager-world-tool-entry-card {
     display: flex;
     flex: 0 0 auto;
@@ -888,7 +943,7 @@
     padding: var(--fab-space-3);
     border: 1px solid var(--fab-mv2-border);
     border-radius: 12px;
-    background: var(--fab-overlay-light-03);
+    background: var(--fab-bg-1);
     min-width: 0;
   }
 
@@ -954,6 +1009,10 @@
     font-size: 0.62rem;
   }
 
+  /* INFORMATION, NOT A WELL. This band states a value authored on another screen, and the
+     design tints it as information rather than recessing it — `--info-soft` over
+     `--info-border` in its own markup. It used to be `--fab-overlay-dark-08`, which read as
+     a fourth grey surface saying nothing about why the band is there. */
   .manager-world-tool-entry-mode {
     display: flex;
     flex: 0 0 auto;
@@ -961,14 +1020,14 @@
     align-items: center;
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-info-border);
     border-radius: 11px;
-    background: var(--fab-overlay-dark-08);
+    background: var(--fab-info-soft);
     min-width: 0;
   }
 
   .manager-world-tool-entry-mode i {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-info);
   }
 
   .manager-world-tool-entry-mode-copy {
@@ -1013,42 +1072,5 @@
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
-  }
-
-  .manager-world-tool-entry-modes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2xs);
-    padding: 3px;
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: 9px;
-    background: var(--fab-overlay-dark-08);
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-modes label {
-    display: flex;
-    flex: 1 1 0;
-    align-items: center;
-    justify-content: center;
-    min-width: 0;
-    padding: 6px var(--fab-space-2);
-    border-radius: 7px;
-    color: var(--fab-mv2-text-muted);
-    font-size: 0.72rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .manager-world-tool-entry-modes label.is-selected {
-    background: var(--fab-mv2-accent);
-    color: var(--fab-on-accent);
-  }
-
-  .manager-world-tool-entry-modes input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
   }
 </style>

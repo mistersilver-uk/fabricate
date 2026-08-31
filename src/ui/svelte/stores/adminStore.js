@@ -4549,6 +4549,20 @@ export function createAdminStore(services) {
       // undefined and silently counts zero, which is how the World > Currency subtitle came to
       // report every ladder as unadopted.
       currencyEnabled: s?.requirements?.currency?.enabled === true,
+      // WHETHER THIS SYSTEM AUTHORS ITS OWN TOOL BREAK MODE, and what it authored (issue
+      // 1373). The world Tools Catalogue states `{n} systems override it` beside the world
+      // default, which is a count of systems whose OWN token differs from the world's — a
+      // question only the per-system `toolBreakage` block answers.
+      //
+      // THE KEY IS ALWAYS PRESENT, even when nothing is authored, and that is the contract
+      // `breakModeOverridesKnown` tests: this list is a deliberate allowlist, so a consumer
+      // reaching for an absent `toolBreakage` reads undefined and counts ZERO, which renders
+      // as "no system overrides it" and is a WRONG number rather than a missing one. An
+      // always-present key with an empty `authority` lets the screen tell "nothing overrides
+      // it" from "this roster cannot answer".
+      toolBreakage: {
+        authority: typeof s?.toolBreakage?.authority === 'string' ? s.toolBreakage.authority : '',
+      },
       selected: s.id === resolvedSystemId,
     }));
 

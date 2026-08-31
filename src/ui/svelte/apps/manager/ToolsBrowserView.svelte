@@ -672,6 +672,20 @@
     min-width: 0;
   }
 
+  /* ── THE THREE FILLS ON THIS SCREEN ARE THE DESIGN'S OWN, AND THEY STAY ─────────────────
+     The flattening pass across these screens removes card fills that paint a surface the
+     design does not have. These three are not that: the membership filter, the sort select
+     and the two bordered buttons are RAISED CONTROLS, and the design fills each of them with
+     its own `--surface-soft` — the same token, not merely a similar one.
+
+     Measured out of the design's own tool-rules frame: the filter track and the sort select
+     sample exactly what `--fab-surface-soft` composites to over the pane colour. Removing
+     these fills would flatten a CONTROL into the page rather than flattening a card into it,
+     so they keep the token.
+
+     The SELECT is the one exception, and its own block says why: a translucent background on
+     a `<select>` opens a light native popup, so it inherits the shipped opaque fill instead
+     of the design's composited one. */
   .manager-tools-membership-filter {
     display: flex;
     flex: 0 1 auto;
@@ -731,6 +745,13 @@
      a full-row width: without both, the select took the whole sort row and pushed the
      direction toggle and the count onto lines of their own. This block is unlayered and the
      sheet's is layered, so it wins on cascade layer rather than on specificity. */
+  /* NO BACKGROUND DECLARATION, and that is a correctness fix rather than a tidy-up. The
+     design fills this control with its own translucent surface token — but a TRANSLUCENT
+     background on a `<select>` makes the browser open a LIGHT native popup, which
+     `manager-layout.test.js` gates against by name. The
+     shipped `.fabricate-manager select` rule already paints `--fab-mv2-bg`, one opaque rung
+     that lands within a few units of the design's composited value, so this block states
+     geometry only and inherits the fill every other manager select wears. */
   .manager-tools-sort-select {
     flex: 0 0 auto;
     width: auto;
@@ -740,7 +761,6 @@
     padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-mv2-border);
     border-radius: 8px;
-    background: var(--fab-surface-soft);
     color: var(--fab-mv2-text-muted);
     font-size: 0.68rem;
   }

@@ -1255,7 +1255,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       {
         container: '[data-scoped-list-inspector]',
-        target: '[data-world-tool-repair-seed="sm-tool-hammer"]',
+        target: '[data-world-tool-defaults="sm-tool-hammer"]',
       },
     ],
     position: { width: 1280, height: 900 },

@@ -50,12 +50,12 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
+  import IconFactRow from '../IconFactRow.svelte';
   import { toolBreakageSummary, toolOnBreakSummary } from '../tools/toolStudio.js';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import {
     breakModeOverrideCount,
     breakModeOverridesKnown,
-    toolBreakModeLabel,
     worldBreakModeOptions,
     worldToolSearchText,
     worldToolSorts,
@@ -162,6 +162,109 @@
     return Array.isArray(groups) ? groups.length : 0;
   }
 
+  /**
+   * How many crafting systems actually HAVE this Tool.
+   *
+   * Read off the projection's own JOIN and filtered on `member`, never `entry.systems.length`:
+   * that array carries one row per system in the world, member or not, so its length is the
+   * SYSTEM COUNT and would state the same number on every row.
+   *
+   * @param {object|null} entry
+   * @returns {number}
+   */
+  function memberCount(entry) {
+    const rows = Array.isArray(entry?.systems) ? entry.systems : [];
+    return rows.filter((row) => row?.member === true).length;
+  }
+
+  /**
+   * The four world defaults one Tool resolves to, as fact rows.
+   *
+   * The first three read through the same summary helpers the row badges and the system
+   * inspector use, so a GM cannot see one answer on the row and a different one in the panel.
+   * The fourth is the SEED, which is deliberately not an inherited section - see the header -
+   * so it states its own rule rather than an inherit count.
+   *
+   * @param {object|null} entry
+   * @returns {Array<{id: string, icon: string, title: string, subtitle: string}>}
+   */
+  function worldDefaultFacts(entry) {
+    const checkDriven = (worldAuthority || 'toolSpecific') === 'checkDriven';
+    return [
+      {
+        id: 'breakage',
+        icon: checkDriven ? 'fas fa-dice-d20' : 'fas fa-hourglass-half',
+        title: breakageLabel(entry),
+        subtitle: checkDriven
+          ? text(
+              'FABRICATE.Admin.Manager.Tools.Editor.PreviewCheckDriven',
+              'Check-driven \u00b7 follows the crafting roll'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Tools.Editor.PreviewToolSpecific',
+              'Tool-specific \u00b7 tracked per copy'
+            ),
+      },
+      {
+        id: 'on-break',
+        icon: 'fas fa-heart-crack',
+        title: format(
+          'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
+          'On break: {action}',
+          { action: onBreakActionLabel(entry).toLocaleLowerCase() }
+        ),
+        subtitle: text(
+          'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak',
+          'Runs immediately after breakage'
+        ),
+      },
+      {
+        id: 'reach',
+        icon: 'fas fa-diagram-project',
+        title: format(
+          memberCount(entry) === 1
+            ? 'FABRICATE.Admin.Manager.Scoped.List.SystemCountOne'
+            : 'FABRICATE.Admin.Manager.Scoped.List.SystemCount',
+          memberCount(entry) === 1 ? '{count} system' : '{count} systems',
+          { count: memberCount(entry) }
+        ),
+        subtitle: text(
+          'FABRICATE.Admin.Manager.Scoped.List.SystemCountNote',
+          'Each one inherits these defaults until it overrides a section'
+        ),
+      },
+      {
+        id: 'repair',
+        icon: 'fas fa-screwdriver-wrench',
+        title: format(
+          repairGroupCount(entry) === 1
+            ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
+            : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
+          repairGroupCount(entry) === 1 ? '{count} group' : '{count} groups',
+          { count: repairGroupCount(entry) }
+        ),
+        subtitle: text(
+          'FABRICATE.Admin.Manager.Tools.RepairSeedPreview',
+          'Copied once when a system adopts this Tool'
+        ),
+      },
+    ];
+  }
+
+  /**
+   * What one tool's world default DOES when it breaks, in words rather than as a badge.
+   *
+   * @param {object|null} entry
+   * @returns {string}
+   */
+  function onBreakActionLabel(entry) {
+    return {
+      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy the item'),
+      flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakFlag', 'Mark as broken'),
+      replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplace', 'Replace with component'),
+    }[toolOnBreakSummary(worldDefaultTool(entry))];
+  }
+
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
   const breakModeOptions = $derived(worldBreakModeOptions(worldAuthority, text));
   const overridesKnown = $derived(breakModeOverridesKnown(systems));
@@ -229,12 +332,20 @@
         </label>
       {/each}
     </div>
+    <!-- WHAT THE SELECTED MODE MEANS, not a sentence naming the segment already highlighted
+         two lines above it. The old copy read `Every crafting system uses Tool-specific unless
+         it overrides the break mode in its own Tool Rules`, which restates the control and the
+         override count on either side of it and says nothing about the rule itself. -->
     <p class="manager-muted manager-world-tool-break-note">
-      {format(
-        'FABRICATE.Admin.Manager.Tools.WorldAuthorityNote',
-        'Every crafting system uses {label} unless it overrides the break mode in its own Tool Rules.',
-        { label: toolBreakModeLabel(worldAuthority, text) }
-      )}
+      {(worldAuthority || 'toolSpecific') === 'checkDriven'
+        ? text(
+            'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteCheckDriven',
+            'The active check decides breakage \u00b7 world default for every system'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteToolSpecific',
+            'Each Tool tracks its own breakage \u00b7 world default for every system'
+          )}
     </p>
   </section>
 
@@ -270,32 +381,46 @@
   <span class="manager-world-tool-row-badges" data-world-tool-row-badges={entry.id}>
     <Chip tone="neutral" data-world-tool-row-breakage>{breakageLabel(entry)}</Chip>
     <Chip tone="neutral" data-world-tool-row-onbreak>{onBreakLabel(entry)}</Chip>
+    <!-- HOW MANY SYSTEMS HAVE IT, as plain text rather than a third chip. The two chips
+         beside it are what the Tool DOES; this is how far it reaches, which is a different
+         kind of fact, and the design sets it as a muted count for that reason. -->
+    <span class="manager-world-tool-row-reach" data-world-tool-row-systems={entry.id}>
+      {format(
+        memberCount(entry) === 1
+          ? 'FABRICATE.Admin.Manager.Scoped.List.SystemCountOne'
+          : 'FABRICATE.Admin.Manager.Scoped.List.SystemCount',
+        memberCount(entry) === 1 ? '{count} system' : '{count} systems',
+        { count: memberCount(entry) }
+      )}
+    </span>
   </span>
 {/snippet}
 
 {#snippet inspectorBody(entry)}
-  <div class="manager-world-tool-seed" data-world-tool-repair-seed={entry.id}>
-    <span class="manager-world-tool-seed-label"
-      >{text(
-        'FABRICATE.Admin.Manager.Scoped.Sections.RepairRequirements',
-        'Repair materials'
-      )}</span
-    >
-    <span class="manager-world-tool-seed-value">
-      {format(
-        repairGroupCount(entry) === 1
-          ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
-          : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
-        repairGroupCount(entry) === 1 ? '{count} group' : '{count} groups',
-        { count: repairGroupCount(entry) }
-      )}
-    </span>
-    <p class="manager-muted" data-world-tool-repair-seed-note>
-      {text(
-        'FABRICATE.Admin.Manager.Tools.RepairSeedNote',
-        'Copied once when a system adopts this Tool, then edited there. Changing it here never reaches a system that already has it.'
-      )}
+  <!--
+    THE WORLD DEFAULTS, AS FOUR FACT ROWS.
+
+    This snippet used to be a label, a group count and a two-sentence paragraph about seeding
+    - three lines of prose in the one place a GM is asking what the selected Tool DOES. What
+    the design puts here is the resolved answer for each world default, each a bold statement
+    over the line that qualifies it, and the seed is the fourth of them rather than an essay.
+
+    THE ROWS ARE `IconFactRow`, the shipped primitive the system inspector and the editor
+    preview both render, so one meaning has one geometry across all three surfaces.
+  -->
+  <div class="manager-world-tool-defaults" data-world-tool-defaults={entry.id}>
+    <p class="manager-kicker">
+      {text('FABRICATE.Admin.Manager.Tools.WorldDefaultsKicker', 'World defaults')}
     </p>
+    {#each worldDefaultFacts(entry) as fact (fact.id)}
+      <IconFactRow
+        icon={fact.icon}
+        title={fact.title}
+        subtitle={fact.subtitle}
+        dataAttr="data-world-tool-default"
+        dataValue={fact.id}
+      />
+    {/each}
   </div>
 {/snippet}
 
@@ -372,6 +497,17 @@
 
      The labels keep `flex: 1 1 0` and `min-width: 0` so the two segments stay equal width,
      which is the parity with `.manager-tools-authority-segments` the note above commits to. */
+  /* ── NO FILL, AND THAT IS MEASURED ──────────────────────────────────────────────────────
+     The design's whole content area is one flat surface, and a region reads as a region
+     because of its 1px border rather than because it is tinted. Sampled pixel by pixel out
+     of the design's own catalogue frame, its segmented track paints the PANE colour inside a
+     card one rung lighter, with a plain border doing the separation.
+
+     `--fab-overlay-dark-08` was painting a surface the design does not have, and painting it
+     faintly: sampled against our own frame it moved the track about eight units away from
+     its card, where the design has a full ramp rung. So the fill goes and the border stays.
+
+     `--fab-mv2-border` resolves to `--fab-border`, so no token change is needed with it. */
   .manager-world-tool-break-segments {
     display: flex;
     flex: 1 1 auto;
@@ -380,7 +516,6 @@
     padding: 3px;
     border: 1px solid var(--fab-mv2-border);
     border-radius: 9px;
-    background: var(--fab-overlay-dark-08);
     min-width: 0;
   }
 
@@ -428,22 +563,18 @@
     min-width: 0;
   }
 
-  .manager-world-tool-seed {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-chip);
-    align-items: baseline;
-    min-width: 0;
-  }
-
-  .manager-world-tool-seed-label {
-    color: var(--fab-mv2-text);
-    font-size: 0.72rem;
-    font-weight: 600;
-  }
-
-  .manager-world-tool-seed-value {
+  /* A muted count rather than a chip: the two chips beside it name what the Tool does, and a
+     third pill would read as a third property of the Tool instead of its reach. */
+  .manager-world-tool-row-reach {
     color: var(--fab-mv2-text-muted);
-    font-size: 0.72rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .manager-world-tool-defaults {
+    display: grid;
+    gap: var(--fab-space-2);
+    min-width: 0;
   }
 </style>
