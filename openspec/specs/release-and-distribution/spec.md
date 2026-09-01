@@ -36,6 +36,7 @@ It has no tester group and no retained cohort: it exists so a hotfix can be publ
 It identifies the bytes, as distinct from the cohort that receives them.
 - **build provenance** — the recorded identity of the build an artefact came from: its version, its source commit, and its build profile.
 - **change provenance** — evidence that a commit reaching the release or prerelease line is attributable to a specific reviewed change, as distinct from **build provenance**, which is the recorded identity of a build.
+- **resolution** — the content chosen where the two lines a forward-port combines cannot be combined automatically.
 
 A release artefact exists, and is not publicly obtainable, from the moment its version is minted.
 It becomes publicly obtainable only at release promotion.
@@ -214,7 +215,7 @@ Its manifest MUST nevertheless be left in place, so that the tooling and credent
 The prerelease line MUST always be positioned so that the next version it mints is numbered above every stable version already published to a channel that retains a cohort.
 A prerelease channel head that is a prerelease of such a stable version satisfies this, because Foundry does not consider a stable version newer than its own prereleases; a head belonging to an older version does not.
 Deferring the forward-port that keeps this true is not a delay but a deadlock: while the prerelease line is numbered below a published stable version, every version that line mints is numbered below it too, so the prerelease channel's head can never overtake the published version, and the registry lead prohibition refuses the very promotion that would have performed the forward-port.
-The remedy for a prerelease line that has fallen below a published stable version MUST be available without making any version publicly obtainable, because the refusal that reports the condition is itself what blocks the promotion.
+The remedy for a prerelease line that has fallen below a published stable version MUST be available without making any version publicly obtainable, because the refusal that reports the condition is itself what blocks the promotion, and it MUST remain available when the two lines cannot be combined automatically, which is precisely the state in which the line is stuck and no route around the deadlock exists.
 
 #### Scenario: the prerelease line has fallen below a published stable version
 
@@ -261,6 +262,7 @@ A stable version minted on the release line MUST be forward-ported into the prer
 A release promotion of a version built on the release line MUST confirm that the forward-port has happened, and MUST perform it if it has not, before any prerelease channel is written.
 The forward-port obligation binds the release line only, never a hotfix line.
 A forward-port that has already happened MUST be a no-op rather than a repetition, so that it can be invoked more than once without conflicting.
+A forward-port whose two lines cannot be combined automatically MUST remain completable; what completing it requires is stated in **Forward-port conflict resolution**.
 A forward-port MUST NOT assume the release line is content-identical to the prerelease line; what it must instead establish is stated in **Forward-port content provenance**.
 A release artefact MUST be created only from a pre-existing, pushed tag and MUST be pinned to that tag's commit; a release creation allowed to create a missing tag will create it from the default branch's head rather than the tested commit.
 The notes published with a version's release artefact MUST be the notes generated for that version when its branch built it, together with the notes of any version that was minted and published to a channel but superseded before it was ever made public — without which the public record silently omits every change a superseded version carried.
@@ -308,6 +310,7 @@ Whether a merge introduced content of its own MUST be established by reproducing
 A forward-port that cannot establish change provenance MUST refuse, and MUST NOT treat an absence of evidence as an absence of unreviewed content.
 A refusal MUST name the commits it could not account for.
 An override MAY exist, but it MUST NOT be the routine path, and a forward-port whose content IS accounted for MUST proceed without one.
+A forward-port completed from a supplied resolution is subject to this requirement unchanged: a resolution accounts for the conflict and for nothing else, and MUST NOT be treated as an override of this requirement or of any refusal it produces.
 
 #### Scenario: a forward-port carrying content authored through review
 
@@ -329,6 +332,61 @@ An override MAY exist, but it MUST NOT be the routine path, and a forward-port w
 - **WHEN** the evidence it needs is unavailable or incomplete
 - **THEN** it refuses and reports the state as unverifiable, rather than proceeding
 - **AND** the override does not apply to it, and is not offered as its remedy, because there is no established refusal to vouch for
+
+### Requirement: Forward-port conflict resolution
+
+A forward-port whose two lines cannot be combined automatically MUST report that state as a conflict distinct from a failure, and MUST name the content that could not be combined.
+It MUST be completable from a supplied resolution, and completing it MUST NOT require any person to write to the prerelease line, because the record of both lines' ancestry that keeps the prerelease line numbered above the released version is a write only the automation may make.
+A supplied resolution MUST be checked against both lines before it is recorded, and MUST NOT be accepted on the supplier's assertion that it is correct.
+A resolution MUST be pinned to the exact state of both lines it was produced against, and MUST be refused rather than reapplied if either line has moved, because a resolution applied to a state it did not resolve can silently discard content the other line has since gained.
+A resolution MUST NOT alter anything the two lines could be combined on automatically; it is confined to what could not be.
+A resolution MUST NOT introduce content present in neither line, and MUST NOT leave behind the marks of a difference that was never resolved.
+The outcome a resolution is expected to produce MUST be stated before it is applied and established afterwards, and a resolution whose stated outcome does not hold MUST be refused.
+A stated outcome that is not one of the outcomes this can establish MUST itself be a refusal, because a statement nothing recognises is a statement nothing checks.
+A resolution that is absent, unreadable, or not present in this repository MUST be refused, and that state MUST be reported as unverifiable rather than as a refusal, so that no override applies to it.
+A forward-port completed from a resolution MUST satisfy every other obligation of a forward-port in full, and the resolution MUST NOT relax any of them.
+
+What these checks establish is bounded, and the bound MUST be stated wherever this capability is described rather than left to be discovered.
+They establish that a resolution reached no further than the conflict, introduced no content neither line carries, left no unresolved difference behind, and produced the outcome it declared.
+They do NOT establish that a resolution kept what the release line was bringing back: a resolution that silently drops it passes every one of them, and the completed forward-port then records that line's ancestry, so the loss is never reported again.
+They detect content duplicated from what both lines already carry only where the stated outcome is that the prerelease line's content is unchanged.
+A resolution MUST therefore be reviewable as a proposed change against the prerelease line before it is applied, because that review is the only place either omission can be seen.
+
+#### Scenario: a forward-port whose lines cannot be combined automatically
+
+- **WHEN** a forward-port's two lines conflict and no resolution has been supplied
+- **THEN** it reports a conflict rather than a generic failure, names the content that could not be combined, and nothing is written to the prerelease line
+
+#### Scenario: completing a forward-port from a supplied resolution
+
+- **WHEN** a resolution is supplied for the exact state of both lines it was produced against, and every check of it holds
+- **THEN** the forward-port is completed and recorded carrying both lines' ancestry, without any person writing to the prerelease line
+- **AND** the change provenance of everything it carries is established exactly as it is for any other forward-port
+
+#### Scenario: a resolution produced against a line that has since moved
+
+- **WHEN** either line has moved since the resolution was produced
+- **THEN** the resolution is refused rather than reapplied, and the failure names producing a new one against the current state as the remedy
+
+#### Scenario: a resolution that reaches beyond the conflict
+
+- **WHEN** a resolution alters content the two lines could be combined on automatically, or introduces content present in neither line
+- **THEN** it is refused, because that content has been reviewed nowhere
+
+#### Scenario: a resolution whose stated outcome does not hold
+
+- **WHEN** a resolution is stated to leave the prerelease line's content unchanged and the completed forward-port would change it
+- **THEN** it is refused, naming the difference
+
+#### Scenario: a resolution whose stated outcome is not one that can be established
+
+- **WHEN** the outcome stated for a resolution is not one of those this can establish
+- **THEN** it is refused, rather than applied with that statement left unchecked
+
+#### Scenario: a resolution offered as an override
+
+- **WHEN** a forward-port completed from a resolution would carry content it cannot attribute to a change reviewed against the release line
+- **THEN** it fails on that account regardless of the resolution, which accounts only for the conflict
 
 ### Requirement: Promotion-gated public availability
 
