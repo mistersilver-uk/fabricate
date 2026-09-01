@@ -1438,6 +1438,18 @@ test('the completion script runs at BOTH merge sites, anchored, and never withou
 test('the completion script builds the merge itself, pushes nothing, and makes no verdict', () => {
   const body = scriptStatements(COMPLETE_MERGE_SCRIPT).join('\n');
 
+  // The runbook quotes these two phrases verbatim to tell an operator how to read the job log, and
+  // nothing else guards that mirror: reword either message and CONTRIBUTING.md silently starts
+  // describing output the job no longer produces, on a path that runs once every few years.
+  const runbook = read('CONTRIBUTING.md');
+  for (const quoted of [
+    "the forward-port's merge of origin/release into main CONFLICTED",
+    'left no conflicting paths behind',
+  ]) {
+    assert.ok(body.includes(quoted), `the completion script must still print ${JSON.stringify(quoted)}`);
+    assert.ok(runbook.includes(quoted), `CONTRIBUTING.md must still quote ${JSON.stringify(quoted)}`);
+  }
+
   // BOTH PARENTS, IN THAT ORDER, and the tree taken wholesale. The order records `origin/main` as
   // the first parent, which is what makes the pushed commit a merge INTO main; taking the tree
   // object rather than driving the conflicted index is what lets a resolution express a DELETION.

@@ -99,6 +99,14 @@ if [ -z "$RESOLUTION" ]; then
   exit 2
 fi
 
+# Record what this script resolved, under a ref of our own, so the gate that runs next decides on the
+# SAME commit rather than re-resolving independently. Without it, a `resolution_ref` given as a branch
+# name resolves here (the fetch leaves it in FETCH_HEAD) but not in the gate, whose clone has only
+# `main` and `release` — so the job would complete the merge from a resolution and then, one step
+# later, report that the very same ref does not resolve. It also removes any possibility of the two
+# scripts resolving different commits.
+git update-ref refs/fabricate/resolution "$RESOLUTION"
+
 # ── 5. RE-DERIVE THE MERGE ──────────────────────────────────────────────────────────────────────
 COMPLETED="$(git commit-tree "${RESOLUTION}^{tree}" -p origin/main -p origin/release -m "chore: forward-port release into main (${REASON}), completed from conflict resolution ${RESOLUTION}")"
 git reset --hard "$COMPLETED"

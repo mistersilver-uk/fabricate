@@ -40,18 +40,10 @@ export const OVERRIDE_HINT = 'OVERRIDE-HINT-SENTINEL';
 /** Written to stderr by every `gh` stub, so "no API call was made" is provable. */
 export const GH_CALLED = 'GH-STUB-WAS-CALLED';
 
-/**
- * git's conflict markers, BUILT rather than written.
- *
- * A literal seven-character run at column 0 in this file would be a marker as far as the gate's own
- * A6 check is concerned, and `CONTRIBUTING.md`'s forward-port runbook is under the same rule — the
- * region most likely to conflict next is the one that documents conflicts.
- */
-export const MARKERS = {
-  ours: `${'<'.repeat(7)} HEAD`,
-  divider: '='.repeat(7),
-  theirs: `${'>'.repeat(7)} origin/release`,
-};
+// A literal seven-character marker run at column 0 in this file would be a marker as far as the
+// gate's own A6 check is concerned, and `CONTRIBUTING.md`'s forward-port runbook is under the same
+// rule — the region most likely to conflict next is the one that documents conflicts. The fixtures
+// below therefore let git write its own markers rather than spelling any out.
 
 /**
  * The real `git`, resolved ONCE and by absolute path, before any stub directory exists.

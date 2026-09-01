@@ -75,6 +75,14 @@
 
 set -euo pipefail
 
+# Every path this script reads from git is fed back to git as a pathspec, so the two forms MUST
+# agree. `core.quotePath` defaults to true, which renders a non-ASCII path as a quoted, escaped
+# string — a form no real path matches, because no real path contains a quote. Left on, the blob
+# lookup for such a path returns empty and A6 and A7 would skip it entirely, so a resolution could
+# land conflict markers on main inside any non-ASCII-named file. Set through the environment rather
+# than per-command, so a path-reading command added later cannot miss it.
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.quotePath GIT_CONFIG_VALUE_0=false
+
 # Resolved from this script's OWN location rather than from the caller's working directory. The
 # workflow invokes it from the repository root; the executed integration test invokes it from a
 # throwaway repository somewhere else entirely. Both must reach the same verifier.
@@ -200,10 +208,23 @@ merge_content_status() {
 #
 # Read through `git ls-tree` rather than `git show <tree-ish>:<path>` deliberately. The colon form is
 # rewritten by MSYS path conversion on the Windows hosts this repository's executed tests run on, and
-# an absent path is an ERROR in either form — which `set -euo pipefail` would turn into a silent
-# mid-check death on exactly the modify/delete resolutions this branch exists to complete.
+# an absent path is an ERROR in either form. Note `errexit` is NOT in force inside verify_resolution:
+# bash suppresses it for a function called in an `&&`/`||` list, and the call site below is one. A
+# failing command therefore does not end the script — it carries on with an empty variable, which is
+# the fail-open direction, so each read is checked explicitly rather than trusted to abort.
 resolution_blob_oid() {
   git ls-tree "$1" -- "$2" | awk '{print $3}'
+}
+
+# True when a tree-ish genuinely records nothing at a path, as distinct from a lookup that returned
+# nothing for some other reason.
+#
+# The distinction is load-bearing: an empty blob oid means either "the resolution deleted this path",
+# which this design intends to support, or "the lookup did not match", which must fail closed. Only
+# the first may be skipped. Answered from the whole recursive listing rather than a second pathspec,
+# so a pathspec that fails to match cannot answer this question the same way twice.
+resolution_path_absent() {
+  ! git ls-tree -r --name-only "$1" | LC_ALL=C grep -qxF -- "$2"
 }
 
 # One path's blob as a sorted, unique set of its non-blank lines. An absent blob is the EMPTY set.
@@ -267,7 +288,12 @@ verify_resolution() {
   esac
 
   # ── A1. THE RESOLUTION IS PRESENT IN THIS REPOSITORY ──────────────────────────────────────────
-  if ! resolution="$(git rev-parse --verify --quiet "${RESOLUTION_REF}^{commit}")"; then
+  # `refs/fabricate/resolution` is what the completion script recorded, and it is preferred so both
+  # scripts decide on the SAME commit. It also makes a `resolution_ref` given as a branch name work:
+  # the completion script's fetch resolved it, whereas re-resolving the name here would not, because
+  # this clone carries only `main` and `release`.
+  if ! resolution="$(git rev-parse --verify --quiet 'refs/fabricate/resolution^{commit}')" &&
+    ! resolution="$(git rev-parse --verify --quiet "${RESOLUTION_REF}^{commit}")"; then
     echo "::error::resolution_ref '${RESOLUTION_REF}' does not resolve to a commit in this repository, so nothing about the resolution could be read at all. That is UNVERIFIABLE rather than refused, and no override applies to it, because there is no established refusal to vouch for. Push the resolution to this repository — as a branch, never to main — and dispatch again with its sha."
     return 2
   fi
@@ -308,8 +334,9 @@ verify_resolution() {
 
   # ── THE RE-MERGE THE REMAINING CHECKS ARE MEASURED AGAINST ────────────────────────────────────
   # `git merge-tree --write-tree` EXITS 1 on conflict, which is the expected outcome here, so its
-  # status is captured exactly as merge_content_status captures it. Left uncaptured, `set -e` would
-  # end the script mid-check with no message at all.
+  # status is captured exactly as merge_content_status captures it. Capturing it is what makes the
+  # three outcomes distinguishable; `errexit` would not abort here in any case, because it is
+  # suppressed throughout a function called in an `&&`/`||` list.
   merge_tree_output="$(git merge-tree --write-tree "$p1" "$p2")" && merge_tree_status=0 ||
     merge_tree_status=$?
   if [ "$merge_tree_status" -eq 0 ]; then
@@ -327,6 +354,15 @@ verify_resolution() {
   stage_paths="$(printf '%s\n' "$merge_tree_output" |
     awk -F'\t' '$1 ~ /^[0-7]{6} [0-9a-f]{40,64} [123]$/ { print $2 }' | LC_ALL=C sort -u)"
   permitted="$(resolution_permitted_paths "$conflict_tree" "$p1" "$p2" "$stage_paths")"
+  # `permitted` cannot legitimately be empty here: the re-merge conflicted, so `stage_paths` is
+  # non-empty by construction and the union contains at least it. Empty therefore means a read
+  # failed — and because `errexit` is suppressed inside this function (see the call site), a failed
+  # read carries on with an empty variable rather than aborting. Left unchecked, that would make A5
+  # pass on an empty difference and A6 and A7 loop over nothing, leaving A8 to decide alone.
+  if [ -z "$permitted" ]; then
+    echo "::error::the set of paths a resolution may alter came back empty, which cannot happen for a merge whose parents conflict, so the reads that establish it did not succeed. That is unverifiable rather than a refusal."
+    return 2
+  fi
 
   # ── A5. THE RESOLUTION REACHED NO FURTHER THAN THE CONFLICT ───────────────────────────────────
   changed="$(git diff --name-only "$conflict_tree" "$head_tree" | sed '/^$/d' | LC_ALL=C sort -u)"
@@ -337,7 +373,7 @@ verify_resolution() {
     resolution_list "$reached_beyond"
     echo "::error::The only paths it may alter are those the automatic merge composed or could not settle:"
     resolution_list "$permitted"
-    echo "::error::The remedy is to recompute the resolution, changing nothing outside that set, and dispatch again."
+    echo "::error::The remedy is to recompute the resolution, changing nothing outside that set, and dispatch again. If the automatic merge took a side verbatim and got it WRONG on a path outside that set, this path cannot complete it: land the correction on the release line through a reviewed pull request first, and forward-port afterwards."
     return 1
   fi
 
@@ -345,12 +381,18 @@ verify_resolution() {
   # Anchored to git's actual marker form — a seven-character run at column 0 followed by a space or
   # the end of the line — rather than to a substring, because prose about conflicts (this
   # repository's own contributing guide included) legitimately contains those characters.
-  # A path the resolution DELETED has no blob to read. That is a resolution this design intends to
-  # support, so it is skipped rather than allowed to end the check under `set -euo pipefail`.
+  # A path the resolution DELETED has no blob to read, and that is a resolution this design intends
+  # to support, so it is skipped. An empty blob oid for a path that IS still in the tree is a lookup
+  # that failed, not a deletion, and skipping it would silently exempt that path from this check and
+  # from A7 — so it refuses as unverifiable instead.
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     oid="$(resolution_blob_oid HEAD "$path")"
-    [ -n "$oid" ] || continue
+    if [ -z "$oid" ]; then
+      resolution_path_absent HEAD "$path" && continue
+      echo "::error::${path} is recorded in the tree this run would push, but its content could not be read, so it could be checked neither for unresolved differences nor for invented lines. That is unverifiable rather than a refusal."
+      return 2
+    fi
     markers="$(git cat-file blob "$oid" | grep -c -E '^(<{7}|\|{7}|={7}|>{7})( |$)' || true)"
     if [ "${markers:-0}" -gt 0 ]; then
       echo "::error::${path} still carries ${markers} line(s) marking a difference that was never resolved, so a partially-resolved file would land on main. Finish resolving it, recompute the resolution, and dispatch again."
@@ -365,6 +407,7 @@ verify_resolution() {
   # invented text inside a conflicted hunk, which is why it stays.
   while IFS= read -r path; do
     [ -n "$path" ] || continue
+    # A6 has already refused the unreadable case, so an empty oid here is a genuine deletion.
     [ -n "$(resolution_blob_oid HEAD "$path")" ] || continue
     invented="$(LC_ALL=C comm -23 <(resolution_blob_lines HEAD "$path") \
       <({

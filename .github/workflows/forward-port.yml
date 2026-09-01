@@ -289,7 +289,8 @@ jobs:
         if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' }}
         env:
           REASON: ${{ inputs.reason }}
-          # Consulted ONLY by the completion script below, and only when the merge conflicts. The
+          # Read only on the conflict path: RESOLUTION_REF by the completion script, RESOLUTION_EFFECT by
+          # the gate that runs after it. The
           # gate re-reads them itself at the next step, which is where every judgment about the
           # resolution is made (githubactions:S7630 — env:, never interpolated into the body).
           RESOLUTION_REF: ${{ inputs.resolution_ref }}
@@ -370,7 +371,10 @@ jobs:
             echo "::notice::Forward-ported release into main and pushed it. This triggers beta.yml, which mints the next prerelease ABOVE the released version."
             exit 0
           fi
-          echo "::warning::The push was rejected — main moved while this run was merging. Retrying once against the fresh tip."
+          echo "::warning::The push was rejected. Retrying once against the fresh tip."
+          # Captured BEFORE the re-fetch so whether main actually moved can be derived rather than
+          # assumed. A rejected push usually means it moved, but not always.
+          MAIN_BEFORE_REFETCH="$(git rev-parse origin/main)"
           # Re-fetch ONLY origin/main and RE-PERFORM the merge: a bare re-push of the stale merge
           # commit fails identically and would make this "retry" a no-op. Do NOT copy step 4's
           # `git fetch origin main release --force --tags` here — freezing the `theirs` side to the
@@ -378,12 +382,18 @@ jobs:
           # nothing gated.
           git fetch origin main --force
           git checkout -B main origin/main
-          # A CONFLICT here has no retry that can pass, and the message says so rather than implying
-          # one: this retry runs because main moved, and a moved main is exactly what invalidates a
-          # resolution pinned to the main this run started from. Both reachable outcomes are red, and
-          # that is correct — the remedy is a new resolution, not another attempt at this one.
+          # This retry runs because the PUSH was rejected, which is USUALLY a moved main but is also
+          # a transient remote failure or a ruleset rejection. So whether main actually moved is
+          # derived here rather than asserted: asserting it would print a red annotation stating
+          # something false on a run that then goes green, because a resolution pinned to an
+          # unchanged main still passes A2 and still pushes.
+          if [ "$MAIN_BEFORE_REFETCH" = "$(git rev-parse origin/main)" ]; then
+            MOVED_NOTE="origin/main did NOT move, so the push was rejected for some other reason and any supplied resolution is still valid."
+          else
+            MOVED_NOTE="origin/main MOVED, which invalidates a resolution pinned to the origin/main this run started from: recompute the resolution against the current origin/main and dispatch the forward-port again."
+          fi
           if ! git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"; then
-            echo "::error::this retry re-merged against a MOVED origin/main and conflicted. A conflicted forward-port has no retry: any resolution supplied for this run was pinned to the origin/main this run started from. Recompute the resolution against the current origin/main and dispatch the forward-port again."
+            echo "::error::this retry's re-merge conflicted. ${MOVED_NOTE}"
             bash scripts/forward-port-complete-merge.sh || exit 1
           fi
           # The WHOLE gate is RE-RUN rather than assumed, through the same script the first pass
