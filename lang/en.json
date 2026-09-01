@@ -5826,7 +5826,7 @@
           "Inherit": {
             "StateInherited": "Inherited",
             "StateOverridden": "Overridden",
-            "ToggleLabel": "Fall back to the world default"
+            "ToggleLabel": "Override the world default for this system"
           },
           "Essence": {
             "BackToCatalogue": "Back to the catalogue",

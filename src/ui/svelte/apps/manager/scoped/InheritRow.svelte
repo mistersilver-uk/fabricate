@@ -15,17 +15,31 @@
   get a heading, a rule and a caption wrapped around a single control — chrome that costs more
   vertical space than the thing it frames, and says nothing the row does not.
 
+  ON IS OVERRIDDEN, OFF IS INHERITING (issue 1372, maintainer parity round). The switch means
+  "this system sets its own", so it reads `on={!row.inherited}`. It shipped inverted — `is-on`
+  while inheriting — which put it in direct contradiction with the state chip beside it and with
+  every note the essence editor writes under it: `Turn on to run a different macro here.` sat
+  beside a switch that was already on, and `Turn off to fall back to {name}.` beside one that was
+  already off. Both design frames draw the corrected polarity — `compare-images/PROTO-essence-
+  rules-editor.png` puts `Inheriting the world default` beside a grey switch and `Overridden for
+  Mythwright Forge` beside a filled one, and `tmp/proto/tool-rules-editor.png` draws the tool
+  editor's `Inheriting` row the same way. Nothing else changed: `onToggle` already reported the
+  NEXT INHERIT value rather than the next switch position, so the write path was correct
+  throughout and only the reading of it was reversed.
+
   THE COPY IS "FALL BACK", NOT "DISCARD". `setSectionInheritance` RETAINS the dormant local
   override when a switch goes back on, so nothing is lost and no confirmation is required. The
-  note therefore states what the section WILL resolve to, never what would be thrown away.
+  note therefore states what the section WILL resolve to, never what would be thrown away. That
+  reassurance lives in the NOTE — "Turn off to fall back to {name}." — rather than in the
+  switch's own name, which has to say what turning it ON does.
 
   THE INHERIT SWITCH WAS HAND-ROLLED AND IS NOW `<StatusToggle>` (issue 1040). The debt this
   paragraph used to record — every Manager on/off control emitting `.manager-status-toggle` with
   its `-track`, `-knob` and `-label` children by hand — is paid: the primitive owns that tree and
   this row calls it. It calls it in the TRACK-ONLY form — `ariaLabel` and no `label` — which is a
   ruling of issue 1372 rather than a variation on 1040's conversion: the reading this switch used
-  to render clipped to `Fall ...` in a compact switch and repeated what the row's own heading,
-  state chip and note already said. There is therefore exactly ONE wording, passed once, and it
+  to render clipped to a meaningless first word in a compact switch and repeated what the row's
+  own heading, state chip and note already said. There is therefore exactly ONE wording, passed once, and it
   is the accessible name; the drift the primitive exists to end is a SECOND, differently worded
   name, not the absence of a caption.
 
@@ -79,6 +93,18 @@
       (row) => !section || row.section === section
     )
   );
+
+  // THE NAME OF THE CONTROL, WHICH IS WHAT TURNING IT ON DOES. It is one string for both
+  // positions, because an accessible name that changed with the state would announce the switch
+  // as two different controls; `aria-pressed`, which `StatusToggle` derives from `on`, is what
+  // carries the position. The old name — "Fall back to the world default" — named the OFF
+  // position, which was survivable only while the switch was wired the wrong way round.
+  const toggleName = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
+      'Override the world default for this system'
+    )
+  );
 </script>
 
 {#each rows as row (row.section)}
@@ -100,22 +126,18 @@
       THE SENTENCE IS THE ACCESSIBLE NAME, NOT VISIBLE TEXT, SO NO `label` IS PASSED.
 
       `.manager-status-toggle-label` is `overflow: hidden` with `text-overflow: ellipsis`
-      inside a compact switch, so "Fall back to the world default" rendered as `Fall ...` —
-      a truncation with no meaning at all. It was also redundant three times over: this row
-      already shows the section name, a state chip reading Inherited or Overridden, and a note
-      naming the inherited value. The switch needs a name, not a caption, which is exactly the
-      `ariaLabel`-without-`label` form `StatusToggle` documents for its track-only sites.
+      inside a compact switch, so the sentence rendered as `Turn ...` — a truncation with no
+      meaning at all. It was also redundant three times over: this row already shows the section
+      name, a state chip reading Inherited or Overridden, and a note naming the inherited value.
+      The switch needs a name, not a caption, which is exactly the `ariaLabel`-without-`label`
+      form `StatusToggle` documents for its track-only sites.
+
+      `on={!row.inherited}` — ON IS OVERRIDDEN. See the polarity paragraph in the docblock.
     -->
     <StatusToggle
-      on={row.inherited}
-      ariaLabel={text(
-        'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
-        'Fall back to the world default'
-      )}
-      title={text(
-        'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
-        'Fall back to the world default'
-      )}
+      on={!row.inherited}
+      ariaLabel={toggleName}
+      title={toggleName}
       {disabled}
       data-scoped-inherit-toggle={row.section}
       onclick={() => onToggle(row.section, !row.inherited)}
