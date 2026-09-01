@@ -5841,6 +5841,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the override face. Adopting `hb-tool-mortar` into Smithing is what produces a membership
     // record that inherits every section, and opening its rules is what photographs the
     // `Inheriting` pill, the `World default: …` line and the read-only world value beneath it.
+    //
+    // IT LANDS ON `Requirements`, NOT ON THE DEFAULT `Breakage` TAB, and that is the point of the
+    // frame rather than a detail of it. `prerequisites` and `bonus` are the two sections that
+    // joined `TOOL_SECTIONS` at `1.31.0`, and they are the two the editor got wrong: `breakage`
+    // only ever LOOKED inherited because adoption used to copy the world value onto the in-system
+    // record, so a frame of the Breakage tab could not tell a union read from a raw one. The
+    // Requirements tab's two cards can — the lab world authors a world `prerequisites` and
+    // `bonus` for `hb-tool-mortar` precisely so they resolve to something a screenshot can read —
+    // and the effective-rules rail beside them states all FOUR sections in the same frame, so the
+    // inheriting breakage face is not lost by moving tab.
     id: 'manager-tool-rules-inheriting-1280x720',
     label: 'Manager — Tool rules inheriting the world defaults 1280x720',
     reaches: 'beyond',
@@ -5851,9 +5861,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-tool-membership-option="all"]' },
       { selector: '[data-tool-add-to-system="hb-tool-mortar"]' },
       { selector: '[data-tool-edit-rules="hb-tool-mortar"]' },
+      { selector: '#tool-tab-requirements' },
     ],
     expectView: 'tool-edit',
-    expectSelector: '[data-tool-rule-card="breakage"][data-tool-rule-state="inheriting"]',
+    expectSelector: '[data-tool-rule-card="bonus"][data-tool-rule-state="inheriting"]',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/],

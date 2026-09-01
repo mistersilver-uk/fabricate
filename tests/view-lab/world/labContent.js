@@ -3949,6 +3949,28 @@ export function buildLabContent() {
             ...(tool.id === 'sm-tool-hammer'
               ? { repairRequirements: [{ id: 'sm-tool-hammer-repair', ingredients: [] }] }
               : {}),
+            // THE TWO SECTIONS THAT JOINED `TOOL_SECTIONS` AT `1.31.0`, AUTHORED ON ONE TOOL
+            // (issue 1373). Without a world value for either, the only frame that photographs
+            // the rules editor's inheriting face could not show them working at all: both cards
+            // and both effective-rules rows would read the canonical empty whether the editor
+            // resolved them from the world or from the in-system record, which is exactly how
+            // the defect stayed hidden. `hb-tool-mortar` is the tool the inheriting case adopts,
+            // so it is the one that has to carry them.
+            //
+            // `gateMode: 'bonus'` rather than `usability`: a usability gate makes the Tool
+            // unusable for a character that fails it, which would reach the player gathering and
+            // crafting frames. Withholding the bonus states the same rule on every Tool screen
+            // and blocks nothing.
+            ...(tool.id === 'hb-tool-mortar'
+              ? {
+                  prerequisites: {
+                    enabled: true,
+                    ids: ['hb-prereq-nature'],
+                    gateMode: 'bonus',
+                  },
+                  bonus: { enabled: true, expression: 'prof' },
+                }
+              : {}),
           },
         ])
       ),
@@ -3963,6 +3985,18 @@ export function buildLabContent() {
             systemId,
             // ONE OVERRIDE among them, so the catalogue's per-section inherit counts are a
             // real number rather than "every system, always".
+            //
+            // AND `prerequisites` AND `bonus` ARE DELIBERATELY NOT AUTHORED HERE (issue 1373),
+            // even though the world default above now authors both for `hb-tool-mortar`. The
+            // lab seeds no `migrationVersion`, so every registered migration runs on every lab
+            // build, and `1.31.0`'s `migrateToolRequirementSections` is what records both
+            // sections as overrides on EVERY membership record that has not authored a switch
+            // — writing the switch AND the canonical-empty value it reads off the in-system
+            // Tool. Authoring the switch here instead SUPPRESSES that pass by its own
+            // per-section guard and leaves the switch standing with NO stored value, which
+            // `resolveScopedDefinition` treats as no override at all: measured, herbalism's
+            // mortar then resolved to the WORLD prerequisite and check bonus — the exact
+            // leak into every herbalism frame that authoring it was meant to prevent.
             inherit: entityId === 'sm-tool-anvil' ? { breakage: false } : {},
             enabled: true,
             ...(entityId === 'sm-tool-anvil'
