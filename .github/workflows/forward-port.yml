@@ -43,7 +43,8 @@ name: "Forward-port release into main"
 # otherwise establishes mechanically — through `scripts/forward-port-provenance.mjs` — that every
 # commit it would carry was reviewed against the release line. `allow_content` survives as a
 # last-resort override that still prints the refusal it overrode, but it is no longer the ordinary
-# path, and it does not override the own-merge guard.
+# path, it does not override the own-merge guard, and it applies ONLY to a refusal — never to a run
+# that could not complete its verification, where there is no established refusal to vouch for.
 #
 # ── SONAR ───────────────────────────────────────────────────────────────────────────────────────
 # githubactions:S7630 — no `${{ inputs.* }}` or `${{ github.* }}` inside any `run:` BODY; every
@@ -81,7 +82,7 @@ on:
         type: string
         default: ""
       allow_content:
-        description: "Last-resort override of the content gate. The gate now verifies provenance itself, so this is not the ordinary path; it never overrides the own-merge guard."
+        description: "Last-resort override of a content-gate REFUSAL. The gate now verifies provenance itself, so this is not the ordinary path; it never overrides the own-merge guard, and it does not apply when the verification could not be completed at all."
         required: false
         type: boolean
         default: false
@@ -118,7 +119,7 @@ on:
         type: string
         default: ""
       allow_content:
-        description: "Last-resort override of the content gate. The gate now verifies provenance itself, so this is not the ordinary path; it never overrides the own-merge guard."
+        description: "Last-resort override of a content-gate REFUSAL. The gate now verifies provenance itself, so this is not the ordinary path; it never overrides the own-merge guard, and it does not apply when the verification could not be completed at all."
         required: false
         type: boolean
         default: false
@@ -296,8 +297,8 @@ jobs:
           # only `contents: read`, and a called workflow can never exceed its caller's grant.
           GH_TOKEN: ${{ steps.apptoken.outputs.token }}
         run: |
-          echo "----- file changes this forward-port would carry onto main -----"
-          git diff --stat origin/main
+          # The gate prints the diff itself, on the one path where it matters (the content path) and
+          # with its own reasoning attached. Printing it here as well only duplicated the log.
           bash scripts/forward-port-content-gate.sh || exit 1
 
       # ── STEP 10 ───────────────────────────────────────────────────────────────────────────────
@@ -340,8 +341,6 @@ jobs:
           # one code path that bypasses pull-request review. The re-merge is also a NEW merge commit,
           # so the own-merge guard has to see it too, and the range is recomputed against the
           # freshly fetched origin/main.
-          echo "----- file changes the re-merge would carry onto main -----"
-          git diff --stat origin/main
           bash scripts/forward-port-content-gate.sh || exit 1
           if ! git push origin HEAD:main; then
             echo "::error::The forward-port push was rejected twice. main is still numbered below the released version, so the prerelease line is jammed until this is completed: dispatch .github/workflows/forward-port.yml manually (dry_run: false) to finish it."

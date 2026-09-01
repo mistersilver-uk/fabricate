@@ -55,7 +55,9 @@
  * commands below, since the real command only ever exercises the happy path.
  */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -94,6 +96,30 @@ const ESLINT_SCRIPTS_GLOB = /files:\s*\[\s*'scripts\/\*\*\/\*\.\{([^}]+)}'/;
  * the array's length; that is the point, exactly as a golden file restates its expected value.
  */
 const ACKNOWLEDGED_UNGATED_COUNT = 15;
+
+/**
+ * The `.sh` files under `scripts/`, pinned as a list.
+ *
+ * SHELL IS NOT COVERED BY THE MACHINERY ABOVE, AND CANNOT BE.
+ * ----------------------------------------------------------
+ * `LINTED_EXTENSIONS` mirrors the `scripts/**` glob in `eslint.config.js` block 6 and is asserted
+ * against it, so adding `.sh` there is not an option: it would immediately fail that mirror test,
+ * and ESLint cannot parse shell anyway. Prettier has no shell parser either. So a `.sh` file under
+ * `scripts/` is invisible to every gate this repository runs — not linted, not formatted, not in
+ * `KNOWN_UNGATED_SCRIPTS`, and not visible to the ratchet, which stays green with nothing
+ * acknowledged.
+ *
+ * That was demonstrated rather than assumed: a syntax error introduced into
+ * `scripts/forward-port-content-gate.sh` gave `bash -n` exit 2 while `lint`, `format:check`,
+ * `lint:md` and both forward-port suites passed. It would have surfaced for the first time
+ * mid-release, on the highest-consequence automated write this repository performs.
+ *
+ * So shell gets its own two-part ratchet: this pinned list, which a new `.sh` cannot join by
+ * accident, and the `bash -n` parse below. The list is pinned rather than derived for the same
+ * reason `ACKNOWLEDGED_UNGATED_COUNT` is pinned exactly — a derived list would grow silently, and
+ * growth here means a new unlinted shell script on the release path.
+ */
+const SHELL_SCRIPTS = ['scripts/forward-port-content-gate.sh'];
 
 /** Characters that make a `scripts/…` token something other than one literal path. */
 const NOT_A_LITERAL_PATH = /["'*?{]/;
@@ -195,12 +221,31 @@ function byPath(a, b) {
   return a > b ? 1 : 0;
 }
 
-/** Every lintable file under `scripts/`, as repository-relative POSIX paths. */
-function enumerateScriptFiles() {
+/** Every file under `scripts/` with one of `extensions`, as repository-relative POSIX paths. */
+function enumerateScriptFilesWith(extensions) {
   const entries = readdirSync(path.join(REPO_ROOT, SCRIPTS_DIRECTORY), { recursive: true });
   return entries
-    .filter((entry) => LINTED_EXTENSIONS.has(path.extname(entry)))
+    .filter((entry) => extensions.has(path.extname(entry)))
     .map((entry) => `${SCRIPTS_DIRECTORY}/${entry.split(path.sep).join('/')}`);
+}
+
+/** Every lintable file under `scripts/`, as repository-relative POSIX paths. */
+function enumerateScriptFiles() {
+  return enumerateScriptFilesWith(LINTED_EXTENSIONS);
+}
+
+/**
+ * `bash -n` over one file: parse it, run nothing.
+ *
+ * The path is POSIX-separated because it is handed to bash, not to a Windows program.
+ *
+ * @param {string} file A repository-relative POSIX path.
+ * @returns {{status: number|null, stderr: string, error?: Error}} What bash reported.
+ */
+function parseWithBash(file) {
+  const absolute = path.join(REPO_ROOT, file).split(path.sep).join('/');
+  const result = spawnSync('bash', ['-n', absolute], { encoding: 'utf8' });
+  return { status: result.status, stderr: result.stderr ?? '', error: result.error };
 }
 
 /** The enumerated files the `lint` script does not name. */
@@ -414,6 +459,51 @@ test('parseGatedScriptPaths accepts the shapes the real npm scripts already use'
       () => parseGatedScriptPaths(packageScripts()[key]),
       `the real "${key}" script must parse without the parser refusing it`
     );
+  }
+});
+
+test('no shell script under scripts/ arrives without joining the shell ratchet', () => {
+  // The only assertion standing between this repository and a second unlinted `.sh` on the release
+  // path. `SHELL_SCRIPTS` is not derived from disk on purpose: derived, it would absorb a new file
+  // silently, which is exactly what happened to the npm gate list this whole file exists to police.
+  assert.deepEqual(
+    enumerateScriptFilesWith(new Set(['.sh'])).sort(byPath),
+    [...SHELL_SCRIPTS].sort(byPath),
+    'a shell script under scripts/ is not in SHELL_SCRIPTS, so nothing parses it and nothing ever' +
+      ' will. Add it to SHELL_SCRIPTS in this file — no other gate in this repository can see it.'
+  );
+});
+
+test('every shell script under scripts/ PARSES, so a syntax error cannot wait for a release', () => {
+  assert.ok(SHELL_SCRIPTS.length > 0, 'SHELL_SCRIPTS is empty — this guard is vacuous');
+
+  for (const file of SHELL_SCRIPTS) {
+    assert.ok(existsInRepository(file), `SHELL_SCRIPTS names "${file}", which is not on disk`);
+    const { status, stderr, error } = parseWithBash(file);
+    assert.ok(
+      !error,
+      `bash could not be launched (${error?.message}), so this guard checked nothing. bash comes` +
+        ' with the git installation this repository already requires, and the CI runner is Linux.'
+    );
+    assert.equal(status, 0, `${file} is not valid bash:\n${stderr}`);
+  }
+});
+
+test('the bash parse check can actually fail', () => {
+  // Guarding the guard, in the style of parseGatedScriptPaths' own fixtures above. A `bash -n` that
+  // silently exits 0 on everything — a wrong path, a bash that ignores its argument — would report
+  // success forever, which is the failure mode this file was written to attack.
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'shell-ratchet-'));
+  try {
+    const broken = path.join(directory, 'broken.sh');
+    writeFileSync(broken, '#!/usr/bin/env bash\nif [ -z "$X" ]; then\n  echo unterminated\n');
+    const result = spawnSync('bash', ['-n', broken.split(path.sep).join('/')], {
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, 'bash -n must reject an unterminated `if`');
+    assert.match(result.stderr, /unexpected end of file|syntax error/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true, maxRetries: 3 });
   }
 });
 

@@ -12,12 +12,13 @@
  * ── THE PREDICATE (one commit at a time) ────────────────────────────────────────────────────────
  * A commit in the forward-port range is ACCEPTED when either rule holds:
  *
- *   1. CONTENT-FREE MERGE — two or more parents AND an empty combined diff. It introduces no hunk
- *      that differs from every parent, so it carries nothing of its own and its parents are judged
- *      on their own merits. This rule is not a loophole, it is a REQUIREMENT: the ordinary release
- *      shape is `promote-to-early-access.yml` merging a beta tag into `release` with `--no-ff` under
- *      the App token, and that merge commit is associated with no pull request at all. A gate
- *      demanding a pull request for it would red every routine release.
+ *   1. CONTENT-FREE MERGE — two parents whose RE-MERGE reproduces the merge's own tree exactly. It
+ *      is then precisely what an unattended three-way merge of its parents produces, so it carries
+ *      nothing of its own and its parents are judged on their own merits. This rule is not a
+ *      loophole, it is a REQUIREMENT: the ordinary release shape is `promote-to-early-access.yml`
+ *      merging a beta tag into `release` with `--no-ff` under the App token, and that merge commit
+ *      is associated with no pull request at all. A gate demanding a pull request for it would red
+ *      every routine release.
  *   2. PULL-REQUEST AUTHORED — associated with a pull request that is MERGED, whose base ref is in
  *      the accepted-base list, and which belongs to this repository. "Reviewed" alone is not
  *      enough: a change reviewed against a DIFFERENT line was never reviewed for landing on this
@@ -28,10 +29,24 @@
  *
  * Anything else is REFUSED, naming the sha, its subject, its author, and which rule it failed.
  *
- * **Stated limitation.** The combined-diff rule catches content introduced by a RESOLUTION. It does
- * not catch an additive semantic duplicate: two sides independently adding the same test in
- * different places merge cleanly, every hunk is attributable to one parent, and the combined diff is
- * empty. That shape is handled procedurally in `CONTRIBUTING.md`, not here.
+ * ── RULE 1 IS NOT A COMBINED DIFF, AND MUST NEVER GO BACK TO BEING ONE ──────────────────────────
+ * It was originally "an empty `git diff-tree --cc -r --no-commit-id --name-only <merge>`". That
+ * predicate cannot express the question. `--name-only` follows the `-c` FILE selection ("files
+ * modified from all parents") and `--cc`'s hunk compression only ever affects PATCH output, so it
+ * never reaches the name list: a clean auto-merge in which one file took hunks from both sides and
+ * a genuine EVIL merge of the same two parents print exactly the same thing. Of the last 38 merges
+ * reachable from this repository's `origin/main`, 5 have a non-empty combined diff and every one of
+ * them invented nothing — two on `CHANGELOG.md`, which is the release path itself.
+ *
+ * So the evidence this module reads for rule 1 is no longer a file list. It is a one-line verdict
+ * written by `scripts/forward-port-content-gate.sh`, which re-merges the two parents with
+ * `git merge-tree --write-tree` and compares the resulting tree with the merge's own. See
+ * `MERGE_CONTENT_VERDICTS`.
+ *
+ * **Stated limitation.** The rule catches content introduced by a RESOLUTION. It does not catch an
+ * additive semantic duplicate: two sides independently adding the same test in different places
+ * merge cleanly, the re-merge reproduces the tree exactly, and every hunk is attributable to one
+ * parent. That shape is handled procedurally in `CONTRIBUTING.md`, not here.
  *
  * ── THE REST PAYLOAD IS NOT THE GRAPHQL PAYLOAD ─────────────────────────────────────────────────
  * The association evidence is the REST `GET /repos/{owner}/{repo}/commits/{sha}/pulls` response,
@@ -62,6 +77,10 @@
  * or the live API. `scripts/forward-port-provenance.mjs` is the thin CLI that supplies file reads,
  * and `scripts/forward-port-content-gate.sh` is the collector that produces the files.
  *
+ * Purity has a cost this module pays deliberately: the git behaviour underneath rule 1 cannot be
+ * tested here, only the reading of the collector's verdict. `tests/forward-port-content-gate.test.js`
+ * covers the other half, by running the real script over real constructed merges.
+ *
  * These `.js` files parse as ESM only because the root `package.json` declares `"type": "module"`;
  * do not drop that declaration or relocate them under a directory with its own `package.json`.
  */
@@ -84,14 +103,62 @@ const DEFAULT_MAX_COMMITS = 200;
 /** An abbreviated or full object id. Anchored, so a subject line can never pass for one. */
 const OBJECT_ID_RE = /^[0-9a-f]{7,64}$/i;
 
+/**
+ * The merge-content verdicts `scripts/forward-port-content-gate.sh` writes, one per commit.
+ *
+ * The collector owns the git work — re-merging a merge's two parents with
+ * `git merge-tree --write-tree` and comparing the result with the merge's own tree — and states its
+ * conclusion as the first token of a one-line file. This module owns the meaning of that token.
+ *
+ * Exactly ONE of them accepts. The other three are all "not established as content-free", and each
+ * says why in a refusal message, because they are genuinely different situations: a re-merge that
+ * conflicts means the recorded merge embeds a human resolution, which is the seam a pre-resolved
+ * merge recovery path attaches to; a parent count other than two means the predicate has no
+ * two-parent re-merge to run at all. None of them is a pass, and none of them is by itself a
+ * refusal either — a merge inside the range that fails rule 1 can still be accounted for by rule 2.
+ *
+ * An unknown token is UNVERIFIABLE rather than either, because it means the collector and this
+ * module have drifted apart and nothing can be concluded from a verdict neither one agrees on.
+ */
+const MERGE_CONTENT_VERDICTS = new Map([
+  ['content-free', { contentFree: true, reason: '' }],
+  [
+    'carries-content',
+    {
+      contentFree: false,
+      reason:
+        're-merging its two parents produces a different tree, so it carries content neither parent has',
+    },
+  ],
+  [
+    'remerge-conflicted',
+    {
+      contentFree: false,
+      reason:
+        'its two parents do not merge cleanly, so it embeds a resolution — content neither parent has',
+    },
+  ],
+  [
+    'parent-count',
+    {
+      contentFree: false,
+      reason:
+        'it does not have exactly two parents, so there is no two-parent re-merge to establish that ' +
+        'it introduced nothing',
+    },
+  ],
+]);
+
 const USAGE =
-  'Usage: node scripts/forward-port-provenance.mjs <commits-file> <combined-diff-dir> ' +
+  'Usage: node scripts/forward-port-provenance.mjs <commits-file> <merge-status-dir> ' +
   '<associations-dir> --repository=<owner>/<name> [--accepted-bases=release,...] ' +
   '[--per-page=100] [--max-commits=200]\n' +
   '  <commits-file>       `git rev-list --parents <range>` output, optionally with a tab-separated\n' +
   '                       author and subject appended per line.\n' +
-  '  <combined-diff-dir>  one `<sha>.txt` per merge commit, holding\n' +
-  '                       `git diff-tree --cc -r --no-commit-id --name-only <sha>` output.\n' +
+  '  <merge-status-dir>   one `<sha>.txt` per commit, holding the merge-content verdict\n' +
+  '                       `scripts/forward-port-content-gate.sh` computed for it: one of\n' +
+  '                       `content-free`, `carries-content <tree>`, `remerge-conflicted` or\n' +
+  '                       `parent-count <n>`.\n' +
   '  <associations-dir>   one `<sha>.json` per commit, holding the verbatim REST response of\n' +
   '                       `GET /repos/{owner}/{repo}/commits/{sha}/pulls`.';
 
@@ -253,6 +320,41 @@ export function parseAssociations(payloadText, options = {}) {
 }
 
 /**
+ * Read the collector's merge-content verdict for one merge commit.
+ *
+ * Only the FIRST token of the first line is the verdict; `carries-content` and `parent-count` carry
+ * a detail token after it (the re-merged tree, and the parent count) that this module reports but
+ * does not interpret.
+ *
+ * @param {string} text The verdict file's contents.
+ * @returns {{contentFree: boolean, verdict: string, reason: string}} What the collector established.
+ * @throws {Error} If the file is empty or names a verdict this module does not know.
+ */
+export function readMergeContentStatus(text) {
+  const [firstLine = ''] = String(text).trim().split('\n');
+  const [verdict = ''] = firstLine.trim().split(/\s+/);
+
+  if (!verdict) {
+    throw new Error(
+      'the merge-content status is empty. It is written by ' +
+        '`scripts/forward-port-content-gate.sh` for every commit it collects, so an empty one means ' +
+        'the collection did not complete — which is unverifiable, not "this merge introduced nothing".'
+    );
+  }
+
+  const known = MERGE_CONTENT_VERDICTS.get(verdict);
+  if (!known) {
+    throw new Error(
+      `'${verdict}' is not a merge-content verdict this verifier knows ` +
+        `(${[...MERGE_CONTENT_VERDICTS.keys()].join(', ')}). The collector and the verifier have ` +
+        'drifted apart, and nothing can be concluded from a verdict only one of them understands.'
+    );
+  }
+
+  return { contentFree: known.contentFree, verdict, reason: known.reason };
+}
+
+/**
  * Read one piece of evidence through an injected accessor, turning any failure into a fail-closed
  * error that names the commit and what could not be read.
  *
@@ -324,23 +426,33 @@ function explainRefusal(associations, deps) {
  * evidence alone and never needs — or waits on — an association read.
  *
  * @param {{sha: string, parents: string[], author: string, subject: string}} commit The commit.
- * @param {object} deps `combinedDiffFor`, `associationsFor`, `repository`, `acceptedBases`, `perPage`.
+ * @param {object} deps `mergeStatusFor`, `associationsFor`, `repository`, `acceptedBases`, `perPage`.
  * @returns {{sha: string, subject: string, author: string, accepted: boolean, rule: string, detail: string}}
  * @throws {Error} If the evidence this commit needs is unavailable or unreadable.
  */
 function classifyCommit(commit, deps) {
   const described = { sha: commit.sha, subject: commit.subject, author: commit.author };
+  let mergeNote = '';
 
   if (commit.parents.length >= 2) {
-    const combined = readEvidence(deps.combinedDiffFor, commit.sha, 'combined diff');
-    if (combined.trim() === '') {
+    const status = readMergeContentStatus(
+      readEvidence(deps.mergeStatusFor, commit.sha, 'merge-content status')
+    );
+    if (status.contentFree) {
       return {
         ...described,
         accepted: true,
         rule: 'content-free merge',
-        detail: `a merge of ${commit.parents.length} parents introducing nothing of its own`,
+        detail:
+          `a merge of ${commit.parents.length} parents whose re-merge reproduces its tree exactly, ` +
+          'so it introduces nothing of its own',
       };
     }
+    // Rule 1 did not hold, but a merge inside the range can still be accounted for by rule 2 — a
+    // merge commit closing a reviewed pull request based on the release line WAS reviewed, its
+    // resolution included. So this is carried as a note on the eventual refusal rather than being a
+    // refusal in itself, and the refusal says both halves of why the commit was not accounted for.
+    mergeNote = `${status.reason}; `;
   }
 
   const associations = parseAssociations(
@@ -367,7 +479,7 @@ function classifyCommit(commit, deps) {
     ...described,
     accepted: false,
     rule: 'unaccounted',
-    detail: explainRefusal(associations, deps),
+    detail: `${mergeNote}${explainRefusal(associations, deps)}`,
   };
 }
 
@@ -398,7 +510,7 @@ function assertParameters(repository, acceptedBases) {
  *
  * @param {object} input The verification inputs.
  * @param {string} input.parentsText `git rev-list --parents <range>` output for the range.
- * @param {(sha: string) => string} input.combinedDiffFor Combined-diff text for a merge commit.
+ * @param {(sha: string) => string} input.mergeStatusFor The collector's merge-content verdict for a merge commit.
  * @param {(sha: string) => string} input.associationsFor Verbatim REST association payload for a commit.
  * @param {string} input.repository The `<owner>/<name>` the pull requests must belong to.
  * @param {string[]} [input.acceptedBases] Base refs a merged pull request may target.
@@ -410,7 +522,7 @@ function assertParameters(repository, acceptedBases) {
 export function verifyForwardPortProvenance(input) {
   const {
     parentsText,
-    combinedDiffFor,
+    mergeStatusFor,
     associationsFor,
     repository,
     acceptedBases = DEFAULT_ACCEPTED_BASES,
@@ -429,7 +541,7 @@ export function verifyForwardPortProvenance(input) {
     );
   }
 
-  const deps = { combinedDiffFor, associationsFor, repository, acceptedBases, perPage };
+  const deps = { mergeStatusFor, associationsFor, repository, acceptedBases, perPage };
   const verdicts = commits.map((commit) => classifyCommit(commit, deps));
   const accepted = verdicts.filter((verdict) => verdict.accepted);
   const refused = verdicts.filter((verdict) => !verdict.accepted);
@@ -540,10 +652,10 @@ function parseArguments(argv) {
     );
   }
 
-  const [commitsFile, diffDirectory, associationDirectory] = positional;
+  const [commitsFile, mergeStatusDirectory, associationDirectory] = positional;
   return {
     commitsFile,
-    diffDirectory,
+    mergeStatusDirectory,
     associationDirectory,
     repository: named.get('repository') ?? '',
     acceptedBases: listOption(named, 'accepted-bases', DEFAULT_ACCEPTED_BASES),
@@ -583,7 +695,7 @@ export function run(argv, io = {}) {
 
     const verdict = verifyForwardPortProvenance({
       parentsText: readFile(options.commitsFile),
-      combinedDiffFor: (sha) => readFile(`${options.diffDirectory}/${sha}.txt`),
+      mergeStatusFor: (sha) => readFile(`${options.mergeStatusDirectory}/${sha}.txt`),
       associationsFor: (sha) => readFile(`${options.associationDirectory}/${sha}.json`),
       repository: options.repository,
       acceptedBases: options.acceptedBases,
@@ -591,13 +703,14 @@ export function run(argv, io = {}) {
       maxCommits: options.maxCommits,
     });
 
-    if (verdict.ok) {
-      log(verdict.message);
-      return 0;
-    }
     // `::error::` is a GitHub Actions annotation; harmless noise anywhere else.
-    error(`::error::${verdict.message}`);
-    return 1;
+    if (verdict.ok) log(verdict.message);
+    else error(`::error::${verdict.message}`);
+
+    // The verdict's OWN `code` is what the process exits with, rather than a `0`/`1` restated here.
+    // The field is documented as this function's contract, and a documented field nothing reads is
+    // a contract by assertion only — it drifts the moment the verdict grows a third outcome.
+    return verdict.code;
   } catch (error_) {
     error(`::error::forward-port-provenance: ${error_.message}`);
     return 2;

@@ -15,7 +15,7 @@
  * file is not spawning. This tool runs `git` and calls the API exactly never;
  * `scripts/forward-port-content-gate.sh` collects the evidence into the files it reads.
  *
- *   node scripts/forward-port-provenance.mjs commits.txt diffs/ pulls/ --repository=owner/name
+ *   node scripts/forward-port-provenance.mjs commits.txt merges/ pulls/ --repository=owner/name
  *
  * ZERO DEPENDENCIES, by design: the content gate provisions Node without running `npm ci`.
  *

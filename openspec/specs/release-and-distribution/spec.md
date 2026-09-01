@@ -304,6 +304,7 @@ A prerelease promotion MAY advance the release line without a per-change review 
 When a forward-port would carry file content onto the prerelease line, it MUST establish mechanically that every commit it carries is attributable to a change reviewed **against the release line**, as **Release line change provenance** requires, and MUST NOT accept an operator's assertion that this is so.
 A change reviewed against a different line MUST NOT be treated as accounted for merely because that review took place and was merged.
 A merge commit that introduces no content beyond what its parents already carry satisfies this without a review of its own; a merge commit that introduces content present in no parent does not.
+Whether a merge introduced content of its own MUST be established by reproducing the merge from its parents and comparing the result with what the merge recorded, never inferred from which files the merge touched, because a clean automatic merge and a merge carrying invented content touch exactly the same files.
 A forward-port that cannot establish change provenance MUST refuse, and MUST NOT treat an absence of evidence as an absence of unreviewed content.
 A refusal MUST name the commits it could not account for.
 An override MAY exist, but it MUST NOT be the routine path, and a forward-port whose content IS accounted for MUST proceed without one.
@@ -327,6 +328,7 @@ An override MAY exist, but it MUST NOT be the routine path, and a forward-port w
 
 - **WHEN** the evidence it needs is unavailable or incomplete
 - **THEN** it refuses and reports the state as unverifiable, rather than proceeding
+- **AND** the override does not apply to it, and is not offered as its remedy, because there is no established refusal to vouch for
 
 ### Requirement: Promotion-gated public availability
 
