@@ -25050,3 +25050,44 @@
 .fabricate-manager[data-manager-view='essences'] .manager-header {
   background: var(--fab-bg-0);
 }
+
+/* THE BROWSER TOOLBAR STRIP IS FLUSH, NOT A RAISED BAND. Last of the surface inversions on these
+   screens, and the same one just corrected on the secondary buttons — ours raised a region the
+   prototype leaves level. The shared `.manager-toolbar` rule paints `--fab-overlay-light-03` and
+   draws a full-bleed `border-bottom`, so the filter bar and the `Select all` row read as one lit
+   band one rung above the pane, closed by a hairline, where the prototype's equivalent strip
+   measures the same value as the pane behind it at every height and has no divider at all.
+
+   With the pane now on `--fab-bg-0`, that overlay is the last thing on these screens still adding
+   a rung to a surface the prototype does not step. Removing the fill AND the hairline together is
+   deliberate: a fill with no border, or a border with no fill, is a half-flush strip that reads as
+   neither construction.
+
+   ── WHAT STILL SEPARATES THE STRIP FROM THE LIST ────────────────────────────────────────────
+   The same two things the prototype uses, and it uses nothing else: the gap between the strip's
+   bottom padding and the first row, and the row cards' own borders. Every row on these routes is
+   a bordered card by the block above — that is what makes a row a row here — so the list's top
+   edge is stated by the first card's border rather than by a divider belonging to the toolbar.
+   Checked on the normal, stacked and grid frames, at 1280 and at the 1000-wide stacked layout
+   where the toolbar wraps to more rows: the boundary still reads.
+
+   ── WHY IT IS ROUTE-SCOPED, AND ONLY TO THE TWO ROUTES THAT DRAW A STRIP ────────────────────
+   `.manager-toolbar` is the shared browser strip for every manager browser — components,
+   recipes, tools, environments, gathering and more — so editing it would re-photograph a dozen
+   studios that are not this change's business. Additive and route-scoped instead, by the
+   precedent this file already sets twice: the Checks Studio block at
+   `.fabricate-manager[data-manager-view^="checks"]` above, and this epic's own surface and header
+   blocks immediately above.
+
+   Two routes, not three. `world-essence-entry` is in this epic and takes the surface and header
+   rules above, but its page is a tabbed editor with no browser strip on it, so a selector for it
+   here would match nothing. A stacked branch adds the tool routes to this same ladder; it owns
+   its own selectors and neither lane owns half of one rule.
+
+   No literals: `--fab-overlay-light-03` is removed rather than replaced, so the pane's own
+   `--fab-bg-0` shows through and no theme's ramp is frozen into the other six. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-toolbar,
+.fabricate-manager[data-manager-view='essences'] .manager-toolbar {
+  border-bottom: 0;
+  background: transparent;
+}
