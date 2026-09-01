@@ -244,6 +244,34 @@ const PRIMITIVES = Object.freeze([
     contractClasses: ['manager-search'],
     minimumTokens: 1,
   }),
+  // THE editor validation surface (issue 1444), and the entry with the SMALLEST token set on
+  // this table: exactly one of its four call sites hands it a class at all, and that one hands
+  // two — `recipe-item/RecipeItemValidationTab`, whose root carried
+  // `manager-recipe-item-tab manager-recipe-item-validation` before the conversion and keeps
+  // them through the appending `class` prop so no shipped rule stops matching. The floor is 1
+  // because the assertion is strictly greater and the census is 2; a floor of 2 would pass
+  // vacuously the day that site stops passing a class.
+  //
+  // It is on the table despite that conversion having deleted the only scoped rule in either
+  // converted file, because the exposure is a property of the BOUNDARY rather than of today's
+  // corpus: `manager-recipe-item-validation` now lives on a component tag, so a rule written
+  // against it in that file tomorrow is dead on arrival, and the family this surface owns —
+  // `manager-recipe-val-*`, `manager-recipe-rail-*` — is exactly the kind a site is tempted to
+  // refine locally.
+  //
+  // All three contract classes are listed because the primitive writes all three on its root
+  // unconditionally. `manager-recipe-tab` is shared with the recipe editor's other tabs, which
+  // is harmless here: the contract half only runs for a file that RENDERS the primitive, and no
+  // such file states a scoped rule against it.
+  Object.freeze({
+    tag: 'EditorValidationSurface',
+    contractClasses: [
+      'manager-editor-validation-surface',
+      'manager-recipe-validation',
+      'manager-recipe-tab',
+    ],
+    minimumTokens: 1,
+  }),
 ]);
 
 test('no component scopes a rule onto a class it hands to a shared primitive', () => {
@@ -389,8 +417,8 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
     violations.sort((left, right) => (left === right ? 0 : left < right ? -1 : 1)),
     [],
     'these rules select a class that only a `<ManagerButton>`, `<IconButton>`, ' +
-      '`<InspectorCard>`, `<ManagerToolbar>` or `<ManagerSearchField>` carries, so they match ' +
-      'NOTHING ' +
+      '`<InspectorCard>`, `<ManagerToolbar>`, `<ManagerSearchField>` or ' +
+      '`<EditorValidationSurface>` carries, so they match NOTHING ' +
       'and the control is silently unstyled — either emitted with this component`s scoping ' +
       'class attached, or pruned by the compiler before they were emitted at all. Wrap each ' +
       'in `:global(...)` — and chain the primitive`s classes while you are there, because a ' +

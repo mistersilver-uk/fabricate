@@ -420,6 +420,40 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
   ]),
+  // THE editor validation surface (issue 1444), closed onto seven renderers. NEITHER
+  // representative frame can contain one, and that is established from the static import
+  // closure rather than from looking at a frame: walking every transitive `.svelte` import,
+  // `ComponentsBrowserView` reaches 22 modules and `FabricateAppRoot` reaches 164, and this
+  // surface is in neither closure — only `CraftingSystemManagerRoot`'s 356-module closure holds
+  // it. So a restyle of the medallion, the count tiles or the row stack published two frames
+  // that structurally could not contain one.
+  //
+  // Two, because the surface has two rail ARITIES and one frame cannot hold both.
+  //
+  // `manager-checks-validation` is the only published frame that draws it inside
+  // `.manager-checks-validation-route`, and that route is the one place its metrics are
+  // re-stated: `styles/fabricate.css:3897-3929` overrides the summary card's gap, padding,
+  // radius and fill, the count tile's height and radius, the group label's size and tracking,
+  // and the row stack's radius and fill. Every geometry decision in the surface is therefore
+  // arbitrated twice, and this is the frame that shows the second arbitration.
+  //
+  // `manager-recipe-item-validation-blocked` is the only published frame that draws the
+  // TWO-TILE rail. The Books & Scrolls check set has no warning tier at all, so that tab
+  // reports `{ passing, blocking }` and the surface omits the Warnings tile — the one state
+  // where the rail's own flex distribution differs, and the state issue 1444 turned from a
+  // hand-rolled second markup block into a property of what a caller reports. Its all-clear
+  // twin is NOT listed: the arity is the same in both and the blocked one additionally draws
+  // the danger medallion and a Block pill.
+  //
+  // Still uncovered, and named rather than left to be discovered: the row's View deep-link,
+  // which renders only where a row carries a `target` and so appears in the recipe editor's
+  // and the Checks route's ISSUE rows rather than in every frame. Whether the lab world's
+  // fixtures put either surface into a state that has one was not established here, so a
+  // change to that button's treatment may publish two frames that do not contain it.
+  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte': Object.freeze([
+    'manager-checks-validation',
+    'manager-recipe-item-validation-blocked',
+  ]),
   // The shared empty panel. Both representative frames are POPULATED states — the components
   // browser lists components and the player app shell lists recipes — so the dashed panel this
   // primitive draws appears in neither, and a restyle of it would publish two frames that do not

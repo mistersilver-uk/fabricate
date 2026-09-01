@@ -142,11 +142,11 @@
  *
  * spec.md requirement "The primitive set is a closed, versioned vocabulary" — two or more
  * INDEPENDENT callers. An importer is any other file under `src/` that imports the component by
- * path. Seven ADJUDICATED candidates are recorded in {@link NOT_A_PRIMITIVE} rather than omitted,
+ * path. Nine ADJUDICATED candidates are recorded in {@link NOT_A_PRIMITIVE} rather than omitted,
  * because that same requirement obliges a candidate with fewer to be "recorded as ruled out WITH
  * ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than
- * an oversight". SIX of those seven are below the bar as this is measured; see that docblock for
- * the seventh, which acquired a second caller and is owed a move nobody has made.
+ * an oversight". EIGHT of those nine are below the bar as this is measured; see that docblock for
+ * the ninth, which acquired a second caller and is owed a move nobody has made.
  *
  * ADJUDICATED is the bound, and it is load-bearing: 48 of the 73 top-level `.svelte` files under
  * `apps/manager/` sit below the two-caller bar, and {@link NOT_A_PRIMITIVE} is emphatically not a
@@ -257,13 +257,13 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * broad-signal set, a `library.html` entry it does or does not implement, an entry on the
  * mounted-harness hang guard. It is NOT a census of the directory. 48 of the 73 top-level `.svelte`
  * files under `apps/manager/` sit below the two-caller bar, and `components/` holds screen regions
- * and dead code besides; listing all of them would bury the seven judgements that were actually
+ * and dead code besides; listing all of them would bury the nine judgements that were actually
  * made in dozens that were not, and the requirement cited above asks for recorded DECISIONS, not
  * for an inventory.
  *
  * So the next reader has two wrong moves available and neither is what this list wants: adding the
- * other 48 manager files, and deleting `InspectorActionButton` as inconsistent with them. The
- * distinguishing fact is written down beside each row.
+ * other 46 top-level manager files, and deleting `InspectorActionButton` or `SystemOverviewView` as
+ * inconsistent with them. The distinguishing fact is written down beside each row.
  *
  * ── ONE ROW IS OWED A MOVE, AND SAYING SO IS THE POINT OF THE LIST ─────────────────────────────
  *
@@ -284,12 +284,25 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * `BROAD_SIGNAL_PATTERN` DOES with the path, not what anyone thinks the file deserves. The five
  * under `src/ui/svelte/components/` are `'broad'` because that directory leg matches them today
  * whatever anyone thinks of them, which is the point issue 1378 makes: a directory cannot tell a
- * primitive from a component that merely lives there. The two under `apps/manager/` —
- * `InspectorActionButton` and `downtime/WorldDowntimeTabs` — are
+ * primitive from a component that merely lives there. The four under `apps/manager/` —
+ * `InspectorActionButton`, `SystemOverviewView`, `downtime/WorldDowntimeTabs` and
+ * `environment/EnvironmentValidationTab` — are
  * `'targeted'` because membership there is by NAME and none of them is on a name list, so the
  * frames that claim each by `sourceMatches` are reached.
  *
- * `checks/ChecksEditorTabs` was a third and is DELIBERATELY GONE, not lost. It was recorded here by
+ * ── THE TWO ROWS THAT ARE NOT UNDER-CALLED CANDIDATES ──────────────────────────────────────────
+ *
+ * `SystemOverviewView` and `environment/EnvironmentValidationTab` were added at issue 1444 and are
+ * a different kind of non-member from the other seven: both are plainly single-caller, but neither
+ * was proposed as a primitive in its own right. They were proposed as unconverted CALL SITES of
+ * `EditorValidationSurface` — the plan that change came from named four hand-rollers of the
+ * validation surface and two of them render a different surface entirely — so what is recorded
+ * here is the measurement that settles that, not a caller count. The distinction matters because
+ * the repair the register exists to prevent is different in each case: for the other seven it is
+ * "someone re-proposes promoting this", and for these two it is "someone re-proposes converting
+ * this", which would be a visual redesign filed as an adoption.
+ *
+ * `checks/ChecksEditorTabs` was recorded here too and is DELIBERATELY GONE, not lost. It was recorded here by
  * issue 1038 on the ground that its count is a bare mono numeral rather than a chip and "the two
  * treatments are deliberately different" — a STYLE divergence, which the maintainer has since ruled
  * is never an acceptable justification: a recorded divergence must be a FUNCTIONAL or INFORMATIONAL
@@ -307,7 +320,7 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * genuinely functional capabilities `EditorTabs` still lacks.
  *
  * That is why the integrity test runs its per-row clauses over THESE rows too. The disk clause in
- * particular is live here: two of the seven name files nothing imports.
+ * particular is live here: two of the nine name files nothing imports.
  *
  * @type {readonly {path: string, library: string|null, evidence: string, why: string}[]}
  */
