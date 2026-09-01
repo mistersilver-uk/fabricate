@@ -19286,7 +19286,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     select.click();
     assert.deepEqual(selections, ['tool-catalyst', 'tool-catalyst']);
     assert.ok(target.querySelector('[data-tool-library-scroll]'));
-    assert.ok(target.querySelector('[data-tool-browser-pagination] .manager-pagination'));
+    // NO FOOT PAGER ON ONE PAGE (issue 1373). `PROTO-tool-rules.png` draws three rows and no bar
+    // under them, and this list shipped a `persistent` one that could only ever read
+    // `Showing 1-1 of 1 · Page 1 of 1` beside a result count already saying `1 shown`.
+    //
+    // THE SLOT IS ASSERTED PRESENT BESIDE IT, because it is not what came out: it is the
+    // bottom-pinned layout div, and it is what keeps the list card above from becoming
+    // `:last-child` and stretching to the foot of the pane. Without this line the absence below
+    // would also be satisfied by the whole browser failing to render.
+    assert.ok(
+      Boolean(target.querySelector('[data-tool-browser-pagination]')),
+      'the bottom-pinned pager slot must survive the bar it no longer holds'
+    );
+    assert.ok(
+      !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
+      'a one-page list must draw no foot pager at all'
+    );
     // NO ON-BREAK CHIP on a system row. The on-break action is a WORLD default, stated on the
     // world catalogue's row; repeating it here says nothing this screen decides.
     assert.equal(
@@ -19294,6 +19309,38 @@ describe('CraftingSystemManager mounted behavior', () => {
         /Destroys|Marks broken|Replaces/.test(chip.textContent)
       ).length,
       0
+    );
+  });
+
+  it('draws the foot pager once the rules list runs to a SECOND page', () => {
+    // The negative above and this positive are the two halves of one rule, and neither is
+    // sufficient alone: a pager deleted outright satisfies the absence, and a `persistent` one
+    // satisfies the presence. The page size is eight, so nine rows is the first dataset that
+    // asks for a second page.
+    const nineTools = Array.from({ length: 9 }, (unused, index) => ({
+      ...toolRouteFixture,
+      id: `tool-${index}`,
+      label: `Tool ${index}`,
+    }));
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: { tools: nineTools, managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }] },
+    });
+    flushSync();
+
+    assert.equal(
+      target.querySelectorAll('.manager-tools-row').length,
+      8,
+      'the page size the pager is judged against is not the one this list actually pages by'
+    );
+    const bar = target.querySelector('[data-tool-browser-pagination] .manager-pagination');
+    assert.ok(Boolean(bar), 'a two-page list must still draw its foot pager');
+    assert.match(bar.querySelector('[data-pagination-summary]').textContent, /of 9/);
+    assert.ok(
+      Boolean(bar.querySelector('.manager-pagination-nav')),
+      'a bar with a second page to reach and no nav would be a summary, not a pager'
     );
   });
 
@@ -26657,6 +26704,8 @@ describe('CraftingSystemManager mounted behavior', () => {
             'and the player preview both moved to the buffered one'
         );
       });
+    });
+
     });
   });
 });

@@ -248,7 +248,9 @@
   );
 
   // KEPT AS THE PAGER'S INPUT under its shipped name, because the Foundry smoke's
-  // `assertToolLibraryPagination` phase pins this list's footer geometry.
+  // `assertToolLibraryPagination` phase pins this list's footer geometry — and, since issue
+  // 1373, its PRESENCE: the pager below is `multiPageOnly`, so that phase now asserts the bar is
+  // absent at eight rows on an eight-row page and present at nine.
   const filteredTools = $derived(filteredRows);
   const pagedTools = $derived(
     filteredTools.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
@@ -650,6 +652,26 @@
       </div>
     </section>
   </div>
+  <!-- THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE (issue 1373).
+
+       `PROTO-tool-rules.png` draws three rows and NO bar under them, and this list shipped a
+       `persistent` one — a full-width `Showing 1-8 of 8 · Page 1 of 1 · Per page 8` band stating
+       nothing the `3 shown · 3 of 10 in this system` count above the list does not already say.
+       That is the maintainer's ruling on the world catalogues applied to the remaining caller;
+       `multiPageOnly` is the mode the essence lane added to `Pagination` for it.
+
+       THE WRAPPER STAYS UNCONDITIONAL (given any tools at all) and only the BAR inside it comes
+       and goes. It is the bottom-pinned layout slot — `margin-top: auto`, zero padding — and it
+       is also what decides whether the browser card above is `:last-child`, which is what the
+       `.manager-tools-main-content > .manager-tools-library-card:last-child` rule keys its
+       `flex: 1 1 auto` off. Removing the slot on the one-page case would therefore stretch the
+       list card to the foot of the pane on exactly the frames the reference draws it
+       content-sized on, which is a second, unasked-for change riding along with this one. Empty,
+       the slot measures zero and the flex free space it would have occupied is absorbed by its
+       own auto margin.
+
+       The Foundry smoke's `assertToolLibraryPagination` phase reads the BAR rather than this
+       slot for the same reason. -->
   {#if tools.length > 0}
     <div class="manager-tools-browser-pagination" data-tool-browser-pagination>
       <Pagination
@@ -657,7 +679,7 @@
         {pageSize}
         {pageIndex}
         pageSizeOptions={[8, 16, 24]}
-        persistent
+        multiPageOnly
         onPageChange={(next) => {
           pageIndex = next;
         }}

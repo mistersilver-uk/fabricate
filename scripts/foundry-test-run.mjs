@@ -5600,11 +5600,60 @@ async function withSingleToolClipboardWrite(page, expectedUuid, action) {
   }
 }
 
-async function assertToolLibraryPagination(page, { expectedTotal, expectedPage = 1, expectScrollable }) {
+// THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE (issue 1373).
+//
+// `PROTO-tool-rules.png` draws no bar under its list, so `ToolsBrowserView` moved from
+// `persistent` to `Pagination`'s `multiPageOnly` mode. This phase used to pin the footer's
+// geometry at eight rows AND at nine on an eight-row page, which asserted the exact opposite of
+// what now ships: at eight the bar is gone.
+//
+// SO PRESENCE IS AN ASSERTED OUTCOME HERE, not a precondition the helper skips past. Both
+// answers are checked at both dataset sizes rather than the absent case simply not being
+// looked at:
+//
+//  - eight rows, page size eight, ONE page  -> the bar must be ABSENT, and the phase fails if
+//    it is drawn. That is the assertion the prototype is about, so it has to be the one that
+//    can fail; a helper that returned early on a missing bar would pass identically against
+//    the `persistent` code this replaces.
+//  - nine rows, page size eight, TWO pages  -> the bar must be PRESENT and every geometry check
+//    below still applies to it verbatim, so the footer's full-width bottom-pinned construction,
+//    its control ordering, its scroll independence and its page-to-page stability are all still
+//    pinned exactly where they were.
+//
+// THE SLOT IS NOT THE BAR. `[data-tool-browser-pagination]` is the bottom-pinned layout div and
+// it still renders whenever the system has any tools at all — it is what keeps the list card
+// from becoming `:last-child` and stretching. What comes and goes inside it is
+// `.manager-pagination`, so presence is read from that, and reading the slot instead would be a
+// check that could never fail.
+async function assertToolLibraryPagination(page, { expectedTotal, expectedPage = 1, expectScrollable, expectFooter = true }) {
   const browser = page.locator('.fabricate-manager [data-tool-library]').first();
   const list = browser.locator('[data-tool-library-scroll]');
-  const footer = browser.locator('[data-tool-browser-pagination]');
+  const slot = browser.locator('[data-tool-browser-pagination]');
+  const footer = slot.locator('.manager-pagination');
   await list.waitFor({ state: 'visible', timeout: 5_000 });
+  if (!expectFooter) {
+    // The SLOT must still be in the DOM, so that a bar which vanished because the whole browser
+    // failed to render cannot be mistaken for the single-page case this asserts.
+    if ((await slot.count()) !== 1) {
+      throw new Error('Tool pagination slot is missing, so its emptiness proves nothing');
+    }
+    const drawn = await footer.count();
+    if (drawn !== 0) {
+      throw new Error(`Tool pagination drew a foot bar on a single page of ${expectedTotal}`);
+    }
+    if (expectScrollable !== undefined) {
+      const scrollable = await list.evaluate((element) => element.scrollHeight > element.clientHeight);
+      if (scrollable !== expectScrollable) {
+        throw new Error(`Tool list scrollability was ${scrollable}; expected ${expectScrollable}`);
+      }
+    }
+    if (expectedPage === 1) {
+      const selectedFirst = await browser.evaluate((element) => element
+        .querySelector('.manager-tools-row:first-child')?.classList.contains('is-selected') === true);
+      if (!selectedFirst) throw new Error('Tool library did not preserve automatic first-row selection');
+    }
+    return null;
+  }
   await footer.waitFor({ state: 'visible', timeout: 5_000 });
   const state = await browser.evaluate((element) => {
     const scroll = element.querySelector('[data-tool-library-scroll]');
@@ -5752,13 +5801,13 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   ), systemId);
   const paginationComponentId = parityTools.find((tool) => tool.componentId)?.componentId;
   if (!paginationComponentId) throw new Error('Tool Studio pagination fixture has no managed Component identity');
-  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1 });
+  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1, expectFooter: false });
   await setManagerWindowSize(page, {
     width: 1214,
     height: 524,
     sourceViewport: { width: 1280, height: 520 },
   });
-  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1, expectScrollable: true });
+  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false });
   await setManagerWindowSize(page, {
     width: 1214,
     height: 724,
