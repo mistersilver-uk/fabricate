@@ -195,6 +195,29 @@ const PRIMITIVES = Object.freeze([
     contractClasses: ['manager-inspector-card'],
     minimumTokens: 8,
   }),
+  // `<Field>` (issue 1428), and the widest sweep this guard has scanned: `manager-field` was a
+  // CSS convention on 88 elements across 24 components and 81 of them became this primitive in
+  // one change. It belongs on THIS list rather than in a suite of its own because the mechanism
+  // is identical and a second copy of it would be new duplicated lines on new code.
+  //
+  // It is also the primitive that proves the EMITTED half carries the weight. Six scoped rules
+  // died in that sweep — `GatheringTaskEditView`'s four, `ImportFolderMappingModal`'s two and
+  // `CraftingModifierCatalogueCard`'s one — and not one was pruned, so `lint:svelte:warnings`
+  // reported zero warnings across all 307 components and the compiled `css.code` of every
+  // converted file came out BYTE-IDENTICAL. Byte-identity is the SIGNATURE of this failure, not
+  // evidence against it: the rules were emitted exactly as before, with the caller's scoping
+  // class attached, onto elements the caller no longer writes.
+  //
+  // Each is repaired as `:global(.manager-field.the-other-class …)`. The `.manager-field`
+  // compound is load-bearing rather than decorative: the scoped form compiled to
+  // `.the-other-class.svelte-hash`, which is (0,2,0), and a bare `:global(.the-other-class)` is
+  // (0,1,0) — so the bare form reaches the element and smuggles a cascade change in as a repair.
+  // This guard cannot see that difference and says so out loud rather than implying otherwise.
+  //
+  // Its subset gate is not decorative either: `SubjectModifierPicker` and `SystemEditView` both
+  // hand `is-wide` to a `<Field>`, and that is a shared modifier they also put on elements they
+  // write themselves. 30 bespoke tokens travel onto a `<Field>` as this lands.
+  Object.freeze({ tag: 'Field', contractClasses: ['manager-field'], minimumTokens: 20 }),
 ]);
 
 test('no component scopes a rule onto a class it hands to a shared primitive', () => {

@@ -12,6 +12,7 @@
   `onToggle(id, nextSelected)`; the parent owns the resulting set write.
 -->
 <script>
+  import Field from './Field.svelte';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { formatList, localize } from '../util/foundryBridge.js';
 
@@ -156,8 +157,9 @@
   }
 </script>
 
-<div
-  class="manager-field manager-availability-multi"
+<Field
+  as="div"
+  class="manager-availability-multi"
   role="group"
   aria-labelledby={labelledBy || undefined}
   aria-describedby={describedBy || undefined}
@@ -248,7 +250,7 @@
   <span class="manager-modifier-pill-status" aria-live="polite" data-modifier-pill-status
     >{selectionSummary}</span
   >
-</div>
+</Field>
 
 <style>
   /* The at-cap menu button. It keeps its box and its focus ring — it is still a real tab

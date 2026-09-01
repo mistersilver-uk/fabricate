@@ -20,6 +20,7 @@
   GM-only by construction: the whole crafting manager admin is GM-scoped.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { tick } from 'svelte';
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
@@ -388,7 +389,7 @@
                        UNIT, because a min separated from its max reads as two unrelated
                        fields. -->
                   <div class="manager-modifier-name-row">
-                    <div class="manager-field manager-modifier-icon-field">
+                    <Field as="div" class="manager-modifier-icon-field">
                       <span>{text('FABRICATE.Admin.Manager.Modifiers.Icon', 'Icon')}</span>
                       <IconPicker
                         value={entry.icon || 'fa-solid fa-user'}
@@ -398,8 +399,8 @@
                         )}
                         onChange={(iconClass) => onUpdate(entry.id, { icon: iconClass })}
                       />
-                    </div>
-                    <label class="manager-field manager-modifier-label-field">
+                    </Field>
+                    <Field as="label" class="manager-modifier-label-field">
                       <span>{text('FABRICATE.Admin.Manager.Modifiers.Label', 'Label')}</span>
                       <input
                         type="text"
@@ -408,13 +409,13 @@
                         oninput={(event) =>
                           onUpdate(entry.id, { label: event.currentTarget.value })}
                       />
-                    </label>
+                    </Field>
                     <!-- The bounds pair rides the SAME line as icon and label since issue
                          1096. It keeps its own wrapper — and its own bounds hook — so the two
                          steppers stay one flex item and wrap together, and so the View Lab
                          case that anchors on that hook still resolves. -->
                     <div class="manager-modifier-bounds-row" data-world-modifier-bounds={entry.id}>
-                      <div class="manager-field manager-modifier-bound-field">
+                      <Field as="div" class="manager-modifier-bound-field">
                         <span class="manager-recipe-micro-label">{minLabel}</span>
                         <Stepper
                           value={resolveModifierBounds(entry).min}
@@ -425,8 +426,8 @@
                           inputProps={{ 'data-world-modifier-field': 'min' }}
                           onChange={(next) => handleBound(entry.id, 'min', next)}
                         />
-                      </div>
-                      <div class="manager-field manager-modifier-bound-field">
+                      </Field>
+                      <Field as="div" class="manager-modifier-bound-field">
                         <span class="manager-recipe-micro-label">{maxLabel}</span>
                         <Stepper
                           value={resolveModifierBounds(entry).max}
@@ -437,7 +438,7 @@
                           inputProps={{ 'data-world-modifier-field': 'max' }}
                           onChange={(next) => handleBound(entry.id, 'max', next)}
                         />
-                      </div>
+                      </Field>
                     </div>
                   </div>
                   <!-- The bounds hint sits DIRECTLY under the bounds it explains (issue 1096,
@@ -450,7 +451,7 @@
                       'Optional. These clamp the resolved value when a check uses this modifier. Leave them empty for no limit — empty is not zero.'
                     )}
                   </p>
-                  <label class="manager-field">
+                  <Field as="label">
                     <span>{text('FABRICATE.Admin.Manager.Modifiers.Expression', 'Expression')}</span
                     >
                     <!-- A PLAIN input: no `@` cap, no stripping, no re-prepending (maintainer
@@ -472,7 +473,7 @@
                         'A character-data path needs its leading @ — for example @abilities.med.mod. A number or a dice expression does not: write 2 or 1d4 as-is.'
                       )}
                     </small>
-                  </label>
+                  </Field>
                   {#if expressionSuggestions.length > 0}
                     <!-- Roll-data suggestion chips (issue 1096). Each APPENDS its term to the
                          expression above rather than replacing it, so a GM builds

@@ -6,6 +6,7 @@
   reverts.
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import { untrack } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -49,7 +50,7 @@
   }
 </script>
 
-<div class="manager-field manager-realm-name-field" data-manager-realm-name-field>
+<Field as="div" class="manager-realm-name-field" data-manager-realm-name-field="">
   <span>{text('FABRICATE.Admin.Manager.Travel.Realms.RenameLabel', 'Realm name')}</span>
   <input
     type="text"
@@ -59,4 +60,4 @@
     onkeydown={onKeydown}
     aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.RenameLabel', 'Realm name')}
   />
-</div>
+</Field>

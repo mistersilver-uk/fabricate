@@ -153,6 +153,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  // The shared labelled-field primitive (issue 1428). The Checks Studio authors its DC, its
+  // formula and every trigger condition through `.manager-field` columns, so this component is
+  // in the static graph of every suite that mounts the studio; an omission HANGS them.
+  'src/ui/svelte/components/Field.svelte',
   // The shared button primitive. Every list in the studio is extended by the prototype's
   // full-width dashed control, which is this primitive's `dashed` role (issue 1096).
   'src/ui/svelte/components/ManagerButton.svelte',

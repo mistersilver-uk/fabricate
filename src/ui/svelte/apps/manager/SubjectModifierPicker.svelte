@@ -62,6 +62,7 @@
      authors a pick.
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import { formatList, localize } from '../../util/foundryBridge.js';
   import ModifierPillSelect from '../../components/ModifierPillSelect.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
@@ -204,7 +205,7 @@
 </script>
 
 {#if options.length > 0}
-  <div class="manager-field is-wide" data-subject-modifier-picker={testId}>
+  <Field as="div" class="is-wide" data-subject-modifier-picker={testId}>
     <span class="manager-recipe-micro-label" id={LABEL_ID}>
       {text(copy.headingKey, copy.heading)}
     </span>
@@ -260,7 +261,7 @@
         {inheritText}
       </p>
     {/if}
-  </div>
+  </Field>
 {/if}
 
 <style>

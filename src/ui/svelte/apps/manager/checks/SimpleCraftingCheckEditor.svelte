@@ -23,6 +23,7 @@
   Controlled component: renders `value` and emits the next value via `onChange`.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import IconFactRow from '../IconFactRow.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
@@ -208,7 +209,7 @@
              upward rather than held here, so the simulator and the strip can never be reading
              different records. -->
         {#if previewRecords.length > 1}
-          <label class="manager-field manager-checks-band-record">
+          <Field as="label" class="manager-checks-band-record">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainst',
@@ -224,7 +225,7 @@
                 <option value={record.id}>{record.label}</option>
               {/each}
             </select>
-          </label>
+          </Field>
         {/if}
 
         <ThresholdBandStrip

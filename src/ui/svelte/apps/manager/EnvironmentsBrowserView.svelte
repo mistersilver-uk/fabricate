@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../components/Field.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
@@ -1196,7 +1197,7 @@
           </header>
           <p class="manager-condition-panel-hint">{conditionHint(condition.kind)}</p>
 
-          <label class="manager-field manager-condition-current">
+          <Field as="label" class="manager-condition-current">
             <span>{conditionCurrentLabel(condition.kind)}</span>
             <select
               value={condition.setting.current}
@@ -1207,7 +1208,7 @@
                 <option value={conditionId(option)}>{conditionLabel(option)}</option>
               {/each}
             </select>
-          </label>
+          </Field>
 
           <form
             class="manager-condition-add"
@@ -1222,14 +1223,14 @@
               )}
               onChange={(icon) => setConditionAddIcon(condition.kind, icon)}
             />
-            <label class="manager-field">
+            <Field as="label">
               <input
                 value={conditionInputValue(condition.kind)}
                 aria-label={conditionAddLabel(condition.kind)}
                 placeholder={conditionInputPlaceholder(condition.kind)}
                 oninput={(event) => setConditionInput(condition.kind, event.currentTarget.value)}
               />
-            </label>
+            </Field>
             <ManagerButton
               role="primary"
               type="submit"
@@ -1361,14 +1362,14 @@
                 }}
               />
             {/if}
-            <label class="manager-field">
+            <Field as="label">
               <input
                 value={vocabularyInputValue()}
                 aria-label={vocabularyAddLabel()}
                 placeholder={vocabularyPlaceholder()}
                 oninput={(event) => setVocabularyInput(event.currentTarget.value)}
               />
-            </label>
+            </Field>
             <ManagerButton
               role="primary"
               type="submit"

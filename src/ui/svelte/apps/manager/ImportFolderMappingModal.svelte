@@ -20,6 +20,7 @@
   as folders are skipped (a skipped folder's items are excluded from the import).
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { matchFolderNameToVocabulary } from '../../../../utils/matchFolderVocabulary.js';
@@ -302,7 +303,7 @@
 
           {#if !row.state.skipped}
             <div class="manager-import-mapping-controls">
-              <label class="manager-field manager-import-mapping-category">
+              <Field as="label" class="manager-import-mapping-category">
                 <span>{text('FABRICATE.Admin.Items.ImportMapping.Category', 'Category')}</span>
                 <select
                   data-import-mapping-category
@@ -313,7 +314,7 @@
                     <option value={option.value}>{option.label}</option>
                   {/each}
                 </select>
-              </label>
+              </Field>
               <ManagerButton
                 class="is-subtle manager-import-mapping-new-category"
                 data-import-mapping-new-category
@@ -501,7 +502,12 @@
     color: var(--fab-text-muted);
   }
 
-  .manager-import-mapping-category select {
+  /* `:global(...)`, chained with `.manager-field`: this class now sits on a `<Field>`, and a
+     scoped rule cannot reach a class the component hands to a child (see `Field.svelte`). The
+     `.manager-field` compound is not decoration — it restores the (0,2,0) the scoped
+     `.manager-import-mapping-category.svelte-hash` form had, which the bare `:global(.manager-import-mapping-category)` would drop to
+     (0,1,0). */
+  :global(.manager-field.manager-import-mapping-category select) {
     font-size: var(--fab-recipe-control-font);
   }
 
@@ -518,7 +524,7 @@
     gap: var(--fab-space-2);
   }
 
-  .manager-import-mapping-category select {
+  :global(.manager-field.manager-import-mapping-category select) {
     min-width: 140px;
   }
 

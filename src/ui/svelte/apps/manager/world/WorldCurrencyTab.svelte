@@ -17,6 +17,7 @@
   GM-scoped.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -395,7 +396,7 @@
 
     <div id="manager-section-body-currency" class="manager-section-body">
       <div class="manager-currency-strategy" data-world-currency-strategy>
-        <label class="manager-field">
+        <Field as="label">
           <span
             >{text('FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategy', 'Spend strategy')}</span
           >
@@ -409,10 +410,10 @@
             {/each}
           </select>
           <small data-world-currency-strategy-hint>{currencySpendStrategyHint()}</small>
-        </label>
+        </Field>
 
         {#if currencyShowProviderBranch}
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
             <select
               value={currencyProviderId}
@@ -429,9 +430,9 @@
                 'A preconfigured adapter that reads and spends coins from the actor inventory.'
               )}</small
             >
-          </label>
+          </Field>
         {:else if currencySpendStrategy === 'actorInventory'}
-          <div class="manager-field">
+          <Field as="div">
             <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
             <div
               class="manager-currency-subunit-warning manager-environment-comp-callout"
@@ -446,7 +447,7 @@
                 )}</span
               >
             </div>
-          </div>
+          </Field>
         {:else if currencyMacroMode}
           <div
             class="manager-currency-macro-zones manager-currency-macro-row"
@@ -454,7 +455,7 @@
           >
             {#each CURRENCY_MACRO_FIELDS as field (field.key)}
               {@const macroDoc = currencyMacroDisplay(field.key)}
-              <div class="manager-field manager-currency-macro-field">
+              <Field as="div" class="manager-currency-macro-field">
                 <span>{text(field.labelKey, field.labelFallback)}</span>
                 {#if macroDoc}
                   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -545,7 +546,7 @@
                   </div>
                 {/if}
                 <small>{text(field.hintKey, field.hintFallback)}</small>
-              </div>
+              </Field>
             {/each}
           </div>
         {/if}
@@ -643,7 +644,7 @@
               {#if expanded}
                 <div class="manager-character-modifier-editor">
                   <div class="manager-edit-grid manager-currency-edit-grid">
-                    <label class="manager-field">
+                    <Field as="label">
                       <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Label', 'Label')}</span>
                       <input
                         type="text"
@@ -653,8 +654,8 @@
                             label: event.currentTarget.value,
                           })}
                       />
-                    </label>
-                    <label class="manager-field">
+                    </Field>
+                    <Field as="label">
                       <span
                         >{text(
                           'FABRICATE.Admin.Manager.CurrencyUnits.Abbreviation',
@@ -669,8 +670,8 @@
                             abbreviation: event.currentTarget.value,
                           })}
                       />
-                    </label>
-                    <div class="manager-field">
+                    </Field>
+                    <Field as="div">
                       <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Icon', 'Icon')}</span>
                       <IconPicker
                         value={unit.icon || 'fa-solid fa-coins'}
@@ -680,7 +681,7 @@
                         )}
                         onChange={(iconClass) => onUpdateCurrencyUnit(unit.id, { icon: iconClass })}
                       />
-                    </div>
+                    </Field>
                   </div>
 
                   {#if currencyMacroMode}
@@ -695,7 +696,7 @@
                     >
                   {:else}
                     <div class="manager-edit-grid manager-currency-detail-grid">
-                      <label class="manager-field">
+                      <Field as="label">
                         <span
                           >{text(
                             'FABRICATE.Admin.Manager.CurrencyUnits.ActorPath',
@@ -711,10 +712,10 @@
                               actorPath: event.currentTarget.value,
                             })}
                         />
-                      </label>
+                      </Field>
                       {#if subUnitOptions.length > 0}
                         <div class="manager-currency-subunit-builder">
-                          <label class="manager-field">
+                          <Field as="label">
                             <span
                               >{text(
                                 'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
@@ -734,7 +735,7 @@
                                 >
                               {/each}
                             </select>
-                          </label>
+                          </Field>
                           <IconButton
                             ariaLabel={text(
                               'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
@@ -746,7 +747,7 @@
                           </IconButton>
                         </div>
                       {:else}
-                        <div class="manager-field">
+                        <Field as="div">
                           <span
                             >{text(
                               'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
@@ -771,7 +772,7 @@
                               >
                             {/if}
                           </div>
-                        </div>
+                        </Field>
                       {/if}
                     </div>
 

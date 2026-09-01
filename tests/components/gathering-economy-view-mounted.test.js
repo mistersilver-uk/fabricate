@@ -109,6 +109,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       writeRawModule(modulePath);
     }
 
+    writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
