@@ -407,6 +407,44 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.match(panel.textContent, /No characters match your search\./);
   });
 
+  it('splits the "no actors configured" reason across EmptyState\'s title and body', async () => {
+    // Issue 1035: the reason used to fuse two sentences into one string. Scoped to
+    // `.manager-party-add-panel .manager-empty` — the actual container this panel
+    // renders into, not the sibling travel-actor picker's `.manager-travel-popover`.
+    const root = await mountBody({
+      actorOptions: [{ uuid: 'Actor.n', name: 'Nasty NPC', isPlayerCharacter: false }],
+    });
+    root.querySelector('[data-manager-party-add-open="p1"]').click();
+    flushSync();
+    const panel = root.querySelector('.manager-party-add-panel .manager-empty');
+    assert.ok(Boolean(panel), 'the empty state renders');
+    const title = panel.querySelector('h3');
+    const detail = panel.querySelector('p');
+    assert.ok(Boolean(title), 'renders a title');
+    assert.match(title.textContent, /No player-character actors are available to add\./);
+    assert.ok(Boolean(detail), 'renders a detail');
+    assert.match(detail.textContent, /Player Character Actor Types/);
+  });
+
+  it('does not give the no-search-match reason a detail (negative control)', async () => {
+    // The other branch is already a correct short title and must not gain a second
+    // sentence — this is the load-bearing half: an unconditional detail forward passes
+    // the test above but would also pass this one, silently.
+    const root = await mountBody({ actorOptions: actors });
+    root.querySelector('[data-manager-party-add-open="p1"]').click();
+    flushSync();
+    const search = root.querySelector('.manager-party-add-query');
+    search.value = 'zzz';
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    const panel = root.querySelector('.manager-party-add-panel .manager-empty');
+    assert.ok(Boolean(panel), 'the empty state renders');
+    const title = panel.querySelector('h3');
+    assert.ok(Boolean(title), 'renders a title');
+    assert.match(title.textContent, /No characters match your search\./);
+    assert.ok(!panel.querySelector('p'), 'no detail paragraph for an already-short reason');
+  });
+
   it('closes the add panel on Done', async () => {
     const root = await mountBody({ actorOptions: actors });
     root.querySelector('[data-manager-party-add-open="p1"]').click();

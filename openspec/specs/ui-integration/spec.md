@@ -2067,7 +2067,8 @@ Shipped capabilities:
   Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
 - The enable toggle is never gated on the travel actor: a party with no travel actor can be enabled, and the card's meta line states "travel actor: none" so the consequence is visible without the configuration being refused.
   Newly created parties visibly show their disabled state.
-- When the world has no actors, the member and travel-actor pickers show an explicit empty state directing the GM to create an Actor first.
+- When no configured player-character actor is available to offer — the world holds no actor of a type the GM has listed under Player Character Actor Types — the member and travel-actor pickers show an explicit empty state naming that module setting as the place to add one, split across a short title and an explanatory body rather than fused into one sentence.
+  A search that matches none of the remaining eligible actors renders the shared no-search-match title with no such explanation, because a search miss is not a configuration problem.
 - The Parties pane exposes a search field only when the world holds more than one party.
   It matches a party's name, any member's name, or its travel actor's name, and states how many of the total parties are showing.
   A search matching nothing renders the shared filtered no-state treatment quoting the query; the World rail's party count is the world total and is unaffected by the filter.
