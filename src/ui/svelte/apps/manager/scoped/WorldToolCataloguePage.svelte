@@ -43,14 +43,24 @@
   == THE THIRD SECTION HAS NO INHERIT COUNT, AND THE INSPECTOR SAYS SO ====================
   The shell renders one inherit count per `scope.sections`, which is `['breakage', 'onBreak']`.
   `repairRequirements` is deliberately absent from that list - it is SEEDED once when a tool
-  joins a system and then diverges - so a shell iterating the counts drops it silently. This
-  page's `inspectorBody` renders it explicitly, as a SEED with no count, because a count would
-  claim a live parent the resolver does not honour.
+  joins a system and then diverges - so a shell iterating the counts drops it silently. It is
+  restored through `extraCards`, the shell's own slot for a card the SECTION LOOP cannot
+  produce, and it states the seed rule rather than a count: a count would claim a live parent
+  the resolver does not honour.
+
+  == THE WORLD DEFAULTS ARE THE SHELL'S CARDS, NOT A SECOND PANEL UNDER THEM ==============
+  They were this page's own `inspectorBody` snippet, headed `World defaults` and drawn below
+  everything the shell renders. The shell states those facts itself now - a glyph, the value
+  the default resolves to, and the line that qualifies it, one card per section - so the
+  snippet had become a second `World defaults` heading in one panel, and it overflowed the
+  inspector besides. `sectionIcons`, `sectionTitles`, `sectionNotes` and `extraCards` are the
+  seam that replaces it, so one meaning is drawn once and every scoped catalogue draws it the
+  same way.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
-  import IconFactRow from '../IconFactRow.svelte';
+  import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
   import { toolBreakageSummary, toolOnBreakSummary } from '../tools/toolStudio.js';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
@@ -67,6 +77,7 @@
     actions = null,
     systems = [],
     onOpenEntry = () => {},
+    onOpenSystemRules = null,
     // CREATE A WORLD TOOL FROM A DROPPED ITEM. The zone is on THIS screen because a Tool is a
     // world record: it exists once, every system adopts the same one, and the system Tool
     // Rules list — which is where the zone used to live — can only ever author RULES for a
@@ -195,80 +206,6 @@
   }
 
   /**
-   * The four world defaults one Tool resolves to, as fact rows.
-   *
-   * The first three read through the same summary helpers the row badges and the system
-   * inspector use, so a GM cannot see one answer on the row and a different one in the panel.
-   * The fourth is the SEED, which is deliberately not an inherited section - see the header -
-   * so it states its own rule rather than an inherit count.
-   *
-   * @param {object|null} entry
-   * @returns {Array<{id: string, icon: string, title: string, subtitle: string}>}
-   */
-  function worldDefaultFacts(entry) {
-    const checkDriven = (worldAuthority || 'toolSpecific') === 'checkDriven';
-    return [
-      {
-        id: 'breakage',
-        icon: checkDriven ? 'fas fa-dice-d20' : 'fas fa-hourglass-half',
-        title: breakageLabel(entry),
-        subtitle: checkDriven
-          ? text(
-              'FABRICATE.Admin.Manager.Tools.Editor.PreviewCheckDriven',
-              'Check-driven \u00b7 follows the crafting roll'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Tools.Editor.PreviewToolSpecific',
-              'Tool-specific \u00b7 tracked per copy'
-            ),
-      },
-      {
-        id: 'on-break',
-        icon: 'fas fa-heart-crack',
-        title: format(
-          'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
-          'On break: {action}',
-          { action: onBreakActionLabel(entry).toLocaleLowerCase() }
-        ),
-        subtitle: text(
-          'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak',
-          'Runs immediately after breakage'
-        ),
-      },
-      {
-        id: 'reach',
-        icon: 'fas fa-diagram-project',
-        title: format(
-          memberCount(entry) === 1
-            ? 'FABRICATE.Admin.Manager.Scoped.List.SystemCountOne'
-            : 'FABRICATE.Admin.Manager.Scoped.List.SystemCount',
-          memberCount(entry) === 1 ? '{count} system' : '{count} systems',
-          { count: memberCount(entry) }
-        ),
-        subtitle: text(
-          'FABRICATE.Admin.Manager.Scoped.List.SystemCountNote',
-          'Each one inherits these defaults until it overrides a section'
-        ),
-      },
-      {
-        id: 'repair',
-        icon: 'fas fa-screwdriver-wrench',
-        title: format(
-          repairGroupCount(entry) === 1
-            ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
-            : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
-          repairGroupCount(entry) === 1 ? '{count} group' : '{count} groups',
-          { count: repairGroupCount(entry) }
-        ),
-        subtitle: text(
-          'FABRICATE.Admin.Manager.Tools.RepairSeedPreview',
-          'Copied once when a system adopts this Tool'
-        ),
-      },
-    ];
-  }
-
-  /**
    * What one tool's world default DOES when it breaks, in words rather than as a badge.
    *
    * @param {object|null} entry
@@ -283,27 +220,102 @@
   }
 
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
+  // The world break mode with the shipped fallback applied, which is what every read of it
+  // here needs: a world that has authored nothing is tool-specific, not modeless.
+  const worldCheckDriven = $derived((worldAuthority || 'toolSpecific') === 'checkDriven');
   const breakModeOptions = $derived(worldBreakModeOptions(worldAuthority, text));
   const overridesKnown = $derived(breakModeOverridesKnown(systems));
   const overrideCount = $derived(breakModeOverrideCount(systems, worldAuthority));
+
+  // Read by `manager-contract.test.js`'s SWAP DETECTOR against the title `viewTitle` renders
+  // for this route. A page that still DELEGATES its body states these four as attributes on
+  // the shared placeholder; a page with its own body states them as module constants, and
+  // this is one of those. See the twin block in `WorldEssenceCataloguePage.svelte`.
+  const PAGE_ID = 'world-tools';
+  const PAGE_ICON = 'fas fa-screwdriver-wrench';
+  const TITLE_KEY = 'FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle';
+  const TITLE_FALLBACK = 'Tools Catalogue';
 
   const entries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
   const selectedEntry = $derived(entries.find((entry) => entry.id === selectedId) ?? null);
 
   const sorts = $derived(worldToolSorts(text, breakageLabel));
 
-  // WHAT EACH WORLD DEFAULT RESOLVES TO, one line per section. Without it the shell's counts
-  // read "Breakage - 3 inheriting" and never say what those three systems are inheriting, and
-  // a row-count criterion passes green over every note empty.
-  const sectionNotes = $derived(
+  // ── THE WORLD-DEFAULT CARDS, THROUGH THE SHELL RATHER THAN BESIDE IT ───────────────────
+  // The card TITLE names the value and the NOTE qualifies it, which is the shell’s own
+  // emphasis: a card titled `Breakage` says which row it is and nothing about what a GM would
+  // be changing by opening it. The inherit count is still hooked by
+  // `data-scoped-list-inherit-count`, so nothing that could read it before has lost it.
+  //
+  // The BREAKAGE GLYPH follows the world break mode, because that mode decides whether this
+  // section is consulted at all: a die when the crafting roll decides it, an hourglass when
+  // the Tool tracks its own.
+  const sectionIcons = $derived({
+    breakage: worldCheckDriven ? 'fas fa-dice-d20' : 'fas fa-hourglass-half',
+    onBreak: 'fas fa-heart-crack',
+  });
+
+  const sectionTitles = $derived(
     selectedEntry
-      ? { breakage: breakageLabel(selectedEntry), onBreak: onBreakLabel(selectedEntry) }
+      ? {
+          breakage: breakageLabel(selectedEntry),
+          onBreak: format(
+            'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
+            'On break: {action}',
+            { action: onBreakActionLabel(selectedEntry).toLocaleLowerCase() }
+          ),
+        }
       : {}
   );
 
-  const catalogueTitle = $derived(
-    text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle', 'Tools Catalogue')
+  // The note says what the rule DOES rather than restating the arithmetic above it, which is
+  // the prototype's own emphasis on these cards (`PROTO-tools-catalogue.png`).
+  const sectionNotes = $derived(
+    selectedEntry
+      ? {
+          breakage: worldCheckDriven
+            ? text(
+                'FABRICATE.Admin.Manager.Tools.Editor.PreviewCheckDriven',
+                'Check-driven \u00b7 follows the crafting roll'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Tools.Editor.PreviewToolSpecific',
+                'Tool-specific \u00b7 tracked per copy'
+              ),
+          onBreak: text(
+            'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak',
+            'Runs immediately after breakage'
+          ),
+        }
+      : {}
   );
+
+  // THE SEED IS THE CARD THE SECTION LOOP CANNOT PRODUCE. `repairRequirements` carries no
+  // inherit count by design, so it is not in `scope.sections` and the loop never reaches it;
+  // the shell draws it in the same stack through `extraCards`, which exists for exactly this.
+  const extraCards = $derived(
+    selectedEntry
+      ? [
+          {
+            id: 'repair',
+            icon: 'fas fa-screwdriver-wrench',
+            title: format(
+              repairGroupCount(selectedEntry) === 1
+                ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
+                : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
+              repairGroupCount(selectedEntry) === 1 ? '{count} group' : '{count} groups',
+              { count: repairGroupCount(selectedEntry) }
+            ),
+            note: text(
+              'FABRICATE.Admin.Manager.Tools.RepairSeedPreview',
+              'Copied once when a system adopts this Tool'
+            ),
+          },
+        ]
+      : []
+  );
+
+  const catalogueTitle = $derived(text(TITLE_KEY, TITLE_FALLBACK));
 </script>
 
 <main class="manager-main" data-scoped-page="world-tools" aria-label={catalogueTitle}>
@@ -411,13 +423,13 @@
       {scope}
       {actions}
       {systems}
-      hookValue="world-tools"
+      hookValue={PAGE_ID}
       title={catalogueTitle}
       subtitle={text(
         'FABRICATE.Admin.Manager.Scoped.ToolCatalogueSubtitle',
         'One Tool per game-world Item, shared by every system.'
       )}
-      icon="fas fa-screwdriver-wrench"
+      icon={PAGE_ICON}
       emptyTitle={text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}
       emptyHint={text(
         'FABRICATE.Admin.Manager.Scoped.ToolCatalogueEmptyHint',
@@ -425,14 +437,44 @@
       )}
       {sorts}
       searchOf={worldToolSearchText}
+      {sectionIcons}
+      {sectionTitles}
       {sectionNotes}
+      {extraCards}
+      inspectorKicker={text('FABRICATE.Admin.Manager.Scoped.Tool.InspectorKicker', 'Tool page')}
+      countUnit={text('FABRICATE.Admin.Manager.Scoped.Tool.CountUnit', 'tools')}
+      selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.SelectAllShort', 'All')}
+      searchPlaceholder={text(
+        'FABRICATE.Admin.Manager.Scoped.Tool.SearchPlaceholder',
+        'Search tools…'
+      )}
+      inspectorFoot={toolInspectorFoot}
       bind:selectedId
+      onSelect={(entityId) => (selectedId = entityId)}
       {onOpenEntry}
+      {onOpenSystemRules}
       {rowMeta}
-      {inspectorBody}
     />
   </div>
 </main>
+
+<!--
+  THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT.
+
+  The reference pins a full-width `Edit tool` under the panel's scroll region
+  (`PROTO-tools-catalogue.png`), which is what makes the panel a place a GM ACTS from rather
+  than only reads. The frame owns the pinning; this snippet owns the verb, which is the split
+  the essence catalogue beside it already makes with the same primitive.
+-->
+{#snippet toolInspectorFoot(entry)}
+  <InspectorActionButton
+    tone="primary"
+    icon="fas fa-arrow-up-right-from-square"
+    label={text('FABRICATE.Admin.Manager.Scoped.Tool.OpenEntry', 'Edit tool')}
+    data-scoped-tool-open-entry
+    onClick={() => onOpenEntry(entry.id)}
+  />
+{/snippet}
 
 {#snippet rowMeta(entry)}
   <span class="manager-world-tool-row-badges" data-world-tool-row-badges={entry.id}>
@@ -481,34 +523,6 @@
       </button>
     {/if}
   </span>
-{/snippet}
-
-{#snippet inspectorBody(entry)}
-  <!--
-    THE WORLD DEFAULTS, AS FOUR FACT ROWS.
-
-    This snippet used to be a label, a group count and a two-sentence paragraph about seeding
-    - three lines of prose in the one place a GM is asking what the selected Tool DOES. What
-    the design puts here is the resolved answer for each world default, each a bold statement
-    over the line that qualifies it, and the seed is the fourth of them rather than an essay.
-
-    THE ROWS ARE `IconFactRow`, the shipped primitive the system inspector and the editor
-    preview both render, so one meaning has one geometry across all three surfaces.
-  -->
-  <div class="manager-world-tool-defaults" data-world-tool-defaults={entry.id}>
-    <p class="manager-kicker">
-      {text('FABRICATE.Admin.Manager.Tools.WorldDefaultsKicker', 'World defaults')}
-    </p>
-    {#each worldDefaultFacts(entry) as fact (fact.id)}
-      <IconFactRow
-        icon={fact.icon}
-        title={fact.title}
-        subtitle={fact.subtitle}
-        dataAttr="data-world-tool-default"
-        dataValue={fact.id}
-      />
-    {/each}
-  </div>
 {/snippet}
 
 <style>
@@ -569,12 +583,12 @@
   }
 
   .manager-world-tool-break-head i {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.7rem;
   }
 
   .manager-world-tool-break-title {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.75rem;
     font-weight: 600;
     overflow-wrap: break-word;
@@ -584,7 +598,7 @@
      wraps under the title instead of overlapping it. */
   .manager-world-tool-break-count {
     margin-left: auto;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.6rem;
     font-weight: 600;
     text-align: right;
@@ -612,14 +626,15 @@
      faintly: sampled against our own frame it moved the track about eight units away from
      its card, where the design has a full ramp rung. So the fill goes and the border stays.
 
-     `--fab-mv2-border` resolves to `--fab-border`, so no token change is needed with it. */
+     That border names `--fab-border` directly, since the legacy alias it used to be written
+     with was collapsed into that token (issue 1399). */
   .manager-world-tool-break-segments {
     display: flex;
     flex: 1 1 auto;
     flex-wrap: wrap;
     gap: var(--fab-space-2xs);
     padding: 3px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 9px;
     min-width: 0;
   }
@@ -636,7 +651,7 @@
   }
 
   .manager-world-tool-break-segments label.is-selected {
-    background: var(--fab-mv2-accent);
+    background: var(--fab-accent);
     color: var(--fab-on-accent);
   }
 
@@ -672,15 +687,9 @@
   /* A muted count rather than a chip: the two chips beside it name what the Tool does, and a
      third pill would read as a third property of the Tool instead of its reach. */
   .manager-world-tool-row-reach {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.6rem;
     font-weight: 600;
     white-space: nowrap;
-  }
-
-  .manager-world-tool-defaults {
-    display: grid;
-    gap: var(--fab-space-2);
-    min-width: 0;
   }
 </style>

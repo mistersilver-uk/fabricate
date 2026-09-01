@@ -3861,9 +3861,17 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     // below to fewer than seven and reds a lane that did everything right — and reading only the
     // second would do the same to the four that have not been replaced yet. The swap detector has
     // to survive the transition it exists to police, so it resolves either.
+    //
+    // THE CONSTANT IS READ FIRST, and the order is load-bearing rather than arbitrary (issue
+    // 1373). The attribute regex is unanchored, so on a REPLACED page it matches the first
+    // `icon="…"` anywhere in the file — which on a page whose inspector pins an action button is
+    // that BUTTON'S glyph, not the route's. Two replaced pages that happen to pin the same verb
+    // then report the same icon and the distinctness assertion reds on markup that is correct.
+    // A page that declares the constant has stated the fact deliberately; a delegating page has
+    // no constant to find and still falls through to its attribute.
     const declared = (source, attribute, constant) =>
-      source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1] ??
-      source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1];
+      source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1] ??
+      source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1];
     const pages = readdirSync(scopedDir)
       .filter((entry) => entry.startsWith('World') && entry.endsWith('.svelte'))
       .map((entry) => {

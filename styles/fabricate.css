@@ -25075,3 +25075,75 @@
   border-bottom: 0;
   background: transparent;
 }
+
+/* ── THE TOOL SCREENS JOIN THE SAME SURFACE LADDER (issue 1373) ──────────────────────────────
+   The block above is route-scoped by design, and its route list names the three ESSENCE
+   screens. The three TOOL screens are the same archetype drawn from the same reference —
+   `PROTO-tools-catalogue.png`, `PROTO-tool-entry.png` and `PROTO-tool-rules.png` all draw one
+   flat content surface with bordered cards on it — so without this they inherit the
+   manager-wide default instead and the whole content area sits two rungs light, measured on
+   the View Lab frames at this theme’s `--fab-bg-2` against the pane beside them.
+
+   EXTENDED RATHER THAN WIDENED. The essence block’s selector lists are left exactly as they
+   are: they are the other lane’s statement about its own three routes, and appending to them
+   would put one rule under two owners. This says the same thing for these three, and both
+   blocks can be deleted independently once the ladder is a manager-wide decision.
+
+   The RAIL and the app title bar stay out of scope for the reason the block above gives. So
+   does the world tool catalogue’s own scope band, whose cards are drawn by that page’s scoped
+   `<style>` — a component's own block is unlayered and beats this sheet at any specificity, so
+   a rule here could not reach it even if it should. */
+.fabricate-manager[data-manager-view='world-tools'] .manager-main,
+.fabricate-manager[data-manager-view='world-tool-entry'] .manager-main,
+.fabricate-manager[data-manager-view='tools'] .manager-main {
+  background: var(--fab-bg-0);
+}
+
+/* `.manager-header` is a SIBLING of `.manager-main`, so the rule above cannot reach the strip
+   carrying the breadcrumb, the title and the subtitle; see the essence block for the whole
+   argument and for why flattening it is safe (the shared rule’s `border-bottom` still states
+   the boundary). */
+.fabricate-manager[data-manager-view='world-tools'] .manager-header,
+.fabricate-manager[data-manager-view='world-tool-entry'] .manager-header,
+.fabricate-manager[data-manager-view='tools'] .manager-header {
+  background: var(--fab-bg-0);
+}
+
+/* THE ROWS AND THE PAGER LOSE THEIR FILLS, so the 1px border is what makes a row a row — the
+   reference’s own construction on both list screens. The two routes name different row
+   classes because they are different lists: the world catalogue renders the shared scoped-list
+   row and the system rules list renders `ToolsBrowserView`’s own. */
+.fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row,
+.fabricate-manager[data-manager-view='world-tools'] .manager-pagination,
+.fabricate-manager[data-manager-view='tools'] .manager-tools-row,
+.fabricate-manager[data-manager-view='tools'] .manager-pagination {
+  background: transparent;
+}
+
+/* HOVER STILL HAS TO READ with the resting fill gone, so it is restated one rung up from the
+   pane rather than left pointing at a ladder that no longer starts where it assumed.
+
+   SELECTION IS RESTATED ONLY FOR THE WORLD CATALOGUE. The system rules row already marks its
+   selection on its own body — `.manager-tools-row.is-selected > .manager-tools-row-body` paints
+   `--fab-success-soft` — so a second fill on the row behind it would be one state stated twice
+   in two colours. */
+.fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row:hover,
+.fabricate-manager[data-manager-view='tools'] .manager-tools-row:hover {
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row.is-selected {
+  background: var(--fab-bg-1);
+}
+
+/* THE SYSTEM RULES LIST SHARES THE MANAGER’S OWN INSPECTOR ASIDE, exactly as the system essence
+   rules list does, so its surfaces are brought onto the ladder here rather than in a scoped
+   block. The `tools` route already declares its own `--fab-bg-2` fill on that aside above; this
+   is the later declaration of the two, which is what carries it. */
+.fabricate-manager[data-manager-view='tools'] .manager-inspector {
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager[data-manager-view='tools'] .manager-inspector .manager-inspector-card {
+  background: transparent;
+}

@@ -736,13 +736,13 @@
   }
 
   .manager-tools-row-recipes strong {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.82rem;
     font-weight: 600;
   }
 
   .manager-tools-row-recipes small {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.52rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -755,7 +755,7 @@
     flex-wrap: wrap;
     gap: 3px;
     padding: 3px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
     min-width: 0;
@@ -766,7 +766,7 @@
     align-items: center;
     padding: 5px var(--fab-space-2);
     border-radius: 6px;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.66rem;
     font-weight: 600;
     line-height: 1.2;
@@ -774,7 +774,7 @@
   }
 
   .manager-tools-membership-filter label.is-selected {
-    background: var(--fab-mv2-accent);
+    background: var(--fab-accent);
     color: var(--fab-on-accent);
   }
 
@@ -797,7 +797,7 @@
   }
 
   .manager-tools-sort-label {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.54rem;
     font-weight: 700;
     letter-spacing: 0.09em;
@@ -812,7 +812,7 @@
      design fills this control with its own translucent surface token — but a TRANSLUCENT
      background on a `<select>` makes the browser open a LIGHT native popup, which
      `manager-layout.test.js` gates against by name. The
-     shipped `.fabricate-manager select` rule already paints `--fab-mv2-bg`, one opaque rung
+     shipped `.fabricate-manager select` rule already paints `--fab-bg-1`, one opaque rung
      that lands within a few units of the design's composited value, so this block states
      geometry only and inherits the fill every other manager select wears. */
   .manager-tools-sort-select {
@@ -822,9 +822,9 @@
     min-width: 92px;
     max-width: 180px;
     padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.68rem;
   }
 
@@ -841,10 +841,10 @@
     height: auto;
     min-height: 28px;
     padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.68rem;
     font-weight: 600;
     line-height: 1.2;
@@ -856,15 +856,15 @@
     flex: 0 0 auto;
     min-height: 30px;
     padding: 0 var(--fab-space-3);
-    border-color: var(--fab-mv2-border-strong);
-    color: var(--fab-mv2-text);
+    border-color: var(--fab-border-strong);
+    color: var(--fab-text);
     font-size: 0.66rem;
   }
 
   .manager-tools-edit-rules.is-add {
     border-style: dashed;
     background: transparent;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
   }
 
   .manager-tools-edit-rules i {
@@ -873,7 +873,7 @@
 
   .manager-tools-sort-row .manager-tools-result-summary {
     margin: 0 0 0 auto;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.66rem;
     text-align: right;
   }
@@ -882,14 +882,14 @@
      came from, not a badge naming one of them, and the prototype sets it as plain text beside
      the pills for exactly that reason. */
   .manager-tools-row-inherit {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.6rem;
     font-weight: 600;
     white-space: nowrap;
   }
 
   .manager-tools-row-inherit.is-overridden {
-    color: var(--fab-status-warning-text, var(--fab-mv2-accent));
+    color: var(--fab-status-warning-text, var(--fab-accent));
   }
 
   /* A world Tool with no rules here is present but not adopted, and reads that way. */

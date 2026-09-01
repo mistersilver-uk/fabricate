@@ -305,10 +305,6 @@
   slot. That keeps the frame's contract literal — the inspector region renders when and only when
   an `inspectorBody` is supplied — while still letting a lane add its own panel below the two
   regions this shell owns.
-
-  That panel is WRAPPED in one element, so the divider between the shell's regions and the
-  lane's own belongs to the shell rather than to markup no lane is told to write; see the
-  `<style>` note.
 -->
 {#snippet catalogueInspector(entry, ctx)}
   {@const counts = entry?.inheritCounts ?? {}}
@@ -484,9 +480,7 @@
     />
   </section>
 
-  {#if inspectorBody}
-    <div class="manager-scoped-catalogue-lane">{@render inspectorBody(entry, ctx)}</div>
-  {/if}
+  {#if inspectorBody}{@render inspectorBody(entry, ctx)}{/if}
 {/snippet}
 
 <style>
@@ -512,23 +506,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-chip);
-    min-width: 0;
-  }
-
-  /* THE LANE'S OWN PANEL IS SEPARATED FROM THE SHELL'S REGIONS, because an unmarked join
-     reads as one continuous list. The shell states world defaults and the membership roster;
-     what follows belongs to the lane and is about something else, and with the two butted
-     together a GM reads the lane's panel as a third region of the roster.
-
-     It lives on the lane wrapper rather than under the roster so it exists only when
-     something follows; a trailing divider under the last region would separate it from
-     nothing. */
-  .manager-scoped-catalogue-lane {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-    padding-top: var(--fab-space-2);
-    border-top: 1px solid var(--fab-border);
     min-width: 0;
   }
 
