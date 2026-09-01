@@ -142,7 +142,7 @@
  *
  * spec.md requirement "The primitive set is a closed, versioned vocabulary" — two or more
  * INDEPENDENT callers. An importer is any other file under `src/` that imports the component by
- * path. Eight ADJUDICATED candidates fall below the bar and are recorded in {@link NOT_A_PRIMITIVE}
+ * path. Seven ADJUDICATED candidates fall below the bar and are recorded in {@link NOT_A_PRIMITIVE}
  * rather than omitted, because that same requirement obliges a candidate with fewer to be "recorded
  * as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a
  * decision rather than an oversight".
@@ -256,7 +256,7 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * broad-signal set, a `library.html` entry it does or does not implement, an entry on the
  * mounted-harness hang guard. It is NOT a census of the directory. 48 of the 72 top-level files
  * under `apps/manager/` sit below the two-caller bar, and `components/` holds screen regions and
- * dead code besides; listing all of them would bury the eight judgements that were actually made in
+ * dead code besides; listing all of them would bury the seven judgements that were actually made in
  * dozens that were not, and the requirement cited above asks for recorded DECISIONS, not for an
  * inventory.
  *
@@ -270,13 +270,22 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * `BROAD_SIGNAL_PATTERN` DOES with the path, not what anyone thinks the file deserves. The five
  * under `src/ui/svelte/components/` are `'broad'` because that directory leg matches them today
  * whatever anyone thinks of them, which is the point issue 1378 makes: a directory cannot tell a
- * primitive from a component that merely lives there. The three under `apps/manager/` —
- * `InspectorActionButton`, `checks/ChecksEditorTabs` and `downtime/WorldDowntimeTabs` — are
+ * primitive from a component that merely lives there. The two under `apps/manager/` —
+ * `InspectorActionButton` and `downtime/WorldDowntimeTabs` — are
  * `'targeted'` because membership there is by NAME and none of them is on a name list, so the
  * frames that claim each by `sourceMatches` are reached.
  *
+ * `checks/ChecksEditorTabs` was a third and is DELIBERATELY GONE, not lost. It was recorded here by
+ * issue 1038 on the ground that its count is a bare mono numeral rather than a chip and "the two
+ * treatments are deliberately different" — a STYLE divergence, which the maintainer has since ruled
+ * is never an acceptable justification: a recorded divergence must be a FUNCTIONAL or INFORMATIONAL
+ * difference the shared primitive absorbs as a capability. It was also backwards on the facts, since
+ * `spec.md`'s Rail Marker Family makes the bare numeral the CORRECT vehicle for a record count and
+ * `library.html`'s own `<TabBar>` specimen draws two vehicles on one bar. Issue 1429 widened
+ * `EditorTabs` and converted the strip. Do not re-add this row.
+ *
  * That is why the integrity test runs its per-row clauses over THESE rows too. The disk clause in
- * particular is live here: two of the eight name files nothing imports.
+ * particular is live here: two of the seven name files nothing imports.
  *
  * @type {readonly {path: string, library: string|null, evidence: string, why: string}[]}
  */
