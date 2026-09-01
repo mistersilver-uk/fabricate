@@ -32,7 +32,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
   ],
-  compiledModules: [PILL_SELECT_PATH],
+  // `Field.svelte` is THE manager's labelled form field (issue 1428): this control's
+  // `.manager-field` column renders through it since the conversion, so it is in this
+  // tree's static graph. Omitting it does not fail the suite — the harness's dependency
+  // validator throws in `before()` and every test here reports as `# cancelled`.
+  compiledModules: ['src/ui/svelte/components/Field.svelte', PILL_SELECT_PATH],
   componentPath: PILL_SELECT_PATH,
 });
 

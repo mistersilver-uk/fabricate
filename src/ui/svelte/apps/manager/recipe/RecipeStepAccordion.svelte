@@ -24,6 +24,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { formatTimeRequirement } from '../../../util/recipeDuration.js';
   import RecipeDurationEditor from './RecipeDurationEditor.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     steps = [],
@@ -183,14 +184,13 @@
           {/if}
         </div>
         <div class="manager-recipe-steps-row-controls">
-          <button
-            type="button"
-            class="manager-icon-button is-danger"
+          <IconButton
+            class="is-danger"
             data-recipe-step-delete={step.id}
-            aria-label={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
             title={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
             onclick={() => onDeleteStep(step.id)}
-            ><i class="fas fa-trash" aria-hidden="true"></i></button
+            ><i class="fas fa-trash" aria-hidden="true"></i></IconButton
           >
         </div>
       </div>

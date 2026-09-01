@@ -192,17 +192,70 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
     harness.remount();
   });
 
-  it('mounts NO "How players see it" card on the inspector path, leaving that surface unaffected', async () => {
+  it('draws the whole panel, and the three retired suppression props are inert', async () => {
+    // ── THE INSPECTOR PATH IS GONE (issue 1372, maintainer parity round 8) ──────────────────
+    // `showIdentity` / `showLiveNote` / `showEffectiveKicker` existed for ONE caller, the
+    // browser inspector, which passed all three `false`. That rail draws the reference's
+    // `ON CRAFT IN <system>` cards now, so all three props had zero callers and are removed.
+    //
+    // Passing them anyway is the NEGATIVE CONTROL: a runes `$props()` destructure without a
+    // rest ignores an undeclared key, so a panel that still hid its card here would mean a
+    // prop had survived under another name.
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire' }),
       showIdentity: false,
       showLiveNote: false,
       showEffectiveKicker: false,
     });
-    assert.equal(root.querySelector('[data-essence-preview-appears]'), null, 'no appears card');
-    assert.equal(root.querySelector('.inventory-card'), null, 'and no player tile is mounted');
-    // The rules — the inspector's actual payload — still render.
-    assert.ok(root.querySelector('[data-essence-preview-rule]'), 'the rules list still renders');
+    // `assert.ok(!el)`, never `assert.equal(el, null)`: on failure `node:assert` serialises a
+    // mounted happy-dom element's circular tree to build its diff and the heap dies, which
+    // surfaces as a `# cancelled` suite with no message.
+    assert.ok(Boolean(root.querySelector('[data-essence-preview-appears]')), 'the card renders');
+    assert.ok(Boolean(root.querySelector('.inventory-card')), 'and the real player tiles mount');
+    assert.ok(Boolean(root.querySelector('[data-essence-preview-live]')), 'and the live note');
+    assert.ok(root.querySelector('[data-essence-preview-rule]'), 'and the rules list');
+    harness.remount();
+  });
+
+  it('words the two behaviour rows for the LAYER it is describing', async () => {
+    // ── D4 (issue 1372, maintainer parity round 8) ─────────────────────────────────────────
+    // At world scope the reference says who INHERITS — `Default effects from Starlit Filament`
+    // over `Systems that inherit copy these onto anything crafted with it`
+    // (`tmp/proto/essence-entry.png`). What shipped said `Transfers active effects / From None`
+    // at both scopes and never mentioned a system or an inheritance, so a GM editing a record
+    // every crafting system copies could not tell that from this panel.
+    const essence = makeEssenceRow({
+      id: 'aether',
+      name: 'Aether',
+      hasEffectTransfer: true,
+      hasPropertyMacro: true,
+    });
+    const shared = {
+      essence,
+      effectTransferEnabled: true,
+      propertyMacrosEnabled: true,
+      sourceName: 'Starlit Filament',
+      macroName: 'Brittle Temper',
+    };
+
+    const world = await harness.mount({ ...shared, scope: 'world' });
+    const worldRows = [...world.querySelectorAll('[data-essence-preview-rule]')].map((row) =>
+      row.textContent.replace(/\s+/g, ' ').trim()
+    );
+    assert.match(worldRows.join(' | '), /Default effects from Starlit Filament/);
+    assert.match(worldRows.join(' | '), /Systems that inherit copy these/);
+    assert.match(worldRows.join(' | '), /Default macro Brittle Temper/);
+    assert.match(worldRows.join(' | '), /Runs on craft in every system that inherits/);
+    harness.remount();
+
+    // NEGATIVE CONTROL: the system-scope wording is untouched, so the branch is a distinction
+    // rather than a rewrite of both.
+    const system = await harness.mount(shared);
+    const systemRows = [...system.querySelectorAll('[data-essence-preview-rule]')]
+      .map((row) => row.textContent.replace(/\s+/g, ' ').trim())
+      .join(' | ');
+    assert.match(systemRows, /Transfers active effects/);
+    assert.doesNotMatch(systemRows, /Default effects from/);
     harness.remount();
   });
 });

@@ -15,6 +15,7 @@
   the same way: the World rail states the scope itself now.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { tick } from 'svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
@@ -25,6 +26,7 @@
     isValuelessOperator,
     prerequisitePreview,
   } from '../../../../../systems/characterPrerequisites.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     library = [],
@@ -177,33 +179,27 @@
                   {prerequisitePreview(entry)}
                 </span>
               </button>
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+              <IconButton
+                ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                 data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                 data-move-prerequisite-up={entry.id}
                 disabled={index === 0}
                 onclick={() => onReorder(index, index - 1, entry.name)}
               >
                 <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
+              </IconButton>
+              <IconButton
+                ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                 data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                 data-move-prerequisite-down={entry.id}
                 disabled={index === library.length - 1}
                 onclick={() => onReorder(index, index + 1, entry.name)}
               >
                 <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-              </button>
+              </IconButton>
               {#if onCopyToModifier}
-                <button
-                  type="button"
-                  class="manager-icon-button"
-                  aria-label={text(
+                <IconButton
+                  ariaLabel={text(
                     'FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers',
                     'Copy to modifiers'
                   )}
@@ -215,28 +211,28 @@
                   onclick={() => onCopyToModifier(entry)}
                 >
                   <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
-                </button>
+                </IconButton>
               {/if}
-              <button
-                type="button"
-                class="manager-icon-button is-danger"
-                aria-label={text(
+              <IconButton
+                class="is-danger"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.CharacterPrerequisites.Delete',
                   'Remove prerequisite'
                 )}
-                data-delete-prerequisite
+                data-delete-prerequisite=""
                 onclick={() => handleDelete(entry.id)}
               >
                 <i class="fa-solid fa-trash" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </div>
 
             {#if open}
               <div class="manager-prerequisite-body" id={`prerequisite-body-${entry.id}`}>
                 <div class="manager-prerequisite-name-row">
-                  <div
-                    class="manager-field manager-prerequisite-icon-field"
-                    data-prerequisite-icon-field
+                  <Field
+                    as="div"
+                    class="manager-prerequisite-icon-field"
+                    data-prerequisite-icon-field=""
                   >
                     <span
                       >{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Icon', 'Icon')}</span
@@ -250,8 +246,8 @@
                       triggerClass="manager-prerequisite-icon-trigger"
                       onChange={(iconClass) => onUpdate(entry.id, { icon: iconClass })}
                     />
-                  </div>
-                  <label class="manager-field manager-prerequisite-name-field">
+                  </Field>
+                  <Field as="label" class="manager-prerequisite-name-field">
                     <span
                       >{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Name', 'Name')}</span
                     >
@@ -261,14 +257,14 @@
                       data-prerequisite-name
                       oninput={(event) => onUpdate(entry.id, { name: event.currentTarget.value })}
                     />
-                  </label>
+                  </Field>
                 </div>
 
                 <span class="manager-prerequisite-condition-label">
                   {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Condition', 'Condition')}
                 </span>
                 <div class="manager-prerequisite-condition">
-                  <label class="manager-field manager-prerequisite-path">
+                  <Field as="label" class="manager-prerequisite-path">
                     <span class="visually-hidden">
                       {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Path', 'Property path')}
                     </span>
@@ -282,8 +278,8 @@
                         oninput={(event) => onUpdate(entry.id, { path: event.currentTarget.value })}
                       />
                     </div>
-                  </label>
-                  <label class="manager-field manager-prerequisite-operator">
+                  </Field>
+                  <Field as="label" class="manager-prerequisite-operator">
                     <span class="visually-hidden">
                       {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Operator', 'Operator')}
                     </span>
@@ -300,9 +296,9 @@
                         >
                       {/each}
                     </select>
-                  </label>
+                  </Field>
                   {#if !isValuelessOperator(entry.op)}
-                    <label class="manager-field manager-prerequisite-value">
+                    <Field as="label" class="manager-prerequisite-value">
                       <span class="visually-hidden">
                         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Value', 'Value')}
                       </span>
@@ -314,7 +310,7 @@
                         oninput={(event) =>
                           onUpdate(entry.id, { value: event.currentTarget.value })}
                       />
-                    </label>
+                    </Field>
                   {/if}
                 </div>
                 <p class="manager-muted manager-prerequisite-note">

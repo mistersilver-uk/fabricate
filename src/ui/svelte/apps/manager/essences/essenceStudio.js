@@ -19,21 +19,6 @@ import {
   essenceEditorValidation,
 } from '../../../../../utils/essenceValidation.js';
 
-/** The library toolbar's status segments, in render order. */
-export const ESSENCE_STATUS_SEGMENTS = Object.freeze([
-  Object.freeze({ value: 'all', labelKey: 'FABRICATE.Admin.Manager.Essence.Status.All', fallback: 'All' }),
-  Object.freeze({
-    value: 'enabled',
-    labelKey: 'FABRICATE.Admin.Manager.Essence.Status.Enabled',
-    fallback: 'Enabled',
-  }),
-  Object.freeze({
-    value: 'disabled',
-    labelKey: 'FABRICATE.Admin.Manager.Essence.Status.Disabled',
-    fallback: 'Disabled',
-  }),
-]);
-
 /** The list / grid presentation toggle, as `SegmentedControl` options. */
 export const ESSENCE_VIEW_MODE_SEGMENTS = Object.freeze([
   Object.freeze({
@@ -50,10 +35,44 @@ export const ESSENCE_VIEW_MODE_SEGMENTS = Object.freeze([
   }),
 ]);
 
-/** The editor's three tabs, in render order: id, English fallback, glyph. */
+/**
+ * The CREATE editor's three tabs, in render order: id, English fallback, glyph.
+ *
+ * ## This set is reached only where there is no shared world definition to contradict
+ *
+ * `ui-integration/spec.md` `### GM World Essence Screens` requirement 10 makes identity a WORLD
+ * field that a system-scope screen may never edit, and the system Essence Rules editor therefore
+ * renders {@link ESSENCE_RULES_TABS} for every essence the world catalogue holds — which, after
+ * the `1.30.0` lift, is every essence a GM can open from a rules list.
+ *
+ * What is left on this set is the CREATE draft: an essence that exists nowhere yet, whose
+ * in-system record is the only record there is and whose identity is therefore being AUTHORED
+ * rather than overridden. It keeps the shipped three tabs because there is no shared layer for it
+ * to disagree with, and the moment the draft is saved the world corpus answers for it and the
+ * editor is the two-tab rules screen forever after.
+ */
 export const ESSENCE_EDITOR_TABS = Object.freeze([
   Object.freeze({ id: 'identity', fallback: 'Identity', icon: 'fas fa-fingerprint' }),
   Object.freeze({ id: 'oncraft', fallback: 'On craft', icon: 'fas fa-wand-magic-sparkles' }),
+  Object.freeze({ id: 'validation', fallback: 'Validation', icon: 'fas fa-clipboard-check' }),
+]);
+
+/**
+ * The SYSTEM ESSENCE RULES editor's two tabs — the set every existing essence opens on.
+ *
+ * There is no Identity tab, and its absence is the requirement rather than a simplification: a
+ * world record holds an essence's name, glyph, colour and description, every crafting system that
+ * has the essence resolves the same one, and a system-scope screen offering to edit them would be
+ * offering to rename the essence in eight other systems from a screen titled with the ninth. The
+ * route to those fields is the shared-definition callout's `Edit shared definition`, which opens
+ * the world essence entry editor that owns them.
+ *
+ * `rules` rather than `oncraft` as the id, because the tab is no longer a third of an editor: it
+ * carries the shared-definition callout, the per-system enable switch, both behaviour cards and
+ * the copy-to-other-systems action, which is the whole of what a system authors for an essence.
+ */
+export const ESSENCE_RULES_TABS = Object.freeze([
+  Object.freeze({ id: 'rules', fallback: 'Essence rules', icon: 'fas fa-mortar-pestle' }),
   Object.freeze({ id: 'validation', fallback: 'Validation', icon: 'fas fa-clipboard-check' }),
 ]);
 
@@ -134,9 +153,19 @@ export function essenceCapabilityPills(essence, features = {}, text = (_key, fal
  * is disabled — the delta is explicit that this change does not claim the stacking outcome
  * is identical, so neither row says anything about stacking.
  *
+ * ── WORLD SCOPE SAYS WHO INHERITS; SYSTEM SCOPE SAYS WHAT HAPPENS HERE (issue 1372) ──
+ * `scope: 'world'` is the world essence entry editor's, and it is what the reference words
+ * differently at that layer (`tmp/proto/essence-entry.png`): `Default effects from Starlit
+ * Filament / Systems that inherit copy these onto anything crafted with it` and `Default macro
+ * Brittle Temper / Runs on craft in every system that inherits`. The world screen edits a record
+ * every crafting system resolves against, and the word `Default` plus the inheritance clause are
+ * the only things on the panel that say so. The shipped system-scope wording — `Transfers active
+ * effects / From None` — never mentioned a system or an inheritance at all, so a GM could not
+ * tell from this rail that they were editing something eight systems copy.
+ *
  * @param {object} essence a projected essence card, or an editor draft.
  * @param {{effectTransferEnabled?: boolean, propertyMacrosEnabled?: boolean,
- *   sourceName?: string, macroName?: string}} context
+ *   sourceName?: string, macroName?: string, scope?: 'world'|'system'}} context
  * @param {(key: string, fallback: string) => string} text
  * @param {(key: string, fallback: string, data: object) => string} format
  * @returns {{id: string, icon: string, title: string, subtitle: string, suppressed: boolean}[]}
@@ -165,6 +194,59 @@ export function projectEssenceBehaviourFacts(
     },
   ];
 
+  const world = context.scope === 'world';
+
+  // ── AT SYSTEM SCOPE WITH A MEMBERSHIP RECORD, THE TWO ROWS ARE THE ON-CRAFT CARDS ──────────
+  //
+  // The reference's system rules EDITOR rail names each row after the VALUE its section resolves
+  // to and ends it in the layer — `Effects from Ember Brand / Copied onto anything crafted with
+  // it here. Overridden here.` (`tmp/proto/essence-rules-editor.png`) — which is the same
+  // question, and the same answer, as the rules LIST inspector one click away. Rendering
+  // `Transfers active effects / From Iron Ore` here left the editor stating a CAPABILITY where
+  // the reference states a resolved rule and its provenance, on the screen that changes it.
+  //
+  // So the two rows are `projectEssenceOnCraftCards`, not a third wording of the same two facts.
+  // The ARITHMETIC row above them is retained, and that is a stated divergence: the reference's
+  // editor rail draws only the two, and a disabled essence still matches, accumulates and is
+  // consumed, which is the one thing neither behaviour row can say.
+  if (!world && context.inherited && typeof context.inherited === 'object') {
+    for (const card of projectEssenceOnCraftCards(essence, context, text, format)) {
+      // ONLY A CONFIGURED SECTION, which is the gate the two blocks below already apply: this
+      // rail describes what the essence DOES, and an unconfigured section does nothing. The
+      // inspector's own panel is the one that lists both sections unconditionally, because there
+      // it is a readout of this system's rules rather than of the essence's behaviour.
+      const configured =
+        card.id === 'effects'
+          ? essence?.hasEffectTransfer === true
+          : essence?.hasPropertyMacro === true;
+      if (configured) facts.push(card);
+    }
+    return facts;
+  }
+
+  const sourceName =
+    context.sourceName || text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None');
+  const macroName =
+    context.macroName ||
+    text('FABRICATE.Admin.Manager.Essence.Macro.Unnamed', 'the linked property macro');
+
+  // AN UNSET WORLD DEFAULT IS NAMED, NOT INTERPOLATED. `Default effects from None` is what
+  // `{name}` produces over an empty value, and it reads as a source called "None" rather than as
+  // no source at all. The world catalogue's own cards already have the two phrases for exactly
+  // this state (`CardEffectsUnset` / `CardMacroUnset`), so this rail says what that rail says.
+  const worldEffectsTitle = context.sourceName
+    ? format(
+        'FABRICATE.Admin.Manager.Essence.Preview.DefaultEffects',
+        'Default effects from {name}',
+        { name: sourceName }
+      )
+    : text('FABRICATE.Admin.Manager.Scoped.Essence.CardEffectsUnset', 'No default effect source');
+  const worldMacroTitle = context.macroName
+    ? format('FABRICATE.Admin.Manager.Essence.Preview.DefaultMacro', 'Default macro {name}', {
+        name: macroName,
+      })
+    : text('FABRICATE.Admin.Manager.Scoped.Essence.CardMacroUnset', 'No default macro');
+
   if (context.effectTransferEnabled === true && essence?.hasEffectTransfer === true) {
     facts.push({
       id: 'effects',
@@ -172,17 +254,28 @@ export function projectEssenceBehaviourFacts(
       // No effect COUNT. `_buildEssenceCards` produces `{id, name, img}` and no count, and
       // producing one needs an async `fromUuid` plus `doc.effects.size` — a number the
       // store cannot compute is not shipped.
-      title: text(
-        'FABRICATE.Admin.Manager.Essence.Preview.Transfers',
-        'Transfers active effects'
-      ),
-      subtitle: disabled
-        ? suppressedSub
-        : format('FABRICATE.Admin.Manager.Essence.Preview.TransfersFrom', 'From {name}', {
-            name:
-              context.sourceName ||
-              text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None'),
-          }),
+      title: world
+        ? worldEffectsTitle
+        : text('FABRICATE.Admin.Manager.Essence.Preview.Transfers', 'Transfers active effects'),
+      subtitle: worldOrSystemSub({
+        disabled,
+        world,
+        suppressedSub,
+        // An UNSET default states its consequence, not its reach: "systems that inherit copy
+        // these" over nothing at all would promise a transfer there is none of. Both sentences
+        // are the world VALIDATION rows' own, so the panel and the check agree word for word.
+        worldKey: context.sourceName
+          ? 'FABRICATE.Admin.Manager.Essence.Preview.DefaultEffectsHint'
+          : 'FABRICATE.Admin.Manager.Essence.Validation.WorldEffectSourceUnset',
+        worldFallback: context.sourceName
+          ? 'Systems that inherit copy these onto anything crafted with it.'
+          : 'Systems that inherit gain no active effects on craft.',
+        systemKey: 'FABRICATE.Admin.Manager.Essence.Preview.TransfersFrom',
+        systemFallback: 'From {name}',
+        name: sourceName,
+        text,
+        format,
+      }),
       suppressed: disabled,
     });
   }
@@ -191,22 +284,190 @@ export function projectEssenceBehaviourFacts(
     facts.push({
       id: 'macro',
       icon: 'fas fa-code',
-      title: format('FABRICATE.Admin.Manager.Essence.Preview.RunsMacro', 'Runs {name}', {
-        name:
-          context.macroName ||
-          text('FABRICATE.Admin.Manager.Essence.Macro.Unnamed', 'the linked property macro'),
+      title: world
+        ? worldMacroTitle
+        : format('FABRICATE.Admin.Manager.Essence.Preview.RunsMacro', 'Runs {name}', {
+            name: macroName,
+          }),
+      subtitle: worldOrSystemSub({
+        disabled,
+        world,
+        suppressedSub,
+        worldKey: context.macroName
+          ? 'FABRICATE.Admin.Manager.Essence.Preview.DefaultMacroHint'
+          : 'FABRICATE.Admin.Manager.Essence.Validation.WorldMacroUnset',
+        worldFallback: context.macroName
+          ? 'Runs on craft in every system that inherits.'
+          : 'Nothing runs on craft for systems that inherit.',
+        systemKey: 'FABRICATE.Admin.Manager.Essence.Preview.RunsMacroHint',
+        systemFallback: 'Runs once per craft against the item data, before the item is created.',
+        name: macroName,
+        text,
+        format,
       }),
-      subtitle: disabled
-        ? suppressedSub
-        : text(
-            'FABRICATE.Admin.Manager.Essence.Preview.RunsMacroHint',
-            'Runs once per craft against the item data, before the item is created.'
-          ),
       suppressed: disabled,
     });
   }
 
   return facts;
+}
+
+/**
+ * One behaviour row's SUBTITLE, in the three states it can be in.
+ *
+ * Extracted so the two rows above stay two literal descriptions rather than two copies of the
+ * same three-branch body, which is what the SonarCloud duplication gate counts.
+ *
+ * @param {object} spec
+ * @returns {string}
+ */
+function worldOrSystemSub(spec) {
+  if (spec.disabled) return spec.suppressedSub;
+  if (spec.world) return spec.text(spec.worldKey, spec.worldFallback);
+  return spec.format(spec.systemKey, spec.systemFallback, { name: spec.name });
+}
+
+/**
+ * THE `ON CRAFT IN <SYSTEM>` CARDS: the RESOLVED rules and the layer each one came from.
+ *
+ * ── WHY THIS IS NOT `projectEssenceBehaviourFacts` (issue 1372, maintainer parity round 8) ────
+ * The two lists look alike and answer different questions, and collapsing them is what left the
+ * system Essence Rules inspector with no provenance at all on a screen whose entire subject is
+ * inherit-versus-override.
+ *
+ * `projectEssenceBehaviourFacts` answers "what does this essence DO to a crafted result" — the
+ * arithmetic row first, then a capability row per configured behaviour, worded the same at every
+ * scope. That is the EDITOR's live preview and the world entry's `Effective behaviour` list.
+ *
+ * This answers "what does this system resolve each section TO, and did it author that or inherit
+ * it" (`tmp/proto/essence-rules.png`, data at `proto:5093`-`5098`). Its card is titled after the
+ * VALUE — `Ember Brand`, `Radiant Blessing` — and its note ends in the layer: `· overridden here`
+ * or `· world default`. Two rows two columns left of it already print `(override)`, so the data
+ * was on the screen and only this panel could not say it.
+ *
+ * ── THE SUFFIX IS OMITTED WHEN THERE IS NOTHING TO ATTRIBUTE ──────────────────────────────────
+ * `inherited` is `null` for a system with no membership record, and the reference appends the
+ * layer clause only for a member (`seiP ? … : ''`). A non-member's sections resolve to nothing at
+ * all, so naming a layer for them would be inventing a provenance.
+ *
+ * @param {object|null} essence a projected essence card.
+ * @param {{effectTransferEnabled?: boolean, propertyMacrosEnabled?: boolean, sourceName?: string,
+ *   macroName?: string, inherited?: {effectSource?: boolean, macro?: boolean}|null}} context
+ * @param {(key: string, fallback: string) => string} text
+ * @param {(key: string, fallback: string, data: object) => string} format
+ * @returns {{id: string, icon: string, title: string, subtitle: string, suppressed: boolean}[]}
+ */
+export function projectEssenceOnCraftCards(
+  essence,
+  context = {},
+  text = (_key, fallback) => fallback,
+  format = (_key, fallback) => fallback
+) {
+  const cards = [];
+  if (context.effectTransferEnabled === true) {
+    cards.push(
+      onCraftCard({
+        id: 'effects',
+        icon: 'fas fa-wand-magic-sparkles',
+        configured: essence?.hasEffectTransfer === true,
+        name: context.sourceName || '',
+        unsetTitle: text(
+          'FABRICATE.Admin.Manager.Essence.OnCraftCard.NoEffects',
+          'No effect source'
+        ),
+        setNote: text(
+          'FABRICATE.Admin.Manager.Essence.OnCraftCard.EffectsNote',
+          'Copied onto anything crafted with this essence here.'
+        ),
+        unsetNote: text(
+          'FABRICATE.Admin.Manager.Essence.OnCraftCard.NoEffectsNote',
+          'Nothing is transferred on craft here.'
+        ),
+        section: 'effectSource',
+        essence,
+        context,
+        text,
+        format,
+      })
+    );
+  }
+  if (context.propertyMacrosEnabled === true) {
+    cards.push(
+      onCraftCard({
+        id: 'macro',
+        icon: 'fas fa-code',
+        configured: essence?.hasPropertyMacro === true,
+        name: context.macroName || '',
+        unsetTitle: text('FABRICATE.Admin.Manager.Essence.OnCraftCard.NoMacro', 'No macro'),
+        setNote: text(
+          'FABRICATE.Admin.Manager.Essence.OnCraftCard.MacroNote',
+          'Runs against the item data before it reaches the character.'
+        ),
+        unsetNote: text(
+          'FABRICATE.Admin.Manager.Essence.OnCraftCard.NoMacroNote',
+          'Nothing runs on craft here.'
+        ),
+        section: 'macro',
+        essence,
+        context,
+        text,
+        format,
+      })
+    );
+  }
+  return cards;
+}
+
+/**
+ * One `ON CRAFT IN <SYSTEM>` card. Extracted so {@link projectEssenceOnCraftCards} stays two
+ * literal descriptions rather than two copies of the same six-branch body, which is what the
+ * SonarCloud duplication gate counts on a file it indexes.
+ *
+ * @param {object} spec
+ * @returns {{id: string, icon: string, title: string, subtitle: string, suppressed: boolean}}
+ */
+function onCraftCard(spec) {
+  const { id, icon, configured, name, unsetTitle, setNote, unsetNote, section, essence, context, text, format } =
+    spec;
+  const disabled = essence?.enabled === false;
+  const title = configured && name ? name : unsetTitle;
+  if (configured && disabled) {
+    return {
+      id,
+      icon,
+      title,
+      subtitle: text(
+        'FABRICATE.Admin.Manager.Essence.Preview.Suppressed',
+        'This essence is disabled — nothing it carries reaches a crafted result.'
+      ),
+      suppressed: true,
+    };
+  }
+  const note = configured ? setNote : unsetNote;
+  const layer = onCraftLayerClause(section, context.inherited, text);
+  return {
+    id,
+    icon,
+    title,
+    subtitle: layer ? format('FABRICATE.Admin.Manager.Essence.OnCraftCard.Layered', '{note} · {layer}', { note, layer }) : note,
+    suppressed: false,
+  };
+}
+
+/**
+ * Which layer one section resolved from, or `''` when there is no membership record to attribute
+ * it to.
+ *
+ * @param {string} section
+ * @param {{effectSource?: boolean, macro?: boolean}|null|undefined} inherited
+ * @param {(key: string, fallback: string) => string} text
+ * @returns {string}
+ */
+function onCraftLayerClause(section, inherited, text) {
+  if (!inherited || typeof inherited !== 'object') return '';
+  return inherited[section] === false
+    ? text('FABRICATE.Admin.Manager.Scoped.Essence.SuffixOverridden', 'overridden here')
+    : text('FABRICATE.Admin.Manager.Scoped.Essence.SuffixWorldDefault', 'world default');
 }
 
 /**

@@ -1104,7 +1104,10 @@ describe('CraftingSystemManager source contract', () => {
     // The row Edit pencil reuses the Books & Scrolls icon-button + pen idiom, and the
     // filter/sort/paging state is lifted (no local $state for those controls remains).
     assert.ok(
-      recipesBrowserSource.includes('class="manager-icon-button manager-recipe-edit"'),
+      // `<IconButton class="manager-recipe-edit">` since issue 1422: the contract class is
+      // emitted by the primitive, so asserting it at the call site would now assert the
+      // convention this change removed.
+      /<IconButton\s+class="manager-recipe-edit"/.test(recipesBrowserSource),
       'the row Edit affordance should be a manager-icon-button, matching Books & Scrolls'
     );
     assert.equal(
@@ -1278,8 +1281,16 @@ describe('CraftingSystemManager source contract', () => {
     // The route title is `Essence.Title`, which the shell owns and which is asserted above.
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditTitle, 'Edit essence');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditBreadcrumb, 'Edit essence');
-    assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, 'Create essence');
-    assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceLinkedFilter, 'Linked');
+    // `CreateBreadcrumb` — and `Create`, `CreateSubtitle` and `CreateNoSourceSubtitle` with it —
+    // are RETIRED (issue 1372, maintainer parity round 8): the system-scope create draft they
+    // titled had one entry point, the Essence Rules header's `+ Create essence`, and an essence's
+    // identity is a world record. `CreateTitle` survives because `EssenceEditView` still titles a
+    // draft it can be handed directly.
+    assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, undefined);
+    // `SourceAll` / `SourceLinkedFilter` / `SourceNone` / `SourceNeedsAttention` and the status
+    // segment's `Status.All` are RETIRED with the two toolbar filters issue 1372's round-8 parity
+    // pass removed; the orphan gate fails a key nothing references, so they left with them.
+    assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceLinkedFilter, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceNoneShort, 'None');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle,
@@ -1798,12 +1809,16 @@ describe('CraftingSystemManager source contract', () => {
       managerSource.includes('toggleSystemEnabled'),
       'systems browser should expose interactive row status toggles'
     );
+    // `<StatusToggle`, not the class literal (issue 1040). The row's switch renders through
+    // the shared primitive, which is the only thing under `src/` that writes
+    // `manager-status-toggle` now, so a search for the class would read 0 while the control
+    // is present and correct.
     assert.ok(
-      systemsBrowserSource.includes('manager-status-toggle'),
+      systemsBrowserSource.includes('<StatusToggle'),
       'systems browser should render status as a toggle control'
     );
     assert.ok(
-      recipesBrowserSource.includes('manager-status-toggle'),
+      recipesBrowserSource.includes('<StatusToggle'),
       'recipes browser should render status as a toggle control'
     );
     assert.ok(
@@ -2205,14 +2220,27 @@ describe('CraftingSystemManager source contract', () => {
     );
     // The SOURCE COLUMN is retired with the table (issue 1036). It reported one bit — is
     // there an image — in a column of its own; the row now carries an `Effects` capability
-    // pill instead, and the retained needs-attention filter is what finds a BROKEN link.
+    // pill instead.
     assert.ok(
       !essenceBrowserSource.includes('manager-essence-source-cell-image'),
       'the source column and its image cell are retired with the table head'
     );
+    // AND SO IS THE SOURCE-STATE SELECT (issue 1372, maintainer parity round 8). The reference's
+    // bar carries ONE filter beside the search field — the membership pair — and this bar carried
+    // four. A broken link is still findable: the row's summary line NAMES the source and marks
+    // the breakage, the search box reads that name, and the `Effects` chip carries it in its own
+    // tone and title.
     assert.ok(
-      essenceBrowserSource.includes('data-essence-source-filter'),
-      'but the source-state filter is RETAINED: a broken source link is otherwise unfindable'
+      !essenceBrowserSource.includes('data-essence-source-filter'),
+      'the source-state select is a control the reference does not draw'
+    );
+    assert.ok(
+      !essenceBrowserSource.includes('data-essence-status-filter'),
+      'and neither is the status segment'
+    );
+    assert.ok(
+      essenceBrowserSource.includes('data-essence-membership-filter'),
+      'NON-VACUITY: the one filter the reference DOES draw is still on the bar'
     );
     // Browser state is LIFTED to the root, which is criterion 12: search, filters, sort,
     // presentation and page all survive the editor round-trip.
@@ -2295,12 +2323,20 @@ describe('CraftingSystemManager source contract', () => {
       !rootSource.includes('data-essence-action='),
       'the root no longer inlines any essence inspector action'
     );
-    for (const action of ['edit', 'duplicate', 'delete', 'copy-source', 'unlink-source']) {
+    // `duplicate` is NOT in this set (issue 1372, maintainer parity round 8): it wrote a
+    // system-owned essence with its own name, icon and colour from the rail whose own banner says
+    // identity is the Essence Catalogue's. Asserted absent below, so a re-added action fails here
+    // rather than reappearing under a passing loop.
+    for (const action of ['edit', 'delete', 'copy-source', 'unlink-source']) {
       assert.ok(
         essenceStudioSource.includes(`data-essence-action="${action}"`),
         `the extracted inspector exposes the ${action} action`
       );
     }
+    assert.ok(
+      !essenceStudioSource.includes('data-essence-action="duplicate"'),
+      'and it exposes NO duplicate action'
+    );
     assert.ok(
       rootSource.includes('<EssenceBrowserInspector'),
       'and the root renders it as a component'
@@ -3340,10 +3376,19 @@ describe('CraftingSystemManager source contract', () => {
       !toolEditorTabsSource.includes("'overview'"),
       'the system tab strip must not declare an Overview tab'
     );
+    // THE DECLARATION FORM IS THE `EditorTabs` PRIMITIVE'S (issue 1038), not the tuple array
+    // this strip hand-rolled: the primitive takes `{id, icon, labelKey, label}` records. What
+    // is asserted is unchanged - three tabs, in this order, and no fourth - because the SET is
+    // this file's contract and the shape it is written in is the primitive's.
     assert.match(
       toolEditorTabsSource,
-      /const tabs = \[\s*\['breakage'[\s\S]*?\['requirements'[\s\S]*?\['validation'/,
+      /const TABS = \[\s*\{\s*id: 'breakage'[\s\S]*?id: 'requirements'[\s\S]*?id: 'validation'/,
       'and must declare Breakage, Requirements and Validation, in that order'
+    );
+    assert.equal(
+      (toolEditorTabsSource.match(/^\s*id: '/gm) || []).length,
+      3,
+      'and exactly three, so a fourth cannot be appended past the ordering match above'
     );
     assert.ok(
       toolEditorTabsSource.includes("activeTab = 'breakage'"),

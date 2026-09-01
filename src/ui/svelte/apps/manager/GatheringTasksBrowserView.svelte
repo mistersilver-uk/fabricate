@@ -7,6 +7,8 @@
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import IconButton from '../../components/IconButton.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
 
   let {
     tasks = [],
@@ -435,11 +437,12 @@
               class="manager-labeled-cell manager-status-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
             >
-              <button
-                type="button"
-                class={`manager-status-toggle ${task.enabled === false ? 'is-off' : 'is-on'}`}
-                aria-pressed={task.enabled !== false}
-                aria-label={text(
+              <StatusToggle
+                on={task.enabled !== false}
+                label={task.enabled === false
+                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.ToggleNamed',
                   'Toggle {name}'
                 ).replace('{name}', taskName(task))}
@@ -448,26 +451,15 @@
                   onToggleTaskEnabled(selectedSystemId, task.id, task.enabled === false);
                 }}
                 onkeydown={(event) => event.stopPropagation()}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true">
-                  <span class="manager-status-toggle-knob"></span>
-                </span>
-                <span class="manager-status-toggle-label">
-                  {task.enabled === false
-                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-                </span>
-              </button>
+              />
             </span>
             <span
               role="cell"
               class="manager-action-group manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
             >
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text(
+              <IconButton
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', taskName(task))}
@@ -478,11 +470,9 @@
                 onclick={() => onEditTask(task.id)}
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text(
+              </IconButton>
+              <IconButton
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateNamed',
                   'Duplicate {name}'
                 ).replace('{name}', taskName(task))}
@@ -493,11 +483,10 @@
                 onclick={() => onDuplicateTask(selectedSystemId, task.id)}
               >
                 <i class="fas fa-copy" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button is-danger"
-                aria-label={text(
+              </IconButton>
+              <IconButton
+                class="is-danger"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.DeleteNamed',
                   'Delete {name}'
                 ).replace('{name}', taskName(task))}
@@ -508,7 +497,7 @@
                 onclick={() => onDeleteTask(selectedSystemId, task.id)}
               >
                 <i class="fas fa-trash" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </span>
           </div>
         {/each}

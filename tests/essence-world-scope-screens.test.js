@@ -185,14 +185,19 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     );
   });
 
-  it('SEAM 2 imports one NAMED helper from a leaf that imports nothing itself', () => {
+  it('SEAM 2 imports NAMED helpers from a leaf that imports nothing itself', () => {
     // A NAMESPACE import would turn this line into a permanent door: every future addition to the
     // leaf would be reachable from the gateway with no diff here at all. The named form makes the
     // next thing the gateway wants from that module a visible edit to this file and to this test.
+    //
+    // `essenceShortValueName` joined `mintEssenceId` at the round-8 parity pass: the editor rail's
+    // macro card is titled after its VALUE now, and a macro stored as a uuid whose document has
+    // not resolved has to fall back to its terminal segment — the same trim the list row's summary
+    // line prints — or the card reads `No macro` for a macro that is configured.
     assert.match(
       rootSource,
-      /import \{ mintEssenceId \} from '\.\/scoped\/essenceScoped\.js';/,
-      'the gateway takes exactly `mintEssenceId`, by name'
+      /import \{ essenceShortValueName, mintEssenceId \} from '\.\/scoped\/essenceScoped\.js';/,
+      'the gateway takes exactly those two, by name'
     );
     const leaf = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/essenceScoped.js'),
@@ -240,8 +245,19 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
       attributes.includes('onOpenWorldDefinition'),
       'the inspector call site carries the one callback the seam needs'
     );
-    // The RENDER bound. Exactly one attribute more than the enumeration shipped, on a child that
-    // was already rendered here — no new element, no new branch, no screen.
+    // The RENDER bound, pinned to a literal. It is still ONE existing child with no new element,
+    // no new branch and no new screen — what moved is the prop set, and the pin is what makes a
+    // silent addition to a gateway call site visible.
+    //
+    // `onDuplicate` is GONE (issue 1372, maintainer parity round 8): duplicating wrote a second
+    // `system.essenceDefinitions` entry with its own name, icon and colour — a system-owned
+    // essence — from the same rail whose banner says identity is the Essence Catalogue's.
+    //
+    // The six that arrived are the two layers the reference states on this rail and could not:
+    // `systemName` and `inherited` are what turn the `ON CRAFT` list into `ON CRAFT IN <system>`
+    // with a provenance per card, and `systemRows` / `memberCount` / `rosterSize` /
+    // `membershipActions` / `onOpenSystemRules` are the `SYSTEM RULES n / m` panel's, which is
+    // the catalogue's own `SystemRulesRoster` composed here rather than a second copy.
     assert.deepEqual(
       attributes,
       [
@@ -250,9 +266,15 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
         'showPropertyMacroUi',
         'managedItemOptions',
         'sourceUuid',
+        'systemName',
+        'inherited',
+        'systemRows',
+        'memberCount',
+        'rosterSize',
+        'membershipActions',
+        'onOpenSystemRules',
         'onEdit',
         'onOpenWorldDefinition',
-        'onDuplicate',
         'onDelete',
         'onEditComponent',
         'onCopySource',
@@ -260,7 +282,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
         'onSourceDrop',
         'onSourceSelect',
       ],
-      'the reopening adds ONE attribute to an existing call site and changes nothing else there'
+      'the reopening changes an existing call site and adds no element, branch or screen'
     );
     // And the callback actually navigates, rather than being a declared-but-inert prop.
     assert.match(
@@ -277,7 +299,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     //
     // The count is TWO because the world tool entry took this component next (issue 1373),
     // which is what this seam was extracted for. It is asserted rather than left unbounded so
-    // that a THIRD site — the world component entry, when that lane lands — has to come here
+    // that a THIRD site - the world component entry, when that lane lands - has to come here
     // and say so, and so that a second pair inside one branch still reds.
     assert.equal(
       [...rootSource.matchAll(/<ScopedEntryHeaderActions\b/g)].length,
@@ -386,27 +408,31 @@ describe('the entry editor buffers exactly the identity fields an essence lifts 
 
 // ── (1c) THE ENTRY EDITOR'S LIVE-PREVIEW FOOTER ───────────────────────────────────────────────
 //
-// `EssenceBehaviorPreview` renders the footer strip by default and both essence sites choose
-// explicitly. The prototype draws it at the foot of the entry editor's preview panel
-// (`proto:3537`) as it does on all six of its editors (`proto:6138`, `6155`, `6209`), and
-// suppresses nothing there; the BROWSER INSPECTOR is the site that legitimately suppresses it,
-// because it is a read-only rail with nothing to type into.
+// `EssenceBehaviorPreview` renders the footer strip, and it is no longer optional. The reference
+// draws it at the foot of the entry editor's preview panel (`proto:3537`) as it does on all six
+// of its editors (`proto:6138`, `6155`, `6209`).
+//
+// THE SUPPRESSION PROP IS GONE WITH ITS ONE CALLER (issue 1372, maintainer parity round 8). The
+// browser inspector was the site that passed `showLiveNote={false}`, and it no longer renders
+// this component at all — it draws the reference's `ON CRAFT IN <system>` cards, which answer a
+// different question. Both remaining callers are editors whose preview recomputes on every
+// keystroke, so both say so and neither has a choice to make.
 //
 // A source assertion rather than a mount, and the pairing is what makes it non-vacuous: a check
-// that the entry page merely lacks the prop would pass just as well if the prop had been deleted
-// from the primitive, so the inspector's surviving suppression is asserted in the same breath.
+// that the entry page merely lacks the prop would pass just as well if the note had been deleted
+// from the primitive, so the primitive's own unconditional render is asserted in the same breath.
 
 describe('the world essence entry editor keeps the live-preview note', () => {
   const entrySource = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte'),
     'utf8'
   );
-  const inspectorSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte'),
+  const previewSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte'),
     'utf8'
   );
 
-  it('does not suppress it, while the read-only inspector still does', () => {
+  it('does not suppress it, and the primitive offers no way to', () => {
     assert.ok(
       entrySource.includes('<EssenceBehaviorPreview'),
       'NON-VACUITY: the entry page renders the preview at all'
@@ -415,9 +441,15 @@ describe('the world essence entry editor keeps the live-preview note', () => {
       !entrySource.includes('showLiveNote'),
       'the editor whose preview recomputes on every keystroke is the one that must say so'
     );
+    // The prop is gone with its one former caller. The comment naming the three retired props
+    // is the only surviving mention, so the check is against a DECLARATION rather than the name.
     assert.ok(
-      inspectorSource.includes('showLiveNote={false}'),
-      'and the inspector still suppresses it, so the prop is a live distinction'
+      !/showLiveNote\s*=/.test(previewSource),
+      'and the prop is gone with its one former caller, so no site can suppress it silently'
+    );
+    assert.ok(
+      previewSource.includes('data-essence-preview-live'),
+      'while the note itself is still rendered, unconditionally'
     );
   });
 });

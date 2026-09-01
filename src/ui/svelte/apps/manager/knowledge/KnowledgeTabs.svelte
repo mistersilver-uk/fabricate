@@ -1,18 +1,40 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The Knowledge surface's two inner tabs (issue 785), mirroring
-  `tools/ToolEditorTabs.svelte` — including its roving-tabindex arrow-key focus
-  move — so the surface introduces no new tab vocabulary. `aria-controls` targets
-  the real `role="tabpanel"` ids KnowledgeView renders.
+  The Knowledge surface's two inner tabs (issue 785).
+
+  A THIN CALLER of the promoted `EditorTabs` primitive since issue 1429, which also
+  CORRECTED the vehicle its marks use. `badgeFor` returns a RECORD COUNT — how many recipe
+  items this character holds, how many recipes they have learned — and this strip drew it
+  through `<Chip tone="neutral">`, the ISSUE-SUMMARY vehicle. The Rail Marker Family in
+  `DOMAIN.md` and design-system spec.md requirement "Near-neighbour primitives are routed by
+  a stated rule" both say the four marks MUST NOT be substituted for one another, so that
+  was a live violation and not a local styling choice: `library.html:1008`'s own `<TabBar>`
+  specimen draws its two record counts as bare numerals and reserves the filled badge for
+  Validation. The count is a bare mono tabular numeral now.
+
+  ── THE ZERO IS DELIBERATELY LEFT AS IT WAS, AND IS AN OPEN QUESTION ────────────────────
+
+  This strip renders its count UNCONDITIONALLY, so a character with nothing shows a literal
+  `0`, while the Checks section strip suppresses a zero and `EditorTabs` suppresses a falsy
+  mark by default. The canonical text does not settle which is right for a record count:
+  `ui-integration/spec.md` repeats "a figure of zero is omitted rather than stated as zero"
+  for delete-impact cards and for the Downtime rollup — but each of those is scoped to its
+  own surface, two of them carry an explicit CARVE-OUT where the number's presence is the
+  point, and the RECORD-COUNT vehicle's own canonical home contradicts them: the rail renders
+  `<span class="manager-nav-count">{selectedCounts.components}</span>` unconditionally, so a
+  system with no components shows a rail count of `0`. Since a knowledge tab count is, in
+  `DOMAIN.md`'s words, "the direct sibling of every other rail record count", the rail is the
+  closer precedent — so this keeps its zero through `suppressZero: false` rather than having
+  the conversion silently drop a number the surface has always stated. Settle it as a
+  product decision, not as a side effect of a refactor.
 
   Props:
    - activeTab: 'recipeItems' | 'learnedRecipes'.
-   - itemCount / learnedCount: per-tab badge counts.
+   - itemCount / learnedCount: per-tab record counts.
    - onChange(tabId).
 -->
 <script>
-  import Chip from '../Chip.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import EditorTabs from '../EditorTabs.svelte';
   import { KNOWLEDGE_TAB_LEARNED_RECIPES, KNOWLEDGE_TAB_RECIPE_ITEMS } from './knowledgeStudio.js';
 
   let {
@@ -22,73 +44,45 @@
     onChange = () => {},
   } = $props();
 
-  const tabs = [
-    [KNOWLEDGE_TAB_RECIPE_ITEMS, 'fas fa-book'],
-    // `fa-graduation-cap` is the prototype's glyph for this tab, and it also keeps the
-    // inner tab distinct from the rail entry, which now carries `fa-brain`.
-    [KNOWLEDGE_TAB_LEARNED_RECIPES, 'fas fa-graduation-cap'],
+  // Both keys stay STATIC literals. A template-interpolated key is invisible to
+  // `ui-lang-keys-resolve` and `lang-keys-no-orphans` alike, so a missing label would ship
+  // as a raw key with no gate catching it.
+  const TABS = [
+    {
+      id: KNOWLEDGE_TAB_RECIPE_ITEMS,
+      icon: 'fas fa-book',
+      labelKey: 'FABRICATE.Admin.Manager.Knowledge.Tabs.RecipeItems',
+      label: 'Recipe items',
+    },
+    {
+      // `fa-graduation-cap` is the prototype's glyph for this tab, and it also keeps the
+      // inner tab distinct from the rail entry, which now carries `fa-brain`.
+      id: KNOWLEDGE_TAB_LEARNED_RECIPES,
+      icon: 'fas fa-graduation-cap',
+      labelKey: 'FABRICATE.Admin.Manager.Knowledge.Tabs.LearnedRecipes',
+      label: 'Learned recipes',
+    },
   ];
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
-  // Both keys are STATIC literals at their call site. A template-interpolated key
-  // is invisible to `ui-lang-keys-resolve` and `lang-keys-no-orphans` alike, so a
-  // missing label would ship as a raw key with no gate catching it.
-  function tabLabel(tabId) {
-    if (tabId === KNOWLEDGE_TAB_RECIPE_ITEMS) {
-      return text('FABRICATE.Admin.Manager.Knowledge.Tabs.RecipeItems', 'Recipe items');
-    }
-    return text('FABRICATE.Admin.Manager.Knowledge.Tabs.LearnedRecipes', 'Learned recipes');
-  }
-
-  function badgeFor(tabId) {
-    return tabId === KNOWLEDGE_TAB_RECIPE_ITEMS ? itemCount : learnedCount;
-  }
-
-  function handleKeydown(event, index) {
-    const lastIndex = tabs.length - 1;
-    let nextIndex = null;
-    if (event.key === 'ArrowRight') nextIndex = index === lastIndex ? 0 : index + 1;
-    if (event.key === 'ArrowLeft') nextIndex = index === 0 ? lastIndex : index - 1;
-    if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = lastIndex;
-    if (nextIndex === null) return;
-    event.preventDefault();
-    const nextTab = tabs[nextIndex][0];
-    onChange(nextTab);
-    event.currentTarget
-      .closest('[role="tablist"]')
-      ?.querySelector(`#knowledge-tab-${nextTab}`)
-      ?.focus();
-  }
+  const marks = $derived({
+    [KNOWLEDGE_TAB_RECIPE_ITEMS]: { vehicle: 'count', label: itemCount, suppressZero: false },
+    [KNOWLEDGE_TAB_LEARNED_RECIPES]: {
+      vehicle: 'count',
+      label: learnedCount,
+      suppressZero: false,
+    },
+  });
 </script>
 
-<div
-  class="manager-editor-tabs manager-knowledge-tabs"
-  role="tablist"
-  aria-label={text('FABRICATE.Admin.Manager.Knowledge.Tabs.Label', 'Knowledge sections')}
->
-  {#each tabs as tab, index (tab[0])}
-    <button
-      type="button"
-      role="tab"
-      id={`knowledge-tab-${tab[0]}`}
-      class="manager-editor-tab-button"
-      class:is-active={activeTab === tab[0]}
-      aria-selected={activeTab === tab[0]}
-      aria-controls={`knowledge-panel-${tab[0]}`}
-      tabindex={activeTab === tab[0] ? 0 : -1}
-      data-keyboard-focus="true"
-      data-knowledge-tab={tab[0]}
-      onclick={() => onChange(tab[0])}
-      onkeydown={(event) => handleKeydown(event, index)}
-    >
-      <i class={tab[1]} aria-hidden="true"></i>
-      <span>{tabLabel(tab[0])}</span>
-      <Chip tone="neutral" class="manager-editor-tab-badge">{badgeFor(tab[0])}</Chip>
-    </button>
-  {/each}
-</div>
+<EditorTabs
+  tabs={TABS}
+  {activeTab}
+  badges={marks}
+  onSelect={onChange}
+  ariaLabelKey="FABRICATE.Admin.Manager.Knowledge.Tabs.Label"
+  ariaLabel="Knowledge sections"
+  idStem="knowledge"
+  hookAttribute="data-knowledge-tab"
+  countAttribute="data-knowledge-tab-count"
+  containerClass="manager-editor-tabs manager-knowledge-tabs"
+/>

@@ -18,6 +18,7 @@
   // Shared pure resolver: an empty OR generic item-bag image falls back to the
   // alchemical blueprint — matching the player builder + browser exactly (no drift).
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     linkedRecipes = [],
@@ -135,16 +136,15 @@
             <span class="manager-recipe-item-recipe-name">{recipe.name}</span>
             <span class="manager-recipe-item-recipe-cat">{categoryLabel(recipe)}</span>
           </div>
-          <button
-            type="button"
-            class="manager-icon-button is-danger"
+          <IconButton
+            class="is-danger"
             data-recipe-item-remove-recipe={recipe.id}
-            aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Contents.Remove', 'Remove recipe')}
+            ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Contents.Remove', 'Remove recipe')}
             title={text('FABRICATE.Admin.Manager.RecipeItem.Contents.Remove', 'Remove recipe')}
             onclick={() => onRemoveRecipe(recipe.id)}
           >
             <i class="fas fa-xmark" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </li>
       {/each}
     </ul>

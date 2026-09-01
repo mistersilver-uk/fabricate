@@ -85,6 +85,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile } from 'svelte/compiler';
 
+import { classTokensPassedTo } from '../helpers/svelteTagScan.js';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** Every `.svelte` beneath `src/`, as repo-relative POSIX paths. */
@@ -96,17 +98,6 @@ function svelteFiles(directory = 'src') {
   });
 }
 
-/**
- * The class tokens a component hands to its `<ManagerButton>` call sites.
- *
- * The tag's end cannot be found with `[^<>]*`: every one of these sites passes an inline
- * `onclick={() => …}`, and the arrow's `>` would end the match half way through the
- * attributes. So the scan walks to the first `>` that is not the tail of an `=>`, which is
- * exact for this markup and does not depend on how prettier wrapped the attributes.
- *
- * @param {string} source component source text
- * @returns {Set<string>} every literal class token passed through the `class` prop
- */
 /**
  * The compounds of a compiled selector: its parts between combinators.
  *
@@ -124,22 +115,6 @@ function compoundsOf(selector) {
     .split(/\s*[\s>+~]\s*/)
     .map((part) => part.trim())
     .filter(Boolean);
-}
-
-function managerButtonClassTokens(source) {
-  const tokens = new Set();
-  for (const opening of source.matchAll(/<ManagerButton\b/g)) {
-    let end = opening.index;
-    do {
-      end = source.indexOf('>', end + 1);
-    } while (end > 0 && source[end - 1] === '=');
-    if (end < 0) continue;
-    const tag = source.slice(opening.index, end + 1);
-    const literal = /\bclass="([^"]*)"/.exec(tag);
-    if (!literal) continue;
-    for (const token of literal[1].split(/\s+/)) if (token) tokens.add(token);
-  }
-  return tokens;
 }
 
 /**
@@ -169,31 +144,128 @@ function compiledCss(file, source) {
   };
 }
 
-// The two classes the primitive emits unconditionally. A rule keyed on either of them reaches
-// a `<ManagerButton>` without the component having handed it any class at all, which is why
-// they are checked separately from the tokens a call site passes.
-const CONTRACT_CLASSES = ['manager-button', 'fab-manager-button'];
+/**
+ * The primitives this guard covers, and the classes each emits UNCONDITIONALLY.
+ *
+ * A rule keyed on a contract class reaches the primitive without the component having handed
+ * it any class at all, which is why they are checked separately from the tokens a call site
+ * passes.
+ *
+ * `IconButton` (issue 1422) joined `ManagerButton` here rather than getting a guard of its
+ * own, because the defect and its two failure modes are identical and a second copy would
+ * drift. That conversion is also the sharpest evidence yet that the SILENT mode is the one
+ * that matters: of its two dead rules, `EssenceIdentityTab`'s was pruned and named by
+ * `lint:svelte:warnings`, while `GatheringEconomyView`'s bare `.manager-economy-actor-roll`
+ * was EMITTED with the hash attached and warned about nowhere. A repair driven by the warning
+ * gate alone would have shipped the second one dead.
+ *
+ * `InspectorCard` (issue 1427) joined on the same argument, and it is not a button at all —
+ * which is the point. The defect is a property of the COMPONENT BOUNDARY rather than of any one
+ * control, so every extraction that moves a class onto a child belongs in this one table.
+ *
+ * It also corrected what this file previously recorded about WHEN the silent mode fires. The
+ * `IconButton` note above blamed a spread attribute on a regular element. That is incomplete.
+ * Measured directly against Svelte 5.56.3, with a `.target` rule whose only call site is
+ * `<Child class="target" />`, the rule is pruned and warned about when the file holds nothing
+ * else, when it holds `<Other {...hook} />`, when it holds `<Other class={expr} />`, when it
+ * holds `<i class:is-on={on}>` and when it holds `<i class="static">` — and it is emitted
+ * SILENTLY when the file holds `<li {...hook}>` or `<i class={o.icon}>` or
+ * ``<i class={`lit ${o.icon}`}>``. The trigger is a REGULAR ELEMENT carrying either a spread or
+ * a `class` whose value is any expression, a template literal included; the same attribute on a
+ * COMPONENT tag does not do it. `GatheringEconomyView` is the worked example: its only spreads
+ * are on `<Stepper>`, and what silences it is `class={option.icon}` on an `<i>`. An
+ * expression-valued `class` on a regular element is ordinary in this codebase, so the silent
+ * mode is the DEFAULT and this guard — not `lint:svelte:warnings` — is what finds it.
+ *
+ * Each floor is stated separately, because one primitive having plenty of call sites must not
+ * let another's scan rot to zero unnoticed.
+ */
+const PRIMITIVES = Object.freeze([
+  Object.freeze({
+    tag: 'ManagerButton',
+    contractClasses: ['manager-button', 'fab-manager-button'],
+    minimumTokens: 20,
+  }),
+  Object.freeze({ tag: 'IconButton', contractClasses: ['manager-icon-button'], minimumTokens: 10 }),
+  // The manager's card shell. Its call sites pass FEWER bespoke tokens than either button's —
+  // 13 across 20 components as issue 1427 lands — because a card's modifier is usually the
+  // only class it carries, so the floor is lower without being weaker.
+  Object.freeze({
+    tag: 'InspectorCard',
+    contractClasses: ['manager-inspector-card'],
+    minimumTokens: 8,
+  }),
+  // `<Field>` (issue 1428), and the widest sweep this guard has scanned: `manager-field` was a
+  // CSS convention on 88 elements across 24 components and 81 of them became this primitive in
+  // one change. It belongs on THIS list rather than in a suite of its own because the mechanism
+  // is identical and a second copy of it would be new duplicated lines on new code.
+  //
+  // It is also the primitive that proves the EMITTED half carries the weight. Six scoped rules
+  // died in that sweep — `GatheringTaskEditView`'s four, `ImportFolderMappingModal`'s two and
+  // `CraftingModifierCatalogueCard`'s one — and not one was pruned, so `lint:svelte:warnings`
+  // reported zero warnings across all 307 components and the compiled `css.code` of every
+  // converted file came out BYTE-IDENTICAL. Byte-identity is the SIGNATURE of this failure, not
+  // evidence against it: the rules were emitted exactly as before, with the caller's scoping
+  // class attached, onto elements the caller no longer writes.
+  //
+  // Each is repaired as `:global(.manager-field.the-other-class …)`. The `.manager-field`
+  // compound is load-bearing rather than decorative: the scoped form compiled to
+  // `.the-other-class.svelte-hash`, which is (0,2,0), and a bare `:global(.the-other-class)` is
+  // (0,1,0) — so the bare form reaches the element and smuggles a cascade change in as a repair.
+  // This guard cannot see that difference and says so out loud rather than implying otherwise.
+  //
+  // Its subset gate is not decorative either: `SubjectModifierPicker` and `SystemEditView` both
+  // hand `is-wide` to a `<Field>`, and that is a shared modifier they also put on elements they
+  // write themselves. 30 bespoke tokens travel onto a `<Field>` as this lands.
+  Object.freeze({ tag: 'Field', contractClasses: ['manager-field'], minimumTokens: 20 }),
+]);
 
-test('no component scopes a rule onto a class it hands to a ManagerButton', () => {
+test('no component scopes a rule onto a class it hands to a shared primitive', () => {
   const violations = [];
-  let sitesScanned = 0;
+  const sitesScanned = new Map(PRIMITIVES.map((p) => [p.tag, 0]));
   let componentsWithScopedCss = 0;
   let contractRulesScanned = 0;
 
   for (const file of svelteFiles()) {
     const source = readFileSync(join(repoRoot, file), 'utf8');
-    const tokens = managerButtonClassTokens(source);
-    const rendersPrimitive = /<ManagerButton[\s/>]/.test(source);
-    if (tokens.size === 0 && !rendersPrimitive) continue;
-    sitesScanned += tokens.size;
+    const active = PRIMITIVES.map((primitive) => ({
+      primitive,
+      tokens: classTokensPassedTo(source, primitive.tag),
+      // `String.raw` is load-bearing and is NOT a style choice. A plain template literal
+      // resolves \s to a bare `s` before `RegExp` ever sees it, so this character
+      // class silently becomes `[s/>]` — which breaks the predicate in BOTH directions at once.
+      // It UNDER-matches, rejecting `<Tag class=…>` and `<Tag\n  class=…>` (a tag
+      // followed by a space or a newline, which is nearly every call site in this corpus),
+      // and it OVER-matches, accepting `<Tags>` — a DIFFERENT component whose name merely
+      // EXTENDS this one — so a file that never renders the primitive can satisfy it.
+      // (`<TagGroup>` escapes only because `G` happens not to be in the collapsed class;
+      // the plural spelling, which is the likely one, does not.) Measured, not reasoned:
+      // `<InspectorCards>` matches the collapsed form and not the raw one.
+      // Measured when `<InspectorCard>` joined (issue 1427): the collapsed form matched 6
+      // of 53 `ManagerButton` files, 2 of 36 `IconButton` files and 5 of 20 `InspectorCard`
+      // files, leaving the contract-class half of this guard inert over three quarters of
+      // its corpus while reporting clean. A mechanical check that cannot fail is
+      // indistinguishable from one that passes, so do not "tidy" this back to a template
+      // literal.
+      renders: new RegExp(String.raw`<${primitive.tag}[\s/>]`).test(source),
+    })).filter((entry) => entry.tokens.size > 0 || entry.renders);
+    if (active.length === 0) continue;
+    for (const entry of active) {
+      sitesScanned.set(
+        entry.primitive.tag,
+        sitesScanned.get(entry.primitive.tag) + entry.tokens.size
+      );
+    }
 
     const { css, pruned } = compiledCss(file, source);
 
     // The pruned half needs no hash to be found — the rule never reached the output at all.
     for (const selector of pruned) {
-      for (const token of tokens) {
-        if (!new RegExp(String.raw`\.${token}\b`).test(selector)) continue;
-        violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')} [pruned as unused]`);
+      for (const { tokens } of active) {
+        for (const token of tokens) {
+          if (!new RegExp(String.raw`\.${token}\b`).test(selector)) continue;
+          violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')} [pruned as unused]`);
+        }
       }
     }
 
@@ -204,44 +276,83 @@ test('no component scopes a rule onto a class it hands to a ManagerButton', () =
     for (const block of css.split('}')) {
       const selector = block.split('{', 1)[0];
       if (!selector.includes(hash)) continue;
-      for (const token of tokens) {
-        if (!new RegExp(String.raw`\.${token}\b`).test(selector)) continue;
-        violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')}`);
+      // The bespoke-token half, PER COMPOUND and SUBSET-GATED. Both qualifications were
+      // forced by real cases when `IconButton` joined this guard (issue 1422), and a
+      // whole-selector test gets each of them wrong in a different direction:
+      //
+      //  - PER COMPOUND, for the reason this file's docblock already gives about the
+      //    contract half. `EssenceIdentityTab`'s REPAIR is
+      //    `.manager-essence-icon-tile.svelte-h .manager-essence-icon-reset` — the hash sits
+      //    on the tile, which this component does write, and the child compound is bare. A
+      //    whole-selector test sees a hash and a token in one string and fails the repair as
+      //    loudly as the defect it fixes.
+      //  - SUBSET-GATED, because a token handed to the primitive may ALSO be a shared
+      //    modifier this component puts on its own elements. `ComplicationSummaryRow` hands
+      //    `is-danger` to an `<IconButton>` and separately declares
+      //    `.fab-complication-severity.is-danger` for a severity pill it writes itself. That
+      //    rule is alive and correct, and flagging it would buy a bogus `:global` repair.
+      //    Requiring every class in the compound to be one the primitive could carry is what
+      //    tells "a rule aimed at the primitive" apart from "a rule that happens to share a
+      //    state class with it".
+      //
+      // `ManagerButton` never met the second case because it takes its role as a `role` prop
+      // rather than a pass-through class, so `is-danger` is not in its token set at all.
+      for (const { primitive, tokens } of active) {
+        for (const compound of compoundsOf(selector)) {
+          if (!compound.includes(hash)) continue;
+          const classes = [...compound.matchAll(/\.([\w-]+)/g)].map((match) => match[1]);
+          const namesToken = classes.some((name) => tokens.has(name));
+          if (!namesToken) continue;
+          const everyClassCouldBeThePrimitives = classes.every(
+            (name) => name === hash || tokens.has(name) || primitive.contractClasses.includes(name)
+          );
+          if (!everyClassCouldBeThePrimitives) continue;
+          violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')}`);
+        }
       }
       // The no-bespoke-class half. Per compound, and only for a component that actually
       // renders the primitive: `.some-row .manager-button` in a component whose buttons are
       // still hand-written is correct and must not be flagged.
-      if (!rendersPrimitive) continue;
-      for (const compound of compoundsOf(selector)) {
-        const noContractClass = CONTRACT_CLASSES.every(
-          (token) => !new RegExp(String.raw`\.${token}\b`).test(compound)
-        );
-        if (noContractClass) continue;
-        contractRulesScanned += 1;
-        if (!compound.includes(hash)) continue;
-        violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')}`);
+      for (const { primitive, renders } of active) {
+        if (!renders) continue;
+        for (const compound of compoundsOf(selector)) {
+          const noContractClass = primitive.contractClasses.every(
+            (token) => !new RegExp(String.raw`\.${token}\b`).test(compound)
+          );
+          if (noContractClass) continue;
+          contractRulesScanned += 1;
+          if (!compound.includes(hash)) continue;
+          violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')}`);
+        }
       }
     }
   }
 
   // Non-vacuity, in both directions the scan can rot. A wrong root, a bad extension filter or
   // a tag matcher that stopped finding call sites reads as zero tokens; a corpus in which no
-  // such component has a scoped block at all would make the loop above unreachable.
-  assert.ok(sitesScanned > 20, `only ${sitesScanned} ManagerButton class tokens found under src`);
+  // such component has a scoped block at all would make the loop above unreachable. Stated
+  // PER PRIMITIVE so a healthy `ManagerButton` count cannot mask an `IconButton` scan that
+  // stopped resolving anything.
+  for (const { tag, minimumTokens } of PRIMITIVES) {
+    assert.ok(
+      sitesScanned.get(tag) > minimumTokens,
+      `only ${sitesScanned.get(tag)} ${tag} class tokens found under src, below the ` +
+        `floor of ${minimumTokens}, so this guard is no longer reaching that primitive`
+    );
+  }
   assert.ok(
     componentsWithScopedCss > 0,
-    'no component both renders a classed ManagerButton and owns a scoped <style>, so this ' +
+    'no component both renders a classed primitive and owns a scoped <style>, so this ' +
       'guard walked over nothing'
   );
   // The floor for the half added at task 9. It has to be stated, because that half is the one
-  // with no bespoke token to key on: if no component in the corpus both renders the primitive
-  // and states a rule against the contract class, the compound walk above is unreachable and
-  // its silence means nothing. Three such rules exist as this lands, all in
-  // `ImportFolderMappingModal`.
+  // with no bespoke token to key on: if no component in the corpus both renders a primitive
+  // and states a rule against its contract class, the compound walk above is unreachable and
+  // its silence means nothing.
   assert.ok(
     contractRulesScanned > 0,
-    'no component that renders a ManagerButton states a scoped rule against `.manager-button` ' +
-      'or `.fab-manager-button`, so the compound check walked over nothing'
+    'no component that renders a primitive states a scoped rule against one of its ' +
+      'contract classes, so the compound check walked over nothing'
   );
 
   // Code point, not `localeCompare`, for the reason `sourceScan.js` gives: locale-dependent
@@ -249,7 +360,8 @@ test('no component scopes a rule onto a class it hands to a ManagerButton', () =
   assert.deepEqual(
     violations.sort((left, right) => (left === right ? 0 : left < right ? -1 : 1)),
     [],
-    'these rules select a class that only a `<ManagerButton>` carries, so they match NOTHING ' +
+    'these rules select a class that only a `<ManagerButton>`, `<IconButton>` or ' +
+      '`<InspectorCard>` carries, so they match NOTHING ' +
       'and the control is silently unstyled — either emitted with this component`s scoping ' +
       'class attached, or pruned by the compiler before they were emitted at all. Wrap each ' +
       'in `:global(...)` — and chain the primitive`s classes while you are there, because a ' +

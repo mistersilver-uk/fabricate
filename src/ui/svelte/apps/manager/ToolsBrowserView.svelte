@@ -4,6 +4,7 @@
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
   import {
     breakModeSourcePill,
@@ -375,10 +376,7 @@
   data-tool-library
 >
   <div class="manager-tools-main-content">
-    <section
-      class="manager-inspector-card manager-tools-authority-card"
-      data-manager-tools-authority
-    >
+    <InspectorCard class="manager-tools-authority-card" data-manager-tools-authority="">
       <div class="manager-tools-authority-heading">
         <span><i class="fas fa-sliders" aria-hidden="true"></i></span>
         <!--
@@ -425,7 +423,7 @@
           </label>
         {/each}
       </div>
-    </section>
+    </InspectorCard>
 
     <section class="manager-tools-library-card" data-manager-tools-search>
       <label class="manager-search">

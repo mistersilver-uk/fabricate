@@ -2,10 +2,12 @@
 <script>
   import { localize, viewScene } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import { sceneDocumentImage } from '../../../util/sceneImages.js';
   import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let { environment = null, composition = { counts: {} }, onUpdate = () => {} } = $props();
 
@@ -63,7 +65,7 @@
   }
 </script>
 
-<section class="manager-inspector-card" data-environment-summary-inspector>
+<InspectorCard data-environment-summary-inspector="">
   <p class="manager-kicker">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Summary', 'Environment summary')}
   </p>
@@ -91,9 +93,9 @@
           )}</Chip
     >
   </div>
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card" data-environment-summary-scene>
+<InspectorCard data-environment-summary-scene="">
   <h3 class="manager-card-title">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}
   </h3>
@@ -134,10 +136,9 @@
         title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenScene', 'Open scene')}
         >{sceneLabel}</button
       >
-      <button
-        type="button"
-        class="manager-icon-button is-danger"
-        aria-label={text(
+      <IconButton
+        class="is-danger"
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene',
           'Unlink scene'
         )}
@@ -148,7 +149,7 @@
         onclick={(event) => {
           event.stopPropagation();
           unlinkScene();
-        }}><i class="fas fa-link-slash" aria-hidden="true"></i></button
+        }}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
       >
     </div>
   {:else}
@@ -165,9 +166,9 @@
       >
     </div>
   {/if}
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card">
+<InspectorCard>
   <h3 class="manager-card-title">
     {text(
       'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ValidationSummary',
@@ -182,9 +183,9 @@
       >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.warning', 'Warning')}: {warning}</Chip
     >
   </div>
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card">
+<InspectorCard>
   <h3 class="manager-card-title">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.RuntimePreview', 'Runtime preview')}
   </h3>
@@ -259,4 +260,4 @@
       >
     </div>
   </div>
-</section>
+</InspectorCard>

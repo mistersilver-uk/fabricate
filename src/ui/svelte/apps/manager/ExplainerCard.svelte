@@ -47,6 +47,7 @@
 -->
 <script>
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
 
   const DEFAULT_LINK_ICON = 'fas fa-arrow-up-right-from-square';
 
@@ -61,7 +62,7 @@
   );
 </script>
 
-<section class="manager-inspector-card manager-explainer-card" {...hookAttributes}>
+<InspectorCard class="manager-explainer-card" {...hookAttributes}>
   <h3 class="manager-card-title manager-explainer-card-title">
     {#if icon}
       <i class={icon} aria-hidden="true"></i>
@@ -127,7 +128,7 @@
       {/each}
     </div>
   {/if}
-</section>
+</InspectorCard>
 
 <style>
   /* Theme-root tokens ONLY. NO scoped `<style>` may reference `--fab-manager-*`, or any other

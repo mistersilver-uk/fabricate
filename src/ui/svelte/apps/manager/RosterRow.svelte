@@ -16,6 +16,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import StatusToggle from '../../components/StatusToggle.svelte';
 
   let {
     name = '',
@@ -42,22 +43,14 @@
     <span class="manager-roster-name">{name}</span>
     {#if subtitle}<span class="manager-roster-subtitle">{subtitle}</span>{/if}
   </div>
-  <button
-    type="button"
-    class={`manager-status-toggle ${granted ? 'is-on' : 'is-off'}`}
-    aria-pressed={granted}
-    aria-label={ariaLabel || undefined}
+  <StatusToggle
+    on={granted}
+    label={granted
+      ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+      : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}
+    {ariaLabel}
     onclick={() => onToggle(!granted)}
-  >
-    <span class="manager-status-toggle-track" aria-hidden="true"
-      ><span class="manager-status-toggle-knob"></span></span
-    >
-    <span class="manager-status-toggle-label"
-      >{granted
-        ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-        : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span
-    >
-  </button>
+  />
 </div>
 
 <style>

@@ -87,6 +87,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
+  import Field from '../../../components/Field.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -1256,7 +1257,7 @@
             <!-- NO SECOND VISIBLE LABEL. The card's kicker already reads `Display label`, so a
                  `Name` caption under it names the same field twice; the accessible name goes
                  on the input instead, which is what a screen reader announces anyway. -->
-            <div class="manager-field" data-world-tool-entry-field="name">
+            <Field as="div" data-world-tool-entry-field="name">
               <input
                 type="text"
                 aria-label={text(
@@ -1267,7 +1268,7 @@
                 value={String(identity.name ?? '')}
                 oninput={(event) => setIdentity('name', event.currentTarget.value)}
               />
-            </div>
+            </Field>
             <!-- THE COPY SAYS WHAT THE FIELD DOES, and it used to say something the model
                  contradicts. `The name every crafting system shows for this Tool` is false
                  while the per-system `label` override ships: a system that sets one shows
@@ -1279,14 +1280,14 @@
                 'The shared name for this Tool. Every crafting system shows it unless that system overrides the name in its own rules.'
               )}
             </p>
-            <label class="manager-field" data-world-tool-entry-field="description">
+            <Field as="label" data-world-tool-entry-field="description">
               <span>{text('FABRICATE.Admin.Manager.Scoped.Entry.Description', 'Description')}</span>
               <textarea
                 rows="3"
                 value={String(identity.description ?? '')}
                 oninput={(event) => setIdentity('description', event.currentTarget.value)}
               ></textarea>
-            </label>
+            </Field>
           </section>
 
           <!--
@@ -1524,7 +1525,7 @@
                 />
               {:else}
                 <div class="manager-world-tool-entry-field-row">
-                  <label class="manager-field manager-world-tool-entry-formula">
+                  <Field as="label" class="manager-world-tool-entry-formula">
                     <span class="manager-kicker"
                       >{text('FABRICATE.Admin.Manager.Tools.BreakageFormula', 'Formula')}</span
                     >
@@ -1536,7 +1537,7 @@
                       oninput={(event) =>
                         patchSection('breakage', { formula: event.currentTarget.value })}
                     />
-                  </label>
+                  </Field>
                   <div class="manager-world-tool-entry-field-copy">
                     <span class="manager-kicker"
                       >{text(
@@ -1824,7 +1825,7 @@
     <i class="fas fa-user" aria-hidden="true"></i>
     {text('FABRICATE.Admin.Manager.Tools.PreviewPanel.PreviewAs', 'Preview as')}
   </p>
-  <label class="manager-field manager-world-tool-entry-preview-actor">
+  <Field as="label" class="manager-world-tool-entry-preview-actor">
     <!-- `.visually-hidden` is the manager's own shipped utility; `.manager-visually-hidden` is
          not a class this stylesheet declares, so the caption rendered as a second visible
          `Preview as` under the kicker that already says it. -->
@@ -1843,7 +1844,7 @@
         <option value={actor.id}>{actor.name}</option>
       {/each}
     </select>
-  </label>
+  </Field>
   {#if previewPrerequisiteRows.length === 0}
     <p class="manager-muted manager-world-tool-entry-preview-line" data-world-tool-entry-gate-line>
       {text(
@@ -2126,7 +2127,18 @@
   /* ── THE `PREVIEW AS` READOUT ────────────────────────────────────────────────────────────
      One row per selected prerequisite, its glyph carrying the three states the evaluation has:
      unevaluated, met, unmet. */
-  .manager-world-tool-entry-preview-actor {
+  /* `:global()` because `Field` (issue 1428) writes this element, not this template: the class
+     reaches it through the primitive's `class` prop and never carries this block's scoping
+     attribute, so the scoped form compiles to a selector that matches nothing.
+
+     THE COMPILED SPECIFICITY DOES DROP, from (0,2,0) to (0,1,0), because the scoper's own hash
+     class is what the rule loses — the same drop `EditorTabs.svelte` takes for the same repair.
+     It is inert HERE, and that is checked rather than assumed: every `.manager-field` rule in
+     `styles/fabricate.css` is written under `.fabricate-manager` and is therefore (0,2,x)
+     already, so it beat both forms; and none of them declares `flex` or `min-width` on a plain
+     `.manager-field`, which is all these two rules set. The descendant rule below keeps its
+     hash on the `input`, which this template still writes, so its specificity is unchanged. */
+  :global(.manager-world-tool-entry-preview-actor) {
     min-width: 0;
   }
 
@@ -2281,7 +2293,18 @@
     font-size: 0.6rem;
   }
 
-  .manager-world-tool-entry-formula {
+  /* `:global()` because `Field` (issue 1428) writes this element, not this template: the class
+     reaches it through the primitive's `class` prop and never carries this block's scoping
+     attribute, so the scoped form compiles to a selector that matches nothing.
+
+     THE COMPILED SPECIFICITY DOES DROP, from (0,2,0) to (0,1,0), because the scoper's own hash
+     class is what the rule loses — the same drop `EditorTabs.svelte` takes for the same repair.
+     It is inert HERE, and that is checked rather than assumed: every `.manager-field` rule in
+     `styles/fabricate.css` is written under `.fabricate-manager` and is therefore (0,2,x)
+     already, so it beat both forms; and none of them declares `flex` or `min-width` on a plain
+     `.manager-field`, which is all these two rules set. The descendant rule below keeps its
+     hash on the `input`, which this template still writes, so its specificity is unchanged. */
+  :global(.manager-world-tool-entry-formula) {
     flex: 1 1 12rem;
     min-width: 0;
   }
@@ -2289,7 +2312,7 @@
   /* AN INVALID FORMULA IS EDGE-MARKED as well as explained, so the field a GM must fix is
      identifiable without reading the sentence under it. Two selectors deep so it beats the
      shipped `.manager-field input` border. */
-  .manager-world-tool-entry-formula input[aria-invalid='true'] {
+  :global(.manager-world-tool-entry-formula) input[aria-invalid='true'] {
     border-color: var(--fab-danger-border);
   }
 

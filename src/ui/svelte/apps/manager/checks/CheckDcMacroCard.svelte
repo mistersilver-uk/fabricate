@@ -32,6 +32,7 @@
   // indirection and the stale-resolution latch.
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
   import ItemDropZone from '../ItemDropZone.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let { macroUuid = null, onChange = () => {} } = $props();
 
@@ -75,7 +76,7 @@
   });
 </script>
 
-<section class="manager-inspector-card manager-checks-card" data-dynamic-dc>
+<InspectorCard class="manager-checks-card" data-dynamic-dc="">
   <div class="manager-checks-card-head">
     <div>
       <h3 class="manager-checks-card-title">
@@ -106,4 +107,4 @@
       onUnlink={() => onChange({ macroUuid: null })}
     />
   </div>
-</section>
+</InspectorCard>

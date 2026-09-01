@@ -7,6 +7,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import {
@@ -605,18 +606,16 @@
         <span class="manager-component-filter-label" id="manager-component-group-label"
           >{text('FABRICATE.Admin.Manager.Component.GroupByCategory', 'Group by category')}</span
         >
-        <button
-          type="button"
-          class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
-          data-component-group-by-category
-          aria-pressed={ui.groupByCategory}
+        <!-- `data-component-group-by-category=""` rather than the bare attribute: on a
+             COMPONENT a bare attribute is the boolean `true`, which the rest spread would
+             stamp as `="true"` and change the byte the sheet's own
+             `[data-component-group-by-category]` rule is written beside. -->
+        <StatusToggle
+          on={ui.groupByCategory}
+          data-component-group-by-category=""
           aria-labelledby="manager-component-group-label"
           onclick={toggleGroupByCategory}
-        >
-          <span class="manager-status-toggle-track" aria-hidden="true"
-            ><span class="manager-status-toggle-knob"></span></span
-          >
-        </button>
+        />
       </div>
       <span class="manager-component-filter-divider" aria-hidden="true"></span>
       <div class="manager-component-filter-field">

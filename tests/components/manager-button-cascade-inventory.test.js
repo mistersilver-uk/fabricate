@@ -436,14 +436,17 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
-        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own: the
-        // catalogue's `+ New essence`. The entry's `Back`/`Save` pair renders into this same
+        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own — the
+        // catalogue's `+ New essence` — and back to 28 at its round-8 parity pass, which deleted
+        // the SYSTEM Essence Rules header's `+ Create essence`: the reference's Essence Rules
+        // header carries nothing on the right, because an essence is a world record and the only
+        // create is the catalogue's. The entry's `Back`/`Save` pair renders into this same
         // container from `scoped/ScopedEntryHeaderActions.svelte`, which slots into the div and
         // declares no region of its own, so it is the `ComponentEditorHeader` case the `why`
         // below already records — reached by the rule, not attributable to this file by a static
         // count. The number is the container's own population read from the tree, so it moves
         // whenever a header branch gains or loses a control it renders itself.
-        buttons: 29,
+        buttons: 28,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -481,8 +484,11 @@ const REVIEWED = [
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
         role: 'primary',
-        // 14 -> 15 with issue 1372's world-essence header create action.
-        buttons: 15,
+        // 14 -> 15 with issue 1372's world-essence header create action, and back to 14 at its
+        // round-8 parity pass, which deleted the SYSTEM Essence Rules header's `+ Create essence`
+        // — the reference's Essence Rules header carries nothing on the right, and an essence's
+        // identity is a world record no system-scope screen authors.
+        buttons: 14,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -665,12 +671,13 @@ const REVIEWED = [
 
   {
     id: scopedRule(
-      'scoped/EntityCatalogueShell.svelte',
-      '.manager-scoped-catalogue-system .manager-button.is-danger'
+      'scoped/SystemRulesRoster.svelte',
+      '.manager-scoped-roster-system .manager-button.is-danger'
     ),
     disposition: 'EXCLUDE',
     why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it. The catalogue inspector`s system ' +
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved '+
+      'it into `SystemRulesRoster`, which both essence rails compose. The panel`s system ' +
       'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
       '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +
       'so this rule cannot be re-chained onto the primitive. What it states is a SIZE taken ' +
@@ -745,14 +752,27 @@ const REVIEWED = [
       'NOT IN THE SEEDED LIST. The (0,2,0) shared treatment behind four population-B ' +
       'triggers; re-chaining it would repaint controls the sweep is not converting.',
   },
-  {
-    id: 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte#.fab-bulk-delete-card .manager-button',
-    disposition: 'EXCLUDE',
-    why:
-      'NOT IN THE SEEDED LIST. A `:global()` scoped rule whose only site is ' +
-      '`ArmedDangerButton`, which is a primitive in its own right and is explicitly out of the ' +
-      "conversion's scope.",
-  },
+  // REMOVED at issue 1427, and the removal is recorded rather than performed silently.
+  //
+  // The entry was `BulkDeleteCard.svelte#.fab-bulk-delete-card .manager-button`, dispositioned
+  // EXCLUDE because its only site is `ArmedDangerButton`, which never gains the primitive class.
+  // That rule still EXISTS and still reaches that button; what changed is that this instrument
+  // can no longer SEE it. The card's root `<section>` became an `<InspectorCard>`, so the rule's
+  // ancestor compound is now `.manager-inspector-card.fab-bulk-delete-card` and the element
+  // carrying it is written by the primitive, from a `class={…}` expression. `providersFor`
+  // resolves an ancestor by the STATIC class tokens a parent component writes, finds none, and
+  // `siteMatch` returns `impossible` — so the rule drops out of `candidates` entirely rather
+  // than into `blindSpots`, and no disposition in this register describes "live, and invisible
+  // to the instrument".
+  //
+  // It is left out rather than re-dispositioned as DEAD, which would be false and would invite
+  // the next reader to delete a live rule. The loss is bounded and inert: arbitration only
+  // matters for CONVERTING sites and this rule has none, its declaration is pinned by
+  // `essence-studio-fidelity.test.js`, and whether it still REACHES its button is
+  // `manager-button-scoped-class-reach.test.js`'s question — which covers `<InspectorCard>` and
+  // did catch this rule going dead. Teaching `providersFor` about a class forwarded through a
+  // child component's `class` prop is the real repair, and it belongs to this instrument rather
+  // than to a card extraction.
 
   // ── NO_CONFLICT: derived NOT at risk, and still rendered ──────────────────────────────
   //

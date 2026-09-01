@@ -1,6 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../components/Field.svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -9,6 +11,7 @@
   import { resolveDropData } from '../../util/dropUtils.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     event = null,
@@ -271,12 +274,12 @@
           </button>
 
           <div class="manager-task-core-status">
-            <button
-              type="button"
-              class={`manager-status-toggle ${event.enabled === false ? 'is-off' : 'is-on'}`}
-              data-gathering-event-field="enabled"
-              aria-pressed={event.enabled !== false}
-              aria-label={text(
+            <StatusToggle
+              on={event.enabled !== false}
+              label={event.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Environment.Events.ToggleNamed',
                 'Toggle {name}'
               ).replace(
@@ -284,17 +287,9 @@
                 event.name ||
                   text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')
               )}
+              data-gathering-event-field="enabled"
               onclick={() => onUpdateEvent({ enabled: event.enabled === false })}
-            >
-              <span class="manager-status-toggle-track" aria-hidden="true">
-                <span class="manager-status-toggle-knob"></span>
-              </span>
-              <span class="manager-status-toggle-label">
-                {event.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              </span>
-            </button>
+            />
             <p class="manager-muted">
               {event.enabled === false
                 ? text(
@@ -310,7 +305,7 @@
         </div>
 
         <div class="manager-task-identity-fields">
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Environment.Events.Name', 'Name')}</span>
             <input
               data-gathering-event-field="name"
@@ -325,8 +320,8 @@
                 )}</span
               >
             {/if}
-          </label>
-          <label class="manager-field">
+          </Field>
+          <Field as="label">
             <span
               >{text('FABRICATE.Admin.Manager.Environment.Events.Description', 'Description')}</span
             >
@@ -335,7 +330,7 @@
               value={event.description || ''}
               oninput={(event) => onUpdateEvent({ description: event.currentTarget.value })}
             ></textarea>
-          </label>
+          </Field>
         </div>
       </div>
     </section>
@@ -356,7 +351,7 @@
       </div>
       <div class="manager-task-availability-row" data-gathering-event-availability>
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
-          <div class="manager-field manager-availability-multi" data-gathering-event-field={kind}>
+          <Field as="div" class="manager-availability-multi" data-gathering-event-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
             <div
               class="manager-availability-picker"
@@ -433,7 +428,7 @@
                 >
               {/if}
             </div>
-          </div>
+          </Field>
         {/each}
       </div>
     </section>
@@ -452,7 +447,7 @@
           </div>
         </div>
         <div class="manager-task-availability-row">
-          <div class="manager-field manager-availability-multi">
+          <Field as="div" class="manager-availability-multi">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Events.DangerTagsField',
@@ -503,7 +498,7 @@
                 {/each}
               </div>
             {/if}
-          </div>
+          </Field>
         </div>
       </section>
 
@@ -520,7 +515,7 @@
           </div>
         </div>
         <div class="manager-task-availability-row">
-          <label class="manager-field manager-drop-rate-editor">
+          <Field as="label" class="manager-drop-rate-editor">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Events.DropRatePercent',
@@ -567,7 +562,7 @@
                 )}</span
               >
             {/if}
-          </label>
+          </Field>
         </div>
       </section>
     </div>
@@ -622,10 +617,9 @@
               viewScene(linkedSceneUuid);
             }}>{linkedSceneLabel}</button
           >
-          <button
-            type="button"
-            class="manager-icon-button is-danger"
-            aria-label={text(
+          <IconButton
+            class="is-danger"
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.Events.SceneUnlink',
               'Unlink scene'
             )}
@@ -633,7 +627,7 @@
             onclick={unlinkScene}
           >
             <i class="fas fa-link-slash" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </div>
       {:else}
         <div

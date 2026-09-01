@@ -154,9 +154,21 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  // The shared labelled-field primitive (issue 1428). The Checks Studio authors its DC, its
+  // formula and every trigger condition through `.manager-field` columns, so this component is
+  // in the static graph of every suite that mounts the studio; an omission HANGS them.
+  'src/ui/svelte/components/Field.svelte',
   // The shared button primitive. Every list in the studio is extended by the prototype's
   // full-width dashed control, which is this primitive's `dashed` role (issue 1096).
   'src/ui/svelte/components/ManagerButton.svelte',
+  // The shared on/off switch (issue 1040). The right rail's activation card renders BOTH of
+  // its non-default forms — the live switch and the locked `role="img"` reading — so it is
+  // in this tree's static import closure whichever mode a test drives.
+  'src/ui/svelte/components/StatusToggle.svelte',
+  // The shared card shell (issue 1427). The Checks Studio is its densest consumer — 25 of the
+  // sweep's 48 converted sites are under `apps/manager/checks/` — so every suite that mounts
+  // any part of this tree reaches it.
+  'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/Chip.svelte',
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
@@ -178,6 +190,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
+  // THE manager's editor tab strip (issue 1362). `ChecksEditorTabs` is a caller of it
+  // since issue 1429 gave it the Rail Marker Family, so omitting it HANGS every checks
+  // suite (`# cancelled`) rather than failing one.
+  'src/ui/svelte/apps/manager/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',

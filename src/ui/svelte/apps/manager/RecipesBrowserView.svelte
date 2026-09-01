@@ -23,6 +23,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import StatusPill from '../../components/StatusPill.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
@@ -43,6 +44,7 @@
     deriveRecipeIo,
     deriveRecipeStatuses,
   } from '../../../../utils/recipeBrowserModel.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     recipes = [],
@@ -532,18 +534,12 @@
           <span class="manager-recipe-filter-label" id="manager-recipe-group-label"
             >{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span
           >
-          <button
-            type="button"
-            class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
-            data-recipe-group-toggle
-            aria-pressed={ui.groupByCategory}
+          <StatusToggle
+            on={ui.groupByCategory}
+            data-recipe-group-toggle=""
             aria-labelledby="manager-recipe-group-label"
             onclick={() => (ui.groupByCategory = !ui.groupByCategory)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-          </button>
+          />
         </div>
         <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
       {/if}
@@ -658,15 +654,14 @@
     <div class="manager-recipe-flash" role="alert" data-recipe-flash>
       <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
       <span class="manager-recipe-flash-message">{flashMessage}</span>
-      <button
-        type="button"
-        class="manager-icon-button manager-recipe-flash-dismiss"
-        data-recipe-flash-dismiss
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
+      <IconButton
+        class="manager-recipe-flash-dismiss"
+        data-recipe-flash-dismiss=""
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
         onclick={() => (flashMessage = '')}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
-      </button>
+      </IconButton>
     </div>
   {/if}
 
@@ -819,12 +814,11 @@
                         <span>{check.label}</span>
                       </Chip>
 
-                      <button
-                        type="button"
-                        class={`manager-icon-button manager-recipe-lock ${recipe.locked ? 'is-locked' : ''}`}
+                      <IconButton
+                        class={`manager-recipe-lock ${recipe.locked ? 'is-locked' : ''}`}
                         data-recipe-lock={recipe.locked === true}
                         aria-pressed={recipe.locked === true}
-                        aria-label={format(
+                        ariaLabel={format(
                           recipe.locked
                             ? 'FABRICATE.Admin.Manager.Recipe.UnlockNamed'
                             : 'FABRICATE.Admin.Manager.Recipe.LockNamed',
@@ -841,7 +835,7 @@
                           class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'}
                           aria-hidden="true"
                         ></i>
-                      </button>
+                      </IconButton>
 
                       <!--
                         No "On"/"Off" text IN THE ROW. The track colour already carries
@@ -851,11 +845,9 @@
                         in the manager, where a switch has no pill beside it.)
                       -->
                       <span class="manager-recipe-status">
-                        <button
-                          type="button"
-                          class={`manager-status-toggle ${recipe.enabled === false ? 'is-off' : 'is-on'}`}
-                          aria-pressed={recipe.enabled !== false}
-                          aria-label={format(
+                        <StatusToggle
+                          on={recipe.enabled !== false}
+                          ariaLabel={format(
                             recipe.enabled === false
                               ? 'FABRICATE.Admin.Manager.Recipe.EnableNamed'
                               : 'FABRICATE.Admin.Manager.Recipe.DisableNamed',
@@ -863,11 +855,7 @@
                             { name: recipe.name }
                           )}
                           onclick={() => handleToggleEnabled(recipe)}
-                        >
-                          <span class="manager-status-toggle-track" aria-hidden="true">
-                            <span class="manager-status-toggle-knob"></span>
-                          </span>
-                        </button>
+                        />
                       </span>
 
                       <!--
@@ -877,11 +865,10 @@
                         toolbar and truncated the description; a single edit pencil next to
                         the enable switch is the row's primary action and does not.
                       -->
-                      <button
-                        type="button"
-                        class="manager-icon-button manager-recipe-edit"
+                      <IconButton
+                        class="manager-recipe-edit"
                         data-recipe-edit={recipe.id}
-                        aria-label={format(
+                        ariaLabel={format(
                           'FABRICATE.Admin.Manager.Recipe.EditNamed',
                           'Edit {name}',
                           { name: recipe.name }
@@ -890,7 +877,7 @@
                         onclick={() => onEditRecipe(recipe.id)}
                       >
                         <i class="fas fa-pen" aria-hidden="true"></i>
-                      </button>
+                      </IconButton>
 
                       <!--
                         The bulk selection box (issue 1010), AFTER the Edit pencil and

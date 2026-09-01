@@ -454,6 +454,14 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
     // linked only by the renamed field starts reporting itself unlinked. One directory apart is
     // still a second copy.
     hasSourceLink: descriptor.sourceLinked ? entryHasSourceLink(entity) : false,
+    // HOW MUCH OF THE WORLD REFERENCES THIS ENTITY, across every crafting system.
+    //
+    // Supplied by the caller rather than derived here: the counts are over corpora this module is
+    // not handed — every system's components and every recipe in the world — and the functions
+    // that count them already exist beside the admin store's own essence cards. An absent `usage`
+    // answers 0, which is what a caller that has not wired it sees.
+    componentCount: Number(usage?.[entity.id]?.componentCount) || 0,
+    recipeCount: Number(usage?.[entity.id]?.recipeCount) || 0,
     systems: rows,
   };
 }

@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../components/Field.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
@@ -10,11 +11,13 @@
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     environments = [],
@@ -1007,11 +1010,12 @@
                   class="manager-labeled-cell manager-status-cell"
                   data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
                 >
-                  <button
-                    type="button"
-                    class={`manager-status-toggle ${displayEnvironment.enabled === false ? 'is-off' : 'is-on'}`}
-                    aria-pressed={displayEnvironment.enabled !== false}
-                    aria-label={text(
+                  <StatusToggle
+                    on={displayEnvironment.enabled !== false}
+                    label={displayEnvironment.enabled === false
+                      ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                      : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.Environment.ToggleNamed',
                       'Toggle {name}'
                     ).replace('{name}', environmentName(displayEnvironment))}
@@ -1023,16 +1027,7 @@
                       );
                     }}
                     onkeydown={(event) => event.stopPropagation()}
-                  >
-                    <span class="manager-status-toggle-track" aria-hidden="true">
-                      <span class="manager-status-toggle-knob"></span>
-                    </span>
-                    <span class="manager-status-toggle-label">
-                      {displayEnvironment.enabled === false
-                        ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                        : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-                    </span>
-                  </button>
+                  />
                 </span>
                 <span
                   role="cell"
@@ -1040,10 +1035,8 @@
                   data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
                 >
                   <span class="manager-environment-action-grid">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
+                    <IconButton
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.EditNamed',
                         'Edit {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1051,11 +1044,9 @@
                       onclick={() => onEditEnvironment(environment.id)}
                     >
                       <i class="fas fa-edit" aria-hidden="true"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
+                    </IconButton>
+                    <IconButton
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.DuplicateNamed',
                         'Duplicate {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1066,11 +1057,10 @@
                       onclick={() => onDuplicateEnvironment(environment.id)}
                     >
                       <i class="fas fa-copy" aria-hidden="true"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="manager-icon-button is-danger"
-                      aria-label={text(
+                    </IconButton>
+                    <IconButton
+                      class="is-danger"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.DeleteNamed',
                         'Delete {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1081,7 +1071,7 @@
                       onclick={() => onDeleteEnvironment(environment.id)}
                     >
                       <i class="fas fa-trash" aria-hidden="true"></i>
-                    </button>
+                    </IconButton>
                   </span>
                 </span>
               </div>
@@ -1183,11 +1173,12 @@
               <i class={condition.icon} aria-hidden="true"></i>
               <span>{conditionTitle(condition.kind)}</span>
             </span>
-            <button
-              type="button"
-              class={`manager-status-toggle ${condition.setting.enabled === false ? 'is-off' : 'is-on'}`}
-              aria-pressed={condition.setting.enabled !== false}
-              aria-label={condition.setting.enabled === false
+            <StatusToggle
+              on={condition.setting.enabled !== false}
+              label={condition.setting.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+              ariaLabel={condition.setting.enabled === false
                 ? text(
                     'FABRICATE.Admin.Manager.Environment.Conditions.EnableMatching',
                     'Enable matching'
@@ -1202,20 +1193,11 @@
                   condition.setting.enabled === false,
                   selectedSystemId
                 )}
-            >
-              <span class="manager-status-toggle-track" aria-hidden="true">
-                <span class="manager-status-toggle-knob"></span>
-              </span>
-              <span class="manager-status-toggle-label">
-                {condition.setting.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              </span>
-            </button>
+            />
           </header>
           <p class="manager-condition-panel-hint">{conditionHint(condition.kind)}</p>
 
-          <label class="manager-field manager-condition-current">
+          <Field as="label" class="manager-condition-current">
             <span>{conditionCurrentLabel(condition.kind)}</span>
             <select
               value={condition.setting.current}
@@ -1226,7 +1208,7 @@
                 <option value={conditionId(option)}>{conditionLabel(option)}</option>
               {/each}
             </select>
-          </label>
+          </Field>
 
           <form
             class="manager-condition-add"
@@ -1241,14 +1223,14 @@
               )}
               onChange={(icon) => setConditionAddIcon(condition.kind, icon)}
             />
-            <label class="manager-field">
+            <Field as="label">
               <input
                 value={conditionInputValue(condition.kind)}
                 aria-label={conditionAddLabel(condition.kind)}
                 placeholder={conditionInputPlaceholder(condition.kind)}
                 oninput={(event) => setConditionInput(condition.kind, event.currentTarget.value)}
               />
-            </label>
+            </Field>
             <ManagerButton
               role="primary"
               type="submit"
@@ -1380,14 +1362,14 @@
                 }}
               />
             {/if}
-            <label class="manager-field">
+            <Field as="label">
               <input
                 value={vocabularyInputValue()}
                 aria-label={vocabularyAddLabel()}
                 placeholder={vocabularyPlaceholder()}
                 oninput={(event) => setVocabularyInput(event.currentTarget.value)}
               />
-            </label>
+            </Field>
             <ManagerButton
               role="primary"
               type="submit"

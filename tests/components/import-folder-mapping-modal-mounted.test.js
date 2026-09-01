@@ -40,9 +40,11 @@ const harness = createMountedComponentHarness({
     // The shared modal chrome (issue 877): portal, centring, title/subtitle, close and
     // footer rail. This modal renders THROUGH it, so omitting it breaks the mount.
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). Skip, New, the footer pair and InlineVocabularyAdd`s Add all render it.
     // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',

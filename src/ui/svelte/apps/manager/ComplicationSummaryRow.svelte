@@ -96,6 +96,7 @@
 <script>
   import Chip from './Chip.svelte';
   import RowDisclosure from '../../components/RowDisclosure.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     variant = 'authoring',
@@ -216,17 +217,16 @@
         onToggle={() => onToggle(!expanded)}
       />
       {#if onDelete}
-        <button
-          type="button"
-          class="manager-icon-button is-ghost is-danger"
-          data-complication-remove
+        <IconButton
+          class="is-ghost is-danger"
+          data-complication-remove=""
           title={deleteLabel || undefined}
-          aria-label={deleteLabel || undefined}
+          ariaLabel={deleteLabel || undefined}
           {disabled}
           onclick={() => onDelete()}
         >
           <i class="fas fa-trash" aria-hidden="true"></i>
-        </button>
+        </IconButton>
       {/if}
     {/if}
   </div>

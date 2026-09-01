@@ -242,6 +242,39 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // DISABLED state. `GatheringEconomyView.svelte:498,514` renders the two bindings, and this
   // case's own steps fill one at `[data-economy-stamina-max]`.
   'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
+  // The manager's on/off switch (issue 1040), and the ONE entry here whose three frames are
+  // chosen per HOST rather than per state. The primitive's `as` prop is a closed set of three
+  // element shapes — a pressable `<button>`, a read-only `<span role="img">` reading, and a
+  // `<label>` wrapping a transparent `<input type="checkbox">` — and they draw different
+  // markup, take different attributes and are painted by different rules, so a change to one
+  // is invisible in a frame that renders another.
+  //
+  // The representative pair does not answer for any of them. `fabricate-app-shell` is the
+  // PLAYER window and contains no manager switch at all, and `manager-components-normal`
+  // contains exactly one: the component browser's grouping filter, which is the TRACK-ONLY
+  // form with no reading beside it, so the label — 28 of the 37 converted sites — appears in
+  // neither.
+  //
+  // `manager-system-edit-normal` is the labelled button host, and the densest frame of it in
+  // the registry: the settings tab's Optional features card
+  // (`SystemEditView.svelte`'s `data-edit-control="advanced-options"`) stacks seven labelled
+  // On/Off switches in one column, so alignment, the 78px cap and the label ellipsis are all
+  // visible at once.
+  //
+  // `coverage-mode-routed-check-checks` is the ONLY frame that draws the indicator host. The
+  // locked activation reading appears when a check's mode requires it, which
+  // `CraftingSystemManagerRoot.svelte`'s `checkActivation` reports as `optional: false` for
+  // `routedByCheck` and `progressive` — and `lab-runework`, this case's system, is the routed
+  // one. Every other checks frame sits on a `simple` or `routedByIngredients` system and draws
+  // the live switch instead.
+  //
+  // `manager-tool-parity-04-requirements-1280x720` is the only frame that draws the checkbox
+  // host: the Tool Studio's Requirements tab is where both of those two switches live.
+  'src/ui/svelte/components/StatusToggle.svelte': Object.freeze([
+    'manager-system-edit-normal',
+    'coverage-mode-routed-check-checks',
+    'manager-tool-parity-04-requirements-1280x720',
+  ]),
   // BOTH band-strip frames, for the same two-mode reasoning `SearchablePopover` carries below. The
   // strip has exactly two importers — `checks/CraftingCheckEditor.svelte` and
   // `checks/SimpleCraftingCheckEditor.svelte` — and they are its two modes, not two instances of
@@ -252,6 +285,80 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // the second, so one of the two would always be the wrong frame to publish alone.
   'src/ui/svelte/components/ThresholdBandStrip.svelte': Object.freeze([
     'manager-checks-simple-two-band-strip',
+    'coverage-mode-routed-check-checks',
+  ]),
+  // THE manager's labelled form field (issue 1428), on 81 call sites across 23 components — and
+  // in NEITHER representative frame. `manager-components-normal` is a browse list and
+  // `fabricate-app-shell` is the player shell; neither renders a `.manager-field` at all, so a
+  // change to the field column would publish two frames that do not contain one.
+  //
+  // TWO entries, because the primitive's `as` set is three hosts and the two frames between them
+  // render all three. `manager-gathering-task-editor-normal` is the densest field surface in the
+  // registry — `GatheringTaskEditView.svelte` alone holds 14 fields, `<label>` and `<div>` hosts
+  // side by side, and it is where four of this conversion's six `:global()` cascade repairs
+  // landed, so a repair that reaches the element but loses the cascade shows up there.
+  // `manager-system-edit-normal` is the frame that renders the corpus's ONE `<fieldset>` field:
+  // `RadioCardGroup` through `ResolutionModeCard`, which that component's own manifest row
+  // already names as its claiming frame.
+  'src/ui/svelte/components/Field.svelte': Object.freeze([
+    'manager-gathering-task-editor-normal',
+    'manager-system-edit-normal',
+  ]),
+  // The manager's icon-only button (issue 1422). 36 callers, and the representative pair does
+  // reach it — but only ever in its NEUTRAL state. `manager-components-normal` renders
+  // `components/ComponentRow.svelte`'s edit pencil and `Pagination`'s two arrows;
+  // `fabricate-app-shell` renders those arrows alone. Every icon button in either frame is a
+  // bare `manager-icon-button`, so a change to the DANGER treatment — 20 of the 82 converted
+  // sites, the second most common form by a wide margin — would publish two frames in which
+  // it does not appear.
+  //
+  // `world-modifiers` is the unconditional one: a World Modifiers row draws three neutral
+  // icon buttons and the `is-danger` delete beside them, in one dense cluster, and that
+  // case's steps already `scroll: true` the list into the frame because it runs below the
+  // page's own fold.
+  //
+  // `manager-environment-edit-blind-weights` is the second because it is the ONLY published
+  // frame that reaches the `is-primary` treatment at all: Shadow Thicket is a MANUAL
+  // composition, so its Tasks tab renders both the composition rows carrying the `is-danger`
+  // quick exclude and the Available-to-add rows carrying the `is-primary` quick include.
+  // `is-primary` has exactly one call site in the codebase — `environment/CompositionList.svelte`
+  // — and it is a conditional row action, so without this entry that treatment is
+  // unphotographed anywhere.
+  //
+  // Still uncovered, and named rather than left to be discovered: `is-ghost`, whose only site
+  // is `ComplicationSummaryRow.svelte`'s compound `is-ghost is-danger`. No published case
+  // reaches a complication row with its delete rendered, so a change to the ghost treatment
+  // publishes these two frames and neither contains it.
+  'src/ui/svelte/components/IconButton.svelte': Object.freeze([
+    'world-modifiers',
+    'manager-environment-edit-blind-weights',
+  ]),
+  // The manager's card shell (issue 1427), extracted from 80 hand-written
+  // `class="manager-inspector-card"` sections. NEITHER representative frame contains one, and
+  // that is established from the trees rather than assumed: `fabricate-app-shell` is the PLAYER
+  // window and the class is painted only under `.fabricate-manager`, while
+  // `manager-components-normal` renders the components browser with nothing selected — its right
+  // rail is `components/ComponentBrowserInspector.svelte`, which was rebuilt precisely to REPLACE
+  // four stacked cards, and the card-bearing bulk rail only appears once rows are selected. So a
+  // restyle of the shell published two frames that could not contain it.
+  //
+  // Two, because the shell has two painted treatments and one frame cannot hold both.
+  // `manager-essences-disabled-in-use` is the BASE box — `fabricate.css:12937` and `:13663`, the
+  // 8px radius on `--fab-overlay-light-04`: it is the one essence frame whose steps select a row,
+  // and the inspector it opens is six of these stacked, which is the densest run of the base
+  // treatment in the registry.
+  //
+  // `coverage-mode-routed-check-checks` is the CHECKS box — `fabricate.css:2500`, which overrides
+  // the base at (0,3,0) to radius 11, zero padding and `--fab-bg-2` — and it reaches the Checks
+  // rail's own third treatment (`:3308`) in the same frame. Twenty-five of the sweep's 48
+  // converted sites are in that studio.
+  //
+  // The sheet's fourth treatment, `.is-sticky` (`:5404`), is NOT listed here and is not a gap:
+  // measured across `src/`, no component writes that class at all, so it is a dead rule rather
+  // than an unphotographed state. Naming a frame for it would be an override for a state the
+  // product cannot reach.
+  'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
+    'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
   ]),
   // The shared empty panel. Both representative frames are POPULATED states — the components
@@ -742,10 +849,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'system-edit',
     kinds: ['manager', 'system-edit'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
-      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
-      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
-      // the source-coverage gate exists to close.
+      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
+      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
+      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
+      // no placeholder case: a regex pasted onto a page that renders no tabs is the
+      // unrelated-evidence exit the source-coverage gate exists to close.
       /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(ResolutionModeCard|CraftingEffectPanel|ItemPageInspector)\.svelte$/,
@@ -1100,6 +1208,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       // cases that RENDER them, exactly as the placeholder body was: a shell edit that selected no
       // frame would publish nothing, and one that selected an unrelated frame would be worse.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+      // The `SYSTEM RULES n / m` panel the shell's inspector composes (issue 1372). It renders
+      // only once a row is selected, which the second step above does, and it is claimed HERE as
+      // well as on `manager-essences-normal` because the reference draws the identical panel on
+      // both rails and a change to it has to publish both.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
       /^src\/utils\/scopedEntityListModel\.js$/,
     ],
@@ -2022,10 +2135,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'recipe-item-edit',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
-      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
-      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
-      // the source-coverage gate exists to close.
+      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
+      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
+      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
+      // no placeholder case: a regex pasted onto a page that renders no tabs is the
+      // unrelated-evidence exit the source-coverage gate exists to close.
       /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
@@ -3268,6 +3382,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      // The editor tab strip draws BOTH of this frame's markers since issue 1429, so a
+      // change to it must be photographed here. This is the only case in the registry that
+      // renders a tab wearing a count and a dot at once, which makes it the one frame where
+      // a regression in either drawing — or in how they share the slot — is visible.
+      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
     ],
     kinds: ['manager', 'checks'],
   }),
@@ -3889,6 +4008,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      // The `SYSTEM RULES n / m` panel, which the browser inspector composes from the world
+      // catalogue's own component (issue 1372). This is the OTHER rail the reference draws it on,
+      // so a change to it publishes this frame beside `world-essence-catalogue`'s.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       // The shared studio-library SHELF — the scroll section, the empty states, the
       // list-or-grid `<ul>` and the pager — is rendered by every essence browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
@@ -4073,8 +4196,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-essence-edit-first-state'],
     // The smoke opens an essence row's Edit action and photographs the editor as it arrives, and
     // this lands in the same place. It is REPOINTED at `aether` (issue 1036): the editor's headline
-    // state is a DISABLED essence — the Enabled row switched off, the On-craft badge counting two
-    // configured behaviours — and `earth` cannot show it.
+    // state is a DISABLED essence — the enable card switched off, both behaviour cards wearing
+    // their `Suppressed` pill — and `earth` cannot show it.
+    //
+    // WHAT "FIRST STATE" MEANS CHANGED AT ISSUE 1372 and this case follows it rather than
+    // photographing the old one: the editor now opens on `Essence rules`, whose head is the
+    // shared-definition callout naming the world record, the `Edit shared definition` exit and
+    // the per-system enable card. There is no Identity tab to open on, because identity is a
+    // world field a system-scope screen may not write.
     //
     // The step still navigates by the row's FIRST `.manager-icon-button`, which must remain the
     // Edit pencil. The row now also carries an enable toggle and a selection box: the toggle wears
@@ -4100,6 +4229,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // frames because those are the frames that show them, exactly as the placeholder body was
       // claimed by every case that rendered it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
@@ -4108,16 +4241,27 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essence edit On craft',
     reaches: 'beyond',
     smokeLabels: [],
-    // The tab the two persisted fields live on. `aether` carries BOTH — a linked source component
-    // and a property macro — so both sections render populated, both wear their `Suppressed` pill
-    // (the essence is disabled), and the macro card photographs in its MISSING state, because the
-    // lab world declares no `Macro` documents at all. The resolved state routes to smoke or
-    // maintainer evidence rather than being implied here.
+    // The two behaviour cards, SCROLLED INTO THE FRAME rather than reached by a tab click.
+    //
+    // Issue 1372 collapsed the editor's three tabs to two — `Essence rules` and `Validation` —
+    // because identity is a world field a system-scope screen may not edit, so there is no longer
+    // an `On craft` tab to select. What that tab held is now the lower half of the rules tab,
+    // below the shared-definition callout and the enable card, and a frame taken at the top of
+    // the page would be `manager-essence-edit-first-state` a second time. Scrolling the macro
+    // page's FOOT in is what keeps the two frames distinct states of one screen: it lands the
+    // macro card and the `Reuse these rules` card in one frame, which is the half of the reference
+    // the first-state frame cannot reach.
+    //
+    // `aether` carries BOTH persisted fields — a linked source component and a property macro —
+    // so both sections render populated, both wear their `Suppressed` pill (the essence is
+    // disabled), and the macro card photographs in its MISSING state, because the lab world
+    // declares no `Macro` documents at all. The resolved state routes to smoke or maintainer
+    // evidence rather than being implied here.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
       { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
-      { selector: '[data-essence-tab="oncraft"]' },
+      { selector: '[data-scoped-copy-rules]', scroll: true },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
@@ -4133,6 +4277,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // frames because those are the frames that show them, exactly as the placeholder body was
       // claimed by every case that rendered it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
@@ -4168,6 +4316,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // frames because those are the frames that show them, exactly as the placeholder body was
       // claimed by every case that rendered it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
@@ -4396,10 +4548,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
-      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
-      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
-      // the source-coverage gate exists to close.
+      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
+      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
+      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
+      // no placeholder case: a regex pasted onto a page that renders no tabs is the
+      // unrelated-evidence exit the source-coverage gate exists to close.
       /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\//,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
@@ -5945,6 +6098,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+      // The editor tab strip draws this surface's two tab counts since issue 1429, which
+      // moved them off the chip and onto the Rail Marker Family's record-count vehicle. This
+      // frame is the one that opens on the OTHER tab, so it is the case where the count's
+      // active and inactive treatments appear together.
+      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
     ],
   }),
   managerCase({

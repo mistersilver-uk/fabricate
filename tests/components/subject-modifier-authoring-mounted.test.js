@@ -43,7 +43,7 @@ const salvageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-salvage-modifier-pick-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
-  compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
+  compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
 
@@ -286,10 +286,13 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). The stamina Add modifier and both
     // Add drop rule controls render it; an omission HANGS the suite (# cancelled).
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     GATHERING_PATH,
   ],
   componentPath: GATHERING_PATH,

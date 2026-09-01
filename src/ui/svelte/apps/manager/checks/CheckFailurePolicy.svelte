@@ -34,6 +34,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Callout from '../Callout.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let {
     // The persisted value: 'never' | 'perRecord' | 'always'.
@@ -109,7 +110,7 @@
   ]);
 </script>
 
-<section class="manager-inspector-card" data-failure-result-policy={activity}>
+<InspectorCard data-failure-result-policy={activity}>
   <h3 class="manager-checks-card-title">
     {text(
       'FABRICATE.Admin.Manager.Checks.FailureResults.Heading',
@@ -136,4 +137,4 @@
     optionDataAttr="data-failure-result-policy-option"
     onChange={(next) => onChange(next)}
   />
-</section>
+</InspectorCard>

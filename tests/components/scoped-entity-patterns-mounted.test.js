@@ -60,6 +60,7 @@ const inheritHarness = createMountedComponentHarness({
   rawModules: SCOPED_RAW_MODULES,
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
@@ -72,6 +73,7 @@ const membershipHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
   ],
@@ -268,23 +270,54 @@ describe('InheritRow (mounted)', () => {
       'an absent key reads as inheriting'
     );
     const toggles = [...root.querySelectorAll('[data-scoped-inherit-toggle]')];
+    // ON IS OVERRIDDEN. The switch means "this system sets its own", so the OVERRIDDEN row's
+    // switch is pressed and the INHERITING row's is not. This assertion is the inverse of what
+    // it asserted before issue 1372's parity round, and the old direction was the defect: it
+    // pinned a switch that contradicted the state chip one line above it and every note the
+    // essence editor writes under it. Both design frames draw this direction —
+    // `compare-images/PROTO-essence-rules-editor.png` and `tmp/proto/tool-rules-editor.png`.
     assert.deepEqual(
       toggles.map((toggle) => toggle.getAttribute('aria-pressed')),
-      ['false', 'true', 'true', 'true']
+      // FOUR rows, because issue 1373 gave a tool `prerequisites` and `bonus` alongside the two
+      // breakage sections, and the `states` assertion above counts the same four. The DIRECTION
+      // is issue 1372's: only the overridden row is pressed.
+      ['true', 'false', 'false', 'false']
     );
+    // And the CLASS the sheet paints from, which is what a frame actually shows.
+    assert.deepEqual(
+      toggles.map((toggle) => (toggle.classList.contains('is-on') ? 'is-on' : 'is-off')),
+      ['is-on', 'is-off', 'is-off', 'is-off'],
+      'the painted state agrees with the pressed state'
+    );
+    // The pair must never agree with each other by accident: the chip and the switch are read
+    // together, so assert the relationship rather than two independent snapshots.
+    const chips = [...root.querySelectorAll('[data-scoped-inherit-state]')];
+    for (const [index, chip] of chips.entries()) {
+      const overridden = chip.getAttribute('data-scoped-inherit-state') === 'overridden';
+      assert.equal(
+        toggles[index].getAttribute('aria-pressed'),
+        String(overridden),
+        'the switch and the pill beside it cannot disagree'
+      );
+    }
   });
 
-  it('says "fall back", never "discard" — the override is retained', async () => {
+  it('names the switch by what turning it ON does, and never says "discard"', async () => {
     const root = await inheritHarness.mount({ entityType: 'component' });
     // THE ACCESSIBLE NAME, not a visible caption. The caption span was removed because
     // `.manager-status-toggle-label` is `overflow: hidden` inside a compact switch, so the
-    // sentence rendered as `Fall ...` — and the row already states the section, the state and
-    // the inherited value. What this test protects is the WORDING, which still has to say the
-    // override is kept, so it follows the sentence to where the sentence now lives.
+    // sentence truncated to a meaningless first word — and the row already states the section,
+    // the state and the inherited value.
+    //
+    // It names the OVERRIDE, not the fallback, because ON is overridden (issue 1372). The
+    // reassurance that the override is RETAINED did not go away with the old wording: it is in
+    // the section NOTE — "Turn off to fall back to {name}." — which is where the corpus states
+    // it, and this still asserts that nothing anywhere says the override is thrown away.
     const toggle = root.querySelector('[data-scoped-inherit-toggle]');
     const label = toggle.getAttribute('aria-label').toLowerCase();
-    assert.match(label, /fall back/);
+    assert.match(label, /override/);
     assert.equal(label.includes('discard'), false);
+    assert.equal(label.includes('fall back'), false, 'it does not name the OFF position');
   });
 
   it('reports the NEXT inherit value rather than a toggle of unknown state', async () => {

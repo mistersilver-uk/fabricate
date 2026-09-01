@@ -18,12 +18,14 @@
   getGatheringStaminaState/setGatheringStamina).
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import ResolutionModeCard from './ResolutionModeCard.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let { services = null, systemId = '' } = $props();
 
@@ -337,7 +339,7 @@
         </p>
 
         <div class="manager-economy-regen-grid">
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.MaxStamina', 'Maximum stamina')}</span>
             <input
               type="text"
@@ -349,8 +351,8 @@
               oninput={(e) => updateStamina({ max: e.currentTarget.value })}
               data-economy-stamina-max
             />
-          </label>
-          <label class="manager-field">
+          </Field>
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.StartStamina', 'Starting stamina')}</span>
             <input
               type="text"
@@ -362,7 +364,7 @@
               oninput={(e) => updateStamina({ start: e.currentTarget.value })}
               data-economy-stamina-start
             />
-          </label>
+          </Field>
         </div>
         <p class="manager-economy-card-hint">
           {text(
@@ -375,7 +377,7 @@
           class="manager-economy-regen-grid"
           class:is-single={economy.stamina.regen.policy !== 'overTime'}
         >
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
             <select
               value={economy.stamina.regen.policy}
@@ -392,9 +394,9 @@
                 )}</option
               >
             </select>
-          </label>
+          </Field>
           {#if economy.stamina.regen.policy === 'overTime'}
-            <label class="manager-field">
+            <Field as="label">
               <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
               <select
                 value={economy.stamina.regen.unit}
@@ -407,12 +409,12 @@
                   >
                 {/each}
               </select>
-            </label>
+            </Field>
           {/if}
         </div>
 
         {#if economy.stamina.regen.policy === 'overTime'}
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Amount per interval')}</span
             >
             <input
@@ -425,7 +427,7 @@
               oninput={(e) => updateRegen({ amount: e.currentTarget.value })}
               data-economy-regen-amount
             />
-          </label>
+          </Field>
           <p class="manager-economy-card-hint">
             {text(
               'FABRICATE.Admin.Manager.Economy.RegenAmountHint',
@@ -527,30 +529,28 @@
                   onChange={(next) => (actor.draftMaxOverride = next)}
                 />
                 {#if actor.rolled}
-                  <button
-                    type="button"
-                    class="manager-icon-button manager-economy-actor-roll"
+                  <IconButton
+                    class="manager-economy-actor-roll"
                     title={text(
                       'FABRICATE.Admin.Manager.Economy.ResetHint',
                       'Re-roll this character’s pool from the max/start expressions'
                     )}
-                    aria-label={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`}
+                    ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`}
                     onclick={() => rollActor(actor)}
-                    data-economy-actor-roll
-                    ><i class="fas fa-arrows-rotate" aria-hidden="true"></i></button
+                    data-economy-actor-roll=""
+                    ><i class="fas fa-arrows-rotate" aria-hidden="true"></i></IconButton
                   >
                 {:else}
-                  <button
-                    type="button"
-                    class="manager-icon-button manager-economy-actor-roll is-roll-needed"
+                  <IconButton
+                    class="manager-economy-actor-roll is-roll-needed"
                     title={text(
                       'FABRICATE.Admin.Manager.Economy.RollHint',
                       'Roll this character’s pool from the max/start expressions'
                     )}
-                    aria-label={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`}
+                    ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`}
                     onclick={() => rollActor(actor)}
-                    data-economy-actor-roll
-                    ><i class="fas fa-dice-d20" aria-hidden="true"></i></button
+                    data-economy-actor-roll=""
+                    ><i class="fas fa-dice-d20" aria-hidden="true"></i></IconButton
                   >
                 {/if}
               </li>
@@ -849,7 +849,24 @@
     line-height: 1.1;
   }
 
-  .manager-economy-actor-roll {
+  /* `:global`, and CHAINED with `.manager-icon-button`, because the roll button is an
+     `<IconButton>` (issue 1422). This rule reached a `<button>` this component wrote until
+     that conversion; afterwards Svelte stamps its `svelte-<hash>` onto the elements this
+     component writes and forwards a `class` prop to the child verbatim, so the scoped
+     spelling emits `.manager-economy-actor-roll.svelte-<hash>` and matches NOTHING.
+
+     It is the SILENT half of that failure, not the loud one, and the pair below is the
+     worked example of both. `essences/EssenceIdentityTab.svelte` states the same kind of
+     rule as a DESCENDANT of an element it still writes, so the compiler prunes it and
+     raises `css_unused_selector`; this one is a bare single-compound selector whose class
+     literal is still visible on the component tag, so the compiler judges it used and
+     EMITS it with the hash attached. Zero warnings, `lint:svelte:warnings` green, and the
+     dice button silently loses its centring and its unrolled emphasis.
+
+     The chain is what keeps the specificity identical rather than merely making the rule
+     reach: the dead scoped form was (0,2,0) and a bare `:global(.manager-economy-actor-roll)`
+     would be (0,1,0), which is a cascade change smuggled in as a repair. */
+  :global(.manager-icon-button.manager-economy-actor-roll) {
     justify-self: center;
   }
 
@@ -857,7 +874,7 @@
      NEUTRAL overlay for the reason `.manager-economy-mode-option.is-active` records above:
      the soft accent this rule once deferred to was never declared, so the fallback is the
      shipped pixel and issue 1399 wrote it down in place of the dead branch. */
-  .manager-economy-actor-roll.is-roll-needed {
+  :global(.manager-icon-button.manager-economy-actor-roll.is-roll-needed) {
     color: var(--fab-accent);
     border-color: var(--fab-accent);
     background: var(--fab-overlay-light-035);

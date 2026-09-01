@@ -497,23 +497,29 @@
    * zero IS the pass, which is the same fact `worstStatus` returns as `pass` for the summary
    * row on the tab's own panel. Nothing is invented to render it.
    *
-   * It is a GLYPH rather than the word, because the other two branches are counts and a chip
-   * that reads `0` states the opposite of what it means.
+   * ── THE PASS MARK IS THE SAME VEHICLE WITH A DIFFERENT LABEL (issue 1372, round 8) ─────────
+   * It is a tick rather than the word, because the other two branches are counts and a chip that
+   * reads `0` states the opposite of what it means. It is a LABEL rather than a glyph, and that
+   * is what the reference does: its tab badge is one pill in two states,
+   * `badge: iss.block.length ? String(iss.block.length) : '✓'` (`proto:6221`-`6223`), drawn
+   * in the danger tone when blocking and the recessive one when clear. So there is no fourth
+   * mark vehicle here and no caller-supplied icon: the issue chip already draws exactly this,
+   * and `EditorTabs`'s family stays closed with no route by which a call site can choose a shape.
+   *
+   * The tone is NEUTRAL rather than success for the same reason — the reference's clear badge is
+   * `surface-soft` over `border` in `text2`, not green (`proto:4566`). A green tick claims a
+   * result where the reference states an absence of findings.
    *
    * @param {{blocking: number, warnings: number}} current
-   * @returns {{label: string, tone: string, icon?: string, srLabel?: string}}
+   * @returns {{label: string, tone: string, name?: string}}
    */
   function validationBadge(current) {
     if (current.blocking > 0) return { label: String(current.blocking), tone: 'danger' };
     if (current.warnings > 0) return { label: String(current.warnings), tone: 'warning' };
     return {
-      label: '',
-      tone: 'success',
-      icon: 'fas fa-check',
-      srLabel: text(
-        'FABRICATE.Admin.Manager.Scoped.Essence.ValidationPassBadge',
-        'Everything passes'
-      ),
+      label: '✓',
+      tone: 'neutral',
+      name: text('FABRICATE.Admin.Manager.Scoped.Essence.ValidationPassBadge', 'Everything passes'),
     };
   }
 
@@ -1141,6 +1147,7 @@
                  the form beside it still prints the address in full. -->
               <EssenceBehaviorPreview
                 essence={previewEssence}
+                scope="world"
                 effectTransferEnabled={Boolean(defaults?.effectSource)}
                 propertyMacrosEnabled={Boolean(defaults?.macro)}
                 sourceName={essenceShortValueName(sectionValueName('effectSource'))}

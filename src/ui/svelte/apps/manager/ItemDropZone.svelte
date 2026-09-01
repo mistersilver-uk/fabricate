@@ -43,11 +43,18 @@
 <script>
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     item = null,
     title = '',
     hint = '',
+    // THE RESOLVED DOCUMENT'S OWN ADDRESS, rendered as a mono line directly under the name
+    // (issue 1372, maintainer parity round 7). It is NOT a sub-line and does not displace one:
+    // the reference draws a linked value as name, then address, then a one-line summary, and the
+    // shipped rule that a sub-line "never restates the raw uuid" is about the SUMMARY slot, which
+    // still instructs. Empty by default, so every shipped call site renders byte-identically.
+    uuid = '',
     subline = '',
     emptyIcon = 'fas fa-download',
     kind = '',
@@ -100,6 +107,7 @@
   </span>
   <span class="manager-item-drop-zone-copy">
     <strong>{item?.name || title}</strong>
+    {#if uuid}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid>{uuid}</code>{/if}
     {#if hint}<small data-tool-source-drop-hint={kind === 'tool-source' ? true : undefined}
         >{hint}</small
       >{/if}
@@ -108,23 +116,20 @@
   {#if item && (onCopy || onUnlink)}
     <span class="manager-item-drop-zone-actions">
       {#if onCopy}
-        <button
-          type="button"
-          class="manager-icon-button"
-          aria-label={copyLabel}
+        <IconButton
+          ariaLabel={copyLabel}
           title={copyLabel}
           data-tool-source-copy-uuid={kind === 'tool-source' ? true : undefined}
           data-recipe-item-copy-uuid={kind === 'recipe-item' ? true : undefined}
           onclick={() => onCopy(item)}
         >
           <i class="fas fa-copy" aria-hidden="true"></i>
-        </button>
+        </IconButton>
       {/if}
       {#if onUnlink}
-        <button
-          type="button"
-          class="manager-icon-button is-danger"
-          aria-label={unlinkLabel}
+        <IconButton
+          class="is-danger"
+          ariaLabel={unlinkLabel}
           title={unlinkLabel}
           data-tool-source-unlink={kind === 'tool-source' ? true : undefined}
           data-recipe-item-unlink={kind === 'recipe-item' ? true : undefined}
@@ -133,7 +138,7 @@
           onclick={onUnlink}
         >
           <i class="fas fa-link-slash" aria-hidden="true"></i>
-        </button>
+        </IconButton>
       {/if}
     </span>
   {/if}
@@ -156,5 +161,17 @@
 
   .manager-item-drop-zone.is-missing strong {
     color: var(--fab-danger-text);
+  }
+
+  /* THE ADDRESS LINE. Mono, because it is an identifier a GM copies and compares character by
+     character rather than reads, and one that a proportional face makes ambiguous between `l`,
+     `1` and `I`. Sized under the sub-line so it never competes with the name above it, and
+     allowed to break so a long compendium address cannot widen the card past its column. */
+  .manager-item-drop-zone-uuid {
+    display: block;
+    font-family: var(--fab-font-mono);
+    font-size: 0.68rem;
+    color: var(--fab-text-subtle);
+    overflow-wrap: anywhere;
   }
 </style>

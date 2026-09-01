@@ -35,6 +35,10 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // THE PANEL'S CARD IS THE SHARED PRIMITIVE (issue 1427), not a hand-written
+    // `class="manager-inspector-card"` section, so it is in this tree's static graph. A
+    // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
   ],
 });

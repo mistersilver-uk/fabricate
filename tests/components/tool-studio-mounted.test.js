@@ -62,10 +62,14 @@ const harness = createMountedComponentHarness({
     // tab bar and the behavior preview all render it.
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1096). The Modifiers card and the Tool
     // Studio header both render through it; an omission HANGS this suite rather than
     // failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
     // the conversion, so it is in this tree's static graph; the harness's closure validator
@@ -101,6 +105,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
+    // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038), so it is in
+    // this tree's static graph. `ToolOverviewTab` is NOT: issue 1373 retired the Overview tab
+    // from the SYSTEM rules editor, because a crafting system authors no identity.
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',

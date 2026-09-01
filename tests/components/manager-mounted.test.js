@@ -54,6 +54,7 @@ import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
+  'Field',
   'ChanceSlider',
   'ImagePathPicker',
   'IconPicker',
@@ -182,6 +183,9 @@ function compileManagerRoot() {
   // The odds histogram's bars are the shipped fill bar (issue 1097) rather than a sixth
   // hand-rolled copy of the shape `ui-integration/spec.md` records as debt.
   writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
+  // The shared card shell (issue 1427). Nineteen components render it and this tree reaches
+  // most of them, so omitting it HANGS this suite (# cancelled) rather than failing it.
+  writeCompiledSvelte('src/ui/svelte/components/InspectorCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   // The roll section's mode callout (issue 1096). `ChecksView` imports it STATICALLY, so
   // omitting it does not skip a branch — it fails module resolution for the whole suite.
@@ -299,6 +303,12 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/MembershipActions.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte');
+  // The two cards the system Essence Rules editor opens and closes with (issue 1372). Both are
+  // in `EssenceEditView`'s STATIC graph, so an omission does not fail this file — it HANGS it,
+  // reported as `# cancelled` with no message.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/CopyRulesCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte');
   // The world scoped-entry editor's header action pair (issue 1372). The ROOT renders it, so it
   // is in this root's static graph and an omission HANGS every test in this file.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedEntryHeaderActions.svelte');
@@ -378,6 +388,11 @@ function compileManagerRoot() {
   // Studio header and the System Overview Modifiers card, and through every other screen
   // as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
+  // THE manager's on/off switch (issue 1040). The root reaches it from 25 components — every
+  // browser, every studio overview tab, the Checks rail, the scoped-entity rows and
+  // `ToggleCard` — so omitting it HANGS every mounted manager test as `# cancelled`.
+  writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',
@@ -2768,13 +2783,13 @@ function createStore(calls = [], options = {}) {
       if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
       return options.addEssenceResult ?? true;
     },
-    // The four essence actions issue 1036 adds beside the two above. Each is reached
-    // OPTIONAL-CHAINED from the root, so an absent export no-ops silently — these stubs are
-    // what make the wiring detectable at all.
-    duplicateEssence: (id) => {
-      calls.push(['duplicateEssence', id]);
-      return options.duplicateEssenceResult ?? `${id}-copy`;
-    },
+    // The essence actions issue 1036 adds beside the two above. Each is reached OPTIONAL-CHAINED
+    // from the root, so an absent export no-ops silently — these stubs are what make the wiring
+    // detectable at all.
+    //
+    // `duplicateEssence` is NOT among them any more (issue 1372, maintainer parity round 8): the
+    // store publishes no such verb and the inspector renders no such control. Leaving the stub
+    // here would make a re-added call site look wired in every mounted assertion.
     setEssenceEnabled: (id, enabled) => {
       calls.push(['setEssenceEnabled', id, enabled]);
       return { updated: true, invalidatedRecipes: 0 };
@@ -11542,14 +11557,32 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-essence-id="water"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Clear current.'));
 
-    // The inspector now OWNS Edit, Duplicate and Delete — the row keeps only the pencil.
+    // The inspector OWNS Edit and Delete — the row keeps only the pencil.
     assert.ok(
       target.querySelector('[data-essence-browser-inspector]'),
       'the selected-essence inspector is an extracted component'
     );
+    // AND IT OFFERS NO DUPLICATE (issue 1372, maintainer parity round 8). Duplicating wrote a
+    // second `system.essenceDefinitions` entry with its own name, icon and colour — a
+    // system-owned essence — from the rail whose own banner two cards above says name, icon and
+    // colour come from the Essence Catalogue and are shared by every system.
     assert.ok(
-      target.querySelector('[data-essence-action="duplicate"]'),
-      'the inspector offers Duplicate'
+      !target.querySelector('[data-essence-action="duplicate"]'),
+      'the inspector offers no Duplicate'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-essence-action="edit"]')),
+      'NON-VACUITY: the actions cluster is rendered, so the absence above is a measurement'
+    );
+    // The `SYSTEM RULES n / m` panel (issue 1372, B1) renders only when the world corpus can
+    // answer it, and this harness registers no essence scope store, so it is correctly absent
+    // here — the same rule the membership filter follows. Its presence is measured where a
+    // corpus exists: `essence-world-scope-screens.test.js` pins the call site's whole attribute
+    // list, and `scoped-shell-prop-contract.test.js` pins that both essence rails compose the
+    // one component rather than each owning a copy.
+    assert.ok(
+      !target.querySelector('[data-essence-section="systems"]'),
+      'and no roster is invented over a corpus nothing could read'
     );
     assert.ok(
       target.querySelector('[data-essence-section="usage"]'),
@@ -11595,14 +11628,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
     flushSync();
-
-    target.querySelector('[data-essence-action="duplicate"]').click();
-    await tick();
-    flushSync();
-    assert.ok(
-      calls.some((call) => call[0] === 'duplicateEssence' && call[1] === 'water'),
-      'Duplicate reaches the store'
-    );
 
     target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
@@ -11695,17 +11720,25 @@ describe('CraftingSystemManager mounted behavior', () => {
       )
     );
 
-    // The RETAINED source-state filter, reachable only with source UI on.
-    const sourceFilter = target.querySelector('[aria-label="Filter essences by source state"]');
-    sourceFilter.value = 'none';
-    sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    // THE SOURCE-STATE FILTER IS GONE (issue 1372, maintainer parity round 8), with the status
+    // segment beside it: the reference's bar carries ONE filter, the membership pair. What it
+    // found is still findable — the row's summary line names the source and marks a broken link,
+    // and the search box reads that name — so the SEARCH is exercised here in its place, over
+    // the same fixture, which is the negative control the removed filter used to provide.
+    assert.ok(
+      !target.querySelector('[aria-label="Filter essences by source state"]'),
+      'the source-state select is not on the bar'
+    );
+    const essenceSearch = target.querySelector('[aria-label="Search essences"]');
+    essenceSearch.value = 'Water';
+    essenceSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
     assert.ok(target.textContent.includes('Water'));
 
-    sourceFilter.value = 'all';
-    sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    essenceSearch.value = '';
+    essenceSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
 
@@ -11852,88 +11885,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       'and an impact note states how far the cascade reaches'
     );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await tick();
-    flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
-    assert.equal(
-      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
-      'New essence draft'
-    );
-    assert.equal(
-      target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
-      true
-    );
-    const createName = target.querySelector('#manager-essence-edit-name');
-    createName.value = 'Air';
-    createName.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.equal(
-      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
-      'Air'
-    );
-
-    // A new draft has NO authored colour, and the INLINE palette must say so rather than
-    // marking Sage: `colorToken` normalizes an absent value onto `sage`, so an unguarded
-    // palette marked Sage selected directly above copy reading "No colour".
-    assert.equal(
-      target.querySelector('[data-manager-essence-colour] [data-essence-colour-state]').dataset
-        .essenceColourState,
-      'none'
-    );
-    assert.equal(
-      target.querySelectorAll(
-        '[data-manager-essence-colour] [data-manager-color-token].is-selected'
-      ).length,
-      0,
-      'no preset claims to be the current choice while none is authored'
-    );
+    // ── NO CREATE ON THIS ROUTE (issue 1372, maintainer parity round 8) ─────────────────────
+    // The header's `+ Create essence` opened a system-scope draft that `store.addEssence` wrote
+    // straight into `system.essenceDefinitions` — a system-owned essence with its own name, icon
+    // and colour, from the screen whose own rail says identity is the Essence Catalogue's. The
+    // reference's Essence Rules header carries nothing on the right at all.
+    //
+    // The palette, the create save call and the six-argument `addEssence` contract this block
+    // used to walk are not lost: the world Essence Catalogue's `+ New essence` is the create now,
+    // and `essence-world-scope-screens-mounted.test.js` walks the world entry editor's identity
+    // form. What is asserted here is that the entry point is gone rather than merely hidden.
     assert.ok(
-      target
-        .querySelector('[data-manager-essence-colour] [data-manager-color-none]')
-        .classList.contains('is-selected'),
-      'the No-colour cell is the one marked, and it is the only route back to unset'
+      !target.querySelector('.manager-header-actions .manager-button'),
+      'the Essence Rules header carries no action'
     );
-    target.querySelector('[data-manager-essence-colour] [data-manager-color-token="rose"]').click();
+    navButton('Component Rules').click();
+    await tick();
+    flushSync();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     assert.equal(
-      target.querySelector('[data-manager-essence-colour] [data-essence-colour-state]').dataset
-        .essenceColourState,
-      'rose',
-      'authoring a colour ends the unset state'
-    );
-    // No colour-NAME copy (maintainer feedback): the caption states Authored/Unset without
-    // ever naming the swatch, unlike the palette cell itself, which still carries "Rose" as
-    // its own accessible name/title (shared `managerColorTokens.js` vocabulary, untouched).
-    assert.equal(
-      target
-        .querySelector('[data-manager-essence-colour] [data-essence-colour-state]')
-        .textContent.includes('Rose'),
-      false,
-      'the caption never renders the colour name as visible text'
-    );
-
-    // The Enabled row is the shared ToggleCard, and a new essence can be created disabled.
-    target.querySelector('[data-recipe-field="essence-enabled"]').click();
-    await tick();
-    flushSync();
-
-    target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
-    await tick();
-    flushSync();
-    const addCall = calls.find((call) => call[0] === 'addEssence' && call[1] === 'Air');
-    assert.ok(addCall, 'the create call reached the store');
-    // SEVEN recorded entries: the verb plus six arguments. The fifth argument is the
-    // authored colour and the sixth is the options bag issue 1036 added — an assertion
-    // that stopped at five passes identically whether either is threaded or dropped.
-    assert.equal(addCall.length, 7, 'addEssence is called with all six arguments');
-    assert.equal(addCall[5], 'rose', 'the GM-authored colour survives the create call');
-    assert.equal(
-      addCall[6].enabled,
-      false,
-      'and so does an Enabled switch the GM turned off before the first save'
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'essences',
+      'NON-VACUITY: the route is still the essence list, so the empty header is a measurement'
     );
   });
 
@@ -12519,37 +12494,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     unmount(mounted);
     target.remove();
 
-    const createFailedCalls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(createFailedCalls, { addEssenceResult: false }),
-        services: { openCurrentAdmin: () => {} },
-      },
-    });
-    flushSync();
-
-    navButton('Essence Rules').click();
-    await tick();
-    flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await tick();
-    flushSync();
-    const createName = target.querySelector('#manager-essence-edit-name');
-    createName.value = 'Air';
-    createName.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await tick();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
-    assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Air');
-    assert.ok(target.textContent.includes('Save failed.'));
+    // THE THIRD CASE — A FAILED CREATE — IS RETIRED WITH ITS ROUTE (issue 1372, round 8). It
+    // walked the system-scope create draft, whose only entry point was the Essence Rules header's
+    // `+ Create essence`; an essence's identity is a world record and the create that authors one
+    // is the Essence Catalogue's. The two cases above still cover what this file is about — a
+    // failed and a rejected save both KEEP the draft — over the update path that survives.
   });
 
   it('shows the Crafting group unconditionally and gates only Graph on experimental features (issue 745)', async () => {
@@ -20513,7 +20462,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.textContent.includes('Select a component'), false);
   });
 
-  it('shows setup guidance and keeps create routing when a system has no essences', async () => {
+  it('shows setup guidance, and offers no create, when a system has no essences', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -20539,11 +20488,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Essence docs'));
     assert.equal(target.textContent.includes('Select an essence'), false);
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    // AND STILL NO CREATE, EVEN HERE (issue 1372, maintainer parity round 8). An empty system is
+    // the one state where a create button on this header is most tempting, and it is still the
+    // wrong layer: an essence is a world record, and the route out is the setup card's own copy
+    // plus the rail's Essence Catalogue entry.
+    assert.ok(
+      !target.querySelector('.manager-header-actions .manager-button'),
+      'the Essence Rules header carries no action on an empty system either'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'essences',
+      'NON-VACUITY: the route is the essence list, so the empty header is a measurement'
+    );
   });
 
   it('names the Gathering sub-tab in the trail, and the group above it navigates', async () => {
@@ -27072,6 +27029,275 @@ describe('CraftingSystemManager mounted behavior', () => {
           'Tool entry',
           'an authored empty name must reach the crumb — `??` on "no editor", never `||` on ' +
             '"nothing typed"'
+        );
+      });
+    });
+
+    // ── THE WORLD ESSENCE ENTRY HEADING NAMES THE DRAFT (issue 1372, parity round 5) ────
+    //
+    // NESTED HERE for the same reason the block above is: `mountWithRealStore` is declared in
+    // this describe, and it is the only harness in the repository that drives the manager shell
+    // over a real world-scope corpus — which is what it takes to render this heading at all.
+    //
+    // ONLY A MOUNT OF THE SHELL CAN ANSWER THIS, and that is the point rather than a
+    // preference. The heading lives in `.manager-header`, a SIBLING of `.manager-main`, so
+    // `WorldEssenceEntryPage`'s own mounted suite cannot see it: every assertion there is green
+    // whether the shell renders the draft name, the persisted name or nothing. And the seam
+    // between them is a reported value, so a test that read the reporting callback would be
+    // satisfied by a shell that received the name and printed the other one.
+    //
+    // The DOM, not the callback, for the reason Svelte 5 makes sharp: the shell holds this name
+    // in a rune it can only publish by REASSIGNING, and every wrong version of that — a mutated
+    // object, a value read off the deliberately non-reactive draft handle — reports correctly
+    // and renders staleness.
+    describe('world essence entry heading (issue 1372)', () => {
+      /** Two NAMED world essences: the heading is about a name, so an id-only corpus is mute. */
+      const WORLD_ESSENCES = Object.freeze([
+        Object.freeze({ id: 'ash', name: 'Ash', icon: 'fas fa-fire', colorToken: 'ember' }),
+        Object.freeze({ id: 'brine', name: 'Brine' }),
+      ]);
+
+      async function settleEntryRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const headingText = () =>
+        target
+          .querySelector('[data-world-essence-entry-heading] .manager-title')
+          ?.textContent?.trim();
+
+      const subtitleText = () =>
+        target.querySelector('[data-world-essence-entry-subline]')?.textContent?.trim();
+
+      /** Open `ash`'s world entry editor the way a GM does: rail, then the row's pen. */
+      async function openAshEntry() {
+        await mountWithRealStore({ worldEssences: [...WORLD_ESSENCES] });
+        worldNavItem('essence-catalogue').click();
+        await settleEntryRoute();
+        const open = target.querySelector(
+          '[data-scoped-list-row="ash"] [data-scoped-list-action="open-entry"]'
+        );
+        assert.ok(
+          Boolean(open),
+          'the essence catalogue rendered no open-entry action for `ash`, so nothing below ' +
+            'reaches the editor this block is about'
+        );
+        open.click();
+        await settleEntryRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          'world-essence-entry',
+          'the row pen did not commit the entry route'
+        );
+      }
+
+      /** Type into the buffered name field — an `input` event, which is the only thing that
+       * moves the draft: it is seeded from the persisted record, so a click cannot dirty it. */
+      async function typeName(value) {
+        const field = target.querySelector('[data-scoped-entry-name]');
+        assert.ok(Boolean(field), 'the entry editor rendered no name field');
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleEntryRoute();
+      }
+
+      it('opens on the persisted name', async () => {
+        await openAshEntry();
+        assert.equal(
+          headingText(),
+          'Ash',
+          'an untouched editor must head the screen with the record on disk'
+        );
+      });
+
+      it('FOLLOWS the buffered name as the GM types, before any Save', async () => {
+        await openAshEntry();
+        await typeName('Aetherlight');
+        assert.equal(
+          target.querySelector('[data-scoped-entry-name]').value,
+          'Aetherlight',
+          'the keystroke never reached the draft, so the heading assertion below is vacuous'
+        );
+        assert.equal(
+          headingText(),
+          'Aetherlight',
+          'the heading still names the PERSISTED essence while the name field and the player ' +
+            'preview both show the buffered one — one screen naming one essence two ways'
+        );
+      });
+
+      it('leaves the USAGE SUBTITLE on the persisted record, which is a count of systems', async () => {
+        await openAshEntry();
+        const before = subtitleText();
+        assert.ok(
+          Boolean(before),
+          'the heading block rendered no subtitle at all, so its stability below proves nothing'
+        );
+        await typeName('Aetherlight');
+        assert.equal(
+          subtitleText(),
+          before,
+          'a rename changed the count of systems using this essence, which no keystroke can do ' +
+            'until the write lands'
+        );
+      });
+
+      it('falls back to the ROUTE TITLE when the buffered name is emptied', async () => {
+        // The same guard the missing-record path takes. A GM who clears the field is authoring
+        // an empty name, and an empty `<h1>` is not a heading — this is what the route already
+        // renders for a record whose persisted name is empty.
+        await openAshEntry();
+        await typeName('');
+        assert.equal(headingText(), 'Essence entry');
+      });
+
+      // ── AND SO DOES THE REST OF THE CHROME (issue 1372, parity round 6) ──────────────
+      //
+      // The heading was fixed on its own in round 5, and the two things beside it were left on
+      // the published corpus: the breadcrumb's last crumb and the 44px medallion. The result was
+      // the same self-contradiction one rung quieter — `Aether` in the trail under an
+      // `Aetherlight` heading, and a tile still wearing the colour on disk.
+      //
+      // THE DOM, NOT THE REPORT, for the reason this whole block is mounted: the shell holds
+      // the reported identity in a rune it can only publish by REASSIGNING, and the wrong
+      // versions of that — a mutated object, a value read off the deliberately non-reactive
+      // draft handle — report correctly and render staleness.
+
+      const crumbText = () =>
+        target
+          .querySelector('[data-breadcrumb-world-scoped="world-essence-entry"]')
+          ?.textContent?.trim();
+
+      const headingMedallion = () =>
+        target.querySelector('[data-world-essence-entry-heading] .fab-medallion');
+
+      /** Pick a preset swatch in the entry editor's inline colour palette. */
+      async function pickColour(token) {
+        const swatch = target.querySelector(
+          `[data-scoped-entry-colour] [data-manager-color-token="${token}"]`
+        );
+        assert.ok(Boolean(swatch), `the entry editor rendered no \`${token}\` colour swatch`);
+        swatch.click();
+        await settleEntryRoute();
+      }
+
+      it('opens with the crumb on the persisted name', async () => {
+        await openAshEntry();
+        assert.equal(
+          crumbText(),
+          'Ash',
+          'an untouched editor must trail the record on disk, exactly as the heading does'
+        );
+      });
+
+      it('FOLLOWS the buffered name in the last crumb, before any Save', async () => {
+        await openAshEntry();
+        await typeName('Aetherlight');
+        assert.equal(
+          headingText(),
+          'Aetherlight',
+          'the heading did not move, so the crumb assertion below would be measuring the ' +
+            'wrong failure'
+        );
+        assert.equal(
+          crumbText(),
+          'Aetherlight',
+          'the trail still names the PERSISTED essence under a heading that names the draft — ' +
+            'one screen naming one essence two ways, one line apart'
+        );
+      });
+
+      it('resolves the crumb GENERICALLY, so every scoped entry route inherits it', async () => {
+        // The crumb is derived once for all three entry routes out of `SCOPED_ENTRY_ROUTES`, and
+        // the buffered name is read from a route-agnostic channel in front of it. This asserts
+        // the SHAPE of that: the leaf carries the route it is on, and the same element answers
+        // for the component and tool entries with no code of their own. A per-essence crumb
+        // would satisfy the test above and leave the tool entry to repeat the fix.
+        await openAshEntry();
+        await typeName('Aetherlight');
+        const leaf = target.querySelector('[data-breadcrumb-world-scoped]');
+        assert.equal(
+          leaf?.getAttribute('data-breadcrumb-world-scoped'),
+          'world-essence-entry',
+          'the buffered name is being rendered somewhere other than the shared entry leaf'
+        );
+        assert.equal(leaf.textContent.trim(), 'Aetherlight');
+      });
+
+      it('falls back to the ROUTE TITLE in the crumb when the buffered name is emptied', async () => {
+        await openAshEntry();
+        await typeName('');
+        assert.equal(
+          crumbText(),
+          'Essence entry',
+          'an authored empty name must reach the crumb — `??` on "no editor", never `||` on ' +
+            '"nothing typed"'
+        );
+      });
+
+      it('opens the heading MEDALLION on the persisted icon and colour', async () => {
+        await openAshEntry();
+        const medallion = headingMedallion();
+        assert.ok(Boolean(medallion), 'the entry heading rendered no medallion');
+        assert.equal(medallion.getAttribute('data-medallion-tint'), 'ember');
+        assert.ok(
+          medallion.querySelector('i')?.className.includes('fa-fire'),
+          'the medallion opened on some icon other than the record on disk'
+        );
+      });
+
+      it('FOLLOWS the buffered colour in the heading medallion, before any Save', async () => {
+        await openAshEntry();
+        await pickColour('lavender');
+        assert.ok(
+          target
+            .querySelector('[data-scoped-entry-colour] [data-manager-color-token="lavender"]')
+            ?.className.includes('is-selected'),
+          'the swatch click never reached the draft, so the medallion assertion below is vacuous'
+        );
+        assert.equal(
+          headingMedallion()?.getAttribute('data-medallion-tint'),
+          'lavender',
+          'the tile at the top of the screen still wears the colour on disk while the picker, ' +
+            'the preview rail and the form tile have all moved'
+        );
+      });
+
+      it('FOLLOWS the buffered icon in the heading medallion, before any Save', async () => {
+        // The COLOUR case above and this one are not one test twice: the colour is a bare palette
+        // key the medallion turns into a tint, the icon is a class it renders directly, and a
+        // shell that read one buffered field and not the other would pass whichever of the two
+        // was written first.
+        await openAshEntry();
+        const trigger = target.querySelector('.essence-icon-picker-trigger');
+        assert.ok(Boolean(trigger), 'the entry editor rendered no icon picker');
+        trigger.click();
+        await settleEntryRoute();
+        // The picker's option list is PORTALLED out of the page, so it is found on the document.
+        const option = [...document.querySelectorAll('.essence-icon-picker-option')].find(
+          (candidate) => !(candidate.querySelector('i')?.className ?? '').includes('fa-fire')
+        );
+        assert.ok(Boolean(option), 'the icon picker offered no glyph other than the persisted one');
+        // The picker's own `<i>` carries ITS component's Svelte scope hash and the medallion's
+        // carries none, so the two are compared on the glyph classes rather than verbatim.
+        const glyphClasses = (element) =>
+          (element?.className ?? '')
+            .split(/\s+/)
+            .filter((token) => token && !token.startsWith('svelte-'))
+            .join(' ');
+        const chosen = glyphClasses(option.querySelector('i'));
+        assert.ok(chosen.length > 0, 'the picker offered an option with no glyph class at all');
+        option.click();
+        await settleEntryRoute();
+        assert.equal(
+          glyphClasses(headingMedallion()?.querySelector('i')),
+          chosen,
+          'the tile at the top of the screen kept the glyph on disk while the picker trigger ' +
+            'and the player preview both moved to the buffered one'
         );
       });
     });

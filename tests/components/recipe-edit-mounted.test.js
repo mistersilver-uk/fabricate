@@ -110,16 +110,20 @@ const RECIPE_COMPILED = [
   // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
   'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/Field.svelte',
   // The manager's labelled push-button (issue 1118). Eight components in this tree render
   // their adds, deep-links and issue views through it, and a `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
   'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   // The Results tab's progressive reorder-permission card (issue 651). A component the
   // mounted tree renders but the harness does not list HANGS the suite (# cancelled)
   // rather than failing it.
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  // The switch that card composes (issue 1040). Omitting it HANGS the suite.
+  'src/ui/svelte/components/StatusToggle.svelte',
   // The resolution-mode banner heads every editor tab (issue 643 §5).
   'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
@@ -138,6 +142,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
+  'src/ui/svelte/apps/manager/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
   // (issue 770). A `.svelte` the tree renders but the harness omits HANGS the suite.
@@ -173,8 +178,15 @@ const stepsHarness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
+    // The card's two step fields render through the labelled-field primitive (issue 1428).
+    'src/ui/svelte/components/Field.svelte',
     // The card's "Add a step" footer renders through the primitive (issue 1118).
     'src/ui/svelte/components/ManagerButton.svelte',
+    // `RecipeStepAccordion`'s per-step delete is an `<IconButton>` (issue 1422). This is the
+    // SECOND module list in this file, and the first one already names the primitive — a
+    // `.svelte` the tree renders but a harness omits HANGS that harness's suite
+    // (# cancelled) rather than failing it, so both lists need it independently.
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',

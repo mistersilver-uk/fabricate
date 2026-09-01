@@ -348,6 +348,12 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 // can be mounted from one shared list.
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
+  // The manager's icon-only push-button (issue 1422). It reaches this PLAYER-app list by two
+  // independent routes, which is why it sits beside `Pagination` rather than under any one
+  // screen: `Pagination` renders its two arrows, and `ProgressiveStageList` renders
+  // `ComplicationSummaryRow`, whose delete is one. Omitting it does not fail a crafting
+  // suite — it HANGS it (# cancelled).
+  'src/ui/svelte/components/IconButton.svelte',
   // The shared numeric stepper the essence pool's per-carrier rows are built on
   // (issue 917). IoTable renders EssencePoolPanel, which renders this, so omitting it
   // HANGS every mounted crafting suite rather than failing it.

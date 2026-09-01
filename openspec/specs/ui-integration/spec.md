@@ -95,7 +95,7 @@ Only two kinds of rule for a primitive stay in the global sheet: what must beat 
 A layout-context rule places the primitive and MUST NOT restyle it: no `font-size`, `font-family`, `font-weight`, `border`, `border-radius`, or `background`.
 The player crafting app's requirement rail, requirement tile, essence pool, consumption-plan panel, and essence-contribution chip are held to that CSS rule as player-side primitives, which is why they added no rules to `styles/fabricate.css`.
 
-Three live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+Five live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
 
 - `FillBar` now EXISTS at `src/ui/svelte/components/FillBar.svelte`, and `src/ui/svelte/apps/gathering/ChanceBar.svelte` is REBUILT on it rather than widened: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would have made it the second component owning half a meaning rather than the primitive that owns one.
   `FillBar` is a LEAF — it renders the track and the value-width fill and declares no `role` or `aria-*`, because the accessible semantics differ per site (`ChanceBar` is a `meter` with its own `aria-valuenow`; an odds row's bar is decorative).
@@ -146,6 +146,47 @@ Three live non-conformances are recorded here rather than left to be discovered,
   It stays deferred because "the loudest control on this panel, in the accent" either IS `primary` or is a seventh role, and the set is closed — so it is a vocabulary ruling rather than a conversion, and making it silently by re-pointing three declarations would settle the vocabulary in the stylesheet.
   The third is TWO treatments of one meaning in the Checks Studio, "go to the canonical authoring screen", both carrying the same `fa-arrow-up-right-from-square` glyph and both role-less: `checks/CraftingModifierCatalogueCard.svelte` renders it as a borderless, padding-free accent TEXT LINK through a pass-through class, and `checks/ChecksView.svelte` renders it as a boxed NEUTRAL button at standard control geometry.
   It stays deferred for the same reason as the second: a `link` treatment would be a seventh role, so the pair cannot be reconciled by conversion, and it is a card-head-to-card-body pair rather than two cards, which is why an earlier sweep looked for it among sibling cards and did not find it.
+- THE manager's icon-only push-button exists at `src/ui/svelte/components/IconButton.svelte`.
+  It replaces the same kind of CSS CONVENTION its labelled sibling replaced — `manager-icon-button`, plus a remembered `type="button"`, plus a remembered `aria-label` — written out by hand at 82 sites across 37 components.
+  It takes the accessible name as a REQUIRED-SHAPED `ariaLabel` prop, which is the `design-system` capability's rule for an icon-only control rather than a choice made here, and it is a sharper obligation than any modifier class: a forgotten `is-danger` renders the wrong colour and is eventually seen, while a forgotten `aria-label` renders IDENTICALLY and leaves the control announcing itself as "button" and nothing else, which no frame can photograph.
+  Every site's element host was measured by walking each component's Svelte AST, and all 82 were `<button type="button">` — so the host set is ONE and the component takes no `as` prop, unlike `StatusToggle`, whose census found three.
+  It carries NO `role` prop, and that is a stated scope line rather than an omission: the icon button's modifiers mix ROLES (`is-danger`, `is-ghost`, `is-primary`) with STATES (`is-locked`, `is-roll-needed`), one shipped site legitimately compounds two of them as the sheet's own declared `.manager-icon-button.is-ghost.is-danger` treatment, and a vocabulary spanning both kinds is a design ruling rather than a mechanical extraction.
+  Settling it inside an 82-site sweep whose entire acceptance bar is that no frame moves would land a judgement call where nobody can review it, so every modifier travels as a PASS-THROUGH class exactly as written today and the ruling is left open.
+  Like `ManagerButton` it deliberately has NO scoped `<style>` and claims the section's button-geometry exception, for the same reason: emitting exactly the classes `styles/fabricate.css` already styles is what makes converting a correct call site provably a no-op on screen.
+  It is consequently a MANAGER primitive, and that consequence is reached in the product — `components/Pagination.svelte` is area-agnostic and renders two of them, so six player-app components paint them through their own `:global(.manager-icon-button)` rules, which are CORRECT and are not debt.
+  No `.svelte` under `src/` renders a raw `class="manager-icon-button"` any longer, with three stated exceptions.
+  `IconButton.svelte`'s own two occurrences are the emission itself and one line of docblock prose.
+  `CraftingSystemManagerRoot.svelte`'s SIX are DEFERRED with a named reason — the converging 12k-line root is the wrong place to land a sweep's tail — and are pinned BY COUNT so a later partial pass fails rather than silently halving a deferral.
+  `component/ComponentIdentityStrip.svelte`'s ONE is not a deferral at all: it hands the class to `SearchablePopover`'s `triggerClass`, so the element carrying it is rendered by THAT primitive, and converting it means reworking a trigger contract shared with ten callers.
+- THE manager's card shell exists at `src/ui/svelte/components/InspectorCard.svelte`.
+  It replaces the same kind of CSS CONVENTION its two button siblings replaced — `class="manager-inspector-card"` on a `<section>`, and the padding, hairline border, 8px radius, surface fill and stacked gap `styles/fabricate.css` gives it — written out by hand at 80 sites across 20 components.
+  Every site's element host was measured by walking each component's Svelte AST, and all 80 were `<section>`, so the host set is ONE and the component takes no `as` prop, unlike `StatusToggle`, whose census found three.
+  Nothing about a hand-rolled card renders WRONG, which is the honest difference between this conversion and the icon button's: a card written as a bare `<section>` is visibly not a card, so the convention was self-policing where an accessible name is not.
+  What it was not self-policing about is ENUMERATION — a shell nobody can list the callers of is a shell no change to it can be reasoned about — and that is the obligation `tests/inspector-card-source-contract.test.js` now carries.
+  Like `ManagerButton` and `IconButton` it deliberately has NO scoped `<style>` and claims this section's exception, for the same reason: emitting exactly the class `styles/fabricate.css` already paints is what makes converting a correct call site provably a no-op on screen.
+  It is consequently a MANAGER primitive, and unlike the icon button that consequence is NOT reached in the product: no player-app component renders the shell, directly or through a shared child.
+  It carries NO variant prop, and that is a stated scope line rather than an omission.
+  The sheet paints three further treatments and anchors them three different ways — on the card's own modifier class (`.manager-checks-card`), on an ANCESTOR (`.manager-checks-rail`, which reaches cards carrying no modifier at all) and on a positioning state (`.is-sticky`, which no component under `src/` writes at all, so the sheet declares it and nothing renders it) — so a closed variant set spanning all three is a design ruling rather than a mechanical extraction, and every modifier travels as a pass-through `class` exactly as written today.
+  Its extraction killed a scoped `<style>` rule in THREE components, and only ONE of the three raised `css_unused_selector`.
+  Measured against Svelte 5.56.3 with a probe whose only call site is `<Child class="target" />`: a class living only on a component tag is normally pruned and warned about, but the presence anywhere in the same component of a REGULAR ELEMENT carrying either a spread attribute or a `class` whose value is any expression — a template literal included — makes every class selector in that block possibly-matching, so the rule is emitted with the scope hash attached, matches nothing, and `lint:svelte:warnings` stays green.
+  The same attribute on a COMPONENT tag does not do it, and neither does a `class:` directive nor a static `class`, so the silencing condition is a property of the elements a component WRITES rather than of the ones it renders.
+  An expression-valued `class` on a regular element is ordinary in this codebase, so the silent mode is the DEFAULT rather than the exception, and `tests/components/manager-button-scoped-class-reach.test.js` rather than `lint:svelte:warnings` is what finds it.
+  All six dead rules are repaired as `:global(...)` chained so their specificity is unchanged, and `tests/components/manager-button-scoped-class-reach.test.js` covers this primitive as the mechanical guard.
+  No `.svelte` under `src/` renders a raw `class="manager-inspector-card"` any longer, with two stated exceptions.
+  `InspectorCard.svelte`'s own two occurrences are the emission itself and one line of prose on the `class` prop.
+  `CraftingSystemManagerRoot.svelte`'s THIRTY-TWO are DEFERRED with a named reason — they are 40% of the whole census, and the converging 12k-line root is the wrong place to land a sweep's tail — and are pinned BY COUNT so a later partial pass fails rather than silently reducing a deferral nobody is tracking.
+- THE manager's labelled form field exists at `src/ui/svelte/components/Field.svelte`, taking its HOST element from a CLOSED `as` set of three: `label`, `div` and `fieldset`.
+  It replaces the same kind of CSS CONVENTION `ManagerButton` replaced — write `manager-field`, then remember which element the field is supposed to be — and it was on 88 elements across 24 components, which is the largest single convention in the manager after the button.
+  The host is not a styling variant and that is the whole reason the set is a prop rather than a remembered element: those 88 sites used 56 `<label>`, 31 `<div>` and one `<fieldset>`, and a `<label>` field WRAPS its control and gives it its accessible name while a `<div>` field does not.
+  Thirty-one sites depend on not doing it, because they hold two controls, or none, or one that is already named by something else — `environment/CharacterModifierBoundsRow.svelte` and `checks/CraftingModifierCatalogueCard.svelte` both state that reason in their own markup — so flattening a `<div>` field into a `<label>` renders identically and changes what a screen reader announces.
+  `as` therefore has NO default: a missing or unrecognised value renders the inert `<div>` and warns, because `label` and `fieldset` both carry behaviour that must never be reached by omission, and `tests/components/field-source-contract.test.js` requires a LITERAL `as` at every call site so the fallback is unreachable from the product.
+  The `fieldset` member has ONE caller, `RadioCardGroup.svelte`, and it is a member rather than an allowlisted exception because that site is a genuine grouped control on three counts a `<div>` drops silently: it renders a `<legend>`, it holds a radio group sharing one `name`, and it forwards `disabled`, which on a fieldset disables every descendant control.
+  Like `ManagerButton` it deliberately has NO scoped `<style>` and claims the section's layout-context exception to say so: `styles/fabricate.css` owns `.manager-field` and roughly thirty rules that reach through it to the controls inside, and a scoped block here would be a second source of truth for the same box.
+  `class` is APPENDED to `manager-field` and never replaces it, and every other attribute — `data-*`, `id`, `for`, `aria-*`, `disabled` — passes through, so a call site keeps its own selectors.
+  A VALUELESS attribute must be written `data-x=""` at a call site rather than as a bare `data-x`: a raw element renders the bare form as `data-x=""` while the same token on a component arrives through the rest spread as boolean `true` and renders `data-x="true"`, and that divergence is invisible in a source diff.
+  81 of the 88 sites converted, across 23 components; the remaining SEVEN are `CraftingSystemManagerRoot.svelte`'s, deferred as a whole so a 23-component sweep and an edit to the 14,000-line file every manager lane touches are separately reviewable, and pinned by EXACT COUNT in that source-contract test so the debt cannot sit still and cannot grow.
+  Six scoped rules across three components — `GatheringTaskEditView.svelte`, `ImportFolderMappingModal.svelte` and `checks/CraftingModifierCatalogueCard.svelte` — were disconnected by the conversion and repaired as `:global(.manager-field.the-other-class …)`, chained with `.manager-field` so each keeps the specificity its scoped form had rather than dropping a compound.
+  Not one of them was pruned, so the compiler warned about none of them and every converted file's emitted CSS was byte-identical to its pre-change output; `tests/components/manager-button-scoped-class-reach.test.js` is the guard that reports the class rather than the gate that missed it, and `<Field>` is a row on that guard’s primitive registry rather than a second copy of its scan.
 
 #### Threshold band strip
 
@@ -777,6 +818,7 @@ The warning dot carries a text accessible name, and a section carrying both a co
 The dot is EXPLAINED IN THE PANEL: the open section renders the shared `Callout` for each of its own issues, carrying the same sentence the Validation route renders for that issue id from one exported copy map, toned `warning` for an issue that blocks enabling and `info` for one that does not.
 A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
+It renders through the ONE editor tab strip primitive, which draws both of its marks and offers that selected-tab-only mode; this route owns the section-to-tab mapping, its `checks-section-*` and `data-checks-*` hooks and the issue count's localized unit, and nothing about how a mark looks.
 Outcomes renders in EVERY mode and hosts that mode's own outcome model: the two-outcome pass/fail statement on `simple`, the `awardMode` selector on `progressive`, the band strip plus the tier rows on `routed`.
 Its count badge is emitted only where there is a tier list to count, so `simple` and `progressive` render it unbadged.
 Modifiers renders in every mode too, INCLUDING the two that roll nothing — gathering `d100` and alchemy `none` — because the modifier card is the one owned path for reporting that a selection reaches no roll, and hiding the section it lives in would take that report away from the two states that need it.
@@ -1165,9 +1207,14 @@ Component import warnings:
 
 Only shown when essences are enabled.
 
+**IDENTITY IS NOT AUTHORED AT SYSTEM SCOPE.**
+An essence's name, glyph, colour and description belong to its WORLD record, which every crafting system holding the essence resolves the same one of, so the system-scope Essence Rules editor renders no control that writes them — see `### GM World Essence Screens` requirement 10.
+The identity capabilities below are the WORLD essence entry editor's, and the system-scope route reaches them only through that editor.
+The one surface at system scope that still authors identity is a CREATE draft, whose in-system record is the only record there is and which therefore has no shared definition to contradict.
+
 Capabilities:
 
-- Browse, create, edit, duplicate when supported, and delete essence definitions.
+- Browse, create, duplicate when supported, and delete essence definitions; edit an essence's PER-SYSTEM rules in the system-scope editor and its SHARED identity in the world essence entry editor.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
 - Set an optional colour for an essence, chosen from the shared token palette with custom hex entry disabled.
   The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
@@ -1188,6 +1235,7 @@ Capabilities:
   The editor's palette caption is the one exception and keeps its name: there the name labels the swatch the GM is choosing, and the No-colour cell has no tile to speak for it.
 - The essence library offers a list and a grid presentation of the same rows.
   The grid card carries the same state vocabulary as the list row — the Disabled marker, the capability markers and the usage counts — because a presentation toggle must not silently remove state.
+  Its usage counts AGREE WITH THEIR NUMBER: each has a singular sibling key, so a card carrying one component reads `1 component` rather than `1 components`, and the same pair serves the inspector's usage row.
   In the grid card the capability markers sit in a header row beside the medallion rather than beside the usage counts, so the icon and what it can do read together; in the list row they stay in the trailing cluster and are NOT moved.
   Row actions are list-only; grid selection routes through the inspector.
 - The grid card lays out as a FIXED vertical stack — a header pairing the medallion with the capability markers, then the name, then the description, then the usage counts — and every growable part states its own ceiling so the same element lands at the same vertical offset in every card and every card in a row is the same height.
@@ -1206,8 +1254,11 @@ Capabilities:
 - Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
   The editor's icon control is one column: the preview tile fills that column's width and the picker and its reset sit inside the same edge, so no control overhangs the tile it belongs to.
   The tile's glyph is sized for the tile rather than inheriting the shared row-medallion glyph size, which reads as a speck at editor scale.
-- Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
-  The essence editor's On-craft tab gates its Active effect source section on `features.effectTransfer` and its property macro section on `features.propertyMacros`.
+- The System Essence Rules toolbar carries ONE filter — the membership pair — beside the search field, and no status segment and no source-state select.
+  Both were removed because the row already states its own enabled state as a pill and its own source breakage in the summary line, the search box reads the source name, and the sort key groups by enabled-ness; a second and a third way to narrow a six-row list is chrome the reference does not draw.
+  The presentation toggle is NOT a filter and stays, because it is the only route to the grid above.
+- Manager hides source columns, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
+  The essence editor's behaviour tab — `Essence rules` in the system-scope editor, `On craft` in a create draft — gates its Active effect source section on `features.effectTransfer` and its macro section on `features.propertyMacros`.
   With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
 - A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
   Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.
@@ -1980,6 +2031,9 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
    The shared list model offers three for a system-scope list; this screen offers two, because "not in this system" alone is a list a GM can only add from, and "all" already contains it with the members for context.
 5. **The System Essence Rules editor renders the shared inherit row over `effectSource` and `macro` and LOCKS the corresponding value card read-only while that section is inherited**, so the editor never presents an edit affordance for a value the system does not own.
    Turning that section's switch off is the one action that unlocks it.
+   Each switch is rendered INSIDE the value card it governs, between that card's explanation and its value, because the switch decides whether the value below it is this system's to change and a GM reading a locked value must find the control that unlocks it without leaving the card.
+   Its head states which way it is set and names the system (`Overridden for <system>` / `Inheriting the world default`) rather than repeating the section name the card's own title carries one line above it, and its note states both what the section resolves to now and what the switch would change that to.
+   A LOCKED value renders as a read-only tile carrying the resolved value's name, its address, and a `World default` marker — never as a drop target, because a drop target is an edit affordance.
    With no membership record at all the editor states the block and offers the one action that fixes it, because nothing in that system reads any value the editor could otherwise present.
 6. **Neither essence screen renders a copy-provenance stamp**, because `copyMembership` writes none and normalization would discard one.
 7. **The System Essence Rules list row's edit affordance is LABELLED and marked as leaving the screen**, carrying the words `Edit rules` and the outbound `fa-arrow-up-right-from-square` glyph rather than a bare pencil.
@@ -1993,7 +2047,45 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
 9. **Both essence list screens state MEMBERSHIP in the toolbar count, and the world entry editor's preview states that it is live.**
    The System Essence Rules bar reads `{shown} shown · {members} of {total} in this system`, which is the one count no other control on the screen answers; it falls back to the page range when the world corpus cannot answer membership, because `{members} of {total}` over an unreadable corpus reports every essence as absent from this system, which is false rather than unavailable.
    The range it replaces is rendered verbatim by the pager at the foot of the same list, so the bar was restating it.
-   The world essence entry editor renders the shared preview's live-update note; the browser inspector is the one site that suppresses it, because that rail is read-only and has nothing to type into.
+   The world essence entry editor renders the shared preview's live-update note, and so does the system rules editor's rail: both recompute on every keystroke, the note is not optional, and the browser inspector — the one site that used to suppress it — no longer renders that panel at all.
+10. **THE SYSTEM ESSENCE RULES EDITOR RENDERS NO IDENTITY CONTROL, AND ITS TAB STRIP IS `Essence rules` AND `Validation`.**
+    Name, glyph, colour and description are the world record's, so a system-scope control that wrote one would rename the essence in every other system holding it from a screen titled with one of them — a model violation rather than a visual divergence, and the reason the shipped Identity tab is removed rather than restyled.
+    The route to those fields is the shared-definition callout's `Edit shared definition`, which opens the world essence entry route on that essence, and it is the ONLY route this screen offers to them.
+    The three-tab editor with its Identity tab survives for a CREATE draft alone, whose in-system record is the only record there is; the moment it is saved the world corpus answers for it and the editor is the two-tab rules screen thereafter.
+11. **The rules tab opens with the SHARED-DEFINITION CALLOUT and closes with the REUSE card, with the per-system enable switch on its own card between them.**
+    The callout carries the essence's own tile and name, a `World definition` marker, the counted sentence saying that name, icon and colour are world vocabulary shared with N other systems while what it does on craft is set here, and the exit above.
+    The enable switch is a card of its own with its own title naming the system — a switch captioned only `Off`, sharing a slab with unrelated controls, states what it is but never what it is off FOR.
+    The reuse card copies this system's effect source and macro into another system's own rules through `copyMembership`, and its copy states that it is a ONE-TIME shortcut and not a live link, because the clone is structural and neither side can reach the other afterwards.
+    Its destination chooser is on this screen because THIS screen knows the source unambiguously — the system whose rules are open — which is the fact the world catalogue's per-system row lacks and the reason that screen renders no copy control at all.
+12. **The page header names the essence and the layer.**
+    The route heads with the essence's medallion, its name, and `<system> rules · enabled | disabled`, with the editor action pair right-aligned beside it; the breadcrumb's leaf is the essence's name, following the recipe and component editors' rule rather than a generic `Edit essence`.
+    The Save verb reads `Save rules`, because the identity the word "essence" names is a world record this route cannot write.
+    The enabled half of the subline follows the DRAFT, because the switch that changes it is buffered and a subline pinned to disk would contradict the card below it until Save.
+13. **NEITHER SYSTEM-SCOPE ESSENCE SCREEN AUTHORS AN IDENTITY, AND THAT CLOSES TWO WRITE PATHS.**
+    The Essence Rules header carries the title and the subtitle and NO action, and the browser inspector offers NO duplicate.
+    Both wrote a `system.essenceDefinitions` entry with its own name, icon and colour — a system-owned essence — from a screen whose own panel states that name, icon and colour come from the Essence Catalogue and are shared by every system, so both claims stood a foot apart.
+    Create is the world Essence Catalogue header's `+ New essence` and is the only create; the verb duplicate served is `Reuse these rules` on the rules editor, which copies THIS system's effect source and macro into another system's own rules for the same essence without minting an identity.
+    **Joining a world essence to a crafting system WRITES BOTH HALVES** — the world membership record and the in-system record — because the system's essence list is built from `system.essenceDefinitions` and the read union only enriches rows it already finds there, so a membership-only join left `Add to this system` writing a record no screen reads.
+    The seeded in-system record carries the four lifted identity fields and no behaviour key, so every section resolves as INHERITED, which is what the membership record beside it declares; a system that already holds the id is left alone.
+    Removal is deliberately not its mirror: deleting the in-system record would strip the essence's stored quantity from every component in that system, which is the opposite of what removing a membership promises.
+14. **The System Essence Rules subtitle states what the list holds, what disabling stops and where identity comes from**, naming the system: `What each essence does on craft in <system>. Disabling stops the crafting effect — ingredient matching still sees the value. Names, icons and colours come from the Essence Catalogue.`
+    The world Essence Catalogue's states what that screen owns: `One definition per quality — name, icon, colour. What an essence does on craft is set by rules in each system that uses it.`
+    Neither uses the other's vocabulary; "definitions" is world scope's word and a system authors none.
+15. **BOTH essence inspectors render the same `SYSTEM RULES n / m` panel, from one component.**
+    It carries the members-over-roster count, a system search, one-line rows in which a MEMBER links out to that system's rules and a NON-MEMBER offers Add, and a five-row pager.
+    It answers "which other systems have rules for this essence", which the system rules rail could not answer at all, and a second copy of it on that screen is what extracting it prevents.
+16. **The System Essence Rules inspector's on-craft section names the system and states the LAYER each resolved rule came from.**
+    It is headed `On craft in <system>` and draws one card per world-default section, titled after the value that section resolves to and noting what that value does, ending in `· overridden here` or `· world default`.
+    A system with no membership record resolves nothing, so its cards omit the layer clause rather than attributing a value to a layer.
+    It is NOT the behaviour preview: that panel answers what an essence does to a crafted result and is worded the same at every scope, and collapsing the two left the one screen whose subject is inherit-versus-override with no provenance on it.
+17. **The world essence entry editor's behaviour rows say who INHERITS.**
+    At world scope they read `Default effects from <name>` over `Systems that inherit copy these onto anything crafted with it` and `Default macro <name>` over `Runs on craft in every system that inherits`; an unset default states its consequence instead of interpolating an empty name.
+    The system-scope wording is unchanged, because a system's rules act here rather than being inherited from.
+18. **A system-scope essence inspector is a BARE COLUMN with a micro-label per section**, on the pane's own surface, and only the things that ARE objects keep a box: the info-toned shared-definition callout, the stat tiles, the on-craft cards and the system rows.
+    Every section wearing the bordered inspector-card treatment made four of them cards inside a card, which is the same correction the recipe inspector already records.
+    The world catalogue's inspector column is likewise unbordered, with a single hairline above its pinned foot action.
+19. **One essence state has one shape.**
+    Enabled and Disabled are the shared status pill at every essence site — row, grid card, inspector and preview — and the pill resolves an unrecognised tone to its recessive default rather than rendering unfilled and unbordered, because four essence call sites named tones outside its ramp and produced a second, quieter treatment of the same state one click away.
 
 ### GM World Tool Screens
 
@@ -2016,7 +2108,7 @@ The two world tool screens and the system-scope Tool Rules list share one break-
 4. **The world Tool entry authors the world `repairRequirements` default, and the screen says it is a SEED.**
    A later world edit never reaches a system already seeded (`## Scoped Entity Definitions` `### Tool scope` requirement 2), so the entry must not imply a live parent: it states no inherit count for that section, because a count would claim an inheritance the resolver does not honour.
    The section's own ingredient groups are not authored at world scope, because a repair group names components in the OWNING crafting system, which world scope cannot address.
-5. **The world Tool entry BUFFERS its edit and is saved explicitly**, under `### Scoped entity editor patterns` requirement 12 and through that requirement's shared module and shared action pair rather than a second implementation of either.
+5. **The world Tool entry BUFFERS its edit and is saved explicitly**, under `### Scoped entity editor patterns` requirement 14 and through that requirement's shared module and shared action pair rather than a second implementation of either.
    What it buffers is the display label, the description and the two INHERITED world-default sections; the world break mode is not among them because this screen does not author it at all.
    Its Delete is a card on the Overview tab rather than an action in the header band, because the reach a GM cannot recover afterwards — the world record, its world defaults and every membership record naming it, in every system — has to be readable beside the control, and a header button has nowhere to say it.
    The two facts the header band states about the record, its NAME and whether it names a game-world Item, are reported UP by the page: the page already resolves both, and deriving them again in the shell would let the band and the page disagree about one record.
@@ -2047,7 +2139,14 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
 10. **The check bonus picks from the world modifier library and never a free-text expression**, through the shared subject picker; the tool subject is a third member of that picker's subject vocabulary rather than a second picker.
 11. **The editor tab strip is ONE primitive**, and it carries each site's DOM CONTRACT as props — the hook attribute name, the button `id` and `aria-controls` stem, and the strip's own accessible-name key — because the shipped sites share no common stem and their PANEL ids are rendered by files outside the strip.
     A promotion that changed a rendered id, `aria-controls`, `data-*` attribute name or badge class at a converted site is a defect, not a cleanup.
-12. **A WORLD ENTRY EDITOR BUFFERS ITS EDIT AND IS SAVED EXPLICITLY.**
+    A site whose button stem and panel stem differ — `checks-section-<id>` beside `checks-panel-<id>` — overrides either half rather than being kept out of the primitive.
+12. **The strip DRAWS the Rail Marker Family**, so a caller names which vehicle its mark uses — a record count, an issue summary, or the dot — and the primitive owns each drawing; the count and the dot take no class from the caller.
+    A tab may carry more than one mark, because a section can be both authored and unready at once.
+    The dot renders only with a text accessible name naming its unit, and a nameless one is dropped rather than drawn, because a mark separated from its siblings by colour alone is not a signal.
+    A record count of zero is the CALLER's decision and not the primitive's, because the shipped record-count vehicle answers it both ways: the rail states `0` unconditionally while the Checks section strip omits it, and a conversion must not settle a product question as a side effect.
+13. **A strip that renders ONE panel at a time puts `aria-controls` on the selected tab only**, because the unselected IDREFs would resolve to nothing and assistive technology reports that as a broken relationship rather than as "not currently shown".
+    It is a mode of the one primitive, never a reason for a second implementation.
+14. **A WORLD ENTRY EDITOR BUFFERS ITS EDIT AND IS SAVED EXPLICITLY.**
     A world entry editor is an EDITOR by `design-system/spec.md`'s archetype, so it carries that recipe's action pair — back before save — and its edits accumulate in a draft rather than persisting on change.
     The pair is ONE shared component rendered by the manager shell, because `.manager-header` is a sibling of `.manager-main` and no page can render into it; `Save` takes the shipped `is-primary` role rather than the reference's peach, and is disabled while there is nothing to flush, because a control that is always available says nothing about whether the last edit landed.
     Save writes only the fields that DIFFER from the record on disk, so re-pointing one world default does not restate the identity over whatever another client wrote to it meanwhile, and it answers whether every write landed.
@@ -2061,7 +2160,7 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
     A world-scope value the screen authors OUTSIDE the draft is immediate on the same rule membership is — the tool entry's world master switch reaches every crafting system at once and states that reach beside itself, and the repair seed is cleared by its own control — because staging either behind Save would show a GM a consequence that had not happened.
     **THE PAGE HEADING FOLLOWS THE BUFFERED NAME**, not the persisted one, because a heading names the thing being edited and the enabled `Save` beside it is what says the edit is unsaved.
     The name is REPORTED by the page from an effect rather than read off the draft handle, which is deliberately a live accessor that never re-renders; the same wire carries whatever else the band states about the record that the page already renders elsewhere, so one sentence is resolved once.
-13. **A scoped entity's IDENTITY FIELD SET is per entity type and is never assumed.**
+15. **A scoped entity's IDENTITY FIELD SET is per entity type and is never assumed.**
     A component and a tool carry a source-item link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`) and an `img`; an ESSENCE carries neither, and carries a `colorToken` instead.
     A shared catalogue or entry shell therefore treats the source link, the item thumbnail, the unlinked flag and the missing-source blocking check as OPTIONAL CAPABILITIES of the entity type rather than as shell furniture, read from the scope descriptor rather than tested at a call site — and an essence screen renders none of them.
     A shell that rendered one unconditionally would paint a permanently-false badge on every essence, which is a stated fact that is never true rather than a missing one.
@@ -2167,7 +2266,8 @@ Shipped capabilities:
   Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
 - The enable toggle is never gated on the travel actor: a party with no travel actor can be enabled, and the card's meta line states "travel actor: none" so the consequence is visible without the configuration being refused.
   Newly created parties visibly show their disabled state.
-- When the world has no actors, the member and travel-actor pickers show an explicit empty state directing the GM to create an Actor first.
+- When no configured player-character actor is available to offer — the world holds no actor of a type the GM has listed under Player Character Actor Types — the member and travel-actor pickers show an explicit empty state naming that module setting as the place to add one, split across a short title and an explanatory body rather than fused into one sentence.
+  A search that matches none of the remaining eligible actors renders the shared no-search-match title with no such explanation, because a search miss is not a configuration problem.
 - The Parties pane exposes a search field only when the world holds more than one party.
   It matches a party's name, any member's name, or its travel actor's name, and states how many of the total parties are showing.
   A search matching nothing renders the shared filtered no-state treatment quoting the query; the World rail's party count is the world total and is unaffected by the filter.

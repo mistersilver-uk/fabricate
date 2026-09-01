@@ -84,6 +84,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    // The design-system primitives this editor's tree renders: the icon action (issue 1422),
+    // the section enable switch (issue 1040), the card shell (issue 1427) and the labelled
+    // field column (issue 1428). A rendered `.svelte` the harness omits HANGS this suite and
+    // reports `# cancelled` with no message, which is why they are named rather than assumed.
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+    'src/ui/svelte/components/Field.svelte',
   ],
 });
 

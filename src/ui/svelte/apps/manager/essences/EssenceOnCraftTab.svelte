@@ -1,7 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The essence editor's ON CRAFT tab (issue 1036): what this essence carries onto a crafted
-  result — an active-effect source, and a property macro.
+  The essence editor's TWO BEHAVIOUR CARDS: what this essence carries onto a crafted result in
+  THIS crafting system — an active-effect source, and a macro that runs on craft.
+
+  It is the body of the `Essence rules` tab for an essence the world catalogue holds, and the body
+  of the shipped `On craft` tab for a CREATE draft, which has no shared definition. The difference
+  between the two is carried by `scoped` and nothing else; see its declaration.
 
   ── ONE CARD WHEN LINKED, THE PICKER WHEN NOT (issue 1036, maintainer round 2) ────
   The maintainer's ruling: "the linked item active effect source needs to appear the same way
@@ -9,27 +13,28 @@
   control for this — an `ItemDropZone` that IS the drop target in both states — so this tab
   does the same:
 
-   - LINKED  -> `ItemDropZone`: the item image, the item name in bold, an instructional
-                sub-line, and the grouped copy-uuid / unlink icon pair right-aligned.
+   - LINKED  -> `ItemDropZone`: the item image, the item name in bold, its ADDRESS on a mono
+                line, an instructional sub-line, and the grouped copy-uuid / unlink icon pair
+                right-aligned.
    - UNLINKED -> `EssenceSourceSelector`, which is the drop-or-PICK affordance.
 
-  Three defects go with the rewrite, all read off `manager-essence-edit-on-craft.png`:
+  `ItemDropZone` itself is UNCHANGED except for the optional address line issue 1372 adds. It
+  already accepts a `documentType`, a `subline`, and a `state`, and it already renders the
+  grouped actions; nothing about its other consumers moves. The essence source is still a
+  managed COMPONENT id rather than a document uuid, and that is why the UNLINKED state stays
+  `EssenceSourceSelector`: only the picker can offer the in-system component list. What the
+  drop handler receives is the same raw Item payload in both states, which the root already
+  resolves to a component.
 
-   1. the hand-rolled `.manager-essence-source-summary` card stated the raw uuid
-      (`Item.sm-ruby`) where the Tool Studio states what to do with the card.
-   2. it carried ONE square ✕ where the Tool Studio has the rounded icon pair, and it had no
-      copy-uuid at all although the browser inspector two clicks away does.
-   3. the `Drop or pick` zone rendered BELOW the linked card as well, so the card and the
-      zone said the same thing twice. An earlier review called that "`ItemDropZone`'s shipped
-      behaviour"; it is not — `ToolOverviewTab` proves the primitive already suppresses the
-      second zone, because there is only ever one zone to begin with.
+  ── EACH CARD CARRIES ITS OWN INHERIT SWITCH (issue 1372, maintainer parity round 7) ──
+  The two switches used to sit together in a band ABOVE the tab strip, sharing one grey slab with
+  the enable toggle and the remove action. The reference puts each switch INSIDE the card it
+  governs, in a bordered row between the card's explanation and its value, and that placement is
+  the point: the switch decides whether the value below it is this system's to change, and a GM
+  reading a locked value has to find the control that unlocks it without leaving the card.
 
-  `ItemDropZone` itself is UNCHANGED. It already accepts a `documentType`, a `subline`, and a
-  `state`, and it already renders the grouped actions; nothing about its other consumers
-  moves. The essence source is still a managed COMPONENT id rather than a document uuid, and
-  that is why the UNLINKED state stays `EssenceSourceSelector`: only the picker can offer the
-  in-system component list. What the drop handler receives is the same raw Item payload in
-  both states, which the root already resolves to a component.
+  `InheritRow` renders the pair as a set, so this file asks it for ONE section at a time and
+  supplies the head sentence, because the section's name is already the card's title one line up.
 
   ── BOTH SECTIONS ARE GATED, AND THE BOTH-OFF STATE IS EXPLAINED ──────────────────
   `features.effectTransfer` and `features.propertyMacros` gate their own sections. With both
@@ -56,6 +61,8 @@
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
   import ExplainerCard from '../ExplainerCard.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
+  import InheritRow from '../scoped/InheritRow.svelte';
+  import StatusPill from '../../../components/StatusPill.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -76,12 +83,33 @@
     // the world default. While it does, this system does not own the value, so the editor must
     // not present an edit affordance for it: the card renders read-only, the drop zone and the
     // picker are not drawn, and the unlink control is absent. Turning the section's inherit
-    // switch off is the one action that unlocks it, and that switch lives beside the card rather
-    // than inside it. Defaults to all-false, so the shipped editor renders exactly as it did.
+    // switch off is the one action that unlocks it, and that switch is the row inside the same
+    // card. Defaults to all-false, so a create draft renders exactly as the shipped editor did.
     lockedSections = {},
-    // `{[section]: string}` — the one-line summary of what the locked value resolves to. Without
-    // it a locked card states a name and never says why it cannot be edited.
+    // `{[section]: string}` — the one-line summary of what each section resolves to. It is the
+    // inherit row's note; without it a row says "Inheriting the world default" and never says
+    // what is being inherited, and a row-count assertion passes green over every note empty.
     inheritNotes = {},
+    // WHETHER THIS ESSENCE HAS A SHARED WORLD DEFINITION. `true` is the system Essence Rules
+    // screen: each card carries its own inherit switch and the tab drops the explainer, because
+    // the cards state their own meaning and the tab is no longer one third of an editor. `false`
+    // is the CREATE draft, which has no world record, no sections to inherit and therefore no
+    // switches — and keeps the explainer, which is the only place a first-time GM is told what an
+    // essence can carry at all.
+    scoped = false,
+    // WHETHER THIS SYSTEM HAS A MEMBERSHIP RECORD to write an inherit switch onto. It is
+    // separate from `scoped` because the two states differ: an essence with a shared definition
+    // that this system has NOT adopted still gets the rules screen's copy and its callout, but
+    // has no record for a switch to write to, and a switch that wrote to nothing would report a
+    // state it could not hold.
+    inheritable = false,
+    // The membership record's `inherit` map, read by `InheritRow`. An ABSENT key reads as
+    // inheriting, matching `isSectionInherited`.
+    inheritedMap = {},
+    // `{[section]: string}` — the bold head sentence of each inherit row, supplied by the editor
+    // because it names the crafting SYSTEM, which this tab is not handed.
+    inheritHeadings = {},
+    onToggleInherit = () => {},
     onSourceSelect = () => {},
     onSourceDrop = () => {},
     onSourceClear = () => {},
@@ -105,32 +133,41 @@
     )
   );
 
+  const worldDefaultLabel = $derived(
+    text('FABRICATE.Admin.Manager.Essence.OnCraft.WorldDefaultPill', 'World default')
+  );
+
   const sourcePill = $derived(
     sectionPill(
+      sourceLocked,
       Boolean(sourceComponentId || storedSourceName),
-      text('FABRICATE.Admin.Manager.Essence.OnCraft.Transferring', 'Transferring'),
+      text('FABRICATE.Admin.Manager.Essence.OnCraft.Transferring', 'Transferring effects'),
       text('FABRICATE.Admin.Manager.Essence.OnCraft.NoSource', 'No source')
     )
   );
   const macroPill = $derived(
     sectionPill(
+      macroLocked,
       Boolean(macroUuid),
       text('FABRICATE.Admin.Manager.Essence.OnCraft.RunsOnCraft', 'Runs on craft'),
       text('FABRICATE.Admin.Manager.Essence.OnCraft.NoMacro', 'No macro')
     )
   );
 
-  // ONE pill shape for both sections: `Suppressed` in the disabled tone when the essence is
-  // disabled AND the section is configured, otherwise the section's own two states.
-  function sectionPill(configured, configuredLabel, emptyLabel) {
-    if (!configured) return { tone: 'neutral', label: emptyLabel, suppressed: false };
-    if (disabledEssence) {
+  // ONE pill shape for both sections. SUPPRESSION OUTRANKS INHERITANCE, because a disabled
+  // essence carries nothing at all and where the value came from is the smaller fact; an
+  // INHERITED section then reports the world default, which is what the reference's macro card
+  // states; and only a section this system owns reports its own two states.
+  function sectionPill(locked, configured, configuredLabel, emptyLabel) {
+    if (configured && disabledEssence) {
       return {
         tone: 'neutral',
         label: text('FABRICATE.Admin.Manager.Essence.OnCraft.Suppressed', 'Suppressed'),
         suppressed: true,
       };
     }
+    if (locked) return { tone: 'neutral', label: worldDefaultLabel, suppressed: false };
+    if (!configured) return { tone: 'neutral', label: emptyLabel, suppressed: false };
     return { tone: 'info', label: configuredLabel, suppressed: false };
   }
 
@@ -185,16 +222,21 @@
   ]);
 </script>
 
-<div class="manager-essence-tab-stack" data-essence-tab-panel="oncraft">
-  <ExplainerCard
-    icon="fas fa-circle-question"
-    title={text(
-      'FABRICATE.Admin.Manager.Essence.OnCraft.ExplainerTitle',
-      'What an essence carries'
-    )}
-    items={explainerItems}
-    dataAttr="data-essence-on-craft-explainer"
-  />
+<div class="manager-essence-tab-stack" data-essence-tab-panel={scoped ? 'rules' : 'oncraft'}>
+  {#if !scoped}
+    <!-- THE CREATE DRAFT'S PRIMER. It is dropped on the rules screen, where each card carries
+         its own explanatory line and the shared-definition callout above them says which layer
+         is which — three sentences of the same subject stated twice. -->
+    <ExplainerCard
+      icon="fas fa-circle-question"
+      title={text(
+        'FABRICATE.Admin.Manager.Essence.OnCraft.ExplainerTitle',
+        'What an essence carries'
+      )}
+      items={explainerItems}
+      dataAttr="data-essence-on-craft-explainer"
+    />
+  {/if}
 
   {#if !effectTransferEnabled && !propertyMacrosEnabled}
     <!-- BOTH gates off. An empty tab reads as a broken screen; this reads as the
@@ -216,7 +258,7 @@
   {#if effectTransferEnabled}
     <section class="manager-edit-card" data-essence-section="effect-source">
       <div class="manager-edit-card-heading">
-        <h3 class="manager-card-title">
+        <h3 class="manager-card-title manager-essence-card-title">
           <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
           {text('FABRICATE.Admin.Manager.Essence.OnCraft.SourceHeading', 'Active effect source')}
         </h3>
@@ -231,14 +273,30 @@
           ? suppressedSub
           : text(
               'FABRICATE.Admin.Manager.Essence.OnCraft.SourceHint',
-              'Optional. Active effects on this component’s item are transferred to whatever is crafted with this essence.'
+              'Active effects on this item are copied onto anything crafted with this essence here.'
             )}
       </p>
 
+      {#if inheritable}
+        <!-- THE SWITCH THAT DECIDES WHETHER THE VALUE BELOW IS THIS SYSTEM'S TO CHANGE. -->
+        <div class="manager-essence-inherit-slot">
+          <InheritRow
+            entityType="essence"
+            section="effectSource"
+            stateChip={false}
+            headings={inheritHeadings}
+            inherited={inheritedMap}
+            notes={inheritNotes}
+            disabled={saving}
+            onToggle={onToggleInherit}
+          />
+        </div>
+      {/if}
+
       {#if sourceLocked}
         <!-- LOCKED: this system inherits the section, so it does not own the value. A read-only
-             card states what resolves and why, and draws no drop target, no picker and no
-             unlink — the absence of `[data-scoped-source-unlink]` IS the lock.
+             tile states what resolves and where it came from, and draws no drop target, no
+             picker and no unlink — the absence of `[data-scoped-source-unlink]` IS the lock.
 
              NESTED RATHER THAN FLATTENED INTO ONE `{:else if}` CHAIN, deliberately. The
              linked/unlinked pair below is pinned by `essence-studio-fidelity.test.js` as
@@ -246,26 +304,33 @@
              assertion that stopped the zone rendering twice — and folding this branch into that
              chain would rewrite the very structure that pin exists to hold. -->
         <div class="manager-essence-locked-card" data-scoped-source-locked="effectSource">
-          <span class="manager-essence-locked-value">
-            {sourceItem?.name ||
-              storedSourceName ||
-              text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None')}
+          <span class="manager-essence-locked-glyph" aria-hidden="true"
+            ><i class="fas fa-wand-magic-sparkles"></i></span
+          >
+          <span class="manager-essence-locked-copy">
+            <span class="manager-essence-locked-value">
+              {sourceItem?.name ||
+                storedSourceName ||
+                text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None')}
+            </span>
+            {#if sourceUuid}
+              <code class="manager-essence-locked-uuid">{sourceUuid}</code>
+            {/if}
           </span>
-          {#if inheritNotes?.effectSource}
-            <p class="manager-muted" data-scoped-source-locked-note>{inheritNotes.effectSource}</p>
-          {/if}
+          <StatusPill tone="subtle" icon="fas fa-globe" label={worldDefaultLabel} />
         </div>
       {:else}
         {#if sourceLinked}
           <!-- The Tool Studio's linked card, from the same primitive `ToolOverviewTab` renders.
              The sub-line is the INSTRUCTION, not the uuid: the card is itself the drop
              target, and telling the GM so is the thing the uuid was occupying the line
-             instead of doing. The uuid is still reachable — `Copy source UUID` is the first
-             of the grouped pair, and its `title` shows it. -->
+             instead of doing. The address has its own mono line above it since issue 1372,
+             which is the reference's own three-line tile. -->
           <ItemDropZone
             item={sourceItem}
             kind="essence-source"
             title={sourceItem.name}
+            uuid={sourceUuid}
             hint={text(
               'FABRICATE.Admin.Manager.Essence.OnCraft.SourceReplaceHint',
               'Drop another Item here to replace the linked source.'
@@ -308,9 +373,9 @@
   {#if propertyMacrosEnabled}
     <section class="manager-edit-card" data-essence-section="macro">
       <div class="manager-edit-card-heading">
-        <h3 class="manager-card-title">
+        <h3 class="manager-card-title manager-essence-card-title">
           <i class="fas fa-code" aria-hidden="true"></i>
-          {text('FABRICATE.Admin.Manager.Essence.Macro.Heading', 'Property macro')}
+          {text('FABRICATE.Admin.Manager.Essence.Macro.Heading', 'Macro on craft')}
         </h3>
         <Chip
           tone={macroPill.tone}
@@ -323,9 +388,24 @@
           ? suppressedSub
           : text(
               'FABRICATE.Admin.Manager.Essence.Macro.Hint',
-              'Optional. Runs once per craft against the item data, before the item is created in the player’s inventory.'
+              'Runs against the item data before it reaches the character’s inventory, and may rewrite its properties.'
             )}
       </p>
+
+      {#if inheritable}
+        <div class="manager-essence-inherit-slot">
+          <InheritRow
+            entityType="essence"
+            section="macro"
+            stateChip={false}
+            headings={inheritHeadings}
+            inherited={inheritedMap}
+            notes={inheritNotes}
+            disabled={saving}
+            onToggle={onToggleInherit}
+          />
+        </div>
+      {/if}
 
       <!-- `documentType="Macro"` is what makes the shared drop zone accept a Macro rather
            than an Item, and `state="missing"` is what paints an unresolvable link as
@@ -337,19 +417,25 @@
            `macroUuid`, and `macroItem.name` falls back to the same uuid when the macro does
            not resolve — which is precisely the lab's state — so the card rendered
            `Macro.lab-aether-binding` as its title AND again as its sub-line. The Tool Studio
-           gives that line to a useful sentence, so this does too; the uuid survives as the
-           card's title in the unresolved case, which is the one case it is diagnostic in. -->
+           gives that line to a useful sentence, so this does too; the address is the mono
+           line issue 1372 adds, which is a different slot from the sub-line. -->
       {#if macroLocked}
         <!-- LOCKED, for the same reason and with the same consequence as the source card. -->
         <div class="manager-essence-locked-card" data-scoped-macro-locked="macro">
-          <span class="manager-essence-locked-value">
-            {macroName ||
-              macroUuid ||
-              text('FABRICATE.Admin.Manager.Essence.Macro.Unnamed', 'the linked property macro')}
+          <span class="manager-essence-locked-glyph" aria-hidden="true"
+            ><i class="fas fa-code"></i></span
+          >
+          <span class="manager-essence-locked-copy">
+            <span class="manager-essence-locked-value">
+              {macroName ||
+                macroUuid ||
+                text('FABRICATE.Admin.Manager.Essence.Macro.Unnamed', 'the linked property macro')}
+            </span>
+            {#if macroUuid && macroUuid !== macroName}
+              <code class="manager-essence-locked-uuid">{macroUuid}</code>
+            {/if}
           </span>
-          {#if inheritNotes?.macro}
-            <p class="manager-muted" data-scoped-macro-locked-note>{inheritNotes.macro}</p>
-          {/if}
+          <StatusPill tone="subtle" icon="fas fa-globe" label={worldDefaultLabel} />
         </div>
       {:else}
         <ItemDropZone
@@ -358,6 +444,7 @@
           documentType="Macro"
           state={macroMissing ? 'missing' : 'linked'}
           disabled={saving}
+          uuid={macroUuid && macroUuid !== macroItem?.name ? macroUuid : ''}
           title={text(
             'FABRICATE.Admin.Manager.Essence.Macro.DropTitle',
             'Drop a script macro here'
@@ -393,13 +480,73 @@
 </div>
 
 <style>
-  /* THE LOCKED VALUE CARD. Static class names, so Svelte can prove each selector is used and
-     `lint:svelte:warnings` stays at zero. */
+  /* THE INHERIT SWITCH'S OWN BOX. `InheritRow` renders a bare stacked row — head, note, switch —
+     which is the right shape for a group of them under a heading. Inside a card it needs to read
+     as a control strip rather than as more of the card's copy, so this slot gives it the
+     reference's bordered row with the switch pulled to the trailing edge.
+
+     `:global(...)` on every child selector because those elements are rendered by `InheritRow`,
+     not by this component, and a scoped selector would carry this file's `svelte-<hash>` and
+     match nothing. The SLOT keeps its scoping, so none of this escapes into another caller of
+     the same row. */
+  .manager-essence-inherit-slot {
+    min-width: 0;
+  }
+
+  .manager-essence-inherit-slot :global(.manager-scoped-inherit-row) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-bg-1);
+  }
+
+  .manager-essence-inherit-slot :global(.manager-scoped-inherit-head),
+  .manager-essence-inherit-slot :global(.manager-scoped-inherit-note) {
+    grid-column: 1;
+  }
+
+  .manager-essence-inherit-slot :global(.manager-status-toggle) {
+    grid-column: 2;
+    grid-row: 1 / -1;
+  }
+
+  /* THE LOCKED VALUE TILE. Static class names, so Svelte can prove each selector is used and
+     `lint:svelte:warnings` stays at zero. It is deliberately NOT `ItemDropZone`: that primitive
+     is a drop target in both of its states, and an inherited section must present no edit
+     affordance at all. */
   .manager-essence-locked-card {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-3);
+    min-width: 0;
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-bg-1);
+  }
+
+  .manager-essence-locked-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: var(--fab-surface-soft);
+    color: var(--fab-text-secondary);
+  }
+
+  .manager-essence-locked-copy {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-chip);
     min-width: 0;
+    flex: 1 1 auto;
   }
 
   .manager-essence-locked-value {
@@ -410,9 +557,28 @@
     overflow-wrap: break-word;
   }
 
+  .manager-essence-locked-uuid {
+    font-family: var(--fab-font-mono);
+    font-size: 0.68rem;
+    color: var(--fab-text-subtle);
+    overflow-wrap: anywhere;
+  }
+
   .manager-essence-tab-stack {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
+  }
+
+  /* SENTENCE CASE, AT FULL INK. See `SharedDefinitionCallout.svelte`'s twin of this rule for the
+     whole argument: `.manager-card-title` is the manager's uppercase micro-label, the reference
+     draws these two as `Active effect source` and `Macro on craft`, and the Checks Studio already
+     set the precedent for retiring the treatment per-card rather than globally. Compounded so the
+     rule is (0,3,0) against the global's (0,2,0). */
+  .manager-card-title.manager-essence-card-title {
+    color: var(--fab-text);
+    font-size: 0.86rem;
+    letter-spacing: 0;
+    text-transform: none;
   }
 </style>

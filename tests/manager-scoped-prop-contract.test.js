@@ -519,8 +519,14 @@ test('the world-scope write path is supplied FOUR store legs', () => {
   // declares one. Its falsifiability is here: delete the leg and this reds, and the lane that
   // needs it would otherwise have to reopen a file requirement 7 closes to it.
   const adminStore = readFileSync(resolve(repoRoot, ADMIN_STORE_PATH), 'utf8');
+  //
+  // THE BINDING IS `worldScopeFamilies`, NOT `worldScope` (issue 1372, maintainer parity round 8).
+  // The store now COMPOSES the generic families into its published `worldScope`, overriding
+  // exactly one verb: the essence family's `addToSystem`, whose second half — the in-system
+  // `essenceDefinitions` row — lives in a store `worldScopeActions.js` cannot reach. So the
+  // factory call is read by the name it is assigned to, and the composition is asserted below it.
   const call =
-    /const worldScope = createWorldScopeActions\(\{\s*getStores: \{([\s\S]*?)\},\s*\}\);/.exec(
+    /const worldScopeFamilies = createWorldScopeActions\(\{\s*getStores: \{([\s\S]*?)\},\s*\}\);/.exec(
       adminStore
     );
   assert.ok(call, 'createWorldScopeActions is called with an inline getStores map');
@@ -529,5 +535,13 @@ test('the world-scope write path is supplied FOUR store legs', () => {
     legs.slice().sort(),
     ['component', 'essence', 'tool', 'vocabulary'],
     'the write path reads the same four store legs the read path does'
+  );
+  // ONE verb is overridden, and only on the essence family: a spread of the generic families with
+  // an essence override. A composition that replaced the whole family, or that reached another
+  // entity type, would be a second write path rather than one seam on one verb.
+  assert.match(
+    adminStore,
+    /const worldScope = \{\s*\.\.\.worldScopeFamilies,\s*essence: \{ \.\.\.worldScopeFamilies\.essence, addToSystem: joinEssenceToSystem \},\s*\};/,
+    'the published write path is the generic families with ONE essence verb composed over them'
   );
 });

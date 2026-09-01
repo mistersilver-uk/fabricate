@@ -4385,7 +4385,6 @@ describe('createAdminStore', () => {
         'addTag',
         'removeTag',
         'addEssence',
-        'duplicateEssence',
         'setEssenceEnabled',
         'applyEssenceBulkEdit',
         'deleteEssence',

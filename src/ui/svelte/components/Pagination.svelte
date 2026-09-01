@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../util/foundryBridge.js';
+  import IconButton from './IconButton.svelte';
 
   let {
     totalCount = 0,
@@ -104,31 +105,27 @@
         class="manager-pagination-nav"
         aria-label={text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
       >
-        <button
-          type="button"
-          class="manager-icon-button"
-          data-pagination-prev
-          aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+        <IconButton
+          data-pagination-prev=""
+          ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
           disabled={pageIndex === 0}
           onclick={() => goToPage(pageIndex - 1)}
         >
           <i class="fas fa-chevron-left" aria-hidden="true"></i>
-        </button>
+        </IconButton>
         <span class="manager-pagination-page" data-pagination-page>
           {text('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}')
             .replace('{page}', pageIndex + 1)
             .replace('{total}', totalPages)}
         </span>
-        <button
-          type="button"
-          class="manager-icon-button"
-          data-pagination-next
-          aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+        <IconButton
+          data-pagination-next=""
+          ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
           disabled={pageIndex >= totalPages - 1}
           onclick={() => goToPage(pageIndex + 1)}
         >
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-        </button>
+        </IconButton>
       </nav>
     {/if}
     {#if showPageSize}

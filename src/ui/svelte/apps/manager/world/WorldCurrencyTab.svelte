@@ -17,6 +17,7 @@
   GM-scoped.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -24,6 +25,7 @@
   import { resolveDropData } from '../../../util/dropUtils.js';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     currencyUnits = [],
@@ -394,7 +396,7 @@
 
     <div id="manager-section-body-currency" class="manager-section-body">
       <div class="manager-currency-strategy" data-world-currency-strategy>
-        <label class="manager-field">
+        <Field as="label">
           <span
             >{text('FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategy', 'Spend strategy')}</span
           >
@@ -408,10 +410,10 @@
             {/each}
           </select>
           <small data-world-currency-strategy-hint>{currencySpendStrategyHint()}</small>
-        </label>
+        </Field>
 
         {#if currencyShowProviderBranch}
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
             <select
               value={currencyProviderId}
@@ -428,9 +430,9 @@
                 'A preconfigured adapter that reads and spends coins from the actor inventory.'
               )}</small
             >
-          </label>
+          </Field>
         {:else if currencySpendStrategy === 'actorInventory'}
-          <div class="manager-field">
+          <Field as="div">
             <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
             <div
               class="manager-currency-subunit-warning manager-environment-comp-callout"
@@ -445,7 +447,7 @@
                 )}</span
               >
             </div>
-          </div>
+          </Field>
         {:else if currencyMacroMode}
           <div
             class="manager-currency-macro-zones manager-currency-macro-row"
@@ -453,7 +455,7 @@
           >
             {#each CURRENCY_MACRO_FIELDS as field (field.key)}
               {@const macroDoc = currencyMacroDisplay(field.key)}
-              <div class="manager-field manager-currency-macro-field">
+              <Field as="div" class="manager-currency-macro-field">
                 <span>{text(field.labelKey, field.labelFallback)}</span>
                 {#if macroDoc}
                   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -507,10 +509,9 @@
                         >{macroDoc.name || macroDoc.uuid}</span
                       >
                     {/if}
-                    <button
-                      type="button"
-                      class="manager-icon-button is-danger"
-                      aria-label={text(
+                    <IconButton
+                      class="is-danger"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
                         'Unlink macro'
                       )}
@@ -521,7 +522,7 @@
                       onclick={(event) => {
                         event.stopPropagation();
                         onClearCurrencyMacro(field.key);
-                      }}><i class="fas fa-link-slash" aria-hidden="true"></i></button
+                      }}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
                     >
                   </div>
                 {:else}
@@ -545,7 +546,7 @@
                   </div>
                 {/if}
                 <small>{text(field.hintKey, field.hintFallback)}</small>
-              </div>
+              </Field>
             {/each}
           </div>
         {/if}
@@ -643,7 +644,7 @@
               {#if expanded}
                 <div class="manager-character-modifier-editor">
                   <div class="manager-edit-grid manager-currency-edit-grid">
-                    <label class="manager-field">
+                    <Field as="label">
                       <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Label', 'Label')}</span>
                       <input
                         type="text"
@@ -653,8 +654,8 @@
                             label: event.currentTarget.value,
                           })}
                       />
-                    </label>
-                    <label class="manager-field">
+                    </Field>
+                    <Field as="label">
                       <span
                         >{text(
                           'FABRICATE.Admin.Manager.CurrencyUnits.Abbreviation',
@@ -669,8 +670,8 @@
                             abbreviation: event.currentTarget.value,
                           })}
                       />
-                    </label>
-                    <div class="manager-field">
+                    </Field>
+                    <Field as="div">
                       <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Icon', 'Icon')}</span>
                       <IconPicker
                         value={unit.icon || 'fa-solid fa-coins'}
@@ -680,7 +681,7 @@
                         )}
                         onChange={(iconClass) => onUpdateCurrencyUnit(unit.id, { icon: iconClass })}
                       />
-                    </div>
+                    </Field>
                   </div>
 
                   {#if currencyMacroMode}
@@ -695,7 +696,7 @@
                     >
                   {:else}
                     <div class="manager-edit-grid manager-currency-detail-grid">
-                      <label class="manager-field">
+                      <Field as="label">
                         <span
                           >{text(
                             'FABRICATE.Admin.Manager.CurrencyUnits.ActorPath',
@@ -711,10 +712,10 @@
                               actorPath: event.currentTarget.value,
                             })}
                         />
-                      </label>
+                      </Field>
                       {#if subUnitOptions.length > 0}
                         <div class="manager-currency-subunit-builder">
-                          <label class="manager-field">
+                          <Field as="label">
                             <span
                               >{text(
                                 'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
@@ -734,21 +735,19 @@
                                 >
                               {/each}
                             </select>
-                          </label>
-                          <button
-                            type="button"
-                            class="manager-icon-button"
-                            aria-label={text(
+                          </Field>
+                          <IconButton
+                            ariaLabel={text(
                               'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
                               'Add sub-unit'
                             )}
                             onclick={() => handleAddCurrencySubUnit(unit.id)}
                           >
                             <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                          </button>
+                          </IconButton>
                         </div>
                       {:else}
-                        <div class="manager-field">
+                        <Field as="div">
                           <span
                             >{text(
                               'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
@@ -773,7 +772,7 @@
                               >
                             {/if}
                           </div>
-                        </div>
+                        </Field>
                       {/if}
                     </div>
 
@@ -859,10 +858,8 @@
                     >{(unit.contains || []).length}
                     {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</Chip
                   >
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                     data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                     data-move-currency-up={unit.id}
                     disabled={index === 0}
@@ -876,14 +873,9 @@
                       )}
                   >
                     <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                      'Move down'
-                    )}
+                  </IconButton>
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                     data-tooltip={text(
                       'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
                       'Move down'
@@ -900,29 +892,26 @@
                       )}
                   >
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text(
+                  </IconButton>
+                  <IconButton
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.CurrencyUnits.Edit',
                       'Edit currency unit'
                     )}
                     onclick={() => (currencyExpandedUnitId = unit.id)}
                   >
                     <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button is-danger"
-                    aria-label={text(
+                  </IconButton>
+                  <IconButton
+                    class="is-danger"
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
                       'Delete currency unit'
                     )}
                     onclick={() => handleDeleteCurrencyUnit(unit.id)}
                   >
                     <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                  </button>
+                  </IconButton>
                 </div>
               {/if}
             </li>

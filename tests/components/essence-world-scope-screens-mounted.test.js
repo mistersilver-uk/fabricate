@@ -59,15 +59,28 @@ const SHELL_MODULES = [
   // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
+  // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
+  // it arrives through `EntityListInspectorFrame` and through `Pagination`, both of which
+  // converted to it, so it is a TRANSITIVE dependency of the shell rather than a new control
+  // on these screens. Listed before `Pagination.svelte` for that reason.
+  'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
+  // THE manager's on/off switch (issue 1040). Not mounted directly by anything here: it arrives
+  // through `MembershipActions`, which converted to it, so it is a TRANSITIVE dependency of the
+  // shell rather than a new control on these screens. Listed before `MembershipActions.svelte`
+  // for that reason, exactly as `IconButton` is listed before `Pagination`.
+  'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, so the essence
   // trees that render the frame carry it in their static graph too. An omission HANGS the suite.
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+  // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
+  // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.
+  'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 ];
 

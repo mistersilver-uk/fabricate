@@ -109,6 +109,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       writeRawModule(modulePath);
     }
 
+    writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
@@ -117,6 +118,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     // it. This suite predates the shared harness and so has no dependency-closure check —
     // omitting this line leaves the compiled view importing a module that is not there.
     writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
     const mod = await import(
       pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte.js'))

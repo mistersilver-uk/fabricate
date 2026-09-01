@@ -9,6 +9,7 @@
   tools are authored on their own tabs.
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import RecipeStepAccordion from './recipe/RecipeStepAccordion.svelte';
   import RecipeDurationSteppers from './recipe/RecipeDurationSteppers.svelte';
@@ -64,7 +65,7 @@
           />
         </div>
       {/if}
-      <label class="manager-field">
+      <Field as="label">
         <span>{text('FABRICATE.Admin.Manager.Recipe.Name', 'Name')}</span>
         <input
           type="text"
@@ -72,15 +73,15 @@
           value={step.name || ''}
           onchange={(event) => onUpdateStep(step.id, { name: event.currentTarget.value })}
         />
-      </label>
-      <label class="manager-field">
+      </Field>
+      <Field as="label">
         <span>{text('FABRICATE.Admin.Manager.Recipe.Description', 'Description')}</span>
         <textarea
           data-recipe-step-field="description"
           value={step.description || ''}
           onchange={(event) => onUpdateStep(step.id, { description: event.currentTarget.value })}
         ></textarea>
-      </label>
+      </Field>
     {/snippet}
 
     {#snippet footer()}

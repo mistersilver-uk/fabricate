@@ -42,6 +42,7 @@
     buildRecipeStepModel,
     groupProduceRowsByResultGroup,
   } from '../../../../../utils/recipeBrowserModel.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     selectedRecipe = null,
@@ -491,15 +492,14 @@
       <!-- Multi-step: paginate one step at a time — the step's own Requires / Produces —
            with prev/next, the step name, and an (x / y) position hint (issue 643). -->
       <div class="manager-recipe-step-pager" data-recipe-step-pager>
-        <button
-          type="button"
-          class="manager-icon-button manager-recipe-step-nav"
-          data-recipe-step-prev
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
+        <IconButton
+          class="manager-recipe-step-nav"
+          data-recipe-step-prev=""
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
           title={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
           disabled={currentStepIndex === 0}
           onclick={() => goToStep(-1)}
-          ><i class="fas fa-chevron-left" aria-hidden="true"></i></button
+          ><i class="fas fa-chevron-left" aria-hidden="true"></i></IconButton
         >
         <div class="manager-recipe-step-pager-copy">
           <span class="manager-recipe-step-pager-name" data-recipe-step-name>{currentStepName}</span
@@ -508,15 +508,14 @@
             >{currentStepIndex + 1} / {stepModel.length}</span
           >
         </div>
-        <button
-          type="button"
-          class="manager-icon-button manager-recipe-step-nav"
-          data-recipe-step-next
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
+        <IconButton
+          class="manager-recipe-step-nav"
+          data-recipe-step-next=""
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
           title={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
           disabled={currentStepIndex === stepModel.length - 1}
           onclick={() => goToStep(1)}
-          ><i class="fas fa-chevron-right" aria-hidden="true"></i></button
+          ><i class="fas fa-chevron-right" aria-hidden="true"></i></IconButton
         >
       </div>
     {/if}

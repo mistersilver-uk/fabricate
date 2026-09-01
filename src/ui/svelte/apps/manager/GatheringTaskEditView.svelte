@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../components/Field.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';
@@ -10,9 +11,11 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import { localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     task = null,
@@ -872,12 +875,12 @@
           </button>
 
           <div class="manager-task-core-status">
-            <button
-              type="button"
-              class={`manager-status-toggle ${task.enabled === false ? 'is-off' : 'is-on'}`}
-              data-gathering-task-field="enabled"
-              aria-pressed={task.enabled !== false}
-              aria-label={text(
+            <StatusToggle
+              on={task.enabled !== false}
+              label={task.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.ToggleNamed',
                 'Toggle {name}'
               ).replace(
@@ -888,17 +891,9 @@
                     'Unnamed gathering task'
                   )
               )}
+              data-gathering-task-field="enabled"
               onclick={() => onUpdateTask({ enabled: task.enabled === false })}
-            >
-              <span class="manager-status-toggle-track" aria-hidden="true">
-                <span class="manager-status-toggle-knob"></span>
-              </span>
-              <span class="manager-status-toggle-label">
-                {task.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              </span>
-            </button>
+            />
             <p class="manager-muted">
               {task.enabled === false
                 ? text(
@@ -914,15 +909,15 @@
         </div>
 
         <div class="manager-task-identity-fields">
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Name', 'Name')}</span>
             <input
               data-gathering-task-field="name"
               value={task.name || ''}
               oninput={(event) => onUpdateTask({ name: event.currentTarget.value })}
             />
-          </label>
-          <label class="manager-field">
+          </Field>
+          <Field as="label">
             <span
               >{text('FABRICATE.Admin.Manager.Environment.Tasks.Description', 'Description')}</span
             >
@@ -931,8 +926,8 @@
               value={task.description || ''}
               oninput={(event) => onUpdateTask({ description: event.currentTarget.value })}
             ></textarea>
-          </label>
-          <label class="manager-field">
+          </Field>
+          <Field as="label">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DefaultEnvironment',
@@ -960,7 +955,7 @@
                 'Used when a dropped node is not inside a tagged scene region. Hold Alt while dropping to always pick manually.'
               )}</span
             >
-          </label>
+          </Field>
         </div>
       </div>
     </section>
@@ -984,7 +979,7 @@
       </div>
       <div class="manager-task-availability-row" data-gathering-task-availability>
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
-          <div class="manager-field manager-availability-multi" data-gathering-task-field={kind}>
+          <Field as="div" class="manager-availability-multi" data-gathering-task-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
             <div
               class="manager-availability-picker"
@@ -1061,7 +1056,7 @@
                 >
               {/if}
             </div>
-          </div>
+          </Field>
         {/each}
       </div>
     </section>
@@ -1078,7 +1073,7 @@
 
         <div class="manager-task-stamina-row">
           <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
-          <div class="manager-field manager-task-stamina-cost-field">
+          <Field as="div" class="manager-task-stamina-cost-field">
             <span
               >{text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt')}</span
             >
@@ -1093,9 +1088,9 @@
               inputProps={{ 'data-gathering-task-stamina-cost': '' }}
               onChange={(next) => updateStaminaCost(next)}
             />
-          </div>
+          </Field>
 
-          <div class="manager-field manager-task-stamina-modifiers">
+          <Field as="div" class="manager-task-stamina-modifiers">
             <span
               title={text(
                 'FABRICATE.Admin.Manager.Economy.TaskStaminaModifiersHint',
@@ -1165,12 +1160,11 @@
                     )}
                     onChange={(next) => updateStaminaCostModifier(index, { max: next })}
                   />
-                  <button
-                    type="button"
-                    class="manager-icon-button is-danger"
-                    aria-label={text('FABRICATE.Admin.Manager.Economy.RemoveModifier', 'Remove')}
+                  <IconButton
+                    class="is-danger"
+                    ariaLabel={text('FABRICATE.Admin.Manager.Economy.RemoveModifier', 'Remove')}
                     onclick={() => removeStaminaCostModifier(index)}
-                    ><i class="fas fa-times" aria-hidden="true"></i></button
+                    ><i class="fas fa-times" aria-hidden="true"></i></IconButton
                   >
                 </div>
               {/each}
@@ -1190,7 +1184,7 @@
                 <span>{text('FABRICATE.Admin.Manager.Economy.AddModifier', 'Add modifier')}</span>
               </ManagerButton>
             </div>
-          </div>
+          </Field>
         </div>
       </section>
     {/if}
@@ -1239,7 +1233,7 @@
 
         <div class="manager-task-dc-row">
           <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
-          <div class="manager-field manager-task-dc-field">
+          <Field as="div" class="manager-task-dc-field">
             <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
             <!-- `min={0}` because a DC below zero is not a DC, and an unset field steps
                  from `min ?? 0` — without it one click of `−` on the blank field commits
@@ -1264,7 +1258,7 @@
               inputProps={{ 'data-gathering-task-dc-override': '' }}
               onChange={(next) => updateDcOverride(next)}
             />
-          </div>
+          </Field>
         </div>
       </section>
     {/if}
@@ -1281,7 +1275,7 @@
 
         <div class="manager-task-nodes-grid">
           <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
-          <div class="manager-field">
+          <Field as="div">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
             <Stepper
               value={nodes.max > 0 ? nodes.max : null}
@@ -1297,9 +1291,9 @@
               inputProps={{ 'data-gathering-task-node-count': '' }}
               onChange={(next) => setNodeCount(next)}
             />
-          </div>
+          </Field>
 
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span>
             <select
               value={nodes.depletionTiming}
@@ -1313,9 +1307,9 @@
                 >{text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success')}</option
               >
             </select>
-          </label>
+          </Field>
 
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span>
             <select
               value={respawn.policy}
@@ -1338,13 +1332,13 @@
                 )}</option
               >
             </select>
-          </label>
+          </Field>
 
           {#if respawnIsOverTime}
             <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. The
                  Stepper precedes the unit `<select>`, so the caption bound to the Stepper's
                  `−` button rather than to either control the reader would expect. -->
-            <div class="manager-field manager-task-node-interval">
+            <Field as="div" class="manager-task-node-interval">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
               <div class="manager-task-node-interval-row">
                 <Stepper
@@ -1376,9 +1370,9 @@
                   >
                 </select>
               </div>
-            </div>
+            </Field>
 
-            <label class="manager-field">
+            <Field as="label">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnGainMode', 'Each interval')}</span
               >
               <select
@@ -1399,12 +1393,12 @@
                   )}</option
                 >
               </select>
-            </label>
+            </Field>
           {/if}
 
           {#if respawnIsChance}
             <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
-            <div class="manager-field">
+            <Field as="div">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}</span>
               <div class="manager-task-node-chance-row">
                 <Stepper
@@ -1421,11 +1415,11 @@
                 />
                 <span class="manager-muted">%</span>
               </div>
-            </div>
+            </Field>
           {/if}
 
           {#if respawnIsExpression}
-            <label class="manager-field">
+            <Field as="label">
               <span
                 >{text(
                   'FABRICATE.Admin.Manager.Economy.RespawnAmount',
@@ -1446,7 +1440,7 @@
                   'Plain dice only (e.g. 1d4) — no character data.'
                 )}</span
               >
-            </label>
+            </Field>
           {/if}
         </div>
 
@@ -2047,10 +2041,9 @@
                     class="manager-drop-cell manager-drop-rank-cell"
                     data-gathering-task-drop-rank-cell
                   >
-                    <button
-                      type="button"
-                      class="manager-icon-button manager-drop-rank-button"
-                      aria-label={text(
+                    <IconButton
+                      class="manager-drop-rank-button"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp',
                         'Move drop up'
                       )}
@@ -2067,14 +2060,13 @@
                       onkeydown={(event) => event.stopPropagation()}
                     >
                       <i class="fas fa-chevron-up" aria-hidden="true"></i>
-                    </button>
+                    </IconButton>
                     <span class="manager-drop-rank-value" data-gathering-task-drop-rank
                       >#{rankIndex + 1}</span
                     >
-                    <button
-                      type="button"
-                      class="manager-icon-button manager-drop-rank-button"
-                      aria-label={text(
+                    <IconButton
+                      class="manager-drop-rank-button"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown',
                         'Move drop down'
                       )}
@@ -2091,7 +2083,7 @@
                       onkeydown={(event) => event.stopPropagation()}
                     >
                       <i class="fas fa-chevron-down" aria-hidden="true"></i>
-                    </button>
+                    </IconButton>
                   </span>
                 {/if}
                 <span
@@ -2296,7 +2288,12 @@
      the width the `fill` variant was measured against (the pinned operand slot at
      `styles/fabricate.css:2150`) and leaves a 106px typeable field. Taking a SIZE from the
      layout context is permitted; restyling the primitive is not. */
-  .manager-task-dc-field {
+  /* `:global(...)`, chained with `.manager-field`: this class now sits on a `<Field>`, and a
+     scoped rule cannot reach a class the component hands to a child (see `Field.svelte`). The
+     `.manager-field` compound is not decoration — it restores the (0,2,0) the scoped
+     `.manager-task-dc-field.svelte-hash` form had, which the bare `:global(.manager-task-dc-field)` would drop to
+     (0,1,0). */
+  :global(.manager-field.manager-task-dc-field) {
     max-width: 160px;
   }
 
@@ -2408,15 +2405,25 @@
     align-items: start;
   }
 
-  .manager-task-stamina-cost-field {
+  /* `:global(...)`, chained with `.manager-field`: this class now sits on a `<Field>`, and a
+     scoped rule cannot reach a class the component hands to a child (see `Field.svelte`). The
+     `.manager-field` compound is not decoration — it restores the (0,2,0) the scoped
+     `.manager-task-stamina-cost-field.svelte-hash` form had, which the bare `:global(.manager-task-stamina-cost-field)` would drop to
+     (0,1,0). */
+  :global(.manager-field.manager-task-stamina-cost-field) {
     width: 100%;
   }
 
-  .manager-task-stamina-cost-field > span {
+  /* The WHOLE selector is global, not just its first compound. Svelte scopes the LAST
+     compound of a rule whose first is `:global(...)`, and it does so with a BARE
+     `.svelte-hash` rather than `:where(.svelte-hash)` — which reaches the span correctly
+     and lifts the rule from the (0,2,1) it had to (0,3,1). A repair may not move the
+     cascade, so the descendant goes inside the `:global()` too. */
+  :global(.manager-field.manager-task-stamina-cost-field > span) {
     white-space: nowrap;
   }
 
-  .manager-task-stamina-modifiers {
+  :global(.manager-field.manager-task-stamina-modifiers) {
     min-width: 0;
     display: flex;
     flex-direction: column;

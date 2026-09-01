@@ -40,9 +40,13 @@ const harness = createMountedComponentHarness({
     // The shared numeric stepper: the condition Value field and the tier-step operand are
     // both built on it (issue 1050), and the same static-closure rule applies.
     'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the `Add trigger` control is the prototype's full-width
     // dashed row under the list rather than a button in the card head (issue 1096).
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     // The shared status card: a trigger's break-tools effect is its own bordered card with an
     // icon, a sentence and a switch (issue 1096), which is exactly this primitive.
     'src/ui/svelte/apps/manager/ToggleCard.svelte',

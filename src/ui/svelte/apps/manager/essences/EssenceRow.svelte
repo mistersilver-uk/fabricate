@@ -64,7 +64,9 @@
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import { essenceCapabilityPills } from './essenceStudio.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     essence = null,
@@ -106,13 +108,44 @@
   const description = $derived(
     essence?.description || text('FABRICATE.Admin.Manager.NoDescription', 'No description')
   );
+  /**
+   * A usage sentence that AGREES WITH ITS NUMBER (issue 1372, maintainer parity round 8).
+   *
+   * `{count} components` rendered `1 components` on five of the six grid cards in the lab world,
+   * and on the inspector's Usage row, because one key served every count. The corpus's own
+   * convention for this is a `…One` sibling holding the singular written out (`GroupCountOne`,
+   * `ImpactRecipesOne`, `SelectedHeadingOne`), which is what this selects — never the `(s)`
+   * marker, which `lang-hardcoded-singular-keeps-plural-marker.test.js` exists to keep off a
+   * literal 1.
+   *
+   * BOTH KEYS ARE PASSED AS LITERALS, never composed as `` `${key}One` ``: `lang-keys-no-orphans`
+   * scans `src/` for captured literals, and a key it only ever sees interpolated is reported as
+   * unreferenced while rendering perfectly.
+   *
+   * @param {{plural: string, singular: string, pluralText: string, singularText: string,
+   *   count: number}} spec
+   * @returns {string}
+   */
+  function usageSentence(spec) {
+    if (spec.count === 1) return format(spec.singular, spec.singularText, { count: 1 });
+    return format(spec.plural, spec.pluralText, { count: spec.count });
+  }
+
   const componentUsage = $derived(
-    format('FABRICATE.Admin.Manager.Essence.ComponentUsageCount', '{count} components', {
+    usageSentence({
+      plural: 'FABRICATE.Admin.Manager.Essence.ComponentUsageCount',
+      singular: 'FABRICATE.Admin.Manager.Essence.ComponentUsageCountOne',
+      pluralText: '{count} components',
+      singularText: '1 component',
       count: essence?.componentUsageCount || 0,
     })
   );
   const recipeUsage = $derived(
-    format('FABRICATE.Admin.Manager.Essence.RecipeUsageCount', '{count} recipes', {
+    usageSentence({
+      plural: 'FABRICATE.Admin.Manager.Essence.RecipeUsageCount',
+      singular: 'FABRICATE.Admin.Manager.Essence.RecipeUsageCountOne',
+      pluralText: '{count} recipes',
+      singularText: '1 recipe',
       count: essence?.recipeUsageCount || 0,
     })
   );
@@ -203,13 +236,13 @@
     <span class="manager-system-name" title={essence.name}>{essence.name}</span>
     {#if absent}
       <StatusPill
-        tone="neutral"
+        tone="subtle"
         icon="fas fa-circle-minus"
         label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
       />
     {:else if disabled}
       <StatusPill
-        tone="neutral"
+        tone="subtle"
         icon="fas fa-circle-pause"
         label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
       />
@@ -309,27 +342,21 @@
      and the GRID card's footer (issue 1036, maintainer round): the prototype's grid card carries
      these actions in a divided footer, not only in the inspector. -->
 {#snippet statusToggle()}
-  <button
-    type="button"
-    class={`manager-status-toggle ${disabled ? 'is-off' : 'is-on'}`}
-    data-essence-toggle={essence.id}
-    aria-pressed={!disabled}
-    aria-label={format(
+  <StatusToggle
+    on={!disabled}
+    ariaLabel={format(
       disabled
         ? 'FABRICATE.Admin.Manager.Essence.EnableNamed'
         : 'FABRICATE.Admin.Manager.Essence.DisableNamed',
       disabled ? 'Enable {name}' : 'Disable {name}',
       { name: essence.name }
     )}
+    data-essence-toggle={essence.id}
     onclick={(event) => {
       event.stopPropagation();
       onToggleEnabled(essence.id, disabled);
     }}
-  >
-    <span class="manager-status-toggle-track" aria-hidden="true"
-      ><span class="manager-status-toggle-knob"></span></span
-    >
-  </button>
+  />
 {/snippet}
 
 <!--
@@ -349,18 +376,19 @@
   producing the `manager-essence-edit-first-state` frame the docs site publishes. So the
   variant is a MODIFIER on the shipped primitive, and the `title` keeps its `Edit` lead.
 
-  The GRID card keeps the pencil. Its footer is a two-slot strip beside the enable switch with
-  no room for a phrase, and the prototype draws no grid presentation for this screen at all —
-  so there is no reference for a labelled card footer and inventing one would be drift in the
-  other direction.
+  WHAT EMITS THAT CLASS CHANGED AT ISSUE 1422 AND THE MODIFIER HAD TO FOLLOW IT.
+  `IconButton.svelte` now writes the `<button>` and prepends `manager-icon-button` itself, so
+  the class here is the caller's EXTRA rather than the whole attribute. `is-labelled` cannot
+  ride a `class:` directive any more — that directive is element-only, and this is a component
+  tag — so it is computed into the string instead. The order the primitive emits,
+  `manager-icon-button` then the extra, is the order this site already wrote by hand, so the
+  rendered `class` is unchanged in both states and the three surfaces above still resolve.
 -->
 {#snippet editButton(labelled = false)}
-  <button
-    type="button"
-    class="manager-icon-button manager-essence-edit"
-    class:is-labelled={labelled}
+  <IconButton
+    class={labelled ? 'manager-essence-edit is-labelled' : 'manager-essence-edit'}
     data-essence-edit={essence.id}
-    aria-label={labelled
+    ariaLabel={labelled
       ? format('FABRICATE.Admin.Manager.Essence.EditRulesNamed', 'Edit rules for {name}', {
           name: essence.name,
         })
@@ -383,7 +411,7 @@
     {:else}
       <i class="fas fa-pen" aria-hidden="true"></i>
     {/if}
-  </button>
+  </IconButton>
 {/snippet}
 
 {#if isCard}
@@ -411,13 +439,13 @@
     {#snippet badges()}
       {#if absent}
         <StatusPill
-          tone="neutral"
+          tone="subtle"
           icon="fas fa-circle-minus"
           label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
         />
       {:else if disabled}
         <StatusPill
-          tone="neutral"
+          tone="subtle"
           icon="fas fa-circle-pause"
           label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
         />
@@ -574,8 +602,19 @@
 
      `height: auto` with a `min-height` rather than a fixed `height`: Foundry's own `button`
      rule pins a height, and used height is `max(height, min-height)`, so the pair is what
-     lets the label sit on one line at the shared 34px without the glyph clipping. */
-  .manager-essence-row .manager-essence-edit.is-labelled {
+     lets the label sit on one line at the shared 34px without the glyph clipping.
+
+     THE CHILD HALF IS `:global` BECAUSE `IconButton.svelte` WRITES THE BUTTON (issue 1422).
+     Svelte stamps its `svelte-<hash>` onto the elements THIS component writes, and a `class`
+     handed to a child component is forwarded verbatim, so a fully scoped
+     `.manager-essence-edit.is-labelled` stopped matching the moment the control converted —
+     the pill would have silently collapsed back to the primitive's square 34px box with the
+     words inside it. The row keeps its scoping, so these rules cannot escape to a labelled
+     edit control drawn by any other component. Specificity is unchanged by construction:
+     Svelte compiles the scoped halves with `:where(.svelte-<hash>)`, which contributes
+     nothing, so the pair is (0,3,0) and (0,3,1) before and after — still beating
+     `.fabricate-manager .manager-icon-button` at (0,2,0), exactly as reasoned above. */
+  .manager-essence-row :global(.manager-essence-edit.is-labelled) {
     width: auto;
     height: auto;
     min-height: 34px;
@@ -588,8 +627,15 @@
   }
 
   /* The external-link glyph is the prototype's small trailing mark (8px against a 10.5px
-     label), not a second icon at label size. */
-  .manager-essence-row .manager-essence-edit.is-labelled i {
+     label), not a second icon at label size.
+
+     The `i` sits INSIDE the `:global(...)` rather than after it because Svelte rejects a
+     `:global()` in the middle of a sequence (`css_global_invalid_placement`) — it may only
+     open or close one. Scoping it separately is not an option either way: the glyph is
+     written in a snippet this component hands to `IconButton`, and while a snippet's markup
+     does carry this component's hash, the BUTTON between them does not, so the chain has to
+     cross the boundary in one global step. Specificity is (0,3,1) either way. */
+  .manager-essence-row :global(.manager-essence-edit.is-labelled i) {
     font-size: 0.55rem;
   }
 

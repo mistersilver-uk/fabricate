@@ -28,6 +28,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/journal/RunStatusPill.svelte',
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',

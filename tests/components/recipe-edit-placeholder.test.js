@@ -51,7 +51,9 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
     assert.equal(browserSource.includes('manager-recipe-actions'), false, 'the row action group markup should be gone');
     // The other two controls the row KEEPS.
     assert.ok(browserSource.includes('data-recipe-lock'), 'the row keeps the lock control');
-    assert.ok(browserSource.includes('manager-status-toggle'), 'the row keeps the enable toggle');
+    // `<StatusToggle`, not the class literal (issue 1040): the shared primitive is the only
+    // thing under `src/` writing `manager-status-toggle`, so the class reads 0 at this call site.
+    assert.ok(browserSource.includes('<StatusToggle'), 'the row keeps the enable toggle');
   });
 
   it('renders exactly three inspector action buttons ordered Duplicate -> Edit -> Delete', () => {

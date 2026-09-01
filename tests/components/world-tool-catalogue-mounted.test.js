@@ -60,6 +60,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    // THE `SYSTEM RULES n / m` PANEL, extracted out of the shell's inspector snippet (issue
+    // 1372). The shell composes it, so it is in this tree's static graph.
+    'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
+    // The design-system primitives the frame and the roster render (issues 1422 and 1040): the
+    // row's icon action, and the membership cluster's on/off switch. A rendered `.svelte` the
+    // harness omits HANGS this suite rather than failing it.
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`: one filter
     // asking the same question as the system Tool Rules screen's, drawn the same way.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',

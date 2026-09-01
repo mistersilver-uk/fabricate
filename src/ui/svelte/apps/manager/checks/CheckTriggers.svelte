@@ -33,6 +33,7 @@
   `outcomeOptions`).
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
@@ -42,7 +43,9 @@
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import ToggleCard from '../ToggleCard.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     value = null,
@@ -523,7 +526,7 @@
      A preset authors an ORDINARY trigger — no marker field, nothing downstream treats it
      differently — which is what keeps it a shortcut rather than a second kind of trigger. -->
 {#if presets.length > 0}
-  <section class="manager-inspector-card manager-checks-card" data-check-trigger-presets>
+  <InspectorCard class="manager-checks-card" data-check-trigger-presets="">
     <div class="manager-checks-card-head">
       <div>
         <h3 class="manager-checks-card-title">
@@ -551,7 +554,7 @@
         {/each}
       </div>
     </div>
-  </section>
+  </InspectorCard>
 {/if}
 
 <!-- THE TRIGGER LIST IS NOT A CARD. Its members are, one per trigger, sitting directly in the
@@ -640,18 +643,17 @@
               </span>
             </button>
 
-            <button
-              type="button"
-              class="manager-icon-button is-danger manager-checks-trigger-remove"
-              data-remove-trigger
-              aria-label={text(
+            <IconButton
+              class="is-danger manager-checks-trigger-remove"
+              data-remove-trigger=""
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Checks.Breakage.RemoveTrigger',
                 'Remove trigger'
               )}
               onclick={() => removeTrigger(trigger.id)}
             >
               <i class="fas fa-trash" aria-hidden="true"></i>
-            </button>
+            </IconButton>
           </div>
 
           {#if expanded}
@@ -662,7 +664,7 @@
             >
               <p class="manager-checks-trigger-legend">{conditionLegend}</p>
               <div class="manager-checks-breakage-condition">
-                <label class="manager-field">
+                <Field as="label">
                   <span
                     >{text('FABRICATE.Admin.Manager.Checks.Breakage.ConditionType', 'When')}</span
                   >
@@ -675,10 +677,10 @@
                       <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
                     {/each}
                   </select>
-                </label>
+                </Field>
 
                 {#if condition.type === 'diceGroup'}
-                  <label class="manager-field">
+                  <Field as="label">
                     <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Group', 'Group')}</span>
                     <select
                       data-trigger-group
@@ -690,8 +692,8 @@
                         <option value={String(group.groupId)}>{group.label}</option>
                       {/each}
                     </select>
-                  </label>
-                  <label class="manager-field">
+                  </Field>
+                  <Field as="label">
                     <span
                       >{text('FABRICATE.Admin.Manager.Checks.Breakage.Aggregate', 'Measure')}</span
                     >
@@ -707,7 +709,7 @@
                         >
                       {/each}
                     </select>
-                  </label>
+                  </Field>
                 {/if}
 
                 {#if isOutcomeTier}
@@ -745,7 +747,7 @@
                     {/if}
                   </div>
                 {:else}
-                  <label class="manager-field">
+                  <Field as="label">
                     <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Operator', 'Is')}</span>
                     <select
                       data-trigger-operator
@@ -759,12 +761,12 @@
                         >
                       {/each}
                     </select>
-                  </label>
+                  </Field>
                   <!-- A PLAIN NUMBER FIELD, not the stepper it was. A threshold is typed, not
                        walked to: reaching 20 from 1 is nineteen clicks, and the prototype draws
                        one input here. `Stepper` still owns the tier-step operand below, which is
                        a magnitude of one or two and is genuinely stepped. -->
-                  <label class="manager-field manager-checks-trigger-value">
+                  <Field as="label" class="manager-checks-trigger-value">
                     <span>{conditionValueLabel}</span>
                     <input
                       type="number"
@@ -775,7 +777,7 @@
                           value: Number(event.currentTarget.value) || 0,
                         })}
                     />
-                  </label>
+                  </Field>
                 {/if}
               </div>
 
@@ -784,7 +786,7 @@
                    the prototype's own effect groups read as a sequence: the condition, then what
                    it does to the outcome, then what it does to the tier. -->
               <div class="manager-checks-trigger-effect-row">
-                <div class="manager-field manager-checks-trigger-outcome">
+                <Field as="div" class="manager-checks-trigger-outcome">
                   <span>{outcomeLegend}</span>
                   <SegmentedControl
                     density="field"
@@ -798,7 +800,7 @@
                     optionDataAttr="data-trigger-outcome"
                     onChange={(next) => updateTrigger(trigger.id, { outcome: next })}
                   />
-                </div>
+                </Field>
               </div>
 
               {#if kind === 'routed'}
@@ -809,7 +811,7 @@
                most of the trigger card's width, and a four-segment control plus an
                operand does not fit what is left. -->
                 <div class="manager-checks-trigger-effect-row" data-trigger-tier-step>
-                  <div class="manager-field manager-checks-trigger-step-mode">
+                  <Field as="div" class="manager-checks-trigger-step-mode">
                     <span>{tierStepLegend}</span>
                     <SegmentedControl
                       density="field"
@@ -820,13 +822,14 @@
                       optionDataAttr="data-trigger-tier-step-mode"
                       onChange={(mode) => updateTierStep(trigger.id, { mode })}
                     />
-                  </div>
+                  </Field>
 
                   <!-- The operand slot is ALWAYS present at one pinned width and only its
                  contents swap, so changing mode never moves the control out from
                  under the pointer in this wrapping row. -->
-                  <div
-                    class={`manager-field manager-checks-trigger-step-operand ${dangling ? 'is-invalid' : ''}`}
+                  <Field
+                    as="div"
+                    class={`manager-checks-trigger-step-operand ${dangling ? 'is-invalid' : ''}`}
                   >
                     <span>{tierStepAmountLabel}</span>
                     {#if step.mode === 'up' || step.mode === 'down'}
@@ -903,7 +906,7 @@
                     {:else}
                       <input type="text" value="" disabled aria-hidden="true" tabindex="-1" />
                     {/if}
-                  </div>
+                  </Field>
 
                   {#if step.mode === 'target' && outcomeOptions.length === 0}
                     <!-- Its own hook, distinct from the outcomeTier condition's: a trigger that

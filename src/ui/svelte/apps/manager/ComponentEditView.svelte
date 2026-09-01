@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../components/Field.svelte';
   import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
@@ -25,6 +26,7 @@
   // screenshot evidence map names it explicitly in the editor's recipe so a change to it
   // still routes evidence to the `manager-component-edit` frames.
   import EssenceQuantityCard from './components/EssenceQuantityCard.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,
@@ -44,6 +46,7 @@
     salvageDcOverrideForSelection,
   } from './component/salvageDcPresets.js';
   import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     component = null,
@@ -1348,25 +1351,20 @@
                  DISABLED <button> receives no mouse events, so a tooltip would never
                  appear in any browser — and no mounted test would notice, because the
                  attribute IS in the DOM. -->
-            <!-- `is-on`/`is-off` mirror ToggleCard's switch exactly: same class pair,
-                 same `aria-pressed`, so the toggle this replaced is a no-op DOM diff at
-                 the control itself. -->
-            <button
-              type="button"
-              class={`manager-status-toggle ${salvageEnabled ? 'is-on' : 'is-off'}`}
-              data-recipe-field="salvageEnabled"
-              aria-pressed={salvageEnabled}
-              aria-label={text(
+            <!-- The shared switch, so this card and `ToggleCard` draw one control rather
+                 than two spellings of it (issue 1040). The hand-rolled version this replaced
+                 omitted `aria-hidden` on its track, which the primitive always emits: the
+                 track and knob are decoration and the button's own `aria-label` is the name. -->
+            <StatusToggle
+              on={salvageEnabled}
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Component.SalvageEditor.Enable',
                 'Salvage this component'
               )}
               disabled={salvageToggleDisabled}
+              data-recipe-field="salvageEnabled"
               onclick={() => setSalvage({ enabled: !salvageEnabled })}
-            >
-              <span class="manager-status-toggle-track"
-                ><span class="manager-status-toggle-knob"></span></span
-              >
-            </button>
+            />
           </div>
         </div>
 
@@ -1415,7 +1413,7 @@
           />
         {/if}
 
-        <div class="manager-field" data-salvage-result-groups>
+        <Field as="div" data-salvage-result-groups="">
           {#if salvageProgressive}
             <!-- PROGRESSIVE: an ordered list of SINGLE results, with no group chrome.
                See `salvageStageGroup` for why the groups are still the storage and why
@@ -1555,19 +1553,18 @@
                         >
                       </span>
 
-                      <button
-                        type="button"
-                        class="manager-icon-button is-danger"
-                        aria-label={text(
+                      <IconButton
+                        class="is-danger"
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
                           'Remove result'
                         )}
-                        data-remove-salvage-result
+                        data-remove-salvage-result=""
                         onclick={() => removeSalvageStage(result.id)}
                         disabled={saving}
                       >
                         <i class="fas fa-xmark" aria-hidden="true"></i>
-                      </button>
+                      </IconButton>
                     </div>
 
                     <!-- ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ────────────────────
@@ -1739,19 +1736,18 @@
                           updateSalvageGroup(group.id, { name: event.currentTarget.value })}
                         disabled={saving}
                       />
-                      <button
-                        type="button"
-                        class="manager-icon-button is-danger"
-                        aria-label={text(
+                      <IconButton
+                        class="is-danger"
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveGroup',
                           'Remove result group'
                         )}
-                        data-remove-salvage-group
+                        data-remove-salvage-group=""
                         onclick={() => removeSalvageGroup(group.id)}
                         disabled={saving}
                       >
                         <i class="fas fa-xmark" aria-hidden="true"></i>
-                      </button>
+                      </IconButton>
                     </div>
 
                     {#if (group.results || []).length > 0}
@@ -1788,19 +1784,18 @@
                                   quantity: clampSalvageQuantity(next),
                                 })}
                             />
-                            <button
-                              type="button"
-                              class="manager-icon-button is-danger"
-                              aria-label={text(
+                            <IconButton
+                              class="is-danger"
+                              ariaLabel={text(
                                 'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
                                 'Remove result'
                               )}
-                              data-remove-salvage-result
+                              data-remove-salvage-result=""
                               onclick={() => removeSalvageResult(group.id, result.id)}
                               disabled={saving}
                             >
                               <i class="fas fa-xmark" aria-hidden="true"></i>
-                            </button>
+                            </IconButton>
                           </li>
                         {/each}
                       </ul>
@@ -1860,13 +1855,13 @@
               </ManagerButton>
             {/if}
           {/if}
-        </div>
+        </Field>
 
         <!-- RULING A: everything below is CHROME — it only has meaning once salvage
              runs, so it collapses when salvage is off. The result-group editor above
              deliberately does NOT, because it owns the only add-group control. -->
         {#if salvageShowChrome && salvageRouted}
-          <div class="manager-field" data-salvage-routing>
+          <Field as="div" data-salvage-routing="">
             <span class="manager-component-readonly-label">
               <span
                 >{text(
@@ -1920,7 +1915,7 @@
                 )}
               </p>
             {/if}
-          </div>
+          </Field>
         {/if}
 
         <!-- The component's own check-modifier pick (issue 1095). Rendered only under the
@@ -1950,7 +1945,7 @@
         {/if}
 
         {#if salvageShowChrome && salvageShowDcOverride}
-          <div class="manager-field" data-salvage-dc-override>
+          <Field as="div" data-salvage-dc-override="">
             <span class="manager-component-readonly-label">
               <span
                 >{text(
@@ -2032,7 +2027,7 @@
                 )}</span
               >
             </ManagerButton>
-          </div>
+          </Field>
         {/if}
       </section>
     {/if}

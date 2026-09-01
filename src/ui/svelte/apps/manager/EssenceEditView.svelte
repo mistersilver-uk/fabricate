@@ -1,13 +1,35 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The GM essence EDITOR (issue 1036): three tabs — Identity, On craft, Validation — beside
-  the shell's own inspector column, which the manager root fills with the live
-  `EssenceBehaviorPreview`.
+  THE SYSTEM ESSENCE RULES EDITOR (issues 1036 and 1372).
 
-  This component is the editor's DRAFT owner and its form. Everything visual belongs to the
-  three tab bodies under `essences/`; what is here is the draft, the dirty computation, the
-  save, and the two async resolutions the tabs cannot do for themselves (the macro's display
-  name, and the `type !== 'script'` check on a dropped macro).
+  It is the system-scope half of the essence model: a world record holds the essence's identity
+  and every crafting system that has the essence resolves the same one, and THIS screen holds what
+  that essence does on craft in ONE system.
+
+  ── IT HAS TWO SHAPES, AND THE FORK IS "IS THERE A SHARED DEFINITION" ─────────────
+  `rulesMode` is `scopedKnown && !isNew` — the world catalogue holds this essence, so there IS a
+  record that owns its identity. Then the editor is the two-tab rules screen: `Essence rules` and
+  `Validation`, and the rules tab is the shared-definition callout, the per-system enable switch,
+  the two behaviour cards each carrying its own inherit switch, and the copy-to-other-systems
+  action.
+
+  Otherwise — a CREATE draft, or a world corpus that cannot answer — it is the shipped three-tab
+  editor with its Identity tab. That is not a hedge: a create draft's in-system record is the only
+  record there is, so there is no shared layer for an identity edit to contradict, and the moment
+  it is saved the world corpus answers for it and it is the rules screen forever after.
+
+  ── IDENTITY IS NOT EDITABLE FROM A SYSTEM, AND THE ABSENCE IS THE FEATURE ────────
+  `ui-integration/spec.md` `### GM World Essence Screens` requirement 10. A name, glyph, colour or
+  description edited here would rename the essence in every other system holding it, from a screen
+  titled with one of them. The route to those fields is the callout's `Edit shared definition`,
+  which opens the world essence entry editor — the surface that owns them — and it is the ONLY
+  route this screen offers to them.
+
+  ── THIS COMPONENT IS THE EDITOR'S DRAFT OWNER AND ITS FORM ───────────────────────
+  Everything visual belongs to the tab bodies under `essences/` and the shared cards under
+  `scoped/`; what is here is the draft, the dirty computation, the save, and the two async
+  resolutions the tabs cannot do for themselves (the macro's display name, and the
+  `type !== 'script'` check on a dropped macro).
 
   ── EVERY TAB PROP MUST ALSO BE FORWARDED HERE ────────────────────────────────────
   This file is the essence equivalent of the `RecipeEditView` wrapper: a prop a tab declares
@@ -21,26 +43,12 @@
   Save silently stops working. The header renders in the SHELL's action bar, not here,
   which is why this file does not import it.
 
-  ── THE WORLD-SCOPE MODEL (issue 1372) ────────────────────────────────────────────
-  `scope`, `actions`, `systems` and `systemId` are the four keys `essenceScopeProps` supplies at
-  this call site, so declaring them is correct rather than hazardous — the spread owns each name
-  and the lookup never falls through to the bundle thunk.
-
-  What they add is three things, and each is OFF unless the world corpus can actually answer it:
-
-   - an IDENTITY BANNER saying that name, icon and colour come from the Essence Catalogue and are
-     shared with N other systems, so a GM editing them here knows the blast radius;
-   - the shared `InheritRow` over `effectSource` and `macro`, and the LOCK that follows from it:
-     while a section is inherited this system does not own the value, so the On-craft tab renders
-     it read-only and draws no unlink. The switch is the one control that unlocks it;
-   - the NO-MEMBERSHIP block: this system has no record for this essence, so nothing here reads
-     its values. It states that and offers the one action that fixes it.
-
-  THE IDENTITY BANNER CARRIES NO DEEP LINK, AND THAT IS A REPORTED LIMIT RATHER THAN A CHOICE.
-  Navigating to the world entry needs a route callback, and this view's call site in
-  `CraftingSystemManagerRoot.svelte` passes none — the file `### GM World Scoped Entity Routes`
-  requirement 7 closes to this lane. The banner therefore NAMES the catalogue and where it lives;
-  the link is a shell change and belongs to whoever may open that file.
+  ── WHAT IS BUFFERED AND WHAT IS NOT ──────────────────────────────────────────────
+  The in-system record's fields — including `enabled` — accumulate in this draft and land on
+  Save. The MEMBERSHIP writes do not: adding this essence to the system and switching a section
+  between inherited and overridden are actions on a world-scope record this draft does not
+  describe, and each lands immediately, exactly as `### Scoped entity editor patterns`
+  requirement 14 states for the world entry editors.
 -->
 <script>
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';
@@ -60,11 +68,21 @@
     resolveMacroName,
   } from '../../../../utils/macroReference.js';
   import { essenceEditorValidation } from '../../../../utils/essenceValidation.js';
-  import { essenceOnCraftCount } from './essences/essenceStudio.js';
+  import {
+    ESSENCE_EDITOR_TABS,
+    ESSENCE_RULES_TABS,
+    essenceOnCraftCount,
+  } from './essences/essenceStudio.js';
   import Callout from './Callout.svelte';
-  import InheritRow from './scoped/InheritRow.svelte';
+  import ToggleCard from './ToggleCard.svelte';
+  import CopyRulesCard from './scoped/CopyRulesCard.svelte';
   import MembershipActions from './scoped/MembershipActions.svelte';
-  import { essenceSectionNote, essenceSectionValueName } from './scoped/essenceScoped.js';
+  import SharedDefinitionCallout from './scoped/SharedDefinitionCallout.svelte';
+  import {
+    essenceInheritHeading,
+    essenceSectionNote,
+    essenceSectionValueName,
+  } from './scoped/essenceScoped.js';
 
   let {
     scope = null,
@@ -85,9 +103,14 @@
     // only when it is given a handler, so an absent seam hides the control instead of
     // shipping one that silently does nothing.
     onCopySourceUuid = null,
+    // THE ROUTE OUT TO THE SHARED DEFINITION (issue 1372, maintainer parity round 7). A page
+    // cannot navigate, so the shell supplies this and it opens `world-essence-entry` on this
+    // essence. Null-by-default for the same reason as the clipboard seam above: the callout
+    // hides the exit rather than shipping a button that does nothing.
+    onOpenSharedDefinition = null,
   } = $props();
 
-  let activeTab = $state('identity');
+  let activeTab = $state('rules');
   let draftId = $state('');
   let name = $state('');
   let description = $state('');
@@ -107,7 +130,6 @@
   let lastEssenceId = $state(null);
   let lastDirty = $state(false);
   let lastDraftSignature = $state('');
-  let armedToken = $state('');
 
   // ── THE WORLD-SCOPE JOIN ────────────────────────────────────────────────────────────────
   // Every one of these is guarded on `scopedKnown`, which is false for an unreadable corpus, for
@@ -147,17 +169,37 @@
     effectSource: essenceSectionNote({
       inherited: inheritedMap.effectSource !== false,
       worldName: worldDefaultNames.effectSource,
+      section: 'effectSource',
       format: formatted,
     }),
     macro: essenceSectionNote({
       inherited: inheritedMap.macro !== false,
       worldName: worldDefaultNames.macro,
+      section: 'macro',
+      format: formatted,
+    }),
+  });
+  // The bold head sentence of each inherit row. It names the SYSTEM, which the tab body is not
+  // handed, so it is composed here and passed down beside the notes.
+  const inheritHeadings = $derived({
+    effectSource: essenceInheritHeading({
+      inherited: inheritedMap.effectSource !== false,
+      systemName,
+      format: formatted,
+    }),
+    macro: essenceInheritHeading({
+      inherited: inheritedMap.macro !== false,
+      systemName,
       format: formatted,
     }),
   });
   const sharedWithCount = $derived(Math.max(0, (Number(worldEntry?.membershipCount) || 0) - 1));
 
   const isNew = $derived(!essence?.id);
+  // THE FORK. See the header note: a shared definition exists, so identity is not this screen's
+  // to edit and the rules screen is what renders.
+  const rulesMode = $derived(scopedKnown && !isNew);
+  const editorTabs = $derived(rulesMode ? ESSENCE_RULES_TABS : ESSENCE_EDITOR_TABS);
   const selectedSource = $derived(
     sourceComponentId
       ? managedItemOptions.find((item) => item.id === sourceComponentId) || null
@@ -183,7 +225,7 @@
       showSourceUi ? 'source' : 'no-source',
       showPropertyMacroUi ? 'macro' : 'no-macro',
       macroName,
-    ].join('')
+    ].join('')
   );
 
   const onCraftCount = $derived(
@@ -233,8 +275,21 @@
     sourceTouched = false;
     saveFailed = false;
     macroWarning = '';
-    activeTab = 'identity';
+    // THE FIRST TAB OF WHICHEVER SET IS RENDERING. A fixed `'identity'` would open the rules
+    // screen on a tab its own strip does not contain, and the panel would render the
+    // validation fallback under a strip showing `Essence rules` as selected.
+    activeTab = editorTabs[0].id;
     lastEssenceId = nextEssenceId;
+  });
+
+  // THE STRIP AND THE PANEL CANNOT DISAGREE. `rulesMode` can flip after mount — the world corpus
+  // is published asynchronously and an editor opened before it arrives starts on the create
+  // editor's tab set — and the seed effect above only re-runs when the ESSENCE changes, so
+  // without this the strip would render `Essence rules | Validation` with neither selected while
+  // the panel rendered whichever body the stale token happened to reach.
+  $effect(() => {
+    if (editorTabs.some((tab) => tab.id === activeTab)) return;
+    activeTab = editorTabs[0].id;
   });
 
   // The macro's display NAME, resolved cancellably. The `cancelled` latch inside
@@ -443,78 +498,15 @@
     ONE HEAD ELEMENT, AND IT IS LOAD-BEARING RATHER THAN TIDINESS.
 
     `styles/fabricate.css:2448` gives this route's `<main>` `grid-template-rows: auto minmax(0,
-    1fr)` — EXACTLY TWO rows, the tab strip and the form. Adding the world-scope banner as a
-    third child of `<main>` puts it in an implicit third row, and the form then overlaps the tab
-    strip: measured in the View Lab, the tab button was visible, enabled and stable and every
-    click on it was intercepted by `<form id="manager-essence-edit-form">`, which is a screen a
-    GM cannot change tabs on. The sheet is closed to this lane by `### GM World Scoped Entity
-    Routes` requirement 7, so the fix belongs here: the banner and the strip share the `auto`
-    row inside one element, and the grid still sees two children.
-
-    NOTHING about the rendered strip changes — `EssenceEditorTabs` keeps its own ids, hooks and
-    classes, which is what makes this a wrapper rather than a conversion.
+    1fr)` — EXACTLY TWO rows, the tab strip and the form. A third child of `<main>` lands in an
+    implicit third row and the form then overlaps the tab strip: measured in the View Lab, the tab
+    button was visible, enabled and stable and every click on it was intercepted by
+    `<form id="manager-essence-edit-form">`, which is a screen a GM cannot change tabs on. The
+    wrapper keeps the grid at two children whatever this head grows to carry.
   -->
   <div class="manager-essence-edit-head">
-    {#if scopedKnown}
-      <!-- THE IDENTITY BANNER. It names what this editor does NOT own, which is the one thing a
-         system-scope editor over a shared definition has to say before anything else. -->
-      <section class="manager-essence-scope-banner" data-essence-scope-banner={essence?.id}>
-        <p class="manager-essence-scope-note">
-          {formatted(
-            'FABRICATE.Admin.Manager.Scoped.Essence.IdentityBanner',
-            'Name, icon and colour come from the Essence Catalogue, shared with {count} other system(s). Everything below belongs to {system} alone.',
-            { count: sharedWithCount, system: systemName }
-          )}
-        </p>
-        {#if !member}
-          <!-- THE BLOCK STATE. No membership record means nothing in this system reads any of the
-             values below, so the editor says so and offers the one action that changes it. -->
-          <Callout
-            tone="warning"
-            text={formatted(
-              'FABRICATE.Admin.Manager.Scoped.Essence.NoRulesHere',
-              'No rules in {system}. Add it here to give this system its own record; it inherits every world default until you override a section.',
-              { system: systemName }
-            )}
-            dataAttr="data-essence-scope-state"
-            dataValue="no-membership"
-          />
-        {/if}
-        <MembershipActions
-          entityType="essence"
-          entityId={essence?.id ?? ''}
-          systemId={activeSystemId}
-          entityName={essence?.name ?? ''}
-          {systemName}
-          {member}
-          enabled={systemRow?.enabled === true}
-          disabled={saving}
-          {armedToken}
-          onArm={(token) => (armedToken = token)}
-          onDisarm={() => (armedToken = '')}
-          onAdd={() => actions?.addToSystem?.(essence?.id, activeSystemId)}
-          onRemove={() => actions?.removeFromSystem?.(essence?.id, activeSystemId)}
-          onToggleEnabled={(next) => actions?.setEnabled?.(essence?.id, activeSystemId, next)}
-        />
-        {#if member}
-          <!-- THE TWO INHERIT SWITCHES, and they sit ABOVE the tab strip rather than inside the
-             On-craft tab on purpose: the switch is what unlocks the value card beneath it, and a
-             GM must be able to see both the state and the control that changes it at once. -->
-          <div class="manager-essence-scope-inherit">
-            <InheritRow
-              entityType="essence"
-              inherited={inheritedMap}
-              notes={inheritNotes}
-              disabled={saving}
-              onToggle={(section, next) =>
-                actions?.setSectionInherited?.(essence?.id, activeSystemId, section, next)}
-            />
-          </div>
-        {/if}
-      </section>
-    {/if}
-
     <EssenceEditorTabs
+      tabs={editorTabs}
       {activeTab}
       {onCraftCount}
       blockingCount={validationCounts.blocking}
@@ -532,7 +524,9 @@
       tabindex="-1"
       data-keyboard-focus="true"
     >
-      {#if activeTab === 'identity'}
+      {#if activeTab === 'validation'}
+        <EssenceValidationTab essence={draftSummary} context={validationContext} />
+      {:else if activeTab === 'identity'}
         <EssenceIdentityTab
           {name}
           {description}
@@ -546,40 +540,150 @@
           onColourChange={(value) => (colorToken = normalizeEssenceColorToken(value) || '')}
           onEnabledChange={(value) => (enabled = value !== false)}
         />
-      {:else if activeTab === 'oncraft'}
-        <EssenceOnCraftTab
-          {sourceComponentId}
-          {selectedSource}
-          storedSourceName={storedSourceName()}
-          macroUuid={propertyMacroUuid}
-          {macroName}
-          {macroMissing}
-          {macroWarning}
-          disabledEssence={enabled === false}
-          {managedItemOptions}
-          effectTransferEnabled={showSourceUi}
-          propertyMacrosEnabled={showPropertyMacroUi}
-          {lockedSections}
-          {inheritNotes}
-          {saving}
-          onSourceSelect={(itemId) => {
-            sourceComponentId = itemId || '';
-            sourceTouched = true;
-          }}
-          onSourceDrop={handleSourceDrop}
-          onSourceClear={() => {
-            sourceComponentId = '';
-            sourceTouched = true;
-          }}
-          {onCopySourceUuid}
-          onMacroDrop={handleMacroDrop}
-          onMacroUnlink={() => {
-            propertyMacroUuid = '';
-            macroWarning = '';
-          }}
-        />
       {:else}
-        <EssenceValidationTab essence={draftSummary} context={validationContext} />
+        <div class="manager-essence-rules-stack">
+          {#if rulesMode}
+            <!-- WHAT THIS SCREEN DOES NOT OWN, STATED FIRST, with the one route to it. -->
+            <SharedDefinitionCallout
+              name={essence?.name ?? ''}
+              icon={normalizeEssenceIcon(essence?.icon || DEFAULT_ESSENCE_ICON)}
+              tint={normalizeEssenceColorToken(essence?.colorToken) || ''}
+              pillLabel={text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.WorldDefinitionPill',
+                'World definition'
+              )}
+              note={sharedWithCount === 1
+                ? text(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.IdentityBannerOne',
+                    'Name, icon and colour are world vocabulary, shared with one other system. What it does on craft is set here.'
+                  )
+                : formatted(
+                    'FABRICATE.Admin.Manager.Scoped.Essence.IdentityBanner',
+                    'Name, icon and colour are world vocabulary, shared with {count} other systems. What it does on craft is set here.',
+                    { count: sharedWithCount }
+                  )}
+              actionLabel={text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.EditSharedDefinition',
+                'Edit shared definition'
+              )}
+              disabled={saving}
+              onOpen={onOpenSharedDefinition
+                ? () => onOpenSharedDefinition(essence?.id ?? '')
+                : null}
+            />
+
+            {#if member}
+              <!-- THE PER-SYSTEM ENABLE SWITCH, ON ITS OWN CARD. It used to share a grey slab
+                 with the remove action and both inherit toggles, unlabelled, so the loudest
+                 switch on the screen said only `Off` and never what it was off FOR. -->
+              <ToggleCard
+                icon=""
+                title={formatted(
+                  'FABRICATE.Admin.Manager.Essence.EnabledIn',
+                  'Enabled in {system}',
+                  { system: systemName }
+                )}
+                sub={text(
+                  'FABRICATE.Admin.Manager.Essence.EnabledInHint',
+                  'Components in this system can carry it, and recipes can require it.'
+                )}
+                on={enabled !== false}
+                disabled={saving}
+                section="enabled"
+                field="essence-enabled"
+                subAttr="data-essence-enabled-state"
+                toggleLabel={enabled !== false
+                  ? text('FABRICATE.Admin.Manager.Essence.DisableThis', 'Disable this essence')
+                  : text('FABRICATE.Admin.Manager.Essence.EnableThis', 'Enable this essence')}
+                onToggle={(next) => (enabled = next !== false)}
+              />
+            {:else}
+              <!-- THE BLOCK STATE. No membership record means nothing in this system reads any
+                 of the values below, so the editor says so and offers the one action that
+                 changes it. -->
+              <Callout
+                tone="warning"
+                text={formatted(
+                  'FABRICATE.Admin.Manager.Scoped.Essence.NoRulesHere',
+                  'No rules in {system}. Add it here to give this system its own record; it inherits every world default until you override a section.',
+                  { system: systemName }
+                )}
+                dataAttr="data-essence-scope-state"
+                dataValue="no-membership"
+              />
+              <MembershipActions
+                entityType="essence"
+                entityId={essence?.id ?? ''}
+                systemId={activeSystemId}
+                entityName={essence?.name ?? ''}
+                {systemName}
+                member={false}
+                disabled={saving}
+                onAdd={() => actions?.addToSystem?.(essence?.id, activeSystemId)}
+              />
+            {/if}
+          {/if}
+
+          <EssenceOnCraftTab
+            scoped={rulesMode}
+            inheritable={rulesMode && member}
+            {inheritedMap}
+            {inheritHeadings}
+            onToggleInherit={(section, next) =>
+              actions?.setSectionInherited?.(essence?.id, activeSystemId, section, next)}
+            {sourceComponentId}
+            {selectedSource}
+            storedSourceName={storedSourceName()}
+            macroUuid={propertyMacroUuid}
+            {macroName}
+            {macroMissing}
+            {macroWarning}
+            disabledEssence={enabled === false}
+            {managedItemOptions}
+            effectTransferEnabled={showSourceUi}
+            propertyMacrosEnabled={showPropertyMacroUi}
+            {lockedSections}
+            {inheritNotes}
+            {saving}
+            onSourceSelect={(itemId) => {
+              sourceComponentId = itemId || '';
+              sourceTouched = true;
+            }}
+            onSourceDrop={handleSourceDrop}
+            onSourceClear={() => {
+              sourceComponentId = '';
+              sourceTouched = true;
+            }}
+            {onCopySourceUuid}
+            onMacroDrop={handleMacroDrop}
+            onMacroUnlink={() => {
+              propertyMacroUuid = '';
+              macroWarning = '';
+            }}
+          />
+
+          {#if rulesMode && member}
+            <!-- REUSE. A one-time clone into another system's own rules, never a live link,
+               and the sentence beside the button says so. -->
+            <CopyRulesCard
+              {systems}
+              currentSystemId={activeSystemId}
+              icon="fas fa-copy"
+              title={text('FABRICATE.Admin.Manager.Scoped.Essence.ReuseTitle', 'Reuse these rules')}
+              blurb={text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.ReuseBlurb',
+                'Copies the effect source and macro into another system’s own rules. One-time shortcut, not a live link.'
+              )}
+              actionLabel={text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.ReuseAction',
+                'Copy to other systems…'
+              )}
+              disabled={saving}
+              onCopy={(targets) =>
+                actions?.copyMembership?.(essence?.id, activeSystemId, targets) ?? false}
+            />
+          {/if}
+        </div>
       {/if}
     </div>
 
@@ -595,9 +699,8 @@
 </main>
 
 <style>
-  /* The `auto` grid row this route declares, holding BOTH the banner and the tab strip. See the
-     note in the markup: a third child of `<main>` lands in an implicit row and the form overlaps
-     the strip. */
+  /* The `auto` grid row this route declares, holding the tab strip. See the note in the markup:
+     a third child of `<main>` lands in an implicit row and the form overlaps the strip. */
   .manager-essence-edit-head {
     display: flex;
     flex-direction: column;
@@ -605,35 +708,12 @@
     min-width: 0;
   }
 
-  /* The world-scope banner. STATIC class names, so Svelte can prove each selector is used and
-     `lint:svelte:warnings` stays at zero; `styles/fabricate.css` is closed to this lane. */
-  /* A CARD, not loose text. This rendered as an unstyled paragraph and two bare controls sitting
-     above the tab strip, which read as content that had escaped its container rather than as a
-     scope banner. The surface is what says "this part is not about the system you are editing". */
-  .manager-essence-scope-banner {
+  /* The rules tab's own stack. The behaviour cards arrive inside `EssenceOnCraftTab`'s stack,
+     so this one spaces the callout, the enable card, that group and the reuse card by the same
+     step — one ladder down the page rather than two that happen to agree. */
+  .manager-essence-rules-stack {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
-    min-width: 0;
-    margin-bottom: var(--fab-space-3);
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: var(--fab-radius-card, 12px);
-    background: var(--fab-bg-3);
-  }
-
-  .manager-essence-scope-note {
-    margin: 0;
-    color: var(--fab-text-muted);
-    font-size: 0.74rem;
-    line-height: 1.55;
-  }
-
-  /* The two inherit rows sit side by side where the card is wide enough, so the banner costs one
-     band rather than four stacked ones above the tab strip. */
-  .manager-essence-scope-inherit {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: var(--fab-space-3);
     min-width: 0;
   }

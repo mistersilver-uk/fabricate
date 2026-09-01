@@ -43,7 +43,9 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import Pagination from '../../components/Pagination.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     recipeItems = [],
@@ -482,12 +484,12 @@
             </Chip>
 
             <div class="manager-books-scrolls-actions">
-              <button
-                type="button"
-                class={`manager-status-toggle ${item.enabled === false ? 'is-off' : 'is-on'}`}
-                aria-pressed={item.enabled !== false}
-                data-books-scrolls-toggle={item.id}
-                aria-label={item.enabled === false
+              <StatusToggle
+                on={item.enabled !== false}
+                label={item.enabled === false
+                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                ariaLabel={item.enabled === false
                   ? text(
                       'FABRICATE.Admin.Manager.BooksScrolls.EnableNamed',
                       'Enable {name}'
@@ -496,25 +498,16 @@
                       'FABRICATE.Admin.Manager.BooksScrolls.DisableNamed',
                       'Disable {name}'
                     ).replace('{name}', item.resolvedName)}
+                data-books-scrolls-toggle={item.id}
                 onclick={(event) => {
                   event.stopPropagation();
                   onToggleEnabled(item.id, item.enabled === false);
                 }}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true"
-                  ><span class="manager-status-toggle-knob"></span></span
-                >
-                <span class="manager-status-toggle-label"
-                  >{item.enabled === false
-                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span
-                >
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button manager-books-scrolls-edit"
+              />
+              <IconButton
+                class="manager-books-scrolls-edit"
                 data-books-scrolls-edit={item.id}
-                aria-label={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.BooksScrolls.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', item.resolvedName)}
@@ -522,7 +515,7 @@
                 onclick={() => onOpenRecipeItem(item.id)}
               >
                 <i class="fas fa-pen" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </div>
           </div>
         {/each}

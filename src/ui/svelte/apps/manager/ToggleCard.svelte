@@ -16,13 +16,29 @@
   truth rather than the second being retired. `aria-pressed` on a plain `<button>` is the
   house pattern — the repo uses no `role="switch"` anywhere; do not introduce one here.
 
+  THE SWITCH ITSELF IS NOW `<StatusToggle>` (issue 1040), and that is a COMPOSITION rather
+  than a competing primitive: this card owns icon, title, sub-line and the card's own state
+  class, and the shared switch owns the track, the knob and the reading. The extraction is
+  byte-faithful in the direction that matters here — the primitive emits the identical
+  element tree, the identical class string (`manager-status-toggle is-on|is-off`, in that
+  order) and the identical `aria-pressed`, so the issue-658 retrofit is still a no-op DOM
+  diff. The one thing that differs is a comment anchor for the primitive's conditional
+  reading, which this card never passes and which renders nothing.
+
   String props are PRE-LOCALIZED by the caller (no `localize` import): the caller owns the
   i18n keys and their fallbacks, which keeps this component a presentational leaf.
 -->
 <script>
+  import StatusToggle from '../../components/StatusToggle.svelte';
+
   let {
     // Visual variant appended to the card class (e.g. 'is-info'), toning it when on.
     variant = '',
+    // The leading glyph. `''` renders NO glyph slot at all rather than an empty one, which is
+    // what the essence rules editor's `Enabled in <system>` card needs: the reference draws that
+    // card as a bold title over one line with the switch on the right and no icon, and a slot
+    // holding an empty `<i>` still reserves its column and left-indents the copy away from the
+    // cards above and below it. Every shipped caller passes a real glyph, so nothing moves.
     icon = 'fas fa-circle',
     title = '',
     sub = '',
@@ -59,7 +75,9 @@
   class={`manager-recipe-status-card ${variant} ${on ? 'is-on' : 'is-off'}`}
   data-recipe-section={section || undefined}
 >
-  <span class="manager-recipe-status-icon" aria-hidden="true"><i class={icon}></i></span>
+  {#if icon}
+    <span class="manager-recipe-status-icon" aria-hidden="true"><i class={icon}></i></span>
+  {/if}
   <div class="manager-recipe-status-copy">
     <p class="manager-recipe-status-title">{title}</p>
     <!-- `''` not `true`: a bare attribute renders `=""`, which is the byte the Overview
@@ -69,19 +87,13 @@
       {sub}
     </p>
   </div>
-  <button
-    type="button"
-    class={`manager-status-toggle ${on ? 'is-on' : 'is-off'}`}
-    data-recipe-field={field || undefined}
-    aria-pressed={on}
-    aria-label={toggleLabel || title}
-    title={toggleTitle || undefined}
+  <StatusToggle
+    {on}
     {disabled}
+    ariaLabel={toggleLabel || title}
+    data-recipe-field={field || undefined}
+    title={toggleTitle || undefined}
     {...toggleAttr ? { [toggleAttr]: '' } : {}}
     onclick={() => onToggle(!on)}
-  >
-    <span class="manager-status-toggle-track" aria-hidden="true"
-      ><span class="manager-status-toggle-knob"></span></span
-    >
-  </button>
+  />
 </div>

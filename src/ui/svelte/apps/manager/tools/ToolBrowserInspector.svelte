@@ -3,6 +3,7 @@
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { projectToolBehaviorFacts, projectToolRow } from './toolStudio.js';
@@ -86,9 +87,9 @@
 </script>
 
 {#if row || unadopted}
-  <section
-    class="manager-inspector-card manager-tool-browser-inspector"
-    data-tool-browser-inspector
+  <InspectorCard
+    class="manager-tool-browser-inspector"
+    data-tool-browser-inspector=""
     data-tool-inspector-membership={row ? 'member' : 'absent'}
   >
     <!-- THE KICKER IS ITS OWN FULL-WIDTH LINE ABOVE THE BLOCK, which is where the design puts it
@@ -225,7 +226,7 @@
         </ManagerButton>
       </div>
     {/if}
-  </section>
+  </InspectorCard>
 {:else}
   <!-- The inspector's no-selection state is the shared primitive at the sidebar scale.
        It used to re-derive the panel by hand through
@@ -272,8 +273,16 @@
   /* THE PANEL FILLS ITS COLUMN, which is what makes `margin-top: auto` below mean anything.
      Without it the card is content-height, the foot has no slack to be pushed into, and the
      pinned action sits wherever the cards happen to end - which is what a first render of this
-     change showed. `.manager-inspector` is a flex column, so growing is all this needs. */
-  .manager-tool-browser-inspector {
+     change showed. `.manager-inspector` is a flex column, so growing is all this needs.
+
+     `:global()` is REQUIRED and is not a loosening. The card element is written by
+     `InspectorCard` (issue 1427), not by this template, so this class reaches it through the
+     primitive's `class` prop and never carries this block's scoping attribute; the scoped form
+     compiles to a selector that matches nothing and the panel silently stops filling its
+     column. Specificity is preserved exactly: `:global(.a)` is still (0,1,0), so the rule wins
+     and loses against everything it did before. `EditorTabs.svelte` repairs the same hazard the
+     same way. */
+  :global(.manager-tool-browser-inspector) {
     flex: 1 1 auto;
     min-height: 0;
   }

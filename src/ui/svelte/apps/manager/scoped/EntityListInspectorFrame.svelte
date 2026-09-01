@@ -153,6 +153,7 @@
   import BulkSelectionToolbar from '../BulkSelectionToolbar.svelte';
   import Callout from '../Callout.svelte';
   import EmptyState from '../EmptyState.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
 
   let {
@@ -493,7 +494,7 @@
   /**
    * The description a row and the inspector state, with a rung down to the LINKED ITEM.
    *
-   * ── WHY A SECOND RUNG EXISTS AT ALL ──────────────────────────────────────────────────────
+   * ── WHY A SECOND RUNG EXISTS AT ALL ──────────────────────────────────────────
    * A world entity's `description` is a SNAPSHOT taken when the link was made, and a record
    * created any other way — an import, a hand edit, a migration that had none to copy — carries
    * an empty one. Every such row read `No description` while wearing a `Linked` chip, on the
@@ -501,7 +502,7 @@
    * has always resolved the live Item for its own card, so the scope that OWNS identity was the
    * only one that could not see the description identity carries.
    *
-   * ── THE RUNG IS THE LANE'S, NOT THIS FRAME'S ─────────────────────────────────────────────
+   * ── THE RUNG IS THE LANE'S, NOT THIS FRAME'S ─────────────────────────────────
    * Resolving a uuid to a document needs a roster this frame has no business holding, and each
    * scope names its source link differently. So a lane supplies `describeEntry`, which answers
    * the linked source's description or `''`; the frame owns only the PRECEDENCE — authored
@@ -936,11 +937,13 @@
                     A LABELLED ACTION IS A DESCRIPTOR FLAG, NOT A SECOND ROW COMPONENT.
 
                     The design's catalogue row ends with a bordered `Edit tool ⧉`, and so does
-                    our own system Tool Rules row — while this frame drew a bare pen, so the two
-                    list screens disagreed with each other as well as with the design. `labelled`
-                    is opt-in per descriptor: a lane that sets none renders the icon button
-                    byte-for-byte as before, which is what keeps the component and essence
-                    catalogues untouched by this.
+                    own system Tool Rules row — while this frame drew a bare pen, so the two list
+                    screens disagreed with each other as well as with the design. `labelled` is
+                    opt-in per descriptor: a lane that sets none renders `IconButton` exactly as
+                    before, which is what keeps the component and essence catalogues untouched by
+                    this. The icon branch stays the PRIMITIVE (issue 1422): a labelled action is a
+                    different control with a visible name, not a hand-rolled icon button, so
+                    nothing here restores markup `IconButton` now owns.
                   -->
                   <span class="manager-action-group">
                     {#each rowActions as action (action.id)}
@@ -960,16 +963,14 @@
                           ></i>
                         </button>
                       {:else}
-                        <button
-                          type="button"
-                          class="manager-icon-button"
+                        <IconButton
                           data-scoped-list-action={action.id}
-                          aria-label={`${action.label} — ${name}`}
+                          ariaLabel={`${action.label} — ${name}`}
                           title={action.label}
                           onclick={() => action.run(entry)}
                         >
                           <i class={action.icon} aria-hidden="true"></i>
-                        </button>
+                        </IconButton>
                       {/if}
                     {/each}
                   </span>
@@ -1227,6 +1228,22 @@
   }
 
   /*
+     AND THE DESCRIPTION IS THE REFERENCE'S 11px, for the reason the name rule above states.
+
+     `.manager-system-description` is a shared 0.78rem, sized for a browser row whose identity
+     cell is the whole width. In this catalogue's row the cell is about 340px of a 714px row —
+     the same ~49% share the reference gives it, measured on both — so the two rows differ not in
+     LAYOUT but in TYPE: at 0.78rem the same cell holds about 62 characters where the reference's
+     11px holds about 70, and every description longer than that ellipsised two words early while
+     the reference's fitted whole. The row NAME took its own scoped size one rule above for
+     exactly this reason; this is the sibling half of that, and it is the type divergence the
+     standing ruling resolves in the reference's favour.
+  */
+  .manager-scoped-list-row .manager-system-description {
+    font-size: 0.69rem;
+  }
+
+  /*
      THE FILTER ROW IS ONE LINE, AND IT TAKES A RULE TO SAY SO.
 
      Foundry core sizes every `<select>` to `width: 100%`, and neither the global toolbar block
@@ -1334,19 +1351,25 @@
      the `overflow-y`, exactly as `.manager-scoped-list-column` already arranges its own three
      parts. A `grid-template-rows` triple would do the same but charge two row gaps for the two
      tracks the resting and bulk states leave empty. */
+  /* A BARE COLUMN, NOT A CARD (issue 1372, maintainer parity round 8).
+
+     The reference's inspector is an unbordered column on the pane's own surface, with a single
+     hairline above its pinned foot action (`tmp/proto/essence-catalogue.png`). This carried a
+     1px border and a 10px radius around the whole panel, so its world-default cards, its system
+     rows and its roster panel all read as cards inside a card — three nested borders where the
+     reference has one, and a right third that looked like a separate screen.
+
+     The surface stays `--fab-bg-0`, the pane's own: `--fab-bg-2` put the column two rungs above
+     the pane, which is the divergence that made it read as a different screen in the first
+     place. The `padding-inline-start` is what now separates the column from the list, since
+     there is no border to do it. */
   .manager-scoped-list-inspector {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
     min-width: 0;
     min-height: 0;
-    padding: var(--fab-space-2) var(--fab-space-3) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 10px;
-    /* THE PANE'S OWN SURFACE, not a rung above it. The prototype's inspector column is the same
-       shade as the list beside it and is bounded by its border (issue 1372); `--fab-bg-2` put
-       it two rungs above the pane, which is what made the whole right third read as a different,
-       lighter screen. */
+    padding: var(--fab-space-2) 0 var(--fab-space-3) var(--fab-space-3);
     background: var(--fab-bg-0);
   }
 
@@ -1379,10 +1402,10 @@
     margin-top: 3px;
   }
 
-  /* THE LABELLED ROW ACTION. Deliberately the same box as the catalogue shell's `Rules ⧉` link,
-     to the value: the design draws both as one small bordered button with a trailing
-     external-link glyph, and two near-identical treatments a panel apart is what this repository
-     keeps finding. Foundry's fixed button geometry is reset explicitly, as every other manager
+  /* THE LABELLED ROW ACTION. Deliberately the same box as `SystemRulesRoster`'s `Rules ⧉` link,
+     the value: the design draws both as one small bordered button with a trailing external-link
+     glyph, and two near-identical treatments a panel apart is what this repository keeps
+     finding. Foundry's fixed button geometry is reset explicitly, as every other manager
      `<button>` wearing its own chrome resets it. */
   .manager-scoped-list-row-action {
     appearance: none;

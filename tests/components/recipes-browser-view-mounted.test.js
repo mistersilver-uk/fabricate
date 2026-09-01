@@ -58,7 +58,9 @@ const RECIPE_PRIMITIVES = [
   // one harness for the reason the chip above gives: the primitive allowlist guard reads the
   // WHOLE file, so naming it in only one of two harnesses reads as covered while the other
   // one HANGS.
-  'src/ui/svelte/components/ManagerButton.svelte'
+  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte'
 ];
 
 const browser = createMountedComponentHarness({

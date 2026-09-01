@@ -46,7 +46,7 @@
     setEssenceSelection,
     toggleEssenceSelection,
   } from '../../../../utils/essenceBulkEditModel.js';
-  import { ESSENCE_STATUS_SEGMENTS, ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
+  import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
 
   let {
@@ -335,6 +335,13 @@
       : listCards
   );
 
+  // THE STATUS AND SOURCE AXES ARE STILL THREADED, AND THEY ARE NOW ALWAYS `all`.
+  //
+  // The two controls that wrote them are gone from the bar (see the note beside the membership
+  // segment). The pure model keeps both axes because they are a property of a browser pipeline
+  // three studios share rather than of this toolbar, and pinning them here is what makes the
+  // removal a TOOLBAR change: nothing about which rows the model can express has moved, so the
+  // axes remain available to a screen that has a reason to offer them.
   const model = $derived(
     buildEssenceBrowserModel(searchedEssences, {
       status: ui.statusFilter,
@@ -407,18 +414,6 @@
     onSelectionCleared?.();
   }
 
-  // The counts the model computes ARE rendered, on the control they describe. Each is how
-  // many rows choosing that segment would show — the model widens the status axis and keeps
-  // every other active filter, so `Disabled 0` means "nothing to see here" rather than
-  // "nothing within the filter you already have".
-  const statusOptions = $derived(
-    ESSENCE_STATUS_SEGMENTS.map((segment) => ({
-      value: segment.value,
-      labelKey: segment.labelKey,
-      fallback: segment.fallback,
-      count: model.statusCounts?.[segment.value] ?? 0,
-    }))
-  );
   const viewModeOptions = $derived(
     ESSENCE_VIEW_MODE_SEGMENTS.map((segment) => ({
       value: segment.value,
@@ -495,21 +490,23 @@
           aria-label={text('FABRICATE.Admin.Manager.Essence.SearchLabel', 'Search essences')}
         />
       </label>
-      <SegmentedControl
-        options={statusOptions}
-        value={ui.statusFilter}
-        groupName="manager-essence-status-filter"
-        ariaLabel={text(
-          'FABRICATE.Admin.Manager.Essence.StatusFilterLabel',
-          'Filter essences by status'
-        )}
-        dataAttr="data-essence-status-filter"
-        optionDataAttr="data-essence-status-option"
-        onChange={(value) => {
-          ui.statusFilter = value;
-          ui.pageIndex = 0;
-        }}
-      />
+      <!-- NO STATUS SEGMENT AND NO SOURCE SELECT (issue 1372, maintainer parity round 8).
+
+           The reference's bar carries ONE filter — the membership pair below — beside the search
+           field (`tmp/proto/essence-rules.png`, markup `proto:1537`-`1550`). This bar carried
+           four controls: `All / Enabled / Disabled`, the membership pair, the presentation toggle
+           and an `All sources` select. Two of them are gone.
+
+           NEITHER LOSES A STATE A GM CANNOT REACH. Every row states its own enabled state as a
+           pill and its own source breakage in the summary line and the Effects chip, both of
+           which the search box reads — `sortKey: 'status'` still groups the list by enabled-ness,
+           and a broken source is findable by the name the summary line prints. What the two
+           controls added was a second way to narrow a list that is six rows long in a real world
+           and is already narrowed by search, membership and sort.
+
+           The PRESENTATION toggle stays, on row two: it is not a filter, it is the only route to
+           the grid, and `### GM World Essence Screens` requirement 7 and the essence-library
+           capability list both name that grid. -->
       <!-- THE MEMBERSHIP AXIS (issue 1372), AS A TWO-SEGMENT CONTROL ON THE TOP ROW.
 
            The prototype draws it as one control with BOTH counts on screen at once —
@@ -615,41 +612,6 @@
         optionDataAttr="data-essence-view-option"
         onChange={(value) => (ui.viewMode = value)}
       />
-
-      <!-- RETAINED from the shipped browser and reachable only with source UI on: a broken
-           source link is otherwise unfindable, which is the only reason `needs-attention`
-           exists. The `aria-label` is the select's accessible name. -->
-      {#if showSourceUi}
-        <select
-          class="manager-essence-source-filter"
-          data-essence-source-filter
-          value={ui.sourceFilter}
-          onchange={(event) => {
-            ui.sourceFilter = event.currentTarget.value;
-            ui.pageIndex = 0;
-          }}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Essence.SourceFilterLabel',
-            'Filter essences by source state'
-          )}
-        >
-          <option value="all"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceAll', 'All sources')}</option
-          >
-          <option value="linked"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceLinkedFilter', 'Linked')}</option
-          >
-          <option value="none"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source')}</option
-          >
-          <option value="needs-attention"
-            >{text(
-              'FABRICATE.Admin.Manager.Essence.SourceNeedsAttention',
-              'Needs attention'
-            )}</option
-          >
-        </select>
-      {/if}
 
       {#each chips as chip (chip.id)}
         <Chip tone="info" class="manager-essence-filter-chip" data-essence-filter-chip={chip.id}>

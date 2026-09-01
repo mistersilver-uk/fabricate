@@ -33,9 +33,13 @@ describe('Travel & Realms participation toggle', () => {
       'the toggle is a feature tile, structured exactly like the Currency tile'
     );
     assert.ok(systemEditSource.includes('data-gathering-realm-toggle'), 'toggle exposes a data hook');
+    // `on=`, not `aria-pressed=` (issue 1040). The tile renders the shared `<StatusToggle>`,
+    // which emits `aria-pressed` from that prop — asserting the attribute here would be
+    // asserting on markup this file no longer writes, and would pass forever once the tile
+    // stopped passing the flag at all.
     assert.ok(
-      systemEditSource.includes('aria-pressed={gatheringRealmsEnabled}'),
-      'toggle reflects the participation flag via aria-pressed'
+      systemEditSource.includes('on={gatheringRealmsEnabled}'),
+      'toggle reflects the participation flag through the shared switch'
     );
     assert.ok(
       systemEditSource.includes(
