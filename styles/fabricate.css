@@ -6820,8 +6820,7 @@
    sentence case reads as a form, not a bar. */
 .fabricate-manager .manager-recipe-category-filter,
 .fabricate-manager .manager-component-category-filter,
-.fabricate-manager .manager-component-essence-filter,
-.fabricate-manager .manager-essence-source-filter {
+.fabricate-manager .manager-component-essence-filter {
   flex: 0 0 auto;
   min-width: 0;
   max-width: 180px;
@@ -17252,19 +17251,53 @@
     Stacked, the rail is a full-height nav sitting ABOVE the content it navigates to.
     Left at its content height it is ~650px of chrome the GM must scroll past before
     the first row, so it becomes a bounded, self-scrolling strip instead.
+
+    ── THE STRIP SCROLLED THE ONLY WAY OUT OF A SYSTEM OFF ITS OWN TOP (issue 1372) ──────────
+    Measured on `manager-essences-stacked` at 1000x700: the rail is a 232px window over 927px of
+    content, and clicking a nav row scrolls that row into view — so the frame's FIRST VISIBLE
+    STATE showed five destinations and neither the `Crafting system` picker nor its `← All
+    crafting systems` link, which are the only two routes to another system or back to the system
+    list. The four destinations above the clicked row went with them, and an overlay scrollbar
+    says nothing, so the strip reads as the whole rail rather than as a window onto it.
+
+    Two changes, and each fixes half of it. The cap rises to the 320px that the Tools and
+    Knowledge routes already override it to — so the strip is one value at this width rather than
+    three — and the two blocks ABOVE the nav are pinned out of the scroll, so the scope picker
+    cannot leave the screen no matter where the nav is scrolled to. Pinning them rather than
+    handing the scroller to `.manager-nav` is deliberate: the nav keeps the full 320px window it
+    scrolls inside, and only the ~116px the picker occupies is spent, which is the trade the
+    earlier note (below) declined to make when the alternative was shrinking the window twice.
   */
   .fabricate-manager .manager-rail {
-    max-height: 232px;
+    max-height: 320px;
     overflow: hidden auto;
     border-right: 0;
     border-bottom: 1px solid var(--fab-border);
   }
 
-  /* Hand the scrolling back to the rail here. Stacked, the rail is already a bounded 232px
-     strip; if the nav kept the scroller it would grow to that cap and scroll the list inside
-     whatever the pinned label and scope card left of it — a much smaller window than the strip
-     the rule above deliberately built. This also covers the per-view 831px rail overrides,
-     which are nested inside this breakpoint. */
+  /* PINNED, so the crafting-system picker and `← All crafting systems` survive any scroll
+     position of the nav below them. `--fab-bg-0` is the rail's own surface, restated because a
+     sticky element scrolls content underneath itself and a transparent one would show it. */
+  .fabricate-manager .manager-rail > .manager-rail-title,
+  .fabricate-manager .manager-rail > .manager-rail-block {
+    position: sticky;
+    z-index: 1;
+    background: var(--fab-bg-0);
+  }
+
+  .fabricate-manager .manager-rail > .manager-rail-title {
+    top: 0;
+  }
+
+  .fabricate-manager .manager-rail > .manager-rail-block {
+    top: 12px;
+  }
+
+  /* Hand the scrolling back to the rail here. Stacked, the rail is already a bounded strip; if
+     the nav kept the scroller it would grow to that cap and scroll the list inside whatever the
+     pinned label and scope card left of it — a much smaller window than the strip the rule above
+     deliberately built. This also covers the per-view 831px rail overrides, which are nested
+     inside this breakpoint. */
   .fabricate-manager .manager-nav {
     flex: 0 0 auto;
     overflow: visible;
