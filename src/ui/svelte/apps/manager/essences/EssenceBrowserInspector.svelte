@@ -32,6 +32,7 @@
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
 
@@ -96,7 +97,7 @@
   }
 </script>
 
-<section class="manager-inspector-card" data-essence-browser-inspector>
+<InspectorCard data-essence-browser-inspector="">
   <div class="manager-inspector-title-row is-hero-large">
     <!-- The tile carries the essence's own colour here too, so the inspector and the row
          cannot disagree about what colour an essence is. -->
@@ -129,12 +130,12 @@
     {description ||
       text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
   </p>
-</section>
+</InspectorCard>
 
 <!-- Two stats, two different questions. Components CARRY the essence, which is what blocks
      a delete; recipes REQUIRE it, which is what a delete rewrites. Neither number is
      derivable from the other. -->
-<section class="manager-inspector-card" data-essence-section="stats">
+<InspectorCard data-essence-section="stats">
   <!-- The SHIPPED two-stat grid, joined rather than re-authored: `.manager-essence-stat-*`
        is added to the `.manager-recipe-stat-*` / `.manager-component-stat-*` selector lists
        in `styles/fabricate.css`. This inspector is one click from those two, and a
@@ -154,9 +155,9 @@
       >
     </div>
   </div>
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card" data-essence-section="oncraft">
+<InspectorCard data-essence-section="oncraft">
   <div class="manager-edit-card-heading">
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')}
@@ -172,7 +173,7 @@
     showLiveNote={false}
     showEffectiveKicker={false}
   />
-</section>
+</InspectorCard>
 
 <!--
   THE ACTIONS SIT ABOVE `Source` AND `Usage`, not below them (issue 1036 fidelity pass).
@@ -182,7 +183,7 @@
   rail's one loud thing was invisible in every frame of it. `Source` and `Usage` are
   reference, so they follow the verb rather than delaying it.
 -->
-<section class="manager-inspector-card" data-essence-section="actions">
+<InspectorCard data-essence-section="actions">
   <!-- The three verbs render through `InspectorActionButton`, the extracted point-of-arrival
        button for every right inspector (issue 1036, maintainer round 2). What changes here
        is not only the size: the primary was `.manager-button.is-primary`, which is the
@@ -242,10 +243,10 @@
       )}
     </p>
   {/if}
-</section>
+</InspectorCard>
 
 {#if showSourceUi}
-  <section class="manager-inspector-card" data-essence-section="source">
+  <InspectorCard data-essence-section="source">
     <div class="manager-edit-card-heading">
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}
@@ -299,10 +300,10 @@
         />
       </div>
     {/if}
-  </section>
+  </InspectorCard>
 {/if}
 
-<section class="manager-inspector-card" data-essence-section="usage">
+<InspectorCard data-essence-section="usage">
   <div class="manager-edit-card-heading">
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}
@@ -341,7 +342,7 @@
       {/each}
     </div>
   {/if}
-</section>
+</InspectorCard>
 
 <style>
   /* No stat-grid block here. The four rules this file used to declare are the shipped

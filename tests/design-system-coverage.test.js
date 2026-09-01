@@ -241,7 +241,7 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 36 library entries with no shipped implementation.
+ * The 35 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
@@ -250,13 +250,12 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'Avatar', 'BandedBar', 'BrowseCard',
-  'Card', 'ChoiceGroup', 'DataTable', 'Field', 'FilterBar',
-  'InfoStrip', 'Kicker', 'ListRow', 'LogList', 'Menu',
-  'Meter', 'NavSidebar', 'Notice', 'PageHeader',
-  'PickerRow', 'Rail', 'RequirementChooser', 'RuleRow', 'RuleSentence',
-  'Search', 'Select', 'SetPicker', 'SortableList', 'StageBars',
-  'StatBox', 'TierTrack', 'ValidationList', 'ValidationSummary', 'ViewToggle',
-  'Well', 'XrefList',
+  'ChoiceGroup', 'DataTable', 'Field', 'FilterBar', 'InfoStrip',
+  'Kicker', 'ListRow', 'LogList', 'Menu', 'Meter',
+  'NavSidebar', 'Notice', 'PageHeader', 'PickerRow', 'Rail',
+  'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'Select',
+  'SetPicker', 'SortableList', 'StageBars', 'StatBox', 'TierTrack',
+  'ValidationList', 'ValidationSummary', 'ViewToggle', 'Well', 'XrefList',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {

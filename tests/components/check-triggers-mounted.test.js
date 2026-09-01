@@ -45,6 +45,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     // The shared status card: a trigger's break-tools effect is its own bordered card with an
     // icon, a sentence and a switch (issue 1096), which is exactly this primitive.
     'src/ui/svelte/apps/manager/ToggleCard.svelte',

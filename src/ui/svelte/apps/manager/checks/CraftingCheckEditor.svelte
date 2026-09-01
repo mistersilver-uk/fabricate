@@ -34,6 +34,7 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
 
   // `showTiers` (default true) renders the per-recipe tier table (relative type
   // only). Salvage/gathering reuse this editor with `showTiers={false}` — they have
@@ -438,7 +439,7 @@
   <!-- Check type anchors the OUTCOME tiers (offsets from the recipe's DC, or absolute
        value ranges), so it sits with them rather than with the roll. -->
   {#if shows('outcomes')}
-    <section class="manager-inspector-card manager-checks-card" data-check-type-card>
+    <InspectorCard class="manager-checks-card" data-check-type-card="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -464,11 +465,11 @@
           onChange={setType}
         />
       </div>
-    </section>
+    </InspectorCard>
   {/if}
 
   {#if shows('roll')}
-    <section class="manager-inspector-card manager-checks-card" data-roll-formula-card>
+    <InspectorCard class="manager-checks-card" data-roll-formula-card="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -493,7 +494,7 @@
           onChange={emit}
         />
       </div>
-    </section>
+    </InspectorCard>
 
     <!-- DIFFICULTY, in its own card (issue 1096), WITH its DC-source chooser. A routed
          RELATIVE check is defined as bands offset from a DC (`dc + outcome.dc`), so it has
@@ -535,14 +536,14 @@
          1096 follow-up), inset the tier rows past the Difficulty card's radio cards and
          BASE DC / COMPARISON row above. `SimpleCraftingCheckEditor`'s `data-static-dc`
          wrapper already carries both classes; this is that same contract. -->
-    <section class="manager-inspector-card manager-checks-card" data-routed-tiers>
+    <InspectorCard class="manager-checks-card" data-routed-tiers="">
       <CheckRecipeTiers
         anchorsBands
         tiers={value?.tiers || []}
         defaultDc={value?.dc ?? 0}
         onChange={(tiers) => emit({ tiers })}
       />
-    </section>
+    </InspectorCard>
   {/if}
 
   {#if !bandsAreAbsolute && shows('roll') && value?.dcMode === 'dynamic'}
@@ -553,7 +554,7 @@
     <!-- ONE card, as the prototype has it: the strip and the tier rows it draws are the
          same subject, and splitting them into two cards put a card border between a band
          and the row that moves it. -->
-    <section class="manager-inspector-card manager-checks-card" data-outcome-bands>
+    <InspectorCard class="manager-checks-card" data-outcome-bands="">
       <!-- STACKED and full-width, like every other studio card head, on the maintainer's
            instruction. It was `is-inline`, which sets the description on the title's line and
            pushes it hard right; with the head action gone there is nothing on that line to
@@ -801,6 +802,6 @@
           >
         </ManagerButton>
       </div>
-    </section>
+    </InspectorCard>
   {/if}
 </div>

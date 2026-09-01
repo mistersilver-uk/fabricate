@@ -57,6 +57,7 @@ const panel = createMountedComponentHarness({
     // Apply through the primitive, so it is a STATIC import of this tree; omitting it HANGS
     // this suite as `# cancelled` rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',

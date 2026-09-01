@@ -60,6 +60,7 @@
   } from './checksReadiness.js';
   import Callout from '../Callout.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { checkIssueCopy, interpolate } from './checksCopy.js';
   import {
     buildCheckModifierContext,
@@ -1480,7 +1481,7 @@
     )}
     dataAttr="data-gathering-failure-dormant"
   />
-  <section class="manager-inspector-card" data-gathering-failure-outcome>
+  <InspectorCard data-gathering-failure-outcome="">
     <h3 class="manager-checks-card-title">
       {text(
         'FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeTitle',
@@ -1523,7 +1524,7 @@
         )}</span
       >
     </ManagerButton>
-  </section>
+  </InspectorCard>
 {/snippet}
 
 <!-- The one place a section that cannot apply is answered, so the copy names the MODE
@@ -1631,7 +1632,7 @@
       {:else if activity === 'crafting' && craftingAlchemy}
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if activeSection === 'roll'}
-            <section class="manager-inspector-card">
+            <InspectorCard>
               <h3 class="manager-checks-card-title">
                 {text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}
               </h3>
@@ -1652,7 +1653,7 @@
                 optionDataAttr="data-crafting-alchemy-checkmode-option"
                 onChange={(mode) => onSetAlchemyCheckMode(mode)}
               />
-            </section>
+            </InspectorCard>
           {/if}
 
           {#if activeSection === 'on-failure'}
@@ -1663,7 +1664,7 @@
                  where it already lived — it is alchemy's substitute for the generic
                  consumption pair, not for this. -->
             {@render failurePolicyCard()}
-            <section class="manager-inspector-card" data-alchemy-behaviour>
+            <InspectorCard data-alchemy-behaviour="">
               <h3 class="manager-checks-card-title">
                 {text(
                   'FABRICATE.Admin.SystemSettings.Alchemy.BehaviourHeading',
@@ -1738,7 +1739,7 @@
                   onToggle={(next) => onUpdateAlchemyFlags({ showAttemptHistoryToPlayers: next })}
                 />
               </div>
-            </section>
+            </InspectorCard>
           {/if}
 
           <!-- There is no alchemy `none` branch here. An alchemy system whose check is off
@@ -1989,7 +1990,7 @@
       {:else if activity === 'gathering' && gatheringD100}
         <div class="manager-checks-page" data-checks-panel="gathering" data-gathering-d100-readonly>
           {#if activeSection === 'roll'}
-            <section class="manager-inspector-card">
+            <InspectorCard>
               <p class="manager-kicker">{pageKicker}</p>
               <h2 class="manager-checks-card-title">
                 {text('FABRICATE.Admin.Manager.Checks.Gathering.D100Title', 'Fixed d100 roll')}
@@ -2000,8 +2001,8 @@
                   'In d100 mode the gathering check is a fixed d100 roll against each drop’s chance. There is nothing to configure here.'
                 )}
               </p>
-            </section>
-            <section class="manager-inspector-card">
+            </InspectorCard>
+            <InspectorCard>
               <h3 class="manager-checks-card-title">{configTitle}</h3>
               <p class="manager-muted">
                 {text(
@@ -2009,7 +2010,7 @@
                   'Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.'
                 )}
               </p>
-            </section>
+            </InspectorCard>
           {:else if activeSection === 'modifiers'}
             <!-- d100 RENDERS Modifiers rather than hiding it (decision 8). The card is the
                  one owned path for reporting that a selection reaches no roll, and it
@@ -2066,15 +2067,15 @@
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activity}>
-          <section class="manager-inspector-card">
+          <InspectorCard>
             <p class="manager-kicker">{pageKicker}</p>
             <h2 class="manager-checks-card-title">{page.title}</h2>
             <p class="manager-muted">{page.lead}</p>
-          </section>
-          <section class="manager-inspector-card">
+          </InspectorCard>
+          <InspectorCard>
             <h3 class="manager-checks-card-title">{configTitle}</h3>
             <p class="manager-muted">{page.configHint}</p>
-          </section>
+          </InspectorCard>
         </div>
       {/if}
     </div>

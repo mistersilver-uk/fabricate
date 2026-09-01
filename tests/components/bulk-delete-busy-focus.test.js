@@ -48,7 +48,11 @@ const card = createMountedComponentHarness({
   // rule it shares with the manager root. A static import, so the harness's closure validator
   // throws without it.
   rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
-  compiledModules: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte', CARD_PATH],
+  compiledModules: [
+    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+    CARD_PATH,
+  ],
   componentPath: CARD_PATH,
 });
 
