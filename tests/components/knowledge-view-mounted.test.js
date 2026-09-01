@@ -50,6 +50,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Callout.svelte',
     // The shared chip (issue 883). The tab bar's count badge and both row types render it.
     'src/ui/svelte/apps/manager/Chip.svelte',
+    // THE manager's editor tab strip (issue 1362). `KnowledgeTabs` is a caller of it since
+    // issue 1429 corrected its badge onto the Rail Marker Family's record-count vehicle, so
+    // omitting it HANGS this suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeTabs.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',

@@ -104,6 +104,13 @@ const SHARED_PRIMITIVES = [
   // without naming any icon button at all, and an omission costs a HUNG suite rather than a
   // failing one.
   'src/ui/svelte/components/IconButton.svelte',
+  // THE manager's editor tab strip (issue 1362), and on this list since issue 1429 gave it
+  // the Rail Marker Family and converted the Checks section strip and the Knowledge tabs
+  // onto it. That is what makes it sharp: it was already in the environment, system and
+  // recipe-item trees, and every further strip that stops hand-rolling its markers drops it
+  // into another mounted tree. Two of those conversions landed in one change, and each
+  // omission costs a HUNG suite rather than a failing one.
+  'src/ui/svelte/apps/manager/EditorTabs.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

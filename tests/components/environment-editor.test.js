@@ -591,9 +591,19 @@ describe('environment composition editor structure', () => {
       tabsSource.includes('buttonClass="manager-environment-tab-button"'),
       'button class, so no shipped rule in styles/fabricate.css stops matching'
     );
-    assert.ok(editorTabsSource.includes('`${idStem}-tab-${tab.id}`'), 'the primitive builds the id');
+    // The primitive still builds BOTH ids from this caller's one `idStem`. Issue 1429 split
+    // the two halves so the Checks strip can keep `checks-section-*` buttons beside
+    // `checks-panel-*` panels, and each half falls back to the stem when the caller does not
+    // override it — which is the whole of this site's contract. The RENDERED proof that the
+    // fallback yields the same ids as before is in
+    // `tests/components/editor-tabs-marker-family.test.js`; these two pin that the caller
+    // still hands over one stem rather than two.
     assert.ok(
-      editorTabsSource.includes('`${idStem}-panel-${tab.id}`'),
+      editorTabsSource.includes('buttonIdStem || `${idStem}-tab`'),
+      'the primitive builds the button id from this caller`s stem'
+    );
+    assert.ok(
+      editorTabsSource.includes('panelIdStem || `${idStem}-panel`'),
       'and points aria-controls at the panel rendered outside it'
     );
   });
