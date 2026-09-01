@@ -77,7 +77,11 @@ export function walkTemplate(node, visit) {
     for (const child of node) walkTemplate(child, visit);
     return;
   }
-  if (node.type === 'RegularElement' || node.type === 'Component' || node.type === 'SvelteElement') {
+  if (
+    node.type === 'RegularElement' ||
+    node.type === 'Component' ||
+    node.type === 'SvelteElement'
+  ) {
     visit(node);
   }
   for (const key of Object.keys(node)) {
@@ -256,7 +260,7 @@ export function definePrimitiveAdoptionContract(spec) {
     const offenders = [...rawSites.entries()]
       .filter(([file]) => !allowed.has(file))
       .map(([file, count]) => `${file} (${count} site${count === 1 ? '' : 's'})`)
-      .sort();
+      .sort((a, b) => a.localeCompare(b));
     assert.deepEqual(offenders, [], `${rawRemedy}:\n  ${offenders.join('\n  ')}`);
   });
 
@@ -306,7 +310,7 @@ export function definePrimitiveAdoptionContract(spec) {
       .map((site) => ({ site, names: site.valueless.filter((name) => !exempt.has(name)) }))
       .filter((entry) => entry.names.length > 0)
       .map((entry) => `${entry.site.file}: ${entry.names.join(', ')}`)
-      .sort();
+      .sort((a, b) => a.localeCompare(b));
     assert.deepEqual(offenders, [], `${valuelessRemedy}:\n  ${offenders.join('\n  ')}`);
   });
 
