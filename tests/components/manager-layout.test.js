@@ -6090,7 +6090,19 @@ test('the Books & Scrolls route names one grid track per section and grows the t
     'the books-scrolls route should render its content region as .manager-main'
   );
   const main = source.slice(mainIndex);
-  const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
+  // A grid CHILD is whatever element the child renders, so `<ManagerToolbar>` counts as one
+  // (issue 1039): this route's filter bar is that primitive now and renders the same
+  // `<section>` it always did. Without the name here the walk books two children against
+  // three tracks and reports the route as having LOST a section.
+  //
+  // NAMED rather than a general `[A-Z]\w*` component pattern, and that is a scope line
+  // rather than timidity. A general pattern also picks up `<Pagination>`, which this route
+  // renders unconditionally as a fourth top-level child and which the element-only walk has
+  // never counted — so generalising would silently turn a 3-versus-3 pin into a 4-versus-3
+  // failure and demand a real change to `grid-template-rows` on a route this change does not
+  // touch. That omission is pre-existing and is reported rather than repaired here.
+  // Both routes below use the same matcher so they cannot drift apart.
+  const children = main.match(/^ {2}<(?:section|div|header|footer|nav|ManagerToolbar)\b/gm) || [];
   assert.equal(children.length, 3, 'expected three unconditional top-level grid children');
   assert.equal(
     main.includes('manager-section-header'),
@@ -6136,7 +6148,7 @@ test('the Tags & Categories route names one grid track per section and grows the
   const mainStart = source.indexOf('<main');
   assert.notEqual(mainStart, -1, 'the view must render a `.manager-main` grid');
   const main = source.slice(mainStart);
-  const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
+  const children = main.match(/^ {2}<(?:section|div|header|footer|nav|ManagerToolbar)\b/gm) || [];
   assert.equal(children.length, 2, 'expected two unconditional top-level grid children');
   assert.equal(
     main.includes('manager-section-header'),

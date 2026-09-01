@@ -241,7 +241,7 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 34 library entries with no shipped implementation.
+ * The 33 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
@@ -250,9 +250,9 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'Avatar', 'BandedBar', 'BrowseCard',
-  'ChoiceGroup', 'DataTable', 'FilterBar', 'InfoStrip',
-  'Kicker', 'ListRow', 'LogList', 'Menu', 'Meter',
-  'NavSidebar', 'Notice', 'PageHeader', 'PickerRow', 'Rail',
+  'ChoiceGroup', 'DataTable', 'InfoStrip', 'Kicker',
+  'ListRow', 'LogList', 'Menu', 'Meter', 'NavSidebar',
+  'Notice', 'PageHeader', 'PickerRow', 'Rail',
   'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'Select',
   'SetPicker', 'SortableList', 'StageBars', 'StatBox', 'TierTrack',
   'ValidationList', 'ValidationSummary', 'ViewToggle', 'Well', 'XrefList',
@@ -290,7 +290,7 @@ test('no library entry recorded as unbuilt ships as a component', () => {
 });
 
 /**
- * The 25 shipped rows the library does not name.
+ * The 26 shipped rows the library does not name.
  *
  * Pinned by EQUALITY rather than as a ceiling, for the reason
  * `tests/design-system-primitives.test.js` records for its own baselines: a ceiling loosens by one
@@ -332,6 +332,7 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ManagerColorPicker.svelte',
+  'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/StatusPill.svelte',

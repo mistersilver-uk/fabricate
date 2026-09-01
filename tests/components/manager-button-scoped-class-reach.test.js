@@ -218,6 +218,32 @@ const PRIMITIVES = Object.freeze([
   // hand `is-wide` to a `<Field>`, and that is a shared modifier they also put on elements they
   // write themselves. 30 bespoke tokens travel onto a `<Field>` as this lands.
   Object.freeze({ tag: 'Field', contractClasses: ['manager-field'], minimumTokens: 20 }),
+  // The manager's filter bar and its search field (issue 1039). The bar is the sharpest entry
+  // on this table so far, because its dead rule was LOCATED IN ADVANCE and is still the silent
+  // kind: `scoped/EntityListInspectorFrame.svelte` states
+  // `.manager-scoped-list-toolbar { flex: 0 0 auto }` inside a `display: flex; flex-direction:
+  // column` column, and that file also renders `<div class={TOOLBAR_ROW_CLASS}>` — a regular
+  // element with an expression-valued `class` — which is precisely the silencing condition
+  // recorded above. `css.code` is BYTE-IDENTICAL across that conversion: the selector is
+  // emitted with the hash attached and matches nothing, so a css-diff gate reports the file
+  // unchanged while the bar has stopped taking `flex: 0 0 auto` and started absorbing the
+  // column's slack instead of the row list.
+  //
+  // `manager-toolbar` is a PREFIX of `manager-toolbar-pills`, which is why the two token
+  // patterns below terminate `(?![\w-])` rather than `\b` — `\b` matches before a hyphen, so
+  // the bare-word form counts a chip row as a filter bar.
+  //
+  // The bar's floor is 5 rather than the buttons' 20 because a filter bar wears exactly one
+  // modifier: eight of the eleven pass one, and the other three pass none at all. The field's
+  // is 1, for a stronger version of the same reason — only two of its nineteen sites carry a
+  // bespoke class, and both of those rules live in `styles/fabricate.css` rather than in a
+  // scoped block.
+  Object.freeze({ tag: 'ManagerToolbar', contractClasses: ['manager-toolbar'], minimumTokens: 5 }),
+  Object.freeze({
+    tag: 'ManagerSearchField',
+    contractClasses: ['manager-search'],
+    minimumTokens: 1,
+  }),
 ]);
 
 test('no component scopes a rule onto a class it hands to a shared primitive', () => {
@@ -263,7 +289,9 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
     for (const selector of pruned) {
       for (const { tokens } of active) {
         for (const token of tokens) {
-          if (!new RegExp(String.raw`\.${token}\b`).test(selector)) continue;
+          // `(?![\w-])`, never `\b`: `\b` matches before a hyphen, so a token pattern for
+          // `manager-toolbar` would count `.manager-toolbar-pills` as a hit.
+          if (!new RegExp(String.raw`\.${token}(?![\w-])`).test(selector)) continue;
           violations.push(`${file}: ${selector.trim().replaceAll(/\s+/g, ' ')} [pruned as unused]`);
         }
       }
@@ -317,7 +345,7 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
         if (!renders) continue;
         for (const compound of compoundsOf(selector)) {
           const noContractClass = primitive.contractClasses.every(
-            (token) => !new RegExp(String.raw`\.${token}\b`).test(compound)
+            (token) => !new RegExp(String.raw`\.${token}(?![\w-])`).test(compound)
           );
           if (noContractClass) continue;
           contractRulesScanned += 1;
@@ -360,8 +388,9 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
   assert.deepEqual(
     violations.sort((left, right) => (left === right ? 0 : left < right ? -1 : 1)),
     [],
-    'these rules select a class that only a `<ManagerButton>`, `<IconButton>` or ' +
-      '`<InspectorCard>` carries, so they match NOTHING ' +
+    'these rules select a class that only a `<ManagerButton>`, `<IconButton>`, ' +
+      '`<InspectorCard>`, `<ManagerToolbar>` or `<ManagerSearchField>` carries, so they match ' +
+      'NOTHING ' +
       'and the control is silently unstyled — either emitted with this component`s scoping ' +
       'class attached, or pruned by the compiler before they were emitted at all. Wrap each ' +
       'in `:global(...)` — and chain the primitive`s classes while you are there, because a ' +

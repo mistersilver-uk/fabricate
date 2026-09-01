@@ -20,6 +20,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../EmptyState.svelte';
   import Medallion from '../../../components/Medallion.svelte';
+  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
 
   let {
     characters = [],
@@ -52,20 +53,16 @@
   <!-- The `flex: 0 0 auto` roster override is authored against
        `.manager-knowledge-roster .manager-search`, alongside the Access roster's
        identical one, so this needs no class of its own. -->
-  <label class="manager-search">
-    <i class="fas fa-search" aria-hidden="true"></i>
-    <input
-      type="search"
-      value={searchTerm}
-      oninput={(event) => onSearch(event.currentTarget.value)}
-      placeholder={text(
-        'FABRICATE.Admin.Manager.Knowledge.SearchPlaceholder',
-        'Search characters...'
-      )}
-      aria-label={text('FABRICATE.Admin.Manager.Knowledge.SearchLabel', 'Search characters')}
-      data-knowledge-search
-    />
-  </label>
+  <ManagerSearchField
+    value={searchTerm}
+    onInput={(next) => onSearch(next)}
+    placeholder={text(
+      'FABRICATE.Admin.Manager.Knowledge.SearchPlaceholder',
+      'Search characters...'
+    )}
+    ariaLabel={text('FABRICATE.Admin.Manager.Knowledge.SearchLabel', 'Search characters')}
+    inputAttrs={{ 'data-knowledge-search': '' }}
+  />
 
   <div class="manager-knowledge-roster-scroll">
     {#if totalCount === 0}

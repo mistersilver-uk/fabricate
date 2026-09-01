@@ -52,6 +52,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Pagination from '../../../components/Pagination.svelte';
   import MembershipActions from './MembershipActions.svelte';
+  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
 
   let {
     rows = [],
@@ -175,17 +176,14 @@
     </span>
   </div>
 
-  <label class="manager-search manager-scoped-roster-search">
-    <i class="fas fa-search" aria-hidden="true"></i>
-    <input
-      type="search"
-      value={systemQuery}
-      data-scoped-list-system-search
-      placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems…')}
-      aria-label={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystemsLabel', 'Search systems')}
-      oninput={(event) => changeSystemQuery(event.currentTarget.value)}
-    />
-  </label>
+  <ManagerSearchField
+    class="manager-scoped-roster-search"
+    value={systemQuery}
+    onInput={(next) => changeSystemQuery(next)}
+    placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems…')}
+    ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystemsLabel', 'Search systems')}
+    inputAttrs={{ 'data-scoped-list-system-search': '' }}
+  />
 
   <ul class="manager-scoped-roster-systems" role="list">
     {#each pageRows as row (row.systemId)}
@@ -283,8 +281,16 @@
   }
 
   /* The search field is the shipped `.manager-search`; only its own row sizing is stated here,
-     because the global rule sizes it for a toolbar rather than for a 300px column. */
-  .manager-scoped-roster-search {
+     because the global rule sizes it for a toolbar rather than for a 300px column.
+
+     `:global`, chained onto `.manager-search`, since the field became a `<ManagerSearchField>`
+     (issue 1039): the class travels to the primitive's `<label>`, which this component does not
+     write and therefore never carries its scope hash. Unlike the three toolbar rules in
+     `EntityListInspectorFrame`, this one was PRUNED rather than silently emitted — this file
+     writes no regular element with a spread or an expression-valued `class`, so nothing made its
+     class selectors possibly-matching and `lint:svelte:warnings` would have named it. The chain
+     keeps the specificity at (0,2,0), which is what the scoped form compiled to. */
+  :global(.manager-search.manager-scoped-roster-search) {
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;

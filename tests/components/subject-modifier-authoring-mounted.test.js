@@ -280,6 +280,7 @@ const gatheringHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',

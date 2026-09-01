@@ -150,6 +150,8 @@
   import Callout from '../Callout.svelte';
   import EmptyState from '../EmptyState.svelte';
   import IconButton from '../../../components/IconButton.svelte';
+  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../../components/ManagerToolbar.svelte';
 
   let {
     scope = null,
@@ -565,10 +567,10 @@
       </div>
     {:else}
       <div class="manager-scoped-list-column">
-        <section
-          class="manager-toolbar manager-scoped-list-toolbar"
-          data-scoped-list-toolbar
-          aria-label={text('FABRICATE.Admin.Manager.Scoped.List.Filters', 'List filters')}
+        <ManagerToolbar
+          class="manager-scoped-list-toolbar"
+          data-scoped-list-toolbar=""
+          ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.Filters', 'List filters')}
         >
           <!--
             ONE ROW, AND THE SELECTION CONTROL IS IN IT.
@@ -606,18 +608,14 @@
               onClear={clearSelection}
             />
 
-            <label class="manager-search">
-              <i class="fas fa-search" aria-hidden="true"></i>
-              <input
-                type="search"
-                value={query}
-                data-scoped-list-search
-                placeholder={searchPlaceholder ||
-                  text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
-                aria-label={text('FABRICATE.Admin.Manager.Scoped.List.SearchLabel', 'Search')}
-                oninput={(event) => changeQuery(event.currentTarget.value)}
-              />
-            </label>
+            <ManagerSearchField
+              value={query}
+              onInput={(next) => changeQuery(next)}
+              placeholder={searchPlaceholder ||
+                text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
+              ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchLabel', 'Search')}
+              inputAttrs={{ 'data-scoped-list-search': '' }}
+            />
 
             {#if membershipFilter}
               <select
@@ -686,7 +684,7 @@
               <span class="manager-scoped-list-count" data-scoped-list-count>{resultCount}</span>
             {/if}
           </div>
-        </section>
+        </ManagerToolbar>
 
         {#if bulk && !inspectorBody && selection.count > 0}
           <!-- With no inspector column there is nowhere else for a bulk body to go, so it sits
@@ -1006,8 +1004,30 @@
 
   /* THE ROWS TAKE THE SLACK AND THE CHROME DOES NOT. Without the explicit pair the column hands
      its height to whichever child grows, and the browse archetype's rule — the pagination bar
-     sits OUTSIDE the scroll area so it never moves — is the opposite of that. */
-  .manager-scoped-list-toolbar,
+     sits OUTSIDE the scroll area so it never moves — is the opposite of that.
+
+     SPLIT, and the toolbar half made `:global`, when the bar became a `<ManagerToolbar>`
+     (issue 1039). `.manager-scoped-list-toolbar` lives only on a COMPONENT tag now, so Svelte no
+     longer stamps this component's scoping class onto the element carrying it and the scoped form
+     matched nothing. That failure is SILENT in this file rather than warned about: the
+     `<div class={TOOLBAR_ROW_CLASS}>` above is a regular element with an expression-valued
+     `class`, which makes every class selector in this block possibly-matching — so all three of
+     this file's toolbar rules were emitted with the hash attached, `lint:svelte:warnings` stayed
+     green, and the compiled `css.code` came out BYTE-IDENTICAL across the conversion. The bar
+     would simply have started absorbing this column's slack instead of
+     `.manager-scoped-list-rows`.
+
+     The `:global` is CHAINED onto `.manager-toolbar`, the class the primitive emits itself, so
+     the specificity is unchanged at (0,2,0) — exactly what `.manager-scoped-list-toolbar` plus
+     the scoping class was. A bare `:global(.manager-scoped-list-toolbar)` would be (0,1,0) and
+     would start losing ties it used to win.
+
+     `.manager-scoped-list-bulk` stays SCOPED and keeps its own rule: it is still a `<section>`
+     this component writes. */
+  :global(.manager-toolbar.manager-scoped-list-toolbar) {
+    flex: 0 0 auto;
+  }
+
   .manager-scoped-list-bulk {
     flex: 0 0 auto;
   }
@@ -1090,7 +1110,18 @@
      Svelte compiles this to two classes plus the element, which outranks the global
      `.fabricate-manager .manager-scoped-list-toolbar select`, and core's rule is layered.
   */
-  .manager-scoped-list-toolbar select {
+  /* WRAPPED WHOLE in one `:global()`, and the shape is load-bearing rather than stylistic.
+     `:global(ancestor) select` looks like the smaller change and is not: it leaves `select` as
+     the ONLY scoped compound, so Svelte stops writing the hash as `:where(.svelte-…)` — which
+     contributes nothing — and writes a bare `.svelte-…` instead. Measured on this exact rule:
+     the scoped form emitted `.manager-scoped-list-toolbar.svelte-… select:where(.svelte-…)` at
+     (0,2,1), and the ancestor-only repair emits `… select.svelte-…` at (0,3,1). That is a
+     silent cascade change smuggled in as a repair. Wrapping the whole selector emits
+     `.manager-toolbar.manager-scoped-list-toolbar select` at (0,2,1), unchanged — which is what
+     keeps this rule tied with, and ordered after, the global rule the comment above names.
+     Reach is unchanged in practice: `manager-scoped-list-toolbar` is written by this component
+     alone, which `tests/components/manager-filter-bar-source-contract.test.js` enforces. */
+  :global(.manager-toolbar.manager-scoped-list-toolbar select) {
     flex: 0 1 auto;
     width: auto;
     min-width: 0;
@@ -1105,7 +1136,15 @@
      unused-selector analysis cannot see across a component boundary and would emit this whole
      block as a dead comment. The local half of the selector keeps it out of every other screen,
      exactly as the `.manager-pagination` rule above does. */
-  .manager-scoped-list-toolbar :global(.manager-scoped-list-filter-row.is-selection) {
+  /* BOTH compounds are `:global` now (issue 1039), and it has to be both. The ancestor is a
+     `<ManagerToolbar>` tag and the child is `BulkSelectionToolbar`'s own element, so NEITHER can
+     carry this component's scope hash — leaving the ancestor scoped emitted
+     `.manager-scoped-list-toolbar.svelte-… .manager-scoped-list-filter-row.is-selection`, which
+     matched nothing while looking exactly like the working rule. Specificity is unchanged at
+     (0,4,0): two classes on the ancestor, two on the child, and a `:global()` contributes none of
+     its own. The pair still keeps this off every other screen, exactly as the note below says. */
+  :global(.manager-toolbar.manager-scoped-list-toolbar)
+    :global(.manager-scoped-list-filter-row.is-selection) {
     display: contents;
   }
 

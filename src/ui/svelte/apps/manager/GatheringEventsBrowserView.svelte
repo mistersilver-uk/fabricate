@@ -9,6 +9,8 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     events = [],
@@ -268,28 +270,24 @@
   aria-labelledby={labelledBy}
   data-gathering-events-browser
 >
-  <section
-    class="manager-toolbar manager-event-toolbar"
-    aria-label={text(
+  <ManagerToolbar
+    class="manager-event-toolbar"
+    ariaLabel={text(
       'FABRICATE.Admin.Manager.Environment.Events.Filters',
       'Gathering event filters'
     )}
   >
-    <label class="manager-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        bind:value={searchTerm}
-        placeholder={text(
-          'FABRICATE.Admin.Manager.Environment.Events.SearchPlaceholder',
-          'Search gathering events...'
-        )}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Environment.Events.SearchLabel',
-          'Search gathering events'
-        )}
-      />
-    </label>
+    <ManagerSearchField
+      bind:value={searchTerm}
+      placeholder={text(
+        'FABRICATE.Admin.Manager.Environment.Events.SearchPlaceholder',
+        'Search gathering events...'
+      )}
+      ariaLabel={text(
+        'FABRICATE.Admin.Manager.Environment.Events.SearchLabel',
+        'Search gathering events'
+      )}
+    />
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <select value={statusFilter} onchange={(event) => (statusFilter = event.currentTarget.value)}>
@@ -339,7 +337,7 @@
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </ManagerButton>
     {/if}
-  </section>
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll"

@@ -730,9 +730,14 @@ describe('CraftingSystemManager source contract', () => {
     // `class="manager-empty"` is NOT in this list any more (issue 785): the manager's
     // no-state panel is the shared `EmptyState` component, so the root imports and renders
     // it rather than hand-rolling the dashed-panel markup.
+    // `class="manager-toolbar"` is NOT in this list any more (issue 1039), for the reason
+    // `class="manager-empty"` left it above: the manager's filter bar is the shared
+    // `ManagerToolbar` component, so these views render it rather than hand-rolling the
+    // `<section>`. The tag is what is probed instead, so the assertion still fails if a browser
+    // stops rendering a bar at all.
     for (const snippet of [
       'class="manager-main"',
-      'class="manager-toolbar"',
+      '<ManagerToolbar',
       'class="manager-filter"',
       "import EmptyState from './EmptyState.svelte'",
       '<EmptyState',
