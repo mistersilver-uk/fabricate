@@ -22,17 +22,33 @@
   import RosterRow from './RosterRow.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import { createRecipeAccessBrowserState } from '../../../../utils/managerBrowserViewState.js';
 
   // Fixed roster page size (design: 6 per roster). A search box appears only when
   // the roster is longer than one page.
   const ROSTER_PAGE_SIZE = 6;
 
-  let { recipe = null, characters = [], players = [], onSaveAccess = () => {} } = $props();
+  let {
+    recipe = null,
+    characters = [],
+    players = [],
+    onSaveAccess = () => {},
+    // ── THE TWO ROSTERS' VIEW-STATE IS LIFTED (issue 1438) ───────────────────────────────
+    // This inspector stays mounted while the selected recipe changes, so neither query has
+    // ever been lost to picking another row — and it still is not, because the lifted object
+    // is not keyed by recipe. What it did not survive is leaving the Access route, which
+    // unmounts the whole branch; the root owns the slot so the trip out and back keeps both
+    // terms and both pages.
+    browserState = $bindable(null),
+  } = $props();
 
-  let charQuery = $state('');
-  let playerQuery = $state('');
-  let charPage = $state(0);
-  let playerPage = $state(0);
+  let ownBrowserState = $state(createRecipeAccessBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const charQuery = $derived(String(ui.characterSearchTerm || ''));
+  const playerQuery = $derived(String(ui.playerSearchTerm || ''));
+  const charPage = $derived(ui.characterPageIndex || 0);
+  const playerPage = $derived(ui.playerPageIndex || 0);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -67,16 +83,12 @@
     );
   }
 
-  // Reset each roster to page 1 whenever its own search term changes, so a filter
-  // never leaves the viewer on an out-of-range page.
-  $effect(() => {
-    charQuery;
-    charPage = 0;
-  });
-  $effect(() => {
-    playerQuery;
-    playerPage = 0;
-  });
+  // Each roster returns to page 1 when its own search term changes, so a filter never leaves
+  // the viewer on an out-of-range page. It is done in the SEARCH HANDLER below rather than in
+  // an effect over the term, because an effect also runs on mount: against the lifted state
+  // that would reset the restored page on every return to this route, which is the exact
+  // failure the lift exists to remove. `onSearch` is the only writer of either term, so the
+  // two are equivalent everywhere except on that first run.
 
   function persist(characterIds, playerIds) {
     if (!recipe?.id) return;
@@ -144,11 +156,14 @@
         'FABRICATE.Admin.Manager.Access.SearchCharacters',
         'Search characters…'
       ),
-      onSearch: (value) => (charQuery = value),
+      onSearch: (value) => {
+        ui.characterSearchTerm = value;
+        ui.characterPageIndex = 0;
+      },
       slice: charSlice,
       page: charPage,
-      onPrev: () => (charPage = Math.max(0, charPage - 1)),
-      onNext: () => (charPage += 1),
+      onPrev: () => (ui.characterPageIndex = Math.max(0, charPage - 1)),
+      onNext: () => (ui.characterPageIndex = charPage + 1),
       granted: grantedCharacterIds,
       onToggle: toggleCharacter,
       dataAttr: 'data-access-character-row',
@@ -160,11 +175,14 @@
       showSearch: playerRows.length > ROSTER_PAGE_SIZE,
       query: playerQuery,
       searchPlaceholder: text('FABRICATE.Admin.Manager.Access.SearchPlayers', 'Search players…'),
-      onSearch: (value) => (playerQuery = value),
+      onSearch: (value) => {
+        ui.playerSearchTerm = value;
+        ui.playerPageIndex = 0;
+      },
       slice: playerSlice,
       page: playerPage,
-      onPrev: () => (playerPage = Math.max(0, playerPage - 1)),
-      onNext: () => (playerPage += 1),
+      onPrev: () => (ui.playerPageIndex = Math.max(0, playerPage - 1)),
+      onNext: () => (ui.playerPageIndex = playerPage + 1),
       granted: grantedPlayerIds,
       onToggle: togglePlayer,
       dataAttr: 'data-access-player-row',

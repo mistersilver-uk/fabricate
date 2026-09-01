@@ -63,6 +63,7 @@
     toBulkRecipeEdit,
   } from '../../../../utils/recipeBulkEditModel.js';
   import { createEssenceBrowserState } from '../../../../utils/essenceBrowserModel.js';
+  import { createManagerBrowserViewStates } from '../../../../utils/managerBrowserViewState.js';
   import {
     createEssenceBulkDraft,
     toBulkEssenceEdit,
@@ -444,6 +445,18 @@
   // the bulk selection all lived inside `EssenceBrowserView`, so opening an essence
   // unmounted the browser and coming back reset every one of them.
   let essenceBrowserState = $state(createEssenceBrowserState());
+  // ── EVERY OTHER BROWSE SURFACE'S LIFTED VIEW-STATE (issue 1438) ────────────────────────
+  // The three studios above each got their own declaration as they shipped; the remaining
+  // eleven surfaces arrive together, so they arrive as ONE record rather than as eleven more
+  // `let`s in this file. It is a state record and not a service bag: each surface is handed
+  // its OWN slot below and never the record, so none can read or write another's.
+  //
+  // Why the ROOT and not each surface's immediate parent: every one of them is a branch of
+  // the `{#if currentView === …}` chain below, or lives inside one, so the parent is unmounted
+  // by the very editor round-trip the state has to survive. The two rosters the issue asked
+  // about — Knowledge and Grant access — are exactly this case: their parents survive every
+  // in-surface interaction and die on the route change.
+  let managerBrowserState = $state(createManagerBrowserViewStates());
   // The staged-but-unwritten essence bulk edit, owned HERE for the reason its two siblings
   // are: the panel is unmounted the moment the selection empties, so a panel-owned draft
   // would be destroyed by the very transition that is supposed to DISCARD it.
@@ -11207,6 +11220,7 @@
         {...essenceScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-essence-entry', entityId)}
         onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
+        bind:browserState={managerBrowserState.worldEssenceCatalogue}
       />
     {:else if currentView === 'world-essence-entry'}
       <WorldEssenceEntryPage
@@ -11364,6 +11378,8 @@
               store.setEnvironmentRealmMembership?.(envId, realmId, true)}
             onRemoveEnvironment={(envId, realmId) =>
               store.setEnvironmentRealmMembership?.(envId, realmId, false)}
+            bind:browserState={managerBrowserState.travelRealms}
+            bind:realmEnvironmentsBrowserState={managerBrowserState.realmEnvironments}
           />
         {/if}
       </main>
@@ -11440,6 +11456,9 @@
         onClearStaleTravelActor={(id) => store.clearStaleTravelActor?.(id)}
         onDropStaleOverrideRealm={(id, sys, realmId) =>
           store.dropStaleOverrideRealm?.(id, sys, realmId)}
+        bind:browserState={managerBrowserState.environments}
+        bind:gatheringTasksBrowserState={managerBrowserState.gatheringTasks}
+        bind:gatheringEventsBrowserState={managerBrowserState.gatheringEvents}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
       <main
@@ -11625,6 +11644,7 @@
         onToggleToolEnabled={(id, enabled) =>
           store.toggleToolEnabled?.(id, enabled, selectedSystemId)}
         onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
+        bind:browserState={managerBrowserState.tools}
       />
     {:else if currentView === 'tool-edit' && selectedSystem && focusedToolDraft}
       <ToolEditView
@@ -11711,6 +11731,9 @@
         onRemoveTag={removeTag}
         onSetCategoryIcon={setCategoryIcon}
         onSetComponentCategoryIcon={setComponentCategoryIcon}
+        bind:recipeCategoryBrowserState={managerBrowserState.recipeCategoryVocabulary}
+        bind:componentCategoryBrowserState={managerBrowserState.componentCategoryVocabulary}
+        bind:componentTagBrowserState={managerBrowserState.componentTagVocabulary}
       />
     {:else if currentView === 'component-edit' && selectedSystem}
       {#if componentForEdit}
@@ -11884,6 +11907,7 @@
         onErase={(actorId, recipeId) => store.eraseLearnedRecipe?.(actorId, recipeId)}
         onResetSystem={(actorId) => store.resetActorSystemKnowledge?.(actorId)}
         onResetAll={(actorId) => store.resetActorAllKnowledge?.(actorId)}
+        bind:browserState={managerBrowserState.knowledgeRoster}
       />
     {:else if currentView === 'recipe-item-edit' && selectedSystem}
       <RecipeItemEditor
@@ -11977,6 +12001,7 @@
         onExportSystem={(id) => exportSystem(id)}
         onDeleteSystem={(id) => deleteSystem(id)}
         onToggleSystemEnabled={(id, enabled) => store.toggleSystemEnabled?.(id, enabled)}
+        bind:browserState={managerBrowserState.systems}
       />
     {/if}
 
@@ -14674,6 +14699,7 @@
             characters={store.getPcRoster?.() || []}
             players={$viewState.worldUsers || []}
             onSaveAccess={(id, grant) => store.saveRecipeAccess?.(id, grant)}
+            bind:browserState={managerBrowserState.recipeAccess}
           />
         {:else if currentView === 'books-scrolls'}
           <ItemPageInspector

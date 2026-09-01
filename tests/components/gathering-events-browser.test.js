@@ -27,7 +27,15 @@ describe('GatheringEventsBrowserView source contract', () => {
     // input itself — a source assertion left pointing at moved markup passes for the wrong
     // reason or fails for one.
     assert.ok(browserSource.includes('<ManagerSearchField'), 'browser should render the shared search field');
-    assert.ok(browserSource.includes('bind:value={searchTerm}'), 'browser should bind the search term');
+    // The term is no longer this component's to own (issue 1438): it lives on the lifted
+    // `browserState` the manager root binds, so the field reads a `$derived` alias and writes
+    // back through `ui`. Both halves are asserted — a read with no writer renders a field the
+    // GM cannot type into, and passes a presence-only check.
+    assert.ok(browserSource.includes('value={searchTerm}'), 'browser should render the search term');
+    assert.ok(
+      browserSource.includes('onInput={(next) => (ui.searchTerm = next)}'),
+      'browser should write the search term back to the lifted view-state'
+    );
     assert.ok(browserSource.includes("value={statusFilter}"), 'browser should expose a status filter');
     assert.equal(browserSource.includes("value={regionFilter}"), false, 'region filter is removed (region is geography, not composition)');
     assert.ok(browserSource.includes("value={biomeFilter}"), 'browser should expose a biome filter');

@@ -14,7 +14,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
-    'src/utils/recipeCategories.js'
+    'src/utils/recipeCategories.js',
+    // The inspector's lifted roster view-state (issue 1438).
+    'src/utils/managerBrowserViewState.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the

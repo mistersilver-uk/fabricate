@@ -30,6 +30,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import { createVocabularyBrowserState } from '../../../../utils/managerBrowserViewState.js';
 
   let {
     label = '',
@@ -72,9 +73,22 @@
     confirmRemoveLabel = '',
     cancelRemoveLabel = '',
     onSetIcon = () => {},
+    // ── THE SEARCH IS LIFTED (issue 1438) ────────────────────────────────────────────────
+    // Tags, recipe categories and component categories are three MUTUALLY EXCLUSIVE branches
+    // of one tabbed surface, so switching vocabulary tab unmounts this panel outright, and so
+    // does leaving the Tags & Categories route. Each caller therefore binds its OWN slot:
+    // "herb" names a tag and nothing in the category vocabulary next door.
+    //
+    // `pendingRemovalId` below is deliberately NOT lifted. It is an ARMED destructive
+    // confirmation against one row in one sitting, and an arm that outlives its surface is a
+    // delete the GM did not re-confirm.
+    browserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
+  let ownBrowserState = $state(createVocabularyBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
   let pendingRemovalId = $state('');
 
   function text(key, fallback) {
@@ -191,7 +205,8 @@
   <div class="manager-vocabulary-search-row">
     <ManagerSearchField
       class="manager-vocabulary-search"
-      bind:value={searchTerm}
+      value={searchTerm}
+      onInput={(next) => (ui.searchTerm = next)}
       placeholder={searchPlaceholder}
       ariaLabel={searchLabel}
     />

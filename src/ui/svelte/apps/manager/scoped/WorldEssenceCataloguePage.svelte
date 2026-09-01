@@ -72,6 +72,9 @@
     systems = [],
     onOpenEntry = () => {},
     onOpenSystemRules = () => {},
+    // The catalogue list's lifted view-state (issue 1438), owned by the manager root. Opening
+    // an essence switches `currentView` to `world-essence-entry`, which unmounts this page.
+    browserState = $bindable(null),
   } = $props();
 
   // The route hook, the glyph and the screen name, declared as constants rather than as props on
@@ -314,6 +317,7 @@
       {actions}
       {systems}
       hookValue={PAGE_ID}
+      bind:browserState
       {title}
       subtitle={text(
         'FABRICATE.Admin.Manager.Scoped.Essence.InspectorResting',

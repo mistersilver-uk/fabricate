@@ -109,6 +109,10 @@
     membershipFilter = true,
     selectAllLabel = '',
     onOpenSystemRules = null,
+    // The list's lifted view-state (issue 1438), passed straight through to the frame. It is
+    // OWNED by the manager root: opening an entry unmounts this shell along with the frame,
+    // so a slot held here would be destroyed by the very trip it exists to survive.
+    browserState = $bindable(null),
     selectedId = $bindable(''),
     onSelect = () => {},
     onOpenEntry = () => {},
@@ -196,6 +200,7 @@
     {countUnit}
     {membershipFilter}
     {selectAllLabel}
+    bind:browserState
     bind:selectedId
     {onSelect}
     bind:armedToken

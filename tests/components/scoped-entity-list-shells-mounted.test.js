@@ -47,6 +47,9 @@ const SCOPED_RAW_MODULES = [
   'src/utils/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
   'src/utils/scopedEntityListModel.js',
+  // The frame's lifted view-state (issue 1438). Omitting a declared dependency here
+  // THROWS in `before()`, which reports its tests as `# cancelled`, never `# fail`.
+  'src/utils/managerBrowserViewState.js',
 ];
 
 const FRAME_MODULES = [
