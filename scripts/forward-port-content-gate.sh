@@ -241,6 +241,14 @@ resolution_blob_lines() {
 # The union described above, one path per line, sorted and unique.
 resolution_permitted_paths() {
   local conflict_tree="$1" main_commit="$2" release_commit="$3" stage_paths="$4" path composed
+  local candidates
+  # Fed by a here-string rather than `done < <(…)`, deliberately: a source-contract assertion bans
+  # that construct outright, because the evidence loop further down must be driven by the commit
+  # listing the verifier is given rather than by a second git invocation over the same range. The
+  # ban is worth more than the convenience, so the candidate list is materialised first.
+  candidates="$(LC_ALL=C comm -12 \
+    <(git diff --name-only "${main_commit}^{tree}" "$conflict_tree" | LC_ALL=C sort -u) \
+    <(git diff --name-only "${release_commit}^{tree}" "$conflict_tree" | LC_ALL=C sort -u))"
   {
     # The composed half is decided on BLOB oids, not on what `git diff --name-only` reports.
     # `git diff` compares whole tree ENTRIES — mode as well as oid — so a path whose mode changed on
@@ -258,9 +266,7 @@ resolution_permitted_paths() {
         [ "$composed" != "$(resolution_blob_oid "${release_commit}^{tree}" "$path")" ]; then
         printf '%s\n' "$path"
       fi
-    done < <(LC_ALL=C comm -12 \
-      <(git diff --name-only "${main_commit}^{tree}" "$conflict_tree" | LC_ALL=C sort -u) \
-      <(git diff --name-only "${release_commit}^{tree}" "$conflict_tree" | LC_ALL=C sort -u))
+    done <<<"$candidates"
     printf '%s\n' "$stage_paths"
   } | sed '/^$/d' | LC_ALL=C sort -u
 }
