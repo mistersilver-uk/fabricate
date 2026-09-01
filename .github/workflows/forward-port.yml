@@ -37,6 +37,14 @@ name: "Forward-port release into main"
 # BOTH outputs in their own `if:`. Re-testing both matters: a SKIPPED step's outputs are the empty
 # string, so `steps.tipguard.outputs.mismatch != 'true'` is true when the tipguard step never ran.
 #
+# ── THE CONTENT GATE VERIFIES, IT DOES NOT ASK ──────────────────────────────────────────────────
+# `scripts/forward-port-content-gate.sh` owns the gate for BOTH the first pass and the push retry.
+# It runs the own-merge guard, keeps the free fast path when the merge carries no content, and
+# otherwise establishes mechanically — through `scripts/forward-port-provenance.mjs` — that every
+# commit it would carry was reviewed against the release line. `allow_content` survives as a
+# last-resort override that still prints the refusal it overrode, but it is no longer the ordinary
+# path, and it does not override the own-merge guard.
+#
 # ── SONAR ───────────────────────────────────────────────────────────────────────────────────────
 # githubactions:S7630 — no `${{ inputs.* }}` or `${{ github.* }}` inside any `run:` BODY; every
 # value crosses into the shell through `env:`. githubactions:S8264 — job-level `permissions:`.
@@ -73,7 +81,7 @@ on:
         type: string
         default: ""
       allow_content:
-        description: "Override the content gate. Only set this after confirming every file in the printed diff was authored through a reviewed pull request."
+        description: "Last-resort override of the content gate. The gate now verifies provenance itself, so this is not the ordinary path; it never overrides the own-merge guard."
         required: false
         type: boolean
         default: false
@@ -110,7 +118,7 @@ on:
         type: string
         default: ""
       allow_content:
-        description: "Override the content gate. Only set this after confirming every file in the printed diff was authored through a reviewed pull request."
+        description: "Last-resort override of the content gate. The gate now verifies provenance itself, so this is not the ordinary path; it never overrides the own-merge guard."
         required: false
         type: boolean
         default: false
@@ -251,6 +259,18 @@ jobs:
           fi
 
       # ── STEP 7 ────────────────────────────────────────────────────────────────────────────────
+      - name: Provide the Node the content gate's verifier runs on
+        # NO `npm ci`. `scripts/lib/forwardPortProvenance.js` and its CLI are zero-dependency by
+        # design, exactly like validate-release-tag.mjs, so this job stays a git merge plus one
+        # `node` invocation rather than acquiring an install step. It carries the same full guard
+        # condition as the merge/gate/dry-run/push chain: it is only needed on the path that
+        # actually merges, and an ungated step here would run during a hotfix promotion's no-op.
+        if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      # ── STEP 8 ────────────────────────────────────────────────────────────────────────────────
       - name: Merge origin/release into main
         if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' }}
         env:
@@ -261,33 +281,26 @@ jobs:
           # Conventional Commit type, or landing it on main would itself mint a version.
           git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"
 
-      # ── STEP 8 ────────────────────────────────────────────────────────────────────────────────
+      # ── STEP 9 ────────────────────────────────────────────────────────────────────────────────
       - name: Content gate
         if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' }}
         env:
+          # `release` used to be content-empty by construction, and a hotfix landed on it falsifies
+          # that premise by definition. The gate no longer ASKS a human whether the content was
+          # authored through a reviewed pull request; it establishes that itself. ALLOW_CONTENT and
+          # OVERRIDE_HINT cross into the shared script's environment from here — never interpolated
+          # into a shell body (githubactions:S7630).
           ALLOW_CONTENT: ${{ inputs.allow_content }}
           OVERRIDE_HINT: ${{ inputs.override_hint }}
+          # The API read authenticates as the App installation, never as GITHUB_TOKEN: the job holds
+          # only `contents: read`, and a called workflow can never exceed its caller's grant.
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
         run: |
-          # Today this merge is content-empty by construction: `release` carries only --no-ff merges
-          # of beta tags that promote-to-early-access.yml already proved were ancestors of
-          # origin/main, and release.config.js loads no @semantic-release/git plugin. A stray direct
-          # commit on `release`, or a future git plugin, would quietly turn this automated,
-          # ruleset-bypassing push into an UNREVIEWED code path onto the default branch. Printing the
-          # diff and continuing would detect nothing, so this fails the job.
-          CONTENT=$(git diff --stat origin/main)
-          if [ -z "$CONTENT" ]; then
-            echo "Content gate passed: this forward-port carries no file changes onto main."
-          elif [ "$ALLOW_CONTENT" = "true" ]; then
-            echo "::warning::allow_content was set, so the content gate is overridden. The forward-port carries these file changes onto main:"
-            echo "$CONTENT"
-          else
-            echo "::error::origin/release carries content origin/main does not, so this forward-port would push file changes to main:"
-            echo "$CONTENT"
-            echo "::error::Confirm that every file listed above was authored through a reviewed pull request. Then ${OVERRIDE_HINT}"
-            exit 1
-          fi
+          echo "----- file changes this forward-port would carry onto main -----"
+          git diff --stat origin/main
+          bash scripts/forward-port-content-gate.sh || exit 1
 
-      # ── STEP 9 ────────────────────────────────────────────────────────────────────────────────
+      # ── STEP 10 ───────────────────────────────────────────────────────────────────────────────
       - name: Dry run — report and stop
         if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' && inputs.dry_run }}
         run: |
@@ -297,12 +310,13 @@ jobs:
           git diff --stat origin/main
           echo "::notice::DRY RUN — nothing was pushed. origin/main is unchanged."
 
-      # ── STEP 10 ───────────────────────────────────────────────────────────────────────────────
+      # ── STEP 11 ───────────────────────────────────────────────────────────────────────────────
       - name: Push the forward-port to main
         if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' && !inputs.dry_run }}
         env:
           ALLOW_CONTENT: ${{ inputs.allow_content }}
           OVERRIDE_HINT: ${{ inputs.override_hint }}
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
           REASON: ${{ inputs.reason }}
         run: |
           if git push origin HEAD:main; then
@@ -318,19 +332,17 @@ jobs:
           git fetch origin main --force
           git checkout -B main origin/main
           git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"
-          # The gate is RE-RUN rather than assumed. "An advanced main can only make an empty diff
-          # more true" holds when `theirs` equals the merge base, which is today's situation, but an
-          # empty diff can also arise from a three-way RESOLUTION that landed on `ours` — and in that
+          # The WHOLE gate is RE-RUN rather than assumed, through the same script the first pass
+          # used — not a second, drifting copy of it, and not just the diff. "An advanced main can
+          # only make an empty diff more true" holds when `theirs` equals the merge base, but an
+          # empty diff can also arise from a three-way RESOLUTION that landed on `ours`, and in that
           # regime an advanced main can flip the resolution and carry content no gate saw onto the
-          # one code path that bypasses pull-request review. The window is seconds and the
-          # coincidence is remote, but the cost of re-checking is one `git diff --stat`.
-          RETRY_CONTENT=$(git diff --stat origin/main)
-          if [ -n "$RETRY_CONTENT" ] && [ "$ALLOW_CONTENT" != "true" ]; then
-            echo "::error::the re-merge against the advanced main carries file changes onto main:"
-            echo "$RETRY_CONTENT"
-            echo "::error::Confirm that every file listed above was authored through a reviewed pull request. Then ${OVERRIDE_HINT}"
-            exit 1
-          fi
+          # one code path that bypasses pull-request review. The re-merge is also a NEW merge commit,
+          # so the own-merge guard has to see it too, and the range is recomputed against the
+          # freshly fetched origin/main.
+          echo "----- file changes the re-merge would carry onto main -----"
+          git diff --stat origin/main
+          bash scripts/forward-port-content-gate.sh || exit 1
           if ! git push origin HEAD:main; then
             echo "::error::The forward-port push was rejected twice. main is still numbered below the released version, so the prerelease line is jammed until this is completed: dispatch .github/workflows/forward-port.yml manually (dry_run: false) to finish it."
             exit 1

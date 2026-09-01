@@ -35,6 +35,23 @@ const FORWARD_PORT = `${WORKFLOW_DIR}/forward-port.yml`;
 const RELEASE = `${WORKFLOW_DIR}/release.yml`;
 const PROMOTE_TO_PUBLIC = `${WORKFLOW_DIR}/promote-to-public.yml`;
 
+/**
+ * The content gate's shared shell (issue #1418).
+ *
+ * The gate is needed at the first pass AND inside the push retry, which re-performs the merge
+ * against a freshly fetched `main` and is therefore a second merge no gate has seen. GitHub Actions
+ * offers neither YAML anchors nor reuse of a step from inside another step's `run:`, so writing it
+ * once means a script both bodies invoke — and the contract below is asserted against that script,
+ * not against a copy of its text in either `run:` body.
+ */
+const GATE_SCRIPT = 'scripts/forward-port-content-gate.sh';
+
+/** The verifier the gate delegates its decision to. */
+const VERIFIER = 'scripts/forward-port-provenance.mjs';
+
+/** How both `run:` bodies invoke the shared gate. */
+const GATE_INVOCATION = /bash scripts\/forward-port-content-gate\.sh/;
+
 // The load-bearing tokens of the merge, tolerant of quoting and intervening whitespace. NOT a
 // literal substring: the point is to find every implementation of the merge, however it is written.
 // Deliberately does NOT require the `chore:` subject, so that a duplicate implementation written
@@ -98,6 +115,29 @@ function unquote(text) {
 /** The forward-port job's ordered steps. */
 function forwardPortSteps() {
   return jobOf(FORWARD_PORT, 'forward-port').steps;
+}
+
+/**
+ * The shared gate script's executable lines: comments and blank lines removed, each trimmed.
+ *
+ * Comments are stripped because this file's header documents the very environment variables and
+ * commands the assertions below look for, and matching the prose would let the code drift behind
+ * its own explanation — the failure mode every structural assertion in this file exists to avoid.
+ *
+ * @returns {string[]} The statements, in order.
+ */
+function gateScriptStatements() {
+  return read(GATE_SCRIPT)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+}
+
+/** The index of the first statement containing `token`, asserted to exist. */
+function statementIndex(statements, token, description) {
+  const index = statements.findIndex((statement) => statement.includes(token));
+  assert.notEqual(index, -1, `${GATE_SCRIPT} has a statement that ${description}`);
+  return index;
 }
 
 /** The index of the first step whose SHELL BODY matches, asserted to exist. */
@@ -489,33 +529,251 @@ test('no inputs or github context expression reaches a shell body (githubactions
 
 // ── 11 ──────────────────────────────────────────────────────────────────────────────────────────
 
-test('the content gate FAILS the job on a non-empty diff and names the caller-composed remedy', () => {
+test('the content gate DELEGATES to the shared script and fails the job on its refusal', () => {
   const steps = forwardPortSteps();
   const mergeIndex = stepIndex(steps, MERGE_IMPLEMENTATION, 'merges origin/release');
   const gate =
     steps[stepIndex(steps, /git diff --stat origin\/main/, 'gates on content', mergeIndex + 1)];
 
-  assert.ok(
-    /\bALLOW_CONTENT\b/.test(gate.run),
-    'the content gate reads the allow_content override'
-  );
-  assert.equal(gate.env.ALLOW_CONTENT, '${{ inputs.allow_content }}');
+  // The gate no longer ASKS a human to confirm authorship; it establishes provenance itself. The
+  // decision therefore lives in one script both call sites invoke, and this asserts the wiring —
+  // the script's own contract is asserted against the script, below.
+  assert.match(gate.run, GATE_INVOCATION, 'the content gate invokes the shared gate script');
 
-  // Printing the diff and continuing detects nothing: a stray direct commit on `release`, or a
-  // future @semantic-release/git plugin, would turn this ruleset-bypassing push into an unreviewed
-  // code path onto the default branch.
+  // Printing the diff and continuing detects nothing: a commit landed straight on `release` would
+  // turn this ruleset-bypassing push into an unreviewed code path onto the default branch. The
+  // script's refusal must therefore END the job, not annotate it.
   assert.ok(/\bexit 1\b/.test(gate.run), 'the content gate exits non-zero');
-
-  assert.ok(
-    /\$\{?OVERRIDE_HINT\}?/.test(gate.run),
-    'the failure message interpolates the caller-composed override hint'
-  );
-  assert.equal(gate.env.OVERRIDE_HINT, '${{ inputs.override_hint }}');
   assert.match(
     gate.run,
-    /reviewed pull request/,
-    'the failure message says what to CHECK, not only how to override'
+    new RegExp(`${GATE_INVOCATION.source}[^\\n]*\\|\\|\\s*exit 1`),
+    "a refusal from the shared gate must fail the step, not merely be printed after it"
   );
+
+  // ALLOW_CONTENT and OVERRIDE_HINT reach the script through the step's environment, which is also
+  // the only legitimate way for an `inputs.` value to reach a shell (githubactions:S7630).
+  assert.equal(gate.env.ALLOW_CONTENT, '${{ inputs.allow_content }}');
+  assert.equal(gate.env.OVERRIDE_HINT, '${{ inputs.override_hint }}');
+
+  const script = read(GATE_SCRIPT);
+  assert.match(script, /\$\{?ALLOW_CONTENT/, 'the shared gate reads the allow_content override');
+  assert.match(script, /\$\{?OVERRIDE_HINT/, 'the refusal names the caller-composed remedy');
+  assert.match(
+    script,
+    /reviewed pull request/,
+    'the refusal says what could not be established, not only how to override it'
+  );
+});
+
+// ── 11c ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('exactly ONE implementation of the content gate exists, invoked from both paths', () => {
+  const steps = forwardPortSteps();
+  const invocations = steps.filter((step) => GATE_INVOCATION.test(step.run));
+
+  // Two: the first-pass gate and the push retry. A third would mean a path acquired its own copy;
+  // one would mean a path lost the gate entirely, which is the silent direction.
+  assert.equal(
+    invocations.length,
+    2,
+    `expected the shared gate at the first-pass gate AND in the push retry, found ` +
+      `${invocations.map((step) => step.name).join(', ') || 'none'}`
+  );
+  assert.ok(
+    invocations.some((step) => /git push origin HEAD:main/.test(step.run)),
+    'the push retry is one of the two call sites'
+  );
+
+  // No other workflow may reach for it: this gate is meaningful only after the forward-port's own
+  // merge, and a second caller would be reading a HEAD it does not own.
+  const callers = readdirSync(WORKFLOW_DIR)
+    .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
+    .filter((file) => read(`${WORKFLOW_DIR}/${file}`).includes(GATE_SCRIPT));
+  assert.deepEqual(callers, ['forward-port.yml']);
+});
+
+// ── 11d ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('the gate verifies `origin/main..origin/release`, never `origin/main..HEAD`', () => {
+  // Statements only: the script's own header explains why `origin/main..HEAD` is wrong, and reading
+  // the raw file would match that explanation and pass while the code did the opposite.
+  const body = gateScriptStatements().join('\n');
+
+  assert.match(
+    body,
+    /RANGE="origin\/main\.\.origin\/release"/,
+    'the range is origin/main..origin/release'
+  );
+
+  // LOAD-BEARING. By the time this runs, HEAD is the bot's own merge commit, which is by definition
+  // associated with no pull request; verifying `origin/main..HEAD` would include it and guarantee a
+  // refusal on every single forward-port that carries content — a gate that always says no.
+  assert.ok(
+    !/origin\/main\.\.HEAD/.test(body),
+    "the verified range must not include the bot's own merge commit"
+  );
+
+  // The range is recomputed rather than captured, so the retry path — which re-merges against a
+  // freshly fetched origin/main — verifies the range it will actually push.
+  assert.match(body, /git rev-list "\$RANGE"/, 'the commit listing comes from the range');
+  assert.match(body, /git rev-list --count "\$RANGE"/, 'the range size is measured');
+});
+
+// ── 11e ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('every combined diff the gate reads passes --no-commit-id', () => {
+  const combinedDiffs = gateScriptStatements().filter((statement) =>
+    statement.includes('git diff-tree --cc')
+  );
+
+  assert.ok(combinedDiffs.length > 0, `${GATE_SCRIPT} reads combined diffs at all`);
+  for (const statement of combinedDiffs) {
+    // Without it the command prints the COMMIT ID as a header line, so an "is the output empty"
+    // check reads that sha as a changed filename and concludes the merge carries content —
+    // refusing EVERY merge, including the ordinary --no-ff promote merges the content-free rule
+    // exists to admit. A gate that always refuses is as broken as one that never does, and far
+    // harder to notice on a path that runs twice a month.
+    assert.ok(
+      statement.includes('--no-commit-id'),
+      `'${statement}' omits --no-commit-id, so the commit id would read as a changed filename`
+    );
+  }
+});
+
+// ── 11f ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('the gate refuses an unexpected range shape before it reads a single association', () => {
+  const statements = gateScriptStatements();
+  const capIndex = statementIndex(statements, 'MAX_COMMITS', 'bounds the range');
+  const apiIndex = statementIndex(statements, 'gh api', 'reads pull-request associations');
+
+  assert.match(
+    statements.join('\n'),
+    /\[ "\$RANGE_SIZE" -gt "\$MAX_COMMITS" \]/,
+    'the range size is compared against the cap'
+  );
+  assert.ok(
+    capIndex < apiIndex,
+    'the cap must bound the API loop, not be checked after it has already run'
+  );
+});
+
+// ── 11g ─────────────────────────────────────────────────────────────────────────────────────────
+
+test("the verifier's EXIT STATUS decides the job, and cannot be swallowed", () => {
+  const statements = gateScriptStatements();
+  const index = statementIndex(statements, VERIFIER, 'invokes the verifier');
+  const invocation = statements[index];
+
+  // The mutation this exists to kill is `… || true`, `… ; echo done`, or a backgrounded call: each
+  // leaves the invocation visibly present while making its verdict unreadable, and the literal
+  // `exit 1` elsewhere in the file survives every one of them.
+  for (const swallow of ['||', ';', '&']) {
+    assert.ok(
+      !invocation.includes(swallow),
+      `the verifier invocation carries '${swallow}', which discards its exit status: ${invocation}`
+    );
+  }
+
+  // `set +e` around it is load-bearing: under `set -e` a refusal aborts the script before its
+  // status can be read, and the override branch becomes unreachable.
+  assert.equal(statements[index - 1], 'set +e', 'the refusal must not abort before it is read');
+  assert.equal(
+    statements[index + 1],
+    'VERDICT=$?',
+    "the verifier's exit status must be captured on the line immediately after the invocation"
+  );
+
+  const body = statements.join('\n');
+  assert.match(body, /\[ "\$VERDICT" -eq 0 \]/, 'a zero verdict is what passes the gate');
+  assert.match(body, /exit "\$VERDICT"/, "a refusal exits with the verifier's own status");
+});
+
+// ── 11h ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('the own-merge guard fails the job and is NOT overridable', () => {
+  const script = read(GATE_SCRIPT);
+  const start = script.indexOf('OWN_MERGE=$(');
+  assert.notEqual(start, -1, `${GATE_SCRIPT} guards the forward-port's own merge commit`);
+  const guard = script.slice(start, script.indexOf('\nfi\n', start));
+
+  assert.match(
+    guard,
+    /git diff-tree --cc -r --no-commit-id --name-only HEAD/,
+    "the guard reads the combined diff of the merge the push actually lands"
+  );
+  // `-n`, not `-z`: inverting it turns the guard into one that fires only when the merge is clean.
+  assert.match(guard, /\[\s+-n\s+"\$OWN_MERGE"\s+\]/, 'the guard fires on NON-EMPTY content');
+  assert.match(guard, /\bexit 1\b/, 'the own-merge guard fails the job');
+
+  // allow_content lets an operator vouch for content that exists somewhere to be reviewed. Content
+  // invented by a conflict resolution exists nowhere else, so it has been reviewed nowhere and no
+  // override applies to it.
+  assert.ok(
+    !/ALLOW_CONTENT/.test(guard),
+    'the own-merge guard must not consult the allow_content override'
+  );
+
+  // It runs BEFORE the content fast path, so it sees every merge this workflow lands rather than
+  // only the ones that happen to carry content.
+  const statements = gateScriptStatements();
+  assert.ok(
+    statementIndex(statements, 'OWN_MERGE=$(', 'guards its own merge') <
+      statementIndex(statements, 'CONTENT=$(', 'takes the content fast path'),
+    'the own-merge guard must precede the fast path, or an empty diff would skip it'
+  );
+});
+
+// ── 11i ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('the association read authenticates as the App installation, on both paths', () => {
+  const steps = forwardPortSteps();
+  const script = read(GATE_SCRIPT);
+
+  assert.match(
+    script,
+    /gh api "repos\/\$\{GITHUB_REPOSITORY\}\/commits\/\$\{SHA\}\/pulls/,
+    'the gate reads each commit\'s associated pull requests from this repository'
+  );
+
+  // The job holds only `contents: read`, and a called workflow can never exceed its caller's grant,
+  // so the read MUST use the App installation token minted in this job. Assertion 9 already forbids
+  // the GITHUB_TOKEN expressions in the workflow; this pins the positive half at both call sites.
+  for (const step of steps.filter((candidate) => GATE_INVOCATION.test(candidate.run))) {
+    assert.equal(
+      step.env.GH_TOKEN,
+      '${{ steps.apptoken.outputs.token }}',
+      `'${step.name}' must hand the shared gate the App installation token`
+    );
+  }
+});
+
+// ── 11j ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('Node is provisioned before the gate, gated like the rest of the chain, without an install', () => {
+  const steps = forwardPortSteps();
+  const setupIndex = steps.findIndex((step) => step.uses.startsWith('actions/setup-node@'));
+  assert.notEqual(setupIndex, -1, 'forward-port.yml provisions Node for the verifier');
+
+  const gateIndex = stepIndex(steps, GATE_INVOCATION, 'invokes the shared gate');
+  assert.ok(setupIndex < gateIndex, 'Node must be available before the gate runs the verifier');
+
+  // The verifier and its library are zero-dependency by design, so this job stays a git merge plus
+  // one `node` invocation. An `npm ci` here would put the whole dependency tree — and its failure
+  // modes — on the path that pushes to `main`.
+  assert.ok(
+    !steps.some((step) => /\bnpm ci\b/.test(step.run)),
+    'the forward-port job must not install dependencies'
+  );
+
+  // A skipped step's outputs are the empty string, so both guards are re-tested here exactly as the
+  // merge/gate/dry-run/push chain re-tests them.
+  for (const output of ['steps.ancestry.outputs.already', 'steps.tipguard.outputs.mismatch']) {
+    assert.ok(
+      steps[setupIndex].if.includes(output),
+      `${stepLabel(steps[setupIndex], setupIndex)} must re-test \`${output}\` in its own if:`
+    );
+  }
 });
 
 // ── 11b ─────────────────────────────────────────────────────────────────────────────────────────
@@ -535,10 +793,21 @@ test('the push retry RE-GATES on content and never re-fetches origin/release', (
   const afterDiff = push.run.slice(diffAt);
   const rePushAt = afterDiff.indexOf('git push origin HEAD:main');
   assert.notEqual(rePushAt, -1, 'the retry re-pushes after re-gating');
+  const beforeRePush = afterDiff.slice(0, rePushAt);
   assert.match(
-    afterDiff.slice(0, rePushAt),
+    beforeRePush,
     /\bexit 1\b/,
     'the retry content gate must FAIL the job, not print and push anyway'
+  );
+
+  // The WHOLE gate is re-run, not just the diff. The re-merge is a NEW merge commit, so the
+  // own-merge guard has to see it; the range is recomputed against the freshly fetched origin/main,
+  // so the provenance verification has to be redone against it; and re-running it through the same
+  // script is what stops the two paths drifting apart, which is how they diverged before.
+  assert.match(
+    beforeRePush,
+    GATE_INVOCATION,
+    'the retry must re-run the full provenance gate, not only re-print the diff'
   );
 
   // Freezing the `theirs` side to the ref the first gate validated is load-bearing: re-fetching
