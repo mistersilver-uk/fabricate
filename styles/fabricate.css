@@ -25077,7 +25077,7 @@
 }
 
 /* ── THE TOOL SCREENS JOIN THE SAME SURFACE LADDER (issue 1373) ──────────────────────────────
-   The block above is route-scoped by design, and its route list names the three ESSENCE
+   The blocks above are route-scoped by design, and their route lists name the ESSENCE
    screens. The three TOOL screens are the same archetype drawn from the same reference —
    `PROTO-tools-catalogue.png`, `PROTO-tool-entry.png` and `PROTO-tool-rules.png` all draw one
    flat content surface with bordered cards on it — so without this they inherit the
@@ -25145,5 +25145,51 @@
 }
 
 .fabricate-manager[data-manager-view='tools'] .manager-inspector .manager-inspector-card {
+  background: transparent;
+}
+
+/* THE WORLD TOOLS CATALOGUE'S TOOLBAR STRIP IS FLUSH TOO (issue 1373).
+
+   The essence block above states the whole argument, and this is the same statement for the
+   one TOOL route that draws the strip: the shared `.manager-toolbar` rule paints
+   `--fab-overlay-light-03` and closes itself with a full-bleed `border-bottom`, so the filter
+   line and its `Select all` read as a lit band one rung above the pane, where
+   `PROTO-tools-catalogue.png` measures the pane's own value at every height and draws no
+   divider at all. Fill and hairline go together for the reason given there: half of the
+   treatment is a third construction that reads as neither.
+
+   ── THE PRECONDITION, CHECKED RATHER THAN ASSUMED ────────────────────────────────────────────
+   Removing a strip's own boundary is only safe where the rows below carry one, because the
+   row border is what states the list's top edge once the fill and the hairline go. This
+   route's rows ARE bordered cards: they are `.manager-scoped-list-row`, whose shared rule
+   declares `border: 1px solid var(--fab-border)`, and the block above takes only their FILL
+   away. So the boundary survives as the gap under the strip's padding plus the first card's
+   own edge, which is exactly the construction the reference uses.
+
+   ── WHY ONE SELECTOR AND NOT THREE ───────────────────────────────────────────────────────────
+   The other two tool routes are named here on purpose, so that their absence reads as a
+   decision rather than as an oversight:
+
+    - `world-tools` is the only one that draws it. Its page composes `EntityCatalogueShell`,
+      which composes `EntityListInspectorFrame`, and that frame is where the
+      `manager-toolbar manager-scoped-list-toolbar` section lives.
+    - `world-tool-entry` is a tabbed editor. It has no browser strip on it at all, so a
+      selector for it would match nothing - the same reason the essence block gives for
+      omitting `world-essence-entry`.
+    - `tools`, the system-scope rules browser, does not use this class at all.
+      `ToolsBrowserView.svelte` draws its own search, membership filter and sort controls as
+      `.manager-tools-library-card` and `.manager-tools-sort-row`, which sit on the pane as
+      cards already and were never a raised band.
+
+   ── ITS OWN BLOCK, NOT AN APPENDED SELECTOR ──────────────────────────────────────────────────
+   The essence block's selector list is that lane's statement about its own routes. Adding a
+   route to it would put one rule under two owners and make either lane's revert carry half
+   of the other's decision away with it; kept apart, both blocks delete independently once
+   the ladder becomes a manager-wide decision.
+
+   No literals: the overlay is REMOVED rather than replaced, so the pane's own `--fab-bg-0`
+   shows through and no theme's ramp is frozen into the other six. */
+.fabricate-manager[data-manager-view='world-tools'] .manager-toolbar {
+  border-bottom: 0;
   background: transparent;
 }
