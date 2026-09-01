@@ -82,9 +82,8 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Pagination from '../../../components/Pagination.svelte';
   import EntityListInspectorFrame from './EntityListInspectorFrame.svelte';
-  import MembershipActions from './MembershipActions.svelte';
+  import SystemRulesRoster from './SystemRulesRoster.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
 
   let {
@@ -120,12 +119,6 @@
     emptyHint = '',
   } = $props();
 
-  /** The system-rules list's page size. Five rows, as the prototype's pager states. */
-  const SYSTEM_PAGE_SIZE = 5;
-
-  let systemQuery = $state('');
-  let systemPageIndex = $state(0);
-
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -157,21 +150,6 @@
   ]);
 
   /**
-   * A crafting system's display name, with an ID FALLBACK.
-   *
-   * `projectSystems` narrows the roster to `{id, name}` and coerces a missing name to `''`, so a
-   * row rendering `system.name` unguarded prints nothing where a system has no name and a row
-   * rendering `${system.name}` prints the literal `undefined`. Neither is an answer.
-   *
-   * @param {{systemId: string, systemName?: string}} row
-   * @returns {string}
-   */
-  function systemLabel(row) {
-    const named = typeof row?.systemName === 'string' ? row.systemName.trim() : '';
-    return named || String(row?.systemId ?? '');
-  }
-
-  /**
    * COPY-FROM IS SUPPRESSED IN THIS SHELL, AND THAT IS A DECISION RATHER THAN AN OMISSION.
    *
    * `copyMembership(entityId, fromSystemId, toSystemIds)` needs a SOURCE and a list of
@@ -186,89 +164,14 @@
    * button that silently does nothing on every click forever — or a guess at the source, which
    * writes the wrong system's overrides onto a record and is worse.
    *
-   * A "sometimes correct" version is available and is also refused: when exactly one other
-   * system holds the entity the source is unambiguous, and the control would then work on some
-   * rows and not others with nothing on screen saying which.
-   *
    * SO THE AFFORDANCE IS NOT RENDERED, and the chooser is 6a-ii's — the lane that owns this
    * screen's inspector body, where a source picker belongs. `tests/components/
    * scoped-shell-prop-contract.test.js` bans a two-argument `copyMembership` call from this
    * directory, so the lane that adds the picker cannot re-introduce the silent form.
    *
-   * @returns {boolean} always `false`
+   * `SystemRulesRoster` states the same refusal as a literal `copyable={false}`, which is why no
+   * function is threaded to it.
    */
-  function copyable() {
-    return false;
-  }
-
-  /**
-   * The state one `(entity, system)` cell is in, as a machine-readable attribute.
-   *
-   * ── THREE STATES FOR AN ENABLEABLE TYPE, TWO FOR THE REST ────────────────────────────────────
-   * `absent` / `disabled` / `enabled`, read from `member` FIRST: `buildSystemRow` omits `enabled`
-   * for a type that has none and answers `false` for a non-member, so a test of `enabled` first
-   * would paint every non-member as "disabled" — the one reading a GM cannot act on, since a
-   * disabled member is re-enabled by a toggle and a non-member is not. A non-enableable type
-   * answers `member`, because "switched off" is not a state a component membership can be in.
-   *
-   * ── WHY IT IS DERIVED HERE AND NOT IMPORTED FROM `essenceScoped.js` ──────────────────────────
-   * That leaf's `essenceSystemState` answers the same question for the essence family and is what
-   * the essence screens read. This shell is entity-AGNOSTIC by contract — nothing in it tests
-   * `scope.entityType` — so it cannot import an essence module, and its answer has a fourth value
-   * the essence one does not need. `scope.enableable` is the descriptor's own flag, so the split
-   * is between two answers to two questions rather than two copies of one.
-   *
-   * The attribute exists because the state has to stay MEASURABLE. It used to live on the row's
-   * per-system pip strip, which the prototype does not draw and issue 1372 deleted; without this
-   * the three states would be conveyed only by which controls `MembershipActions` happens to
-   * render, and the delta's criterion 5 would have nothing to assert against.
-   *
-   * @param {{member?: boolean, enabled?: boolean}} row a projected system row.
-   * @returns {string}
-   */
-  function membershipState(row) {
-    if (row?.member !== true) return 'absent';
-    if (scope?.enableable !== true) return 'member';
-    return row?.enabled === true ? 'enabled' : 'disabled';
-  }
-
-  /**
-   * The inspected entry's system rows, narrowed by the inspector's own search box.
-   *
-   * IT SEARCHES THE DISPLAY LABEL, which is `systemLabel`'s id fallback where a system has no
-   * name — so a roster whose names never loaded is still searchable by the ids on screen rather
-   * than by nothing at all.
-   *
-   * @param {object|null} entry
-   * @returns {object[]}
-   */
-  function systemRowsOf(entry) {
-    const rows = Array.isArray(entry?.systems) ? entry.systems : [];
-    const needle = systemQuery.trim().toLowerCase();
-    if (needle === '') return rows;
-    return rows.filter((row) => systemLabel(row).toLowerCase().includes(needle));
-  }
-
-  /**
-   * Reset the system list to its first page.
-   *
-   * A search that shrinks the list below the current page would otherwise leave the panel on an
-   * empty page with a pager reading `Showing 11–5 of 3`, which is the same clamp defect
-   * `EntityListInspectorFrame`'s header records against the main list.
-   */
-  function changeSystemQuery(value) {
-    systemQuery = String(value ?? '');
-    systemPageIndex = 0;
-  }
-
-  // A NEW SELECTION IS A NEW LIST. Without this the panel keeps the previous entry's page index
-  // and search term, so clicking a six-system row after paging to page three of a thirteen-system
-  // one shows an empty system list under a full inspector.
-  $effect(() => {
-    void selectedId;
-    systemQuery = '';
-    systemPageIndex = 0;
-  });
 </script>
 
 <div class="manager-scoped-catalogue" data-scoped-list={hookValue}>
@@ -308,19 +211,15 @@
 -->
 {#snippet catalogueInspector(entry, ctx)}
   {@const counts = entry?.inheritCounts ?? {}}
-  {@const rows = systemRowsOf(entry)}
-  {@const pageCount = Math.max(1, Math.ceil(rows.length / SYSTEM_PAGE_SIZE))}
-  {@const pageIndex = Math.min(systemPageIndex, pageCount - 1)}
-  {@const pageRows = rows.slice(pageIndex * SYSTEM_PAGE_SIZE, (pageIndex + 1) * SYSTEM_PAGE_SIZE)}
 
   <!--
     THE WORLD DEFAULTS ARE CARDS THAT NAME THEIR VALUE, not a label-and-count run.
 
-    Each card is `[glyph] {what this default IS} / {how many systems take it}` (`essences.png`).
-    What shipped was `Effect source · 0 inheriting` with the value on a third line below, which
-    inverts the prototype's emphasis: the count is the footnote and the value is the fact. The
-    inherit COUNT is still on the card and still hooked by `data-scoped-list-inherit-count`, so
-    nothing that could read it before has lost it.
+    Each card is `[glyph] {what this default IS} / {how many systems take it}`
+    (`tmp/proto/essence-catalogue.png`). What shipped was `Effect source · 0 inheriting` with the
+    value on a third line below, which inverts the reference's emphasis: the count is the footnote
+    and the value is the fact. The inherit COUNT is still on the card and still hooked by
+    `data-scoped-list-inherit-count`, so nothing that could read it before has lost it.
   -->
   <section class="manager-scoped-catalogue-section" data-scoped-list-defaults>
     <p class="manager-kicker">
@@ -360,125 +259,26 @@
   </section>
 
   <!--
-    THE SYSTEM LIST IS A SEARCHED, PAGED SECTION WITH A COUNT — because at a real world's roster
-    it is otherwise the whole panel.
-
-    The prototype heads it `SYSTEM RULES  13 / 24`, gives it a search field and pages it five at a
-    time (`essences.png`). This shell rendered every system in the roster, unheaded and unpaged,
-    each row a stacked name over an enable switch and a red Remove — measured at six lab systems
-    that was about 350px of destructive controls between the world defaults and the panel's only
-    navigation. The row is now ONE line, name leading and its actions trailing, which is the
-    prototype's silhouette with this screen's function intact.
+    THE SYSTEM LIST IS `SystemRulesRoster`, COMPOSED RATHER THAN INLINED (issue 1372, maintainer
+    parity round 8). The reference draws the identical panel on the system Essence Rules
+    inspector, which had none; extracting it is what let that screen have this one rather than a
+    second copy of it. Every prop below is a fact this shell holds and the panel does not.
   -->
-  <section class="manager-scoped-catalogue-section" data-scoped-list-systems>
-    <div class="manager-scoped-catalogue-section-head">
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.Scoped.List.SystemRulesHead', 'System rules')}
-      </p>
-      <span class="manager-scoped-catalogue-section-count" data-scoped-list-system-count>
-        {format('FABRICATE.Admin.Manager.Scoped.List.SystemRulesCount', '{members} / {total}', {
-          members: Number(entry?.membershipCount) || 0,
-          total: rosterSize,
-        })}
-      </span>
-    </div>
-
-    <label class="manager-search manager-scoped-catalogue-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        value={systemQuery}
-        data-scoped-list-system-search
-        placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems…')}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Scoped.List.SearchSystemsLabel',
-          'Search systems'
-        )}
-        oninput={(event) => changeSystemQuery(event.currentTarget.value)}
-      />
-    </label>
-
-    <ul class="manager-scoped-catalogue-systems" role="list">
-      {#each pageRows as row (row.systemId)}
-        <li
-          class="manager-scoped-catalogue-system"
-          data-scoped-list-system={row.systemId}
-          data-scoped-system={row.systemId}
-          data-scoped-system-state={membershipState(row)}
-        >
-          <span class="manager-scoped-catalogue-system-name">{systemLabel(row)}</span>
-          <!--
-            A MEMBER ROW IS A LINK; A NON-MEMBER ROW IS AN ADD.
-
-            The prototype's system row is `[System name]  [Rules ↗]` (`essences.png`) — this panel
-            is where a GM finds out WHICH systems hold the entity and gets to each one's rules, and
-            it is not where they edit those rules. What shipped here was the full membership
-            cluster: an enable switch and a red Remove on every row, which put a destructive delete
-            on five rows of a navigation panel and made the row three lines tall.
-
-            Enable and Remove are NOT lost. They are on the world ENTRY editor's per-system rules
-            section, one click away through this panel's own `Open definition` foot action, which
-            is the layer that owns them — and the entry editor states each row's inherit state
-            beside them, which this 258px row never could.
-
-            A NON-MEMBER row keeps `MembershipActions`, because there is no rules screen to link to
-            for a system that has no record: Add is the only verb it has, and it is not
-            destructive. That is also why the whole cluster is not simply deleted.
-          -->
-          {#if row.member === true && onOpenSystemRules}
-            <button
-              type="button"
-              class="manager-scoped-catalogue-system-link"
-              data-scoped-list-system-rules={row.systemId}
-              title={format(
-                'FABRICATE.Admin.Manager.Scoped.List.OpenSystemRulesNamed',
-                'Open {system} rules for {entity}',
-                {
-                  system: systemLabel(row),
-                  entity: entry?.entity?.name ?? entry?.id ?? '',
-                }
-              )}
-              onclick={() => onOpenSystemRules(entry.id, row.systemId)}
-            >
-              <span>{text('FABRICATE.Admin.Manager.Scoped.List.OpenSystemRules', 'Rules')}</span>
-              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-            </button>
-          {:else}
-            <MembershipActions
-              entityType={scope?.entityType ?? 'component'}
-              entityId={entry?.id ?? ''}
-              systemId={row.systemId}
-              entityName={entry?.entity?.name ?? entry?.id ?? ''}
-              systemName={systemLabel(row)}
-              member={row.member === true}
-              enabled={row.enabled === true}
-              copyable={copyable()}
-              hint={false}
-              compact={true}
-              {armedToken}
-              onArm={(token) => (armedToken = token)}
-              onDisarm={() => (armedToken = '')}
-              onAdd={() => actions?.addToSystem?.(entry.id, row.systemId)}
-              onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
-              onToggleEnabled={(next) => actions?.setEnabled?.(entry.id, row.systemId, next)}
-            />
-          {/if}
-        </li>
-      {/each}
-    </ul>
-
-    <!-- NO per-page selector: see `Pagination`'s own `showPageSize` note. The window is five
-         rows because the prototype's pager states five, and a size a GM cannot change is not a
-         control they need offered. -->
-    <Pagination
-      persistent={true}
-      showPageSize={false}
-      totalCount={rows.length}
-      {pageIndex}
-      pageSize={SYSTEM_PAGE_SIZE}
-      onPageChange={(next) => (systemPageIndex = next)}
-    />
-  </section>
+  <SystemRulesRoster
+    rows={Array.isArray(entry?.systems) ? entry.systems : []}
+    memberCount={Number(entry?.membershipCount) || 0}
+    {rosterSize}
+    entityId={entry?.id ?? ''}
+    entityName={entry?.entity?.name ?? entry?.id ?? ''}
+    entityType={scope?.entityType ?? 'component'}
+    enableable={scope?.enableable === true}
+    {actions}
+    {onOpenSystemRules}
+    {armedToken}
+    onArm={(token) => (armedToken = token)}
+    onDisarm={() => (armedToken = '')}
+    resetKey={selectedId}
+  />
 
   {#if inspectorBody}{@render inspectorBody(entry, ctx)}{/if}
 {/snippet}
@@ -507,24 +307,6 @@
     flex-direction: column;
     gap: var(--fab-space-chip);
     min-width: 0;
-  }
-
-  .manager-scoped-catalogue-section-head {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: baseline;
-    justify-content: space-between;
-    min-width: 0;
-  }
-
-  /* The `13 / 24` at the trailing edge of the section head: members over roster. `tabular-nums`
-     so the pair does not shuffle as a GM adds systems. */
-  .manager-scoped-catalogue-section-count {
-    flex: 0 0 auto;
-    color: var(--fab-text-subtle);
-    font-family: var(--fab-font-mono);
-    font-size: 0.66rem;
-    font-variant-numeric: tabular-nums;
   }
 
   /* ONE WORLD DEFAULT, AS A CARD. Glyph, then a title that names the VALUE over a note that
@@ -578,137 +360,5 @@
     font-size: 0.62rem;
     line-height: 1.35;
     overflow-wrap: break-word;
-  }
-
-  /* The search field is the shipped `.manager-search`; only its own row sizing is stated here,
-     because the global rule sizes it for a toolbar rather than for a 300px column. */
-  .manager-scoped-catalogue-search {
-    flex: 0 0 auto;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .manager-scoped-catalogue-systems {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    min-width: 0;
-  }
-
-  /* ONE LINE PER SYSTEM: the name leads and its membership cluster trails, where the shipped row
-     stacked the two and made a six-system list about 350px tall. */
-  .manager-scoped-catalogue-system {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    justify-content: space-between;
-    padding: 2px var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    /* NO FILL. The prototype draws every card in the content area on the pane's own surface and
-       separates them with a 1px border alone (issue 1372); a fill here put a fifth grey on a
-       screen that has one. */
-    background: transparent;
-    min-width: 0;
-  }
-
-  /* THE `Rules ↗` LINK. A quiet bordered pill rather than a `ManagerButton`: it is a navigation
-     affordance inside a list row, so it must not compete with the panel's one primary action at
-     the foot, and the prototype draws it as a small outlined link (`essences.png`). It carries
-     the manager's `<button>` reset assumptions locally because Foundry's host rule centres a
-     button's content and pins a fixed height. */
-  .manager-scoped-catalogue-system-link {
-    display: inline-flex;
-    flex: 0 0 auto;
-    gap: var(--fab-space-chip);
-    align-items: center;
-    justify-content: center;
-    width: auto;
-    height: 24px;
-    min-height: 24px;
-    padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 7px;
-    background: transparent;
-    color: var(--fab-text-muted);
-    font-size: 0.62rem;
-    font-weight: 600;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .manager-scoped-catalogue-system-link:hover {
-    border-color: var(--fab-accent);
-    color: var(--fab-accent);
-  }
-
-  /* THE ROW IS ~36px, AND THE 34px CONTROL INSIDE IT IS WHY IT TAKES A RULE.
-     `.manager-button` pins `min-height: 34px` for a page-level control; five of those plus the
-     row's own padding is 290px of a panel that also has to hold three cards, a search field and a
-     pager, so only four rows of five fitted above the fold and the pager was never on screen. The
-     prototype's system rows are about 35px tall (`essences.png`), which is this control at 26px.
-
-     Scoped to this row, so no other `ArmedDangerButton` in the manager is retuned. */
-  .manager-scoped-catalogue-system :global(.manager-button.is-danger) {
-    min-height: 26px;
-    padding: 0 var(--fab-space-2);
-  }
-
-  .manager-scoped-catalogue-system-name {
-    flex: 1 1 0;
-    color: var(--fab-text);
-    font-size: 0.7rem;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* THE CLUSTER KEEPS ITS WIDTH AND THE NAME GIVES WAY. `.manager-scoped-membership-actions` is
-     `flex-wrap: wrap` in the host sheet, sized for a full-width editor row; dropped into a 258px
-     inspector row it wrapped its own two controls onto separate lines and made every system row
-     three lines tall. `flex: 0 0 auto` + `nowrap` fixes the cluster at its content width and the
-     name — already `overflow: hidden` with an ellipsis — takes the remainder.
-
-     `:global()` because the element belongs to `MembershipActions`, scoped under a local class so
-     it reaches no other caller of that component. */
-  .manager-scoped-catalogue-system > :global(.manager-scoped-membership-actions) {
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
-  }
-
-  /* `Pagination` renders its own `<section>`, so the sizing has to be stated from this side of the
-     boundary — the same reason the frame states it for the list's own pager.
-
-     THE THREE RULES BELOW ARE WHY THE ARROWS ARE ON SCREEN. The shipped bar is built for the foot
-     of a full-width list: `gap: --fab-space-3`, `padding: --fab-space-2 --fab-space-3`, a 96px
-     minimum on the page label and `flex-wrap: wrap`. In a 258px inspector column that wraps the
-     nav onto a second line below the summary, and the second line fell under the panel's own
-     scroll edge — so the frame published `Showing 1-5 of 6` with no way to reach row six, which
-     is a pager that states there is more and then hides the only control that gets to it.
-
-     `nowrap` plus the tighter metrics put the summary and the nav on one line at this width. */
-  .manager-scoped-catalogue-section > :global(.manager-pagination) {
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
-    font-size: 0.62rem;
-  }
-
-  .manager-scoped-catalogue-section :global(.manager-pagination-page) {
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .manager-scoped-catalogue-section :global(.manager-pagination-nav .manager-icon-button) {
-    width: 24px;
-    height: 24px;
-    min-height: 24px;
-    flex: 0 0 24px;
   }
 </style>

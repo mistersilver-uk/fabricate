@@ -41,6 +41,11 @@ const FRAME = `${SCOPED_DIR}/EntityListInspectorFrame.svelte`;
 const CATALOGUE = `${SCOPED_DIR}/EntityCatalogueShell.svelte`;
 const RULES = `${SCOPED_DIR}/EntityRulesListShell.svelte`;
 const SHELLS = Object.freeze([FRAME, CATALOGUE, RULES]);
+// The `SYSTEM RULES n / m` panel, extracted out of the catalogue's inspector snippet at issue
+// 1372 so the system Essence Rules rail could have the same one rather than a second copy. It is
+// not a SHELL — it composes no frame and owns no route — but it is where the system rows and
+// their membership cluster now live, so the copy-from ban has to follow them.
+const ROSTER = `${SCOPED_DIR}/SystemRulesRoster.svelte`;
 
 function sourceOf(path) {
   return readFileSync(resolve(repoRoot, path), 'utf8');
@@ -188,7 +193,12 @@ describe('no chrome is inlined into a shell', () => {
   //
   // So the exception is CHECKED rather than waived: it must sit inside the inspector snippet, and
   // it must carry the two props that make it the inspector's rather than the list's.
-  const INSPECTOR_PAGER = { [CATALOGUE]: 1, [RULES]: 0 };
+  //
+  // AT ISSUE 1372 THE EXCEPTION MOVED RATHER THAN BEING SPENT. `SystemRulesRoster` is that panel
+  // as a component, so BOTH shells are back to zero composed chrome, and the pager is asserted on
+  // the roster instead — see the two `it`s below, which together say the same thing the position
+  // and prop checks used to say about the inlined copy.
+  const INSPECTOR_PAGER = { [CATALOGUE]: 0, [RULES]: 0 };
 
   for (const shell of [CATALOGUE, RULES]) {
     it(`${shell.split('/').pop()} renders exactly one frame and none of the composed chrome`, () => {
@@ -212,15 +222,17 @@ describe('no chrome is inlined into a shell', () => {
     });
   }
 
-  it('the catalogue pager is the INSPECTOR pager, by position and by props', () => {
-    const source = sourceOf(CATALOGUE);
-    const snippet = source.indexOf('{#snippet catalogueInspector');
-    const pager = source.indexOf('<Pagination');
-    assert.ok(snippet > 0, 'the inspector snippet was not found, so the position check is vacuous');
+  it('the system-list pager lives on the ROSTER, and it is the inspector pager', () => {
+    // The catalogue composes the panel rather than inlining it, so the shell is back to zero
+    // composed chrome and the pager's own identity is asserted where it now is.
+    const shell = sourceOf(CATALOGUE);
     assert.ok(
-      pager > snippet,
-      'the shell pager sits inside the inspector snippet, not beside the frame'
+      shell.includes('<SystemRulesRoster'),
+      'the catalogue composes the panel; without this the zero count above means it was deleted'
     );
+    const source = sourceOf(ROSTER);
+    const pager = source.indexOf('<Pagination');
+    assert.ok(pager > 0, 'the roster renders the pager');
     // The PROP evidence: it walks a fixed five-row window with no page-size selector, where the
     // frame's list pager takes the browse-screen default. A pager that grew a size selector here
     // would be the list pager copied, which is what the count check alone cannot see.
@@ -232,6 +244,22 @@ describe('no chrome is inlined into a shell', () => {
       'and walks the system window, not the list'
     );
     assert.doesNotMatch(call, /onPageSizeChange/, 'so it has no size handler to wire either');
+  });
+
+  it('and BOTH essence rails reach that one panel', () => {
+    // B1 (issue 1372): the reference draws `SYSTEM RULES n / m` on the world catalogue's
+    // inspector AND on the system Essence Rules inspector. The second had none at all, and
+    // adding it by copying the snippet is the duplication this whole file exists to prevent.
+    const inspector = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte'),
+      'utf8'
+    );
+    assert.ok(inspector.includes('<SystemRulesRoster'), 'the system rules rail composes it too');
+    assert.equal(
+      sourceOf(ROSTER).split('<Pagination').length - 1,
+      1,
+      'and there is exactly ONE pager between the two of them'
+    );
   });
 
   it('and the FRAME renders each of them, so the zero counts above are a measurement', () => {
@@ -643,7 +671,7 @@ actions.copyMembership(entry.id, row.systemId);`),
   });
 
   it('no shell calls it at all today, and any future call carries three arguments', () => {
-    for (const path of SHELLS) {
+    for (const path of [...SHELLS, ROSTER]) {
       for (const args of copyMembershipCalls(sourceOf(path))) {
         assert.equal(
           args.length,
@@ -657,10 +685,17 @@ actions.copyMembership(entry.id, row.systemId);`),
     // …and the affordance itself is suppressed, which is what the mounted suite measures. Stated
     // here too so the two halves cannot drift: a lane that renders the button must also wire the
     // call, and a lane that wires the call must render the button.
+    // The suppression moved WITH the rows it governs: the panel that renders `MembershipActions`
+    // is `SystemRulesRoster`, and it states the refusal as a literal rather than as a function
+    // whose body a future lane could widen without noticing.
     assert.match(
-      sourceOf(CATALOGUE),
-      /copyable\(\)\s*\{\s*return false;/,
-      'the catalogue must suppress copy-from while it has no source chooser'
+      sourceOf(ROSTER),
+      /copyable=\{false\}/,
+      'the roster must suppress copy-from while no screen has a source chooser'
+    );
+    assert.ok(
+      sourceOf(ROSTER).includes('<MembershipActions'),
+      'NON-VACUITY: it is the panel that renders the cluster copy-from would live in'
     );
   });
 });

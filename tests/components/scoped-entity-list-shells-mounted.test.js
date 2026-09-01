@@ -71,6 +71,7 @@ const catalogueHarness = createMountedComponentHarness({
     ...FRAME_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
@@ -670,7 +671,7 @@ describe('the per-system rows come from the join, never from the roster prop', (
       scope: scopeOf('component', { systems: [{ id: 'sys-a', name: 'Forge' }] }),
     });
     assert.equal(
-      named.querySelector('.manager-scoped-catalogue-system-name').textContent.trim(),
+      named.querySelector('.manager-scoped-roster-system-name').textContent.trim(),
       'Forge'
     );
     const unnamed = await catalogueHarness.mount({
@@ -678,7 +679,7 @@ describe('the per-system rows come from the join, never from the roster prop', (
       scope: scopeOf('component', { systems: [{ id: 'sys-a' }] }),
     });
     assert.equal(
-      unnamed.querySelector('.manager-scoped-catalogue-system-name').textContent.trim(),
+      unnamed.querySelector('.manager-scoped-roster-system-name').textContent.trim(),
       'sys-a',
       'an allowlist-omitted field reads undefined, and the literal string "undefined" is not a name'
     );

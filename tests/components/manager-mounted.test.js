@@ -299,6 +299,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/MembershipActions.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte');
   // The two cards the system Essence Rules editor opens and closes with (issue 1372). Both are
   // in `EssenceEditView`'s STATIC graph, so an omission does not fail this file — it HANGS it,
   // reported as `# cancelled` with no message.
@@ -2738,13 +2739,13 @@ function createStore(calls = [], options = {}) {
       if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
       return options.addEssenceResult ?? true;
     },
-    // The four essence actions issue 1036 adds beside the two above. Each is reached
-    // OPTIONAL-CHAINED from the root, so an absent export no-ops silently — these stubs are
-    // what make the wiring detectable at all.
-    duplicateEssence: (id) => {
-      calls.push(['duplicateEssence', id]);
-      return options.duplicateEssenceResult ?? `${id}-copy`;
-    },
+    // The essence actions issue 1036 adds beside the two above. Each is reached OPTIONAL-CHAINED
+    // from the root, so an absent export no-ops silently — these stubs are what make the wiring
+    // detectable at all.
+    //
+    // `duplicateEssence` is NOT among them any more (issue 1372, maintainer parity round 8): the
+    // store publishes no such verb and the inspector renders no such control. Leaving the stub
+    // here would make a re-added call site look wired in every mounted assertion.
     setEssenceEnabled: (id, enabled) => {
       calls.push(['setEssenceEnabled', id, enabled]);
       return { updated: true, invalidatedRecipes: 0 };
@@ -11494,14 +11495,32 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-essence-id="water"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Clear current.'));
 
-    // The inspector now OWNS Edit, Duplicate and Delete — the row keeps only the pencil.
+    // The inspector OWNS Edit and Delete — the row keeps only the pencil.
     assert.ok(
       target.querySelector('[data-essence-browser-inspector]'),
       'the selected-essence inspector is an extracted component'
     );
+    // AND IT OFFERS NO DUPLICATE (issue 1372, maintainer parity round 8). Duplicating wrote a
+    // second `system.essenceDefinitions` entry with its own name, icon and colour — a
+    // system-owned essence — from the rail whose own banner two cards above says name, icon and
+    // colour come from the Essence Catalogue and are shared by every system.
     assert.ok(
-      target.querySelector('[data-essence-action="duplicate"]'),
-      'the inspector offers Duplicate'
+      !target.querySelector('[data-essence-action="duplicate"]'),
+      'the inspector offers no Duplicate'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-essence-action="edit"]')),
+      'NON-VACUITY: the actions cluster is rendered, so the absence above is a measurement'
+    );
+    // The `SYSTEM RULES n / m` panel (issue 1372, B1) renders only when the world corpus can
+    // answer it, and this harness registers no essence scope store, so it is correctly absent
+    // here — the same rule the membership filter follows. Its presence is measured where a
+    // corpus exists: `essence-world-scope-screens.test.js` pins the call site's whole attribute
+    // list, and `scoped-shell-prop-contract.test.js` pins that both essence rails compose the
+    // one component rather than each owning a copy.
+    assert.ok(
+      !target.querySelector('[data-essence-section="systems"]'),
+      'and no roster is invented over a corpus nothing could read'
     );
     assert.ok(
       target.querySelector('[data-essence-section="usage"]'),
@@ -11547,14 +11566,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
     flushSync();
-
-    target.querySelector('[data-essence-action="duplicate"]').click();
-    await tick();
-    flushSync();
-    assert.ok(
-      calls.some((call) => call[0] === 'duplicateEssence' && call[1] === 'water'),
-      'Duplicate reaches the store'
-    );
 
     target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
@@ -11647,17 +11658,25 @@ describe('CraftingSystemManager mounted behavior', () => {
       )
     );
 
-    // The RETAINED source-state filter, reachable only with source UI on.
-    const sourceFilter = target.querySelector('[aria-label="Filter essences by source state"]');
-    sourceFilter.value = 'none';
-    sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    // THE SOURCE-STATE FILTER IS GONE (issue 1372, maintainer parity round 8), with the status
+    // segment beside it: the reference's bar carries ONE filter, the membership pair. What it
+    // found is still findable — the row's summary line names the source and marks a broken link,
+    // and the search box reads that name — so the SEARCH is exercised here in its place, over
+    // the same fixture, which is the negative control the removed filter used to provide.
+    assert.ok(
+      !target.querySelector('[aria-label="Filter essences by source state"]'),
+      'the source-state select is not on the bar'
+    );
+    const essenceSearch = target.querySelector('[aria-label="Search essences"]');
+    essenceSearch.value = 'Water';
+    essenceSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
     assert.ok(target.textContent.includes('Water'));
 
-    sourceFilter.value = 'all';
-    sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    essenceSearch.value = '';
+    essenceSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
 
@@ -11804,88 +11823,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       'and an impact note states how far the cascade reaches'
     );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await tick();
-    flushSync();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
-    assert.equal(
-      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
-      'New essence draft'
-    );
-    assert.equal(
-      target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
-      true
-    );
-    const createName = target.querySelector('#manager-essence-edit-name');
-    createName.value = 'Air';
-    createName.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.equal(
-      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
-      'Air'
-    );
-
-    // A new draft has NO authored colour, and the INLINE palette must say so rather than
-    // marking Sage: `colorToken` normalizes an absent value onto `sage`, so an unguarded
-    // palette marked Sage selected directly above copy reading "No colour".
-    assert.equal(
-      target.querySelector('[data-manager-essence-colour] [data-essence-colour-state]').dataset
-        .essenceColourState,
-      'none'
-    );
-    assert.equal(
-      target.querySelectorAll(
-        '[data-manager-essence-colour] [data-manager-color-token].is-selected'
-      ).length,
-      0,
-      'no preset claims to be the current choice while none is authored'
-    );
+    // ── NO CREATE ON THIS ROUTE (issue 1372, maintainer parity round 8) ─────────────────────
+    // The header's `+ Create essence` opened a system-scope draft that `store.addEssence` wrote
+    // straight into `system.essenceDefinitions` — a system-owned essence with its own name, icon
+    // and colour, from the screen whose own rail says identity is the Essence Catalogue's. The
+    // reference's Essence Rules header carries nothing on the right at all.
+    //
+    // The palette, the create save call and the six-argument `addEssence` contract this block
+    // used to walk are not lost: the world Essence Catalogue's `+ New essence` is the create now,
+    // and `essence-world-scope-screens-mounted.test.js` walks the world entry editor's identity
+    // form. What is asserted here is that the entry point is gone rather than merely hidden.
     assert.ok(
-      target
-        .querySelector('[data-manager-essence-colour] [data-manager-color-none]')
-        .classList.contains('is-selected'),
-      'the No-colour cell is the one marked, and it is the only route back to unset'
+      !target.querySelector('.manager-header-actions .manager-button'),
+      'the Essence Rules header carries no action'
     );
-    target.querySelector('[data-manager-essence-colour] [data-manager-color-token="rose"]').click();
+    navButton('Component Rules').click();
+    await tick();
+    flushSync();
+    navButton('Essence Rules').click();
     await tick();
     flushSync();
     assert.equal(
-      target.querySelector('[data-manager-essence-colour] [data-essence-colour-state]').dataset
-        .essenceColourState,
-      'rose',
-      'authoring a colour ends the unset state'
-    );
-    // No colour-NAME copy (maintainer feedback): the caption states Authored/Unset without
-    // ever naming the swatch, unlike the palette cell itself, which still carries "Rose" as
-    // its own accessible name/title (shared `managerColorTokens.js` vocabulary, untouched).
-    assert.equal(
-      target
-        .querySelector('[data-manager-essence-colour] [data-essence-colour-state]')
-        .textContent.includes('Rose'),
-      false,
-      'the caption never renders the colour name as visible text'
-    );
-
-    // The Enabled row is the shared ToggleCard, and a new essence can be created disabled.
-    target.querySelector('[data-recipe-field="essence-enabled"]').click();
-    await tick();
-    flushSync();
-
-    target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
-    await tick();
-    flushSync();
-    const addCall = calls.find((call) => call[0] === 'addEssence' && call[1] === 'Air');
-    assert.ok(addCall, 'the create call reached the store');
-    // SEVEN recorded entries: the verb plus six arguments. The fifth argument is the
-    // authored colour and the sixth is the options bag issue 1036 added — an assertion
-    // that stopped at five passes identically whether either is threaded or dropped.
-    assert.equal(addCall.length, 7, 'addEssence is called with all six arguments');
-    assert.equal(addCall[5], 'rose', 'the GM-authored colour survives the create call');
-    assert.equal(
-      addCall[6].enabled,
-      false,
-      'and so does an Enabled switch the GM turned off before the first save'
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'essences',
+      'NON-VACUITY: the route is still the essence list, so the empty header is a measurement'
     );
   });
 
@@ -12471,37 +12432,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     unmount(mounted);
     target.remove();
 
-    const createFailedCalls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(createFailedCalls, { addEssenceResult: false }),
-        services: { openCurrentAdmin: () => {} },
-      },
-    });
-    flushSync();
-
-    navButton('Essence Rules').click();
-    await tick();
-    flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await tick();
-    flushSync();
-    const createName = target.querySelector('#manager-essence-edit-name');
-    createName.value = 'Air';
-    createName.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await tick();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
-    assert.equal(target.querySelector('#manager-essence-edit-name').value, 'Air');
-    assert.ok(target.textContent.includes('Save failed.'));
+    // THE THIRD CASE — A FAILED CREATE — IS RETIRED WITH ITS ROUTE (issue 1372, round 8). It
+    // walked the system-scope create draft, whose only entry point was the Essence Rules header's
+    // `+ Create essence`; an essence's identity is a world record and the create that authors one
+    // is the Essence Catalogue's. The two cases above still cover what this file is about — a
+    // failed and a rejected save both KEEP the draft — over the update path that survives.
   });
 
   it('shows the Crafting group unconditionally and gates only Graph on experimental features (issue 745)', async () => {
@@ -20130,7 +20065,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.textContent.includes('Select a component'), false);
   });
 
-  it('shows setup guidance and keeps create routing when a system has no essences', async () => {
+  it('shows setup guidance, and offers no create, when a system has no essences', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -20156,11 +20091,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Essence docs'));
     assert.equal(target.textContent.includes('Select an essence'), false);
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+    // AND STILL NO CREATE, EVEN HERE (issue 1372, maintainer parity round 8). An empty system is
+    // the one state where a create button on this header is most tempting, and it is still the
+    // wrong layer: an essence is a world record, and the route out is the setup card's own copy
+    // plus the rail's Essence Catalogue entry.
+    assert.ok(
+      !target.querySelector('.manager-header-actions .manager-button'),
+      'the Essence Rules header carries no action on an empty system either'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'essences',
+      'NON-VACUITY: the route is the essence list, so the empty header is a measurement'
+    );
   });
 
   it('names the Gathering sub-tab in the trail, and the group above it navigates', async () => {

@@ -127,6 +127,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusPill.svelte',
     FRAME,
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     SHELL,
   ],
   componentPath: SHELL,

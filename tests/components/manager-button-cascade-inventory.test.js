@@ -436,14 +436,17 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
-        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own: the
-        // catalogue's `+ New essence`. The entry's `Back`/`Save` pair renders into this same
+        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own — the
+        // catalogue's `+ New essence` — and back to 28 at its round-8 parity pass, which deleted
+        // the SYSTEM Essence Rules header's `+ Create essence`: the reference's Essence Rules
+        // header carries nothing on the right, because an essence is a world record and the only
+        // create is the catalogue's. The entry's `Back`/`Save` pair renders into this same
         // container from `scoped/ScopedEntryHeaderActions.svelte`, which slots into the div and
         // declares no region of its own, so it is the `ComponentEditorHeader` case the `why`
         // below already records — reached by the rule, not attributable to this file by a static
         // count. The number is the container's own population read from the tree, so it moves
         // whenever a header branch gains or loses a control it renders itself.
-        buttons: 29,
+        buttons: 28,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -470,8 +473,11 @@ const REVIEWED = [
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
         role: 'primary',
-        // 14 -> 15 with issue 1372's world-essence header create action.
-        buttons: 15,
+        // 14 -> 15 with issue 1372's world-essence header create action, and back to 14 at its
+        // round-8 parity pass, which deleted the SYSTEM Essence Rules header's `+ Create essence`
+        // — the reference's Essence Rules header carries nothing on the right, and an essence's
+        // identity is a world record no system-scope screen authors.
+        buttons: 14,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -654,12 +660,13 @@ const REVIEWED = [
 
   {
     id: scopedRule(
-      'scoped/EntityCatalogueShell.svelte',
-      '.manager-scoped-catalogue-system .manager-button.is-danger'
+      'scoped/SystemRulesRoster.svelte',
+      '.manager-scoped-roster-system .manager-button.is-danger'
     ),
     disposition: 'EXCLUDE',
     why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it. The catalogue inspector`s system ' +
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved '+
+      'it into `SystemRulesRoster`, which both essence rails compose. The panel`s system ' +
       'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
       '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +
       'so this rule cannot be re-chained onto the primitive. What it states is a SIZE taken ' +

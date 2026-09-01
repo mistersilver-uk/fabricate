@@ -70,6 +70,9 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+  // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
+  // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.
+  'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 ];
 
