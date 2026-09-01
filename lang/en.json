@@ -6050,7 +6050,6 @@
             "SourceUnlinked": "No source item",
             "SystemCount": "{count} systems",
             "SystemCountOne": "{count} system",
-            "SystemCountNote": "Each one inherits these defaults until it overrides a section",
             "Unavailable": "This world corpus could not be read, so nothing here can be listed or edited. Reload the world once its settings are readable."
           },
           "Membership": {
