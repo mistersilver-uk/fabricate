@@ -5,6 +5,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
   import {
@@ -55,6 +56,10 @@
     // that did not exist when the zone was parked here.
     onToggleToolEnabled = () => {},
     onSetBreakageAuthority = () => {},
+    // THE ROUTE OUT OF THE ZERO STATE that leaves this system. Passed rather than reached
+    // through `actions`, which is the world Tool WRITE family: opening a route is the shell's
+    // job and the write family has no navigation on it (issue 1373).
+    onOpenWorldCatalogue = () => {},
   } = $props();
 
   /**
@@ -269,12 +274,17 @@
     filteredTools.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
   );
 
+  // `{shown}` IS THE PAGE, NOT THE FILTER (issue 1373). It was fed `filteredRows.length`, so a
+  // two-page result read `11 shown` over eight rows while the pager immediately below read
+  // `Showing 1-8 of 11`. Two counts in one pane contradicting each other is worse than either
+  // alone; the filter total is not lost, because `{world}` and the membership filter's own
+  // `All world tools (11)` both still state it.
   const resultCountText = $derived(
     text(
       'FABRICATE.Admin.Manager.Tools.ResultCountScoped',
       '{shown} shown · {member} of {world} in this system'
     )
-      .replace('{shown}', String(filteredRows.length))
+      .replace('{shown}', String(pagedTools.length))
       .replace('{member}', String(memberRows.length))
       .replace('{world}', String(memberRows.length + ghostRows.length))
   );
@@ -362,10 +372,12 @@
     }
     const maxUses = Number(tool?.breakage?.maxUses);
     if (Number.isInteger(maxUses) && maxUses > 0) {
-      return text('FABRICATE.Admin.Manager.Tools.SummaryUseCount', '{count} uses').replace(
-        '{count}',
-        String(maxUses)
-      );
+      return text(
+        maxUses === 1
+          ? 'FABRICATE.Admin.Manager.Tools.SummaryUseCountOne'
+          : 'FABRICATE.Admin.Manager.Tools.SummaryUseCount',
+        maxUses === 1 ? '{count} use' : '{count} uses'
+      ).replace('{count}', String(maxUses));
     }
     return text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses');
   }
@@ -433,8 +445,8 @@
           searchTerm = next;
           pageIndex = 0;
         }}
-        placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
-        ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
+        placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
+        ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
       />
       <div
         class="manager-tools-membership-filter"
@@ -512,6 +524,22 @@
     <section class="manager-tools-library-card" data-manager-tools-browser>
       <div class="manager-tools-library-scroll" data-tool-library-scroll>
         {#if tools.length === 0}
+          <!--
+            THE EMPTY STATE NAMES A DESTINATION, SO IT OFFERS ONE (issue 1373).
+
+            It read `Add a Tool from the world Tools Catalogue, where Tools are created.` and
+            gave the GM no control at all - while the toolbar directly above it said
+            `All world tools (11)`, i.e. eleven Tools were adoptable one chip-click away without
+            leaving the screen. `EmptyState` has taken `children` for exactly this since it was
+            extracted; this call site simply passed none.
+
+            TWO ROUTES, because the state has two honest answers and they are different sizes.
+            The nearer one switches the membership filter in place and is the primary: nothing
+            is created, nothing is navigated, and the eleven adoptable rows appear with their
+            own `Add to system` buttons. It renders only when there is something to show. The
+            farther one leaves for the world catalogue, which is where a Tool that does not
+            exist yet has to be made, and is the only route when the world holds none either.
+          -->
           <EmptyState
             icon="fas fa-screwdriver-wrench"
             title={text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}
@@ -520,7 +548,37 @@
               'Add a Tool from the world Tools Catalogue, where Tools are created.'
             )}
             dataAttr="data-tool-library-empty"
-          />
+          >
+            <div class="manager-tools-empty-actions">
+              {#if ghostRows.length > 0}
+                <ManagerButton
+                  role="primary"
+                  data-tool-empty-browse-world={String(ghostRows.length)}
+                  onclick={() => {
+                    membershipFilter = 'all';
+                    pageIndex = 0;
+                  }}
+                >
+                  <i class="fas fa-plus" aria-hidden="true"></i>
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Tools.EmptyBrowseWorld',
+                      'Show the {count} world Tools you can add'
+                    ).replace('{count}', String(ghostRows.length))}</span
+                  >
+                </ManagerButton>
+              {/if}
+              <ManagerButton data-tool-empty-open-catalogue onclick={onOpenWorldCatalogue}>
+                <i class="fas fa-globe" aria-hidden="true"></i>
+                <span
+                  >{text(
+                    'FABRICATE.Admin.Manager.Tools.EmptyOpenCatalogue',
+                    'Open the world Tools Catalogue'
+                  )}</span
+                >
+              </ManagerButton>
+            </div>
+          </EmptyState>
         {:else if filteredTools.length === 0}
           <EmptyState
             icon="fas fa-search"
@@ -581,7 +639,9 @@
                              here says nothing this screen decides. The enabled half of that
                              pair is the toggle in the action cluster rather than a second
                              chip beside it - see the note there. -->
-                        <Chip tone="neutral">{breakageLabel(entry.tool, row.breakage)}</Chip>
+                        <Chip tone="neutral" class="manager-tools-breakage-chip"
+                          >{breakageLabel(entry.tool, row.breakage)}</Chip
+                        >
                       {/if}
                       {#if inherit}
                         <span
@@ -606,9 +666,13 @@
                        it is not a property of the Tool: it is how much of this system leans on
                        it, and it is the number a GM checks before disabling or removing one. -->
                   <span class="manager-tools-row-recipes" data-tool-row-recipes={entry.id}>
-                    <strong>{recipeCount(entry.id)}</strong>
+                    <!-- A DASH, NOT A ZERO, for a world Tool this system holds no rules for. A
+                         recipe here cannot reference a Tool the system is not a member of, so
+                         `0` is not a count that came out low - there is nothing to count, and
+                         the reference draws the em dash for exactly that (issue 1373). -->
+                    <strong>{entry.member ? recipeCount(entry.id) : '\u2014'}</strong>
                     <small
-                      >{recipeCount(entry.id) === 1
+                      >{recipeCount(entry.id) === 1 && entry.member
                         ? text('FABRICATE.Admin.Manager.Tools.RowRecipeOne', 'Recipe')
                         : text('FABRICATE.Admin.Manager.Tools.RowRecipeCount', 'Recipes')}</small
                     >
@@ -785,14 +849,20 @@
     text-align: right;
   }
 
+  /* MONO AND ONE RUNG DOWN. The reference sets this figure at `700 12px var(--mono)` in the
+     SECONDARY ink - a column of numerals a GM scans down, in the face that lines them up. It
+     rendered in the full text colour, which made it the brightest thing in a row whose subject
+     is the Tool's name (issue 1373). */
   .manager-tools-row-recipes strong {
-    color: var(--fab-text);
-    font-size: 0.82rem;
-    font-weight: 600;
+    color: var(--fab-text-secondary);
+    font-family: var(--fab-font-mono);
+    font-size: 0.76rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
   .manager-tools-row-recipes small {
-    color: var(--fab-text-muted);
+    color: var(--fab-text-subtle);
     font-size: 0.52rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -930,16 +1000,48 @@
 
   /* THE INHERIT STATE IS NOT A CHIP, deliberately. It is a sentence about where the values
      came from, not a badge naming one of them, and the prototype sets it as plain text beside
-     the pills for exactly that reason. */
+     the pills for exactly that reason.
+
+     ── THE READING ORDER WAS INVERTED, AND A TOKEN THAT DOES NOT EXIST IS WHY (issue 1373) ──
+     This resolved `var(--fab-status-warning-text, var(--fab-accent))`, and
+     `--fab-status-warning-text` IS DECLARED NOWHERE in this repository - the only reference to
+     it was this one call site. So the live branch was always the FALLBACK, and the qualifying
+     sentence rendered in the full accent while the stat chip it qualifies rendered in
+     `--fab-text-muted`: the caption outshone the fact.
+
+     The warning FAMILY is right and the reference uses it here - `--fab-warning-text` for the
+     overriding sentence, the subtle tone for the inheriting one. That token is real and is
+     declared in all seven theme blocks, which is the whole difference. It is not spelled as a
+     literal for the reason `theme-colour-contract.test.js` exists: seven themes redefine this
+     ramp, and one theme's value frozen into the sheet is six wrong colours. */
   .manager-tools-row-inherit {
-    color: var(--fab-text-muted);
+    color: var(--fab-text-subtle);
     font-size: 0.6rem;
     font-weight: 600;
     white-space: nowrap;
   }
 
   .manager-tools-row-inherit.is-overridden {
-    color: var(--fab-status-warning-text, var(--fab-accent));
+    color: var(--fab-warning-text);
+  }
+
+  /* The stat chip is the FACT and reads one rung brighter than the sentence beside it, which is
+     the reference's own relationship between the two. `:global()` is required and is not a
+     loosening: the chip element is written by `Chip.svelte`, so a class handed to it as a prop
+     never carries this block's scoping attribute - `ToolBrowserInspector` repairs the same
+     hazard the same way. The ANCESTOR half stays local, so the hash lands on the wrapper. */
+  .manager-tools-library-chips :global(.manager-tools-breakage-chip) {
+    color: var(--fab-text-secondary);
+  }
+
+  /* The way out of the zero state. A column, so a long localized label does not force the two
+     routes onto one squeezed row inside a panel that is already centred and capped. */
+  .manager-tools-empty-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--fab-space-2);
+    min-width: 0;
   }
 
   /* A world Tool with no rules here is present but not adopted, and reads that way. */

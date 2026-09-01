@@ -36,6 +36,34 @@ export function toolBreakageSummary(tool, authority = 'toolSpecific') {
   return 'limitedUses';
 }
 
+/**
+ * THE ONE ANSWER TO "what breakage mechanic does this Tool author", including the state the
+ * radio group had no option for (issue 1373).
+ *
+ * `breakage.mode: 'limitedUses'` carries `maxUses: number | null`, and `src/models/Tool.js:23`
+ * has always said what the null means: UNLIMITED — the copy is never used up, so it never
+ * breaks. `Tool#evaluateBreakage` and `toolBreakageRuntime` both short-circuit on it, and
+ * `normalizeBreakage` reads the retired `mode: 'immune'` FORWARD onto it, so it is also the
+ * model's own spelling of "does not break". A brand-new Tool defaults to it.
+ *
+ * Every reading surface already said `Unlimited uses`; only the editor's radio group and its
+ * uses stepper did not, because they keyed off `breakage.mode` alone — which cannot tell the
+ * two limited-uses states apart — and drew the null as `1`. This splits the presentation of one
+ * MODE into the two answers a GM actually authors. It is deliberately NOT a fourth
+ * `breakage.mode`: `Tool#validate` and `validBreakage` both already accept a null `maxUses`
+ * under `limitedUses`, so a new mode would be a migration for a state the model holds today.
+ *
+ * @param {object|null} tool
+ * @param {string} authority Active system breakage authority.
+ * @returns {string} `unlimited`, `limitedUses`, `breakageChance`, `diceExpression`,
+ *   `breakable` or `immune`.
+ */
+export function toolBreakageChoice(tool, authority = 'toolSpecific') {
+  const kind = toolBreakageSummary(tool, authority);
+  if (kind !== 'limitedUses') return kind;
+  return tool?.breakage?.maxUses == null ? 'unlimited' : 'limitedUses';
+}
+
 export function toolOnBreakSummary(tool) {
   const mode = tool?.onBreak?.mode;
   if (mode === 'flagBroken') return 'flagBroken';
@@ -87,10 +115,16 @@ export function projectToolBehaviorFacts(
     Number.isInteger(Number(tool?.breakage?.maxUses)) &&
     Number(tool?.breakage?.maxUses) > 0
   ) {
+    // A SINGULAR FORM, because `1 uses` is now reachable and photographed. Switching a Tool
+    // from `Unlimited uses` to `Limited uses` seeds `maxUses` at 1 (issue 1373), which is the
+    // state a GM lands on the moment they choose the option.
+    const useCount = Number(tool.breakage.maxUses);
     breakageTitle = format(
-      'FABRICATE.Admin.Manager.Tools.SummaryUseCount',
-      { count: Number(tool.breakage.maxUses) },
-      '{count} uses'
+      useCount === 1
+        ? 'FABRICATE.Admin.Manager.Tools.SummaryUseCountOne'
+        : 'FABRICATE.Admin.Manager.Tools.SummaryUseCount',
+      { count: useCount },
+      useCount === 1 ? '{count} use' : '{count} uses'
     );
   }
 
@@ -182,7 +216,11 @@ export function projectToolBehaviorFacts(
     {
       id: 'prerequisites',
       heading: text('FABRICATE.Admin.Manager.Tools.Editor.Prerequisites', 'Prerequisites'),
-      icon: 'fas fa-user-shield',
+      // THE GROUP GLYPH, not the single-figure-with-shield. The design draws `fa-users` on
+      // this rule row, on the Requirements tab and on the rail's `No prerequisites to use`
+      // alike; a prerequisite is a statement about WHO may wield the Tool, and the shield
+      // glyph reads as protection rather than as a roster (issue 1373).
+      icon: 'fas fa-users',
       title: prerequisiteTitle,
       value: prerequisiteTitle,
       subtitle: tool?.prerequisites?.enabled
@@ -198,7 +236,7 @@ export function projectToolBehaviorFacts(
     {
       id: 'bonus',
       heading: text('FABRICATE.Admin.Manager.Tools.Editor.Bonus', 'Check bonus'),
-      icon: 'fas fa-plus-minus',
+      icon: 'fas fa-plus',
       title: bonusTitle,
       value: bonusTitle,
       subtitle: tool?.bonus?.enabled
@@ -575,9 +613,11 @@ export function projectToolPlayerPreview(
         icon: limited ? 'fas fa-hourglass-half' : breakageFact?.icon || 'fas fa-hourglass-half',
         label: limited
           ? format(
-              'FABRICATE.Admin.Manager.Tools.Editor.PlayerUsesLeft',
+              maxUses === 1
+                ? 'FABRICATE.Admin.Manager.Tools.Editor.PlayerUsesLeftOne'
+                : 'FABRICATE.Admin.Manager.Tools.Editor.PlayerUsesLeft',
               { count: maxUses },
-              '{count} uses left'
+              maxUses === 1 ? '{count} use left' : '{count} uses left'
             )
           : breakageFact?.title || '',
       },

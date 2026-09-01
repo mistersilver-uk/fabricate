@@ -30,6 +30,16 @@
     // button exists to answer.
     systemName = '',
     unadopted = null,
+    // THE PER-SECTION INHERIT TRUTH, which this panel could not state and the row beside it
+    // already did (issue 1373). `inherited` is the membership record's own `inherit` map, read
+    // by the root off the same world-projection join `ToolsBrowserView` reads for its
+    // `Overrides breakage, prerequisites, check bonus` sentence.
+    //
+    // It is a SEPARATE prop from `tool`, and it has to be: the system's own Tool record carries
+    // the RESOLVED values and cannot tell an inherited answer from an identical overridden one.
+    // Without it the panel listed four rules with no marking at all, two of which read `No...`,
+    // so a Tool overriding three sections was indistinguishable from one authoring nothing.
+    inherited = {},
     onEditWorldTool = () => {},
     onAddToSystem = () => {},
   } = $props();
@@ -48,6 +58,42 @@
   }
 
   const row = $derived(tool ? projectToolRow(tool, managedItems, authority) : null);
+
+  /**
+   * The four world-default sections, each with the state this system resolves it through.
+   *
+   * The section NAMES are `scopedStudio`'s tool descriptor's, restated here rather than
+   * imported, for the reason `ToolsBrowserView` restates its own copy: this list is the
+   * PRESENTATION order the design's `Inheritance` region reads in, and it is deliberately the
+   * same four the row's sentence enumerates so the row and the panel cannot disagree about
+   * which rules are the overrides.
+   *
+   * An ABSENT key reads as inheriting, matching `isSectionInherited` and `scopedInheritRows`.
+   */
+  const INHERIT_SECTIONS = [
+    { id: 'breakage', key: 'FABRICATE.Admin.Manager.Tools.Breakage', label: 'Breakage' },
+    { id: 'onBreak', key: 'FABRICATE.Admin.Manager.Tools.OnBreak', label: 'On break' },
+    {
+      id: 'prerequisites',
+      key: 'FABRICATE.Admin.Manager.Scoped.Sections.Prerequisites',
+      label: 'Prerequisites',
+    },
+    { id: 'bonus', key: 'FABRICATE.Admin.Manager.Scoped.Sections.Bonus', label: 'Check bonus' },
+  ];
+
+  const inheritRows = $derived(
+    INHERIT_SECTIONS.map((section) => {
+      const isInherited = inherited?.[section.id] !== false;
+      return {
+        id: section.id,
+        label: text(section.key, section.label),
+        inherited: isInherited,
+        state: isInherited
+          ? text('FABRICATE.Admin.Manager.Scoped.Inherit.StateInherited', 'Inherited')
+          : text('FABRICATE.Admin.Manager.Scoped.Inherit.StateOverridden', 'Overridden'),
+      };
+    })
+  );
 
   /**
    * The world record's own defaults read as a TOOL-SHAPED record, for the unadopted panel.
@@ -121,7 +167,11 @@
               : text('FABRICATE.Admin.Manager.Tools.InspectorDisabledHere', 'Disabled here')}
           </Chip>
         {:else}
-          <Chip tone="warning" icon="fas fa-circle-minus" data-tool-inspector-no-rules>
+          <!-- NEUTRAL, not `warning`. A world Tool this system has not adopted is an ordinary
+               state with its own first-class row treatment and its own pinned CTA below; the
+               reference tones this pill exactly as it tones a disabled one, and a warning
+               tint here read as a defect in a Tool that has none (issue 1373). -->
+          <Chip tone="neutral" icon="fas fa-circle-minus" data-tool-inspector-no-rules>
             {text('FABRICATE.Admin.Manager.Tools.InspectorNoRulesHere', 'No rules here')}
           </Chip>
         {/if}
@@ -173,11 +223,45 @@
           icon={fact.icon}
           title={fact.title}
           subtitle={fact.subtitle}
+          tile
           dataAttr="data-tool-inspector-rule"
           dataValue={fact.id}
         />
       {/each}
     </div>
+    <!--
+      WHICH OF THOSE FOUR ARE THIS SYSTEM'S OWN (issue 1373).
+
+      The rules above state what the Tool RESOLVES to here; they cannot state where each answer
+      came from, because a section this system overrode to the world's own value resolves
+      identically to one it inherits. The row one column to the left already claims `Overrides
+      breakage, prerequisites, check bonus` — and the panel it opened listed four rules with no
+      marking at all, so the claim was unverifiable on the screen that made it.
+
+      A separate region rather than a pill on each rule row, which is where the reference puts
+      it and is also the honest shape: `Inherited` qualifies the RULE, not the value, and a
+      badge inside the value row reads as a property of the value.
+
+      Members only. A Tool with no rules record here inherits nothing, and the rules above are
+      already captioned `What it would inherit here`.
+    -->
+    {#if row}
+      <p class="manager-kicker manager-tool-inspector-section-kicker">
+        {text('FABRICATE.Admin.Manager.Tools.InspectorInheritance', 'Inheritance')}
+      </p>
+      <div class="manager-tool-inspector-inheritance" data-tool-inspector-inheritance>
+        {#each inheritRows as section (section.id)}
+          <div
+            class="manager-tool-inspector-inherit-row"
+            data-tool-inspector-inherit={section.id}
+            data-tool-inspector-inherit-state={section.inherited ? 'inherited' : 'overridden'}
+          >
+            <span>{section.label}</span>
+            <Chip tone={section.inherited ? 'info' : 'warning'}>{section.state}</Chip>
+          </div>
+        {/each}
+      </div>
+    {/if}
     <!--
       TWO GROUPS, AND THE SPLIT IS THE DESIGN'S OWN, not a tidiness choice.
 
@@ -241,7 +325,7 @@
     title={text('FABRICATE.Admin.Manager.Tools.SelectTitle', 'Select a Tool')}
     hint={text(
       'FABRICATE.Admin.Manager.Tools.SelectHint',
-      'Choose a Tool to inspect its behavior.'
+      'Choose a Tool to inspect its behaviour.'
     )}
     contextClass="manager-tool-browser-inspector-empty"
     dataAttr="data-tool-browser-inspector-empty"
@@ -265,6 +349,37 @@
     display: grid;
     gap: var(--fab-space-2);
     min-width: 0;
+  }
+
+  /* The `Inheritance` region: one row per world-default section, the section name on the left
+     and its state pill on the right. Deliberately a rung quieter than the rules above it - it
+     qualifies them rather than adding a fifth. */
+  .manager-tool-inspector-inheritance {
+    display: grid;
+    gap: var(--fab-space-1);
+    min-width: 0;
+  }
+
+  .manager-tool-inspector-inherit-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+    min-width: 0;
+    padding: 7px 11px;
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    background: var(--fab-bg-1);
+  }
+
+  .manager-tool-inspector-inherit-row > span {
+    min-width: 0;
+    color: var(--fab-text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* `margin-top: auto` on a WRAPPER rather than on the button: a class passed into a child

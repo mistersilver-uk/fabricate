@@ -52,11 +52,32 @@
    - disabled: while the editor is saving.
    - onToggle(section, nextInherit): the switch.
    - children: the section's controls, rendered ONLY when the section is overridden.
+   - localInherit: `null` for a real world-default SECTION, which resolves its state through
+     `inherited` and renders the shared `InheritRow`. A boolean for a card whose overridable
+     fact is NOT in the membership record's `inherit` map — today exactly one, the per-system
+     DISPLAY LABEL, whose "inheriting" state is simply that no override is stored. See the
+     paragraph below.
+   - toggleLabel: the accessible name of the local switch. Ignored for a section card, which
+     takes `InheritRow`'s own.
+
+  == THE LOCAL SWITCH, AND WHY IT IS NOT A NEW `inherited` SECTION ============================
+  `InheritRow` renders exactly the sections `scopedStudio`'s descriptor declares for the entity
+  type, and it is right to: those names are the membership record's `inherit` KEYS, read by the
+  resolver. The per-system display label is an override with no such key — it is stored as a
+  value or not stored at all — so adding `label` to that descriptor would mint an inherit flag
+  the model does not hold and would put a label row on the WORLD scoped editors too.
+
+  The card therefore writes the switch itself, in `InheritRow`'s OWN element tree
+  (`.manager-scoped-inherit-row` > `.manager-scoped-inherit-head` > `.manager-scoped-inherit-label`
+  plus a bare `StatusToggle`) so the head's `display: contents` grid rule in
+  `styles/fabricate.css` places it identically. Same idiom, same pixels, same polarity — ON is
+  OVERRIDDEN — without a second inherit vocabulary underneath it.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
   import IconFactRow from '../IconFactRow.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import InheritRow from '../scoped/InheritRow.svelte';
 
   let {
@@ -69,6 +90,13 @@
     fact = null,
     hint = false,
     disabled = false,
+    localInherit = null,
+    toggleLabel = '',
+    // Whether `World default: {value}` lower-cases the value it interpolates. True for a rule
+    // ("World default: unlimited uses"), which reads as a sentence; false for a card whose
+    // world value is a PROPER NOUN — the display-label card states a Tool's actual name, and
+    // "World default: anvil" is a different word from the one on the world record.
+    lowercaseFact = true,
     onToggle = () => {},
     children,
   } = $props();
@@ -88,11 +116,18 @@
 
   // An ABSENT key reads as inheriting, matching `isSectionInherited` and `scopedInheritRows`.
   // A card with no world membership record is never inheriting: there is no parent.
-  const isInherited = $derived(inheritable && inherited?.[section] !== false);
+  const isLocal = $derived(localInherit !== null);
+  const isInherited = $derived(
+    inheritable && (isLocal ? localInherit === true : inherited?.[section] !== false)
+  );
   const worldDefaultLine = $derived(
     formattedText(
       'FABRICATE.Admin.Manager.Tools.Editor.WorldDefaultValue',
-      { value: String(fact?.value ?? '').toLocaleLowerCase() },
+      {
+        value: lowercaseFact
+          ? String(fact?.value ?? '').toLocaleLowerCase()
+          : String(fact?.value ?? ''),
+      },
       'World default: {value}'
     )
   );
@@ -119,7 +154,21 @@
         >
       {/if}
     </div>
-    {#if inheritable}
+    {#if inheritable && isLocal}
+      <div class="manager-scoped-inherit-row" data-scoped-inherit-row={section}>
+        <div class="manager-scoped-inherit-head">
+          <span class="manager-scoped-inherit-label">{worldDefaultLine}</span>
+        </div>
+        <StatusToggle
+          on={!isInherited}
+          ariaLabel={toggleLabel}
+          title={toggleLabel}
+          {disabled}
+          data-scoped-inherit-toggle={section}
+          onclick={() => onToggle(section, !isInherited)}
+        />
+      </div>
+    {:else if inheritable}
       <InheritRow
         entityType="tool"
         {section}
@@ -136,8 +185,14 @@
 
   {#if isInherited}
     <div class="manager-tool-rule-card-inherited" data-tool-rule-inherited={section}>
+      <!-- BARE GLYPH, INFO TONE. The rail's rule rows one column over draw a bordered tile in
+           the ACCENT hue, and that contrast is the point: an accent-toned mark in a tile is a
+           fact this system authored, while the cooler informational globe with no tile is the
+           reference's mark for a value that came from somewhere else. Ours drew a tan globe,
+           the same hue as the value beside it (issue 1373). -->
       <IconFactRow
         icon="fas fa-globe"
+        tone="info"
         title={fact?.title || ''}
         subtitle={hint
           ? text(

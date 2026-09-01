@@ -15,6 +15,20 @@
   anything at all. Putting the second one in the header — where the design puts the first — is
   what made the old heading read as though the margin switch governed the whole section.
 
+  == BUT IT IS A ROW, NOT A SECOND CARD HEAD, AND OFF RENDERS NOTHING (issue 1373) ============
+  It was written as `.manager-tool-editor-card-heading`: an `<h3>` over the card's OWN subtitle
+  restated verbatim, with a switch at the right margin. Inside a card whose head is already a
+  title, a state pill and a switch at the right margin, that is the same furniture twice one
+  inch apart, and a GM reading `Character prerequisites` + `Overridden` above five greyed-out
+  rows could not tell which of the two switches had greyed them.
+
+  Off now renders the ANSWER instead of the disabled apparatus. `ToolInheritCard`'s docblock
+  makes the argument for its inheriting face and it is the same one here: a control a GM can
+  still reach, greyed, is furniture; a sentence saying what the section resolves to is a claim,
+  and it is the same sentence the rail states one column over. The switch keeps
+  `data-tool-prerequisites-enabled` / `data-tool-bonus-enabled`, which is what the Foundry
+  smoke hit-tests and what `tool-studio-mounted.test.js` drives.
+
   It is still a real `<input type="checkbox">` rather than the `ToggleCard` button used by the
   enable card on `Breakage`, and deliberately: the Foundry smoke drives both of these through
   `isChecked()`, which reads a checkbox and not `aria-pressed`. `StatusToggle`'s `as="checkbox"`
@@ -131,20 +145,20 @@
     onToggle={onToggleInherited}
   >
     <section class="manager-tool-requirements-section">
-      <div class="manager-tool-editor-card-heading">
+      <div class="manager-tool-setting-row">
         <div data-tool-prerequisites-copy>
-          <h3>
-            {text(
+          <strong
+            >{text(
               'FABRICATE.Admin.Manager.Tools.Editor.RequirePrerequisites',
               'Require prerequisites'
-            )}
-          </h3>
-          <p>
-            {text(
+            )}</strong
+          >
+          <small
+            >{text(
               'FABRICATE.Admin.Manager.Tools.Editor.CharacterPrerequisitesHint',
               'Gate who may wield this Tool. Prerequisites are defined in the crafting system editor; pick which ones apply.'
-            )}
-          </p>
+            )}</small
+          >
         </div>
         <StatusToggle
           as="checkbox"
@@ -157,41 +171,48 @@
           onChange={(checked) => patchPrerequisites({ enabled: checked })}
         />
       </div>
-      <fieldset disabled={!prerequisites.enabled} class="manager-tool-prerequisite-list">
-        {#if prerequisiteOptions.length === 0}<p class="manager-muted">
-            {text(
-              'FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites',
-              'No character prerequisites are defined in this world yet.'
-            )}
-          </p>{/if}
-        {#each prerequisiteOptions as option (option.id)}
-          <ChecklistCardRow
-            value={option.id}
-            title={option.name || option.label || option.id}
-            detail={prerequisitePreview(option)}
-            icon={option.icon || 'fas fa-user-shield'}
-            checked={(prerequisites.ids || []).includes(option.id)}
-            disabled={!prerequisites.enabled}
-            onChange={(checked) => togglePrerequisite(option.id, checked)}
-          />
-        {/each}
-      </fieldset>
-      <p class="manager-tool-requirements-summary">
-        {text(
-          'FABRICATE.Admin.Manager.Tools.Editor.RequiredAll',
-          'All selected prerequisites are required (AND)'
-        )}
-      </p>
-      <RadioCardGroup
-        legend={text('FABRICATE.Admin.Manager.Tools.Editor.GateMode', 'When prerequisites fail')}
-        options={gateModeOptions}
-        selectedValue={prerequisites.gateMode}
-        groupName="tool-gate-mode"
-        columns={2}
-        disabled={!prerequisites.enabled}
-        dataGroup="tool-gate-mode"
-        onChange={(gateMode) => patchPrerequisites({ gateMode })}
-      />
+      {#if prerequisites.enabled}
+        <div class="manager-tool-prerequisite-list" data-tool-prerequisite-list>
+          {#if prerequisiteOptions.length === 0}<p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites',
+                'No character prerequisites are defined in this world yet.'
+              )}
+            </p>{/if}
+          {#each prerequisiteOptions as option (option.id)}
+            <ChecklistCardRow
+              value={option.id}
+              title={option.name || option.label || option.id}
+              detail={prerequisitePreview(option)}
+              icon={option.icon || 'fas fa-users'}
+              checked={(prerequisites.ids || []).includes(option.id)}
+              onChange={(checked) => togglePrerequisite(option.id, checked)}
+            />
+          {/each}
+        </div>
+        <p class="manager-tool-requirements-summary">
+          {text(
+            'FABRICATE.Admin.Manager.Tools.Editor.RequiredAll',
+            'All selected prerequisites are required (AND)'
+          )}
+        </p>
+        <RadioCardGroup
+          legend={text('FABRICATE.Admin.Manager.Tools.Editor.GateMode', 'When prerequisites fail')}
+          options={gateModeOptions}
+          selectedValue={prerequisites.gateMode}
+          groupName="tool-gate-mode"
+          columns={2}
+          dataGroup="tool-gate-mode"
+          onChange={(gateMode) => patchPrerequisites({ gateMode })}
+        />
+      {:else}
+        <p class="manager-tool-requirements-summary" data-tool-prerequisites-off>
+          {text(
+            'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoPrerequisites',
+            'Any character may use it'
+          )}
+        </p>
+      {/if}
     </section>
   </ToolInheritCard>
 
@@ -209,15 +230,20 @@
     onToggle={onToggleInherited}
   >
     <section class="manager-tool-requirements-section">
-      <div class="manager-tool-editor-card-heading">
+      <div class="manager-tool-setting-row">
         <div data-tool-bonus-copy>
-          <h3>{text('FABRICATE.Admin.Manager.Tools.Editor.AddCheckBonus', 'Add a check bonus')}</h3>
-          <p>
-            {text(
+          <strong
+            >{text(
+              'FABRICATE.Admin.Manager.Tools.Editor.AddCheckBonus',
+              'Add a check bonus'
+            )}</strong
+          >
+          <small
+            >{text(
               'FABRICATE.Admin.Manager.Tools.Editor.BonusToCheckHint',
               'What using this Tool adds to the crafting check, if anything.'
-            )}
-          </p>
+            )}</small
+          >
         </div>
         <StatusToggle
           as="checkbox"
@@ -230,24 +256,35 @@
           onChange={(checked) => patchBonus({ enabled: checked })}
         />
       </div>
-      <label class="manager-tool-bonus-field">
-        <span
-          >{text('FABRICATE.Admin.Manager.Tools.Editor.BonusExpression', 'Bonus expression')}</span
-        >
-        <RollDataExpressionInput
-          dataField="tool-bonus"
-          value={bonus.expression || ''}
-          placeholder="prof"
-          disabled={!bonus.enabled}
-          onChange={(expression) => patchBonus({ expression })}
-        />
-        <small
-          >{text(
-            'FABRICATE.Admin.Manager.Tools.Editor.BonusExpressionHint',
-            'Enter a roll-data path without @, or a numeric or dice expression. Roll-data paths are stored with @ automatically.'
-          )}</small
-        >
-      </label>
+      {#if bonus.enabled}
+        <label class="manager-tool-bonus-field">
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Tools.Editor.BonusExpression',
+              'Bonus expression'
+            )}</span
+          >
+          <RollDataExpressionInput
+            dataField="tool-bonus"
+            value={bonus.expression || ''}
+            placeholder="prof"
+            onChange={(expression) => patchBonus({ expression })}
+          />
+          <small
+            >{text(
+              'FABRICATE.Admin.Manager.Tools.Editor.BonusExpressionHint',
+              'Enter a roll-data path without @, or a numeric or dice expression. Roll-data paths are stored with @ automatically.'
+            )}</small
+          >
+        </label>
+      {:else}
+        <p class="manager-tool-requirements-summary" data-tool-bonus-off>
+          {text(
+            'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
+            'Adds nothing to the crafting check'
+          )}
+        </p>
+      {/if}
     </section>
   </ToolInheritCard>
 </div>

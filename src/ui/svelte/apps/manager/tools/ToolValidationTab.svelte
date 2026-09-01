@@ -24,6 +24,15 @@
   rather than as a check row. The notice renders only when the link is genuinely missing, so a
   healthy Tool's surface is exactly the four rules checks and nothing else.
 
+  == AND NO IN-PANE PAGE HEADING (issue 1373) =================================================
+  It opened with an `<h2>` reading `Validation` over a `A Tool saves only when every blocking
+  issue is cleared.` intro — the only tab of the three to carry one, and the reference draws it
+  on none of them. The tab strip immediately above already names the tab, the editor header
+  above that names the Tool, and the summary card immediately below already says `Every Tool
+  check passes. Ready to save.` in the state where it matters. Both props are simply not
+  passed; `EditorValidationSurface` renders no head block at all when neither is given, so no
+  other caller of that surface changes.
+
   ESCALATED, NOT SOLVED: the domain still refuses the SAVE. `Tool#validate` and
   `CraftingSystemManager#upsertTool` both reject a Tool with neither a `componentId` nor a source
   reference, because an unmatched Tool cannot be found in any inventory. So a rules record whose
@@ -180,11 +189,6 @@
   stackClass="manager-scoped-tab-stack manager-tool-tab-stack"
   hookAttribute="data-tool-validation-tab"
   focusNonce={focusValidationNonce}
-  title={text('FABRICATE.Admin.Manager.Tools.Editor.Validation', 'Validation')}
-  intro={text(
-    'FABRICATE.Admin.Manager.Tools.Editor.ValidationIntro',
-    'A Tool saves only when every blocking issue is cleared.'
-  )}
   {summary}
   counts={{ passing, warnings: 0, blocking }}
   {groups}

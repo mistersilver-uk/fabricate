@@ -4509,6 +4509,48 @@
       : null
   );
 
+  /**
+   * The Tool the browser inspector describes, or `null` while a NON-MEMBER world Tool is
+   * selected (issue 1373).
+   *
+   * `selectedLibraryTool` is derived from the open tool DRAFT, and a world Tool this system
+   * holds no rules for cannot open one - `openToolDraft` returns false and the draft stays on
+   * whatever was selected before. So clicking a `No rules in this system` row set
+   * `unadoptedToolId` correctly and the panel went on describing the PREVIOUS Tool, because
+   * `ToolBrowserInspector` prefers its `tool` prop over its `unadopted` one and both were
+   * populated at once. The two states are mutually exclusive by design; this is where that is
+   * made true.
+   *
+   * It was invisible because no capture case selected a non-member row - which is what
+   * `manager-tool-non-member-selected-1280x720` exists to end.
+   */
+  const inspectedLibraryTool = $derived(unadoptedWorldTool ? null : selectedLibraryTool);
+
+  /**
+   * The selected Tool's per-section INHERIT map, for the browser inspector's `Inheritance`
+   * region (issue 1373).
+   *
+   * Read off the world projection's per-system JOIN, which is the only place that answer
+   * exists: the system's own Tool record carries the RESOLVED values, so it cannot tell an
+   * inherited section from one overridden to an identical value. `ToolsBrowserView` reads the
+   * same join for its per-row `Overrides ...` sentence, and reading it here is what makes the
+   * row and the panel incapable of disagreeing.
+   *
+   * `{}` for a Tool with no membership record: an absent key reads as inheriting everywhere,
+   * and the panel renders the region for members only anyway.
+   */
+  const selectedLibraryToolInherited = $derived.by(() => {
+    const toolId = String(inspectedLibraryTool?.id ?? '');
+    if (!toolId) return {};
+    const entry = (worldScopeState.tool?.entries ?? []).find(
+      (candidate) => String(candidate?.id ?? '') === toolId
+    );
+    const systemRow = (Array.isArray(entry?.systems) ? entry.systems : []).find(
+      (candidate) => String(candidate?.systemId ?? '') === String(selectedSystemId ?? '')
+    );
+    return systemRow?.inherited ?? {};
+  });
+
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
     selectedComponentId = '';
@@ -9410,51 +9452,68 @@
     Its gold badge is the PREMIUM signal, and it appears only when a companion module has
     registered with `managerExtensions` — in the free module the slot is simply empty.
   -->
-  {#if !isToolStudioRoute}
-    <div
-      class="manager-titlebar"
-      data-manager-titlebar
-      aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
-    >
-      <!--
-      The layer-group icon and "Crafting Systems" product label used to lead this
-      strip, but the Foundry window's own title bar already names the app — a second
-      copy inside the window was duplicated chrome (issue 643).
+  <!--
+    THE TITLE BAND RENDERS ON THE TOOL ROUTES TOO (issue 1373).
 
-      The gold badge used to carry the SELECTED SYSTEM's name and no longer does (issue
-      1185): the rail's crafting-system card already names the selected system on every
-      screen, so the strip was repeating it. The slot now carries the one thing nothing
-      else in the chrome says — that a premium companion module is installed and connected
-      — and the rail's own PREMIUM chip steps down to a quiet marker in that state, so the
-      loud signal is stated exactly once.
-    -->
-      {#if premiumInstalled}
-        <span
-          class="manager-titlebar-badge"
-          data-manager-titlebar-premium
-          title={text(
-            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-            'Fabricate Premium is installed and connected'
-          )}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
-            'Fabricate Premium is installed and connected'
-          )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
-        >
-      {/if}
-      {#if selectedSystem}
-        <span
-          class="manager-titlebar-status"
-          data-manager-titlebar-status
-          title={titlebarStatusLabel()}
-          aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
-        >
-          <i class="fas fa-dice-d20 manager-titlebar-status-icon" aria-hidden="true"></i>
-          <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
-        </span>
-      {/if}
-    </div>
-  {/if}
+    It was gated `{#if !isToolStudioRoute}`, so the two screens the design draws this band on
+    most explicitly were the two that did not draw it: `Tool Rules` and its editor rendered
+    ~18px of empty ground where the reference states the selected system's resolution mode,
+    and the premium slot with it. Nothing about the band is route-specific - the gate below,
+    which suppresses the shared `.manager-header`, is, because both Tool routes render headers
+    of their own.
+
+    THE LEFT-HAND SYSTEM BADGE STAYS RETIRED. The reference puts the system's name here; issue
+    1185 moved it to the rail's crafting-system card because the strip was repeating it on
+    every one of the manager's ~20 routes, and re-adding it on two of them would restore the
+    duplication AND make those two disagree with the other eighteen. Recorded rather than
+    silently skipped.
+  -->
+  <div
+    class="manager-titlebar"
+    data-manager-titlebar
+    aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
+  >
+    <!--
+    The layer-group icon and "Crafting Systems" product label used to lead this
+    strip, but the Foundry window's own title bar already names the app — a second
+    copy inside the window was duplicated chrome (issue 643).
+
+    The gold badge used to carry the SELECTED SYSTEM's name and no longer does (issue
+    1185): the rail's crafting-system card already names the selected system on every
+    screen, so the strip was repeating it. The slot now carries the one thing nothing
+    else in the chrome says — that a premium companion module is installed and connected
+    — and the rail's own PREMIUM chip steps down to a quiet marker in that state, so the
+    loud signal is stated exactly once.
+  -->
+    {#if premiumInstalled}
+      <span
+        class="manager-titlebar-badge"
+        data-manager-titlebar-premium
+        title={text(
+          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+          'Fabricate Premium is installed and connected'
+        )}
+        aria-label={text(
+          'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+          'Fabricate Premium is installed and connected'
+        )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
+      >
+    {/if}
+    {#if selectedSystem}
+      <span
+        class="manager-titlebar-status"
+        data-manager-titlebar-status
+        title={titlebarStatusLabel()}
+        aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
+      >
+        <!-- The reference marks this line with an INFORMATION glyph, not a die. What follows
+             it is a statement about how the selected system resolves, which a d20 reads as a
+             dice-roll control rather than as a caption (issue 1373). -->
+        <i class="fas fa-circle-info manager-titlebar-status-icon" aria-hidden="true"></i>
+        <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
+      </span>
+    {/if}
+  </div>
 
   {#if !isToolStudioRoute}
     <!--
@@ -10573,10 +10632,12 @@
           <button type="button" onclick={() => editSystem(selectedSystem.id)}
             >{selectedSystem.name}</button
           >
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}
-            >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-          >
+          <!-- NO `Crafting` CRUMB (issue 1373). This trail claimed Tool Rules sits inside the
+               Crafting group, and the rail in the same frame shows that group holding Recipes
+               and Settings with Tool Rules a sibling OUTSIDE it. Two navigations one pane
+               apart disagreed about the shape of the app, and the rail is the one a GM
+               actually clicks. The editor's own trail never had the crumb, so dropping it
+               also makes the two Tool screens agree with each other. -->
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span>
         </nav>
@@ -10885,7 +10946,14 @@
             <span class="manager-nav-label"
               >{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span
             >
-            <span class="manager-nav-count">{toolsNavCount}</span>
+            <!-- NO ZERO BADGE (issue 1373). The rail states counts where there is something to
+                 count; a `0` beside `Tool Rules` on a system that has adopted none is a badge
+                 whose whole content is the absence the row already reads as, and the reference
+                 draws none. Scoped to this row: the other rail counts are the other lanes' and
+                 their reference frames were not read in this pass. -->
+            {#if toolsNavCount > 0}
+              <span class="manager-nav-count">{toolsNavCount}</span>
+            {/if}
           </button>
           <div class={`manager-nav-group ${railGroupExpanded.checks ? 'is-expanded' : ''}`}>
             <button
@@ -12080,12 +12148,14 @@
         onToggleToolEnabled={(id, enabled) =>
           store.toggleToolEnabled?.(id, enabled, selectedSystemId)}
         onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
+        onOpenWorldCatalogue={() => setView('world-tools')}
       />
     {:else if currentView === 'tool-edit' && selectedSystem && focusedToolDraft}
       <ToolEditView
         {...toolScopeProps}
         tool={focusedToolDraft}
         systemName={selectedSystem.name}
+        breakageSource={selectedSystem?.toolBreakage?.source || 'default'}
         validation={focusedToolValidation}
         dirty={$viewState.toolDraftDirty === true}
         persisted={$viewState.toolDraftBaseline !== null}
@@ -15113,12 +15183,13 @@
           {/if}
         {:else if currentView === 'tools'}
           <ToolBrowserInspector
-            tool={selectedLibraryTool}
+            tool={inspectedLibraryTool}
             managedItems={selectedSystem?.managedItemOptions || []}
             prerequisiteOptions={selectedCharacterPrerequisites}
             authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
             systemName={selectedSystem?.name || ''}
             unadopted={unadoptedWorldTool}
+            inherited={selectedLibraryToolInherited}
             onEdit={openToolEditor}
             onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
             onAddToSystem={(entityId) => adoptWorldToolIntoSystem(entityId)}

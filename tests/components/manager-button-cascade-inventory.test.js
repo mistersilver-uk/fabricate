@@ -507,7 +507,7 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-knowledge-row-actions .manager-button'),
     disposition: 'EXCLUDE',
-    stranding: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte:147'],
+    stranding: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte:153'],
     why:
       MOVED_POPULATION +
       'The move is unusually clean here, because this entry always rested on the site that ' +

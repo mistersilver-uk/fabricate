@@ -5926,7 +5926,12 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       repairRequirements: [],
     },
   });
-  await manager.locator('[data-tool-result-count]').filter({ hasText: '9 shown' })
+  // `8 shown`, NOT `9 shown` (issue 1373). The count above the list states the PAGE, not the
+  // filter: it was fed the filtered length, so a two-page result read `9 shown` over eight rows
+  // while the pager immediately below it read `Showing 1-8 of 9` — two counts in one pane
+  // contradicting each other. The ninth Tool is still proved present, by
+  // `assertToolLibraryPagination`'s own `of 9` summary check on the very next line.
+  await manager.locator('[data-tool-result-count]').filter({ hasText: '8 shown' })
     .waitFor({ state: 'visible', timeout: 5_000 });
   await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId });
   await setManagerWindowSize(page, {
@@ -6127,7 +6132,28 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertSavedToolStudioCapture(editor, 'Tool rules editor opening');
   const enabledInSystem = editor.locator('[data-tool-enabled] .manager-status-toggle');
   await assertPointerTarget(page, enabledInSystem, '[data-tool-enabled]', 'Enabled in system');
+  // ── THE DISPLAY LABEL IS AN OVERRIDE, AND ITS FIELD IS ON THE OVERRIDING FACE ───────────
+  // The per-system display label is a `ToolInheritCard` like every other overridable fact on
+  // this tab (issue 1373): BLANK is the inheriting state, which renders the world name read-only
+  // on a globe row and no field at all, and the switch is what opens this system's own copy.
+  // So the walk flips the card before it types, and it flips it CONDITIONALLY - a fixture Tool
+  // that already carries a label, or one with no world membership to inherit through, is
+  // already showing its field, and a second click would put the card back to inheriting and
+  // fail the fill with nothing to type into.
+  const labelCard = editor.locator('[data-tool-rule-card="label"]');
+  await labelCard.waitFor({ state: 'visible', timeout: 5_000 });
+  if ((await labelCard.getAttribute('data-tool-rule-state')) === 'inheriting') {
+    const labelInheritToggle = editor.locator('[data-scoped-inherit-toggle="label"]');
+    await assertPointerTarget(
+      page,
+      labelInheritToggle,
+      '[data-scoped-inherit-toggle="label"]',
+      'Tool display-label override switch',
+    );
+    await labelInheritToggle.click();
+  }
   const displayLabel = editor.locator('[data-tool-label]');
+  await displayLabel.waitFor({ state: 'visible', timeout: 5_000 });
   await displayLabel.fill("Masterwork Smith's Hammer with an Exceptionally Long Display Name");
   await resetToolStudioScroll(page);
   await captureToolStudioProduct(page, 'manager-tool-stress-long-name', wideGeometry);

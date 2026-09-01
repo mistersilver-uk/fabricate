@@ -13,6 +13,19 @@
   `projectToolBehaviorFacts` projection. The geometry kept here is the behavior preview's,
   which is the treatment issue 881 names as the reference.
 
+  ── THE GLYPH TILE, AND WHY IT IS OPT-IN (issue 1373) ────────────────────────────────
+  Unifying those two geometries kept the behaviour preview's BARE glyph and dropped the
+  inspector's bordered square. The reference draws a 28px `border-radius: 8px` tile around the
+  glyph on every rule row of both Tool rails — and draws a BARE glyph on the rules editor's
+  inherited-value inset, one pane over. So the tile is a real distinction the design makes,
+  not a geometry one of the two sites happened to have, and the row cannot choose for its
+  callers.
+
+  It is opt-in rather than the default because this primitive has nine call sites across the
+  Checks, Essence, Tool and scoped-entity studios, and the reference frames for the other six
+  were not part of the parity pass that established this. `tile` is therefore a fact a caller
+  asserts about its own surface; the default is exactly what shipped.
+
   Its CSS lives in this scoped `<style>`, not `styles/fabricate.css`, so `VIEW_RECIPES` in
   `scripts/ui-pr-screenshot-evidence.mjs` maps a change here to the views that actually
   render it instead of matching the broad `theme-or-global-ui` recipe.
@@ -29,6 +42,13 @@
      `titleAttr="data-tool-preview-breakage"`, for a caller that needs to assert the
      rendered value of ONE named fact.
    - dataAttr / dataValue: an optional test/screenshot hook on the row itself.
+   - tile: draw the glyph inside the reference's bordered rounded square. See above.
+   - tone: the glyph's colour family — `accent` (default) or `info`. `info` is the reference's
+     mark for a value that came from SOMEWHERE ELSE: the rules editor's inherited-value inset
+     paints its globe in a cooler informational hue precisely so it does not read as one more
+     accent-toned fact authored here. The token is the theme's own `--fab-info`, never a
+     literal: seven themes redefine that family, and `hearth-herb`'s informational hue is a
+     sage rather than a steel blue on purpose.
 
   A component wearing `.manager-*` classes belongs under `apps/manager/` (not the
   import-free `components/` leaf directory), which is why it lives here.
@@ -41,6 +61,8 @@
     titleAttr = '',
     dataAttr = '',
     dataValue = '',
+    tile = false,
+    tone = 'accent',
   } = $props();
 
   // Spread so a hook is genuinely absent when unset, rather than an empty attribute a
@@ -49,7 +71,13 @@
   const titleAttributes = $derived(titleAttr ? { [titleAttr]: true } : {});
 </script>
 
-<div class="manager-icon-fact-row" class:is-glyphless={!icon} {...hookAttributes}>
+<div
+  class="manager-icon-fact-row"
+  class:is-glyphless={!icon}
+  class:is-tiled={tile}
+  class:is-info={tone === 'info'}
+  {...hookAttributes}
+>
   {#if icon}
     <i class={icon} aria-hidden="true"></i>
   {/if}
@@ -96,6 +124,27 @@
   .manager-icon-fact-row > i {
     color: var(--fab-accent);
     text-align: center;
+  }
+
+  /* The reference's rule-row tile: a 28px square carrying the row's own fill and its own
+     1px edge, exactly as the reference draws it — the tile is read by its BORDER, not by a
+     fill step, which is why no second background rung is introduced here. The row keeps its
+     28px glyph COLUMN either way, so opting in moves no other column and reflows nothing
+     beside it. */
+  .manager-icon-fact-row.is-tiled > i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    font-size: 0.7rem;
+  }
+
+  /* "This value came from somewhere else." Never a literal — see the docblock. */
+  .manager-icon-fact-row.is-info > i {
+    color: var(--fab-info);
   }
 
   .manager-icon-fact-row > span {

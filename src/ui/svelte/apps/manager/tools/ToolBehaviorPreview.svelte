@@ -256,6 +256,7 @@
   rulesKicker={text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}
   rules={previewRules}
   ruleHookAttribute="data-tool-preview-rule"
+  ruleTile
 >
   <p class="manager-kicker">
     {text('FABRICATE.Admin.Manager.Tools.Editor.PlayersKicker', 'How players see it')}

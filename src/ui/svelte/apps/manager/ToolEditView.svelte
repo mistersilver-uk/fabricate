@@ -48,6 +48,10 @@
     getActorRollData = async () => null,
     requiredFor = [],
     authority = 'toolSpecific',
+    // WHERE THAT AUTHORITY CAME FROM, for the Breakage tab's mode card. `authority` is the
+    // RESOLVED token and cannot tell "this system chose it" from "this system follows the
+    // world"; the card states which, exactly as the rules list's own pill does (issue 1373).
+    breakageSource = 'default',
     onOpenSystems = () => {},
     onOpenSystem = () => {},
     onOpenTools = () => {},
@@ -167,6 +171,15 @@
    * then renders its controls with no switch and no pill — which is exactly what this screen did
    * before, so nothing about that state changed.
    */
+  // THE WORLD'S OWN BREAKAGE AUTHORITY, read off the world-scope projection this view already
+  // takes, exactly as `ToolsBrowserView` reads it for the same sentence. It is read HERE rather
+  // than threaded from the shell on purpose: `world-scope-tool-breakage-authority.test.js` pins
+  // every `toolBreakage` access in `CraftingSystemManagerRoot` to a closed set, and a fifth
+  // rooted read there would be a fifth screen re-deriving a fact the projection already
+  // publishes. `''` means the world corpus authored nothing, which is a different answer from
+  // an authored `toolSpecific` and is why it is read rather than inferred.
+  const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
+
   const member = $derived(systemRow?.member === true);
   const inherited = $derived(systemRow?.inherited ?? {});
   const worldDefaults = $derived(worldEntry?.defaults ?? null);
@@ -306,6 +319,8 @@
         <ToolBreakageTab
           {tool}
           {authority}
+          {breakageSource}
+          {worldAuthority}
           componentOptions={managedItems}
           {itemTags}
           {essenceOptions}

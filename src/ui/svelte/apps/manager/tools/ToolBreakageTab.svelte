@@ -25,13 +25,12 @@
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
-  import Chip from '../Chip.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
   import ToolRepairRequirements from './ToolRepairRequirements.svelte';
   import ToolSystemScopeCards from './ToolSystemScopeCards.svelte';
-  import { toolWorldDefaultFact } from './toolStudio.js';
+  import { toolBreakageChoice, toolWorldDefaultFact } from './toolStudio.js';
 
   let {
     tool = null,
@@ -43,6 +42,12 @@
     currencyEnabled = false,
     managedItems = [],
     systemName = '',
+    // WHERE THE BREAKAGE AUTHORITY ABOVE CAME FROM. The card states the world default and, when
+    // this system has departed from it, says so — which is what the design's own mode card
+    // draws and what the rules LIST one route away already chips. `authority` alone is the
+    // RESOLVED token and cannot tell "chose it" from "inherited it" (issue 1373).
+    breakageSource = 'default',
+    worldAuthority = '',
     persisted = true,
     saving = false,
     // The world membership facts this tab reads to draw its inherit affordances. `member` is
@@ -65,10 +70,17 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+  // `limitedUses` SEEDS AT 1, NEVER AT NULL. A null `maxUses` is the UNLIMITED answer
+  // (`toolBreakageChoice`), so a config that carried it would make "pick Limited uses" land the
+  // GM back on the option they just left — silently, because the stepper used to draw the null
+  // as `1` while every reading surface said `Unlimited uses` (issue 1373).
   function createBreakageConfigs(breakage = { mode: 'limitedUses', maxUses: null }) {
     return {
+      unlimited: { mode: 'limitedUses', maxUses: null },
       limitedUses:
-        breakage.mode === 'limitedUses' ? { ...breakage } : { mode: 'limitedUses', maxUses: null },
+        breakage.mode === 'limitedUses' && breakage.maxUses != null
+          ? { ...breakage }
+          : { mode: 'limitedUses', maxUses: 1 },
       breakageChance:
         breakage.mode === 'breakageChance'
           ? { ...breakage }
@@ -84,6 +96,12 @@
   const immune = $derived(authority === 'checkDriven' && tool?.checkBreakable === false);
   const onBreak = $derived(tool?.onBreak || { mode: 'destroy' });
 
+  function authorityLabel(mode) {
+    return mode === 'checkDriven'
+      ? text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven', 'Check-driven')
+      : text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific');
+  }
+
   function formattedText(key, data, fallback) {
     const template = localize(key);
     if (template && template !== key) return localize(key, data);
@@ -92,6 +110,23 @@
       fallback
     );
   }
+
+  // WHERE THE MODE CAME FROM, in the design's own words. `default` means this system follows
+  // the world's answer and the line names it, which is exactly the `World default` chip the
+  // rules list wears; anything else means this system departed from it and the line says so.
+  const authoritySourceLine = $derived(
+    breakageSource === 'default'
+      ? formattedText(
+          'FABRICATE.Admin.Manager.Tools.Editor.AuthorityFromWorld',
+          { mode: authorityLabel(worldAuthority || authority) },
+          'World default · {mode} ·'
+        )
+      : formattedText(
+          'FABRICATE.Admin.Manager.Tools.Editor.AuthorityOverriddenHere',
+          { system: systemName },
+          'Overridden for {system} ·'
+        )
+  );
 
   /**
    * What one section resolves to while it INHERITS.
@@ -117,13 +152,13 @@
     cachedToolId = tool?.id ?? null;
   });
 
-  function changeMode(mode) {
-    onPatch({ breakage: { ...configs[mode] } });
+  function changeMode(choice) {
+    onPatch({ breakage: { ...configs[choice] } });
   }
   function patchBreakage(patch) {
-    const mode = tool?.breakage?.mode || 'limitedUses';
-    configs = { ...configs, [mode]: { ...configs[mode], ...patch } };
-    onPatch({ breakage: configs[mode] });
+    const choice = breakageChoice;
+    configs = { ...configs, [choice]: { ...configs[choice], ...patch } };
+    onPatch({ breakage: configs[choice] });
   }
   function patchOnBreak(patch) {
     onPatch({ onBreak: { ...onBreak, ...patch } });
@@ -138,8 +173,17 @@
   function setReplacement(componentId) {
     patchOnBreak({ replacementTarget: { type: 'component', componentId } });
   }
+  // WHAT THIS TOOL ACTUALLY AUTHORS, resolved once and read by the radio group, by the stepper
+  // gate and by nothing else. See `toolBreakageChoice`.
+  const breakageChoice = $derived(toolBreakageChoice(tool, authority));
+
+  // FOUR OPTIONS, AND `unlimited` LEADS THEM (issue 1373). It is the model's default and the
+  // only one of the four that names an ABSENCE of a mechanic, so it opens the set the way
+  // `Immune` opens the check-driven pair below. The label is the exact string the rail, the
+  // player preview and the library row already print for this state, so the four surfaces read
+  // as one answer rather than as four opinions.
   const breakageModeOptions = $derived(
-    ['limitedUses', 'breakageChance', 'diceExpression'].map((mode) => ({
+    ['unlimited', 'limitedUses', 'breakageChance', 'diceExpression'].map((mode) => ({
       value: mode,
       label: breakageModeLabel(mode),
       description: breakageModeDescription(mode),
@@ -186,6 +230,7 @@
   );
   function breakageModeLabel(mode) {
     return {
+      unlimited: text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses'),
       limitedUses: text('FABRICATE.Admin.Manager.Tools.BreakageLimitedUses', 'Limited uses'),
       breakageChance: text('FABRICATE.Admin.Manager.Tools.BreakageChance', 'Breakage chance'),
       diceExpression: text('FABRICATE.Admin.Manager.Tools.BreakageDice', 'Dice expression'),
@@ -193,6 +238,10 @@
   }
   function breakageModeDescription(mode) {
     return {
+      unlimited: text(
+        'FABRICATE.Admin.Manager.Tools.BreakageUnlimitedHint',
+        'It is never used up, so it never breaks.'
+      ),
       limitedUses: text(
         'FABRICATE.Admin.Manager.Tools.BreakageLimitedUsesHint',
         'A fixed number of uses, then it breaks.'
@@ -209,6 +258,7 @@
   }
   function breakageModeIcon(mode) {
     return {
+      unlimited: 'fas fa-infinity',
       limitedUses: 'fas fa-hourglass-half',
       breakageChance: 'fas fa-percent',
       diceExpression: 'fas fa-dice-d20',
@@ -252,10 +302,22 @@
     {managedItems}
     {systemName}
     {persisted}
+    {member}
     {onPatch}
     {onToggleEnabled}
   />
 
+  <!--
+    THE BREAKAGE MODE, AS A READ-ONLY STATEMENT OF WHERE IT CAME FROM (issue 1373).
+
+    It used to end in a `System-wide` LOCK CHIP and to drop the world half of the sentence
+    entirely — while the rules LIST one route away chipped the very same setting `World default`.
+    Two screens a click apart said different things about one value, and the padlock claimed a
+    permanence the setting does not have: it is a system-level choice, changed on the Tool Rules
+    screen, not a thing a GM may not change. The design states its provenance on the right
+    instead — `World default · Tool-specific`, or `Overridden for <System>` — and closes with
+    where to change it.
+  -->
   <section class="manager-tool-authority-readonly" data-tool-breakage-authority-explanation>
     <span class="manager-tool-authority-icon"
       ><i class="fas fa-sliders" aria-hidden="true"></i></span
@@ -269,17 +331,14 @@
           ? text('FABRICATE.Admin.Manager.Tools.AuthorityCheckDriven', 'Check-driven')
           : text('FABRICATE.Admin.Manager.Tools.AuthorityToolSpecific', 'Tool-specific')}
       </h3>
-      <p>
-        {text(
-          'FABRICATE.Admin.Manager.Tools.Editor.AuthorityExplanation',
-          'Set for every Tool on the Tool Rules screen.'
-        )}
-      </p>
     </div>
-    <Chip tone="neutral" icon="fas fa-lock"
-      ><span>{text('FABRICATE.Admin.Manager.Tools.Editor.SystemSetting', 'System-wide')}</span
-      ></Chip
-    >
+    <p class="manager-tool-authority-source" data-tool-authority-source={breakageSource}>
+      {authoritySourceLine}
+      {text(
+        'FABRICATE.Admin.Manager.Tools.Editor.AuthorityExplanation',
+        'Set for every Tool on the Tool Rules screen.'
+      )}
+    </p>
   </section>
 
   <ToolInheritCard
@@ -307,15 +366,20 @@
       <RadioCardGroup
         legend={text('FABRICATE.Admin.Manager.Tools.BreakageTitle', 'Breakage mechanic')}
         options={breakageModeOptions}
-        selectedValue={tool?.breakage?.mode}
+        selectedValue={breakageChoice}
         groupName="tool-breakage-mode"
-        columns={3}
+        columns={2}
         dataGroup="tool-breakage-mode"
         optionDataAttr="data-tool-breakage-choice"
         onChange={changeMode}
       />
-      <hr class="manager-tool-breakage-config-divider" data-tool-breakage-config-divider />
-      {#if tool?.breakage?.mode === 'limitedUses'}
+      <!-- The rule below the choices separates them from the CONFIGURATION of the chosen one.
+           `unlimited` configures nothing, so drawing it there would close the card on a line
+           with nothing under it (issue 1373). -->
+      {#if breakageChoice !== 'unlimited'}
+        <hr class="manager-tool-breakage-config-divider" data-tool-breakage-config-divider />
+      {/if}
+      {#if breakageChoice === 'limitedUses'}
         <div class="manager-tool-breakage-config" data-tool-limited-uses-stepper>
           <div data-tool-limited-uses-copy>
             <p class="manager-kicker">
@@ -328,8 +392,13 @@
               )}</small
             >
           </div>
+          <!-- NO `?? 1` FALLBACK. This block renders only while `breakageChoice` is
+               `limitedUses`, which is exactly the case a non-null `maxUses` defines, so the
+               fallback that used to sit here could only ever fire for the UNLIMITED state —
+               and drew it as `1`, against a rail, a player preview and a library row all
+               reading `Unlimited uses` (issue 1373). -->
           <Stepper
-            value={tool.breakage.maxUses ?? 1}
+            value={tool.breakage.maxUses}
             min={1}
             ariaLabel={text('FABRICATE.Admin.Manager.Tools.BreakageMaxUses', 'Maximum uses')}
             decrementLabel={text(
@@ -344,16 +413,7 @@
             onChange={(maxUses) => patchBreakage({ maxUses })}
           />
         </div>
-        <aside class="manager-tool-info-strip" data-tool-limited-uses-info>
-          <i class="fas fa-circle-info" aria-hidden="true"></i>
-          <p>
-            {text(
-              'FABRICATE.Admin.Manager.Tools.Editor.PerCopyInfo',
-              'Each copy tracks its own remaining uses. A character inventory, not this archetype, records that remaining count.'
-            )}
-          </p>
-        </aside>
-      {:else if tool?.breakage?.mode === 'breakageChance'}
+      {:else if breakageChoice === 'breakageChance'}
         <section class="manager-tool-breakage-chance-card" data-tool-breakage-chance>
           <div>
             <p class="manager-kicker">
@@ -381,7 +441,7 @@
             onChange={(breakageChance) => patchBreakage({ breakageChance })}
           />
         </section>
-      {:else}
+      {:else if breakageChoice === 'diceExpression'}
         <div class="manager-tool-inline-fields">
           <label class="manager-recipe-field"
             ><span class="manager-recipe-micro-label"
@@ -556,6 +616,11 @@
           )}
         </p>
       </div>
+      <!-- NO `idleIcon`. The callout already leads with that exact glyph one column to the
+           left, and the design's own button is label-only and compact — a second copy of the
+           section's own mark inside its action reads as decoration and made the control the
+           loudest thing in a callout whose point is that it is NOT the destructive one
+           (issue 1373). -->
       <ArmedDangerButton
         token="tool-remove-from-system"
         armed={removeArmed}
@@ -564,7 +629,7 @@
           'Remove from system'
         )}
         armedLabel={text('FABRICATE.Admin.Manager.Scoped.Membership.RemoveConfirm', 'Confirm?')}
-        idleIcon="fas fa-right-from-bracket"
+        idleIcon=""
         idleAriaLabel={formattedText(
           'FABRICATE.Admin.Manager.Tools.Editor.RemoveFromSystemLabel',
           { system: systemName },

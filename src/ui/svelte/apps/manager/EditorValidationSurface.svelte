@@ -35,10 +35,17 @@
   class="manager-recipe-tab manager-recipe-validation manager-editor-validation-surface"
   data-editor-validation-surface
 >
-  <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">{title}</h2>
-    {#if intro}<p class="manager-muted">{intro}</p>{/if}
-  </div>
+  <!-- THE IN-PANE HEADING IS OPTIONAL (issue 1373). A tab reached through a labelled tab strip
+       inside a titled editor is already named three times over, and the Tool rules editor's
+       reference draws no heading on any of its three tabs. Every caller that passes a `title`
+       renders exactly what it rendered before; a caller that passes neither gets the surface
+       with no head block at all, rather than an empty `<h2>` holding open a row of space. -->
+  {#if title || intro}
+    <div class="manager-recipe-tab-intro">
+      {#if title}<h2 class="manager-recipe-tab-title">{title}</h2>{/if}
+      {#if intro}<p class="manager-muted">{intro}</p>{/if}
+    </div>
+  {/if}
   <section class="manager-recipe-validation-summary-row">
     <div
       class={`manager-recipe-rail-summary is-${summary.status || 'pass'}`}

@@ -39,6 +39,11 @@
    - liveNote / liveNoteHook: the "updates live" strip.
    - rules: `{id, icon, title, subtitle, titleAttr}[]`, rendered through the shared
      `IconFactRow`; `ruleHookAttribute` names the per-row `data-*` carrying the rule id.
+   - ruleTile: whether those rows draw `IconFactRow`'s bordered glyph tile. Opt-in and
+     forwarded verbatim, for the reason that primitive's own docblock gives: the reference
+     draws the tile on the Tool rails and a bare glyph one pane over, so it is a fact each
+     caller asserts about its own surface rather than a default this shell picks for all of
+     them.
    - explainer: the shared `ExplainerCard`'s props, or `null`.
    - children: a TRAILING snippet, rendered last inside the aside.
 
@@ -77,6 +82,7 @@
     rulesKicker = '',
     rules = [],
     ruleHookAttribute = '',
+    ruleTile = false,
     explainer = null,
     children,
   } = $props();
@@ -130,6 +136,7 @@
             title={rule.title}
             subtitle={rule.subtitle}
             titleAttr={rule.titleAttr || ''}
+            tile={ruleTile}
           />
         </li>
       {/each}

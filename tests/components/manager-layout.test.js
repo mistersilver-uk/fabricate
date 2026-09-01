@@ -730,21 +730,37 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
     focusVisibleBlock.includes('outline: 2px solid var(--fab-accent);'),
     'keyboard focus should keep a manager focus-visible ring'
   );
+  // ONE ACCENT FOR BOTH POSITIONS (issue 1373). This asserted the SUCCESS family for `on`,
+  // beside the note below asserting a neutral track and a `--fab-text-secondary` (tan) knob for
+  // `off` — so the manager's most semantically loaded control changed HUE when it changed
+  // meaning, and the off position was the louder of the two. On the Tool rules editor that is
+  // two accents for one control type on one screen: the enable switch sits inches from four
+  // inherit switches. The reference builds every switch it draws from one pair —
+  // `svTrack(on)` / `svKnob(on)` — which is the accent track with the on-accent knob when on,
+  // and a raised neutral track with a subtle knob when off.
   assert.ok(
-    onBlock.includes('var(--fab-success'),
-    'enabled status should use the manager success accent family'
+    onBlock.includes('var(--fab-accent)'),
+    'the lit switch is the ACCENT family, which is the one accent this manager has'
+  );
+  assert.ok(
+    onBlock.includes('--fab-toggle-knob: var(--fab-on-accent);'),
+    'and its knob is the ink that family reads against'
   );
   // Issue 643: OFF is now NEUTRAL (bg-3 / border-strong), not amber. A disabled
   // recipe, component or environment is an ordinary state, not a warning. The
   // state colour moved onto the TRACK via the local --fab-toggle-* properties,
   // so these assertions read the custom-property declarations, not a background.
   assert.ok(
-    offBlock.includes('var(--fab-bg-3)'),
+    offBlock.includes('var(--fab-surface-raised)'),
     'disabled status should read as a neutral off switch, not a warning'
   );
+  assert.ok(offBlock.includes('var(--fab-border)'), 'the off track should keep a visible edge');
+  // AND ITS KNOB IS SUBTLE, NOT THE TAN SECONDARY INK (issue 1373). The off knob used to be the
+  // brightest part of the whole control, so the switch shouted loudest in the position that
+  // means "nothing is happening here".
   assert.ok(
-    offBlock.includes('var(--fab-border-strong)'),
-    'the off track should keep a visible edge'
+    offBlock.includes('--fab-toggle-knob: var(--fab-text-subtle);'),
+    'the off knob recedes; the lit position is the loud one'
   );
   // The switch sets `border: 0` on the BUTTON, so a `:hover { border-color }` rule on
   // the button is inert. The hover affordance has to live on the TRACK, which is the
@@ -821,9 +837,21 @@ test('the rail crafting-system card selects a system and links back to the libra
     scopeBlock.includes('overflow: hidden;'),
     'scope card should prevent long names from affecting nav layout'
   );
-  assert.ok(
+  // NO BOX (issue 1373). The reference's rail is a flat run — its section label, then nav rows
+  // — and draws nothing around the scope controls at the top; ours opened with a bordered,
+  // filled card, so the rail began with a panel where the design begins with a list. The
+  // CONTROLS are unchanged and still asserted below: the reference is a static mock with one
+  // crafting system and no switcher, and this rail carries the live system select, the route
+  // back to the library and the collapse toggle, which have no other home.
+  assert.equal(
     scopeBlock.includes('border: 1px solid var(--fab-border-strong);'),
-    'scope card should render as a visible rail card'
+    false,
+    'the scope block draws no card edge: the reference rail is a flat run of rows'
+  );
+  assert.equal(
+    scopeBlock.includes('background: var(--fab-bg-2);'),
+    false,
+    'and no card fill either — half of the treatment reads as neither'
   );
 
   // The system's name is set in the display face wherever it is named — here it is the
@@ -921,17 +949,33 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     '.fabricate-manager .manager-nav-subitem:focus-visible'
   );
 
-  assert.ok(
+  // AN EXPANDED GROUP IS INDENTED ROWS AGAINST A GUIDE, NOT A SECOND CARD (issue 1373). The
+  // filled, ring-inset box drew a panel around a run of nav rows in a rail that is otherwise a
+  // flat list — and on the Tool Rules screen the boxed `Crafting` group sits directly above
+  // `Tool Rules`, which is NOT in it, so the box read as a claim about membership that the
+  // breadcrumb had also been making and that was equally untrue. The reference indents the
+  // children and marks them with a thin vertical rule.
+  assert.equal(
     expandedGroupBlock.includes('border-radius: 8px;'),
-    'expanded gathering nav should read as one grouped container'
+    false,
+    'an expanded group draws no card corner'
   );
-  assert.ok(
+  assert.equal(
     expandedGroupBlock.includes('background: var(--fab-overlay-light-035);'),
-    'expanded gathering nav should use a soft background'
+    false,
+    'and no card fill: it is a guide, not a container'
   );
-  assert.ok(
+  assert.equal(
     expandedGroupBlock.includes('box-shadow: inset 0 0 0 1px var(--fab-border);'),
-    'expanded gathering nav should draw chrome without shifting contents'
+    false,
+    'and no inset ring: that WAS the container edge, drawn as a shadow so it shifted nothing'
+  );
+  // THE GUIDE IS ON THE SUBMENU, which is where the children actually are — so it starts and
+  // ends exactly where they do, which a rule around the whole group could not do.
+  const submenuGuide = blockFor('.fabricate-manager .manager-nav-submenu');
+  assert.ok(
+    submenuGuide.includes('border-left: 1px solid var(--fab-border);'),
+    'the indented children are marked with a thin vertical rule instead'
   );
   assert.equal(
     expandedGroupBlock.includes('padding:'),
@@ -2349,11 +2393,13 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const toolsRowBlock = blockFor('.fabricate-manager .manager-tools-row');
   const toolsSelectedRowBlock = blockFor('.fabricate-manager .manager-tools-row.is-selected');
-  const toolsSelectedRowBodyBlock = blockFor(
-    '.fabricate-manager .manager-tools-row.is-selected > .manager-tools-row-body'
-  );
-  const toolsSelectedExpandedRowBodyBlock = blockFor(
-    '.fabricate-manager .manager-tools-row.is-selected.is-expanded > .manager-tools-row-body'
+  // THE RULE THAT ACTUALLY PAINTS A SELECTED ROW. `ToolsBrowserView` renders
+  // `<article class="manager-tools-row"><button class="manager-tools-select-target">`, so the
+  // two `> .manager-tools-row-body` rules this used to read were DEAD — nothing has rendered
+  // that element since the list was rewritten, and the `--fab-success-soft` one was the rule
+  // finding 8 of the parity pass cited without it ever reaching a pixel (issue 1373).
+  const toolsSelectedListRowBlock = blockFor(
+    '.fabricate-manager .manager-tools-library-list > article.is-selected'
   );
   const toolsRowBodyBlock = blockFor('.fabricate-manager .manager-tools-row-body');
   const toolsIdentityBlock = blockFor('.fabricate-manager .manager-tools-identity');
@@ -2686,21 +2732,33 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     toolsRowBlock.includes('position: relative;'),
     'tool rows should anchor the dirty pip overlay without involving header flow'
   );
+  // SELECTION IS AN ACCENT EDGE AND THE ACTIVE FILL (issue 1373). This asserted
+  // `--fab-border-strong` against a `--fab-surface-soft` fill — roughly an 11-level luminance
+  // step over the row's own overlay, which reads as an accident of lighting rather than as a
+  // chosen row — and forbade the accent alongside it. The reference marks a selected row the
+  // way it marks every other chosen thing on these screens: `--fab-accent-border` with
+  // `--fab-surface-active`.
+  //
+  // THE INSET MARKER STAYS FORBIDDEN, and that half of the original ratchet is intact: an
+  // accent BORDER is the edge of the card, while `box-shadow: inset 3px 0 0` is a second
+  // vocabulary this list does not use anywhere else.
   assert.ok(
-    toolsSelectedRowBlock.includes('border-color: var(--fab-border-strong);') &&
-      !toolsSelectedRowBlock.includes('border-color: var(--fab-accent);') &&
-      toolsSelectedRowBlock.includes('box-shadow: none;') &&
-      !toolsSelectedRowBlock.includes('box-shadow: inset 3px 0 0 var(--fab-accent);'),
-    'selected tool rows should not use accent borders or inset line markers'
+    toolsSelectedListRowBlock.includes('border-color: var(--fab-accent-border);') &&
+      toolsSelectedListRowBlock.includes('background: var(--fab-surface-active);') &&
+      toolsSelectedListRowBlock.includes('box-shadow: none;') &&
+      !toolsSelectedListRowBlock.includes('box-shadow: inset 3px 0 0 var(--fab-accent);'),
+    'a selected tool row takes the accent edge and the active fill, never an inset line marker'
   );
   assert.ok(
-    toolsSelectedRowBodyBlock.includes('background: var(--fab-success-soft);'),
-    'selected tool rows should indicate selection through a legible header background'
+    toolsSelectedRowBlock.includes('border-color: var(--fab-accent-border);') &&
+      toolsSelectedRowBlock.includes('box-shadow: none;'),
+    'and the shared row rule agrees with it rather than stating a second answer'
   );
-  assert.ok(
-    toolsSelectedExpandedRowBodyBlock.includes('border-bottom-right-radius: 0;') &&
-      toolsSelectedExpandedRowBodyBlock.includes('border-bottom-left-radius: 0;'),
-    'expanded selected tool headers should meet the editor panel cleanly'
+  assert.equal(
+    toolsSelectedListRowBlock.includes('var(--fab-success'),
+    false,
+    'never the SUCCESS family: green is this screen `Enabled` tone, and one colour cannot say ' +
+      'both "selected" and "enabled" on a list whose every row carries an enable switch'
   );
   assert.ok(
     toolsRowBodyBlock.includes(

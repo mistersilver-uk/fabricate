@@ -5870,6 +5870,120 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/],
   }),
   managerCase({
+    // A NON-MEMBER TOOL, SELECTED (issue 1373).
+    //
+    // The reference's own tool-rules frame is in exactly this state - its inspector shows
+    // `Mining Pick`, a `No rules here` pill and a pinned `Add Mining Pick to Mythwright Forge`
+    // - and no frame in this registry reached it. Both halves were implemented and neither was
+    // photographable: `data-tool-inspector-no-rules` and `data-tool-inspector-add` render only
+    // for a world Tool the selected system has no rules record for, which needs the membership
+    // filter widened AND the ghost row clicked rather than its own `Add to system` button.
+    //
+    // WHAT IT CATCHES. The panel is fed a DIFFERENT prop from a member's (`unadopted`, a world
+    // entry, against `tool`, a system record), so every regression in that branch is invisible
+    // to the member frames: an empty panel where a Tool was clicked, a `Enabled here` pill over
+    // rules that do not exist, a missing CTA, a rules list captioned `Effective rules here`
+    // rather than `What it would inherit here`, and - since this round - the `Inheritance`
+    // region wrongly rendering for a Tool with nothing to inherit through.
+    //
+    // It clicks the ROW rather than the row's `Add to system`: pressing that button adopts the
+    // Tool and destroys the state this case exists to photograph.
+    id: 'manager-tool-non-member-selected-1280x720',
+    label: 'Manager — Tool rules, non-member Tool selected 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="hb-tool-mortar"] .manager-tools-select-target',
+      },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-inspector-add="hb-tool-mortar"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Tool/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+    ],
+  }),
+  managerCase({
+    // THE EDITOR'S RAIL, SCROLLED (issue 1373).
+    //
+    // The rail has five regions and every editor frame in this registry photographs the first
+    // two. `HOW PLAYERS SEE IT`, `PREVIEW AS` and `REQUIRED FOR` sit below the fold at every
+    // height the registry captures, so three regions - the player tile with its broken-copy
+    // switch, the actor selector with its resolved-prerequisite readout, and the list of what
+    // in this system requires the Tool - shipped unphotographed.
+    //
+    // WHAT IT CATCHES. Each of those three resolves values the rules cards do not: the uses
+    // pill and the broken-copy note come from `projectToolPlayerPreview`, the usability row from
+    // a live prerequisite evaluation, and `REQUIRED FOR` from a store projection over recipes
+    // and gathering tasks. A defect in any of them - a mis-toned pill, an empty `Required for`
+    // over a Tool four recipes require, a usability sentence that stopped resolving - is
+    // currently reported by nothing at all.
+    //
+    // `scroll` on `[data-tool-required-for]`, the LAST region: bringing it into view brings the
+    // two above it with it, and it is a stable container rather than leaf content.
+    id: 'manager-tool-editor-rail-scrolled-1280x720',
+    label: 'Manager — Tool rules editor rail scrolled 1280x720',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-edit-rules]' },
+      { selector: '[data-tool-required-for]', scroll: true },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-preview-usability]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // THE EDITOR WITH UNSAVED CHANGES (issue 1373).
+    //
+    // Every other editor frame photographs a CLEAN draft, where `Save rules` is disabled - so
+    // the screen's primary action has only ever been captured switched off, and a review that
+    // reads it as "a dim ghost, lower in emphasis than the two secondary buttons" is reading
+    // the only state a frame could show. The `Unsaved` chip has the same problem.
+    //
+    // WHAT IT CATCHES. The enabled primary's own paint and its rank against the two secondaries;
+    // the dirty chip; and - because the step that dirties the draft is the breakage choice - the
+    // `Limited uses` face of the radio group with its uses stepper, which is the state the
+    // registry could not otherwise reach on the default fixture. That last one is load-bearing
+    // this round: `Unlimited uses` and `Limited uses` are one `breakage.mode` split into two
+    // authored answers, and a frame that shows only one of the two cannot see them diverge.
+    //
+    // The step clicks the LABEL, never the `input` inside it: a radio card's input is overlaid
+    // by its own label, so a click aimed at the input is intercepted.
+    id: 'manager-tool-editor-dirty-1280x720',
+    label: 'Manager — Tool rules editor with unsaved changes 1280x720',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-edit-rules]' },
+      { selector: '[data-tool-breakage-choice="limitedUses"]' },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-limited-uses-stepper]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
+  }),
+  managerCase({
     // THE OVERVIEW FRAME IS GONE BECAUSE THE OVERVIEW TAB IS (issue 1373). The system Tool rules
     // editor's tabs are `Breakage · Requirements · Validation`; identity is world scope's, and
     // `#tool-tab-overview` no longer exists to click, so a case pointed at it would fail its
@@ -5892,7 +6006,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-tool-remove-from-system]',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-long-name',
@@ -5918,7 +6035,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tool-edit',
     expectSelector: '[data-tool-label]',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolSystemScopeCards\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-03-breakage-1280x720',
@@ -5934,7 +6054,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-repair',
@@ -5958,7 +6081,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-replacement',
@@ -5979,7 +6106,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-immune',
@@ -6003,7 +6133,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-04-requirements-1280x720',
@@ -6019,7 +6152,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-05-validation-1280x720',
@@ -6035,7 +6171,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-invalid-validation',
@@ -6060,7 +6199,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-06-breakage-900x700',
@@ -6076,7 +6218,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tool-edit',
     position: { width: 900, height: 700 },
     kinds: ['manager', 'tools', 'responsive'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-stress-wrapping-680',

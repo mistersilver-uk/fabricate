@@ -49,7 +49,10 @@
     },
     {
       id: 'requirements',
-      icon: 'fas fa-user-shield',
+      // The GROUP glyph. See `projectToolBehaviorFacts` — the reference draws `fa-users` on
+      // this tab, on the rail's prerequisite rule row and on the checklist rows alike, and the
+      // single-figure-with-shield it replaced read as protection rather than as a roster.
+      icon: 'fas fa-users',
       labelKey: 'FABRICATE.Admin.Manager.Tools.Editor.TabRequirements',
       label: 'Requirements',
     },
@@ -83,15 +86,22 @@
   }
 
   // The Requirements count is suppressed at zero by the primitive's own badge rule. The
-  // Validation badge is always present: a danger count, or the `is-valid` tick, whose
-  // `name` is its only readable name.
+  // Validation badge is always present: a danger count, or the tick, whose `name` is its only
+  // readable name.
+  //
+  // THE TICK IS NEUTRAL, NOT POSITIVE (issue 1373). It rendered as a filled success disc — the
+  // loudest badge in a strip whose only genuinely loud state is the danger COUNT beside it, and
+  // green is already this screen's `Enabled` tone. The reference draws the passing badge in the
+  // same outlined neutral treatment every other tab badge wears and reserves the tinted one for
+  // the blocking count, so a GM scanning the strip sees a mark only where there is something to
+  // do.
   const badges = $derived({
     requirements: requirementCount,
     validation:
       errorCount > 0
         ? { tone: 'danger', label: errorCount, name: issueCountText(errorCount) }
         : {
-            tone: 'positive',
+            tone: 'neutral',
             label: '✓',
             class: 'is-valid',
             name: text('AllValid', 'All checks pass'),

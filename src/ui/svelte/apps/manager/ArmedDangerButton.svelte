@@ -18,6 +18,12 @@
     copy.
   - The ICON swaps as well as the label, so the armed state survives greyscale
     (design system "icon + word, always") and does not rest on the danger fill.
+    A caller may pass `idleIcon=""` to suppress the IDLE glyph only, and exactly one does:
+    the Tool rules editor's `Stop using this Tool here` callout already leads with that same
+    mark one column to the left, so drawing it again inside the button was one glyph stated
+    twice (issue 1373). The greyscale guarantee is not weakened by it — a glyphless idle face
+    against a glyphed `Confirm?` differs by MORE than an icon swap, not less — and no caller
+    may suppress the armed one, which is where the guarantee actually earns its keep.
   - `aria-label` carries the full consequence sentence in both states.
   - Disarm is the OWNER's job for character/tab/search/publish changes; this
     component only reports the local `Escape` and `blur` disarms plus the confirm.
@@ -158,6 +164,5 @@
   onkeydown={handleKeydown}
   onblur={handleBlur}
 >
-  <i class={icon} aria-hidden="true"></i>
-  <span>{label}</span>
+  {#if icon}<i class={icon} aria-hidden="true"></i>{/if}<span>{label}</span>
 </button>

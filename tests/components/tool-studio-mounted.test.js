@@ -563,15 +563,56 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(removed, 1);
   });
 
-  it('keeps the display-label override in a real field beside the enable switch', async () => {
-    const root = await harness.mount(props());
+  it('states the display label as an override inside the screen own inherit idiom', async () => {
+    // THE DEFECT THIS PINS (issue 1373). The card was the only overridable fact on the screen
+    // with no state pill, no world-default line and no globe row, wearing the NAME-AUTHORING
+    // field treatment with the world Tool own name as its placeholder - on a screen whose
+    // subtitle and whose tab strip both say a crafting system authors no identity. A blank
+    // field showing a greyed name is indistinguishable from a field that lost one.
+    const patches = [];
+    const root = await harness.mount(props({ onPatch: (patch) => patches.push(patch) }));
+
     assert.equal(root.querySelector('[data-tool-name]'), null);
-    assert.ok(root.querySelector('[data-tool-label]').closest('.manager-recipe-field'));
     assert.ok(root.querySelector('[data-tool-enabled] .manager-recipe-status-card'));
-    assert.match(
-      root.querySelector('[data-tool-label]').closest('label').textContent,
-      /Overrides the world Tool name in this crafting system only/
+
+    // BLANK IS INHERITING, and inheriting renders the world value read-only - not a disabled
+    // field, and not an empty one.
+    const card = root.querySelector('[data-tool-rule-card="label"]');
+    assert.ok(Boolean(card), 'the display label is a rule card');
+    assert.equal(card.dataset.toolRuleState, 'inheriting');
+    assert.match(card.textContent, /World default: Smith/);
+    assert.ok(!root.querySelector('[data-tool-label]'), 'no field while it inherits');
+    assert.ok(
+      Boolean(card.querySelector('[data-tool-rule-inherited="label"] .fa-globe')),
+      'and the globe row states where the name came from'
     );
+
+    // The switch is the same control, in the same place, with the same polarity as every other
+    // card head on the tab: ON is OVERRIDDEN.
+    const toggle = card.querySelector('[data-scoped-inherit-toggle="label"]');
+    assert.ok(Boolean(toggle), 'the card carries the shared inherit switch');
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false');
+    toggle.click();
+    // Overriding SEEDS this system own copy of the world name rather than emptying the field,
+    // which is the same claim `ToolInheritCard` makes for every other section.
+    assert.deepEqual(patches, [{ label: "Smith's Hammer" }]);
+  });
+
+  it('renders an ORDINARY field for the label override, never the name treatment', async () => {
+    const root = await harness.mount(props({ tool: tool({ label: 'Forge Mallet' }) }));
+
+    const card = root.querySelector('[data-tool-rule-card="label"]');
+    assert.equal(card.dataset.toolRuleState, 'overridden');
+    const field = root.querySelector('[data-tool-label]');
+    assert.ok(Boolean(field), 'the override renders its field');
+    assert.equal(field.value, 'Forge Mallet');
+    // `manager-recipe-name-input` is this manager NAME-AUTHORING treatment. Wearing it here is
+    // half of why the card read as though a crafting system names Tools.
+    assert.equal(field.classList.contains('manager-recipe-name-input'), false);
+    // NO PLACEHOLDER. The world value is on the card head; repeating it as ghost text inside
+    // the override is what made a blank field look like a lost name.
+    assert.equal(field.getAttribute('placeholder'), null);
+    assert.ok(Boolean(field.closest('.manager-tool-label-field')));
   });
 
 
@@ -621,12 +662,15 @@ describe('Tool Studio editor (mounted)', () => {
     const enabled = [];
     const root = await harness.mount(
       props({
+        tool: tool({ label: 'Forge Mallet' }),
         onPatch: (patch) => patches.push(patch),
         onToggleEnabled: (value) => enabled.push(value),
       })
     );
 
     assert.equal(root.querySelector('[data-tool-name]'), null);
+    // The field exists only on the OVERRIDING face of the label card (issue 1373), so the tool
+    // this mounts already carries an override rather than the inheriting blank.
     const label = root.querySelector('[data-tool-label]');
     label.value = 'Display-only name';
     label.dispatchEvent(new Event('input', { bubbles: true }));
@@ -681,14 +725,19 @@ describe('Tool Studio editor (mounted)', () => {
     const root = await harness.mount(
       props({ activeTab: 'breakage', onPatch: (patch) => patches.push(patch) })
     );
+    // FOUR, and `unlimited` leads them (issue 1373). It is not a fourth `breakage.mode`: it is
+    // the `limitedUses` mode with a NULL `maxUses`, which the model has always documented as
+    // "never used up", which `Tool#validate` has always accepted, and which every reading
+    // surface has always printed as `Unlimited uses` - while this group offered no option for
+    // it at all and the stepper beside it drew the null as `1`.
     assert.deepEqual(
       Array.from(root.querySelectorAll('input[name="tool-breakage-mode"]')).map(
         (input) => input.value
       ),
-      ['limitedUses', 'breakageChance', 'diceExpression']
+      ['unlimited', 'limitedUses', 'breakageChance', 'diceExpression']
     );
     const mechanicChoices = root.querySelectorAll('[data-tool-breakage-choice]');
-    assert.equal(mechanicChoices.length, 3);
+    assert.equal(mechanicChoices.length, 4);
     for (const choice of mechanicChoices) {
       assert.ok(choice.querySelector('input[type="radio"]'));
       assert.ok(choice.querySelector('[data-tool-choice-icon]'));
@@ -699,9 +748,17 @@ describe('Tool Studio editor (mounted)', () => {
     // THE ROW NAMES THE SCREEN THAT STILL EXISTS. It read `from the Tools library`, which is
     // what the system's Tool list was called two renames ago; it is the Tool Rules screen now,
     // and the design's own copy names it.
+    // THE PROVENANCE, NOT A PADLOCK (issue 1373). The row closed with a `System-wide` lock chip
+    // and dropped the world half of the sentence entirely, while the rules LIST one route away
+    // chipped the same setting `World default`. It states where the mode came from now, and the
+    // padlock - which claimed a permanence a per-system setting does not have - is gone.
     assert.match(
       root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
-      /Set for every Tool on the Tool Rules screen\..*System-wide/
+      /World default \u00b7 Tool-specific \u00b7\s+Set for every Tool on the Tool Rules screen\./
+    );
+    assert.doesNotMatch(
+      root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
+      /System-wide/
     );
     assert.doesNotMatch(
       root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
@@ -716,7 +773,9 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.ok(root.querySelector('[data-tool-breakage-config-divider]'));
     assert.ok(root.querySelector('[data-tool-limited-uses-stepper]'));
-    assert.ok(root.querySelector('[data-tool-limited-uses-info]'));
+    // NO PER-COPY EXPLAINER CARD (issue 1373). `Each copy tracks its own remaining uses` restated
+    // a fact the rail states one column over, in a card the reference does not draw.
+    assert.ok(!root.querySelector('[data-tool-limited-uses-info]'));
     root.querySelector('input[value="breakageChance"]').click();
     root.querySelector('input[value="diceExpression"]').click();
     assert.equal(patches[0].breakage.mode, 'breakageChance');
@@ -796,6 +855,107 @@ describe('Tool Studio editor (mounted)', () => {
       3,
       'the immune fieldset removes every on-break radio from interaction'
     );
+  });
+
+  it('draws a null maxUses as Unlimited uses on every surface of the editor', async () => {
+    // THE DEFECT THIS PINS (issue 1373). `breakage: { mode: "limitedUses", maxUses: null }` is a
+    // valid saved state - `src/models/Tool.js:23` documents the null as UNLIMITED, the runtime
+    // short-circuits on it, `normalizeBreakage` reads the retired `mode: "immune"` forward onto
+    // it, and `Tool#validate` accepts it. Every READING surface said `Unlimited uses`. The
+    // editor did not: the radio group had no option for the state, so it fell to `Limited uses`,
+    // and the stepper beside it printed `tool.breakage.maxUses ?? 1` as `1`. The pane and the
+    // rail therefore stated DIFFERENT RULES for one saved Tool, with Save disabled, and the
+    // Validation tab called it `All clear`.
+    //
+    // A GM could land in that state, could not see it, and had no control to leave it.
+    const root = await harness.mount(
+      props({ tool: tool({ breakage: { mode: 'limitedUses', maxUses: null } }) })
+    );
+
+    const checked = Array.from(root.querySelectorAll('input[name="tool-breakage-mode"]')).find(
+      (input) => input.checked
+    );
+    assert.equal(checked?.value, 'unlimited', 'the radio group selects the state it is in');
+    assert.ok(
+      !root.querySelector('[data-tool-limited-uses-stepper]'),
+      'and offers no uses stepper, which is what drew the null as 1'
+    );
+    // THE RAIL, THE PLAYER PREVIEW AND THE PANE NOW AGREE. The first two are the surfaces that
+    // were already right; the assertion is that the pane has joined them, not that they moved.
+    assert.match(
+      root.querySelector('[data-tool-preview-breakage]').textContent,
+      /Unlimited uses/
+    );
+    assert.match(root.querySelector('[data-tool-player-preview]').textContent, /Unlimited uses/);
+    assert.match(
+      root.querySelector('[data-tool-breakage-choice="unlimited"]').textContent,
+      /Unlimited uses/
+    );
+  });
+
+  it('seeds a real count when the GM leaves Unlimited uses, and clears it on return', async () => {
+    // THE OTHER DOOR INTO THE SAME DEFECT. `createBreakageConfigs` seeded its `limitedUses`
+    // config with `maxUses: null` - the UNLIMITED answer - so choosing `Limited uses` from any
+    // other mode wrote the state the GM had just left, silently, while the stepper drew `1`.
+    const patches = [];
+    const root = await harness.mount(
+      props({
+        tool: tool({ breakage: { mode: 'limitedUses', maxUses: null } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+
+    root.querySelector('[data-tool-breakage-choice="limitedUses"] input').click();
+    assert.deepEqual(patches, [{ breakage: { mode: 'limitedUses', maxUses: 1 } }]);
+
+    await harness.setProps(
+      props({
+        tool: tool({ breakage: { mode: 'limitedUses', maxUses: 4 } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+    assert.equal(root.querySelector('[data-tool-max-uses]').value, '4');
+    root.querySelector('[data-tool-breakage-choice="unlimited"] input').click();
+    // Back to the state the model calls unlimited, written EXPLICITLY rather than left to a
+    // fallback that reads it as one use.
+    assert.deepEqual(patches[1], { breakage: { mode: 'limitedUses', maxUses: null } });
+  });
+
+  it('hides a switched-off requirements section rather than greying its controls', async () => {
+    // THE DEFECT THIS PINS (issue 1373). The card head said `Character prerequisites` +
+    // `Overridden` with the inherit switch at the right margin; the body opened with a SECOND
+    // full card heading, restating the head own hint verbatim, with a second switch at the same
+    // margin - and below it five greyed rows, a greyed summary line and a greyed radio pair. A
+    // GM reading a card that says `Overridden` over a greyed-out body cannot tell which of the
+    // two switches greyed it.
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        tool: tool({
+          prerequisites: { enabled: false, ids: [], gateMode: 'usability' },
+          bonus: { enabled: false, expression: '' },
+        }),
+      })
+    );
+
+    assert.ok(
+      Boolean(root.querySelector('[data-tool-prerequisites-enabled]')),
+      'the section switch stays, and keeps the hook the smoke hit-tests'
+    );
+    assert.ok(!root.querySelector('[data-tool-prerequisite-list]'), 'no greyed checklist');
+    assert.ok(!root.querySelector('[data-radio-card-group="tool-gate-mode"]'), 'no greyed radios');
+    assert.ok(!root.querySelector('[data-field="tool-bonus"]'), 'no greyed bonus field');
+    // It states the ANSWER instead, in the words the rail states it in one column over.
+    assert.match(
+      root.querySelector('[data-tool-prerequisites-off]').textContent,
+      /Any character may use it/
+    );
+    assert.match(
+      root.querySelector('[data-tool-bonus-off]').textContent,
+      /Adds nothing to the crafting check/
+    );
+    // And no second card head: the body head is a subordinate ROW.
+    assert.ok(!root.querySelector('[data-tool-requirements-tab] .manager-tool-editor-card-heading'));
   });
 
   it('resets inactive breakage mode values when the mounted editor switches Tools', async () => {
@@ -1047,11 +1207,10 @@ describe('Tool Studio editor (mounted)', () => {
   it('separates the breakage tab sibling blocks with exactly one whitespace run', async () => {
     const root = await harness.mount(props({ activeTab: 'breakage' }));
 
-    for (const hook of [
-      '[data-tool-authority-copy]',
-      '[data-tool-limited-uses-copy]',
-      '[data-tool-limited-uses-info]',
-    ]) {
+    // `[data-tool-limited-uses-info]` is GONE with the explainer card it wrapped (issue 1373),
+    // and `[data-tool-authority-copy]` is a single block now that the mode row states its
+    // provenance in its own element rather than as a third paragraph inside the copy column.
+    for (const hook of ['[data-tool-limited-uses-copy]']) {
       const element = root.querySelector(hook);
       assert.ok(element, `${hook} must render`);
       joinedByOneSpace(element, hook);
@@ -1240,8 +1399,16 @@ describe('Tool Studio editor (mounted)', () => {
       /Break chance must be between 0% and 100%/
     );
     assert.doesNotMatch(root.textContent, /breakage\.breakageChance|breakageChance/);
-    assert.equal(root.querySelector('.manager-recipe-tab-title').textContent.trim(), 'Validation');
-    assert.match(root.querySelector('.manager-recipe-tab-intro').textContent, /blocking issue/);
+    // NO IN-PANE PAGE HEADING (issue 1373). It was the only one of the three tabs to carry an
+    // `<h2>` and an intro, and the reference draws neither on any of them - the strip above
+    // names the tab, the header above that names the Tool, and the summary card below already
+    // states the outcome. `blocking issue` moved to that card, which is asserted next.
+    assert.ok(!root.querySelector('.manager-recipe-tab-title'), 'no in-pane page heading');
+    assert.ok(!root.querySelector('.manager-recipe-tab-intro'), 'and no intro block');
+    assert.match(
+      root.querySelector('[data-editor-validation-summary]').textContent,
+      /blocking issue/
+    );
     assert.equal(
       root.querySelector('[data-tool-validation-tab] > .manager-tool-editor-card'),
       null

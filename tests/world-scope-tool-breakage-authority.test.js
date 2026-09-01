@@ -239,14 +239,17 @@ test('the UI readers are routed at ONE point: the selected-system projection (is
     [...tally.entries()].sort(([left], [right]) => left.localeCompare(right)),
     [
       ['selectedSystem?.toolBreakage?.authority', 4],
-      ['selectedSystem?.toolBreakage?.source', 1],
+      ['selectedSystem?.toolBreakage?.source', 2],
     ],
     'every `toolBreakage` access in the shell reads the PUBLISHED projection off ' +
       '`selectedSystem`. FOUR read the resolved authority — `ChecksView` gates on it (and fans ' +
       'out internally to crafting, salvage and gathering rather than being three editors), ' +
       '`ToolsBrowserView` authors it, `ToolEditView` reads it, and `tools/ToolBrowserInspector` ' +
       'draws the per-tool behaviour copy from it — and ONE carries the authoring scope to the ' +
-      'control. If your change adds a LEGITIMATE fifth read off `selectedSystem`, this pin is ' +
+      'control TWICE — the rules list authors the mode and the rules EDITOR states, in the ' +
+      'words the reference uses, whether the mode it is showing is the world default or a ' +
+      'departure this system authored (issue 1373). If your change adds a LEGITIMATE further ' +
+      'read off `selectedSystem`, this pin is ' +
       'not a verdict on it: bump the expected count and say so. What it is a verdict on is a ' +
       'read rooted anywhere ELSE, including an alias bound to the block — that is a screen ' +
       're-defaulting on a raw crafting system'

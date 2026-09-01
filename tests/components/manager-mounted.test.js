@@ -3658,8 +3658,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       0,
       'the standalone Overview nav item should be removed'
     );
+    // NO ZERO BADGE (issue 1373). The rail states counts where there is something to count, and
+    // the reference draws none beside a row whose section is empty: a `0` there is a badge whose
+    // whole content is the absence the row already reads as. This system adopts no Tools, so the
+    // assertion is that the badge is ABSENT rather than that it reads zero.
     const toolsNav = navButton('Tool Rules');
-    assert.equal(toolsNav.querySelector('.manager-nav-count')?.textContent.trim(), '0');
+    assert.ok(!toolsNav.querySelector('.manager-nav-count'), 'no zero count badge on Tool Rules');
     assert.ok(target.textContent.includes('Alchemy'));
     assert.ok(target.textContent.includes('Potion and essence work'));
     assert.ok(target.textContent.includes('4'));
@@ -19517,7 +19521,16 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('wires Tool library selection to the shell inspector without restoring an inline editor', async () => {
     const calls = await mountToolRoute();
 
-    assert.equal(target.querySelector('.fabricate-manager > .manager-titlebar'), null);
+    // THE TITLE BAND RENDERS HERE NOW (issue 1373). It was suppressed on both Tool routes, so
+    // the two screens the reference draws it on most explicitly were the two that showed ~18px
+    // of empty ground where the selected system resolution is stated. `assert.ok(Boolean(...))`
+    // rather than an identity comparison: `node:assert` serialises a mounted happy-dom element
+    // to build its diff and walks the circular tree until the heap dies, so a one-line failure
+    // surfaces as an OOM with no message.
+    assert.ok(
+      Boolean(target.querySelector('.fabricate-manager > .manager-titlebar')),
+      'the Tool library draws the shared title band'
+    );
     const contextHeader = target.querySelector(
       '.fabricate-manager > .manager-header[data-tool-library-context]'
     );
@@ -19534,7 +19547,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       // 'Tool Rules' is the Tool Studio's screen title since issue 1362 (see the rail
       // relabel). The crumb takes it too: a trail whose leaf disagrees with the heading
       // below it is the WCAG 2.5.3 "Label in Name" hazard the relabel had to avoid.
-      ['Crafting Systems', 'Alchemy', 'Crafting', 'Tool Rules']
+      //
+      // NO `Crafting` CRUMB (issue 1373). It claimed Tool Rules sits inside the Crafting group,
+      // and the rail rendered in the same frame shows that group holding Recipes and Settings
+      // with Tool Rules a sibling OUTSIDE it. Two navigations one pane apart disagreed about the
+      // shape of the app; the rail is the one a GM clicks, and the EDITOR's own trail never had
+      // the crumb, so dropping it also makes the two Tool screens agree with each other.
+      ['Crafting Systems', 'Alchemy', 'Tool Rules']
     );
     assert.equal(contextHeader.querySelector('.manager-title').textContent, 'Tool Studio');
     assert.match(
@@ -19813,16 +19832,45 @@ describe('CraftingSystemManager mounted behavior', () => {
       inspector.querySelector('[data-tool-inspector-rule="bonus"]').textContent,
       /Adds @prof/
     );
+    // TWO REGIONS, EACH WITH ONE HEADING (issue 1373). This asserted ONE, against the four
+    // per-row headings it replaced. The second is `Inheritance`, and it is not a fifth rule: the
+    // rules above state what the Tool RESOLVES to here and cannot state where each answer came
+    // from, because a section overridden to the world's own value resolves identically to one
+    // inherited. The row one column left already claims `Overrides breakage, prerequisites,
+    // check bonus`, and the panel it opened listed four rules with no marking at all — so the
+    // claim was unverifiable on the screen that made it, and two of the four read `No...`, which
+    // made an overriding Tool indistinguishable from one authoring nothing.
+    assert.deepEqual(
+      Array.from(inspector.querySelectorAll('.manager-tool-inspector-section-kicker')).map((node) =>
+        node.textContent.trim()
+      ),
+      ['Effective rules here', 'Inheritance'],
+      'one heading names the resolved rules, a second names where each of them came from'
+    );
+    const inheritance = inspector.querySelector('[data-tool-inspector-inheritance]');
+    assert.ok(Boolean(inheritance), 'the panel states the per-section inherit truth');
+    assert.deepEqual(
+      Array.from(inheritance.querySelectorAll('[data-tool-inspector-inherit]')).map(
+        (row) => `${row.dataset.toolInspectorInherit}:${row.dataset.toolInspectorInheritState}`
+      ),
+      [
+        'breakage:overridden',
+        'onBreak:overridden',
+        'prerequisites:overridden',
+        'bonus:overridden',
+      ],
+      'all four world-default sections, each with its own state'
+    );
+    // `overridden` FOUR TIMES IS THE LOAD-BEARING HALF. An absent inherit key reads as
+    // INHERITING everywhere in this model, so a region that failed to reach the world join at
+    // all would render four `Inherited` pills and look perfectly healthy. This fixture's
+    // membership record overrides every section — which is the state every migrated world is in
+    // — so the four `overridden` values can only have come from the join.
     assert.equal(
-      inspector.querySelectorAll('.manager-tool-inspector-section-kicker').length,
-      1,
-      'the four resolved rules sit under one heading naming the group, not four naming each row'
+      inheritance.querySelectorAll('[data-tool-inspector-inherit-state="inherited"]').length,
+      0
     );
-    assert.match(
-      inspector.querySelector('.manager-tool-inspector-section-kicker').textContent,
-      /Effective rules here/i
-    );
-    assert.equal(inspector.querySelector('[data-tool-inspector-validation]'), null);
+    assert.ok(!inspector.querySelector('[data-tool-inspector-validation]'));
     // Issue 881: the library inspector renders the SAME icon fact row the editor's
     // behavior preview does, from the same behavior-fact projection — one implementation,
     // so the two side panels cannot hold two geometries for one meaning.
@@ -19912,10 +19960,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the editor does not pay for a separate root breadcrumb header'
     );
-    assert.equal(
-      target.querySelector('.fabricate-manager > .manager-titlebar'),
-      null,
-      'Tool parity routes suppress the generic system status ribbon'
+    // THE TITLE BAND RENDERS HERE TOO (issue 1373). Suppressing it left the Tool editor showing
+    // ~18px of empty ground where the reference states the selected system's resolution — and
+    // the shared `.manager-header` above IS still suppressed, because this route draws a header
+    // of its own; the two gates were never the same decision. `assert.ok(Boolean(...))` rather
+    // than an identity comparison: serialising a mounted element for a diff walks its circular
+    // tree until the heap dies, so a one-line failure surfaces as an OOM with no message.
+    assert.ok(
+      Boolean(target.querySelector('.fabricate-manager > .manager-titlebar')),
+      'the Tool editor draws the shared title band'
     );
     const editorRail = target.querySelector('.manager-rail');
     assert.equal(

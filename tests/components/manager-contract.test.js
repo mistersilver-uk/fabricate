@@ -3444,9 +3444,17 @@ describe('CraftingSystemManager source contract', () => {
       toolSystemScopeSource.includes('data-tool-label'),
       'the per-system display-label override still ships'
     );
+    // AND IT SAYS SO IN THE SCREEN'S OWN IDIOM RATHER THAN IN A HELP SENTENCE (issue 1373). The
+    // card is a `ToolInheritCard` now: blank IS the inheriting state, so the pill, the
+    // `World default: <name>` line, the globe row and the switch carry the whole claim, and the
+    // sentence beneath is a caption rather than the only place the override is stated.
+    assert.ok(
+      toolSystemScopeSource.includes('<ToolInheritCard'),
+      'the label card is the same inherit card every other overridable fact here renders through'
+    );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.LabelFallback,
-      'Overrides the world Tool name in this crafting system only. Leave blank to use the world Tool name.'
+      'The name this crafting system shows for the Tool.'
     );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelHint,
