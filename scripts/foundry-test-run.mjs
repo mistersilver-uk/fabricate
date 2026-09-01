@@ -5625,11 +5625,37 @@ async function withSingleToolClipboardWrite(page, expectedUuid, action) {
 // from becoming `:last-child` and stretching. What comes and goes inside it is
 // `.manager-pagination`, so presence is read from that, and reading the slot instead would be a
 // check that could never fail.
-async function assertToolLibraryPagination(page, { expectedTotal, expectedPage = 1, expectScrollable, expectFooter = true }) {
+async function assertToolLibraryPagination(page, {
+  expectedTotal,
+  expectedPage = 1,
+  expectScrollable,
+  expectFooter = true,
+  selectedToolId,
+}) {
   const browser = page.locator('.fabricate-manager [data-tool-library]').first();
   const list = browser.locator('[data-tool-library-scroll]');
   const slot = browser.locator('[data-tool-browser-pagination]');
   const footer = slot.locator('.manager-pagination');
+  // THE SELECTION INVARIANT IS AN IDENTITY, NOT A ROW POSITION. This used to read
+  // `.manager-tools-row:first-child`, which was only ever right while the library rendered in
+  // fixture-authored order; the shipped `SORT BY [Name] [Asc]` control (issue 1373) puts the
+  // Tool the walk selects in row six, so a first-child check would fail against a perfectly
+  // healthy pager. The caller says which Tool it selected and every page-1 call re-reads it, so
+  // a pager or a re-render that drops the selection still fails here.
+  if (expectedPage === 1 && !selectedToolId) {
+    throw new Error('Tool pagination page-1 checks need the Tool ID the walk selected');
+  }
+  const selectionRows = browser.locator('.manager-tools-row');
+  const assertSelectionRetained = async () => {
+    const selectedToolIds = await selectionRows.evaluateAll((rows) => rows
+      .filter((candidate) => candidate.classList.contains('is-selected'))
+      .map((candidate) => candidate.dataset.managerToolId));
+    if (JSON.stringify(selectedToolIds) !== JSON.stringify([selectedToolId])) {
+      throw new Error(
+        `Tool library did not preserve its selection of ${selectedToolId}: ${JSON.stringify(selectedToolIds)}`
+      );
+    }
+  };
   await list.waitFor({ state: 'visible', timeout: 5_000 });
   if (!expectFooter) {
     // The SLOT must still be in the DOM, so that a bar which vanished because the whole browser
@@ -5647,11 +5673,7 @@ async function assertToolLibraryPagination(page, { expectedTotal, expectedPage =
         throw new Error(`Tool list scrollability was ${scrollable}; expected ${expectScrollable}`);
       }
     }
-    if (expectedPage === 1) {
-      const selectedFirst = await browser.evaluate((element) => element
-        .querySelector('.manager-tools-row:first-child')?.classList.contains('is-selected') === true);
-      if (!selectedFirst) throw new Error('Tool library did not preserve automatic first-row selection');
-    }
+    if (expectedPage === 1) await assertSelectionRetained();
     return null;
   }
   await footer.waitFor({ state: 'visible', timeout: 5_000 });
@@ -5670,7 +5692,6 @@ async function assertToolLibraryPagination(page, { expectedTotal, expectedPage =
       scroll: rect(scroll),
       footer: rect(pagination),
       scrollable: scroll ? scroll.scrollHeight > scroll.clientHeight : false,
-      selectedFirst: element.querySelector('.manager-tools-row:first-child')?.classList.contains('is-selected') === true,
       ordered: Boolean(
         summary &&
         nav &&
@@ -5692,9 +5713,7 @@ async function assertToolLibraryPagination(page, { expectedTotal, expectedPage =
     throw new Error(`Tool pagination is not a full-width bottom-pinned footer: ${JSON.stringify(state)}`);
   }
   if (!state.ordered) throw new Error('Tool pagination does not match Recipe Studio control ordering');
-  if (expectedPage === 1 && !state.selectedFirst) {
-    throw new Error('Tool library did not preserve automatic first-row selection');
-  }
+  if (expectedPage === 1) await assertSelectionRetained();
   if (expectScrollable !== undefined && state.scrollable !== expectScrollable) {
     throw new Error(`Tool list scrollability was ${state.scrollable}; expected ${expectScrollable}`);
   }
@@ -5762,6 +5781,17 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (JSON.stringify(visibleToolNames) !== JSON.stringify(expectedToolNames)) {
     throw new Error(`Tool Studio parity library order drifted: ${JSON.stringify(visibleToolNames)}`);
   }
+  // AUTO-SELECTION IS A FIRST-RENDER FACT, so it is read here, before this walk touches the
+  // library at all. The effect behind it only re-fires when the inspected Tool leaves `tools`,
+  // so the same assertion made after a sort click - let alone after a selection click - would
+  // only prove that some selection survived, not that the screen made one for the GM on first
+  // paint. The first row is whatever the shipped default sort puts there, which is why the name
+  // comes out of the order constant above rather than being written in.
+  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
+    throw new Error(
+      `Tool Studio parity library did not automatically select its first row (${expectedToolNames[0]})`
+    );
+  }
   // Drive the direction toggle, so the constant above is a gate on a working sort rather than a
   // record of whatever order the library happened to come back in. Descending must be the exact
   // reverse, and toggling back must restore it — a control that renders but sorts nothing passes
@@ -5790,11 +5820,6 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (JSON.stringify(restoredToolNames) !== JSON.stringify(expectedToolNames)) {
     throw new Error(
       `Tool Studio sort did not restore ascending order: ${JSON.stringify(restoredToolNames)}`
-    );
-  }
-  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
-    throw new Error(
-      `Tool Studio parity library did not automatically select its first row (${expectedToolNames[0]})`
     );
   }
   const selectTarget = row.locator('.manager-tools-select-target');
@@ -5828,8 +5853,18 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       }
     },
   );
-  if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
-    throw new Error("Tool Studio parity library must select Smith's Hammer in the first row");
+  // ONE SELECTED ROW, AND IT IS THE ONE THE WALK JUST CLICKED. `rowSelected` is an equality
+  // test, so the alternate row selected a moment ago has to have gone dark; this catches a
+  // library that lights a second row rather than moving the one selection. It is deliberately
+  // NOT a row-position check: under the shipped name-ascending default sort the parity fixture
+  // is row six, so asserting `:first-child` here would demand two rows be selected at once.
+  const selectedAfterParityClick = await visibleToolRows.evaluateAll((rows) => rows
+    .filter((candidate) => candidate.classList.contains('is-selected'))
+    .map((candidate) => candidate.dataset.managerToolId));
+  if (JSON.stringify(selectedAfterParityClick) !== JSON.stringify([fixture.toolId])) {
+    throw new Error(
+      `Tool Studio parity row selection did not select exactly the intended Tool: ${JSON.stringify(selectedAfterParityClick)}`
+    );
   }
   const inspectorDescription = await manager.locator('[data-tool-inspector-description]').textContent();
   if (!inspectorDescription?.includes('well-balanced forge hammer')) {
@@ -5840,13 +5875,19 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   ), systemId);
   const paginationComponentId = parityTools.find((tool) => tool.componentId)?.componentId;
   if (!paginationComponentId) throw new Error('Tool Studio pagination fixture has no managed Component identity');
-  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1, expectFooter: false });
+  await assertToolLibraryPagination(
+    page,
+    { expectedTotal: 8, expectedPage: 1, expectFooter: false, selectedToolId: fixture.toolId },
+  );
   await setManagerWindowSize(page, {
     width: 1214,
     height: 524,
     sourceViewport: { width: 1280, height: 520 },
   });
-  await assertToolLibraryPagination(page, { expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false });
+  await assertToolLibraryPagination(
+    page,
+    { expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false, selectedToolId: fixture.toolId },
+  );
   await setManagerWindowSize(page, {
     width: 1214,
     height: 724,
@@ -5872,7 +5913,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   });
   await manager.locator('[data-tool-result-count]').filter({ hasText: '9 shown' })
     .waitFor({ state: 'visible', timeout: 5_000 });
-  await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1 });
+  await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId });
   await setManagerWindowSize(page, {
     width: 1214,
     height: 524,
@@ -5880,7 +5921,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   });
   const firstPageFooter = await assertToolLibraryPagination(
     page,
-    { expectedTotal: 9, expectedPage: 1, expectScrollable: true },
+    { expectedTotal: 9, expectedPage: 1, expectScrollable: true, selectedToolId: fixture.toolId },
   );
   await manager.locator('[data-tool-browser-pagination] [data-pagination-next]').click();
   const secondPageFooter = await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 2 });

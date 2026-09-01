@@ -1253,13 +1253,49 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     HARNESS,
     /normalized Tool snapshot[\s\S]*?description: 'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/,
   );
-  assert.match(HARNESS, /const expectedToolNames = \[[\s\S]*?"Smith's Hammer"[\s\S]*?'Woodcarving Tools'/);
+  // NAME-ASCENDING, THE WHOLE LIST, IN ORDER. This used to pin only that "Smith's Hammer"
+  // preceded 'Woodcarving Tools', which the fixture-authored order satisfies just as well —
+  // "Smith's Hammer" is upserted first there — so it could not tell the shipped
+  // `SORT BY [Name] [Asc]` default (issue 1373) from no sort at all. Pinning every name in
+  // sequence is what actually fails if the walk is "restored" to authored order.
   assert.match(
-    toolStudioWalk,
-    /did not automatically select Smith's Hammer[\s\S]*?const otherSelectTarget/,
+    HARNESS,
+    /const expectedToolNames = \[\s*"Alchemist's Supplies",\s*'Arcane Forge',\s*'Ley-Line Nexus',\s*"Master's Anvil",\s*'Moonwell',\s*"Smith's Hammer",\s*'Volcanic Vent',\s*'Woodcarving Tools',\s*\];/,
+    'the parity library order must stay pinned name-ascending, not in fixture-authored order',
+  );
+  // FIRST-RENDER EVIDENCE, ORDERED BY SOURCE POSITION rather than by a tool name the sort order
+  // now decides. Auto-selection has to be read after the order check (so the row it names is
+  // known) and before anything that touches the library — the sort-direction toggle included,
+  // since the effect behind it does not re-run for a selection that is still present, and before
+  // the first selection click, which would make it prove nothing at all.
+  const orderCheckIndex = toolStudioWalk.indexOf('Tool Studio parity library order drifted');
+  const autoSelectionIndex = toolStudioWalk.indexOf('did not automatically select its first row');
+  const sortToggleIndex = toolStudioWalk.indexOf('sortDirectionToggle.click()');
+  const firstSelectionClickIndex = toolStudioWalk.indexOf('otherSelectTarget.click()');
+  assert.ok(orderCheckIndex > 0, 'the walk must pin the rendered library order');
+  assert.ok(autoSelectionIndex > 0, 'the walk must observe automatic first-row selection');
+  assert.ok(sortToggleIndex > 0, 'the walk must exercise the sort-direction toggle');
+  assert.ok(firstSelectionClickIndex > 0, 'the walk must click a row to select it');
+  assert.ok(
+    autoSelectionIndex > orderCheckIndex,
+    'first-row auto-selection must be read after the rendered order it is named against',
+  );
+  assert.ok(
+    autoSelectionIndex < sortToggleIndex,
+    'first-row auto-selection must be observed on first render, before the sort toggle re-sorts',
+  );
+  assert.ok(
+    autoSelectionIndex < firstSelectionClickIndex,
     'first-row auto-selection must be observed before any harness selection click',
   );
-  assert.match(HARNESS, /visibleToolRows\.first\(\)[\s\S]*?Tool Studio parity library must select Smith's Hammer in the first row/);
+  // SELECTION IS AN IDENTITY. After the walk clicks the parity row, exactly that Tool is
+  // selected — not the first row, which under the shipped name-ascending sort is a different
+  // Tool, so a `:first-child` reading here would demand two rows be selected at once.
+  assert.match(
+    HARNESS,
+    /const selectedAfterParityClick = await visibleToolRows\.evaluateAll[\s\S]*?JSON\.stringify\(\[fixture\.toolId\]\)[\s\S]*?Tool Studio parity row selection did not select exactly the intended Tool/,
+    'the post-click selection check must assert the selected Tool ID, never a row position',
+  );
   assert.match(HARNESS, /data-tool-inspector-description[\s\S]*?well-balanced forge hammer/);
   assert.match(
     HARNESS,
@@ -1274,8 +1310,36 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(HARNESS, /async function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length !== 0/);
   assert.match(
     HARNESS,
-    /async function assertToolLibraryPagination[\s\S]*?data-tool-library[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?selectedFirst[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/,
+    /async function assertToolLibraryPagination[\s\S]*?data-tool-library[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?await assertSelectionRetained\(\)[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/,
   );
+  // The pager's selection check must keep firing on every page-1 call, and must be an identity
+  // check: `selectedToolId` is mandatory there, so a caller that quietly stops passing it fails
+  // loudly instead of skipping the assertion.
+  assert.match(
+    HARNESS,
+    /expectedPage === 1 && !selectedToolId[\s\S]*?Tool pagination page-1 checks need the Tool ID the walk selected/,
+    'the pager must refuse a page-1 check that was not told which Tool the walk selected',
+  );
+  assert.match(
+    HARNESS,
+    /const assertSelectionRetained = async \(\)[\s\S]*?JSON\.stringify\(\[selectedToolId\]\)[\s\S]*?did not preserve its selection of/,
+  );
+  assert.doesNotMatch(
+    HARNESS,
+    /manager-tools-row:first-child'\)\?\.classList\.contains\('is-selected'\)/,
+    'Tool library selection must never be pinned to row position again',
+  );
+  for (const paginationCall of [
+    "{ expectedTotal: 8, expectedPage: 1, expectFooter: false, selectedToolId: fixture.toolId }",
+    "{ expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false, selectedToolId: fixture.toolId }",
+    "{ expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId }",
+    "{ expectedTotal: 9, expectedPage: 1, expectScrollable: true, selectedToolId: fixture.toolId }",
+  ]) {
+    assert.ok(
+      toolStudioWalk.includes(paginationCall),
+      `Tool pagination call ${paginationCall} must name the selected Tool`,
+    );
+  }
   const issue800Search = HARNESS.indexOf("getByRole('searchbox', { name: 'Search components' })");
   const issue800Fill = HARNESS.indexOf('componentSearch().fill(componentName)', issue800Search);
   const issue800Wait = HARNESS.indexOf("identity.waitFor({ state: 'visible'", issue800Fill);
