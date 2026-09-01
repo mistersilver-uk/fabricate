@@ -5,6 +5,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ItemDropZone from './ItemDropZone.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import { filterTools, projectToolRow } from './tools/toolStudio.js';
   import IconButton from '../../components/IconButton.svelte';
 
@@ -116,10 +117,7 @@
   data-tool-library
 >
   <div class="manager-tools-main-content">
-    <section
-      class="manager-inspector-card manager-tools-authority-card"
-      data-manager-tools-authority
-    >
+    <InspectorCard class="manager-tools-authority-card" data-manager-tools-authority="">
       <div class="manager-tools-authority-heading">
         <span><i class="fas fa-sliders" aria-hidden="true"></i></span>
         <div>
@@ -165,7 +163,7 @@
         {/each}
       </div>
       <small class="manager-tools-authority-caption">{authorityCaption()}</small>
-    </section>
+    </InspectorCard>
 
     <section class="manager-tools-library-card" data-manager-tools-search>
       <label class="manager-search">

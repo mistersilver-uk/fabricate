@@ -61,6 +61,8 @@ const harness = createMountedComponentHarness({
     // failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
     // the conversion, so it is in this tree's static graph; the harness's closure validator
@@ -86,6 +88,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',

@@ -3,6 +3,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import EnvironmentSummaryInspector from './EnvironmentSummaryInspector.svelte';
   import RecordInspector from './RecordInspector.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let {
     activeTab = 'overview',
@@ -44,7 +45,7 @@
   {:else if recordEntry}
     <RecordInspector kind={recordKind} {environment} entry={recordEntry} {onUpdateEnvironment} />
   {:else}
-    <section class="manager-inspector-card" data-record-inspector-empty={recordKind}>
+    <InspectorCard data-record-inspector-empty={recordKind}>
       <p class="manager-kicker">
         {recordKind === 'event'
           ? text(
@@ -67,6 +68,6 @@
               'Add or include tasks in this environment so they appear here.'
             )}
       </p>
-    </section>
+    </InspectorCard>
   {/if}
 </aside>

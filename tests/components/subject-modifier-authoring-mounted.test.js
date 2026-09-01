@@ -43,7 +43,7 @@ const salvageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-salvage-modifier-pick-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
-  compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
+  compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
 
@@ -290,6 +290,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     GATHERING_PATH,
   ],
   componentPath: GATHERING_PATH,

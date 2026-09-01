@@ -10,6 +10,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import { localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
@@ -873,12 +874,12 @@
           </button>
 
           <div class="manager-task-core-status">
-            <button
-              type="button"
-              class={`manager-status-toggle ${task.enabled === false ? 'is-off' : 'is-on'}`}
-              data-gathering-task-field="enabled"
-              aria-pressed={task.enabled !== false}
-              aria-label={text(
+            <StatusToggle
+              on={task.enabled !== false}
+              label={task.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.ToggleNamed',
                 'Toggle {name}'
               ).replace(
@@ -889,17 +890,9 @@
                     'Unnamed gathering task'
                   )
               )}
+              data-gathering-task-field="enabled"
               onclick={() => onUpdateTask({ enabled: task.enabled === false })}
-            >
-              <span class="manager-status-toggle-track" aria-hidden="true">
-                <span class="manager-status-toggle-knob"></span>
-              </span>
-              <span class="manager-status-toggle-label">
-                {task.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              </span>
-            </button>
+            />
             <p class="manager-muted">
               {task.enabled === false
                 ? text(

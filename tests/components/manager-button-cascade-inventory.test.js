@@ -741,14 +741,27 @@ const REVIEWED = [
       'NOT IN THE SEEDED LIST. The (0,2,0) shared treatment behind four population-B ' +
       'triggers; re-chaining it would repaint controls the sweep is not converting.',
   },
-  {
-    id: 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte#.fab-bulk-delete-card .manager-button',
-    disposition: 'EXCLUDE',
-    why:
-      'NOT IN THE SEEDED LIST. A `:global()` scoped rule whose only site is ' +
-      '`ArmedDangerButton`, which is a primitive in its own right and is explicitly out of the ' +
-      "conversion's scope.",
-  },
+  // REMOVED at issue 1427, and the removal is recorded rather than performed silently.
+  //
+  // The entry was `BulkDeleteCard.svelte#.fab-bulk-delete-card .manager-button`, dispositioned
+  // EXCLUDE because its only site is `ArmedDangerButton`, which never gains the primitive class.
+  // That rule still EXISTS and still reaches that button; what changed is that this instrument
+  // can no longer SEE it. The card's root `<section>` became an `<InspectorCard>`, so the rule's
+  // ancestor compound is now `.manager-inspector-card.fab-bulk-delete-card` and the element
+  // carrying it is written by the primitive, from a `class={…}` expression. `providersFor`
+  // resolves an ancestor by the STATIC class tokens a parent component writes, finds none, and
+  // `siteMatch` returns `impossible` — so the rule drops out of `candidates` entirely rather
+  // than into `blindSpots`, and no disposition in this register describes "live, and invisible
+  // to the instrument".
+  //
+  // It is left out rather than re-dispositioned as DEAD, which would be false and would invite
+  // the next reader to delete a live rule. The loss is bounded and inert: arbitration only
+  // matters for CONVERTING sites and this rule has none, its declaration is pinned by
+  // `essence-studio-fidelity.test.js`, and whether it still REACHES its button is
+  // `manager-button-scoped-class-reach.test.js`'s question — which covers `<InspectorCard>` and
+  // did catch this rule going dead. Teaching `providersFor` about a class forwarded through a
+  // child component's `class` prop is the real repair, and it belongs to this instrument rather
+  // than to a card extraction.
 
   // ── NO_CONFLICT: derived NOT at risk, and still rendered ──────────────────────────────
   //

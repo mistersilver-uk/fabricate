@@ -58,7 +58,7 @@
       "path": "src/ui/svelte/apps/manager/EditorTabs.svelte",
       "library": "<TabBar>",
       "evidence": "targeted",
-      "why": "The editor tab strip (5 callers: the system, environment, recipe-item, Checks and Knowledge strips each wrap it). `library.html:1008` specifies `<PageHeader> <TabBar>` and states that a studio never puts its tabs in a side rail. Its specimen also draws TWO Rail Marker Family vehicles on one bar — `Tiers 3` and `Businesses 23` as bare counts beside a warning badge on Validation — so drawing the family is part of what the entry specifies, not an extension of it, and spec.md requirement \"Near-neighbour primitives are routed by a stated rule\" forbids substituting one vehicle for another. Issue 1038 ruled the Checks section strip OUT of conversion, led by the reason that its count \"is a bare mono numeral, not a chip — the two treatments are deliberately different\"; that ruling was never recorded in this manifest, and it was wrong twice over — a deliberate STYLE divergence is the one kind a shared primitive may not record, and the strip was RIGHT about the marks while the primitive was too narrow to express them. Issue 1429 made the family a capability instead. Targeted: one frame per wrapping editor claims it."
+      "why": "The editor tab strip (8 callers: the system, environment, recipe-item, Checks, Knowledge, recipe, essence and tool strips each wrap it). `library.html:1008` specifies `<PageHeader> <TabBar>` and states that a studio never puts its tabs in a side rail. Its specimen also draws TWO Rail Marker Family vehicles on one bar — `Tiers 3` and `Businesses 23` as bare counts beside a warning badge on Validation — so drawing the family is part of what the entry specifies, not an extension of it, and spec.md requirement \"Near-neighbour primitives are routed by a stated rule\" forbids substituting one vehicle for another. Issue 1038 ruled the Checks section strip OUT of conversion, led by the reason that its count \"is a bare mono numeral, not a chip — the two treatments are deliberately different\"; that ruling was never recorded in this manifest, and it was wrong twice over — a deliberate STYLE divergence is the one kind a shared primitive may not record, and the strip was RIGHT about the marks while the primitive was too narrow to express them. Issue 1429 made the family a capability instead, and the Checks strip is a caller as of that change. Issue 1038's OTHER three conversions stand and are counted above — the recipe, essence and tool editors — and the capabilities they needed (a chip accessible name, a chip modifier class, the `positive` tone spelling and a suppressible tab hook) live on the primitive rather than in a hand-rolled strip. The one manager strip still recorded as NOT a caller is `downtime/WorldDowntimeTabs`, in {@link NOT_A_PRIMITIVE} with the measurements that ruled it out, so its absence is a decision rather than an omission. Targeted: one frame per wrapping editor claims it."
     },
     {
       "path": "src/ui/svelte/apps/manager/EditorValidationSurface.svelte",
@@ -181,6 +181,12 @@
       "why": "The shared icon picker (8 callers, issue 1269). `library.html:764` names icons FIRST among the catalogues collapsing into `<SearchPopover>`; same reasoning as `EssenceSourceSelector`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because everything it presents exists only in the open popover and neither representative frame opens one."
     },
     {
+      "path": "src/ui/svelte/components/InspectorCard.svelte",
+      "library": "<Card>",
+      "evidence": "broad",
+      "why": "THE manager's card shell (19 callers, issue 1427), extracted from 80 hand-written `class=\"manager-inspector-card\"` sections across 20 components — every one of them a `<section>`, measured by walking each component's Svelte AST, so it takes no polymorphism prop. `library.html:941` heads one specimen `<Card> <Well> <RowDisclosure>` and states \"two container levels only; a card sits on the page, a well nests inside a card\" — this is that card, and the entry was in the specified-but-unbuilt register until it shipped. Two divergences from that specimen are deliberate and recorded rather than smoothed over: the shipped box is radius 8 with `--fab-space-3` padding on `--fab-overlay-light-04` (`fabricate.css:13663`) against the specimen's radius 11 / padding 16 / bg-2, and the sheet declares three further treatments keyed on a modifier class (`.manager-checks-card`), on an ANCESTOR (`.manager-checks-rail`, which reaches cards carrying no modifier at all) and on a positioning state (`.is-sticky`, which — measured across `src/` — no component writes at all) — so it takes NO variant prop, because a vocabulary spanning three different anchors is a design ruling and not something to settle inside a sweep whose acceptance bar is that no frame moves. `<Well>`, the level below it, remains unbuilt. Broad by reach: the Checks Studio, both environment inspectors, the essence and tool inspectors, the books-and-scrolls inspector, the Tool Studio authority card and the shared bulk-delete card all render it, and the deferred root holds 32 more sites. It carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because NEITHER representative frame contains a card at all."
+    },
+    {
       "path": "src/ui/svelte/components/ManagerButton.svelte",
       "library": "<Button>",
       "evidence": "broad",
@@ -223,6 +229,12 @@
       "why": "The row and inspector state pill, six tones (13 callers). The library's mark vocabulary (`library.html:835`, `:858`) specifies marks that carry KIND; this pill carries STATE, and `library.html:348` states that colouring a chip background by kind would double-code kind against state — so it is deliberately not one of those marks."
     },
     {
+      "path": "src/ui/svelte/components/StatusToggle.svelte",
+      "library": "<Toggle>",
+      "evidence": "broad",
+      "why": "`library.html:595` — \"Binary state that takes effect immediately\", and the manager's one on/off switch (25 callers, issue 1040). It was a CSS convention over an element TREE — track span, nested knob span, optional reading — hand-written at 37 sites in 26 components, and `scoped/InheritRow.svelte` and `scoped/MembershipActions.svelte` each recorded in their own docblocks that they had to. Carries a three-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because its `as` prop is a closed set of three element HOSTS and no representative frame draws even one of them: `fabricate-app-shell` is the player window and `manager-components-normal` holds only the track-only filter switch. The shipped 34x20 track against this ladder's 38x22 is recorded as a migration in the entry's own delta, not resolved here."
+    },
+    {
       "path": "src/ui/svelte/components/Stepper.svelte",
       "library": "<Stepper>",
       "evidence": "broad",
@@ -241,6 +253,12 @@
       "library": null,
       "evidence": "targeted",
       "why": "ONE caller, `src/ui/svelte/apps/manager/EssenceBrowserInspector.svelte` (issue 1036's Duplicate / Edit / Delete / Copy source UUID / Unlink extraction). No `library.html` entry names a right-inspector action button. Adjudicated twice already, which is what puts it here rather than among the other 47 sub-bar manager files: `viewLabCases.js` records why it is excluded from the broad-signal set and names the recipe, component and gathering inspectors as its planned remaining consumers, and `tests/components/mounted-harness-primitive-allowlist.test.js` carries it because each of those conversions drops it into another mounted tree. Targeted, and the four `manager-essences-*` frames that put an essence in the inspector claim it by `sourceMatches` — so this row moves to {@link DESIGN_SYSTEM_PRIMITIVES} when a second inspector adopts it, and its `evidence` becomes a judgement to make rather than a fact about a directory."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "why": "ONE caller, `src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte`. Recorded because it reads like a ninth copy of the manager's tab strip and is not one, and issue 1038 measured why so the next audit does not re-propose it. (1) It carries 177 lines of its own scoped `<style>` (lines 122-298 of 298) where every one of the other eight strips carries ZERO — the card row it sits in, the padlock treatment and the tooltip's containing block are all authored there, so the component owns a layout, not just a tablist. (2) Its prop vocabulary is different: `activeTabId`, not `activeTab`, and no `badges` at all. (3) It implements its OWN roving focus, and deliberately: `focusableTabId` falls back to the first tab when `activeTabId` names no rendered tab, so the strip keeps a tab stop, while `aria-selected` stays bound to `activeTabId` — a divergence between the two that `EditorTabs` does not have and that the APG requires here. It also renders hover/focus tooltips OUTSIDE the tablist, which no other strip does. Targeted: the `manager-world-downtime-*` frames render it and claim it by `sourceMatches`."
     },
     {
       "path": "src/ui/svelte/components/ActorSelectTopBar.svelte",

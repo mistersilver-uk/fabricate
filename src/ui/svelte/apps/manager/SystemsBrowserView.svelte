@@ -5,6 +5,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js';
   import IconButton from '../../components/IconButton.svelte';
 
@@ -268,11 +269,12 @@
               class="manager-labeled-cell manager-status-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
             >
-              <button
-                type="button"
-                class={`manager-status-toggle ${system.enabled === false ? 'is-off' : 'is-on'}`}
-                aria-pressed={system.enabled !== false}
-                aria-label={system.enabled === false
+              <StatusToggle
+                on={system.enabled !== false}
+                label={system.enabled === false
+                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                ariaLabel={system.enabled === false
                   ? text('FABRICATE.Admin.Manager.EnableSystemNamed', 'Enable {name}').replace(
                       '{name}',
                       systemDisplayLabel(system, systemLabels)
@@ -283,16 +285,7 @@
                     )}
                 onclick={(event) => toggleEnabled(system.id, system.enabled === false, event)}
                 onkeydown={(event) => event.stopPropagation()}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true">
-                  <span class="manager-status-toggle-knob"></span>
-                </span>
-                <span class="manager-status-toggle-label">
-                  {system.enabled === false
-                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-                </span>
-              </button>
+              />
             </span>
             <span
               role="cell"

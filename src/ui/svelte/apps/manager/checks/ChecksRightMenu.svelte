@@ -74,6 +74,8 @@
   import CheckOddsPanel from './CheckOddsPanel.svelte';
   import CheckOutcomePreview from './CheckOutcomePreview.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { NO_ACTOR_ID } from './checkPreview.js';
   import {
     formatPreviewDifficulties,
@@ -490,32 +492,26 @@
         text('FABRICATE.Admin.Manager.Checks.Validation.AllChecks', 'All checks')
       )}
     </div>
-    <section class="manager-inspector-card is-rail-list" data-checks-all-checks>
+    <InspectorCard class="is-rail-list" data-checks-all-checks="">
       {#each allCheckRows as row (row.id)}
         {@render railRow(row, 'data-checks-all-checks-row')}
       {/each}
-    </section>
+    </InspectorCard>
   {:else}
     {#if activation}
       <!-- NO KICKER. The card IS the section: the switch, the reading, and the sentence that
            says which mode locks it. See the header note. -->
-      <section
-        class={`manager-inspector-card manager-checks-active-card ${showActiveToggle && !activeOn ? 'is-off' : 'is-on'}`}
+      <InspectorCard
+        class={`manager-checks-active-card ${showActiveToggle && !activeOn ? 'is-off' : 'is-on'}`}
         data-checks-active={activeTab}
       >
         {#if showActiveToggle}
-          <button
-            type="button"
-            class={`manager-status-toggle ${activeOn ? 'is-on' : 'is-off'}`}
-            data-checks-active-toggle
-            aria-pressed={activeOn}
+          <StatusToggle
+            on={activeOn}
+            label={activeOn ? onLabel : offLabel}
+            data-checks-active-toggle=""
             onclick={() => onToggleActive(!activeOn)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label">{activeOn ? onLabel : offLabel}</span>
-          </button>
+          />
           <p class="manager-muted">{optionalHint}</p>
         {:else}
           <!-- A LOCKED toggle, not a bare sentence. Removing the control removed the STATE
@@ -526,21 +522,20 @@
                a padlock. It is an INDICATOR, not a disabled control: nothing here is
                actionable, so it is announced as one labelled image rather than as a button a
                GM might keep trying to press. -->
-          <span
-            class="manager-status-toggle is-locked is-on"
+          <StatusToggle
+            as="indicator"
+            on
+            label={onLabel}
+            ariaLabel={lockedLabel}
             data-checks-active-locked="on"
-            role="img"
-            aria-label={lockedLabel}
           >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label">{onLabel}</span>
-            <i class="fas fa-lock manager-checks-active-lock" aria-hidden="true"></i>
-          </span>
+            {#snippet trailing()}
+              <i class="fas fa-lock manager-checks-active-lock" aria-hidden="true"></i>
+            {/snippet}
+          </StatusToggle>
           <p class="manager-muted" data-checks-active-required>{requiredHint}</p>
         {/if}
-      </section>
+      </InspectorCard>
     {/if}
 
     {#if !checkOff}
@@ -577,7 +572,7 @@
           text('FABRICATE.Admin.Manager.Checks.PreviewAs.Title', 'Preview as')
         )}
       </div>
-      <section class="manager-inspector-card" data-checks-preview-as>
+      <InspectorCard data-checks-preview-as="">
         <SearchablePopover
           value={previewActorId}
           options={previewActorOptions}
@@ -659,7 +654,7 @@
             </select>
           </label>
         {/if}
-      </section>
+      </InspectorCard>
 
       <div class="manager-checks-rail-head">
         {@render railHead(
@@ -667,9 +662,9 @@
           text('FABRICATE.Admin.Manager.Checks.Simulator.Title', 'Outcome preview')
         )}
       </div>
-      <section class="manager-inspector-card" data-checks-simulator>
+      <InspectorCard data-checks-simulator="">
         <CheckOutcomePreview {preview} onRoll={onRollPreview} />
-      </section>
+      </InspectorCard>
 
       <div class="manager-checks-rail-head">
         {@render railHead(
@@ -680,9 +675,9 @@
           <span class="manager-checks-rail-head-note" data-checks-odds-domain>{oddsDomain}</span>
         {/if}
       </div>
-      <section class="manager-inspector-card" data-checks-odds>
+      <InspectorCard data-checks-odds="">
         <CheckOddsPanel {odds} />
-      </section>
+      </InspectorCard>
     {/if}
 
     <div class="manager-checks-rail-head">
@@ -692,11 +687,11 @@
       )}
       <Chip tone={digestStatus.tone}>{digestStatus.label}</Chip>
     </div>
-    <section class="manager-inspector-card is-rail-list" data-checks-digest>
+    <InspectorCard class="is-rail-list" data-checks-digest="">
       {#each digestRows as row (row.id)}
         {@render railRow(row, 'data-checks-digest-row')}
       {/each}
-    </section>
+    </InspectorCard>
   {/if}
 </aside>
 

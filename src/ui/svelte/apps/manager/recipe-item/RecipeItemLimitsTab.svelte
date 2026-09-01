@@ -31,6 +31,7 @@
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SegmentedControl from '../SegmentedControl.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
 
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
 
@@ -298,23 +299,15 @@
                   )}</span
             >
           </div>
-          <button
-            type="button"
-            class={`manager-status-toggle ${limitUses ? 'is-on' : 'is-off'}`}
-            data-recipe-item-limit-uses
-            aria-pressed={limitUses}
-            aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUse', 'Limited use')}
+          <StatusToggle
+            on={limitUses}
+            label={limitUses
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUse', 'Limited use')}
+            data-recipe-item-limit-uses=""
             onclick={toggleLimitUses}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label"
-              >{limitUses
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-            >
-          </button>
+          />
         </div>
 
         {#if limitUses}
@@ -416,26 +409,18 @@
                   )}</span
             >
           </div>
-          <button
-            type="button"
-            class={`manager-status-toggle ${limitLearning ? 'is-on' : 'is-off'}`}
-            data-recipe-item-limit-learning
-            aria-pressed={limitLearning}
-            aria-label={text(
+          <StatusToggle
+            on={limitLearning}
+            label={limitLearning
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearning',
               'Limited learning'
             )}
+            data-recipe-item-limit-learning=""
             onclick={toggleLimitLearning}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label"
-              >{limitLearning
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-            >
-          </button>
+          />
         </div>
 
         {#if limitLearning}

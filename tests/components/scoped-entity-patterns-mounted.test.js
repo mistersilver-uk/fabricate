@@ -60,6 +60,7 @@ const inheritHarness = createMountedComponentHarness({
   rawModules: SCOPED_RAW_MODULES,
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
@@ -72,6 +73,7 @@ const membershipHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
   ],

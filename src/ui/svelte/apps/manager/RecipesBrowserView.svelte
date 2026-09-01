@@ -23,6 +23,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import StatusPill from '../../components/StatusPill.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
@@ -533,18 +534,12 @@
           <span class="manager-recipe-filter-label" id="manager-recipe-group-label"
             >{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span
           >
-          <button
-            type="button"
-            class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
-            data-recipe-group-toggle
-            aria-pressed={ui.groupByCategory}
+          <StatusToggle
+            on={ui.groupByCategory}
+            data-recipe-group-toggle=""
             aria-labelledby="manager-recipe-group-label"
             onclick={() => (ui.groupByCategory = !ui.groupByCategory)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-          </button>
+          />
         </div>
         <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
       {/if}
@@ -850,11 +845,9 @@
                         in the manager, where a switch has no pill beside it.)
                       -->
                       <span class="manager-recipe-status">
-                        <button
-                          type="button"
-                          class={`manager-status-toggle ${recipe.enabled === false ? 'is-off' : 'is-on'}`}
-                          aria-pressed={recipe.enabled !== false}
-                          aria-label={format(
+                        <StatusToggle
+                          on={recipe.enabled !== false}
+                          ariaLabel={format(
                             recipe.enabled === false
                               ? 'FABRICATE.Admin.Manager.Recipe.EnableNamed'
                               : 'FABRICATE.Admin.Manager.Recipe.DisableNamed',
@@ -862,11 +855,7 @@
                             { name: recipe.name }
                           )}
                           onclick={() => handleToggleEnabled(recipe)}
-                        >
-                          <span class="manager-status-toggle-track" aria-hidden="true">
-                            <span class="manager-status-toggle-knob"></span>
-                          </span>
-                        </button>
+                        />
                       </span>
 
                       <!--

@@ -8,6 +8,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
 
   let {
     tasks = [],
@@ -436,11 +437,12 @@
               class="manager-labeled-cell manager-status-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
             >
-              <button
-                type="button"
-                class={`manager-status-toggle ${task.enabled === false ? 'is-off' : 'is-on'}`}
-                aria-pressed={task.enabled !== false}
-                aria-label={text(
+              <StatusToggle
+                on={task.enabled !== false}
+                label={task.enabled === false
+                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.ToggleNamed',
                   'Toggle {name}'
                 ).replace('{name}', taskName(task))}
@@ -449,16 +451,7 @@
                   onToggleTaskEnabled(selectedSystemId, task.id, task.enabled === false);
                 }}
                 onkeydown={(event) => event.stopPropagation()}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true">
-                  <span class="manager-status-toggle-knob"></span>
-                </span>
-                <span class="manager-status-toggle-label">
-                  {task.enabled === false
-                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-                </span>
-              </button>
+              />
             </span>
             <span
               role="cell"

@@ -16,6 +16,8 @@ const harness = createMountedComponentHarness({
     // THE manager's labelled push-button (issue 1118). The inspector renders its Edit
     // recipe item action through the primitive, so a `.svelte` omission HANGS this suite.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/ItemPageInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte'

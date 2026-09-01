@@ -106,11 +106,27 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/IconButton.svelte',
   // THE manager's editor tab strip (issue 1362), and on this list since issue 1429 gave it
   // the Rail Marker Family and converted the Checks section strip and the Knowledge tabs
-  // onto it. That is what makes it sharp: it was already in the environment, system and
-  // recipe-item trees, and every further strip that stops hand-rolling its markers drops it
-  // into another mounted tree. Two of those conversions landed in one change, and each
-  // omission costs a HUNG suite rather than a failing one.
+  // onto it. Issue 1038 converted three more — the recipe, essence and tool editors — so
+  // EIGHT wrapping strips call it, and each of those wrappers sits in a different mounted
+  // tree. That is what makes it sharp: every further strip that stops hand-rolling its
+  // markers drops it into another mounted tree, and each omission costs a HUNG suite rather
+  // than a failing one.
   'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  // THE manager's on/off switch (issue 1040). Sharper again than `ManagerButton`: the switch
+  // shipped as a hand-rolled element TREE at 37 sites in 26 components, and converting them
+  // dropped this leaf into 25 mounted trees in one change — the browsers, every studio's
+  // overview tab, the Checks rail, the scoped-entity rows and `ToggleCard`, which is itself
+  // rendered by ten more. An omission in any harness that compiles one of those HANGS the
+  // suite as `# cancelled` rather than failing it.
+  'src/ui/svelte/components/StatusToggle.svelte',
+  // THE manager's card shell (issue 1427), extracted from 80 hand-written
+  // `class="manager-inspector-card"` sections. It is the widest entry on this list after `Chip`
+  // by reach rather than by call count: 19 components render it and they are spread across the
+  // Checks Studio, both environment inspectors, the essence inspector, the Tool Studio, the
+  // books-and-scrolls inspector and the shared bulk-delete card — so almost every mounted
+  // manager tree pulls it in, and the root's 32 deferred sites will pull it into the rest when
+  // they convert.
+  'src/ui/svelte/components/InspectorCard.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

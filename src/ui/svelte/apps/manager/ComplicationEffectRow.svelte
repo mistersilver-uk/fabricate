@@ -77,6 +77,7 @@
 -->
 <script>
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
 
   let {
     control = 'checkbox',
@@ -144,19 +145,8 @@
   </span>
   {#if control === 'switch'}
     <!-- `aria-pressed` on a plain button is the house switch pattern; the repo uses no
-         `role="switch"` anywhere and `ToggleCard` records that rule explicitly. -->
-    <button
-      type="button"
-      class={`manager-status-toggle ${on ? 'is-on' : 'is-off'}`}
-      aria-pressed={on}
-      aria-label={accessibleName}
-      {disabled}
-      onclick={() => onToggle(!on)}
-    >
-      <span class="manager-status-toggle-track" aria-hidden="true"
-        ><span class="manager-status-toggle-knob"></span></span
-      >
-    </button>
+         `role="switch"` anywhere and `StatusToggle` records that rule explicitly. -->
+    <StatusToggle {on} ariaLabel={accessibleName} {disabled} onclick={() => onToggle(!on)} />
   {/if}
   {#if headAction}<span class="fab-complication-effect-head-action">{@render headAction()}</span
     >{/if}

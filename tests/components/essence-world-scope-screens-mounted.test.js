@@ -68,6 +68,11 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
+  // THE manager's on/off switch (issue 1040). Not mounted directly by anything here: it arrives
+  // through `MembershipActions`, which converted to it, so it is a TRANSITIVE dependency of the
+  // shell rather than a new control on these screens. Listed before `MembershipActions.svelte`
+  // for that reason, exactly as `IconButton` is listed before `Pagination`.
+  'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
   // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this

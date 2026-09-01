@@ -6,9 +6,11 @@
   } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
   import CompositionStatePill from './CompositionStatePill.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import MatchingEvidenceChips from './MatchingEvidenceChips.svelte';
   import IconButton from '../../../components/IconButton.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let {
     kind = 'task',
@@ -254,7 +256,7 @@
 </script>
 
 {#if entry}
-  <section class="manager-inspector-card" data-record-inspector={kind}>
+  <InspectorCard data-record-inspector={kind}>
     <div class="manager-inspector-title-row is-hero-large">
       <img class="manager-recipe-preview" src={record?.img || defaultImg} alt="" />
       <div class="manager-inspector-copy">
@@ -276,10 +278,10 @@
         </div>
       </div>
     </div>
-  </section>
+  </InspectorCard>
 
   {#if hasNodes}
-    <section class="manager-inspector-card" data-record-inspector-section="nodes">
+    <InspectorCard data-record-inspector-section="nodes">
       <h3 class="manager-card-title">
         {text(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.AvailableNodes',
@@ -337,15 +339,15 @@
           </IconButton>
         </div>
       {/if}
-    </section>
+    </InspectorCard>
   {/if}
 
-  <section class="manager-inspector-card" data-record-inspector-section="evidence">
+  <InspectorCard data-record-inspector-section="evidence">
     <h3 class="manager-card-title">{environmentMatchTitle}</h3>
     <MatchingEvidenceChips evidence={entry.evidence} variant="checks" />
-  </section>
+  </InspectorCard>
 
-  <section class="manager-inspector-card" data-record-inspector-section="overrides">
+  <InspectorCard data-record-inspector-section="overrides">
     <div class="manager-environment-overrides-header">
       <div class="manager-environment-overrides-copy">
         <h3 class="manager-card-title">
@@ -367,32 +369,25 @@
         </p>
       </div>
       {#if showOverridesToggle}
-        <button
-          type="button"
-          class={`manager-status-toggle manager-environment-override-toggle ${dropRateAdjustmentsEnabled ? 'is-on' : 'is-off'}`}
-          aria-pressed={dropRateAdjustmentsEnabled}
+        <StatusToggle
+          on={dropRateAdjustmentsEnabled}
+          label={dropRateAdjustmentsEnabled
+            ? text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOn',
+                'On'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOff',
+                'Off'
+              )}
+          class="manager-environment-override-toggle"
           data-task-drop-rate-adjustments-toggle={kind === 'event' ? undefined : ''}
           data-event-drop-rate-adjustments-toggle={kind === 'event' ? '' : undefined}
           onclick={() =>
             kind === 'event'
               ? setEventDropAdjustmentsEnabled(!dropRateAdjustmentsEnabled)
               : setTaskDropAdjustmentsEnabled(!dropRateAdjustmentsEnabled)}
-        >
-          <span class="manager-status-toggle-track" aria-hidden="true">
-            <span class="manager-status-toggle-knob"></span>
-          </span>
-          <span class="manager-status-toggle-label">
-            {dropRateAdjustmentsEnabled
-              ? text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOn',
-                  'On'
-                )
-              : text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ApplyDropRateAdjustmentsOff',
-                  'Off'
-                )}
-          </span>
-        </button>
+        />
       {/if}
     </div>
 
@@ -582,5 +577,5 @@
         )}
       </p>
     {/if}
-  </section>
+  </InspectorCard>
 {/if}

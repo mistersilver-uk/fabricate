@@ -17,6 +17,7 @@
 <script>
   import Chip from './Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';
@@ -399,25 +400,14 @@
                       <div class="manager-feature-tile-body">
                         <div class="manager-feature-tile-head">
                           <strong>{text(feature.labelKey, feature.fallback)}</strong>
-                          <button
-                            type="button"
-                            class={`manager-status-toggle ${selectedSystem.features?.[feature.systemKey] === true ? 'is-on' : 'is-off'}`}
-                            aria-pressed={selectedSystem.features?.[feature.systemKey] === true}
-                            aria-label={text(feature.labelKey, feature.fallback)}
+                          <StatusToggle
+                            on={selectedSystem.features?.[feature.systemKey] === true}
+                            label={selectedSystem.features?.[feature.systemKey] === true
+                              ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                              : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}
+                            ariaLabel={text(feature.labelKey, feature.fallback)}
                             onclick={() => handleToggleFeature(feature)}
-                          >
-                            <span class="manager-status-toggle-track" aria-hidden="true"
-                              ><span class="manager-status-toggle-knob"></span></span
-                            >
-                            <span class="manager-status-toggle-label"
-                              >{selectedSystem.features?.[feature.systemKey] === true
-                                ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-                                : text(
-                                    'FABRICATE.Admin.Manager.SystemEdit.FeatureOff',
-                                    'Off'
-                                  )}</span
-                            >
-                          </button>
+                          />
                         </div>
                         <small>{text(feature.hintKey, feature.hintFallback)}</small>
                       </div>
@@ -436,26 +426,18 @@
                             'Time requirements'
                           )}</strong
                         >
-                        <button
-                          type="button"
-                          class={`manager-status-toggle ${timeRequirementsEnabled ? 'is-on' : 'is-off'}`}
-                          aria-pressed={timeRequirementsEnabled}
-                          aria-label={text(
+                        <StatusToggle
+                          on={timeRequirementsEnabled}
+                          label={timeRequirementsEnabled
+                            ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                            : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}
+                          ariaLabel={text(
                             'FABRICATE.Admin.Manager.Feature.Time',
                             'Time requirements'
                           )}
-                          data-system-time-toggle
+                          data-system-time-toggle=""
                           onclick={handleToggleTime}
-                        >
-                          <span class="manager-status-toggle-track" aria-hidden="true"
-                            ><span class="manager-status-toggle-knob"></span></span
-                          >
-                          <span class="manager-status-toggle-label"
-                            >{timeRequirementsEnabled
-                              ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-                              : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span
-                          >
-                        </button>
+                        />
                       </div>
                       <small
                         >{text(
@@ -483,33 +465,22 @@
                               'Refund on player cancel'
                             )}</strong
                           >
-                          <button
-                            type="button"
-                            class={`manager-status-toggle ${refundOnCancelEnabled ? 'is-on' : 'is-off'}`}
-                            aria-pressed={refundOnCancelEnabled}
-                            aria-label={text(
+                          <StatusToggle
+                            on={refundOnCancelEnabled}
+                            label={refundOnCancelEnabled
+                              ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                              : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}
+                            ariaLabel={text(
                               'FABRICATE.Admin.Manager.Feature.RefundOnPlayerCancel',
                               'Refund on player cancel'
                             )}
-                            data-system-refund-toggle
                             disabled={!timeRequirementsEnabled}
+                            data-system-refund-toggle=""
                             onclick={() => {
                               if (timeRequirementsEnabled)
                                 handleToggleFeature(refundOnCancelFeature);
                             }}
-                          >
-                            <span class="manager-status-toggle-track" aria-hidden="true"
-                              ><span class="manager-status-toggle-knob"></span></span
-                            >
-                            <span class="manager-status-toggle-label"
-                              >{refundOnCancelEnabled
-                                ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-                                : text(
-                                    'FABRICATE.Admin.Manager.SystemEdit.FeatureOff',
-                                    'Off'
-                                  )}</span
-                            >
-                          </button>
+                          />
                         </div>
                         <small
                           >{timeRequirementsEnabled
@@ -535,23 +506,15 @@
                         <strong
                           >{text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}</strong
                         >
-                        <button
-                          type="button"
-                          class={`manager-status-toggle ${currencyEnabled ? 'is-on' : 'is-off'}`}
-                          aria-pressed={currencyEnabled}
-                          aria-label={text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}
-                          data-system-currency-toggle
+                        <StatusToggle
+                          on={currencyEnabled}
+                          label={currencyEnabled
+                            ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                            : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}
+                          ariaLabel={text('FABRICATE.Admin.Manager.Feature.Currency', 'Currency')}
+                          data-system-currency-toggle=""
                           onclick={handleToggleCurrency}
-                        >
-                          <span class="manager-status-toggle-track" aria-hidden="true"
-                            ><span class="manager-status-toggle-knob"></span></span
-                          >
-                          <span class="manager-status-toggle-label"
-                            >{currencyEnabled
-                              ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-                              : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span
-                          >
-                        </button>
+                        />
                       </div>
                       <small
                         >{text(
@@ -575,29 +538,18 @@
                               'Travel & Realms'
                             )}</strong
                           >
-                          <button
-                            type="button"
-                            class={`manager-status-toggle ${gatheringRealmsEnabled ? 'is-on' : 'is-off'}`}
-                            aria-pressed={gatheringRealmsEnabled}
-                            aria-label={text(
+                          <StatusToggle
+                            on={gatheringRealmsEnabled}
+                            label={gatheringRealmsEnabled
+                              ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+                              : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}
+                            ariaLabel={text(
                               'FABRICATE.Admin.Manager.Feature.GatheringRealms',
                               'Travel & Realms'
                             )}
-                            data-gathering-realm-toggle
+                            data-gathering-realm-toggle=""
                             onclick={handleToggleGatheringRealms}
-                          >
-                            <span class="manager-status-toggle-track" aria-hidden="true"
-                              ><span class="manager-status-toggle-knob"></span></span
-                            >
-                            <span class="manager-status-toggle-label"
-                              >{gatheringRealmsEnabled
-                                ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-                                : text(
-                                    'FABRICATE.Admin.Manager.SystemEdit.FeatureOff',
-                                    'Off'
-                                  )}</span
-                            >
-                          </button>
+                          />
                         </div>
                         <small
                           >{text(

@@ -44,6 +44,7 @@
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import SystemRulesRoster from '../scoped/SystemRulesRoster.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { essenceColourName, essenceShortValueName } from '../scoped/essenceScoped.js';
@@ -231,7 +232,7 @@
   nothing else. So this is the uncounted variant of one sentence, deliberately, and the two
   keys collapse into that one the moment the inspector legitimately holds those two values.
 -->
-<section class="manager-inspector-card manager-essence-shared" data-essence-section="shared">
+<InspectorCard class="manager-essence-shared" data-essence-section="shared">
   <p class="manager-kicker">
     {text('FABRICATE.Admin.Manager.Essence.SharedDefinition', 'Shared definition')}
   </p>
@@ -254,7 +255,7 @@
     >
     <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
   </button>
-</section>
+</InspectorCard>
 
 <!-- Two stats, two different questions. Components CARRY the essence, which is what blocks
      a delete; recipes REQUIRE it, which is what a delete rewrites. Neither number is
@@ -506,8 +507,15 @@
 
   /* The prototype's shared-definition block is INFO-toned — the one panel on the rail that is
      an explanation rather than a control (`proto:1676`). It reuses the inspector card's own
-     geometry and restates only the tint, so no second card shape enters the rail. */
-  .manager-essence-shared {
+     geometry and restates only the tint, so no second card shape enters the rail.
+
+     `:global()` AND CHAINED (issue 1427), for the reason `ItemPageInspector` states at length.
+     That block is an `<InspectorCard>` now, so `manager-essence-shared` rides the `class` prop
+     onto an element THIS component does not write, and Svelte stamps its `svelte-<hash>` only
+     onto the ones it does. `.manager-inspector-card` is chained rather than left off so the
+     selector stays at (0,2,0), exactly where the scoped form put it, and it still beats nothing
+     it did not beat before. */
+  :global(.manager-inspector-card.manager-essence-shared) {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
   }
@@ -516,17 +524,25 @@
      paints muted; the prototype paints this link in the accent because it LEAVES the screen.
      Compounded through `.manager-inspector-card` so the rule is (0,3,0) and beats the global
      `.fabricate-manager .manager-link-button` outright instead of tying it at (0,2,0) and
-     being decided by stylesheet injection order. */
-  .manager-inspector-card .manager-essence-shared-link {
+     being decided by stylesheet injection order.
+
+     WHOLLY `:global()` for the same issue-1427 reason, rather than a `:global()` ancestor with a
+     scoped descendant — which is the form that looks right and quietly changes the cascade. The
+     ANCESTOR compound is the one that stopped matching: `.manager-inspector-card` is now written
+     by the primitive and carries no hash, and the button, which this component does still write,
+     cannot rescue a selector whose left half matches nothing. `.manager-essence-shared` replaces
+     the hash as the compound that narrows the match set to this card, so the count of classes —
+     and therefore the specificity — is unchanged at (0,3,0). */
+  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link) {
     color: var(--fab-accent);
     font-weight: 600;
   }
 
-  .manager-inspector-card .manager-essence-shared-link:hover {
+  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link:hover) {
     color: var(--fab-text);
   }
 
-  .manager-inspector-card .manager-essence-shared-link i {
+  :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link i) {
     font-size: 0.6rem;
   }
 
@@ -571,7 +587,11 @@
      shape the other one already has rather than inventing a treatment.
 
      THE SHARED-DEFINITION CALLOUT KEEPS ITS BOX, because it IS an object: an info-toned
-     explanation the reference draws as a filled, bordered block. */
+     explanation the reference draws as a filled, bordered block. It is therefore the ONE site
+     in this file that calls `<InspectorCard>` (issue 1427). The other six are not unconverted
+     callers of that primitive — they stopped being cards at all, so there is no shell for them
+     to ask for, and calling the primitive to then unpaint its border, radius and padding would
+     be a worse hand-roll than writing the column. */
   .manager-essence-inspector-section {
     display: flex;
     flex-direction: column;

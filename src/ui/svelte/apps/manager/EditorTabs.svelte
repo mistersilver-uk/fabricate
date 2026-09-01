@@ -70,18 +70,35 @@
   A tab may carry MORE THAN ONE mark, because a section can be both authored and unready at
   once — pass an array, and they render in the order the caller listed them.
 
+  Issue 1038 converted three more callers — `recipe/RecipeEditorTabs`,
+  `essences/EssenceEditorTabs` and `tools/ToolEditorTabs` — and every capability those three
+  needed is HERE, on this component, rather than left behind as a hand-rolled strip that
+  happened to render the same classes: a chip accessible name (`name`, because a badge whose
+  whole label is `✓` has no readable name at all without one), a chip modifier class
+  (`class`, because `fabricate.css:18183` writes a real shipped rule against
+  `.manager-tool-editor-tabs > button > span.is-valid`), the `positive` tone spelling, and
+  `hookAttribute=''` for the one caller that renders no tab hook.
+
   Props:
    - tabs: `{id, icon, labelKey, label}[]`, in render order. `labelKey` is looked up and
      `label` is the English fallback, matching the `text()` contract everywhere else.
    - activeTab / onSelect(tabId).
    - badges: per tab id, one mark or an array of them. A mark is a plain value, or
-     `{vehicle, label, tone, name, icon, suppressZero}` — `vehicle` ∈ count/issue/dot (default
-     `issue`), `tone` ∈ neutral/success/warning/danger and applies to the chip, `name` is
-     the accessible name (REQUIRED by any mark that renders no text — the `dot`, and the
-     glyph-only chip below), and `suppressZero` defaults true so a mark reading `0` is
-     omitted rather than stated as zero.
+     `{vehicle, label, tone, name, class, suppressZero}` — `vehicle` ∈ count/issue/dot
+     (default `issue`), `tone` ∈ neutral/success/positive/warning/danger and applies to the
+     chip, `name` is the accessible name (REQUIRED by any mark that renders no readable text —
+     the `dot`, and equally a chip whose whole label is a bare character such as `✓`),
+     `class` is one modifier class appended to `badgeClass` on the CHIP only, and
+     `suppressZero` defaults true so a mark reading `0` is omitted rather than stated as zero.
      A mark carries NO `icon`; see the note above for the caller that wanted one and what the
-     reference says instead.
+     reference says instead. `class` is not that route reopened: it appends a token to a chip
+     this primitive still draws, and cannot change which element or which vehicle is rendered.
+
+     `positive` is `Chip`'s OWN spelling of the success family — its `is-active` and
+     `is-positive` selectors share one rule there, so the two paint identically — and it is
+     passed through rather than folded into `success` because two callers converted by issue
+     1038 render `is-positive` today, and renaming a shipped class would be a markup change
+     wearing a tidy-up's clothes.
    - ariaLabelKey / ariaLabel: the strip's own accessible name.
    - idStem: builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`.
    - buttonIdStem / panelIdStem: override either half of that pair for a site whose ids do
@@ -90,7 +107,8 @@
      optional for the sites that need it: a strip rendering one panel at a time points every
      unselected tab at an id that is not in the document, which assistive technology reports
      as a broken relationship rather than as "not currently shown".
-   - hookAttribute: the per-button `data-*` name carrying the tab id.
+   - hookAttribute: the per-button `data-*` name carrying the tab id; '' renders none, which
+     is how `tools/ToolEditorTabs` keeps rendering no tab hook at all.
    - containerAttribute: a valueless `data-*` hook on the tablist itself; '' renders none.
    - badgeAttribute / countAttribute / dotAttribute: the per-mark `data-*` name carrying the
      tab id, one per vehicle because the shipped hooks do not share a stem; '' renders none.
@@ -151,6 +169,7 @@
         label: mark.label ?? mark.value ?? '',
         tone: mark.tone || fallbackTone,
         name: mark.name ?? '',
+        class: mark.class ?? '',
         suppressZero: mark.suppressZero !== false,
       };
     }
@@ -159,6 +178,7 @@
       label: mark,
       tone: fallbackTone,
       name: '',
+      class: '',
       suppressZero: true,
     };
   }
@@ -190,6 +210,7 @@
     if (tone === 'danger') return 'danger';
     if (tone === 'warning') return 'warning';
     if (tone === 'success') return 'active';
+    if (tone === 'positive') return 'positive';
     return 'neutral';
   }
 
@@ -205,21 +226,32 @@
   }
 
   function buttonAttributes(tab) {
+    if (!hookAttribute) return {};
     return { [hookAttribute]: tab.id };
   }
 
   function markAttributes(tab, mark) {
     if (mark.vehicle === 'count') return countAttribute ? { [countAttribute]: tab.id } : {};
     if (mark.vehicle === 'dot') return dotAttribute ? { [dotAttribute]: tab.id } : {};
-    // A GLYPH chip renders no text, so without this it would contribute nothing to the tab's
-    // accessible name while a COUNT chip contributes its number: a screen reader would hear
-    // `Validation` for a passing tab and `Validation 3` for a failing one, which is the
-    // difference between the two states being announced and one of them being silent. It
-    // rides the chip rather than the button so the tab's own label stays first. The `dot`
-    // states the same thing on its own element two branches down in the template.
-    const named = mark.name ? { 'aria-label': mark.name } : {};
-    if (!badgeAttribute) return named;
-    return { ...named, [badgeAttribute]: tab.id, 'data-badge-tone': mark.tone };
+    // A chip whose whole label is a single character renders no READABLE text, so without the
+    // name it would contribute nothing to the tab's accessible name while a COUNT chip
+    // contributes its number: a screen reader would hear `Validation` for a passing tab and
+    // `Validation 3` for a failing one, which is the difference between the two states being
+    // announced and one of them being silent. It rides the chip rather than the button so the
+    // tab's own label stays first. The `dot` states the same thing on its own element two
+    // branches down in the template.
+    const attributes = badgeAttribute
+      ? { [badgeAttribute]: tab.id, 'data-badge-tone': mark.tone }
+      : {};
+    if (mark.name) attributes['aria-label'] = mark.name;
+    return attributes;
+  }
+
+  // The chip's modifier class, joined with the empties dropped. `badgeClass` is the site's
+  // own class and `mark.class` is the per-mark modifier a shipped rule is written against
+  // (`.manager-tool-editor-tabs > button > span.is-valid`, `fabricate.css:18183`).
+  function badgeClasses(mark) {
+    return [badgeClass, mark.class].filter(Boolean).join(' ');
   }
 
   // Arrow / Home / End, the four the ARIA tablist pattern asks a horizontal strip for. Home
@@ -279,8 +311,10 @@
             {...markAttributes(tab, mark)}
           ></span>
         {:else}
-          <Chip tone={badgeTone(mark.tone)} class={badgeClass} {...markAttributes(tab, mark)}
-            >{mark.label}</Chip
+          <Chip
+            tone={badgeTone(mark.tone)}
+            class={badgeClasses(mark)}
+            {...markAttributes(tab, mark)}>{mark.label}</Chip
           >
         {/if}
       {/each}

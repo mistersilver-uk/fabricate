@@ -40,6 +40,7 @@
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let {
@@ -114,7 +115,7 @@
   ];
 </script>
 
-<section class="manager-inspector-card manager-checks-card" data-check-difficulty-card>
+<InspectorCard class="manager-checks-card" data-check-difficulty-card="">
   <div class="manager-checks-card-head">
     <div>
       <h3 class="manager-checks-card-title">
@@ -186,4 +187,4 @@
       </div>
     </div>
   </div>
-</section>
+</InspectorCard>

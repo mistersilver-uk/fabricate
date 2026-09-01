@@ -60,6 +60,7 @@ const RECIPE_PRIMITIVES = [
   // one HANGS.
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte'
 ];
 
 const browser = createMountedComponentHarness({

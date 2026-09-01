@@ -19,15 +19,15 @@
   override when a switch goes back on, so nothing is lost and no confirmation is required. The
   note therefore states what the section WILL resolve to, never what would be thrown away.
 
-  THE INHERIT SWITCH IS HAND-ROLLED, AND ITS FOLLOW-UP IS ISSUE 1040. There is no shared
-  `StatusToggle` primitive in this repository: every Manager on/off control emits
-  `.manager-status-toggle` with its `-track`, `-knob` and `-label` children by hand, and issue
-  1040 — "extract a shared StatusToggle primitive and convert the manager sites" — already
-  tracks fixing that across the whole Manager. This row joins that backlog rather than
-  pre-empting it, because extracting a primitive obliges converting every existing site, and
-  that is two dozen components in files whose whole premise here is that four later lanes need
-  not reopen them. Recorded at the site so the debt is visible where it was incurred; the count
-  deliberately is not restated here, because issue 1040 owns the roster.
+  THE INHERIT SWITCH WAS HAND-ROLLED AND IS NOW `<StatusToggle>` (issue 1040). The debt this
+  paragraph used to record — every Manager on/off control emitting `.manager-status-toggle` with
+  its `-track`, `-knob` and `-label` children by hand — is paid: the primitive owns that tree and
+  this row calls it. It calls it in the TRACK-ONLY form — `ariaLabel` and no `label` — which is a
+  ruling of issue 1372 rather than a variation on 1040's conversion: the reading this switch used
+  to render clipped to `Fall ...` in a compact switch and repeated what the row's own heading,
+  state chip and note already said. There is therefore exactly ONE wording, passed once, and it
+  is the accessible name; the drift the primitive exists to end is a SECOND, differently worded
+  name, not the absence of a caption.
 
   Props:
    - entityType: `component`, `essence` or `tool`; the row set is derived from it.
@@ -55,6 +55,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import { scopedInheritRows } from './scopedStudio.js';
 
   let {
@@ -95,13 +96,19 @@
     {#if row.note}
       <p class="manager-scoped-inherit-note" data-scoped-inherit-note={row.section}>{row.note}</p>
     {/if}
-    <button
-      type="button"
-      class={`manager-status-toggle ${row.inherited ? 'is-on' : 'is-off'}`}
-      data-scoped-inherit-toggle={row.section}
-      aria-pressed={row.inherited}
-      {disabled}
-      aria-label={text(
+    <!--
+      THE SENTENCE IS THE ACCESSIBLE NAME, NOT VISIBLE TEXT, SO NO `label` IS PASSED.
+
+      `.manager-status-toggle-label` is `overflow: hidden` with `text-overflow: ellipsis`
+      inside a compact switch, so "Fall back to the world default" rendered as `Fall ...` —
+      a truncation with no meaning at all. It was also redundant three times over: this row
+      already shows the section name, a state chip reading Inherited or Overridden, and a note
+      naming the inherited value. The switch needs a name, not a caption, which is exactly the
+      `ariaLabel`-without-`label` form `StatusToggle` documents for its track-only sites.
+    -->
+    <StatusToggle
+      on={row.inherited}
+      ariaLabel={text(
         'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
         'Fall back to the world default'
       )}
@@ -109,20 +116,9 @@
         'FABRICATE.Admin.Manager.Scoped.Inherit.ToggleLabel',
         'Fall back to the world default'
       )}
+      {disabled}
+      data-scoped-inherit-toggle={row.section}
       onclick={() => onToggle(row.section, !row.inherited)}
-    >
-      <!--
-        THE SENTENCE IS THE ACCESSIBLE NAME, NOT VISIBLE TEXT.
-
-        `.manager-status-toggle-label` is `overflow: hidden` with `text-overflow: ellipsis`
-        inside a compact switch, so "Fall back to the world default" rendered as `Fall ...` —
-        a truncation with no meaning at all. It was also redundant three times over: this row
-        already shows the section name, a state chip reading Inherited or Overridden, and a note
-        naming the inherited value. The switch needs a name, not a caption.
-      -->
-      <span class="manager-status-toggle-track" aria-hidden="true"
-        ><span class="manager-status-toggle-knob"></span></span
-      >
-    </button>
+    />
   </div>
 {/each}

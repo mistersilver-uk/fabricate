@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -272,12 +273,12 @@
           </button>
 
           <div class="manager-task-core-status">
-            <button
-              type="button"
-              class={`manager-status-toggle ${event.enabled === false ? 'is-off' : 'is-on'}`}
-              data-gathering-event-field="enabled"
-              aria-pressed={event.enabled !== false}
-              aria-label={text(
+            <StatusToggle
+              on={event.enabled !== false}
+              label={event.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Environment.Events.ToggleNamed',
                 'Toggle {name}'
               ).replace(
@@ -285,17 +286,9 @@
                 event.name ||
                   text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')
               )}
+              data-gathering-event-field="enabled"
               onclick={() => onUpdateEvent({ enabled: event.enabled === false })}
-            >
-              <span class="manager-status-toggle-track" aria-hidden="true">
-                <span class="manager-status-toggle-knob"></span>
-              </span>
-              <span class="manager-status-toggle-label">
-                {event.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              </span>
-            </button>
+            />
             <p class="manager-muted">
               {event.enabled === false
                 ? text(

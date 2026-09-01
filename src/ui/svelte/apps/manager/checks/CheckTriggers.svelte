@@ -42,6 +42,7 @@
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import ToggleCard from '../ToggleCard.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import IconButton from '../../../components/IconButton.svelte';
 
@@ -524,7 +525,7 @@
      A preset authors an ORDINARY trigger — no marker field, nothing downstream treats it
      differently — which is what keeps it a shortcut rather than a second kind of trigger. -->
 {#if presets.length > 0}
-  <section class="manager-inspector-card manager-checks-card" data-check-trigger-presets>
+  <InspectorCard class="manager-checks-card" data-check-trigger-presets="">
     <div class="manager-checks-card-head">
       <div>
         <h3 class="manager-checks-card-title">
@@ -552,7 +553,7 @@
         {/each}
       </div>
     </div>
-  </section>
+  </InspectorCard>
 {/if}
 
 <!-- THE TRIGGER LIST IS NOT A CARD. Its members are, one per trigger, sitting directly in the
