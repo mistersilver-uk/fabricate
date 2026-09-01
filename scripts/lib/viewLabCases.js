@@ -3722,7 +3722,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'tags'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
-      /^src\/ui\/svelte\/apps\/manager\/(VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+      // `VocabularyTabs` is the strip issue 1429 extracted OUT of `TagsCategoriesView`, so the
+      // `TagsCategories` prefix above stops reaching it. An uncovered state publishes an
+      // unrelated frame, which is the failure this registry exists to prevent.
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyTabs|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
     ],
   }),
   managerCase({
@@ -3734,7 +3737,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [{ selector: '#manager-nav-tags' }, { selector: '#vocabulary-tab-tag' }],
     expectView: 'tags',
     kinds: ['manager', 'tags'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategories/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tags-categories-stacked',
@@ -3746,7 +3752,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tags',
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'tags', 'responsive'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategories/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
+    ],
   }),
   // ── The GM Essence Studio (issue 1036) ────────────────────────────────────────────────────────
   //

@@ -10,11 +10,17 @@
   The strip uses the shared `.manager-editor-tab*` treatment every other manager tab
   bar uses (issue 878) rather than its own vocabulary-only look, and the view renders
   NO page header of its own — the shell's `.manager-header` is the only one.
+
+  Since issue 1429 the strip is not authored here at all: it is `VocabularyTabs`, a thin
+  caller of the shared `EditorTabs` primitive. It was the LAST hand-rolled manager tab strip,
+  and it survived issue 1038's sweep only because it was inlined in this view rather than
+  standing as its own component — so converting it meant extracting it first. This view keeps
+  the two things that are genuinely its own: which tab is active, and which panel that renders.
 -->
 <script>
-  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import VocabularyPanel from './VocabularyPanel.svelte';
+  import VocabularyTabs from './VocabularyTabs.svelte';
 
   let {
     categoryRows = [],
@@ -62,52 +68,6 @@
   const decoratedTagRows = $derived(
     (tagRows || []).map((row) => ({ ...row, displayName: `#${row.name}` }))
   );
-
-  const tabs = $derived([
-    {
-      id: 'recipe',
-      icon: 'fas fa-scroll',
-      label: text('FABRICATE.Admin.Manager.TagsCategories.Categories', 'Recipe categories'),
-      // Whole-vocabulary counts, General included — the same total the panel's own entry
-      // chip and the inspector's at-a-glance tile report (issue 878).
-      count: counts.recipeCategories || 0,
-    },
-    {
-      id: 'component',
-      icon: 'fas fa-cubes',
-      label: text(
-        'FABRICATE.Admin.Manager.TagsCategories.ComponentCategories',
-        'Component categories'
-      ),
-      count: counts.componentCategories || 0,
-    },
-    {
-      id: 'tag',
-      icon: 'fas fa-tag',
-      label: text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags'),
-      count: counts.itemTags || 0,
-    },
-  ]);
-
-  // Roving-tabindex arrow/Home/End focus move, matching `knowledge/KnowledgeTabs` and
-  // `recipe-item/RecipeItemEditorTabs` (issue 878) — this strip now shares their
-  // `.manager-editor-tab*` treatment, so it shares their keyboard contract too.
-  function handleTabKeydown(event, index) {
-    const lastIndex = tabs.length - 1;
-    let nextIndex = null;
-    if (event.key === 'ArrowRight') nextIndex = index === lastIndex ? 0 : index + 1;
-    if (event.key === 'ArrowLeft') nextIndex = index === 0 ? lastIndex : index - 1;
-    if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = lastIndex;
-    if (nextIndex === null) return;
-    event.preventDefault();
-    const nextTab = tabs[nextIndex].id;
-    onTabChange(nextTab);
-    event.currentTarget
-      .closest('[role="tablist"]')
-      ?.querySelector(`#vocabulary-tab-${nextTab}`)
-      ?.focus();
-  }
 
   function existsIn(rows, value) {
     const normalized = String(value || '')
@@ -228,38 +188,26 @@
        "Tags & Categories" title and its subtitle, so a second one restated the title
        inside the panel. Removed for the same reason as the components and recipes
        libraries (issue 676) and Books & Scrolls (issue 785). -->
-  <!-- A `<div>`, not a `<nav>`: `role="tablist"` on a `<nav>` overrides its implicit
-       `navigation` landmark, which the compiler reports. The ROLE is what matters and it
-       is unchanged — `handleTabKeydown` resolves the strip with
-       `.closest('[role="tablist"]')`, and the 37 other `<div role="tablist">` elements
-       across `src/` warn zero times, because a `<div>` has no implicit role to conflict
-       with. -->
-  <div
-    class="manager-editor-tabs manager-vocabulary-tabs"
-    role="tablist"
-    aria-label={text('FABRICATE.Admin.Manager.TagsCategories.TabList', 'Vocabulary tabs')}
-  >
-    {#each tabs as tab, index (tab.id)}
-      <button
-        type="button"
-        role="tab"
-        id={`vocabulary-tab-${tab.id}`}
-        class="manager-editor-tab-button"
-        class:is-active={activeTab === tab.id}
-        aria-selected={activeTab === tab.id}
-        aria-controls={`vocabulary-panel-${tab.id}`}
-        tabindex={activeTab === tab.id ? 0 : -1}
-        data-keyboard-focus="true"
-        data-vocabulary-tab={tab.id}
-        onclick={() => onTabChange(tab.id)}
-        onkeydown={(event) => handleTabKeydown(event, index)}
-      >
-        <i class={tab.icon} aria-hidden="true"></i>
-        <span>{tab.label}</span>
-        <Chip tone="neutral" class="manager-editor-tab-badge">{tab.count}</Chip>
-      </button>
-    {/each}
-  </div>
+  <!-- The strip, which this view no longer authors (issue 1429). `VocabularyTabs` renders it
+       through the shared `EditorTabs` primitive, which emits the SAME `<div role="tablist">`
+       host this view used to — a `<div>` and not a `<nav>`, because `role="tablist"` on a
+       `<nav>` overrides its implicit `navigation` landmark and the compiler reports it, while a
+       `<div>` has no implicit role to conflict with. The ids, the `data-vocabulary-tab` hook and
+       both classes are unchanged, so the View Lab's `#vocabulary-tab-*` steps, the smoke
+       harness's `[data-vocabulary-tab]` locator and `.manager-vocabulary-tabs` in
+       `styles/fabricate.css` all still resolve.
+
+       The counts are whole-vocabulary totals, General included — the same total the panel's own
+       entry chip and the inspector's at-a-glance tile report (issue 878) — and they are RECORD
+       COUNTS, so `VocabularyTabs` draws them on the Rail Marker Family's count vehicle rather
+       than through the neutral chip this view used to pass. See that file for why. -->
+  <VocabularyTabs
+    {activeTab}
+    recipeCategoryCount={counts.recipeCategories || 0}
+    componentCategoryCount={counts.componentCategories || 0}
+    tagCount={counts.itemTags || 0}
+    onSelect={onTabChange}
+  />
 
   <!-- Same rule for the panel: an `aria-label` promotes a `<section>` from generic to
        the `region` landmark, which `role="tabpanel"` then overrides. A `<div>` has

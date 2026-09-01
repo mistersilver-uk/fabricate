@@ -12,6 +12,17 @@
  *
  * Built on the shared mount harness rather than inlined boilerplate — an inlined mount trips
  * SonarCloud's new-code duplication threshold.
+ *
+ * ── ISSUE 1429 MOVED THE STRIP AND THIS FILE DELIBERATELY DID NOT MOVE WITH IT ──────────
+ * The tablist is `VocabularyTabs` -> `EditorTabs` now, not markup this view authors. Every
+ * clause below still mounts THIS view and reads the rendered DOM, which is the point: a
+ * conversion is exactly the change under which a suite that had been asserting on the view's
+ * own source, or on a hand-written copy of its markup, would keep passing while the product
+ * stopped emitting it. Mounting the real tree is what makes the roving `tabindex`, the
+ * `aria-selected` binding and the Arrow/Home/End traversal observable across the seam — and
+ * the traversal in particular is now `EditorTabs`' `parentElement`/`[role="tab"]` walk rather
+ * than this view's old `.closest('[role="tablist"]')`, so the CONTRACT is asserted here while
+ * the mechanism belongs to the primitive.
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,6 +61,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
+    // The strip, extracted from this view in issue 1429, and the primitive it wraps. Both are
+    // rendered by the tree under test, and a rendered `.svelte` the harness omits HANGS the
+    // suite (`# cancelled`) rather than failing it.
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/apps/manager/VocabularyTabs.svelte',
     'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
@@ -123,6 +139,49 @@ describe('TagsCategoriesView (mounted)', () => {
     }
   });
 
+  // THE ONE INTENTIONAL RENDERED CHANGE in issue 1429's conversion, asserted positively rather
+  // than left to a parity comparison. A parity harness cannot see this on its own: reverting the
+  // vehicle makes the converted strip byte-identical to the strip it replaced, so the comparison
+  // reports parity precisely when the correction is missing.
+  it('draws each vocabulary count on the record-count vehicle, not through a chip', async () => {
+    const root = await harness.mount(
+      mountProps({ counts: { recipeCategories: 4, componentCategories: 11, itemTags: 2 } })
+    );
+
+    const expected = { recipe: '4', component: '11', tag: '2' };
+    for (const id of TABS) {
+      const tab = tabButton(root, id);
+      const count = tab.querySelector('.manager-editor-tab-count');
+      assert.ok(Boolean(count), `the ${id} tab draws its record count`);
+      assert.equal(count.textContent.trim(), expected[id]);
+      assert.ok(
+        !tab.querySelector('.manager-editor-tab-badge'),
+        `the ${id} tab must not draw a RECORD COUNT through the issue-summary chip: the Rail ` +
+          'Marker Family forbids substituting one vehicle for another, and this strip drew a ' +
+          'neutral chip until issue 1429'
+      );
+      assert.ok(
+        !tab.querySelector('.manager-chip'),
+        `the ${id} tab count is a bare mono numeral, so no chip element may remain`
+      );
+    }
+  });
+
+  // The zero is the OTHER thing a sweep could have taken silently. `EditorTabs` suppresses a
+  // falsy mark by default; this strip has always stated its zero, so `VocabularyTabs` passes
+  // `suppressZero: false` and the behaviour is pinned here rather than left to a default.
+  it('states a record count of zero rather than omitting it', async () => {
+    const root = await harness.mount(
+      mountProps({ counts: { recipeCategories: 0, componentCategories: 0, itemTags: 0 } })
+    );
+
+    for (const id of TABS) {
+      const count = tabButton(root, id).querySelector('.manager-editor-tab-count');
+      assert.ok(Boolean(count), `the ${id} tab still renders a mark at zero`);
+      assert.equal(count.textContent.trim(), '0', 'the zero is stated, not suppressed');
+    }
+  });
+
   it('renders the panel as a plain element named by its own tab', async () => {
     const root = await harness.mount(mountProps({ activeTab: 'tag' }));
 
@@ -161,28 +220,35 @@ describe('TagsCategoriesView (mounted)', () => {
       mountProps({ onTabChange: (id) => changes.push(id) })
     );
     const activeElement = () => root.ownerDocument.activeElement;
+    // The focused tab BY ID, never the element itself. `assert.equal` on two mounted happy-dom
+    // nodes serialises their circular trees to build a failure diff and kills the heap, so a
+    // one-line focus regression surfaces as a `# cancelled` suite with no message —
+    // indistinguishable from a missing harness allowlist entry. Proved by mutating
+    // `EditorTabs`' `Home` branch, which took this suite from a clean red to a two-minute hang.
+    // An id string diffs in one line and names the tab that took focus.
+    const focusedTab = () => activeElement()?.getAttribute('data-vocabulary-tab') ?? null;
 
     const recipe = tabButton(root, 'recipe');
     recipe.focus();
-    assert.equal(activeElement(), recipe, 'the active tab takes focus');
+    assert.equal(focusedTab(), 'recipe', 'the active tab takes focus');
 
     pressOn(recipe, 'ArrowRight');
-    assert.equal(activeElement(), tabButton(root, 'component'), 'ArrowRight moves right');
+    assert.equal(focusedTab(), 'component', 'ArrowRight moves right');
 
     pressOn(activeElement(), 'ArrowRight');
-    assert.equal(activeElement(), tabButton(root, 'tag'), 'and again');
+    assert.equal(focusedTab(), 'tag', 'and again');
 
     pressOn(activeElement(), 'ArrowRight');
-    assert.equal(activeElement(), tabButton(root, 'recipe'), 'ArrowRight wraps at the end');
+    assert.equal(focusedTab(), 'recipe', 'ArrowRight wraps at the end');
 
     pressOn(activeElement(), 'ArrowLeft');
-    assert.equal(activeElement(), tabButton(root, 'tag'), 'ArrowLeft wraps at the start');
+    assert.equal(focusedTab(), 'tag', 'ArrowLeft wraps at the start');
 
     pressOn(activeElement(), 'Home');
-    assert.equal(activeElement(), tabButton(root, 'recipe'), 'Home goes to the first tab');
+    assert.equal(focusedTab(), 'recipe', 'Home goes to the first tab');
 
     pressOn(activeElement(), 'End');
-    assert.equal(activeElement(), tabButton(root, 'tag'), 'End goes to the last tab');
+    assert.equal(focusedTab(), 'tag', 'End goes to the last tab');
 
     assert.deepEqual(
       changes,
@@ -203,7 +269,11 @@ describe('TagsCategoriesView (mounted)', () => {
     pressOn(recipe, 'a');
 
     assert.deepEqual(changes, [], 'no tab change');
-    assert.equal(root.ownerDocument.activeElement, recipe, 'focus stays put');
+    assert.equal(
+      root.ownerDocument.activeElement?.getAttribute('data-vocabulary-tab') ?? null,
+      'recipe',
+      'focus stays put'
+    );
   });
 
   it('switches the rendered vocabulary panel with the active tab', async () => {

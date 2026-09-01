@@ -550,6 +550,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemOverviewView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
+  // The vocabulary tab strip, extracted out of TagsCategoriesView in issue 1429 and now a thin
+  // caller of `EditorTabs` (compiled above). Omitting a rendered `.svelte` HANGS every mounted
+  // manager test as `# cancelled` rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyTabs.svelte');
   // The one vocabulary section TagsCategoriesView renders three times (recipe
   // categories, component categories, item tags — issue 676).
   writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyPanel.svelte');
@@ -1331,14 +1335,18 @@ async function openTagsScreen(calls = [], storeOptions = {}) {
   return target;
 }
 
-// The three numbers that disagreed on one screen before issue 878: the tab badge, the
+// The three numbers that disagreed on one screen before issue 878: the tab mark, the
 // inspector's at-a-glance tile, and the active panel's own entry chip. Reading all three
 // through one helper is what lets a test assert they AGREE as well as what they agree on.
 // The entry chip belongs to whichever panel is mounted, so `tab` must be the active tab.
+//
+// `tabBadge` reads `.manager-editor-tab-count` since issue 1429. The number is unchanged and
+// so is every assertion below it; what changed is the Rail Marker Family VEHICLE carrying it,
+// from the neutral chip to the bare mono numeral a RECORD COUNT is specified to use.
 function vocabularyCounters(tab, fact) {
   return {
     tabBadge: target
-      .querySelector(`[data-vocabulary-tab="${tab}"] .manager-editor-tab-badge`)
+      .querySelector(`[data-vocabulary-tab="${tab}"] .manager-editor-tab-count`)
       .textContent.trim(),
     glanceTile: target
       .querySelector(`[data-tags-category-fact="${fact}"] strong`)
@@ -10862,8 +10870,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       'each vocabulary tab reuses the shared editor tab button'
     );
     assert.ok(
-      target.querySelector('[data-vocabulary-tab="recipe"] .manager-editor-tab-badge'),
-      'each vocabulary tab carries the shared editor tab badge'
+      target.querySelector('[data-vocabulary-tab="recipe"] .manager-editor-tab-count'),
+      'each vocabulary tab carries the shared editor tab RECORD COUNT (issue 1429): these are ' +
+        'whole-vocabulary counts, and the Rail Marker Family draws a record count as a bare ' +
+        'mono numeral rather than through the issue-summary chip this strip used to pass'
+    );
+    assert.ok(
+      !target.querySelector('[data-vocabulary-tab="recipe"] .manager-editor-tab-badge'),
+      'and must not ALSO draw a chip: substituting one vehicle for another is what the family ' +
+        'exists to prevent, so the chip is gone rather than kept alongside'
     );
 
     // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
