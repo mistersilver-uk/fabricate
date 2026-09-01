@@ -14,6 +14,10 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { deflateSync } from 'node:zlib';
 
+// CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
+// on every machine, and `localeCompare` is locale-dependent.
+import { byCodePoint } from './helpers/ratchetBaseline.js';
+
 import {
   buildScreenshotMarkdown,
   cleanPrScreenshotEvidence,
@@ -1003,6 +1007,14 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(idsFor('src/systems/SalvageChatCard.js'), ['chat-craft-card']);
     // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
     assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));
+    // #1429 — the vocabulary tab strip, extracted OUT of `TagsCategoriesView`. The recipes key on
+    // an exact `TagsCategoriesView.svelte` path, so an extraction silently leaves the new file
+    // matching no recipe at all and its changes publish an unrelated frame.
+    assert.deepEqual(
+      idsFor('src/ui/svelte/apps/manager/VocabularyTabs.svelte').sort(byCodePoint),
+      ['manager-tags-categories', 'manager-tags-categories-tags-tab'],
+      'the extracted strip renders on BOTH tags frames, so both must republish for it'
+    );
 
     // Each new frame carries exactly its own single smoke label.
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
