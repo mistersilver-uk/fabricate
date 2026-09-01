@@ -60,6 +60,7 @@
   import StatusPill from '../../../components/StatusPill.svelte';
   import {
     essenceColourCaption,
+    essenceEffectSourceReferent,
     essenceInheritLine,
     essenceSectionValueName,
     essenceShortValueName,
@@ -144,7 +145,15 @@
     const defaults = entry?.defaults ?? null;
     const titles = {};
     for (const section of scope?.sections ?? []) {
-      const name = essenceSectionValueName(defaults?.[section]);
+      // `effectSource` GOES THROUGH ITS OWN READER (issue 1372): it is the one section stored as
+      // a BLOCK over three shipped field names rather than as a scalar, so
+      // `essenceSectionValueName` found neither a string nor an `{id, name}` and answered `''` —
+      // and this card then read `No default effect source` for a default that WAS authored and
+      // that the inherit line one row below was already counting inheriting systems for.
+      const name =
+        section === 'effectSource'
+          ? essenceEffectSourceReferent(defaults?.effectSource)
+          : essenceSectionValueName(defaults?.[section]);
       titles[section] = name ? sectionValuePhrase(section, name) : sectionUnsetPhrase(section);
     }
     return titles;

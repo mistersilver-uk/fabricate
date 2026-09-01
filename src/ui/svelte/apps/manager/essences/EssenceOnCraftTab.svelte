@@ -90,6 +90,15 @@
     // inherit row's note; without it a row says "Inheriting the world default" and never says
     // what is being inherited, and a row-count assertion passes green over every note empty.
     inheritNotes = {},
+    // ── WHAT A LOCKED CARD RENDERS (issue 1372) ────────────────────────────────────────────
+    // `{sourceName, sourceUuid, macroUuid, macroName}` — the WORLD DEFAULT, resolved by the
+    // editor, which is the half that holds the world entry. A locked card wears a `World default`
+    // pill, and before this prop existed it rendered the DRAFT's own source and macro underneath
+    // it: the same two fields the unlocked card edits, relabelled as the world's. That read as
+    // correct for as long as no card could be locked at all, and became visible the moment the
+    // lab world seeded an inheriting section. It is used ONLY by the two locked branches, so an
+    // unlocked card is byte-identical to what it rendered before.
+    worldDefaults = {},
     // WHETHER THIS ESSENCE HAS A SHARED WORLD DEFINITION. `true` is the system Essence Rules
     // screen: each card carries its own inherit switch and the tab drops the explainer, because
     // the cards state their own meaning and the tab is no longer one third of an editor. `false`
@@ -120,6 +129,10 @@
 
   const sourceLocked = $derived(lockedSections?.effectSource === true);
   const macroLocked = $derived(lockedSections?.macro === true);
+  const lockedSourceName = $derived(String(worldDefaults?.sourceName ?? '').trim());
+  const lockedSourceUuid = $derived(String(worldDefaults?.sourceUuid ?? '').trim());
+  const lockedMacroUuid = $derived(String(worldDefaults?.macroUuid ?? '').trim());
+  const lockedMacroName = $derived(String(worldDefaults?.macroName ?? '').trim());
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -309,12 +322,10 @@
           >
           <span class="manager-essence-locked-copy">
             <span class="manager-essence-locked-value">
-              {sourceItem?.name ||
-                storedSourceName ||
-                text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None')}
+              {lockedSourceName || text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None')}
             </span>
-            {#if sourceUuid}
-              <code class="manager-essence-locked-uuid">{sourceUuid}</code>
+            {#if lockedSourceUuid}
+              <code class="manager-essence-locked-uuid">{lockedSourceUuid}</code>
             {/if}
           </span>
           <StatusPill tone="subtle" icon="fas fa-globe" label={worldDefaultLabel} />
@@ -427,12 +438,12 @@
           >
           <span class="manager-essence-locked-copy">
             <span class="manager-essence-locked-value">
-              {macroName ||
-                macroUuid ||
+              {lockedMacroName ||
+                lockedMacroUuid ||
                 text('FABRICATE.Admin.Manager.Essence.Macro.Unnamed', 'the linked property macro')}
             </span>
-            {#if macroUuid && macroUuid !== macroName}
-              <code class="manager-essence-locked-uuid">{macroUuid}</code>
+            {#if lockedMacroUuid && lockedMacroUuid !== lockedMacroName}
+              <code class="manager-essence-locked-uuid">{lockedMacroUuid}</code>
             {/if}
           </span>
           <StatusPill tone="subtle" icon="fas fa-globe" label={worldDefaultLabel} />

@@ -487,10 +487,16 @@ describe('a row the in-system array no longer carries does NOT come back', () =>
 });
 
 // -----------------------------------------------------------------------------------------------
-// Criterion 6 — the BEHAVIOUR keys are re-derived, all eight arms
+// Criterion 6 — the behaviour keys, split by whether they are a SECTION (issue 1372)
 // -----------------------------------------------------------------------------------------------
 
-describe('the behaviour keys are re-derived from the in-system record', () => {
+describe('the NON-SECTION behaviour keys are re-derived from the in-system record', () => {
+  // THE SUITE SPLITS ALONG THE SECTION LINE, and issue 1372 is what drew the line. Arms (a), (e)
+  // and (f) are `tags`, `repairRequirements` and `enabled`, none of which is a section and none of
+  // which has an inherit switch to read - so the in-system record answers all three whatever the
+  // membership record says, exactly as issue 1370 made it. Arms (b), (c) and (d) WERE the three
+  // SECTIONS, pinned here on inheriting fixtures, and they are what made the world-scope screens'
+  // `Inheriting` pill a false statement; they now live in the suite below.
   it('(a) keeps the in-system tags, and the tag matcher expands over them', () => {
     // `resolveComponent` emits `tags` UNCONDITIONALLY, so before the inversion a GM's tag edit
     // was reverted whether or not any scope had authored tags.
@@ -511,40 +517,6 @@ describe('the behaviour keys are re-derived from the in-system record', () => {
       ['comp-1'],
       'the tag matcher expands over the ANSWER, so a reverted tag silently unmatches an ingredient'
     );
-  });
-
-  it('(b) keeps the in-system category', () => {
-    const manager = componentManager(
-      { id: 'comp-1' },
-      { worldDefault: { category: 'stale-category' } }
-    );
-    const system = { id: SYSTEM_ID, components: [{ id: 'comp-1', category: 'reagent' }] };
-
-    assert.equal(manager.resolveScopedComponents(system)[0].category, 'reagent');
-  });
-
-  it('(c) keeps the in-system breakage mode', () => {
-    const manager = makeManagerWithScope(CraftingSystemManager, {
-      toolScope: scopePayload({ id: 'tool-1' }, { worldDefault: { breakage: { mode: 'none' } } }),
-    });
-    const system = {
-      id: SYSTEM_ID,
-      tools: [{ id: 'tool-1', breakage: { mode: 'onFailure', chance: 25 } }],
-    };
-
-    assert.deepEqual(manager.resolveScopedTools(system)[0].breakage, {
-      mode: 'onFailure',
-      chance: 25,
-    });
-  });
-
-  it('(d) keeps the in-system onBreak action', () => {
-    const manager = makeManagerWithScope(CraftingSystemManager, {
-      toolScope: scopePayload({ id: 'tool-1' }, { worldDefault: { onBreak: { action: 'delete' } } }),
-    });
-    const system = { id: SYSTEM_ID, tools: [{ id: 'tool-1', onBreak: { action: 'replace' } }] };
-
-    assert.deepEqual(manager.resolveScopedTools(system)[0].onBreak, { action: 'replace' });
   });
 
   it('(e) keeps the in-system repair requirements', () => {
@@ -868,5 +840,106 @@ describe('the deliberate exclusions are unchanged', () => {
       'repointing it would have the detector compare the union against the world corpus, report ' +
         'zero drift every session, and void the disclosure obligation entirely'
     );
+  });
+});
+
+// -----------------------------------------------------------------------------------------------
+// Criterion 6b — the three SECTION keys follow the inherit switch (issue 1372)
+// -----------------------------------------------------------------------------------------------
+
+describe('the SECTION keys follow the inherit switch, through the manager seam', () => {
+  // THROUGH THE MANAGER, not through `unionScopedDefinitions` directly, and that is the point of
+  // repeating three assertions this file's neighbour also makes: `resolveScopedComponents` and
+  // its siblings are what every non-UI reader enters, so a rule proved only on the pure function
+  // says nothing about whether a seeded store, a memoized union and the unknown-half passthrough
+  // still deliver it. `scopePayload` defaults `inherit` to `{}`, which reads as INHERITING.
+
+  it('(b) an INHERITING component takes the world category, and an OVERRIDING one does not', () => {
+    const inheriting = componentManager(
+      { id: 'comp-1' },
+      { worldDefault: { category: 'world-category' } }
+    );
+    const system = { id: SYSTEM_ID, components: [{ id: 'comp-1', category: 'reagent' }] };
+    assert.equal(inheriting.resolveScopedComponents(system)[0].category, 'world-category');
+
+    const overriding = componentManager(
+      { id: 'comp-1' },
+      { worldDefault: { category: 'world-category' }, membership: { inherit: { category: false } } }
+    );
+    assert.equal(
+      overriding.resolveScopedComponents(system)[0].category,
+      'reagent',
+      'an OVERRIDING section is the system\u2019s own value, which is where the GM\u2019s edits land'
+    );
+  });
+
+  it('(c) an INHERITING tool takes the world breakage mode, and an OVERRIDING one does not', () => {
+    const system = {
+      id: SYSTEM_ID,
+      tools: [{ id: 'tool-1', breakage: { mode: 'onFailure', chance: 25 } }],
+    };
+    const inheriting = makeManagerWithScope(CraftingSystemManager, {
+      toolScope: scopePayload({ id: 'tool-1' }, { worldDefault: { breakage: { mode: 'none' } } }),
+    });
+    assert.deepEqual(inheriting.resolveScopedTools(system)[0].breakage, { mode: 'none' });
+
+    const overriding = makeManagerWithScope(CraftingSystemManager, {
+      toolScope: scopePayload(
+        { id: 'tool-1' },
+        { worldDefault: { breakage: { mode: 'none' } }, membership: { inherit: { breakage: false } } }
+      ),
+    });
+    assert.deepEqual(overriding.resolveScopedTools(system)[0].breakage, {
+      mode: 'onFailure',
+      chance: 25,
+    });
+  });
+
+  it('(d) an INHERITING tool takes the world onBreak action, and an OVERRIDING one does not', () => {
+    const system = { id: SYSTEM_ID, tools: [{ id: 'tool-1', onBreak: { action: 'replace' } }] };
+    const inheriting = makeManagerWithScope(CraftingSystemManager, {
+      toolScope: scopePayload({ id: 'tool-1' }, { worldDefault: { onBreak: { action: 'delete' } } }),
+    });
+    assert.deepEqual(inheriting.resolveScopedTools(system)[0].onBreak, { action: 'delete' });
+
+    const overriding = makeManagerWithScope(CraftingSystemManager, {
+      toolScope: scopePayload(
+        { id: 'tool-1' },
+        { worldDefault: { onBreak: { action: 'delete' } }, membership: { inherit: { onBreak: false } } }
+      ),
+    });
+    assert.deepEqual(overriding.resolveScopedTools(system)[0].onBreak, { action: 'replace' });
+  });
+
+  it('(g) an INHERITING essence takes the world effect source and macro, on the SHIPPED names', () => {
+    // The essence sections are the two that need a PROJECTION: `effectSource` and `macro` are new
+    // names, and every consumer reads `sourceComponentId` and `propertyMacroUuid`. Without one the
+    // resolved value lands on the row under a key nothing reads, and the rule would be true of the
+    // union\u2019s shape and false of every craft.
+    const manager = makeManagerWithScope(CraftingSystemManager, {
+      essenceScope: scopePayload(
+        { id: 'fire', name: 'Fire' },
+        {
+          worldDefault: {
+            effectSource: { sourceComponentId: 'world-comp' },
+            macro: 'Macro.world',
+          },
+        }
+      ),
+    });
+    const system = {
+      id: SYSTEM_ID,
+      essenceDefinitions: [
+        {
+          id: 'fire',
+          name: 'Fire',
+          sourceComponentId: 'system-comp',
+          propertyMacroUuid: 'Macro.system',
+        },
+      ],
+    };
+    const read = manager.resolveScopedEssences(system)[0];
+    assert.equal(read.sourceComponentId, 'world-comp');
+    assert.equal(read.propertyMacroUuid, 'Macro.world');
   });
 });

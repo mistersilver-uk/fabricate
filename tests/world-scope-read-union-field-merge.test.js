@@ -1,5 +1,5 @@
 /**
- * THE READ UNION'S MERGE (issue 1363 Phase 8, INVERTED by issue 1370 PR 8a).
+ * THE READ UNION'S MERGE (issue 1363 Phase 8, inverted by issue 1370 PR 8a, SCOPED by 1372).
  *
  * `unionScopedDefinitions` used to push the world-resolved entry, mark the id claimed, and then
  * SKIP the legacy entry entirely. #1363 corrected that to `{ ...legacyEntry, ...entity,
@@ -7,11 +7,22 @@
  * INTENDED: an authored empty-string world `description` beat a populated in-system one, and the
  * resolved `enabled` beat a GM-disabled in-system essence or tool.
  *
- * BOTH ARE NOW RETIRED, for as long as `## CraftingSystem` requirement 36 keeps the in-system
- * arrays authoritative, and this file is the record of that inversion rather than a new file
- * beside a stale one. The union re-spreads the whole in-system record LAST and then DELETES every
- * lifted identity field the in-system record does not carry, so the world layer supplies only the
- * keys that record does not have. The reason the old bullets stop holding is mechanical: every
+ * BOTH ARE STILL RETIRED, and issue 1372 did not bring either back. What 1372 changed is the
+ * SCOPE of the rule that retired them. Issue 1370 made the in-system record decide EVERY key, and
+ * this file said so in its own arm titles. It now decides its own identity and its own
+ * NON-SECTION keys, while the membership record's inherit switch decides which layer answers a
+ * SECTION, because `## CraftingSystem` requirement 36's blanket claim made every `Inheriting`
+ * pill and every `World default: ...` line on the world-scope screens a false statement.
+ *
+ * SO THIS FILE PINS THE HALF THAT DID NOT MOVE, and the half that did is pinned next door in
+ * `tests/world-scope-inherited-section-resolution.test.js`. The two are deliberately separate
+ * files: every fixture here carries an OVERRIDING or absent membership record, or a world half
+ * that authored no section at all, which is exactly the population the 1372 rule leaves alone -
+ * and that is the fact worth having a file assert.
+ *
+ * The union still re-spreads the whole in-system record LAST and then DELETES every lifted
+ * identity field that record does not carry, so the world layer supplies only the keys it does
+ * not have. The reason the old bullets stop holding is unchanged and mechanical: every
  * shipped identity writer writes the IN-SYSTEM copy, no shipped editor writes a world or
  * membership `enabled`, and `resolveScopedDefinition` emits `enabled` — and `resolveComponent`
  * emits `tags` — UNCONDITIONALLY, so those two keys were overwritten even when no scope had
@@ -68,7 +79,7 @@ describe('the read union merges FIELD BY FIELD on an id collision', () => {
     assert.equal(entry.difficulty, 3);
     assert.deepEqual(entry.complications, legacy.complications);
     // …and the IN-SYSTEM record now wins every identity field it CARRIES.
-    assert.equal(entry.name, 'fresh name', 'the in-system identity WINS while requirement 36 holds');
+    assert.equal(entry.name, 'fresh name', 'the in-system identity WINS, and issue 1372 kept it');
     // The world layer still supplies the keys the in-system record does not carry, and the
     // resolved section still wins over both.
     assert.equal(entry.category, 'reagent', 'the resolved section wins over both halves');
@@ -200,7 +211,7 @@ describe('an unrecognised entityType is REFUSED, never defaulted', () => {
   });
 });
 
-describe('the two spread hazards are RETIRED while requirement 36 holds', () => {
+describe('the two spread hazards stay RETIRED for a row with no section to inherit', () => {
   it('an authored EMPTY-STRING world description no longer overwrites a populated legacy one', () => {
     // RETIRED. It was defended as "an authored empty string is an authored value", and that is
     // still true of the world entity — but nothing authors that entity, while the in-system copy
@@ -222,7 +233,9 @@ describe('the two spread hazards are RETIRED while requirement 36 holds', () => 
   it('a GM-disabled in-system essence and tool read back DISABLED', () => {
     // RETIRED, and this is the severe half: `enabled` is emitted UNCONDITIONALLY for an enableable
     // scope, so before the inversion a disabled essence or tool read back usable whether or not
-    // any membership record had authored anything.
+    // any membership record had authored anything. `enabled` is NOT a section at any scope, so
+    // issue 1372's inherit-switch rule does not reach it, and the EMPTY `inherit` maps below -
+    // which read as inheriting everything - are what prove that rather than merely assert it.
     const essenceUnion = unionScopedDefinitions({
       corpus: collidingCorpus(
         { id: 'fire', name: 'Fire' },
@@ -233,7 +246,7 @@ describe('the two spread hazards are RETIRED while requirement 36 holds', () => 
       resolve: resolveEssence,
       entityType: 'essences',
     });
-    assert.equal(essenceUnion[0].enabled, false, 'the IN-SYSTEM record decides');
+    assert.equal(essenceUnion[0].enabled, false, 'the IN-SYSTEM record decides a NON-section key');
 
     const toolUnion = unionScopedDefinitions({
       corpus: collidingCorpus(

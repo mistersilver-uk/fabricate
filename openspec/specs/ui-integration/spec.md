@@ -2048,7 +2048,12 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
     Create is the world Essence Catalogue header's `+ New essence` and is the only create; the verb duplicate served is `Reuse these rules` on the rules editor, which copies THIS system's effect source and macro into another system's own rules for the same essence without minting an identity.
     **Joining a world essence to a crafting system WRITES BOTH HALVES** — the world membership record and the in-system record — because the system's essence list is built from `system.essenceDefinitions` and the read union only enriches rows it already finds there, so a membership-only join left `Add to this system` writing a record no screen reads.
     The seeded in-system record carries the four lifted identity fields and no behaviour key, so every section resolves as INHERITED, which is what the membership record beside it declares; a system that already holds the id is left alone.
-    Removal is deliberately not its mirror: deleting the in-system record would strip the essence's stored quantity from every component in that system, which is the opposite of what removing a membership promises.
+    **REMOVAL IS ITS MIRROR AND TAKES BOTH HALVES**, because the reference's own copy for it says removal takes this system's rules: "Components here keep the values, but nothing resolves on craft until the essence is added back."
+    Deleting only the membership record left the in-system record standing and the essence resolving on every craft, so the second clause was false; deleting the in-system record was declined on the belief that the first clause would then be false too.
+    **IT IS NOT: the stored quantities SURVIVE**, and the mechanism is the Valid Id Basis rather than a new special case.
+    `data-models/spec.md` -> Scoped Entity Definitions requirement 16 makes the basis the UNION of the world roster with the system's surviving in-system array, so an essence that is still a world entity is still in the basis after its in-system row is gone and there is nothing for the prune to act on.
+    Re-adding restores the row and the essence resolves again over quantities it never lost, which is what makes the copy's promise true in both directions.
+    This is exactly why the verb may only be reached from a world-scope screen: with NO world half the basis is the in-system array alone and the strip is real, and it is also why `Delete this essence` — which removes the world entity — DOES prune, correctly.
 14. **The System Essence Rules subtitle states what the list holds, what disabling stops and where identity comes from**, naming the system: `What each essence does on craft in <system>. Disabling stops the crafting effect — ingredient matching still sees the value. Names, icons and colours come from the Essence Catalogue.`
     The world Essence Catalogue's states what that screen owns: `One definition per quality — name, icon, colour. What an essence does on craft is set by rules in each system that uses it.`
     Neither uses the other's vocabulary; "definitions" is world scope's word and a system authors none.
@@ -2067,6 +2072,13 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
     The world catalogue's inspector column is likewise unbordered, with a single hairline above its pinned foot action.
 19. **One essence state has one shape.**
     Enabled and Disabled are the shared status pill at every essence site — row, grid card, inspector and preview — and the pill resolves an unrecognised tone to its recessive default rather than rendering unfilled and unbordered, because four essence call sites named tones outside its ramp and produced a second, quieter treatment of the same state one click away.
+20. **THE LIST/GRID PRESENTATION TOGGLE ON THE SYSTEM ESSENCE RULES LIST IS A DELIBERATE DEVIATION FROM THE REFERENCE, AND IT STAYS.**
+    The reference draws one presentation for this screen and Fabricate ships two, so a reviewer comparing the two finds a control the reference does not have.
+    It is recorded here as RULED rather than left to be re-raised, because it has been raised at more than one review and the answer is the same each time.
+    The grid is a shipped CAPABILITY rather than a styling choice: requirement 7 above specifies its own footer affordance, `### Essences Tab` enumerates it in the essence-library capability list ("The essence library offers a list and a grid presentation of the same rows"), and the `manager-essences-grid` View Lab case is the only frame that guards the card's identity button against Foundry's fixed button height.
+    Removing the toggle would therefore remove a capability, delete a registered capture state and orphan two requirements, to converge on a reference that simply does not draw this screen twice.
+    Toolbar row one already matches the reference, so the deviation is confined to the presentation control at its end — which `### Essences Tab` already exempts from the filter-clearing rule for the same reason: it is not a filter, and it is the only route to the grid.
+    What is NOT licensed by this ruling is a grid that says less than the list: `### Essences Tab` binds the two presentations to one state vocabulary, and a divergence there is a defect however this deviation is ruled.
 
 ### Scoped entity editor patterns
 

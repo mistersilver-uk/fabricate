@@ -79,6 +79,7 @@
   import MembershipActions from './scoped/MembershipActions.svelte';
   import SharedDefinitionCallout from './scoped/SharedDefinitionCallout.svelte';
   import {
+    essenceEffectSourceReferent,
     essenceInheritHeading,
     essenceSectionNote,
     essenceSectionValueName,
@@ -161,9 +162,43 @@
     effectSource: scopedKnown && member && inheritedMap.effectSource !== false,
     macro: scopedKnown && member && inheritedMap.macro !== false,
   });
+  // ── WHAT THE WORLD DEFAULT ACTUALLY IS, resolved once and read by BOTH halves ───────────
+  // The note under an inherit row and the locked tile beneath it must name the SAME thing, and
+  // before issue 1372 neither named the world default: the note read `effectSource` as a scalar
+  // and answered `''` for a block, printing "The world default is unset" over a tile naming a
+  // value, while the tile itself rendered the DRAFT's own source under a `World default` pill.
+  // Both were invisible while every membership record was fully overriding, because a locked card
+  // could not be reached at all - which is why the lab world now seeds one inheriting section.
+  const worldSourceReferent = $derived(
+    essenceEffectSourceReferent(worldEntry?.defaults?.effectSource)
+  );
+  const worldSourceItem = $derived(
+    worldSourceReferent
+      ? (managedItemOptions.find(
+          (item) =>
+            item?.id === worldSourceReferent ||
+            item?.originItemUuid === worldSourceReferent ||
+            item?.registeredItemUuid === worldSourceReferent
+        ) ?? null)
+      : null
+  );
+  // The world default's macro, and NOT `macroName`: that state resolves the DRAFT's uuid, so an
+  // inheriting system whose own stored macro differs would have shown its own macro's name in a
+  // sentence about the world's.
+  const worldMacroUuid = $derived(
+    typeof worldEntry?.defaults?.macro === 'string' ? worldEntry.defaults.macro.trim() : ''
+  );
   const worldDefaultNames = $derived({
-    effectSource: essenceSectionValueName(worldEntry?.defaults?.effectSource),
-    macro: essenceSectionValueName(worldEntry?.defaults?.macro),
+    effectSource: worldSourceItem?.name || essenceSectionValueName(worldSourceReferent),
+    macro: essenceSectionValueName(worldMacroUuid),
+  });
+  // The two locked cards' contents, passed down as ONE bag so the tab reads the world layer for a
+  // locked section and the draft for an unlocked one, with no second resolution of its own.
+  const worldDefaultCards = $derived({
+    sourceName: worldDefaultNames.effectSource,
+    sourceUuid: worldSourceItem?.originItemUuid || worldSourceItem?.registeredItemUuid || '',
+    macroUuid: worldMacroUuid,
+    macroName: '',
   });
   const inheritNotes = $derived({
     effectSource: essenceSectionNote({
@@ -644,6 +679,7 @@
             propertyMacrosEnabled={showPropertyMacroUi}
             {lockedSections}
             {inheritNotes}
+            worldDefaults={worldDefaultCards}
             {saving}
             onSourceSelect={(itemId) => {
               sourceComponentId = itemId || '';
