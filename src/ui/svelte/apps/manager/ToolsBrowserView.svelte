@@ -6,6 +6,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ItemDropZone from './ItemDropZone.svelte';
   import { filterTools, projectToolRow } from './tools/toolStudio.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     tools = [],
@@ -277,13 +278,11 @@
                   >
                     <span aria-hidden="true"><span></span></span>
                   </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text('FABRICATE.Admin.Manager.Tools.Edit', 'Edit Tool')}
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Admin.Manager.Tools.Edit', 'Edit Tool')}
                     title={text('FABRICATE.Admin.Manager.Tools.Edit', 'Edit Tool')}
                     onclick={() => onEditTool(tool.id)}
-                    ><i class="fas fa-pen" aria-hidden="true"></i></button
+                    ><i class="fas fa-pen" aria-hidden="true"></i></IconButton
                   >
                 </div>
               </article>

@@ -510,7 +510,11 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'the tile wrapper is the positioning context for the overlay'
     );
     assert.ok(
-      /class="manager-icon-button manager-essence-icon-reset"\s+data-essence-icon-reset/.test(
+      // The reset became an `<IconButton>` at issue 1422, so `manager-icon-button` is emitted
+      // by the primitive and only the per-site modifier is passed. `data-essence-icon-reset`
+      // is spelled `=""` rather than bare because a bare `data-*` on a COMPONENT tag is the
+      // boolean `true` and would render `="true"`.
+      /<IconButton\s+class="manager-essence-icon-reset"\s+data-essence-icon-reset=""/.test(
         identityTabSource
       ),
       'the reset is still the icon-only control, now rendered inside the tile wrapper'
@@ -525,19 +529,28 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'the reset sits inside the tile wrapper, ahead of the separate actions row'
     );
     assert.ok(
-      identityTabSource.includes("aria-label={text('FABRICATE.Admin.Manager.Essence.ClearIcon'"),
+      identityTabSource.includes("ariaLabel={text('FABRICATE.Admin.Manager.Essence.ClearIcon'"),
       'and its label survives as the accessible name'
     );
     // Hidden by default, and revealed by hover AND by keyboard focus independently — never
     // hover-only, which would strand a keyboard user with no way to see the control at all.
+    //
+    // The CHILD half of each selector is `:global(...)` as of issue 1422, and pinning that
+    // spelling is the point rather than an accommodation. The reset is an `<IconButton>` now,
+    // so the element carrying `manager-essence-icon-reset` is written by the primitive and
+    // never receives this component's `svelte-<hash>`; the scoped spelling these regexes used
+    // to assert is exactly the dead rule, and the compiler pruned all three of them. The tile
+    // stays scoped because this component does write it. Specificity is unchanged either way:
+    // Svelte compiled the scoped descendant with the hash inside `:where()`, which contributes
+    // nothing.
     assert.ok(
-      /\.manager-essence-icon-tile \.manager-essence-icon-reset \{[^}]*opacity: 0;/s.test(
+      /\.manager-essence-icon-tile :global\(\.manager-essence-icon-reset\) \{[^}]*opacity: 0;/s.test(
         identityStyles
       ),
       'the overlay starts hidden'
     );
     assert.ok(
-      /\.manager-essence-icon-tile:hover \.manager-essence-icon-reset,\s*\n\s*\.manager-essence-icon-tile \.manager-essence-icon-reset:focus-visible \{[^}]*opacity: 1;/s.test(
+      /\.manager-essence-icon-tile:hover :global\(\.manager-essence-icon-reset\),\s*\n\s*\.manager-essence-icon-tile :global\(\.manager-essence-icon-reset:focus-visible\) \{[^}]*opacity: 1;/s.test(
         identityStyles
       ),
       'and reveals on tile hover or button focus-visible, independent of pointer'
@@ -548,7 +561,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // would be a dead rule and the control hover-only in practice. `opacity: 0` keeps it
     // focusable; this pins that so a revert to `visibility: hidden` fails here.
     assert.ok(
-      /\.manager-essence-icon-tile \.manager-essence-icon-reset \{[^}]*pointer-events: none;/s.test(
+      /\.manager-essence-icon-tile :global\(\.manager-essence-icon-reset\) \{[^}]*pointer-events: none;/s.test(
         identityStyles
       ),
       'the hidden overlay uses pointer-events so it stays keyboard-focusable'

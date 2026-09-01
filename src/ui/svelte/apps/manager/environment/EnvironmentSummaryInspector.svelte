@@ -6,6 +6,7 @@
   import { resolveDropData } from '../../../util/dropUtils.js';
   import { sceneDocumentImage } from '../../../util/sceneImages.js';
   import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let { environment = null, composition = { counts: {} }, onUpdate = () => {} } = $props();
 
@@ -134,10 +135,9 @@
         title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenScene', 'Open scene')}
         >{sceneLabel}</button
       >
-      <button
-        type="button"
-        class="manager-icon-button is-danger"
-        aria-label={text(
+      <IconButton
+        class="is-danger"
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene',
           'Unlink scene'
         )}
@@ -148,7 +148,7 @@
         onclick={(event) => {
           event.stopPropagation();
           unlinkScene();
-        }}><i class="fas fa-link-slash" aria-hidden="true"></i></button
+        }}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
       >
     </div>
   {:else}

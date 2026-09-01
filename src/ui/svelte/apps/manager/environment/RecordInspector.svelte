@@ -8,6 +8,7 @@
   import CompositionStatePill from './CompositionStatePill.svelte';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import MatchingEvidenceChips from './MatchingEvidenceChips.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     kind = 'task',
@@ -303,39 +304,37 @@
         </p>
       {:else}
         <div class="manager-environment-node-count">
-          <button
-            type="button"
-            class="manager-icon-button manager-environment-node-count-step"
-            aria-label={text(
+          <IconButton
+            class="manager-environment-node-count-step"
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease',
               'Decrease'
             )}
             title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Decrease', 'Decrease')}
             disabled={nodeCurrent <= 0}
-            data-node-count-dec
+            data-node-count-dec=""
             onclick={() => adjustNodeCount(-1)}
           >
             <i class="fas fa-minus" aria-hidden="true"></i>
-          </button>
+          </IconButton>
           <span class="manager-environment-node-count-value" data-node-count>
             <strong>{nodeCurrent}</strong>
             <span aria-hidden="true">/</span>
             <span>{nodeMax}</span>
           </span>
-          <button
-            type="button"
-            class="manager-icon-button manager-environment-node-count-step"
-            aria-label={text(
+          <IconButton
+            class="manager-environment-node-count-step"
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase',
               'Increase'
             )}
             title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Increase', 'Increase')}
             disabled={nodeCurrent >= nodeMax}
-            data-node-count-inc
+            data-node-count-inc=""
             onclick={() => adjustNodeCount(1)}
           >
             <i class="fas fa-plus" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </div>
       {/if}
     </section>
@@ -469,10 +468,9 @@
               >
               <strong>{eventEffectiveDropRate}%</strong>
             </span>
-            <button
-              type="button"
-              class="manager-icon-button manager-environment-drop-adjustment-clear"
-              aria-label={text(
+            <IconButton
+              class="manager-environment-drop-adjustment-clear"
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment',
                 'Clear'
               )}
@@ -484,7 +482,7 @@
               onclick={() => setEventAdjustment(0)}
             >
               <i class="fas fa-rotate-left" aria-hidden="true"></i>
-            </button>
+            </IconButton>
           </div>
         </div>
       </div>
@@ -557,10 +555,9 @@
                 >
                 <strong>{row.effectiveDropRate}%</strong>
               </span>
-              <button
-                type="button"
-                class="manager-icon-button manager-environment-drop-adjustment-clear"
-                aria-label={text(
+              <IconButton
+                class="manager-environment-drop-adjustment-clear"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment',
                   'Clear'
                 )}
@@ -572,7 +569,7 @@
                 onclick={() => setTaskDropAdjustment(row.id, 0)}
               >
                 <i class="fas fa-rotate-left" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </div>
           </div>
         {/each}

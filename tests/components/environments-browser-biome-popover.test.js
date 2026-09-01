@@ -40,6 +40,7 @@ const harness = createMountedComponentHarness({
     // EnvironmentsBrowserView and from the two gathering browsers it embeds; omitting it
     // reds `mounted-harness-primitive-allowlist.test.js` and HANGS this suite.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/IconPicker.svelte',

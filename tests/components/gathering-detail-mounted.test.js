@@ -207,6 +207,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared

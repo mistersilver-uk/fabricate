@@ -254,6 +254,35 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-simple-two-band-strip',
     'coverage-mode-routed-check-checks',
   ]),
+  // The manager's icon-only button (issue 1422). 36 callers, and the representative pair does
+  // reach it — but only ever in its NEUTRAL state. `manager-components-normal` renders
+  // `components/ComponentRow.svelte`'s edit pencil and `Pagination`'s two arrows;
+  // `fabricate-app-shell` renders those arrows alone. Every icon button in either frame is a
+  // bare `manager-icon-button`, so a change to the DANGER treatment — 20 of the 82 converted
+  // sites, the second most common form by a wide margin — would publish two frames in which
+  // it does not appear.
+  //
+  // `world-modifiers` is the unconditional one: a World Modifiers row draws three neutral
+  // icon buttons and the `is-danger` delete beside them, in one dense cluster, and that
+  // case's steps already `scroll: true` the list into the frame because it runs below the
+  // page's own fold.
+  //
+  // `manager-environment-edit-blind-weights` is the second because it is the ONLY published
+  // frame that reaches the `is-primary` treatment at all: Shadow Thicket is a MANUAL
+  // composition, so its Tasks tab renders both the composition rows carrying the `is-danger`
+  // quick exclude and the Available-to-add rows carrying the `is-primary` quick include.
+  // `is-primary` has exactly one call site in the codebase — `environment/CompositionList.svelte`
+  // — and it is a conditional row action, so without this entry that treatment is
+  // unphotographed anywhere.
+  //
+  // Still uncovered, and named rather than left to be discovered: `is-ghost`, whose only site
+  // is `ComplicationSummaryRow.svelte`'s compound `is-ghost is-danger`. No published case
+  // reaches a complication row with its delete rendered, so a change to the ghost treatment
+  // publishes these two frames and neither contains it.
+  'src/ui/svelte/components/IconButton.svelte': Object.freeze([
+    'world-modifiers',
+    'manager-environment-edit-blind-weights',
+  ]),
   // The shared empty panel. Both representative frames are POPULATED states — the components
   // browser lists components and the player app shell lists recipes — so the dashed panel this
   // primitive draws appears in neither, and a restyle of it would publish two frames that do not

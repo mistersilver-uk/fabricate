@@ -6,6 +6,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     systems = [],
@@ -298,10 +299,8 @@
               class="manager-action-group manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
             >
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text('FABRICATE.Admin.Manager.EditNamed', 'Edit {name}').replace(
+              <IconButton
+                ariaLabel={text('FABRICATE.Admin.Manager.EditNamed', 'Edit {name}').replace(
                   '{name}',
                   systemDisplayLabel(system, systemLabels)
                 )}
@@ -312,11 +311,9 @@
                 }}
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace(
+              </IconButton>
+              <IconButton
+                ariaLabel={text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace(
                   '{name}',
                   systemDisplayLabel(system, systemLabels)
                 )}
@@ -327,11 +324,10 @@
                 }}
               >
                 <i class="fas fa-file-export" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button is-danger"
-                aria-label={text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace(
+              </IconButton>
+              <IconButton
+                class="is-danger"
+                ariaLabel={text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace(
                   '{name}',
                   systemDisplayLabel(system, systemLabels)
                 )}
@@ -342,7 +338,7 @@
                 }}
               >
                 <i class="fas fa-trash" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </span>
           </div>
         {/each}

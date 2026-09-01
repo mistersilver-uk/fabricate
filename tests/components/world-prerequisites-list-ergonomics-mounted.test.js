@@ -41,6 +41,7 @@ const harness = createMountedComponentHarness({
     // than failing it, so every one is named.
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
     'src/ui/svelte/apps/manager/world/WorldPrerequisitesTab.svelte',
   ],

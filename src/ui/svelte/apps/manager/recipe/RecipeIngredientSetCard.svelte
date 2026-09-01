@@ -20,6 +20,7 @@
   import RecipeIngredientGroupCard from './RecipeIngredientGroupCard.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     set = {},
@@ -199,21 +200,18 @@
           >{defaultName}</span
         >
       {/if}
-      <button
-        type="button"
-        class="manager-icon-button"
+      <IconButton
         data-recipe-duplicate="ingredient-set"
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
         title={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
-        onclick={() => onDuplicate()}><i class="fas fa-clone" aria-hidden="true"></i></button
+        onclick={() => onDuplicate()}><i class="fas fa-clone" aria-hidden="true"></i></IconButton
       >
-      <button
-        type="button"
-        class="manager-icon-button is-danger"
+      <IconButton
+        class="is-danger"
         data-recipe-remove="ingredient-set"
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
         title={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
-        onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></button
+        onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></IconButton
       >
     </div>
   {/if}

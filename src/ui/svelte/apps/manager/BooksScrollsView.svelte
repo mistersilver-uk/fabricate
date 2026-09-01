@@ -44,6 +44,7 @@
   import { resolveDropData } from '../../util/dropUtils.js';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Pagination from '../../components/Pagination.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     recipeItems = [],
@@ -510,11 +511,10 @@
                     : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span
                 >
               </button>
-              <button
-                type="button"
-                class="manager-icon-button manager-books-scrolls-edit"
+              <IconButton
+                class="manager-books-scrolls-edit"
                 data-books-scrolls-edit={item.id}
-                aria-label={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.BooksScrolls.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', item.resolvedName)}
@@ -522,7 +522,7 @@
                 onclick={() => onOpenRecipeItem(item.id)}
               >
                 <i class="fas fa-pen" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </div>
           </div>
         {/each}

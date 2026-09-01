@@ -135,6 +135,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared

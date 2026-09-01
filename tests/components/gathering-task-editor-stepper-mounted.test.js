@@ -63,6 +63,7 @@ const harness = createMountedComponentHarness({
     // THE manager's labelled push-button (issue 1118). The stamina Add modifier and both
     // Add drop rule controls render it; an omission HANGS the suite (# cancelled).
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     EDITOR_PATH,
   ],

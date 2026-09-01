@@ -528,7 +528,11 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('data-drop-rate-adjustment-base'), 'task override rows should expose base chance as its own control-row item');
     assert.ok(inspectorSource.includes('data-drop-rate-adjustment-effective'), 'task override rows should expose effective chance as its own control-row item');
     assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-clear'), 'task override clear action should be an icon-only button');
-    assert.ok(/aria-label=\{text\(\s*'FABRICATE\.Admin\.Manager\.EnvironmentEditor\.Inspector\.ClearAdjustment',\s*'Clear'\s*\)\}/.test(inspectorSource), 'icon-only clear action should keep accessible copy');
+    // `ariaLabel`, not `aria-label`: the clear action is an `<IconButton>` as of issue 1422,
+    // and the primitive takes the accessible name as a REQUIRED-shaped named prop rather than
+    // letting it ride the rest spread. The assertion is retargeted rather than dropped —
+    // the copy it pins is the whole point of the control being icon-only.
+    assert.ok(/ariaLabel=\{text\(\s*'FABRICATE\.Admin\.Manager\.EnvironmentEditor\.Inspector\.ClearAdjustment',\s*'Clear'\s*\)\}/.test(inspectorSource), 'icon-only clear action should keep accessible copy');
     assert.ok(inspectorSource.includes('class={`manager-environment-drop-adjustment-row is-task-drop ${dropRateAdjustmentsEnabled ? \'\' : \'is-disabled\'} ${adjustmentValueClass(row.adjustment)}`}'), 'task override row card should carry positive/negative/zero state classes');
     assert.ok(inspectorSource.includes('class="manager-condition-modifier-value" data-drop-rate-adjustment-percent'), 'task override input shell should remain neutral while keeping the percent suffix');
     assert.ok(!inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should not carry positive/negative/zero state classes');

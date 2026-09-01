@@ -269,7 +269,12 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
   it('carries the linked-list a11y contract and the missing state', () => {
     assert.ok(booksTabSource.includes('data-recipe-item-links'), 'renders the linked-items list');
     assert.ok(booksTabSource.includes('aria-label='), 'the list has an aria-label');
-    assert.ok(booksTabSource.includes('manager-icon-button is-danger'), 'visible danger unlink button');
+    // `<IconButton class="is-danger">` since issue 1422 — the primitive emits
+    // `manager-icon-button`, the call site passes only the danger modifier.
+    assert.ok(
+      /<IconButton\s+class="is-danger"/.test(booksTabSource),
+      'visible danger unlink button'
+    );
     assert.ok(booksTabSource.includes('onOpenItem('), 'open wired');
     assert.ok(
       booksTabSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'),

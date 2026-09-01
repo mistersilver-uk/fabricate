@@ -18,6 +18,7 @@
 <script>
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../actions/portal.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     open = false,
@@ -60,15 +61,9 @@
             <p class="manager-modal-subtitle manager-muted">{subtitle}</p>
           {/if}
         </div>
-        <button
-          type="button"
-          class="manager-icon-button"
-          data-manager-modal-close
-          aria-label={closeLabel}
-          onclick={() => onClose()}
-        >
+        <IconButton data-manager-modal-close="" ariaLabel={closeLabel} onclick={() => onClose()}>
           <i class="fas fa-xmark" aria-hidden="true"></i>
-        </button>
+        </IconButton>
       </div>
 
       {#if body}{@render body()}{/if}

@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     // The house chip primitive the salvage bodies render.
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',

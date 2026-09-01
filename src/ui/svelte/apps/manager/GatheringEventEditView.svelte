@@ -9,6 +9,7 @@
   import { resolveDropData } from '../../util/dropUtils.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     event = null,
@@ -622,10 +623,9 @@
               viewScene(linkedSceneUuid);
             }}>{linkedSceneLabel}</button
           >
-          <button
-            type="button"
-            class="manager-icon-button is-danger"
-            aria-label={text(
+          <IconButton
+            class="is-danger"
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.Events.SceneUnlink',
               'Unlink scene'
             )}
@@ -633,7 +633,7 @@
             onclick={unlinkScene}
           >
             <i class="fas fa-link-slash" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </div>
       {:else}
         <div

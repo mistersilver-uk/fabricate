@@ -1088,7 +1088,10 @@ describe('CraftingSystemManager source contract', () => {
     // The row Edit pencil reuses the Books & Scrolls icon-button + pen idiom, and the
     // filter/sort/paging state is lifted (no local $state for those controls remains).
     assert.ok(
-      recipesBrowserSource.includes('class="manager-icon-button manager-recipe-edit"'),
+      // `<IconButton class="manager-recipe-edit">` since issue 1422: the contract class is
+      // emitted by the primitive, so asserting it at the call site would now assert the
+      // convention this change removed.
+      /<IconButton\s+class="manager-recipe-edit"/.test(recipesBrowserSource),
       'the row Edit affordance should be a manager-icon-button, matching Books & Scrolls'
     );
     assert.equal(

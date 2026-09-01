@@ -64,6 +64,7 @@
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import { essenceCapabilityPills } from './essenceStudio.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     essence = null,
@@ -232,11 +233,10 @@
 {/snippet}
 
 {#snippet editButton()}
-  <button
-    type="button"
-    class="manager-icon-button manager-essence-edit"
+  <IconButton
+    class="manager-essence-edit"
     data-essence-edit={essence.id}
-    aria-label={format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
+    ariaLabel={format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
       name: essence.name,
     })}
     title={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
@@ -246,7 +246,7 @@
     }}
   >
     <i class="fas fa-pen" aria-hidden="true"></i>
-  </button>
+  </IconButton>
 {/snippet}
 
 {#if isCard}

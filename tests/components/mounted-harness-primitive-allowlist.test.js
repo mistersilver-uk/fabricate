@@ -102,6 +102,14 @@ const SHARED_PRIMITIVES = [
   // one change. That is the shape this list exists for: the omission does not fail the
   // suite that rendered the newly-converted strip, it hangs it.
   'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  // THE manager's icon-only push-button (issue 1422), and the widest entry on this list by
+  // reach: 36 components render it as this lands, against `ManagerButton`'s 50 but spread
+  // across nearly every studio, browser, inspector and editor tab. `Pagination.svelte`
+  // renders two of them, which is what carries it out of the manager entirely and into the
+  // player-app suites — so a suite mounting a tree that merely PAGINATES pulls this leaf in
+  // without naming any icon button at all, and an omission costs a HUNG suite rather than a
+  // failing one.
+  'src/ui/svelte/components/IconButton.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
