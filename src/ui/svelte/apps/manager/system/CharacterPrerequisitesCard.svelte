@@ -25,6 +25,7 @@
     isValuelessOperator,
     prerequisitePreview,
   } from '../../../../../systems/characterPrerequisites.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     library = [],
@@ -177,33 +178,27 @@
                   {prerequisitePreview(entry)}
                 </span>
               </button>
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+              <IconButton
+                ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                 data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                 data-move-prerequisite-up={entry.id}
                 disabled={index === 0}
                 onclick={() => onReorder(index, index - 1, entry.name)}
               >
                 <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
+              </IconButton>
+              <IconButton
+                ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                 data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                 data-move-prerequisite-down={entry.id}
                 disabled={index === library.length - 1}
                 onclick={() => onReorder(index, index + 1, entry.name)}
               >
                 <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-              </button>
+              </IconButton>
               {#if onCopyToModifier}
-                <button
-                  type="button"
-                  class="manager-icon-button"
-                  aria-label={text(
+                <IconButton
+                  ariaLabel={text(
                     'FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers',
                     'Copy to modifiers'
                   )}
@@ -215,20 +210,19 @@
                   onclick={() => onCopyToModifier(entry)}
                 >
                   <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
-                </button>
+                </IconButton>
               {/if}
-              <button
-                type="button"
-                class="manager-icon-button is-danger"
-                aria-label={text(
+              <IconButton
+                class="is-danger"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.CharacterPrerequisites.Delete',
                   'Remove prerequisite'
                 )}
-                data-delete-prerequisite
+                data-delete-prerequisite=""
                 onclick={() => handleDelete(entry.id)}
               >
                 <i class="fa-solid fa-trash" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </div>
 
             {#if open}

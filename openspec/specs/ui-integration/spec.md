@@ -95,7 +95,7 @@ Only two kinds of rule for a primitive stay in the global sheet: what must beat 
 A layout-context rule places the primitive and MUST NOT restyle it: no `font-size`, `font-family`, `font-weight`, `border`, `border-radius`, or `background`.
 The player crafting app's requirement rail, requirement tile, essence pool, consumption-plan panel, and essence-contribution chip are held to that CSS rule as player-side primitives, which is why they added no rules to `styles/fabricate.css`.
 
-Three live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+Four live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
 
 - `FillBar` now EXISTS at `src/ui/svelte/components/FillBar.svelte`, and `src/ui/svelte/apps/gathering/ChanceBar.svelte` is REBUILT on it rather than widened: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would have made it the second component owning half a meaning rather than the primitive that owns one.
   `FillBar` is a LEAF — it renders the track and the value-width fill and declares no `role` or `aria-*`, because the accessible semantics differ per site (`ChanceBar` is a `meter` with its own `aria-valuenow`; an odds row's bar is decorative).
@@ -146,6 +146,18 @@ Three live non-conformances are recorded here rather than left to be discovered,
   It stays deferred because "the loudest control on this panel, in the accent" either IS `primary` or is a seventh role, and the set is closed — so it is a vocabulary ruling rather than a conversion, and making it silently by re-pointing three declarations would settle the vocabulary in the stylesheet.
   The third is TWO treatments of one meaning in the Checks Studio, "go to the canonical authoring screen", both carrying the same `fa-arrow-up-right-from-square` glyph and both role-less: `checks/CraftingModifierCatalogueCard.svelte` renders it as a borderless, padding-free accent TEXT LINK through a pass-through class, and `checks/ChecksView.svelte` renders it as a boxed NEUTRAL button at standard control geometry.
   It stays deferred for the same reason as the second: a `link` treatment would be a seventh role, so the pair cannot be reconciled by conversion, and it is a card-head-to-card-body pair rather than two cards, which is why an earlier sweep looked for it among sibling cards and did not find it.
+- THE manager's icon-only push-button exists at `src/ui/svelte/components/IconButton.svelte`.
+  It replaces the same kind of CSS CONVENTION its labelled sibling replaced — `manager-icon-button`, plus a remembered `type="button"`, plus a remembered `aria-label` — written out by hand at 82 sites across 37 components.
+  It takes the accessible name as a REQUIRED-SHAPED `ariaLabel` prop, which is the `design-system` capability's rule for an icon-only control rather than a choice made here, and it is a sharper obligation than any modifier class: a forgotten `is-danger` renders the wrong colour and is eventually seen, while a forgotten `aria-label` renders IDENTICALLY and leaves the control announcing itself as "button" and nothing else, which no frame can photograph.
+  Every site's element host was measured by walking each component's Svelte AST, and all 82 were `<button type="button">` — so the host set is ONE and the component takes no `as` prop, unlike `StatusToggle`, whose census found three.
+  It carries NO `role` prop, and that is a stated scope line rather than an omission: the icon button's modifiers mix ROLES (`is-danger`, `is-ghost`, `is-primary`) with STATES (`is-locked`, `is-roll-needed`), one shipped site legitimately compounds two of them as the sheet's own declared `.manager-icon-button.is-ghost.is-danger` treatment, and a vocabulary spanning both kinds is a design ruling rather than a mechanical extraction.
+  Settling it inside an 82-site sweep whose entire acceptance bar is that no frame moves would land a judgement call where nobody can review it, so every modifier travels as a PASS-THROUGH class exactly as written today and the ruling is left open.
+  Like `ManagerButton` it deliberately has NO scoped `<style>` and claims the section's button-geometry exception, for the same reason: emitting exactly the classes `styles/fabricate.css` already styles is what makes converting a correct call site provably a no-op on screen.
+  It is consequently a MANAGER primitive, and that consequence is reached in the product — `components/Pagination.svelte` is area-agnostic and renders two of them, so six player-app components paint them through their own `:global(.manager-icon-button)` rules, which are CORRECT and are not debt.
+  No `.svelte` under `src/` renders a raw `class="manager-icon-button"` any longer, with three stated exceptions.
+  `IconButton.svelte`'s own two occurrences are the emission itself and one line of docblock prose.
+  `CraftingSystemManagerRoot.svelte`'s SIX are DEFERRED with a named reason — the converging 12k-line root is the wrong place to land a sweep's tail — and are pinned BY COUNT so a later partial pass fails rather than silently halving a deferral.
+  `component/ComponentIdentityStrip.svelte`'s ONE is not a deferral at all: it hands the class to `SearchablePopover`'s `triggerClass`, so the element carrying it is rendered by THAT primitive, and converting it means reworking a trigger contract shared with ten callers.
 
 #### Threshold band strip
 

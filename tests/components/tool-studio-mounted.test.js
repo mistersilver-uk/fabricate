@@ -60,6 +60,7 @@ const harness = createMountedComponentHarness({
     // Studio header both render through it; an omission HANGS this suite rather than
     // failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
     // the conversion, so it is in this tree's static graph; the harness's closure validator

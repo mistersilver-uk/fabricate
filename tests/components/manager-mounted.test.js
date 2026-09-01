@@ -367,6 +367,7 @@ function compileManagerRoot() {
   // Studio header and the System Overview Modifiers card, and through every other screen
   // as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

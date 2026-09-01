@@ -169,6 +169,12 @@
       "why": "The product's one horizontal fill bar (2 callers). `library.html:872` splits the instrument into `<Meter>`, `<BandedBar>` and `<StageBars>` and states that merging them leaves one component unable to carry a correct accessible role, \"which is why the shipped fill leaf renders none\" — this is that leaf, so it corresponds to no single entry by the library's own account."
     },
     {
+      "path": "src/ui/svelte/components/IconButton.svelte",
+      "library": "<IconButton>",
+      "evidence": "broad",
+      "why": "The manager's icon-only push-button (36 callers, issue 1422), extracted from 82 hand-rolled `class=\"manager-icon-button\"` sites across 37 components. `library.html:570` heads one specimen `<Button> <IconButton>` and specifies the icon size on that ladder (`icon 28x28 - radius 7`) with `ariaLabel` REQUIRED when icon-only, which is the entry this row names. Two divergences from that specimen are deliberate and are recorded rather than smoothed over: the shipped control is 34px (`fabricate.css:13935`), 28px only inside `.manager-pagination`, so the ladder value and the shipped pixel disagree and this change does not repaint 82 sites to settle it; and it takes NO `role` prop, because its modifiers mix roles with states and one site compounds two, so the vocabulary is a design ruling left open rather than folded into a sweep whose acceptance bar is that no frame moves. Broad by reach rather than by count alone: it lands in nearly every studio, browser, inspector and editor tab, and through `Pagination` it reaches the player apps too."
+    },
+    {
       "path": "src/ui/svelte/components/IconPicker.svelte",
       "library": null,
       "evidence": "broad",

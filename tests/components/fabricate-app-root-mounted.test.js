@@ -206,6 +206,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ActorSelectTopBar.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/FabricateAppRoot.svelte',

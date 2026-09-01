@@ -7,6 +7,7 @@
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     events = [],
@@ -471,10 +472,8 @@
               class="manager-action-group manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
             >
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text(
+              <IconButton
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Events.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', eventName(event))}
@@ -482,11 +481,9 @@
                 onclick={() => onEditEvent(event.id)}
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button"
-                aria-label={text(
+              </IconButton>
+              <IconButton
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Events.DuplicateNamed',
                   'Duplicate {name}'
                 ).replace('{name}', eventName(event))}
@@ -497,11 +494,10 @@
                 onclick={() => onDuplicateEvent(selectedSystemId, event.id)}
               >
                 <i class="fas fa-copy" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button is-danger"
-                aria-label={text(
+              </IconButton>
+              <IconButton
+                class="is-danger"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Events.DeleteNamed',
                   'Delete {name}'
                 ).replace('{name}', eventName(event))}
@@ -509,7 +505,7 @@
                 onclick={() => onDeleteEvent(selectedSystemId, event.id)}
               >
                 <i class="fas fa-trash" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </span>
           </div>
         {/each}

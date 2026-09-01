@@ -44,6 +44,7 @@
     salvageDcOverrideForSelection,
   } from './component/salvageDcPresets.js';
   import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     component = null,
@@ -1555,19 +1556,18 @@
                         >
                       </span>
 
-                      <button
-                        type="button"
-                        class="manager-icon-button is-danger"
-                        aria-label={text(
+                      <IconButton
+                        class="is-danger"
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
                           'Remove result'
                         )}
-                        data-remove-salvage-result
+                        data-remove-salvage-result=""
                         onclick={() => removeSalvageStage(result.id)}
                         disabled={saving}
                       >
                         <i class="fas fa-xmark" aria-hidden="true"></i>
-                      </button>
+                      </IconButton>
                     </div>
 
                     <!-- ── THE READ-ONLY COMPLICATION STRIP (issue 1286) ────────────────────
@@ -1739,19 +1739,18 @@
                           updateSalvageGroup(group.id, { name: event.currentTarget.value })}
                         disabled={saving}
                       />
-                      <button
-                        type="button"
-                        class="manager-icon-button is-danger"
-                        aria-label={text(
+                      <IconButton
+                        class="is-danger"
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveGroup',
                           'Remove result group'
                         )}
-                        data-remove-salvage-group
+                        data-remove-salvage-group=""
                         onclick={() => removeSalvageGroup(group.id)}
                         disabled={saving}
                       >
                         <i class="fas fa-xmark" aria-hidden="true"></i>
-                      </button>
+                      </IconButton>
                     </div>
 
                     {#if (group.results || []).length > 0}
@@ -1788,19 +1787,18 @@
                                   quantity: clampSalvageQuantity(next),
                                 })}
                             />
-                            <button
-                              type="button"
-                              class="manager-icon-button is-danger"
-                              aria-label={text(
+                            <IconButton
+                              class="is-danger"
+                              ariaLabel={text(
                                 'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
                                 'Remove result'
                               )}
-                              data-remove-salvage-result
+                              data-remove-salvage-result=""
                               onclick={() => removeSalvageResult(group.id, result.id)}
                               disabled={saving}
                             >
                               <i class="fas fa-xmark" aria-hidden="true"></i>
-                            </button>
+                            </IconButton>
                           </li>
                         {/each}
                       </ul>

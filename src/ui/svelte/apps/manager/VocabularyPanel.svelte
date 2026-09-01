@@ -28,6 +28,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     label = '',
@@ -258,15 +259,14 @@
               >{text('FABRICATE.Admin.Manager.TagsCategories.Unused', 'Unused')}</Chip
             >
           {/if}
-          <button
-            type="button"
-            class={`manager-icon-button ${row.totalUsage > 0 ? '' : 'is-danger'}`}
-            aria-label={removeNamedLabel.replace('{name}', row.name)}
+          <IconButton
+            class={row.totalUsage > 0 ? '' : 'is-danger'}
+            ariaLabel={removeNamedLabel.replace('{name}', row.name)}
             title={removeLabel}
             onclick={() => requestRemove(row)}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </div>
         {#if pendingRemovalId === row.id}
           <div

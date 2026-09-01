@@ -20,6 +20,7 @@
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import RosterRow from './RosterRow.svelte';
+  import IconButton from '../../components/IconButton.svelte';
 
   // Fixed roster page size (design: 6 per roster). A search box appears only when
   // the roster is longer than one page.
@@ -256,26 +257,22 @@
                   .replace('{total}', totalPages(section.slice.filtered.length))}
               </span>
               <span class="manager-access-roster-pager-nav">
-                <button
-                  type="button"
-                  class="manager-icon-button"
+                <IconButton
                   data-access-roster-prev={section.key}
-                  aria-label={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
+                  ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
                   disabled={section.page === 0}
                   onclick={section.onPrev}
                 >
                   <i class="fas fa-chevron-left" aria-hidden="true"></i>
-                </button>
-                <button
-                  type="button"
-                  class="manager-icon-button"
+                </IconButton>
+                <IconButton
                   data-access-roster-next={section.key}
-                  aria-label={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
+                  ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
                   disabled={section.page >= totalPages(section.slice.filtered.length) - 1}
                   onclick={section.onNext}
                 >
                   <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                </button>
+                </IconButton>
               </span>
             </div>
           {/if}

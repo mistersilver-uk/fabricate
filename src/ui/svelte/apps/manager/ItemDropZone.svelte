@@ -28,6 +28,7 @@
 <script>
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
+  import IconButton from '../../components/IconButton.svelte';
 
   let {
     item = null,
@@ -89,23 +90,20 @@
   {#if item && (onCopy || onUnlink)}
     <span class="manager-item-drop-zone-actions">
       {#if onCopy}
-        <button
-          type="button"
-          class="manager-icon-button"
-          aria-label={copyLabel}
+        <IconButton
+          ariaLabel={copyLabel}
           title={copyLabel}
           data-tool-source-copy-uuid={kind === 'tool-source' ? true : undefined}
           data-recipe-item-copy-uuid={kind === 'recipe-item' ? true : undefined}
           onclick={() => onCopy(item)}
         >
           <i class="fas fa-copy" aria-hidden="true"></i>
-        </button>
+        </IconButton>
       {/if}
       {#if onUnlink}
-        <button
-          type="button"
-          class="manager-icon-button is-danger"
-          aria-label={unlinkLabel}
+        <IconButton
+          class="is-danger"
+          ariaLabel={unlinkLabel}
           title={unlinkLabel}
           data-tool-source-unlink={kind === 'tool-source' ? true : undefined}
           data-recipe-item-unlink={kind === 'recipe-item' ? true : undefined}
@@ -113,7 +111,7 @@
           onclick={onUnlink}
         >
           <i class="fas fa-link-slash" aria-hidden="true"></i>
-        </button>
+        </IconButton>
       {/if}
     </span>
   {/if}
