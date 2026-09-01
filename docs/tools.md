@@ -37,7 +37,8 @@ The Tool Studio has no browse button or blank Tool shortcut.
 
 Fabricate records the linked Item's name, image, and description when you create or relink the Tool.
 Later changes to the source Item do not refresh that stored display automatically.
-Open **Overview** and drop another Item onto the linked source card when you want a new source and a fresh display snapshot.
+Open the Tool's entry in the world **Tools Catalogue** and drop another Item onto its linked source card when you want a new source and a fresh display snapshot.
+A crafting system's Tool rules editor cannot change which Item a Tool is.
 
 A **Display label** overrides the stored source name in Fabricate without changing the Item.
 The source name and description are read-only in the Tool Studio.
@@ -61,10 +62,10 @@ The behavior preview summarizes the draft while you work.
 The **Unsaved** state appears after a change.
 Leaving the editor with unsaved changes offers **Save**, **Discard**, and **Keep editing**.
 
-Choose **Save Tool** when the Tool is ready.
+Choose **Save rules** when the Tool's rules are ready.
 An invalid or failed save keeps the editor open and moves attention to **Validation**.
 Validation and operation failures use safe descriptions instead of technical error details.
-Changing **Tool enabled** takes effect immediately and does not stage the other editor changes.
+Changing **Enabled in <system>** takes effect immediately and does not stage the other editor changes.
 
 Because the library is a draft-and-save surface, your edits are held until you save, leaving with unsaved edits prompts before discarding, and a notice appears if someone else changed the Tool list while you were editing it.
 
