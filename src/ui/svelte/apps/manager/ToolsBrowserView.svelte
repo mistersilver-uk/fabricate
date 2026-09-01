@@ -293,7 +293,23 @@
       autoSelectedToolId = '';
       return;
     }
-    const firstToolId = tools[0]?.id || '';
+    // THE FIRST ROW THE GM IS LOOKING AT, read off `pagedTools` rather than off the raw
+    // `tools` prop. The list renders `pagedTools`, which is the membership filter, the search
+    // term, the sort key and direction and the page slice applied in that order; `tools` is
+    // the unsorted, unfiltered authored array. Since this screen gained the design's
+    // `SORT BY [Name] [Asc]` control (issue 1373) those two disagree for every library whose
+    // authored order is not name-ascending, and the effect selected a row the GM could not
+    // see - the Foundry smoke reads the top row as `Alchemist's Supplies` while this selected
+    // the sixth, `Smith's Hammer`.
+    //
+    // `.member` SKIPS THE GHOST ROWS, and that is not an optimisation. Under the `all`
+    // membership filter `filteredRows` also carries unadopted world Tools, which are inspected
+    // through `selectedUnadoptedToolId` and not through `onSelectTool`; auto-selecting one here
+    // would push an unadopted id down the adopted path AND then latch, because the first early
+    // return above suppresses every later auto-select while an unadopted row is selected.
+    // A page holding no member row at all selects nothing: there is no adopted Tool to inspect
+    // and the GM chooses.
+    const firstToolId = pagedTools.find((row) => row.member)?.id || '';
     if (!firstToolId || autoSelectedToolId === firstToolId) return;
     autoSelectedToolId = firstToolId;
     onSelectTool(firstToolId);

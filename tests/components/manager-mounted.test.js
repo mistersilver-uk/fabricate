@@ -19583,6 +19583,181 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
   });
 
+  // ── THE AUTO-SELECTED ROW IS THE ONE THE GM IS LOOKING AT (issue 1373) ───────────────────
+  // The library's auto-selection read `tools[0]` - the raw authored prop - while the list
+  // renders `pagedTools`: the membership filter, the search term, the sort key and direction
+  // and the page slice, applied in that order. Those two agreed until the design's
+  // `SORT BY [Name] [Asc]` control shipped, and the Foundry smoke caught them disagreeing.
+  //
+  // The first two cases mount the ROOT, not the view, because the view does not own the
+  // selection: `onSelectTool` goes to the shell, which opens the draft and feeds
+  // `selectedToolId` back. Asserting the callback alone would stay green on a screen that
+  // never paints the selection, so these read `is-selected` and the inspector heading out of
+  // the DOM instead.
+  const libraryRowNames = () =>
+    [...target.querySelectorAll('.manager-tools-row .manager-tools-select-target strong')].map(
+      (node) => node.textContent.trim()
+    );
+  const selectedLibraryRowNames = () =>
+    [
+      ...target.querySelectorAll(
+        '.manager-tools-row.is-selected .manager-tools-select-target strong'
+      ),
+    ].map((node) => node.textContent.trim());
+  const inspectorSubjectName = () =>
+    target.querySelector('[data-tool-browser-inspector] h2')?.textContent.trim() || '';
+  const openedToolDraftIds = (calls) => [
+    ...new Set(calls.filter((call) => call[0] === 'openToolDraft').map((call) => call[1])),
+  ];
+  const namedTools = (labels) =>
+    labels.map((label, index) => ({ ...toolRouteFixture, id: `tool-order-${index}`, label }));
+
+  it('auto-selects the row at the top of the SORTED PAGE, not the first authored Tool', async () => {
+    // Nine Tools, authored with the alphabetically LAST one first. Name-ascending pages the
+    // first eight of them, so the authored-first Tool is not merely further down the list - it
+    // is on page two, and selecting it left the inspector describing a Tool the GM could not
+    // see at all.
+    const calls = await mountToolRoute({
+      storeOptions: {
+        gatheringLibraryTools: namedTools([
+          'Zephyr Kiln',
+          "Alchemist's Supplies",
+          'Arcane Forge',
+          'Ley-Line Nexus',
+          "Master's Anvil",
+          'Moonwell',
+          "Smith's Hammer",
+          'Volcanic Vent',
+          'Woodcarving Tools',
+        ]),
+      },
+    });
+
+    assert.deepEqual(libraryRowNames(), [
+      "Alchemist's Supplies",
+      'Arcane Forge',
+      'Ley-Line Nexus',
+      "Master's Anvil",
+      'Moonwell',
+      "Smith's Hammer",
+      'Volcanic Vent',
+      'Woodcarving Tools',
+    ]);
+    assert.equal(
+      libraryRowNames().includes('Zephyr Kiln'),
+      false,
+      'the authored-first Tool sorts onto page two, so nothing on this page can be it'
+    );
+    assert.deepEqual(
+      selectedLibraryRowNames(),
+      ["Alchemist's Supplies"],
+      'exactly one row is marked, and it is the one drawn at the top of the list'
+    );
+    assert.equal(
+      inspectorSubjectName(),
+      "Alchemist's Supplies",
+      'the inspector describes the row the GM sees first, not an off-page Tool'
+    );
+    assert.deepEqual(openedToolDraftIds(calls), ['tool-order-1']);
+  });
+
+  it('keeps the auto-selected row marked and on screen when the sort direction flips', async () => {
+    const calls = await mountToolRoute({
+      storeOptions: {
+        gatheringLibraryTools: namedTools([
+          "Smith's Hammer",
+          "Alchemist's Supplies",
+          'Arcane Forge',
+        ]),
+      },
+    });
+    assert.deepEqual(selectedLibraryRowNames(), ["Alchemist's Supplies"]);
+
+    target.querySelector('[data-tool-sort-direction]').click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('[data-tool-sort-direction]').dataset.toolSortDirection,
+      'desc'
+    );
+    assert.deepEqual(libraryRowNames(), ["Smith's Hammer", 'Arcane Forge', "Alchemist's Supplies"]);
+    // THE SELECTION NEITHER CHASES THE NEW TOP ROW NOR VANISHES. A GM who re-sorts is looking
+    // for a Tool, not replacing the one they are inspecting, and the still-valid-selection
+    // early return is what keeps the panel still while the list moves under it.
+    assert.deepEqual(selectedLibraryRowNames(), ["Alchemist's Supplies"]);
+    assert.equal(inspectorSubjectName(), "Alchemist's Supplies");
+    assert.deepEqual(
+      openedToolDraftIds(calls),
+      ['tool-order-1'],
+      'a re-sort must not open a second draft'
+    );
+  });
+
+  it('never auto-selects an UNADOPTED world row through the adopted-Tool callback', async () => {
+    // `All world tools` widens the list with `ghostRows` - world Tools this system holds no
+    // rules record for. They are inspected through `selectedUnadoptedToolId`, so pushing one
+    // through `onSelectTool` would misroute the panel AND latch: an unadopted selection
+    // suppresses every later auto-select. The pick therefore skips every non-member row.
+    //
+    // Mounted on the VIEW here, because the selection must still be open when the `all` filter
+    // is applied: the shell answers `onSelectTool` by feeding a valid `selectedToolId` back,
+    // and the effect's still-valid-selection early return would then stop before the widened
+    // list was ever consulted.
+    const selections = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(ToolsBrowserViewComponent, {
+      target,
+      props: {
+        tools: [
+          { ...toolRouteFixture, id: 'tool-zephyr', label: 'Zephyr Kiln' },
+          { ...toolRouteFixture, id: 'tool-basalt', label: 'Basalt Mortar' },
+        ],
+        managedItemOptions: [{ id: 'c1', name: 'Iron Ore' }],
+        systemId: 'sys-forge',
+        scope: {
+          entityType: 'tool',
+          available: true,
+          entries: [
+            { id: 'tool-zephyr', entity: { id: 'tool-zephyr', name: 'Zephyr Kiln' }, systems: [] },
+            {
+              id: 'tool-basalt',
+              entity: { id: 'tool-basalt', name: 'Basalt Mortar' },
+              systems: [],
+            },
+            {
+              id: 'world-aegis',
+              entity: { id: 'world-aegis', name: 'Aegis Crucible' },
+              systems: [],
+            },
+          ],
+        },
+        onSelectTool: (id) => selections.push(id),
+      },
+    });
+    flushSync();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-tool-membership-option="all"] input').click();
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      [...target.querySelectorAll('.manager-tools-row')].map(
+        (row) => `${row.dataset.managerToolId}:${row.dataset.toolRowMember}`
+      ),
+      ['world-aegis:absent', 'tool-basalt:member', 'tool-zephyr:member'],
+      'the widened list really does draw an unadopted world row above every member'
+    );
+    assert.deepEqual(
+      selections,
+      ['tool-basalt'],
+      'the first MEMBER row is selected once, and the unadopted row above it is never pushed through onSelectTool'
+    );
+  });
+
   it('projects configured Tool values into the compact library inspector', async () => {
     await mountToolRoute({
       storeOptions: {
