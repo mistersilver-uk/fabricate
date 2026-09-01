@@ -313,9 +313,21 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // have stopped matching, which is exactly the regression this assertion exists to catch —
     // in all three studios at once, and invisibly to any source review. Asserting it here is
     // what makes the move safe rather than what makes it pass.
+    //
+    // RETARGETED AGAIN, and for the SAME failure one level further out (issue 1427). The card's
+    // root `<section>` became an `<InspectorCard>`, so `fab-bulk-delete-card` now rides the
+    // `class` prop onto an element this component does not write and the ancestor half of the
+    // old selector stopped matching. It did so SILENTLY — this component spreads attributes onto
+    // three regular elements, which makes every class selector in its block possibly-matching, so
+    // the compiler emitted the rule with its hash attached and raised no `css_unused_selector`.
+    // The repair moves the whole selector inside `:global()` and chains
+    // `.manager-inspector-card` so the specificity stays at (0,3,0); this assertion follows it,
+    // which is the point of pinning a selector rather than a declaration.
     const styles = styleBlock(bulkDeleteCardSource);
     assert.ok(
-      /\.fab-bulk-delete-card :global\(\.manager-button\) \{[^}]*font-size: 0\.72rem;/s.test(styles),
+      /:global\(\.manager-inspector-card\.fab-bulk-delete-card \.manager-button\) \{[^}]*font-size: 0\.72rem;/s.test(
+        styles
+      ),
       'the delete card scopes its button to the shared inspector-action label size'
     );
     // Scoped to the delete card only — the danger/armed colour treatment stays in the

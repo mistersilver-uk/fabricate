@@ -159,8 +159,26 @@ function compiledCss(file, source) {
  * was EMITTED with the hash attached and warned about nowhere. A repair driven by the warning
  * gate alone would have shipped the second one dead.
  *
- * Its floor is stated separately from `ManagerButton`'s below, because one primitive having
- * plenty of call sites must not let the other's scan rot to zero unnoticed.
+ * `InspectorCard` (issue 1427) joined on the same argument, and it is not a button at all —
+ * which is the point. The defect is a property of the COMPONENT BOUNDARY rather than of any one
+ * control, so every extraction that moves a class onto a child belongs in this one table.
+ *
+ * It also corrected what this file previously recorded about WHEN the silent mode fires. The
+ * `IconButton` note above blamed a spread attribute on a regular element. That is incomplete.
+ * Measured directly against Svelte 5.56.3, with a `.target` rule whose only call site is
+ * `<Child class="target" />`, the rule is pruned and warned about when the file holds nothing
+ * else, when it holds `<Other {...hook} />`, when it holds `<Other class={expr} />`, when it
+ * holds `<i class:is-on={on}>` and when it holds `<i class="static">` — and it is emitted
+ * SILENTLY when the file holds `<li {...hook}>` or `<i class={o.icon}>` or
+ * ``<i class={`lit ${o.icon}`}>``. The trigger is a REGULAR ELEMENT carrying either a spread or
+ * a `class` whose value is any expression, a template literal included; the same attribute on a
+ * COMPONENT tag does not do it. `GatheringEconomyView` is the worked example: its only spreads
+ * are on `<Stepper>`, and what silences it is `class={option.icon}` on an `<i>`. An
+ * expression-valued `class` on a regular element is ordinary in this codebase, so the silent
+ * mode is the DEFAULT and this guard — not `lint:svelte:warnings` — is what finds it.
+ *
+ * Each floor is stated separately, because one primitive having plenty of call sites must not
+ * let another's scan rot to zero unnoticed.
  */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
@@ -169,9 +187,17 @@ const PRIMITIVES = Object.freeze([
     minimumTokens: 20,
   }),
   Object.freeze({ tag: 'IconButton', contractClasses: ['manager-icon-button'], minimumTokens: 10 }),
+  // The manager's card shell. Its call sites pass FEWER bespoke tokens than either button's —
+  // 13 across 20 components as issue 1427 lands — because a card's modifier is usually the
+  // only class it carries, so the floor is lower without being weaker.
+  Object.freeze({
+    tag: 'InspectorCard',
+    contractClasses: ['manager-inspector-card'],
+    minimumTokens: 8,
+  }),
 ]);
 
-test('no component scopes a rule onto a class it hands to a shared button primitive', () => {
+test('no component scopes a rule onto a class it hands to a shared primitive', () => {
   const violations = [];
   const sitesScanned = new Map(PRIMITIVES.map((p) => [p.tag, 0]));
   let componentsWithScopedCss = 0;
@@ -182,7 +208,23 @@ test('no component scopes a rule onto a class it hands to a shared button primit
     const active = PRIMITIVES.map((primitive) => ({
       primitive,
       tokens: classTokensPassedTo(source, primitive.tag),
-      renders: new RegExp(`<${primitive.tag}[\s/>]`).test(source),
+      // `String.raw` is load-bearing and is NOT a style choice. A plain template literal
+      // resolves \s to a bare `s` before `RegExp` ever sees it, so this character
+      // class silently becomes `[s/>]` — which breaks the predicate in BOTH directions at once.
+      // It UNDER-matches, rejecting `<Tag class=…>` and `<Tag\n  class=…>` (a tag
+      // followed by a space or a newline, which is nearly every call site in this corpus),
+      // and it OVER-matches, accepting `<Tags>` — a DIFFERENT component whose name merely
+      // EXTENDS this one — so a file that never renders the primitive can satisfy it.
+      // (`<TagGroup>` escapes only because `G` happens not to be in the collapsed class;
+      // the plural spelling, which is the likely one, does not.) Measured, not reasoned:
+      // `<InspectorCards>` matches the collapsed form and not the raw one.
+      // Measured when `<InspectorCard>` joined (issue 1427): the collapsed form matched 6
+      // of 53 `ManagerButton` files, 2 of 36 `IconButton` files and 5 of 20 `InspectorCard`
+      // files, leaving the contract-class half of this guard inert over three quarters of
+      // its corpus while reporting clean. A mechanical check that cannot fail is
+      // indistinguishable from one that passes, so do not "tidy" this back to a template
+      // literal.
+      renders: new RegExp(String.raw`<${primitive.tag}[\s/>]`).test(source),
     })).filter((entry) => entry.tokens.size > 0 || entry.renders);
     if (active.length === 0) continue;
     for (const entry of active) {
@@ -277,7 +319,7 @@ test('no component scopes a rule onto a class it hands to a shared button primit
   }
   assert.ok(
     componentsWithScopedCss > 0,
-    'no component both renders a classed button primitive and owns a scoped <style>, so this ' +
+    'no component both renders a classed primitive and owns a scoped <style>, so this ' +
       'guard walked over nothing'
   );
   // The floor for the half added at task 9. It has to be stated, because that half is the one
@@ -286,7 +328,7 @@ test('no component scopes a rule onto a class it hands to a shared button primit
   // its silence means nothing.
   assert.ok(
     contractRulesScanned > 0,
-    'no component that renders a button primitive states a scoped rule against one of its ' +
+    'no component that renders a primitive states a scoped rule against one of its ' +
       'contract classes, so the compound check walked over nothing'
   );
 
@@ -295,8 +337,8 @@ test('no component scopes a rule onto a class it hands to a shared button primit
   assert.deepEqual(
     violations.sort((left, right) => (left === right ? 0 : left < right ? -1 : 1)),
     [],
-    'these rules select a class that only a `<ManagerButton>` or `<IconButton>` carries, so ' +
-      'they match NOTHING ' +
+    'these rules select a class that only a `<ManagerButton>`, `<IconButton>` or ' +
+      '`<InspectorCard>` carries, so they match NOTHING ' +
       'and the control is silently unstyled — either emitted with this component`s scoping ' +
       'class attached, or pruned by the compiler before they were emitted at all. Wrap each ' +
       'in `:global(...)` — and chain the primitive`s classes while you are there, because a ' +

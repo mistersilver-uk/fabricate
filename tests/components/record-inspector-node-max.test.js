@@ -27,6 +27,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
     'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
     'src/ui/svelte/apps/manager/environment/MatchingEvidenceChips.svelte',

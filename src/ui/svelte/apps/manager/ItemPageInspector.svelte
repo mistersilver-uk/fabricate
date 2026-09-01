@@ -22,6 +22,7 @@
   import Chip from './Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -247,10 +248,7 @@
       {/if}
     </div>
 
-    <section
-      class="manager-inspector-card manager-books-scrolls-quick-limits"
-      data-item-page-quick-limits
-    >
+    <InspectorCard class="manager-books-scrolls-quick-limits" data-item-page-quick-limits="">
       <div class="manager-inspector-title-row">
         <span class="manager-inspector-icon" aria-hidden="true"><i class="fas fa-sliders"></i></span
         >
@@ -288,7 +286,7 @@
           />
         </span>
       </div>
-    </section>
+    </InspectorCard>
 
     <ManagerButton
       role="primary"
@@ -422,11 +420,27 @@
     padding-left: var(--fab-space-2);
   }
 
-  .manager-books-scrolls-quick-limits {
+  /* `:global()` AND CHAINED (issue 1427), for the reason the `.manager-books-scrolls-edit-action`
+     rule below states for `<ManagerButton>`. The quick-limits card is an `<InspectorCard>` now,
+     so `manager-books-scrolls-quick-limits` rides the `class` prop onto an element THIS
+     component does not write, and Svelte stamps its `svelte-<hash>` only onto the ones it does.
+     This half of the sweep was the LOUD one — the component spreads no attributes onto a regular
+     element, so the compiler pruned the descendant rule and `lint:svelte:warnings` named it. The
+     bare rule beside it did NOT warn and was equally dead, so both are repaired.
+     `.manager-inspector-card` is chained rather than left off so the selector stays at (0,2,0),
+     exactly where the scoped form put it. */
+  :global(.manager-inspector-card.manager-books-scrolls-quick-limits) {
     margin: 0;
   }
 
-  .manager-books-scrolls-quick-limits .manager-rule-row {
+  /* Same repair, and WHOLLY `:global()` rather than a `:global()` ancestor with a scoped
+     descendant — which is the form that looks right and quietly changes the cascade. Svelte
+     writes the hash as `:where(.svelte-<hash>)`, worth nothing, only while the selector has
+     another scoped compound to carry it; leave `.manager-rule-row` as the ONLY scoped compound
+     and the compiler emits a bare `.svelte-<hash>` instead, taking the rule from (0,3,0) to
+     (0,4,0). Measured, not assumed. Inside the `:global()` it stays at (0,3,0), and the ancestor
+     compound is written by nothing but this component, so the match set is unchanged. */
+  :global(.manager-inspector-card.manager-books-scrolls-quick-limits .manager-rule-row) {
     display: flex;
     align-items: center;
     justify-content: space-between;

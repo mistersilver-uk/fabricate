@@ -3,6 +3,7 @@
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { projectToolBehaviorFacts, projectToolRow } from './toolStudio.js';
 
@@ -36,10 +37,7 @@
 </script>
 
 {#if row}
-  <section
-    class="manager-inspector-card manager-tool-browser-inspector"
-    data-tool-browser-inspector
-  >
+  <InspectorCard class="manager-tool-browser-inspector" data-tool-browser-inspector="">
     <div class="manager-tool-inspector-hero">
       <img src={row.img} alt="" />
       <div>
@@ -87,7 +85,7 @@
         </section>
       {/each}
     </div>
-  </section>
+  </InspectorCard>
 {:else}
   <!-- The inspector's no-selection state is the shared primitive at the sidebar scale.
        It used to re-derive the panel by hand through

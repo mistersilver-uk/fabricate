@@ -181,6 +181,12 @@
       "why": "The shared icon picker (8 callers, issue 1269). `library.html:764` names icons FIRST among the catalogues collapsing into `<SearchPopover>`; same reasoning as `EssenceSourceSelector`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because everything it presents exists only in the open popover and neither representative frame opens one."
     },
     {
+      "path": "src/ui/svelte/components/InspectorCard.svelte",
+      "library": "<Card>",
+      "evidence": "broad",
+      "why": "THE manager's card shell (19 callers, issue 1427), extracted from 80 hand-written `class=\"manager-inspector-card\"` sections across 20 components — every one of them a `<section>`, measured by walking each component's Svelte AST, so it takes no polymorphism prop. `library.html:941` heads one specimen `<Card> <Well> <RowDisclosure>` and states \"two container levels only; a card sits on the page, a well nests inside a card\" — this is that card, and the entry was in the specified-but-unbuilt register until it shipped. Two divergences from that specimen are deliberate and recorded rather than smoothed over: the shipped box is radius 8 with `--fab-space-3` padding on `--fab-overlay-light-04` (`fabricate.css:13663`) against the specimen's radius 11 / padding 16 / bg-2, and the sheet declares three further treatments keyed on a modifier class (`.manager-checks-card`), on an ANCESTOR (`.manager-checks-rail`, which reaches cards carrying no modifier at all) and on a positioning state (`.is-sticky`, which — measured across `src/` — no component writes at all) — so it takes NO variant prop, because a vocabulary spanning three different anchors is a design ruling and not something to settle inside a sweep whose acceptance bar is that no frame moves. `<Well>`, the level below it, remains unbuilt. Broad by reach: the Checks Studio, both environment inspectors, the essence and tool inspectors, the books-and-scrolls inspector, the Tool Studio authority card and the shared bulk-delete card all render it, and the deferred root holds 32 more sites. It carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because NEITHER representative frame contains a card at all."
+    },
+    {
       "path": "src/ui/svelte/components/ManagerButton.svelte",
       "library": "<Button>",
       "evidence": "broad",

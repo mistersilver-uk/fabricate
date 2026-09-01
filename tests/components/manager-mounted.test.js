@@ -182,6 +182,9 @@ function compileManagerRoot() {
   // The odds histogram's bars are the shipped fill bar (issue 1097) rather than a sixth
   // hand-rolled copy of the shape `ui-integration/spec.md` records as debt.
   writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
+  // The shared card shell (issue 1427). Nineteen components render it and this tree reaches
+  // most of them, so omitting it HANGS this suite (# cancelled) rather than failing it.
+  writeCompiledSvelte('src/ui/svelte/components/InspectorCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   // The roll section's mode callout (issue 1096). `ChecksView` imports it STATICALLY, so
   // omitting it does not skip a branch — it fails module resolution for the whole suite.

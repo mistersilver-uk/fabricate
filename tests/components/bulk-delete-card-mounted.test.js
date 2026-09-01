@@ -37,7 +37,13 @@ const harness = createMountedComponentHarness({
   // The card's ONE shared leaf (issue 1157): the "move the keyboard, then announce" ordering
   // rule it shares with the manager root, which is why it is a module rather than two copies.
   rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
-  compiledModules: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte', CARD_PATH],
+  compiledModules: [
+    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    // The shared card shell (issue 1427). The card's root element is an `<InspectorCard>`
+    // now, so omitting it makes the harness's own closure validator throw in `before()`.
+    'src/ui/svelte/components/InspectorCard.svelte',
+    CARD_PATH,
+  ],
   componentPath: CARD_PATH,
 });
 
