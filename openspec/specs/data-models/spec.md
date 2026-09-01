@@ -2459,7 +2459,7 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    **The world default is AUTHORED through its own tool-family write action, never through the section writer.**
    `updateWorldDefaultSection` refuses every name outside the scope's declared sections and `repairRequirements` is deliberately not one of them, so routing the write through it returns `false` and stores nothing.
    The seed's WRITE path and its READ path are therefore deliberately asymmetric: the world holds it and a tool-family-only action writes it, while the membership record alone answers it.
-   Without that action the world Tool entry would display a seed source nobody could author, which is a screen stating a value the model makes unreachable.
+   The action's callers are import, migration and adoption; NO GM SCREEN offers it, and `### GM World Scoped Entity Routes` requirement 4 states why — a screen that cannot show a repair group's contents cannot honestly offer a write over them.
 
    **WHILE `## CraftingSystem` REQUIREMENT 36 HOLDS THE SEED IS TAKEN ONTO BOTH RECORDS, AND ONLY THE IN-SYSTEM COPY IS READ** (issue 1373).
    `Tool.repairRequirements` is a shipped in-system field, so a normalized in-system record always carries it — and requirement 15's KEYS clause answers every key the in-system record carries FROM that record.

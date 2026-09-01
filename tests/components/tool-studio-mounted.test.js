@@ -103,6 +103,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
+    // `ToolBehaviorPreview` renders the shipped pager for its `Required for` region since
+    // issue 1373's parity round. This editor passes no `requiredForPageSize`, so it draws no
+    // pager - but the import is STATIC, so it is in this tree's graph either way and the
+    // harness's closure validator throws for a shared-harness suite that omits it.
+    'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
     // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038), so it is in

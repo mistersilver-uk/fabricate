@@ -192,6 +192,28 @@
     // document answers that document's description here, and `''` when it cannot; see
     // `descriptionOf` for why the rung is the lane's and the PRECEDENCE is the frame's.
     describeEntry = undefined,
+    // ── THE ROW'S NAME, WHEN THE LANE CAN RESOLVE A BETTER ONE ──────────────────────────────
+    // `scopedEntryName` is the shipped answer and stays the default: the entity's own `name`,
+    // falling back to its id. The world Tool catalogue overrides it because a Tool's display
+    // label is OPTIONAL — the entry editor draws it empty with the linked Item's name as the
+    // placeholder, under `Leave blank to use the linked Item name.` (issue 1373) — and only the
+    // lane holds the Item roster that resolves the blank. Without this the row of a Tool that
+    // takes the Item's name would print the record id under a screen that promised otherwise.
+    //
+    // It answers a NAME, not a fallback rung: the frame keeps its own `|| id` last resort, so a
+    // lane that resolves nothing is exactly the shipped behaviour.
+    nameEntry = undefined,
+    // ── WHAT OPENS THE LIST, ABOVE THE FIRST ROW ────────────────────────────────────────────
+    // A snippet rendered INSIDE the scroller, before the rows, and only when there are rows to
+    // open. The world Tool catalogue puts its create-from-drop zone here, which is where the
+    // design draws it — a full-width dashed zone directly under the toolbar as the list's first
+    // element (`tmp/proto/tool-catalogue.png`) — rather than sharing the band above the toolbar
+    // with the world breakage card and taking a third of its width (issue 1373).
+    //
+    // Absent by default, so the component and essence catalogues render unchanged. It is NOT a
+    // row: it sits outside the `<ul>`, because a drop target is not a list item and every row
+    // affordance below — selection, inspection, the row action — would be a lie on it.
+    listLead = undefined,
     countUnit = '',
     // Whether the toolbar offers the world/system MEMBERSHIP `<select>`. Default ON, so every
     // other caller renders unchanged. The essence catalogue turns it off: the prototype's toolbar
@@ -227,6 +249,24 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  /**
+   * One row's displayed name.
+   *
+   * THE PRECEDENCE IS THE FRAME'S and the extra rung is the lane's, exactly as `descriptionOf`
+   * splits the same question: the shipped `scopedEntryName` first, then whatever the lane can
+   * resolve, then the record id. A lane that supplies no `nameEntry` gets `scopedEntryName`
+   * unchanged, which is what every catalogue but the Tool one wants.
+   *
+   * @param {object} entry
+   * @returns {string}
+   */
+  function rowName(entry) {
+    const own = String(entry?.entity?.name ?? '').trim();
+    if (own) return own;
+    const resolved = typeof nameEntry === 'function' ? String(nameEntry(entry) ?? '').trim() : '';
+    return resolved || scopedEntryName(entry);
   }
 
   function format(key, fallback, replacements) {
@@ -768,6 +808,12 @@
         {/if}
 
         <div class="manager-scoped-list-rows">
+          <!-- WHAT OPENS THE LIST. Inside the scroller so it scrolls with the rows rather than
+               standing as a fixed band that costs the list its height, and OUTSIDE the `<ul>`
+               because it is not a list item. It renders in the empty states too: a catalogue
+               with nothing in it is exactly when a GM most needs the surface that creates the
+               first record. -->
+          {#if listLead}{@render listLead()}{/if}
           {#if page.rows.length === 0 && filtered}
             <EmptyState
               filtered
@@ -796,7 +842,7 @@
                 {@const inspected = inspectedEntry?.id === entry.id}
                 {@const bulkSelected = selectedIds.has(entry.id)}
                 {@const thumbnail = thumbnailOf(entry)}
-                {@const name = scopedEntryName(entry)}
+                {@const name = rowName(entry)}
                 <li
                   class="manager-scoped-list-row"
                   class:is-selected={inspected}
@@ -1373,11 +1419,44 @@
     white-space: nowrap;
   }
 
+  /* THE SCROLLER RESTS ON A ROW BOUNDARY, NEVER THROUGH ONE (issue 1373).
+
+     Opening a catalogue on a selected row auto-scrolls it into view, and an auto-scroll lands
+     wherever the target needs it to — which left the frame opening on a half-row, cut through
+     its own title, with no mask or fade to say the list continues above. `proximity` snapping
+     is the gentlest control that fixes it: it does not fight a wheel or a drag the way
+     `mandatory` does, and it settles the rest position onto a row start.
+
+     `scroll-padding-block-start` is what keeps the FIRST row reachable once a lead element sits
+     above it: without it a snap to the first row hides the lead entirely. */
   .manager-scoped-list-rows {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
+    scroll-padding-block-start: var(--fab-space-1);
+    scroll-snap-type: y proximity;
+  }
+
+  /* `:global` because the rows are `<li>` elements this component writes but whose class rules
+     live in `styles/fabricate.css`; the SNAP is a fact about this scroller rather than about the
+     row's appearance, so it is stated here, against the scroller that owns it. */
+  .manager-scoped-list-rows :global(.manager-scoped-list-row) {
+    scroll-snap-align: start;
+  }
+
+  /* AND THE TOP OF THE LIST IS A SNAP POINT, which is not optional once the rows are.
+
+     `proximity` snapping resolves a rest position to the NEAREST snap point, and with points on
+     the rows alone the nearest one to `scrollTop: 0` is the first ROW — so the scroller settled
+     one lead-element down from its own top and the `listLead` creation zone was scrolled out of
+     view at rest, with nothing having been scrolled. Caught by looking at the frame: the gate
+     passed, because the zone was still inside the list's box.
+
+     `:first-child` rather than a named class, because the first child is the lead when a lane
+     supplies one and the `<ul>` when it does not, and both want the same answer. */
+  .manager-scoped-list-rows > :global(:first-child) {
+    scroll-snap-align: start;
   }
 
   /* THE SCROLL MOVED OFF THE PANEL AND ONTO ITS MIDDLE CHILD.

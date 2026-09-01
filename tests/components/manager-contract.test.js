@@ -3425,9 +3425,17 @@ describe('CraftingSystemManager source contract', () => {
       worldToolEntrySource.includes('<ItemDropZone'),
       'the world Tool entry reuses the shared drag-only Item drop zone'
     );
+    // ONE ACTION ON THE TILE, which is what the design draws (issue 1373's parity round). The
+    // Copy that sat beside Unlink is gone with the raw uuid line it copied: an id is not a fact
+    // this screen states anywhere else, and the third line displaced the hint that says what
+    // dropping onto the tile does.
     assert.ok(
-      /copyLabel=[\s\S]*?unlinkLabel=/.test(worldToolEntrySource),
-      'and places the Copy source UUID action before Unlink'
+      !worldToolEntrySource.includes('copyLabel='),
+      'the tile offers one button, not a Copy beside the Unlink'
+    );
+    assert.ok(
+      !worldToolEntrySource.includes('subline='),
+      'and no raw uuid line under the two the design draws'
     );
     assert.ok(
       worldToolEntrySource.includes('SourceDropHint'),
@@ -3456,9 +3464,17 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Tools.Editor.LabelFallback,
       'The name this crafting system shows for the Tool.'
     );
+    // AND THE WORLD FIELD NAMES ITSELF AS OPTIONAL (issue 1373's parity round). Its old copy
+    // described the field's REACH across crafting systems, which is a fact about the override
+    // above rather than about this control, and said nothing about the one thing the design's
+    // frame does: that a blank is allowed and what answers for it.
     assert.equal(
-      lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelHint,
-      'The shared name for this Tool. Every crafting system shows it unless that system overrides the name in its own rules.'
+      lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelInheritHint,
+      'Leave blank to use the linked Item name.'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelUnlinkedHint,
+      'No Item is linked, so this record has no name to fall back on.'
     );
     // TASK 4: the editor behind `Edit rules` offers the route the rules LIST already advertises.
     assert.ok(
@@ -3988,9 +4004,19 @@ describe('world scoped-entity source contract (issue 1362)', () => {
       'the shell renders the bare stem as a class, which the derivation below depends on'
     );
     const defaultStem = previewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
-    const toolStem = toolPreviewSource.match(/classPrefix="([a-z-]+)"/)?.[1];
+    // THE TOOL RAIL'S STEM IS ITS OWN PROP DEFAULT NOW, not a literal it hands down (issue 1373's
+    // parity round). `manager-tool-preview` carries the system Tool Studio's GRID PLACEMENT
+    // (`grid-column: 3; grid-row: 2 / 4`) and its filled panel surface, so handing it to the
+    // world Tool entry — whose column is a two-track grid — placed that rail in an implicit
+    // third column off the side of its own layout. The world entry passes the DEFAULT stem
+    // instead, which is why both stems still have to be declared.
+    const toolStem = toolPreviewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
     assert.equal(defaultStem, 'manager-scoped-preview');
     assert.equal(toolStem, 'manager-tool-preview');
+    assert.ok(
+      worldToolEntrySource.includes('classPrefix="manager-scoped-preview"'),
+      'the world Tool entry renders the shared rail under the placement-free default stem'
+    );
 
     // NON-VACUITY FIRST. The lookup is a set built by regex over a 20,000-line stylesheet, and a
     // regex that stopped matching would make every assertion below pass against an empty

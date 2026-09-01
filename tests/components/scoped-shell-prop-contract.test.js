@@ -83,7 +83,15 @@ const CATALOGUE_PROPS = [
   'inspectorCaption',
   'inspectorFoot',
   'inspectorKicker',
+  // THE LIST'S OWN TWO SEAMS (issue 1373's parity round), both opt-in and both defaulting to
+  // exactly what the component and essence catalogues render: `listLead` puts a lane's
+  // create-from-drop zone at the HEAD OF THE LIST, where the design draws it, instead of in a
+  // band above the toolbar; `nameEntry` gives a lane a rung under the entity's own `name`, which
+  // the Tool catalogue needs because a Tool's display label is optional and a blank falls back to
+  // the linked Item.
+  'listLead',
   'membershipFilter',
+  'nameEntry',
   'onOpenEntry',
   'onOpenSystemRules',
   'onSelect',
@@ -176,7 +184,12 @@ describe('the shells declare the pinned prop sets', () => {
       'inspectorCaption',
       'inspectorFoot',
       'inspectorKicker',
+      // AND THE TWO LIST SEAMS issue 1373's parity round added, catalogue-only for the same
+      // reason: `listLead` opens a LIST the rules-list shell draws differently, and `nameEntry`
+      // answers a display label the world catalogue alone has to resolve a blank for.
+      'listLead',
       'membershipFilter',
+      'nameEntry',
       'onOpenEntry',
       'onOpenSystemRules',
       'openEntryLabel',

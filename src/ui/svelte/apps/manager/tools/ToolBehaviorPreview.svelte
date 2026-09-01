@@ -24,6 +24,34 @@
   `Rules in <System> · identity comes from the world Tool` — the sentence that tells a GM what
   this screen may and may not change. It read `Linked game-world Item`, which is the WORLD
   editor's subtitle and describes the one thing this screen cannot touch.
+
+  == IT IS NOW BOTH SCOPES' RAIL, AND THE DIFFERENCES ARE PROPS ===============================
+  The world Tool entry drew a SECOND rail — a fork of this one that re-implemented the player
+  tile, the broken-copy toggle, the prerequisite-gate line and the `Required for` rows, and lost
+  every one of the four treatments in the copying. It composes this component instead (issue
+  1373, maintainer parity round on `TOOL-PARITY-WORLD.md`).
+
+  NOTHING HERE BRANCHES ON SCOPE. The three things world scope genuinely says differently arrive
+  as OPT-IN props that default to exactly what the system editor already rendered:
+
+   - `contextText` replaces the identity block's derived scope sentence. World scope's rail
+     restates what the RECORD is (`Linked game-world Item`), because there is no system to name;
+   - `requiredForEmptyText` replaces the derived empty hint for the same reason — `Nothing in
+     {system} requires it yet` has no system to interpolate at world scope;
+   - `requiredForPageSize` turns the `Required for` list into a PAGED window. World scope lists
+     every recipe and gathering task in every system, which for a Tool a world really uses is
+     dozens of rows in a 300px column; the design's rail overflow idiom is a pager, and the
+     shipped `Pagination` in its inspector face is that pager. `0` — the default — renders the
+     whole list exactly as the system editor does.
+
+  `classPrefix` is the fourth, and it was found by LOOKING at the frame rather than at the markup:
+  `manager-tool-preview` carries the STUDIO's grid placement (`grid-column: 3; grid-row: 2 / 4`)
+  and its filled panel surface, so the world entry's two-track column put the rail in an implicit
+  third column off the side of its own layout. See the prop's own note.
+
+  `hookAttribute` is a prop for the reason `EditorTabs` carries its own: the two screens' rails
+  are addressed by their own `data-*` names in the tests and in the View Lab case registry, and a
+  shared component must not rename a caller's selector.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -31,6 +59,7 @@
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
+  import Pagination from '../../../components/Pagination.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import ScopedEntityPreview from '../scoped/ScopedEntityPreview.svelte';
@@ -68,6 +97,25 @@
     // kind chip its row carries. Projected by the store, never counted here — this component has
     // no recipe corpus and no gathering config.
     requiredFor = [],
+    // ── THE THREE OPT-IN SCOPE DIFFERENCES, AND THE HOOK NAME ─────────────────────────────
+    // See the file header. Every default below is what the system Tool rules editor already
+    // rendered, so a caller that passes none of them is unchanged.
+    hookAttribute = 'data-tool-behavior-preview',
+    // THE CLASS STEM, WHICH IS ALSO THE GRID PLACEMENT. `manager-tool-preview` — the default,
+    // and the system Tool Studio's — carries `grid-column: 3; grid-row: 2 / 4`, a filled
+    // `--fab-bg-2` surface and a left divider, because that is where and what the STUDIO's own
+    // three-column grid needs its rail to be. Handing the same stem to the world entry, whose
+    // column is a two-track `1fr 300px` grid, placed the rail in an implicit THIRD column off
+    // the side of its own layout, and painted a panel the design does not draw there.
+    //
+    // The stem is already `ScopedEntityPreview`'s prop for exactly this reason; passing it on is
+    // what lets one rail render in two layouts. Only the shell's five region classes follow it —
+    // the three trailing regions keep their own `manager-tool-player-*`, `manager-tool-actor-*`
+    // and `manager-tool-required-*` names in both, which is what makes their treatments shared.
+    classPrefix = 'manager-tool-preview',
+    contextText = '',
+    requiredForEmptyText = '',
+    requiredForPageSize = 0,
   } = $props();
 
   function text(key, fallback) {
@@ -91,8 +139,9 @@
     )
   );
   const image = $derived(toolDisplayImage(tool, managedItems));
-  const scopeContext = $derived(
-    systemName
+  const scopeContext = $derived.by(() => {
+    if (contextText) return contextText;
+    return systemName
       ? formattedText(
           'FABRICATE.Admin.Manager.Tools.Editor.HeaderSystemScope',
           { system: systemName },
@@ -101,8 +150,8 @@
       : text(
           'FABRICATE.Admin.Manager.Tools.Editor.HeaderSystemScopeUnnamed',
           'System rules · identity comes from the world Tool'
-        )
-  );
+        );
+  });
   const rules = $derived(projectToolBehaviorFacts(tool, authority, text, formattedText));
   // The per-fact title hook is attached HERE rather than inside the shared shell, so no other
   // consumer of that shell inherits four dead attributes.
@@ -240,11 +289,49 @@
   function kindOf(entry) {
     return REQUIRED_FOR_KIND[entry?.kind] || REQUIRED_FOR_KIND.recipe;
   }
+
+  // ── THE `REQUIRED FOR` WINDOW ─────────────────────────────────────────────────────────────
+  // A PAGER RATHER THAN A TRAILING SENTENCE. The world rail used to cap the list at five rows
+  // and print `and 5 more` under it — a dead sentence that states there is more and offers no
+  // way to reach it. The design's rail overflow idiom is a pager, and `Pagination` in its
+  // inspector face (`showPageSize={false}`, `multiPageOnly`) is the one already drawn in the
+  // catalogue's system roster one route away.
+  //
+  // The index is CLAMPED rather than reset by an effect: the list shrinks whenever a recipe
+  // stops naming the Tool, and an out-of-range page would render an empty window under a
+  // summary claiming rows.
+  let requiredForPage = $state(0);
+  const requiredForPaged = $derived(requiredForPageSize > 0);
+  const requiredForPageCount = $derived(
+    requiredForPaged ? Math.max(1, Math.ceil(requiredFor.length / requiredForPageSize)) : 1
+  );
+  const requiredForIndex = $derived(Math.min(requiredForPage, requiredForPageCount - 1));
+  const requiredForShown = $derived(
+    requiredForPaged
+      ? requiredFor.slice(
+          requiredForIndex * requiredForPageSize,
+          (requiredForIndex + 1) * requiredForPageSize
+        )
+      : requiredFor
+  );
+  const requiredForEmptyHint = $derived.by(() => {
+    if (requiredForEmptyText) return requiredForEmptyText;
+    return systemName
+      ? formattedText(
+          'FABRICATE.Admin.Manager.Tools.Editor.RequiredForEmpty',
+          { system: systemName },
+          'Nothing in {system} requires it yet.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Tools.Editor.RequiredForEmptyUnnamed',
+          'Nothing in this system requires it yet.'
+        );
+  });
 </script>
 
 <ScopedEntityPreview
-  classPrefix="manager-tool-preview"
-  hookAttribute="data-tool-behavior-preview"
+  {classPrefix}
+  {hookAttribute}
   ariaLabel={text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}
   kicker={text('FABRICATE.Admin.Manager.Tools.Editor.PreviewKicker', 'How it behaves')}
   identity={{
@@ -338,26 +425,72 @@
       <EmptyState
         compact
         inline
-        hint={systemName
-          ? formattedText(
-              'FABRICATE.Admin.Manager.Tools.Editor.RequiredForEmpty',
-              { system: systemName },
-              'Nothing in {system} requires it yet.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Tools.Editor.RequiredForEmptyUnnamed',
-              'Nothing in this system requires it yet.'
-            )}
+        hint={requiredForEmptyHint}
         dataAttr="data-tool-required-for-empty"
       />
     {:else}
-      {#each requiredFor as entry (`${entry.kind}:${entry.id}`)}
+      <!-- THE KEY CARRIES THE SYSTEM AND THE POSITION. At system scope a `(kind, id)` pair is
+           unique; at WORLD scope the same recipe id can be reached through two crafting systems,
+           and a duplicate key is a mount-time throw rather than a rendering fault. -->
+      {#each requiredForShown as entry, index (`${entry.kind}:${entry.systemId ?? ''}:${entry.id}:${index}`)}
         <div class="manager-tool-required-row" data-tool-required-row={entry.id}>
           <i class={kindOf(entry).icon} aria-hidden="true"></i>
           <strong title={entry.name}>{entry.name}</strong>
           <Chip tone="neutral">{text(kindOf(entry).key, kindOf(entry).label)}</Chip>
         </div>
       {/each}
+      {#if requiredForPaged}
+        <!-- NO per-page selector: the rail is 300px wide and the window is fixed, exactly as
+             `SystemRulesRoster`'s pager is. `multiPageOnly` keeps the bar off a list that fits. -->
+        <Pagination
+          multiPageOnly
+          showPageSize={false}
+          totalCount={requiredFor.length}
+          pageIndex={requiredForIndex}
+          pageSize={requiredForPageSize}
+          onPageChange={(next) => (requiredForPage = next)}
+        />
+      {/if}
     {/if}
   </section>
 </ScopedEntityPreview>
+
+<style>
+  /* `Pagination` renders its own `<section>`, so the sizing has to be stated from this side of
+     the boundary — the same repair, for the same reason, that `SystemRulesRoster` makes for the
+     inspector roster's pager. The shipped bar is built for the foot of a full-width list
+     (`gap: --fab-space-3`, `padding: --fab-space-2 --fab-space-3`, a 96px minimum on the page
+     label, `flex-wrap: wrap`); in a 300px rail that wraps the nav onto a second line below the
+     summary, which is a pager that says there is more and hides the control that reaches it.
+
+     `.manager-tool-required-for` IS written by this component, so it carries the scoping hash and
+     the descendant is what has to be `:global` — `Pagination`'s markup never sees this file's
+     hash. Written as a descendant rather than as a bare `:global`, so the reach is this rail's
+     `Required for` region and not every pager in the manager. */
+  .manager-tool-required-for > :global(.manager-pagination) {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-1) 0 0;
+
+    /* MARGIN, NOT PADDING, and the difference is load-bearing. This is the LAST element of the
+       last region of a scrolling rail, so at the bottom of the scroll it sits flush against the
+       panel edge — measured at a 0.64px overflow of its own container, which the View Lab
+       reports as a clipped region and which a reader sees as a control touching the edge.
+       Padding grows the element's own box and moves nothing; a margin is outside it. */
+    margin-bottom: var(--fab-space-1);
+    font-size: 0.62rem;
+  }
+
+  .manager-tool-required-for :global(.manager-pagination-page) {
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .manager-tool-required-for :global(.manager-pagination-nav .manager-icon-button) {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    min-height: 24px;
+  }
+</style>

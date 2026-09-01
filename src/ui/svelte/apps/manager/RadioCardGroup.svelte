@@ -7,6 +7,13 @@
     cardId = undefined,
     legend = '',
     legendKey = '',
+    // Whether the fieldset's own `<legend>` is VISIBLE. The `is-config-cards` face hides every
+    // legend, which is right for a group that already sits under a kicker naming it and wrong
+    // for one that does not: the Tool Requirements gate-mode pair was the only group on its
+    // screen with no visible heading at all (issue 1373). Opt-in and DEFAULT OFF, so every
+    // shipped group renders unchanged, and it un-hides the group's own accessible name rather
+    // than adding a second heading a screen reader would announce twice.
+    legendVisible = false,
     hint = '',
     hintKey = '',
     options = [],
@@ -36,7 +43,7 @@
 <Field
   as="fieldset"
   id={cardId}
-  class={`is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}`}
+  class={`is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}${legendVisible ? ' is-legend-visible' : ''}`}
   {disabled}
   data-radio-card-group={dataGroup || undefined}
   {...{ [dataAttr]: dataAttr ? true : undefined }}

@@ -67,9 +67,11 @@
      did not declare it, and a snippet a shell does not forward is dropped in SILENCE — the frame
      rendered its own name-only fallback and the caption looked merely unfinished rather than
      unwired.
-   - rowTrailing / rowSecondLine / describeEntry / openEntryLabel / systemRowAction: the row and
-     inspector parity switches, each opt-in and each defaulting to what shipped. See the frame's
-     prop notes, and `SystemRulesRoster`'s own note for `systemRowAction`.
+   - rowTrailing / rowSecondLine / describeEntry / nameEntry / listLead / openEntryLabel /
+     systemRowAction: the row, list and inspector parity switches, each opt-in and each
+     defaulting to what shipped. See the frame's prop notes, and `SystemRulesRoster`'s own note
+     for `systemRowAction`. `listLead` is what puts a lane's create-from-drop zone at the head of
+     the list where the design draws it, instead of in a band above the toolbar.
    - onOpenSystemRules(entityId, systemId): the inspector system row's `Rules ↗` deep link, into
      that system's own rules for this entity. `null` — the default — falls the row back to the
      membership cluster, so a lane whose shell has nowhere to route to still gets a usable row.
@@ -121,6 +123,10 @@
     rowTrailing = undefined,
     rowSecondLine = 'description',
     describeEntry = undefined,
+    // Threaded straight to the frame; see its own prop notes. Both are OPT-IN and default to
+    // exactly what the component and essence catalogues render today.
+    nameEntry = undefined,
+    listLead = undefined,
     // The ROW ACTION the list offers per entity. The shipped icon button stays the default; a
     // lane that NAMES the verb gets the design's bordered `Edit <noun>` button instead, which is
     // also what our own system rules list already draws.
@@ -214,6 +220,8 @@
     {rowTrailing}
     {rowSecondLine}
     {describeEntry}
+    {nameEntry}
+    {listLead}
     {bulk}
     {inspectorKicker}
     {inspectorCaption}

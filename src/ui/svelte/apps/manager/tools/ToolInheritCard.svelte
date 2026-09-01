@@ -41,6 +41,11 @@
    - icon / title / subtitle: the card's own heading. `subtitle` is the descriptive line shown
      when the card carries NO inherit affordance; an inheritable card states the world default
      there instead, through `InheritRow`'s head.
+   - headingStyle: `'title'` — the system rules editor's sentence-case bold, and the default —
+     or `'kicker'`, the uppercase micro-label the WORLD entry sets every card heading in.
+     The two design frames genuinely differ here, and mounting this card unchanged put two
+     heading idioms on one world screen (issue 1373). It is the CALLER's answer rather than a
+     scope test in here, on the same argument as `ToolBehaviorPreview`'s copy overrides.
    - inheritable: whether this `(tool, system)` pair has a world membership record to inherit
      through. `false` for a pre-migration in-system Tool with no world half, which has nothing
      to inherit FROM — the card then renders its controls with no switch and no pill, exactly
@@ -97,6 +102,7 @@
     // world value is a PROPER NOUN — the display-label card states a Tool's actual name, and
     // "World default: anvil" is a different word from the one on the world record.
     lowercaseFact = true,
+    headingStyle = 'title',
     onToggle = () => {},
     children,
   } = $props();
@@ -141,7 +147,10 @@
 >
   <div class="manager-tool-rule-card-head">
     <div class="manager-tool-rule-card-title">
-      <h3>
+      <!-- `manager-kicker` is the shipped uppercase micro-label class and rides the SAME `<h3>`
+           rather than replacing it with a paragraph: the card's heading is a heading in both
+           faces, and only its treatment differs. -->
+      <h3 class={headingStyle === 'kicker' ? 'manager-kicker' : ''}>
         {#if icon}<i class={icon} aria-hidden="true"></i>{/if}{title}
       </h3>
       {#if inheritable}

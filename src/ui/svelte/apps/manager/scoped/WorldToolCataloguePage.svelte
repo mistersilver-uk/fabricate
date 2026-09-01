@@ -40,14 +40,19 @@
   `breakModeOverridesKnown` gates the line: when the roster cannot answer, the card states
   nothing there rather than guessing.
 
-  == THE THIRD SECTION HAS NO INHERIT COUNT, AND THE INSPECTOR SAYS SO ====================
+  == THE INSPECTOR SAYS NOTHING ABOUT REPAIR MATERIALS, AND THAT IS THE ANSWER ============
   The shell renders one inherit count per `scope.sections`, which is
-  `['breakage', 'onBreak', 'prerequisites', 'bonus']` since `1.31.0`.
-  `repairRequirements` is deliberately absent from that list - it is SEEDED once when a tool
-  joins a system and then diverges - so a shell iterating the counts drops it silently. It is
-  restored through `extraCards`, the shell's own slot for a card the SECTION LOOP cannot
-  produce, and it states the seed rule rather than a count: a count would claim a live parent
-  the resolver does not honour.
+  `['breakage', 'onBreak', 'prerequisites', 'bonus']` since `1.31.0`. `repairRequirements` is
+  deliberately absent from that list - it is SEEDED once when a tool joins a system and then
+  diverges - so the section loop never reaches it. It used to be restored as an `extraCards`
+  entry reading `{n} groups / Copied once when a system adopts this Tool`.
+
+  That card is gone (issue 1373). The design draws four world-default cards and no fifth at
+  either scope, and a group COUNT is the only thing world scope can state about a seed whose
+  contents name components in the OWNING SYSTEM - which `toolScope.js` says world scope cannot
+  address. `1 group` is not a fact a GM can check anything against, so the panel states it no
+  more. `extraCards` stays the shell's slot for a card the section loop cannot produce; this
+  lane has none to put in it.
 
   == THE WORLD DEFAULTS ARE THE SHELL'S CARDS, NOT A SECOND PANEL UNDER THEM ==============
   They were this page's own `inspectorBody` snippet, headed `World defaults` and drawn below
@@ -188,17 +193,6 @@
       flagBroken: text('FABRICATE.Admin.Manager.Tools.OnBreakMarksBroken', 'Marks broken'),
       replaceWith: text('FABRICATE.Admin.Manager.Tools.OnBreakReplaces', 'Replaces'),
     }[toolOnBreakSummary(worldDefaultTool(entry))];
-  }
-
-  /**
-   * How many repair groups one tool's world default seeds.
-   *
-   * @param {object|null} entry
-   * @returns {number}
-   */
-  function repairGroupCount(entry) {
-    const groups = entry?.defaults?.repairRequirements;
-    return Array.isArray(groups) ? groups.length : 0;
   }
 
   /**
@@ -369,30 +363,15 @@
       : {}
   );
 
-  // THE SEED IS THE CARD THE SECTION LOOP CANNOT PRODUCE. `repairRequirements` carries no
-  // inherit count by design, so it is not in `scope.sections` and the loop never reaches it;
-  // the shell draws it in the same stack through `extraCards`, which exists for exactly this.
-  const extraCards = $derived(
-    selectedEntry
-      ? [
-          {
-            id: 'repair',
-            icon: 'fas fa-screwdriver-wrench',
-            title: format(
-              repairGroupCount(selectedEntry) === 1
-                ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
-                : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
-              repairGroupCount(selectedEntry) === 1 ? '{count} group' : '{count} groups',
-              { count: repairGroupCount(selectedEntry) }
-            ),
-            note: text(
-              'FABRICATE.Admin.Manager.Tools.RepairSeedPreview',
-              'Copied once when a system adopts this Tool'
-            ),
-          },
-        ]
-      : []
-  );
+  // NO EXTRA CARD. `repairRequirements` used to be one: `{n} groups` over `Copied once when a
+  // system adopts this Tool`, drawn under the four world-default cards through `extraCards`.
+  //
+  // IT WENT WITH THE ENTRY EDITOR'S SECTION (issue 1373). The design draws four cards here and
+  // no repair card at either scope, and the reason is the same one the entry's own removal
+  // note gives: a repair group names ingredient quantities over the OWNING SYSTEM's components,
+  // which world scope cannot address, so a bare group COUNT is not a number a GM can check
+  // anything against. `extraCards` itself is untouched and stays the shell's slot for a card
+  // the section loop cannot produce; this lane simply has none.
 
   /**
    * The LINKED ITEM's own description, for the frame's second description rung.
@@ -411,28 +390,49 @@
     return toolSourceSnapshot(entity, worldItems).description || '';
   }
 
+  /**
+   * One row's NAME, when the record's own display label is blank.
+   *
+   * The world Tool entry draws that label as an OPTIONAL field - empty, with the linked Item's
+   * name as its placeholder, under `Leave blank to use the linked Item name.` (issue 1373) - so
+   * a Tool that takes the Item's name stores nothing, and the shipped `scopedEntryName` would
+   * print the record id on the row. Only this page holds the Item roster that answers it.
+   *
+   * `toolSourceSnapshot` is not used here, deliberately: it substitutes `Unlinked Tool` for a
+   * missing name, which is right for a tile and wrong for a fallback.
+   *
+   * @param {object|null} entry
+   * @returns {string}
+   */
+  function nameFromLinkedItem(entry) {
+    const uuid = String(entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || '');
+    if (!uuid) return '';
+    return String(worldItems.find((item) => item?.uuid === uuid)?.name ?? '').trim();
+  }
+
   const catalogueTitle = $derived(text(TITLE_KEY, TITLE_FALLBACK));
 </script>
 
 <main class="manager-main" data-scoped-page="world-tools" aria-label={catalogueTitle}>
   <!--
-    THE SCOPE BAND: the world break mode and the creation surface, side by side.
+    THE SCOPE BAND: the world break mode, FULL WIDTH, above the list.
 
-    == WHY THEY SHARE A ROW, WHICH IS NOT WHERE THE DESIGN DRAWS THE ZONE ====================
-    The design opens the LIST with the dashed zone, immediately under the toolbar.
-    `EntityListInspectorFrame` takes no before-rows snippet and both shared shells are closed to
-    this lane, so the zone can only be a sibling of the shell - and stacked ABOVE it as its own
-    band it costs the column 86px, which is measured rather than guessed: the View Lab reported
+    == THE ZONE IS NO LONGER BESIDE IT, AND THAT WAS THE WHOLE OF THE DEFECT ================
+    The design spans this card edge to edge across the content column and opens the LIST with
+    the dashed zone, directly under the toolbar (`tmp/proto/tool-catalogue.png`). The zone was
+    parked beside the card instead, taking a third of the band's width and squeezing the card
+    that states a world-wide rule into two thirds of the room the design gives it.
+
+    The reason recorded here was that `EntityListInspectorFrame` took no before-rows snippet and
+    both shared shells were closed to the lane, so the only alternative was a THIRD stacked band
+    costing the column 86px - measured, not guessed: the View Lab reported
     `[data-world-tool-defaults] is clipped or extends outside [data-scoped-list-inspector]` on
-    the first render of the stacked version, because the shell's inspector floors its roster at
-    120px and pins its lane panel at `flex: 0 0 auto`, so the panel a GM reads the world
-    defaults in was pushed below the fold.
+    the stacked version, because the shell's inspector floors its roster at 120px and pins its
+    lane panel at `flex: 0 0 auto`.
 
-    Sharing the row with a card that is already taller than the zone costs the column NOTHING,
-    which is what keeps the inspector intact. Both are page-level statements rather than list
-    rows, so the band reads as one: what breakage means for every Tool, and how a new Tool is
-    made. Moving the zone INTO the list is a shell prop, not a page change, and belongs to
-    whichever lane next opens those two files.
+    THE FRAME TAKES ONE NOW. `listLead` renders the zone INSIDE the list's own scroller, above
+    the first row, which is the design's placement and which costs the inspector column nothing
+    at all - the zone scrolls with the rows rather than standing over them.
   -->
   <div class="manager-world-tool-scope-band">
     <InspectorCard class="manager-world-tool-break-card" data-world-tool-break-mode="">
@@ -496,19 +496,6 @@
             )}
       </p>
     </InspectorCard>
-
-    <ItemDropZone
-      kind="tool-create"
-      title={text(
-        'FABRICATE.Admin.Manager.Tools.CreateDropTitle',
-        'Drag an Item here to make it a Tool'
-      )}
-      hint={text(
-        'FABRICATE.Admin.Manager.Tools.CreateDropHint',
-        'Drop an Item from the Items directory or a compendium.'
-      )}
-      onDrop={onCreateFromItemDrop}
-    />
   </div>
 
   <div class="manager-world-tool-catalogue-body">
@@ -533,7 +520,6 @@
       {sectionIcons}
       {sectionTitles}
       {sectionNotes}
-      {extraCards}
       inspectorKicker={text('FABRICATE.Admin.Manager.Scoped.Tool.InspectorKicker', 'Tool page')}
       countUnit={text('FABRICATE.Admin.Manager.Scoped.Tool.CountUnit', 'tools')}
       selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.SelectAllShort', 'All')}
@@ -544,9 +530,12 @@
       inspectorFoot={toolInspectorFoot}
       inspectorCaption={toolInspectorCaption}
       describeEntry={describeFromLinkedItem}
+      nameEntry={nameFromLinkedItem}
+      listLead={toolCreateZone}
       openEntryLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.RowOpenEntry', 'Edit tool')}
       rowSecondLine="meta"
       systemRowAction="navigate"
+      membershipFilter={false}
       bind:selectedId
       onSelect={(entityId) => (selectedId = entityId)}
       {onOpenEntry}
@@ -558,6 +547,35 @@
 </main>
 
 <!--
+  THE LIST'S FIRST ELEMENT: the surface that makes a Tool.
+
+  The design opens the list with it, full width, directly under the toolbar
+  (`tmp/proto/tool-catalogue.png`). It is on THIS screen because a Tool is a world record - it
+  exists once, every system adopts the same one, and the system Tool Rules list can only ever
+  author RULES for a record the world already holds.
+
+  The resolution is the SHELL's, not this page's. Turning a dropped payload into
+  `{name, img, description, originItemUuid}` needs `services.resolveToolSource`, which reads a
+  Foundry global; `worldScopeActions` deliberately reads none, and a page cannot reach the
+  services bag. So the page raises the raw drag data and the root resolves, creates and
+  navigates.
+-->
+{#snippet toolCreateZone()}
+  <ItemDropZone
+    kind="tool-create"
+    title={text(
+      'FABRICATE.Admin.Manager.Tools.CreateDropTitle',
+      'Drag an Item here to make it a Tool'
+    )}
+    hint={text(
+      'FABRICATE.Admin.Manager.Tools.CreateDropHint',
+      'Drop an Item from the Items directory or a compendium.'
+    )}
+    onDrop={onCreateFromItemDrop}
+  />
+{/snippet}
+
+<!--
   THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT.
 
   The reference pins a full-width `Edit tool` under the panel's scroll region
@@ -566,9 +584,11 @@
   the essence catalogue beside it already makes with the same primitive.
 -->
 {#snippet toolInspectorFoot(entry)}
+  <!-- NO GLYPH. The design's pinned action is the verb alone; the external-link mark belongs to
+       the ROW buttons, which leave the catalogue for a different screen, and this one opens the
+       record the panel above it is already describing (issue 1373). -->
   <InspectorActionButton
     tone="primary"
-    icon="fas fa-arrow-up-right-from-square"
     label={text('FABRICATE.Admin.Manager.Scoped.Tool.OpenEntry', 'Edit tool')}
     data-scoped-tool-open-entry
     onClick={() => onOpenEntry(entry.id)}
@@ -584,9 +604,11 @@
   is usable anywhere at all.
 -->
 {#snippet toolInspectorCaption(entry)}
+  <!-- THE WORD ALONE. The design's state pill under the Tool's name is a bare `On`, and a
+       leading dot on a two-letter label is a mark carrying no information the word does not
+       (issue 1373). The TONE still separates the two states. -->
   <Chip
     tone={entry?.worldEnabled === false ? 'neutral' : 'positive'}
-    icon={entry?.worldEnabled === false ? 'fas fa-circle-pause' : 'fas fa-circle-check'}
     data-world-tool-inspector-state={entry?.worldEnabled === false ? 'off' : 'on'}
   >
     {entry?.worldEnabled === false
@@ -667,21 +689,12 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  /* Two page-level statements on ONE row, so the creation surface costs the list column no
-     height at all; see the band's own note. It WRAPS under a narrow pane rather than crushing
-     either half, and the zone takes the smaller basis because the card carries three lines. */
+  /* ONE STATEMENT, EDGE TO EDGE. The band held the break card and the creation zone side by
+     side; the zone is the list's lead now, so what remains spans the content column exactly as
+     the design draws it. */
   .manager-world-tool-scope-band {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     grid-row: 1;
-    align-items: stretch;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-
-  .manager-world-tool-scope-band > :global(.manager-item-drop-zone) {
-    flex: 1 1 18rem;
-    width: auto;
     min-width: 0;
   }
 
@@ -694,7 +707,6 @@
      moves on screen. */
   :global(.manager-inspector-card.manager-world-tool-break-card) {
     display: flex;
-    flex: 2 1 26rem;
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;

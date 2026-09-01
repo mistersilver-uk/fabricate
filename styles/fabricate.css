@@ -10560,6 +10560,31 @@
   grid-column: 1 / -1;
 }
 
+/* A FIELD'S VALUE IS NOT ITS CAPTION (issue 1373, world Tool parity round).
+
+   The rule above sets `font-weight: 700` on the `.manager-field` BOX, because the caption it
+   wraps is a label and a label is bold. Foundry's own control reset gives `input`, `select` and
+   `textarea` `font: inherit`, so the value inside the field inherits that 700 as well — and the
+   world Tool entry's `Display label` therefore rendered the Tool's name at the same weight as
+   the kicker above it, reading as a heading rather than as something a GM has typed. The design
+   sets field text at regular weight.
+
+   SCOPED TO THE ROUTE RATHER THAN FIXED ON THE PRIMITIVE, and that is a bounded call rather
+   than a preference: `.manager-field` is re-typed at 88 sites across 24 components, and a
+   blanket reset here would restyle every form in the manager on the evidence of one screen's
+   design frame. The general repair belongs with a `Field` audit; what this closes is the screen
+   the frame is of.
+
+   `:not(.fab-stepper-input)` mirrors the shared field rules further down for the same reason
+   they carry it: the stepper supplies its own chrome and must not be reweighted with the text
+   controls around it. */
+.fabricate-manager[data-manager-view='world-tool-entry']
+  .manager-field
+  input:not(.fab-stepper-input),
+.fabricate-manager[data-manager-view='world-tool-entry'] .manager-field textarea {
+  font-weight: 400;
+}
+
 .fabricate-manager .manager-currency-edit-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -10756,6 +10781,30 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+  border: 0;
+}
+
+/* `legendVisible` PUTS THE GROUP'S OWN NAME BACK ON SCREEN (issue 1373).
+
+   The config-cards face above hides every legend, on the premise that a card group always sits
+   under a kicker that already names it. The Tool Requirements gate-mode pair does not — it was
+   the one group on that screen with no visible heading at all — and the honest repair is to
+   un-hide the fieldset's accessible name rather than to print a second heading beside it.
+   (0,3,1) against the hiding rule's (0,3,1) would be a tie settled on order, so the state class
+   is CHAINED onto the card, which makes it (0,4,1) and settles it on specificity. It restates
+   every property the hiding rule sets, because a partially reset visually-hidden block is a
+   1px-tall legend with its text clipped. */
+.fabricate-manager
+  .manager-resolution-mode-card.is-config-cards.is-legend-visible
+  .manager-resolution-mode-legend {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
   border: 0;
 }
 
@@ -18418,6 +18467,20 @@
 .fabricate-manager .manager-tool-rule-card-title h3 > i {
   margin-right: var(--fab-space-2);
   color: var(--fab-accent);
+}
+
+/* THE WORLD ENTRY'S FACE OF THE SAME HEADING (issue 1373).
+
+   The system rules editor sets its section headings in sentence-case display type, which is
+   what its design frame draws; the WORLD Tool entry sets every card heading as an uppercase
+   micro-label, which is what ITS frame draws — so mounting this card there unchanged put two
+   heading idioms on one screen. `ToolInheritCard`'s `headingStyle="kicker"` adds the shipped
+   `.manager-kicker` to the same `<h3>`, and that class carries the colour, weight and casing
+   at (0,2,0); the two properties the rule above out-specifies at (0,2,1) — the serif face and
+   the 0.9rem size — are what this restates. Nothing else about the card moves. */
+.fabricate-manager .manager-tool-rule-card-title h3.manager-kicker {
+  font-family: inherit;
+  font-size: 0.72rem;
 }
 
 .fabricate-manager .manager-tool-rule-card-sub {
