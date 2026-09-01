@@ -119,7 +119,14 @@ import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import {
   seedToolRepairRequirements as _seedToolRepairRequirements,
   TOOL_BREAKAGE_AUTHORITIES,
+  TOOL_SECTIONS,
 } from '../../../systems/toolScope.js';
+// THE READ UNION AND THE SWITCH THAT DECIDES WHAT IT ANSWERS (issue 1373). The Tool Rules editor
+// DISPLAYS from `resolvedToolsFor` — what a craft will actually do — and SAVES only the sections
+// the membership record marks overriding, which is what stops a display read from converting an
+// inheriting section into an override on the next save.
+import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
+import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
 import {
   defaultKnowledgeTab,
   projectKnowledgeSnapshot,
@@ -1997,7 +2004,10 @@ export function createAdminStore(services) {
     const draft = get(toolDraft);
     const baseline = get(toolDraftBaseline);
     const systemId = get(toolDraftSystemId);
-    const library = systemId ? _systemTools(systemId) : [];
+    // THE UNION, because this is a display projection and the draft it overlays is one too
+    // (issue 1373). A raw-array library beneath a union-seeded draft would be two answers to
+    // "what does this system's Tool do" in one published object.
+    const library = systemId ? _resolvedSystemTools(systemId) : [];
     const overlay = (entries, entry) => {
       if (!entry) return entries.map(_clonePlain);
       const index = entries.findIndex((tool) => String(tool.id) === String(entry.id));
@@ -2092,10 +2102,23 @@ export function createAdminStore(services) {
     return _clonePlain(created);
   }
 
+  /**
+   * Open the rules editor on one Tool, SEEDED FROM THE READ UNION (issue 1373).
+   *
+   * `_resolvedSystemTools` rather than `_systemTools`: for an inheriting section the draft — and
+   * therefore every card and the effective-rules rail — must state the value a craft will take,
+   * which is the world default. The baseline is the SAME resolved record, so opening an untouched
+   * Tool is not dirty and the save below has nothing to write. What keeps that display read from
+   * becoming an override is `_toolRecordForSave`, on the save, not a second read here.
+   *
+   * @param {string} toolId
+   * @param {string} [systemId]
+   * @returns {boolean}
+   */
   function openToolDraft(toolId, systemId = get(selectedSystemId)) {
     const id = String(toolId || '');
     if (!id || !systemId) return false;
-    const existing = _systemTools(systemId).find((tool) => String(tool.id) === id);
+    const existing = _resolvedSystemTools(systemId).find((tool) => String(tool.id) === id);
     if (!existing) return false;
     return _setFocusedToolDraft(existing, existing, systemId);
   }
@@ -2229,13 +2252,21 @@ export function createAdminStore(services) {
     _patchToolsDraftViewState();
     try {
       const itemUuid = get(toolDraftSourceItemUuid);
+      // SECTION-AWARE. `_toolRecordForSave` restores every INHERITING section from the live
+      // in-system record, so a draft seeded from the read union cannot write the world's answer
+      // onto this system as an override. See its docblock for the failure that guards.
       const result = await systemManager.upsertTool(
         systemId,
-        _clonePlain(draft),
+        _toolRecordForSave(systemId, draft),
         itemUuid ? { itemUuid } : {}
       );
       if (!result?.item) throw new Error('Tool save returned no item');
-      const saved = _normalizeGatheringLibraryTool(result.item, _randomID);
+      const persisted = _normalizeGatheringLibraryTool(result.item, _randomID);
+      // AND THE EDITOR GOES BACK TO THE UNION, not to the record the manager just wrote: an
+      // inheriting section's persisted value is deliberately NOT what this screen shows.
+      const saved =
+        _resolvedSystemTools(systemId).find((tool) => String(tool.id) === String(persisted.id)) ||
+        persisted;
       toolDraft.set(_clonePlain(saved));
       toolDraftBaseline.set(_clonePlain(saved));
       toolDraftSourceItemUuid.set('');
@@ -2341,8 +2372,15 @@ export function createAdminStore(services) {
           toolDraft.update((draft) => ({ ...draft, ...written }));
           toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
         } else {
-          toolDraft.set(_clonePlain(saved));
-          toolDraftBaseline.set(_clonePlain(saved));
+          // THE UNION, NOT THE RECORD THE MANAGER HANDED BACK (issue 1373). `saved` is the raw
+          // in-system record, so re-seeding a clean draft from it would put every inheriting
+          // section back onto the value this screen exists not to show — undoing the union read
+          // on the first press of the enable switch.
+          const resolved =
+            _resolvedSystemTools(systemId).find((tool) => String(tool.id) === String(saved.id)) ||
+            saved;
+          toolDraft.set(_clonePlain(resolved));
+          toolDraftBaseline.set(_clonePlain(resolved));
         }
         _recomputeToolsDraftDirty();
       }
@@ -2369,22 +2407,28 @@ export function createAdminStore(services) {
    * MOVE ONE WORLD-DEFAULT SECTION between following the world Tool and this system's own
    * (issue 1373).
    *
-   * ── IT IS TWO WRITES, AND THE SECOND ONE IS WHAT MAKES THE FIRST TRUE ──────────────────────
-   * The world membership record carries the SWITCH; the in-system Tool record carries the
-   * VALUE, and while `## CraftingSystem` requirement 36 holds the in-system record is what the
-   * resolver actually answers with. So flipping the switch alone would paint an `Inheriting`
-   * pill over a value this system had authored for itself — the resolver would go on answering
-   * the local value, and the screen would be stating something it had not made true.
+   * ── THE SEED MOVED TO THE OTHER END OF THE SWITCH, AND THAT IS THE WHOLE CHANGE ────────────
+   * This used to write the WORLD DEFAULT onto the in-system record whenever inheritance was
+   * turned ON, because the editor read that record and would otherwise have painted an
+   * `Inheriting` pill over a value this system had authored for itself. The editor reads the
+   * READ UNION now, and the union answers an inheriting section from the world default
+   * (`## Scoped Entity Definitions` requirement 15, clause 1a) — so the pill is true with no
+   * in-system write at all, and making one would be the very thing this screen must not do: mint
+   * an override-shaped value on a record whose switch says it has none.
    *
-   * Turning inheritance ON therefore also writes the WORLD DEFAULT onto the in-system record, so
-   * the resolved value is the world's for as long as the pill says it is. Turning it OFF writes
-   * nothing: the in-system record already holds the value that was on screen, which is exactly
-   * the value the GM is about to start editing. `setSectionInheritance` retains the dormant
-   * override on the membership record either way, so nothing is destroyed in either direction.
+   * TURNING INHERITANCE ON THEREFORE WRITES THE SWITCH ALONE, and the draft's copy of the
+   * section is re-read from the union so the card flips to the world's answer immediately.
    *
-   * A world half with no defaults record for the section writes nothing either: there is no
-   * world value to adopt, and the canonical empty the resolver would answer is already what an
-   * absent section resolves to.
+   * TURNING IT OFF SEEDS THE OVERRIDE FROM THE VALUE THAT WAS ON SCREEN, which is the contract
+   * `scoped/InheritRow` already states and which the in-system record cannot satisfy on its own:
+   * while the section inherited, that record's own copy was whatever it happened to hold — stale,
+   * or the normalizer's default — and never the world value the GM was looking at. Seeding at the
+   * moment of override is what makes the first keystroke an edit OF the inherited value rather
+   * than a jump back to an older one.
+   *
+   * A section whose union answer is `undefined` seeds nothing: there is no value to author from,
+   * and the canonical empty the resolver would answer is already what an absent section resolves
+   * to.
    *
    * @param {string} toolId
    * @param {string} section One of the world-default tool sections.
@@ -2396,26 +2440,24 @@ export function createAdminStore(services) {
     const target = String(toolId || '').trim();
     const system = String(systemId || '').trim();
     if (!target || !system || typeof inherit !== 'boolean') return false;
+    // READ BEFORE THE WRITE. Once the switch says overriding, the union answers this section from
+    // the in-system record, so the world value the GM was looking at is no longer reachable here.
+    const shown = inherit
+      ? undefined
+      : _resolvedSystemTools(system).find((tool) => String(tool.id) === target)?.[section];
     const written = await worldScope.tool.setSectionInherited(target, system, section, inherit);
     if (written !== true) return false;
-    if (!inherit) {
+    if (inherit || shown === undefined) {
       await refresh();
-      return true;
-    }
-    const worldDefault = (_worldToolCorpus()?.defaults || []).find(
-      (record) => String(record?.id ?? '').trim() === target
-    );
-    const value = worldDefault?.[section];
-    if (value === undefined) {
-      await refresh();
+      _syncToolDraftSection(target, system, section);
       return true;
     }
     return _writeLiveTool(
       target,
       system,
-      { [section]: _clonePlain(value) },
+      { [section]: _clonePlain(shown) },
       'FABRICATE.Admin.Manager.Tools.Editor.InheritFailed',
-      'This Tool could not be returned to the world default. Try again.'
+      'This section could not be set for this system. Try again.'
     );
   }
 
@@ -3457,6 +3499,117 @@ export function createAdminStore(services) {
     return (Array.isArray(system?.tools) ? system.tools : []).map((tool) =>
       _normalizeGatheringLibraryTool(tool, _randomID)
     );
+  }
+
+  /**
+   * The same library, THROUGH THE READ UNION — what a craft will actually do (issue 1373).
+   *
+   * ── WHY THE EDITOR MUST NOT READ {@link _systemTools} ──────────────────────────────────────
+   * The Tools BROWSER has read the union since the repoint, for the reason its own comment in
+   * `adminSystemInspectorProjection` gives: a row must not read `Inherits world defaults` while
+   * displaying a value it has not inherited. The rules EDITOR behind that row went on reading the
+   * raw in-system array, so for an inheriting Tool it stated the in-system value while every
+   * craft took the world one. `breakage` only LOOKED inherited because adoption used to copy the
+   * world value onto the record; `prerequisites` and `bonus` — added to `TOOL_SECTIONS` at
+   * `1.31.0` — had no such copy, so the rail read `No check bonus` over an authored world bonus.
+   *
+   * ── IT IS A DISPLAY READ AND NEVER A WRITE SOURCE ─────────────────────────────────────────
+   * Every write path in this file still reads {@link _systemTools}. Persisting a union row would
+   * take the world's answer for an INHERITING section and write it onto the in-system record,
+   * silently converting the section into an override — the exact behaviour `## Scoped Entity
+   * Definitions` requirement 15's clause 1a retired clause 1 to remove. {@link _toolRecordForSave}
+   * is what keeps the two apart.
+   *
+   * @param {string} systemId
+   * @returns {Array<object>}
+   */
+  function _resolvedSystemTools(systemId) {
+    const id = String(systemId || get(selectedSystemId) || '');
+    if (!id) return [];
+    const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
+    if (!system) return [];
+    return resolvedToolsFor(system, _worldToolCorpus()).map((tool) =>
+      _normalizeGatheringLibraryTool(tool, _randomID)
+    );
+  }
+
+  /**
+   * One `(tool, system)` pair's WORLD MEMBERSHIP RECORD — the only thing that carries the
+   * per-section inherit switch.
+   *
+   * `null` for a pre-migration in-system Tool with no world half, which inherits nothing because
+   * there is no parent; the save path then writes the draft verbatim, exactly as it always did.
+   *
+   * @param {string} toolId
+   * @param {string} systemId
+   * @returns {object|null}
+   */
+  function _toolMembership(toolId, systemId) {
+    return findMembership(_worldToolCorpus()?.membership, toolId, systemId);
+  }
+
+  /**
+   * THE RECORD A SAVE ACTUALLY PERSISTS: the draft, with every INHERITING section restored from
+   * the live in-system record (issue 1373).
+   *
+   * ── THE FAILURE THIS EXISTS TO PREVENT, WHICH ANNOUNCES ITSELF NOWHERE ────────────────────
+   * The draft is seeded from the read union, so an inheriting section's value in the draft is the
+   * WORLD'S. Persisting the draft whole would write that value onto the in-system record, which
+   * `resolveTool` reads the moment the switch says overriding — so every inheriting section would
+   * quietly become a frozen copy of one moment's world default, and the next world edit would
+   * stop reaching this system. No suite would go red: the record would still be valid, the pill
+   * would still say `Inheriting`, and the divergence would only appear after the world changed.
+   *
+   * ── SO THE SAVE READS THE SWITCH, NOT THE DRAFT ───────────────────────────────────────────
+   * An ABSENT `inherit` key reads as inheriting, matching `isSectionInherited` and the card. A
+   * section marked OVERRIDING is taken from the draft, which is where the GM's edit is. Every key
+   * that is not a section — identity, `label`, `enabled`, `requirement`, `checkBreakable`,
+   * `repairRequirements` — comes from the draft unchanged, because none of them resolve through
+   * the world layer.
+   *
+   * @param {string} systemId
+   * @param {object} draft
+   * @returns {object} a new record; neither input is mutated.
+   */
+  function _toolRecordForSave(systemId, draft) {
+    const record = _clonePlain(draft);
+    const id = String(record?.id ?? '');
+    const membership = _toolMembership(id, systemId);
+    if (!membership) return record;
+    const live = _systemTools(systemId).find((tool) => String(tool.id) === id) || null;
+    if (!live) return record;
+    for (const section of TOOL_SECTIONS) {
+      if (!isSectionInherited(membership, section)) continue;
+      if (section in live) record[section] = _clonePlain(live[section]);
+      else delete record[section];
+    }
+    return record;
+  }
+
+  /**
+   * Re-read ONE section of the open draft from the read union, after a membership write moved it.
+   *
+   * Written onto the draft AND its baseline together, on {@link _writeLiveTool}'s own rule: the
+   * GM did not type this value, so a half-finished edit elsewhere in the draft must neither be
+   * discarded nor start reading as though this section were an unsaved change.
+   *
+   * @param {string} toolId
+   * @param {string} systemId
+   * @param {string} section
+   * @returns {void}
+   */
+  function _syncToolDraftSection(toolId, systemId, section) {
+    if (String(get(toolDraft)?.id || '') !== String(toolId)) return;
+    const resolved = _resolvedSystemTools(systemId).find(
+      (tool) => String(tool.id) === String(toolId)
+    );
+    if (!resolved) return;
+    const written = { [section]: _clonePlain(resolved[section]) };
+    toolDraft.update((draft) => (draft ? { ...draft, ...written } : draft));
+    toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
+    _recomputeToolsDraftDirty();
+    toolDraftValidation.set(validateToolDraft());
+    _patchToolsDraftViewState();
   }
 
   /**
@@ -5551,22 +5704,32 @@ export function createAdminStore(services) {
   );
 
   /**
-   * The in-system Tool record adoption creates: the world entity's IDENTITY, plus a COPY of the
-   * world defaults' three behaviour sections.
+   * The in-system Tool record adoption creates: the world entity's IDENTITY, and the ONE seeded
+   * section that has no live parent.
    *
-   * ── WHY THE SECTIONS ARE COPIED AND NOT LEFT TO INHERIT ───────────────────────────────────
-   * They cannot be inherited while `## CraftingSystem` requirement 36 holds. The read union
-   * re-spreads the in-system record LAST, and a `Tool` normalizes with `breakage`, `onBreak` and
-   * `repairRequirements` ALWAYS present — so an identity-only record wins every one of those
-   * key contests with a value nobody authored. Measured in the View Lab: a Tool whose world
-   * default is 25 uses adopted as `Unlimited uses`, on a row that said `Inherits world defaults`
-   * beside it. Copying is what makes the row's own claim true at the moment it is made.
+   * ── WHY IT NO LONGER COPIES ANY INHERITED SECTION (issue 1373) ────────────────────────────
+   * It used to copy `breakage` and `onBreak` — two of the four sections `TOOL_SECTIONS` now
+   * declares — because the read union re-spread the in-system record LAST, so an identity-only
+   * record won those key contests with the normalizer's own defaults and the row read
+   * `Unlimited uses` under a pill saying `Inherits world defaults`. That is no longer how the
+   * union answers: clause 1a resolves an INHERITING section from the world default, on the
+   * shipped field names, whatever the in-system record carries. So the copy no longer makes the
+   * row's claim true — the union does — and every reader, this store's own editor included,
+   * enters there.
    *
-   * ── IT IS A SEED, ON THE SHIPPED `seedToolRepairRequirements` PATTERN ─────────────────────
-   * A structural copy taken once, never a live parent, and the same call is what `addToSystem`
-   * already makes for the membership record's `repairRequirements`. When requirement 36 retires
-   * the world layer takes precedence over these keys again and the copy stops being read, so the
-   * seed cannot outlive the suspension it exists for.
+   * ── AND SEEDING ALL FOUR WOULD BE WORSE THAN SEEDING TWO ──────────────────────────────────
+   * A freshly adopted Tool inherits every section, so the only moment any of these values is read
+   * back is after the GM turns a section's switch OFF — and `setToolSectionInherited` seeds THAT
+   * from the value on screen at that moment, which is current where an adoption-time copy is a
+   * snapshot that may be months stale. Writing four sections a system has not authored would put
+   * four override-shaped values on a record whose switches all say `Inheriting`: invisible while
+   * they hold, and wrong the first time one is flipped.
+   *
+   * ── `repairRequirements` IS THE EXCEPTION, AND IT IS NOT A SECTION ────────────────────────
+   * `TOOL_SEEDED_SECTIONS` names it precisely because the resolver does NOT read it through: it
+   * is copied once by `addToSystem` for the membership record and then diverges freely, so there
+   * is no world value for a union to answer with and no switch to read. Without the copy here an
+   * adopted Tool would simply have no repair recipe.
    *
    * ── `enabled` IS DELIBERATELY NOT SEEDED ──────────────────────────────────────────────────
    * The world master switch is a VETO applied over the merged rows (`applyWorldEnabledVeto`),
@@ -5588,8 +5751,6 @@ export function createAdminStore(services) {
       originItemUuid,
       registeredItemUuid: entity?.registeredItemUuid ?? originItemUuid,
       aliasItemUuids: Array.isArray(entity?.aliasItemUuids) ? [...entity.aliasItemUuids] : [],
-      ...(worldDefault?.breakage ? { breakage: _clonePlain(worldDefault.breakage) } : {}),
-      ...(worldDefault?.onBreak ? { onBreak: _clonePlain(worldDefault.onBreak) } : {}),
       ...(repairRequirements.length > 0 ? { repairRequirements } : {}),
     };
   }

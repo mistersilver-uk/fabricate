@@ -103,9 +103,18 @@ function createMockServices(overrides = {}) {
             }
           : {}),
       });
+      // REPLACES THE ARRAY, exactly as `CraftingSystemManager#upsertTool` does
+      // (`system.tools = existing ? tools.map(...) : [...tools, staged]`). An IN-PLACE
+      // `sys.tools[index] = staged` is a looser double than the thing it stands for, and the
+      // looseness is load-bearing here: the read union memoizes on the world corpus object AND
+      // the in-system array, guarded by `(revision, length)`. A same-identity, same-length
+      // mutation misses every invalidation signal there is, so the union would serve the
+      // pre-save row and the editor's post-save re-read would silently test the memo.
       const index = sys.tools.findIndex((tool) => tool.id === staged.id);
-      if (index >= 0) sys.tools[index] = staged;
-      else sys.tools.push(staged);
+      sys.tools =
+        index >= 0
+          ? sys.tools.map((tool, position) => (position === index ? staged : tool))
+          : [...sys.tools, staged];
       return { item: staged, action: index >= 0 ? 'updated' : 'added' };
     },
     deleteTool: async (id, toolId) => {
@@ -159,6 +168,44 @@ function createMockServices(overrides = {}) {
   merged._calls = calls;
   return merged;
 }
+
+/**
+ * A REAL tool scope store over an in-memory settings map, seeded with one world Tool.
+ *
+ * Real rather than doubled because adoption and the inherit switch are both round trips: the
+ * membership write has to reach the setting, be re-normalized on publish, and come back out
+ * through the read union. A double that stored the record it was handed would pass whatever the
+ * write path did.
+ *
+ * Module scope rather than inside one `describe`, because two suites drive it now — adoption and
+ * the rules editor's union read — and a second copy is the new-code duplication the SonarCloud
+ * gate fails on.
+ *
+ * @param {Array<object>} entities
+ * @param {Record<string, object>} [defaults] World defaults keyed by entity id.
+ * @param {Record<string, object>} [membership] Membership records keyed `<entityId>|<systemId>`.
+ * @returns {object}
+ */
+function seededToolScope(entities, defaults = {}, membership = {}) {
+  const settings = new Map([[SETTING_KEYS.TOOL_SCOPE, { entities, defaults, membership }]]);
+  const store = createToolScopeStore({
+    getSetting: (key) => settings.get(key),
+    setSetting: async (key, value) => {
+      settings.set(key, value);
+    },
+  });
+  store.load();
+  return store;
+}
+
+const WORLD_HAMMER = {
+  id: 'wt-hammer',
+  name: 'World Hammer',
+  img: 'icons/tools/smithing/hammer-blue-grey.webp',
+  description: 'One hammer, every system.',
+  originItemUuid: 'Item.world-hammer',
+  registeredItemUuid: 'Item.world-hammer',
+};
 
 describe('adminStore library tools (system-owned)', () => {
   // ---------------------------------------------------------------------------
@@ -928,40 +975,6 @@ describe('adminStore library tools (system-owned)', () => {
   // -------------------------------------------------------------------------------------
 
   describe('world Tool adoption', () => {
-    /**
-     * A REAL tool scope store over an in-memory settings map, seeded with one world Tool.
-     *
-     * Real rather than doubled because adoption is a round trip: the membership write has to
-     * reach the setting, be re-normalized on publish, and come back out through the read union.
-     * A double that stored the record it was handed would pass whatever the write path did.
-     *
-     * @param {Array<object>} entities
-     * @param {Record<string, object>} [defaults] World defaults keyed by entity id.
-     * @returns {object}
-     */
-    function seededToolScope(entities, defaults = {}) {
-      const settings = new Map([
-        [SETTING_KEYS.TOOL_SCOPE, { entities, defaults, membership: {} }],
-      ]);
-      const store = createToolScopeStore({
-        getSetting: (key) => settings.get(key),
-        setSetting: async (key, value) => {
-          settings.set(key, value);
-        },
-      });
-      store.load();
-      return store;
-    }
-
-    const WORLD_HAMMER = {
-      id: 'wt-hammer',
-      name: 'World Hammer',
-      img: 'icons/tools/smithing/hammer-blue-grey.webp',
-      description: 'One hammer, every system.',
-      originItemUuid: 'Item.world-hammer',
-      registeredItemUuid: 'Item.world-hammer',
-    };
-
     it('surfaces an adopted world Tool as a member row of the Tool Rules list', async () => {
       // THE REGRESSION GUARD. `ToolsBrowserView` builds `memberRows` from the `tools` prop,
       // which is `selectedSystem.tools` off this projection, and everything else it draws for
@@ -1083,12 +1096,15 @@ describe('adminStore library tools (system-owned)', () => {
       assert.ok(!('inherited' in tools[0]));
     });
 
-    it('seeds the world default sections onto the record it creates', async () => {
-      // WITHOUT THIS the adopted row states a value NOBODY authored. The read union re-spreads
-      // the in-system record last while `## CraftingSystem` requirement 36 holds, and a `Tool`
-      // always normalizes with `breakage`, `onBreak` and `repairRequirements` present - so an
-      // identity-only record wins those key contests with the normalizer's own defaults, on a
-      // row whose inherit pill says `Inherits world defaults`.
+    it('adopts inheriting: the union states the world sections, the record authors none', async () => {
+      // THE SEED'S JOB CHANGED (issue 1373). It used to COPY `breakage` and `onBreak` onto the
+      // in-system record, because the union re-spread that record last and an identity-only
+      // record won those key contests with the normalizer's defaults - a row reading
+      // `Unlimited uses` under a pill saying `Inherits world defaults`. Clause 1a resolves an
+      // inheriting section from the world default now, so the copy is what would be wrong: it
+      // puts an override-shaped value on a record whose switch says it has none.
+      //
+      // Both halves are asserted, because either one alone is satisfiable by the other's defect.
       const toolScopeStore = seededToolScope([WORLD_HAMMER], {
         'wt-hammer': {
           id: 'wt-hammer',
@@ -1105,8 +1121,42 @@ describe('adminStore library tools (system-owned)', () => {
       const adopted = get(store.viewState).selectedSystem.tools.find(
         (tool) => tool.id === 'wt-hammer'
       );
-      assert.deepEqual(adopted.breakage, { mode: 'breakageChance', breakageChance: 25 });
+      assert.deepEqual(
+        adopted.breakage,
+        { mode: 'breakageChance', breakageChance: 25 },
+        'the row a GM reads states the world default, through the union'
+      );
       assert.deepEqual(adopted.onBreak, { mode: 'flagBroken' });
+
+      const persisted = services._systemTools().find((tool) => tool.id === 'wt-hammer');
+      assert.deepEqual(
+        persisted.breakage,
+        { mode: 'limitedUses', maxUses: null },
+        'and the PERSISTED record authors nothing: the seed copies no inherited section'
+      );
+      assert.deepEqual(persisted.onBreak, { mode: 'destroy' });
+    });
+
+    it('still seeds `repairRequirements`, which has no live parent to inherit from', async () => {
+      // The counter-case to the seed removal above, and the reason "seed all four" is the wrong
+      // reading of it. `repairRequirements` is in `TOOL_SEEDED_SECTIONS`, not `TOOL_SECTIONS`:
+      // the resolver never reads it back out of the world defaults, so no union can supply it and
+      // an adopted Tool without the copy simply has no repair recipe.
+      const toolScopeStore = seededToolScope([WORLD_HAMMER], {
+        'wt-hammer': {
+          id: 'wt-hammer',
+          repairRequirements: [{ id: 'wt-hammer-repair', name: 'New haft', options: [] }],
+        },
+      });
+      const services = createMockServices({ getToolScopeStore: () => toolScopeStore });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(await store.worldScope.tool.addToSystem('wt-hammer', 'sys1'), true);
+
+      const persisted = services._systemTools().find((tool) => tool.id === 'wt-hammer');
+      assert.equal(persisted.repairRequirements.length, 1);
+      assert.equal(persisted.repairRequirements[0].id, 'wt-hammer-repair');
     });
 
     it('never seeds `enabled`, so the world master switch stays a read-time veto', async () => {
@@ -1139,6 +1189,255 @@ describe('adminStore library tools (system-owned)', () => {
         true,
         're-enabling in the world reaches a Tool adopted while it was off'
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------------------
+  // The Tool RULES EDITOR: display from the union, save only what is overridden (issue 1373)
+  // -------------------------------------------------------------------------------------
+
+  describe('tool rules editor inheritance', () => {
+    /**
+     * A world Tool with all four sections authored, adopted into `sys1` and left INHERITING.
+     *
+     * `bonus` and `prerequisites` matter most: they joined `TOOL_SECTIONS` at `1.31.0` and have
+     * no adoption-time copy, so before the union read the editor stated the in-system record's
+     * empty values over an authored world bonus — the rail read `No check bonus` while every
+     * craft added `@prof`.
+     *
+     * @param {object} [options]
+     * @param {Record<string, boolean>} [options.inherit] The membership record's inherit map.
+     * @param {Array<object>} [options.systemTools] Extra in-system Tool records.
+     * @returns {Promise<{store: object, services: object, worldDefault: object}>}
+     */
+    async function inheritingTool({ inherit = {}, systemTools = [] } = {}) {
+      const worldDefault = {
+        id: 'wt-hammer',
+        breakage: { mode: 'breakageChance', breakageChance: 25 },
+        onBreak: { mode: 'flagBroken' },
+        prerequisites: { enabled: true, ids: ['prq-smith'], gateMode: 'usability' },
+        bonus: { enabled: true, expression: '@prof' },
+      };
+      const toolScopeStore = seededToolScope(
+        [WORLD_HAMMER],
+        { 'wt-hammer': worldDefault },
+        { 'wt-hammer|sys1': { entityId: 'wt-hammer', systemId: 'sys1', enabled: true, inherit } }
+      );
+      const services = createMockServices({
+        getToolScopeStore: () => toolScopeStore,
+        systemTools: [
+          {
+            id: 'wt-hammer',
+            name: 'World Hammer',
+            label: '',
+            // A LINKED source, because `Tool#validate` refuses an unlinked record and every
+            // assertion below turns on a save that actually lands.
+            registeredItemUuid: 'Item.world-hammer',
+            originItemUuid: 'Item.world-hammer',
+          },
+          ...systemTools,
+        ],
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      return { store, services, worldDefault };
+    }
+
+    /**
+     * The one persisted in-system record, straight off the mock manager.
+     *
+     * @param {object} services
+     * @returns {object}
+     */
+    function persistedTool(services) {
+      return services._systemTools().find((tool) => tool.id === 'wt-hammer');
+    }
+
+    /**
+     * The `(tool, system)` row of the world projection — the only thing carrying the switch.
+     *
+     * @param {object} store
+     * @returns {object|null}
+     */
+    function membershipRow(store) {
+      const entry = (get(store.viewState).worldScope?.tool?.entries || []).find(
+        (row) => row.id === 'wt-hammer'
+      );
+      return (entry?.systems || []).find((system) => system.systemId === 'sys1') ?? null;
+    }
+
+    it('opens the draft on the WORLD value for every inheriting section', async () => {
+      // THE DEFECT, STATED AS AN ASSERTION. `openToolDraft` read `getSystem(id).tools` — the raw
+      // in-system array — so the cards and the effective-rules rail described a Tool that does
+      // not exist: `breakage` only agreed because adoption copied it, and the two new sections
+      // disagreed outright.
+      const { store, services } = await inheritingTool();
+      assert.deepEqual(
+        persistedTool(services).bonus,
+        { enabled: false, expression: '' },
+        'precondition: the in-system record authors no bonus at all'
+      );
+
+      assert.equal(store.openToolDraft('wt-hammer', 'sys1'), true);
+      const draft = get(store.viewState).toolDraft;
+      assert.deepEqual(draft.bonus, { enabled: true, expression: '@prof' });
+      assert.deepEqual(draft.prerequisites, {
+        enabled: true,
+        ids: ['prq-smith'],
+        gateMode: 'usability',
+      });
+      assert.deepEqual(draft.breakage, { mode: 'breakageChance', breakageChance: 25 });
+      assert.equal(draft.onBreak.mode, 'flagBroken');
+      assert.equal(
+        get(store.viewState).toolDraftDirty,
+        false,
+        'and reading the union is not an edit: the baseline is the same resolved record'
+      );
+    });
+
+    it('saving an UNTOUCHED inheriting Tool changes nothing', async () => {
+      // THE NEGATIVE THE WHOLE CHANGE TURNS ON. Routing the read through the union without making
+      // the save section-aware would persist the world's answer onto the in-system record on the
+      // next save, converting every inheriting section into an override — invisibly, with every
+      // suite still green, and visible later only as a system that stopped tracking its world
+      // default. So this asserts the RECORD, not the draft, and asserts the switch survived too.
+      const { store, services } = await inheritingTool();
+      const before = JSON.stringify(persistedTool(services));
+
+      assert.equal(store.openToolDraft('wt-hammer', 'sys1'), true);
+      assert.equal(await store.saveToolDraft(), true);
+
+      assert.equal(
+        JSON.stringify(persistedTool(services)),
+        before,
+        'the in-system record is byte-identical: no world value was written onto it'
+      );
+      assert.equal(
+        services._calls.filter((call) => call[0] === 'upsertTool').length,
+        0,
+        'an untouched draft is not dirty, so nothing was written at all'
+      );
+      const row = membershipRow(store);
+      assert.deepEqual(
+        [row?.inherited?.bonus, row?.inherited?.prerequisites, row?.inherited?.breakage],
+        [true, true, true],
+        'and the sections still INHERIT'
+      );
+    });
+
+    it('a save that DOES write leaves every inheriting section on the record untouched', async () => {
+      // The stronger half of the pair. The assertion above is satisfied by the dirty guard's
+      // early return alone, which would still hold for a save path that wrote the union row —
+      // so this one dirties a NON-section field and drives a real `upsertTool`.
+      const { store, services } = await inheritingTool();
+      const before = persistedTool(services);
+
+      assert.equal(store.openToolDraft('wt-hammer', 'sys1'), true);
+      assert.equal(store.patchToolDraft({ label: 'Sledge' }), true);
+      assert.equal(get(store.viewState).toolDraftDirty, true);
+      assert.equal(await store.saveToolDraft(), true);
+
+      const after = persistedTool(services);
+      assert.equal(after.label, 'Sledge', 'the edit the GM made did land');
+      assert.deepEqual(after.bonus, before.bonus, 'and the inherited bonus was NOT written');
+      assert.deepEqual(after.prerequisites, before.prerequisites);
+      assert.deepEqual(after.breakage, before.breakage);
+      assert.deepEqual(after.onBreak, before.onBreak);
+      assert.deepEqual(
+        get(store.viewState).toolDraft.bonus,
+        { enabled: true, expression: '@prof' },
+        'and the editor still shows the world value, not the record it just wrote'
+      );
+      assert.deepEqual(
+        [membershipRow(store)?.inherited?.bonus, membershipRow(store)?.inherited?.breakage],
+        [true, true],
+        'and the sections are still inheriting after the write'
+      );
+    });
+
+    it('writes an OVERRIDDEN section from the draft, exactly as it always did', async () => {
+      // The counter-case: without it, "wrote nothing" is satisfiable by a save that writes no
+      // section at all, which would make every override unsaveable.
+      const { store, services } = await inheritingTool({ inherit: { bonus: false } });
+
+      assert.equal(store.openToolDraft('wt-hammer', 'sys1'), true);
+      assert.equal(store.patchToolDraft({ bonus: { enabled: true, expression: '+3' } }), true);
+      assert.equal(await store.saveToolDraft(), true);
+
+      assert.deepEqual(persistedTool(services).bonus, { enabled: true, expression: '+3' });
+      assert.deepEqual(
+        persistedTool(services).prerequisites,
+        { enabled: false, ids: [], gateMode: 'usability' },
+        'and the section still inheriting beside it was still not written'
+      );
+    });
+
+    it('flipping a section to OVERRIDDEN seeds it from the value that was on screen', async () => {
+      // `scoped/InheritRow` states this contract in its own docblock, and the in-system record
+      // cannot satisfy it alone: while the section inherited, that record held the normalizer's
+      // default and never the world value. Seeding at the moment of override is what makes the
+      // GM's first keystroke an edit OF the inherited value rather than a jump to an older one.
+      const { store, services } = await inheritingTool();
+      assert.equal(store.openToolDraft('wt-hammer', 'sys1'), true);
+
+      assert.equal(await store.setToolSectionInherited('wt-hammer', 'bonus', false, 'sys1'), true);
+
+      assert.deepEqual(
+        persistedTool(services).bonus,
+        { enabled: true, expression: '@prof' },
+        'the override starts at the world value the card was showing'
+      );
+      assert.deepEqual(get(store.viewState).toolDraft.bonus, {
+        enabled: true,
+        expression: '@prof',
+      });
+      assert.equal(
+        get(store.viewState).toolDraftDirty,
+        false,
+        'and a membership write is not an unsaved edit'
+      );
+    });
+
+    it('flipping a section back to INHERITING writes nothing to the in-system record', async () => {
+      // The direction that used to write, and must not any more: the union answers an inheriting
+      // section from the world default, so the pill is true with no in-system write — and making
+      // one would mint an override-shaped value under a switch that says there is none.
+      const { store, services } = await inheritingTool({ inherit: { bonus: false } });
+      assert.equal(store.openToolDraft('wt-hammer', 'sys1'), true);
+      assert.equal(store.patchToolDraft({ bonus: { enabled: true, expression: '+3' } }), true);
+      assert.equal(await store.saveToolDraft(), true);
+      const overridden = JSON.stringify(persistedTool(services));
+
+      assert.equal(await store.setToolSectionInherited('wt-hammer', 'bonus', true, 'sys1'), true);
+
+      assert.equal(
+        JSON.stringify(persistedTool(services)),
+        overridden,
+        'the dormant local override is left exactly where it was'
+      );
+      assert.deepEqual(
+        get(store.viewState).toolDraft.bonus,
+        { enabled: true, expression: '@prof' },
+        'and the card immediately reads the world default again'
+      );
+    });
+
+    it('an in-system Tool with no world half saves its own sections verbatim', async () => {
+      // The compatibility case. A pre-migration Tool has no membership record, so there is no
+      // switch to read and `_toolRecordForSave` must write the draft whole — otherwise the
+      // section-aware save would silently refuse every edit on an unmigrated world.
+      const services = createMockServices({
+        systemTools: [{ id: 't1', label: 'Axe', componentId: 'comp-axe' }],
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      assert.equal(store.openToolDraft('t1', 'sys1'), true);
+      assert.equal(store.patchToolDraft({ bonus: { enabled: true, expression: '+1' } }), true);
+      assert.equal(await store.saveToolDraft(), true);
+
+      const saved = services._systemTools().find((tool) => tool.id === 't1');
+      assert.deepEqual(saved.bonus, { enabled: true, expression: '+1' });
     });
   });
 });

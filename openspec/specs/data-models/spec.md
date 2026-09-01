@@ -2033,8 +2033,12 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > AUTHORITY has moved ONE STEP and no further (issue 1372): requirement 15's clause 1a makes the union answer an INHERITED SECTION from the world default, while `## CraftingSystem` requirement 36 keeps the in-system arrays the source of truth for every other key, every ROW and the row ORDER, re-derived at read time, with the world layer supplying only the keys they do not carry.
 > The SHED has NOT: nothing is removed from any of the eight shadowed keys, and `destructive-changes-and-migrations` still measures zero references disappearing.
 > `src/ui/**` was deliberately outside the repoint, on the precedent this banner sets for the effective tool-breakage authority: with the ORDER and ROW SET rules adopted, an unwritten world corpus reads exactly as the previous release did.
-> ONE UI READER HAS SINCE JOINED IT (issue 1373): the manager's selected-system `tools` projection, because the system Tool Rules screen is the surface a GM administers Tools from and reading the raw array there gave that one screen a SECOND answer to a question the read union already answers — one that could not see the world master switch of `### Tool scope` requirement 3a at all.
-> It is threaded the corpus EXPLICITLY rather than probing a global, and `null` — no world half — makes the seam hand back the in-system array itself, so an unmigrated world still reads exactly as the previous release did.
+> TWO UI READERS HAVE SINCE JOINED IT (issue 1373), and both are the Tool Rules surface: the manager's selected-system `tools` projection, which the rules LIST reads, and the rules EDITOR's own draft seed.
+> The list joined because it is the surface a GM administers Tools from and reading the raw array there gave that one screen a SECOND answer to a question the read union already answers — one that could not see the world master switch of `### Tool scope` requirement 3a at all.
+> The editor joined for the same reason one route deeper: it stated the in-system value for a section the list beside it labelled `Inherits world defaults`, and `prerequisites` and `bonus` — which no adoption seed ever copied — disagreed with the world outright.
+> Each is threaded the corpus EXPLICITLY rather than probing a global, and `null` — no world half — makes the seam hand back the in-system array itself, so an unmigrated world still reads exactly as the previous release did.
+> **THE EDITOR'S READ CARRIES A WRITE OBLIGATION AND THE LIST'S DOES NOT**, because the editor is the only one of the two that saves: its save is section-aware, so a value it displays because the section INHERITS is never persisted back onto the in-system record (`ui-integration/spec.md` -> Tools Tab).
+> Without that, a display repoint would convert every inheriting section into an override on the next save — an AUTHORITY move made by accident, which is exactly the conflation of clocks this banner warns about.
 > The rest of `src/ui/**` is unchanged and stays outside.
 >
 > **DELIVERED AT `1.30.0`** (epic 1357, PR 3): the migration itself, the world entity corpus, the membership model, and the WORLD tool-breakage authority (`### Tool scope` requirement 5), which the crafting-system normalizer's absence-preserving flip makes reachable.
@@ -2504,10 +2508,13 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    The order is membership first, because that write owns the already-a-member rule; if the `Tool` record is then refused the membership record is REMOVED again, because a membership record with no in-system record is exactly the unreadable state above, while an in-system record with no membership record is an ordinary pre-migration Tool.
    An in-system record that already exists is NEVER rewritten: requirement 36 keeps it authoritative, and a migrated world's in-system record and world entity share an id by construction.
 
-   **THE WORLD DEFAULTS' TWO INHERITED SECTIONS ARE COPIED ONTO THE RECORD IT CREATES.**
-   `breakage` and `onBreak` are shipped in-system `Tool` fields that a normalizer emits UNCONDITIONALLY, so an identity-only record wins requirement 15's KEYS contest for both with a value nobody authored — measured, a Tool whose world default was 25 uses adopted as `Unlimited uses` on a row stating "Inherits world defaults" beside it.
-   The copy is what makes that row's own claim true at the moment it is made, it is a SEED on requirement 2's pattern rather than a live parent, and it stops being read when requirement 36 retires and the world layer re-takes precedence.
-   `enabled` is deliberately NOT copied: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
+   **NO INHERITED SECTION IS COPIED ONTO THE RECORD IT CREATES.**
+   The record adoption writes is IDENTITY plus the SEEDED `repairRequirements` of requirement 2, and nothing else.
+   `breakage` and `onBreak` were copied while requirement 15's retired clause 1 answered every key the in-system record carried: a normalizer emits both UNCONDITIONALLY, so an identity-only record won that contest with a value nobody authored — measured, a Tool whose world default was 25 uses adopted as `Unlimited uses` on a row stating "Inherits world defaults" beside it.
+   Clause 1a answers an INHERITING section from the world default instead, so the union makes that row's claim true and the copy no longer does; retaining it would leave an override-shaped value on a record whose every switch says `Inheriting`, invisible while they hold and wrong the first time one is flipped.
+   WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-integration/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
+   `repairRequirements` remains copied because it is NOT a section: the resolver never reads it back out of the world defaults, so no union can supply it and an adopted Tool without the copy would simply have no repair recipe.
+   `enabled` is deliberately NOT copied either: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
 
 ## Tool
 
