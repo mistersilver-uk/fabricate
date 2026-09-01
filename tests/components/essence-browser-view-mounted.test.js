@@ -316,6 +316,17 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       edit.querySelector('i.fa-arrow-up-right-from-square'),
       'and carries the prototype trailing glyph that marks a control leaving this screen'
     );
+    // THE ACCESSIBLE NAME, ASSERTED BY VALUE (issue 1422). The control is an `<IconButton>`,
+    // which takes the name as the `ariaLabel` PROP and emits it as `aria-label` itself. That
+    // spelling is the whole reason this clause exists: a name handed to the wrong prop is
+    // dropped rather than rejected, the button renders IDENTICALLY, every `data-*` selector
+    // above still resolves, and the frame is unchanged — so nothing else in this file, and no
+    // screenshot, can tell a named control from an unnamed one.
+    assert.equal(
+      edit.getAttribute('aria-label'),
+      'Edit rules for Aether',
+      'the labelled variant names the essence AND the layer it opens'
+    );
     // NON-VACUITY, and the reason the label could not simply replace the class: the Foundry
     // smoke reaches this control as `.manager-icon-button[title*="Edit" i]` behind a
     // `count() > 0` guard, so a lost class or a retitled control would stop producing the
@@ -340,6 +351,14 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     assert.ok(
       !card.textContent.includes('Edit rules'),
       'and does not carry the phrase, so the two presentations differ deliberately'
+    );
+    // The card's pencil has NO visible text at all, so here the accessible name is the only
+    // thing naming the control — and it takes the other branch of the same ternary, which is
+    // what makes this a second reading of the prop rather than a repeat of the first.
+    assert.equal(
+      card.querySelector('[data-essence-edit="aether"]').getAttribute('aria-label'),
+      'Edit Aether',
+      'the icon-only presentation is still named, and names the essence'
     );
     harness.remount();
   });
