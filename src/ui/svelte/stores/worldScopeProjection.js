@@ -435,6 +435,11 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
     // `usage` answers 0, which is what a caller that has not wired it sees.
     componentCount: Number(entityUsage?.componentCount) || 0,
     recipeCount: Number(entityUsage?.recipeCount) || 0,
+    // WHAT REQUIRES IT, by name and kind, rather than only how many (issue 1373). The world
+    // Tool entry's `REQUIRED FOR` region lists each recipe and gathering task; it is the one
+    // surface with no system context, so it cannot re-derive the list from a selection. Supplied
+    // by the caller for the same reason the counts are, and an absent `usage` answers `[]`.
+    requiredBy: Array.isArray(entityUsage?.requiredBy) ? [...entityUsage.requiredBy] : [],
     // WHETHER THE WORLD MASTER SWITCH LEAVES THIS ENTITY ON. Read through `isWorldEnabled`, so
     // an ABSENT flag — every record in every world that has never touched the switch — answers
     // `true` here and the screens draw the state they always drew.

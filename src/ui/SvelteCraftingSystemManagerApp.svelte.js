@@ -14,6 +14,7 @@ import {
   enrichToHtml,
   resolveItemSourceSnapshot,
 } from './svelte/util/foundryBridge.js';
+import { descriptionTextCandidate, plainTextDescription } from '../utils/plainTextDescription.js';
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sceneRegions.js';
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
@@ -349,8 +350,23 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       // `game.*` itself. Unsorted and unfiltered on purpose: the shared selector owns the
       // scope, so a second filter here could only make the two disagree.
       getWorldActors: () => Array.from(game.actors?.contents || game.actors || []),
-      // Game-world Items ({ uuid, name, img, type }), name-sorted, for resolving
+      // Game-world Items ({ uuid, name, img, type, description }), name-sorted, for resolving
       // linked Item previews after drag-and-drop.
+      //
+      // ── `description` IS PART OF THE PROJECTION (issue 1373) ──────────────────────────────
+      // The world Tools Catalogue reads it as the SECOND rung of a Tool's description: a world
+      // record's own `description` is a snapshot taken when the link was made, so a record the
+      // migration lifted from a legacy component-linked Tool has none, and every such row read
+      // `No description` while wearing a `Linked` chip. The scope that owns identity was the only
+      // one that could not see the description identity carries.
+      //
+      // IT IS NOT ENRICHED, and that is deliberate rather than a shortcut. `enrichToHtml` is
+      // async and per-document; running it over every Item in the world to fill a list preview
+      // would put an enrichment pass behind opening a catalogue. `descriptionTextCandidate`
+      // picks the same field this app's own snapshot resolver picks and `plainTextDescription`
+      // flattens it, so an unenriched `@UUID[...]` reference renders as its raw text rather than
+      // as a link — which is a preview, and the entry editor's own card is where the resolved
+      // description is shown.
       getWorldItemOptions: () =>
         Array.from(game.items?.contents || [])
           .map((item) => ({
@@ -358,6 +374,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             name: item.name,
             img: item.img || '',
             type: item.type || '',
+            description: plainTextDescription(
+              descriptionTextCandidate(item?.system?.description?.value) ||
+                descriptionTextCandidate(item?.system?.description) ||
+                ''
+            ),
           }))
           .filter((item) => item.uuid && item.name)
           .sort((a, b) => a.name.localeCompare(b.name)),

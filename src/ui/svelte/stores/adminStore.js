@@ -4989,19 +4989,39 @@ export function createAdminStore(services) {
    * matches an in-system record to its world entity BY ID — so scanning each system's own
    * recipes and keying by that id needs no membership join.
    *
-   * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>}>}
+   * ── IT ALSO CARRIES THE REFERENCES THEMSELVES, NOT ONLY THE COUNT (issue 1373) ────────────
+   * The world Tool entry's `REQUIRED FOR` region names each recipe and gathering task that
+   * requires the Tool, with a chip for which KIND it is. A count cannot answer that, and the
+   * screen that asks it is the world entry — which is the one surface with no system context at
+   * all, so it cannot re-derive the list from a selected system either.
+   *
+   * GATHERING TASKS ARE COUNTED IN `requiredBy` AND NOT IN `recipeCount`. The count is read by a
+   * row that says `N RECIPES`, and folding a task into it would make that a wrong number rather
+   * than a missing one — the failure this file keeps naming. They are two questions, so they are
+   * two fields.
+   *
+   * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>,
+   *   requiredBy: Array<{id: string, name: string, kind: string, systemId: string,
+   *   systemName: string}>}>}
    */
   function _worldToolUsage() {
     const usage = {};
     const recipeManager = services.getRecipeManager?.();
+    const entryFor = (toolId) =>
+      (usage[toolId] ??= { recipeCount: 0, recipeCountBySystem: {}, requiredBy: [] });
     const record = (toolId, systemId) => {
-      const entry = (usage[toolId] ??= { recipeCount: 0, recipeCountBySystem: {} });
+      const entry = entryFor(toolId);
       entry.recipeCount += 1;
       entry.recipeCountBySystem[systemId] = (entry.recipeCountBySystem[systemId] || 0) + 1;
     };
+    const reference = (toolId, reference_) => {
+      entryFor(toolId).requiredBy.push(reference_);
+    };
+    const gatheringSystems = _currentGatheringConfig()?.systems ?? {};
     for (const system of _allSystems()) {
       const systemId = String(system?.id ?? '');
       if (!systemId) continue;
+      const systemName = String(system?.name ?? systemId);
       let recipes = [];
       try {
         recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
@@ -5009,7 +5029,30 @@ export function createAdminStore(services) {
         recipes = [];
       }
       for (const recipe of recipes) {
-        for (const toolId of _recipeToolIds(recipe)) record(toolId, systemId);
+        for (const toolId of _recipeToolIds(recipe)) {
+          record(toolId, systemId);
+          reference(toolId, {
+            id: String(recipe?.id ?? ''),
+            name: String(recipe?.name ?? recipe?.id ?? ''),
+            kind: 'recipe',
+            systemId,
+            systemName,
+          });
+        }
+      }
+      const tasks = gatheringSystems?.[systemId]?.tasks;
+      for (const task of Array.isArray(tasks) ? tasks : []) {
+        for (const raw of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+          const toolId = String(raw ?? '').trim();
+          if (!toolId) continue;
+          reference(toolId, {
+            id: String(task?.id ?? ''),
+            name: String(task?.name ?? task?.id ?? ''),
+            kind: 'gathering',
+            systemId,
+            systemName,
+          });
+        }
       }
     }
     return usage;

@@ -59,6 +59,15 @@ const CATALOGUE_PROPS = [
   'actions',
   'bulk',
   'countUnit',
+  // ── THE FIVE ROW-AND-INSPECTOR PARITY SWITCHES ISSUE 1373 ADDED ─────────────────────────────
+  // Every one is OPT-IN and defaults to what the component and essence catalogues already
+  // rendered, which is the property that let the tool catalogue reach the design without moving
+  // either of them: `describeEntry` (the linked source's description, as the second rung of a
+  // row's), `openEntryLabel` (the design's bordered `Edit tool` in place of a bare pen),
+  // `rowSecondLine` (chips under the name instead of a description), `rowTrailing` (the row's
+  // interactive trailing content, which `rowSecondLine: 'meta'` cannot hold because it renders
+  // inside a `<button>`) and `systemRowAction` (navigate-only inspector system rows).
+  'describeEntry',
   'emptyHint',
   'emptyTitle',
   'extraCards',
@@ -73,7 +82,10 @@ const CATALOGUE_PROPS = [
   'onOpenEntry',
   'onOpenSystemRules',
   'onSelect',
+  'openEntryLabel',
   'rowMeta',
+  'rowSecondLine',
+  'rowTrailing',
   'scope',
   'searchOf',
   'searchPlaceholder',
@@ -84,6 +96,7 @@ const CATALOGUE_PROPS = [
   'selectedId',
   'sorts',
   'subtitle',
+  'systemRowAction',
   'systems',
   'title',
 ];
@@ -149,6 +162,10 @@ describe('the shells declare the pinned prop sets', () => {
       // renders no inspector at all: there is nothing on that screen for a kicker, a card title or
       // a pinned foot action to appear in.
       'countUnit',
+      // The five parity switches (issue 1373) are catalogue-only for the same reason: four of
+      // them describe a ROW the rules-list shell draws differently, and `systemRowAction` names
+      // an inspector system row that shell has no inspector to draw.
+      'describeEntry',
       'extraCards',
       'inspectorBody',
       'inspectorCaption',
@@ -157,10 +174,14 @@ describe('the shells declare the pinned prop sets', () => {
       'membershipFilter',
       'onOpenEntry',
       'onOpenSystemRules',
+      'openEntryLabel',
+      'rowSecondLine',
+      'rowTrailing',
       'searchPlaceholder',
       'sectionIcons',
       'sectionTitles',
       'selectAllLabel',
+      'systemRowAction',
     ]);
   });
 });

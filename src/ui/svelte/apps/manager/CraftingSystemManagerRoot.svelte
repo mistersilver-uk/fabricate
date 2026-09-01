@@ -72,6 +72,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
+  import { isPlayerCharacterActor } from '../../../../config/playerCharacterTypes.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
@@ -851,8 +852,18 @@
   );
   const isToolStudioRoute = $derived(currentView === 'tools' || currentView === 'tool-edit');
 
+  // WHICH ROUTES NEED THE ITEM ROSTER, which is a WIDER set than the Tool Studio's own (issue
+  // 1373). It was `isToolStudioRoute`, and that left both WORLD tool screens with an empty
+  // roster: the catalogue could not resolve a linked Tool's description off its Item — so every
+  // record read `No description` while wearing a `Linked` chip — and the entry's linked-item card
+  // could show neither the live name nor the live art. Those two screens are exactly where the
+  // link is authored, so they are the ones that most need to resolve it.
+  const needsWorldItemOptions = $derived(
+    isToolStudioRoute || currentView === 'world-tools' || currentView === 'world-tool-entry'
+  );
+
   $effect(() => {
-    if (!isToolStudioRoute) return;
+    if (!needsWorldItemOptions) return;
     let active = true;
     const applyOptions = (options) => {
       if (active) worldItemOptions = Array.isArray(options) ? options : [];
@@ -7871,6 +7882,66 @@
    * @param {object} data The raw drag payload.
    * @returns {Promise<boolean>}
    */
+  /**
+   * The actors the world Tool entry's `Preview as` region offers.
+   *
+   * ── THE SAME PREDICATE THE CHECKS STUDIO'S PICKER USES, and for the same reason it states:
+   * a real world's actor directory is mostly bestiary, and a crafting Tool is wielded by a
+   * CHARACTER, so an unfiltered roster buries the three actors a GM would ever pick. The
+   * predicate is the shared, GM-configurable one rather than a second `type === 'character'`
+   * test, so the two pickers cannot disagree about who a player character is.
+   *
+   * PROJECTED TO `{id, name, img}` HERE. The page is a leaf with no Foundry in its closure, and
+   * handing it live Actor documents would put one there.
+   *
+   * @returns {Array<{id: string, name: string, img: string}>}
+   */
+  function listWorldToolPreviewActors() {
+    const rows = [];
+    let actors;
+    try {
+      actors = services?.getWorldActors?.() ?? [];
+    } catch {
+      return rows;
+    }
+    for (const actor of actors) {
+      if (!actor?.id || !isPlayerCharacterActor(actor)) continue;
+      rows.push({
+        id: String(actor.id),
+        name: String(actor.name ?? actor.id),
+        img: typeof actor.img === 'string' ? actor.img : '',
+      });
+    }
+    return rows;
+  }
+
+  const worldToolPreviewActors = $derived(
+    currentView === 'world-tool-entry' ? listWorldToolPreviewActors() : []
+  );
+
+  /**
+   * ONE actor's prepared roll data, for resolving a Tool's world-default prerequisites.
+   *
+   * `null` for the `No actor` selection AND for an actor that no longer resolves, which are the
+   * same answer from the readout's point of view: nothing was evaluated. It must NOT degrade to
+   * `{}` — every `@` path would then resolve to zero and a numeric gate would read as FAILED
+   * rather than as unevaluated, which is a plausible wrong answer rather than a missing one.
+   *
+   * @param {string} actorId
+   * @returns {object|null}
+   */
+  function worldToolPreviewRollData(actorId) {
+    if (!actorId) return null;
+    try {
+      const actor = (services?.getWorldActors?.() ?? []).find(
+        (candidate) => String(candidate?.id ?? '') === String(actorId)
+      );
+      return actor?.getRollData?.() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async function relinkWorldToolSource(data) {
     const entityId = worldScopedEntryId;
     if (!entityId || !data) return false;
@@ -11450,6 +11521,7 @@
       <WorldToolCataloguePage
         {...toolScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+        worldItems={worldItemOptions}
         onOpenSystemRules={(entityId, systemId) => openSystemToolRules(entityId, systemId)}
         onCreateFromItemDrop={createWorldToolFromItemDrop}
       />
@@ -11459,6 +11531,8 @@
         entityId={worldScopedEntryId}
         worldItems={worldItemOptions}
         prerequisiteOptions={selectedCharacterPrerequisites}
+        previewActors={worldToolPreviewActors}
+        getPreviewRollData={worldToolPreviewRollData}
         onBackToCatalogue={() => setView('world-tools')}
         onSourceDrop={relinkWorldToolSource}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}

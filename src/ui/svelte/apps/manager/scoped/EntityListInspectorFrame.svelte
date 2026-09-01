@@ -92,6 +92,10 @@
    - inspectorKicker: the uppercase eyebrow over the inspector's identity block (`WORLD
      DEFINITION`, `SELECTED ESSENCE`). Pre-localized, from the lane, because it names the LAYER
      the panel is showing and only the lane knows which one it is.
+   - rowTrailing(entry, ctx): the row's interactive trailing content, beside the row actions.
+   - describeEntry(entry): the LINKED SOURCE's description, for the second rung of the row and
+     inspector description. Not a snippet: it answers a string, so the frame can apply the same
+     precedence in both places rather than a lane rendering two copies of it.
    - inspectorCaption(entry): the one line under the inspected name — the slot the prototype
      fills with a colour name and its hex. A SNIPPET rather than a string prop, because what
      belongs there is per-entity and per-scope (a colour for an essence, a source item for a
@@ -149,6 +153,7 @@
   import BulkSelectionToolbar from '../BulkSelectionToolbar.svelte';
   import Callout from '../Callout.svelte';
   import EmptyState from '../EmptyState.svelte';
+  import SegmentedControl from '../SegmentedControl.svelte';
 
   let {
     scope = null,
@@ -172,6 +177,18 @@
     inspectorKicker = '',
     inspectorCaption = undefined,
     inspectorFoot = undefined,
+    // WHICH FACT THE ROW'S SECOND LINE CARRIES: `description` (the shipped default, and what the
+    // component and essence catalogues draw) or `meta`, which moves the lane's `rowMeta` snippet
+    // out of the trailing column and under the name. See the row markup for the design argument.
+    rowSecondLine = 'description',
+    // The row's INTERACTIVE trailing content, rendered in the meta column beside the actions.
+    // Separate from `rowMeta` because `rowSecondLine: 'meta'` moves that snippet inside the
+    // identity `<button>`, where a control is invalid DOM; see the row markup.
+    rowTrailing = undefined,
+    // The LINKED-SOURCE rung of `descriptionOf`. A lane that can resolve its entity's source
+    // document answers that document's description here, and `''` when it cannot; see
+    // `descriptionOf` for why the rung is the lane's and the PRECEDENCE is the frame's.
+    describeEntry = undefined,
     countUnit = '',
     // Whether the toolbar offers the world/system MEMBERSHIP `<select>`. Default ON, so every
     // other caller renders unchanged. The essence catalogue turns it off: the prototype's toolbar
@@ -473,11 +490,33 @@
     return { src, icon: glyph, tint };
   }
 
+  /**
+   * The description a row and the inspector state, with a rung down to the LINKED ITEM.
+   *
+   * ── WHY A SECOND RUNG EXISTS AT ALL ──────────────────────────────────────────────────────
+   * A world entity's `description` is a SNAPSHOT taken when the link was made, and a record
+   * created any other way — an import, a hand edit, a migration that had none to copy — carries
+   * an empty one. Every such row read `No description` while wearing a `Linked` chip, on the
+   * one screen whose whole premise is that the world record IS the Item. The system Tool editor
+   * has always resolved the live Item for its own card, so the scope that OWNS identity was the
+   * only one that could not see the description identity carries.
+   *
+   * ── THE RUNG IS THE LANE'S, NOT THIS FRAME'S ─────────────────────────────────────────────
+   * Resolving a uuid to a document needs a roster this frame has no business holding, and each
+   * scope names its source link differently. So a lane supplies `describeEntry`, which answers
+   * the linked source's description or `''`; the frame owns only the PRECEDENCE — authored
+   * first, linked source second, the literal last — so the row and the inspector cannot
+   * disagree about it.
+   *
+   * @param {object|null} entry
+   * @returns {string}
+   */
   function descriptionOf(entry) {
     const description = entry?.entity?.description;
-    return typeof description === 'string' && description.trim()
-      ? description
-      : text('FABRICATE.Admin.Manager.Scoped.List.NoDescription', 'No description');
+    if (typeof description === 'string' && description.trim()) return description;
+    const inherited = describeEntry?.(entry);
+    if (typeof inherited === 'string' && inherited.trim()) return inherited;
+    return text('FABRICATE.Admin.Manager.Scoped.List.NoDescription', 'No description');
   }
 
   /**
@@ -496,13 +535,36 @@
     return entry?.hasSourceLink === true;
   }
 
+  // SHORT ENOUGH FOR A CHIP TRACK. A `<select>` shows one option at a time and can afford
+  // `In at least one system`; a segmented control states all three side by side, and the long
+  // pair pushed the sort controls onto a second toolbar band. Each segment now carries its COUNT
+  // as well, which is the fact the long label was standing in for.
   const membershipLabels = $derived({
     all: text('FABRICATE.Admin.Manager.Scoped.List.MembershipAll', 'All'),
-    member: text('FABRICATE.Admin.Manager.Scoped.List.MembershipMember', 'In at least one system'),
-    unused: text('FABRICATE.Admin.Manager.Scoped.List.MembershipUnused', 'In no system'),
+    member: text('FABRICATE.Admin.Manager.Scoped.List.MembershipMember', 'In a system'),
+    unused: text('FABRICATE.Admin.Manager.Scoped.List.MembershipUnused', 'Unused'),
     in: text('FABRICATE.Admin.Manager.Scoped.List.MembershipIn', 'In this system'),
-    out: text('FABRICATE.Admin.Manager.Scoped.List.MembershipOut', 'Not in this system'),
+    out: text('FABRICATE.Admin.Manager.Scoped.List.MembershipOut', 'Not here'),
   });
+
+  /**
+   * The membership filter's segments, each carrying the number of rows it would show.
+   *
+   * COUNTED OVER THE WHOLE CORPUS, and deliberately not over the current page or the current
+   * search: a segment's count answers "how many are there", and a count that moved with the
+   * search box would make choosing a segment depend on what is already typed in another control.
+   *
+   * The predicate is the MODEL's, reached by asking it for each membership value in turn rather
+   * than by re-deriving membership here — the frame must not hold a second opinion about what
+   * `member` means.
+   */
+  const membershipSegments = $derived(
+    membershipOptions.map((option) => ({
+      value: option,
+      fallback: membershipLabels[option],
+      count: model.project({ entries, searchOf, membership: option, systemId }).rows.length,
+    }))
+  );
 
   const sortKeyLabels = $derived({
     name: text('FABRICATE.Admin.Manager.Scoped.List.SortKeyName', 'Name'),
@@ -618,20 +680,31 @@
               />
             </label>
 
+            <!--
+              SEGMENTED CHIPS, NOT A `<select>`. This is the SAME question the system Tool Rules
+              list asks one screen away — which rows am I looking at — and that screen asks it
+              with a segmented track. One filter drawn two ways, a click apart, is a GM having to
+              learn the same control twice; and a `<select>` hides its other options behind a
+              click, so the counts that make the choice decidable were unreadable until opened.
+
+              THE COUNTS ARE THE PRIMITIVE'S OWN `count` SLOT, which exists for exactly this and
+              which no consumer had used: each segment says how many rows choosing it would show,
+              measured against the corpus rather than against the current page.
+            -->
             {#if membershipFilter}
-              <select
+              <SegmentedControl
+                density="compact"
+                options={membershipSegments}
                 value={membership}
-                data-scoped-list-membership
-                aria-label={text(
+                groupName={`scoped-list-membership-${scope?.entityType || 'entity'}`}
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Scoped.List.MembershipLabel',
                   'Membership filter'
                 )}
-                onchange={(event) => changeMembership(event.currentTarget.value)}
-              >
-                {#each membershipOptions as option (option)}
-                  <option value={option}>{membershipLabels[option]}</option>
-                {/each}
-              </select>
+                dataAttr="data-scoped-list-membership"
+                optionDataAttr="data-scoped-list-membership-option"
+                onChange={(next) => changeMembership(next)}
+              />
             {/if}
 
             {#each laneFilters as filter (filter.id)}
@@ -773,9 +846,56 @@
                     />
                     <span class="manager-system-copy">
                       <span class="manager-system-name" title={name}>{name}</span>
-                      <span class="manager-system-description" title={descriptionOf(entry)}>
-                        {descriptionOf(entry)}
-                      </span>
+                      <!--
+                        THE SECOND LINE IS THE LANE'S CHOICE OF FACT.
+
+                        `description` is the shipped default and stays it. `meta` is what the tool
+                        catalogue needs: the design puts a Tool's chips — what it does, and how
+                        far it reaches — directly under its name, and spends no row width on a
+                        description the inspector states in full. Two lanes wanting two different
+                        second lines is a placement prop, not a second row component.
+                      -->
+                      {#if rowSecondLine === 'description'}
+                        <span class="manager-system-description" title={descriptionOf(entry)}>
+                          {descriptionOf(entry)}
+                        </span>
+                      {:else if rowMeta}
+                        <!--
+                          INSIDE THE IDENTITY BUTTON, WHICH IS WHY `rowTrailing` EXISTS.
+
+                          The design indents the chips under the NAME, not under the medallion,
+                          so they have to share `.manager-system-copy` with it. That places them
+                          inside a `<button>`, where interactive content is invalid DOM the
+                          browser silently reparents — so a lane choosing `meta` puts only inert
+                          content here and renders anything clickable through `rowTrailing`.
+                        -->
+                        <span
+                          class="manager-scoped-list-row-facts"
+                          data-scoped-list-row-facts={entry.id}
+                        >
+                          {#if scope?.sourceLinked === true && !sourceLinkedRow(entry)}
+                            <!-- ONLY THE WARNING HALF. A `Linked` pill on every row of a
+                                 catalogue whose whole premise is that each record IS an Item
+                                 states the rule rather than the exception; the design carries
+                                 neither. What a GM has to see is the record that is NOT linked,
+                                 because that one resolves to nothing in an inventory. -->
+                            <span
+                              class="manager-scoped-list-source"
+                              data-scoped-list-source="unlinked"
+                            >
+                              <StatusPill
+                                tone="warning"
+                                icon="fas fa-link-slash"
+                                label={text(
+                                  'FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked',
+                                  'No source item'
+                                )}
+                              />
+                            </span>
+                          {/if}
+                          {@render rowMeta(entry, rowContext(entry))}
+                        </span>
+                      {/if}
                     </span>
                   </button>
 
@@ -783,7 +903,13 @@
                      rules-list shell's own `InheritRow` — render block elements, and a `<div>`
                      inside a `<span>` is invalid nesting the browser silently reparents. -->
                   <div class="manager-scoped-list-row-meta">
-                    {#if scope?.sourceLinked === true}
+                    <!-- THE SOURCE PILL FOLLOWS THE FACTS. Under `rowSecondLine: 'meta'` the
+                         lane's chips sit under the name and the design's row silhouette is
+                         `[medallion] [name over its chips] [toggle] [action]` — a pill floating
+                         in the trailing column reads as a third control there. It is rendered
+                         inside the fact run instead, which keeps the information and the
+                         silhouette at once. -->
+                    {#if scope?.sourceLinked === true && rowSecondLine === 'description'}
                       <span
                         class="manager-scoped-list-source"
                         data-scoped-list-source={sourceLinkedRow(entry) ? 'linked' : 'unlinked'}
@@ -800,21 +926,51 @@
                         />
                       </span>
                     {/if}
-                    {#if rowMeta}{@render rowMeta(entry, rowContext(entry))}{/if}
+                    {#if rowSecondLine === 'description' && rowMeta}
+                      {@render rowMeta(entry, rowContext(entry))}
+                    {/if}
+                    {#if rowTrailing}{@render rowTrailing(entry, rowContext(entry))}{/if}
                   </div>
 
+                  <!--
+                    A LABELLED ACTION IS A DESCRIPTOR FLAG, NOT A SECOND ROW COMPONENT.
+
+                    The design's catalogue row ends with a bordered `Edit tool ⧉`, and so does
+                    our own system Tool Rules row — while this frame drew a bare pen, so the two
+                    list screens disagreed with each other as well as with the design. `labelled`
+                    is opt-in per descriptor: a lane that sets none renders the icon button
+                    byte-for-byte as before, which is what keeps the component and essence
+                    catalogues untouched by this.
+                  -->
                   <span class="manager-action-group">
                     {#each rowActions as action (action.id)}
-                      <button
-                        type="button"
-                        class="manager-icon-button"
-                        data-scoped-list-action={action.id}
-                        aria-label={`${action.label} — ${name}`}
-                        title={action.label}
-                        onclick={() => action.run(entry)}
-                      >
-                        <i class={action.icon} aria-hidden="true"></i>
-                      </button>
+                      {#if action.labelled}
+                        <button
+                          type="button"
+                          class="manager-scoped-list-row-action"
+                          data-scoped-list-action={action.id}
+                          aria-label={`${action.label} — ${name}`}
+                          title={action.label}
+                          onclick={() => action.run(entry)}
+                        >
+                          <span>{action.label}</span>
+                          <i
+                            class={action.trailingIcon || 'fas fa-arrow-up-right-from-square'}
+                            aria-hidden="true"
+                          ></i>
+                        </button>
+                      {:else}
+                        <button
+                          type="button"
+                          class="manager-icon-button"
+                          data-scoped-list-action={action.id}
+                          aria-label={`${action.label} — ${name}`}
+                          title={action.label}
+                          onclick={() => action.run(entry)}
+                        >
+                          <i class={action.icon} aria-hidden="true"></i>
+                        </button>
+                      {/if}
                     {/each}
                   </span>
                 </li>
@@ -909,7 +1065,19 @@
                   <h2 class="manager-inspector-name" data-scoped-list-inspector-name>
                     {scopedEntryName(inspectedEntry)}
                   </h2>
-                  {#if caption}
+                  <!--
+                    THE GATE IS THE SNIPPET OR THE COLOUR, NEVER THE COLOUR ALONE.
+
+                    It was `{#if caption}`, and `caption` is `colourCaption(colorToken)` — so a
+                    scope with no colour token could pass `inspectorCaption` and have it silently
+                    never render. The tool catalogue did exactly that: its `On` / `Off` state pill
+                    is the design's own caption for this slot (`tool-catalogue.png`), the lane
+                    supplied the snippet, and nothing was drawn because a Tool has no colour.
+
+                    A LANE SNIPPET WINS OUTRIGHT when it is supplied, which is unchanged; what
+                    changed is that supplying one is now sufficient to reach the DOM.
+                  -->
+                  {#if inspectorCaption || caption}
                     <span class="manager-scoped-list-inspector-caption" data-scoped-list-caption>
                       {#if inspectorCaption}
                         {@render inspectorCaption(inspectedEntry)}
@@ -1198,6 +1366,57 @@
     flex-direction: column;
     gap: var(--fab-space-2xs);
     min-width: 0;
+  }
+
+  /* THE ROW'S FACT RUN, in the identity column under the name. It wraps rather than truncating,
+     because every chip in it names a rule and a clipped rule is worse than a two-line row. */
+  .manager-scoped-list-row-facts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-1);
+    min-width: 0;
+    margin-top: 3px;
+  }
+
+  /* THE LABELLED ROW ACTION. Deliberately the same box as the catalogue shell's `Rules ⧉` link,
+     to the value: the design draws both as one small bordered button with a trailing
+     external-link glyph, and two near-identical treatments a panel apart is what this repository
+     keeps finding. Foundry's fixed button geometry is reset explicitly, as every other manager
+     `<button>` wearing its own chrome resets it. */
+  .manager-scoped-list-row-action {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: var(--fab-space-chip);
+    width: auto;
+    height: 26px;
+    min-height: 26px;
+    margin: 0;
+    padding: 0 var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 7px;
+    color: var(--fab-text-muted);
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.62rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .manager-scoped-list-row-action:hover {
+    border-color: var(--fab-accent);
+    color: var(--fab-accent);
+  }
+
+  .manager-scoped-list-row-action:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 
   /* The colour caption, under the name and above the description. See `colourCaption` for why it

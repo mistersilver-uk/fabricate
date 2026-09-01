@@ -1245,9 +1245,20 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-tool-break-mode]',
         target: '[data-world-tool-break-segment="toolSpecific"]',
       },
+      // THE FACT RUN, which is where a Tool row's badges live since issue 1373: the design puts
+      // the chips under the NAME and the frame renders them inside the identity column, so a
+      // trailing-column assertion would be measuring a container the row no longer uses.
       {
         container: '[data-scoped-list="world-tools"]',
-        target: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-source]',
+        target: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-row-facts]',
+      },
+      // AND THE SOURCE BADGE STILL, on the row that HAS one. A linked record carries no pill any
+      // more — a `Linked` chip on every row of a catalogue whose premise is that each record IS
+      // an Item states the rule rather than the exception — so the badge is asserted where it is
+      // now a real answer: the one world record no Item stands behind.
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-row="lab-tool-unlinked"] [data-scoped-list-source]',
       },
       {
         container: '[data-scoped-list-inspector]',
@@ -1408,6 +1419,98 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-requirements',
+    label: 'Manager — World Tool entry, Requirements',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE FOURTH TAB, which the screen did not have (issue 1373). `prerequisites` and `bonus`
+    // became world-default sections a crafting system inherits and may override, so the world
+    // entry is where the default is authored - and until this tab existed there was nowhere to
+    // author it, which is what left the design's four tabs at three.
+    //
+    // IT RENDERS THE SHIPPED `ToolRequirementsTab`, the same component the SYSTEM editor mounts,
+    // so this frame is also the evidence that one meaning has one shape across the two scopes.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="requirements"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-requirements-tab]',
+    // THE TWO CONTROLS AND THE REACH LINE. A frame proving the tab exists but not that each
+    // section states how many systems inherit it would be evidence for the strip alone.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-prerequisites-enabled]',
+      },
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-world-tool-entry-inherit-count="prerequisites"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-player-preview',
+    label: 'Manager — World Tool entry, player preview',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE THIRD FRAME ON THIS SCREEN, and it is the only one that can show its preview COLUMN
+    // (issue 1373). The column has four regions and the pane is 900px: its two siblings both
+    // photograph the tab BODY, so `Preview as` and `Required for` are below the fold in both and
+    // a change to either would publish a frame that cannot contain it.
+    //
+    // WHAT THE THREE LOWER REGIONS ANSWER is the half of this screen a rules list cannot: what a
+    // COPY of the Tool looks like in a player's inventory, whether one named character may wield
+    // it, and what stops working if the Tool is deleted. None is derivable from the world
+    // defaults above them.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      // SCROLLED, because the column is what this frame is about and it does not fit. Anchored
+      // on the LAST region rather than the first, so everything this case claims is on screen at
+      // once rather than only the region the scroll landed on.
+      { selector: '[data-world-tool-entry-required]', scroll: true },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-preview]',
+    // ONE ASSERTION PER REGION, against the preview column itself. A frame proving only the
+    // inventory tile would be evidence for a third of the change.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-world-tool-entry-player-copy]',
+      },
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-world-tool-entry-preview-status]',
+      },
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-world-tool-entry-required]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    // THE PREVIEW SHELL IS CLAIMED TOO, unlike this screen's other two cases: the three regions
+    // render through its `footer` slot, so a change that dropped the slot would render nothing
+    // here and publish neither of the other frames as evidence of it.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
     ],
   }),
   managerCase({

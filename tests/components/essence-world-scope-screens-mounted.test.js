@@ -64,6 +64,9 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+  // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, so the essence
+  // trees that render the frame carry it in their static graph too. An omission HANGS the suite.
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
 ];

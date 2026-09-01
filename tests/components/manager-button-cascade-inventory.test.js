@@ -448,7 +448,10 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
         container: 'manager-header-actions',
-        buttons: 3,
+        // 3 -> 4 with issue 1373's `World Tool` header action: the rules LIST already
+        // advertised `Edit the world Tool`, and the editor behind `Edit rules` had no route to
+        // that record, so the list promised a destination the next screen could not reach.
+        buttons: 4,
       },
     ],
     why:

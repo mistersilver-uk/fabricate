@@ -60,6 +60,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`: one filter
+    // asking the same question as the system Tool Rules screen's, drawn the same way.
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -117,25 +120,55 @@ describe('world Tools Catalogue (issue 1373)', () => {
     harness.teardown();
   });
 
-  it('renders the source-item badge for a linked tool and the UNLINKED flag for one with none', async () => {
+  it('flags the record with NO source Item, and says nothing about the ones that have one', async () => {
+    // THE EXCEPTION, NOT THE RULE (issue 1373). This asserted a `Linked` badge on every linked
+    // row; the design's catalogue carries none, and it is a catalogue whose whole premise is
+    // that each record IS a game-world Item — so the badge stated the rule on every row and the
+    // one record that resolves to nothing in an inventory looked like all the others.
     const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
 
-    const linked = target.querySelector('[data-scoped-list-row="hammer"] [data-scoped-list-source]');
-    assert.ok(Boolean(linked), 'the linked row renders a source affordance at all');
-    assert.equal(
-      linked.getAttribute('data-scoped-list-source'),
-      'linked',
-      'a tool naming an origin Item reads as LINKED. An essence-shaped identity list carries no ' +
-        'link field at all, so this whole affordance disappears while the row still renders'
+    assert.ok(
+      !target.querySelector('[data-scoped-list-row="hammer"] [data-scoped-list-source]'),
+      'a linked row states no badge: being linked is what every row here is'
     );
 
     const orphan = target.querySelector('[data-scoped-list-row="orphan"] [data-scoped-list-source]');
-    assert.ok(Boolean(orphan), 'the unlinked row renders the affordance too, in its other state');
+    assert.ok(Boolean(orphan), 'the record with no source reference IS flagged');
     assert.equal(
       orphan.getAttribute('data-scoped-list-source'),
       'unlinked',
       'a record with no source reference of its own is FLAGGED rather than omitted: validation ' +
         'has to be able to surface it'
+    );
+    // AND IT IS IN THE FACT RUN, under the name, which is where the design puts a row's badges.
+    assert.ok(
+      Boolean(
+        target.querySelector(
+          '[data-scoped-list-row="orphan"] [data-scoped-list-row-facts] [data-scoped-list-source]'
+        )
+      ),
+      'the flag sits with the rest of the row facts rather than floating in the action column'
+    );
+  });
+
+  it('offers a LABELLED row action and a segmented membership filter, not a pen and a select', async () => {
+    // Both are the design's, and both were also the idiom our own system Tool Rules screen
+    // already used — so the two list screens disagreed with each other as well as with it.
+    const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+
+    const action = target.querySelector(
+      '[data-scoped-list-row="hammer"] [data-scoped-list-action="open-entry"]'
+    );
+    assert.ok(Boolean(action), 'the row still offers its entry action');
+    assert.match(action.textContent, /Edit tool/, 'and it NAMES the verb and the noun');
+
+    const segments = [
+      ...target.querySelectorAll('[data-scoped-list-membership-option]'),
+    ].map((segment) => segment.getAttribute('data-scoped-list-membership-option'));
+    assert.deepEqual(segments, ['all', 'member', 'unused']);
+    assert.ok(
+      !target.querySelector('select[data-scoped-list-membership]'),
+      'and the bare select is gone rather than rendered beside it'
     );
   });
 

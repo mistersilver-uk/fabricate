@@ -126,6 +126,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusPill.svelte',
     FRAME,
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    // The shared frame's membership filter is a segmented track since issue 1373.
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     SHELL,
   ],
   componentPath: SHELL,

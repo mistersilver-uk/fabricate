@@ -91,15 +91,21 @@
     data-tool-browser-inspector
     data-tool-inspector-membership={row ? 'member' : 'absent'}
   >
+    <!-- THE KICKER IS ITS OWN FULL-WIDTH LINE ABOVE THE BLOCK, which is where the design puts it
+         and where the world catalogue's inspector already puts its own. It sat inside the copy
+         column beside the medallion, so it read as a caption belonging to the name rather than as
+         the panel's own head — and the two tool inspectors, a click apart, drew the same element
+         two ways.
+
+         `Selected tool`, not `Tool page`. The two screens had their kickers swapped: `Tool page`
+         names the WORLD record and belongs on the world catalogue's inspector, while this panel
+         is showing what one Tool resolves to INSIDE one crafting system. -->
+    <p class="manager-kicker manager-tool-inspector-kicker" data-tool-inspector-kicker>
+      {text('FABRICATE.Admin.Manager.Tools.InspectorKicker', 'Selected tool')}
+    </p>
     <div class="manager-tool-inspector-hero">
       <img src={row?.img || unadopted?.entity?.img || ''} alt="" />
       <div>
-        <!-- `Selected tool`, not `Tool page`. The two tool screens had their kickers swapped:
-             `Tool page` names the WORLD record and belongs on the world catalogue's inspector,
-             while this panel is showing what one Tool resolves to INSIDE one crafting system. -->
-        <p class="manager-kicker">
-          {text('FABRICATE.Admin.Manager.Tools.InspectorKicker', 'Selected tool')}
-        </p>
         <h2 title={subjectName}>{subjectName}</h2>
         <!-- THE PILL STATES MEMBERSHIP FIRST. `Enabled here` over a Tool this system has no
              rules record for would be a claim about rules that do not exist; the design says
@@ -246,6 +252,14 @@
      `styles/fabricate.css` so `VIEW_RECIPES` maps a change to the Tool views alone. The
      four-heading `.manager-tool-inspector-sections` grid this replaces is no longer
      rendered by anything. */
+  /* THE PANEL'S OWN HEAD, spanning the column above the medallion rather than sitting in the
+     copy cell beside it. `.manager-kicker` fully specifies the type; this adds only the
+     placement. */
+  .manager-tool-inspector-kicker {
+    margin: 0;
+    min-width: 0;
+  }
+
   .manager-tool-inspector-rules {
     display: grid;
     gap: var(--fab-space-2);

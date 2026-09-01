@@ -67,6 +67,9 @@
      did not declare it, and a snippet a shell does not forward is dropped in SILENCE — the frame
      rendered its own name-only fallback and the caption looked merely unfinished rather than
      unwired.
+   - rowTrailing / rowSecondLine / describeEntry / openEntryLabel / systemRowAction: the row and
+     inspector parity switches, each opt-in and each defaulting to what shipped. See the frame's
+     prop notes and the system row's own note for `systemRowAction`.
    - onOpenSystemRules(entityId, systemId): the inspector system row's `Rules ↗` deep link, into
      that system's own rules for this entity. `null` — the default — falls the row back to the
      membership cluster, so a lane whose shell has nowhere to route to still gets a usable row.
@@ -114,6 +117,20 @@
     onSelect = () => {},
     onOpenEntry = () => {},
     rowMeta = undefined,
+    // Threaded straight to the frame; see its own prop notes. All four are OPT-IN and default to
+    // exactly what the component and essence catalogues render today.
+    rowTrailing = undefined,
+    rowSecondLine = 'description',
+    describeEntry = undefined,
+    // The ROW ACTION the list offers per entity. `pen` is the shipped icon button; `labelled`
+    // is the design's bordered `Edit <noun> ⧉`, which is also what our own system rules list
+    // already draws — so the default is the compatible one and a lane opts into parity.
+    openEntryLabel = '',
+    // WHAT AN INSPECTOR SYSTEM ROW OFFERS. `manage` is the shipped pair — a `Rules ⧉` link for a
+    // member and the membership cluster for a non-member. `navigate` is the design's tool
+    // catalogue: EVERY row is a link, and the verb that creates a system's record lives on the
+    // system's own screen rather than on the world catalogue.
+    systemRowAction = 'manage',
     inspectorBody = undefined,
     bulk = undefined,
     emptyTitle = '',
@@ -151,7 +168,11 @@
     {
       id: 'open-entry',
       icon: 'fas fa-pen',
-      label: text('FABRICATE.Admin.Manager.Scoped.List.OpenEntry', 'Open'),
+      // A LANE THAT NAMES THE VERB GETS THE LABELLED BUTTON. The design's row action reads
+      // `Edit tool ⧉`, and a bare pen states neither the verb nor the noun; the shipped `Open`
+      // icon button stays the default so no other catalogue's row moves.
+      labelled: Boolean(openEntryLabel),
+      label: openEntryLabel || text('FABRICATE.Admin.Manager.Scoped.List.OpenEntry', 'Open'),
       run: (entry) => onOpenEntry(entry.id),
     },
   ]);
@@ -286,6 +307,9 @@
     {searchPlaceholder}
     {rowActions}
     {rowMeta}
+    {rowTrailing}
+    {rowSecondLine}
+    {describeEntry}
     {bulk}
     {inspectorKicker}
     {inspectorCaption}
@@ -424,8 +448,19 @@
             A NON-MEMBER row keeps `MembershipActions`, because there is no rules screen to link to
             for a system that has no record: Add is the only verb it has, and it is not
             destructive. That is also why the whole cluster is not simply deleted.
+
+            ── `systemRowAction: 'navigate'` OVERRIDES THAT LAST PARAGRAPH, AND THE TOOL CATALOGUE
+            TAKES IT (issue 1373, maintainer ruling). The design's tool catalogue rows are
+            `[System name] [Rules ⧉]` and nothing else, member or not: this panel says WHICH
+            systems hold the Tool and how to reach each one's rules, and the verb that creates a
+            system's record belongs on that system's own Tool Rules screen — where its inspector
+            already pins `Add {tool} to {system}`. A write action here put the create verb on the
+            world catalogue, one scope away from the record it writes.
+
+            The link is still meaningful for a NON-MEMBER under this mode: the rules list it opens
+            is the system's whole Tool Rules screen, which is exactly where the adoption happens.
           -->
-          {#if row.member === true && onOpenSystemRules}
+          {#if (row.member === true || systemRowAction === 'navigate') && onOpenSystemRules}
             <button
               type="button"
               class="manager-scoped-catalogue-system-link"

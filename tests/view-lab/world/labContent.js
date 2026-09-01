@@ -1987,6 +1987,8 @@ const SMITHING_TOOLS = [
   {
     id: 'sm-tool-hammer',
     name: 'Smith’s Hammer',
+    description:
+      'A cross-pein sledge with a hickory haft, weighted for drawing hot iron out along the horn.',
     componentId: 'sm-iron-ingot',
     registeredItemUuid: 'Item.sm-tool-hammer',
     originItemUuid: 'Item.sm-tool-hammer',
@@ -1998,6 +2000,7 @@ const SMITHING_TOOLS = [
   {
     id: 'sm-tool-anvil',
     name: 'Anvil',
+    description: 'Two hundredweight of cast steel, set on an elm stump and rung true.',
     componentId: 'sm-steel-ingot',
     registeredItemUuid: 'Item.sm-tool-anvil',
     originItemUuid: 'Item.sm-tool-anvil',
@@ -2008,6 +2011,7 @@ const SMITHING_TOOLS = [
   {
     id: 'sm-tool-tongs',
     name: 'Forge Tongs',
+    description: 'Wolf-jaw tongs, long enough in the rein to keep a hand clear of the fire.',
     componentId: 'sm-iron-ingot',
     registeredItemUuid: 'Item.sm-tool-tongs',
     originItemUuid: 'Item.sm-tool-tongs',
@@ -2021,6 +2025,7 @@ const HERBALISM_TOOLS = [
   {
     id: 'hb-tool-mortar',
     name: 'Mortar & Pestle',
+    description: 'Unglazed porcelain, deliberately rough inside so a seed head gives up its oils.',
     componentId: 'hb-mortar-dust',
     registeredItemUuid: 'Item.hb-tool-mortar',
     originItemUuid: 'Item.hb-tool-mortar',
@@ -3894,13 +3899,26 @@ export function buildLabContent() {
     // `lab-tool-unlinked` earns its place: `worldScopeEntityGrouping` records that a definition
     // with no source references of its own becomes a world entity FLAGGED UNLINKED, and that
     // state is drawn by a different badge in a different tone. One linked row cannot show it.
+    // ── THE DESCRIPTION IS NOT BLANKED ANY MORE, AND ONE RECORD STILL HAS NONE ──────────────
+    // Every world tool entity carried `description: ''`, so every row and the inspector read
+    // `No description` on the one screen whose premise is that the world record IS the Item —
+    // and the frames published that as the catalogue's normal state. A Tool registered through
+    // the shipped drop path captures the Item's description at link time, so a populated one is
+    // what a real corpus looks like.
+    //
+    // `hb-tool-alembic` deliberately keeps the empty one. The row and the inspector fall through
+    // to the linked ITEM's description when a record has none of its own, and a fixture where
+    // every record answers on the first rung would publish frames that could not tell the two
+    // apart. The lab has no `Item.hb-tool-alembic` document to inherit FROM, so what its row
+    // shows is the last rung — which is the honest picture of an unresolvable link and the state
+    // the catalogue exists to make findable.
     toolScope: {
       entities: [
         ...[...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => ({
           id: tool.id,
           name: tool.name,
           img: tool.img,
-          description: '',
+          description: tool.description ?? '',
           originItemUuid: tool.originItemUuid,
           registeredItemUuid: tool.registeredItemUuid,
           aliasItemUuids: [],

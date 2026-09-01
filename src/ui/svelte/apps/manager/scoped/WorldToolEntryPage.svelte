@@ -79,6 +79,10 @@
   is what stops a second near-identical `.svelte` tab block, which SonarCloud counts.
 -->
 <script>
+  import {
+    evaluatePrerequisite,
+    prerequisitePreview,
+  } from '../../../../../systems/characterPrerequisites.js';
   import { formulaRolls } from '../../../../../utils/rollFormulaRollability.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
@@ -124,6 +128,15 @@
     // itself (issue 1308), which is what makes a world-default `prerequisites.ids` addressable
     // from here at all: a system-local id would name nothing in the next system to inherit it.
     prerequisiteOptions = [],
+    // ── THE `PREVIEW AS` SEAM (issue 1373) ────────────────────────────────────────────────
+    // `{id, name, img}` per previewable actor, and a reader that answers ONE actor's prepared
+    // roll data. Both are the shell's: resolving an Actor document and calling `getRollData()`
+    // are Foundry reads, and this page is a leaf that holds none — the mounted suites compile it
+    // with no `game` at all. A reader that answers `null` is the `No actor` case, and every `@`
+    // key then resolves to nothing, which is why the readout says so rather than showing a
+    // plausible wrong answer.
+    previewActors = [],
+    getPreviewRollData = () => null,
     onBackToCatalogue = () => {},
     // ── THE LINK IS AUTHORED HERE, AND ONLY HERE (issue 1373) ─────────────────────────────
     // The three wires below moved OFF the system Tool editor, which had them and should not
@@ -549,19 +562,31 @@
     }[mode];
   }
 
+  /**
+   * One on-break card's description.
+   *
+   * SIZED FOR THE CARD, which is a measured constraint rather than a stylistic preference. These
+   * three sit in a 3-column grid inside a ~690px pane, so each has roughly a 22-character
+   * measure; `Replace it with a managed Component that can participate in repair routes.` wrapped
+   * to eight lines and made this group twice the height of the identical group above it, in the
+   * same tab. The group above sets the length these have to match.
+   *
+   * The FULL sentence is not lost: it is what the resolved on-break rule states in the preview
+   * column, where there is room for it.
+   *
+   * @param {string} mode
+   * @returns {string}
+   */
   function onBreakModeDescription(mode) {
     return {
-      destroy: text(
-        'FABRICATE.Admin.Manager.Tools.OnBreakDestroyHint',
-        'The tool is consumed and removed.'
-      ),
+      destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroyHint', 'Consumed and removed.'),
       flagBroken: text(
         'FABRICATE.Admin.Manager.Tools.OnBreakFlagHint',
-        'Sets a broken flag; appends " (Broken)".'
+        'Flagged broken and renamed.'
       ),
       replaceWith: text(
         'FABRICATE.Admin.Manager.Tools.OnBreakReplaceHint',
-        'Replace it with a managed Component that can participate in repair routes.'
+        'Swapped for a Component.'
       ),
     }[mode];
   }
@@ -863,16 +888,14 @@
     });
   });
 
+  // ── FOUR ROWS, WHICH IS THE DESIGN'S OWN SET ──────────────────────────────────────────────
+  // It was six. The two that went are the ones this column was RESTATING rather than resolving:
+  // the world BREAK MODE, which the Breakage tab already leads with in a read-only band of its
+  // own, and the repair SEED count, which the repair card states with the sentence that makes it
+  // meaningful. Neither is a rule a player is subject to, which is what this column answers, and
+  // together they cost the column ~150px — enough that `Preview as` and `Required for` fell below
+  // the fold on a 900px window.
   const previewRules = $derived([
-    {
-      id: 'break-mode',
-      icon: 'fas fa-sliders',
-      title: toolBreakModeLabel(worldAuthority, text),
-      subtitle: text(
-        'FABRICATE.Admin.Manager.Tools.WorldAuthorityPreview',
-        'The world break mode, unless a system overrides it.'
-      ),
-    },
     {
       id: 'breakage',
       icon: 'fas fa-hourglass-half',
@@ -935,22 +958,136 @@
             'Adds nothing to the crafting check'
           ),
     },
-    {
-      id: 'repair',
-      icon: 'fas fa-screwdriver-wrench',
-      title: format(
-        repairGroups.length === 1
-          ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
-          : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
-        repairGroups.length === 1 ? '{count} group' : '{count} groups',
-        { count: repairGroups.length }
-      ),
-      subtitle: text(
-        'FABRICATE.Admin.Manager.Tools.RepairSeedPreview',
-        'Copied once when a system adopts this Tool'
-      ),
-    },
   ]);
+
+  // ── THE PLAYER PREVIEW'S OWN STATE ─────────────────────────────────────────────────────
+  // Neither is persisted, and neither should be: `Show as broken` asks what a copy carrying the
+  // `toolBroken` flag would look like, and `Preview as` asks what one actor would resolve. Both
+  // are questions ABOUT the record rather than fields OF it, so staging them into the buffered
+  // draft would put a preview toggle behind `Save tool`.
+  let previewBroken = $state(false);
+  let previewActorId = $state('');
+
+  /** The previewable actor roster, with the `No actor` case first. */
+  const previewActorRows = $derived(
+    Array.isArray(previewActors)
+      ? previewActors.filter((actor) => actor && typeof actor.id === 'string' && actor.id)
+      : []
+  );
+
+  /**
+   * What ONE copy of this Tool shows in a player's inventory.
+   *
+   * `limitedUses` is the only mode with a per-copy tally, so it is the only one that can state
+   * uses left; the other two answer with the rule itself, which is what the copy in an inventory
+   * would actually be governed by.
+   */
+  const previewUsesLabel = $derived.by(() => {
+    const maxUses = Number(defaults.breakage?.maxUses);
+    if (breakMode === 'limitedUses' && Number.isInteger(maxUses) && maxUses > 0) {
+      return format(
+        maxUses === 1
+          ? 'FABRICATE.Admin.Manager.Tools.PreviewPanel.UsesLeftOne'
+          : 'FABRICATE.Admin.Manager.Tools.PreviewPanel.UsesLeft',
+        maxUses === 1 ? '{count} use left' : '{count} uses left',
+        { count: maxUses }
+      );
+    }
+    return breakageSummaryLabel;
+  });
+
+  /**
+   * The prerequisites resolved against the previewed actor.
+   *
+   * The gate is the WORLD default's `ids`, resolved against the world prerequisite library; a
+   * selected id the library no longer holds is DROPPED rather than reported as failing, because
+   * a missing definition is a validation problem rather than a character one.
+   *
+   * `met` is `null` with no actor, which is a THIRD state and not a pessimistic `false`: nothing
+   * was evaluated, so nothing passed or failed, and the readout says exactly that.
+   */
+  const previewPrerequisiteRows = $derived.by(() => {
+    if (worldPrerequisites.enabled !== true) return [];
+    const ids = Array.isArray(worldPrerequisites.ids) ? worldPrerequisites.ids : [];
+    const rollData = previewActorId ? getPreviewRollData(previewActorId) : null;
+    return ids
+      .map((id) => prerequisiteOptions.find((option) => option?.id === id) ?? null)
+      .filter(Boolean)
+      .map((option) => ({
+        id: option.id,
+        name: option.name || option.label || option.id,
+        detail: prerequisitePreview(option),
+        met: rollData ? evaluatePrerequisite(rollData, option) : null,
+      }));
+  });
+
+  /**
+   * The status card under `Preview as`: whether this actor may wield the Tool, and what it adds.
+   *
+   * THREE OUTCOMES, and the third is the one a two-state readout gets wrong. With no actor
+   * nothing has been evaluated, so the card states the RULE rather than a verdict — a
+   * `Usable` on an unevaluated gate is the plausible-wrong-answer failure the checks preview
+   * already refuses.
+   */
+  const previewStatus = $derived.by(() => {
+    const bonus = worldBonus.enabled === true && String(worldBonus.expression ?? '').trim();
+    const bonusClause = bonus
+      ? format('FABRICATE.Admin.Manager.Tools.PreviewPanel.WithBonus', 'adds {expression}', {
+          expression: String(worldBonus.expression).trim(),
+        })
+      : text('FABRICATE.Admin.Manager.Tools.PreviewPanel.NoBonus', 'with no check bonus');
+    const unmet = previewPrerequisiteRows.filter((row) => row.met === false).length;
+    if (previewPrerequisiteRows.length > 0 && !previewActorId) {
+      return {
+        tone: 'info',
+        icon: 'fas fa-circle-info',
+        label: format(
+          'FABRICATE.Admin.Manager.Tools.PreviewPanel.Ungated',
+          'Gated on {count} prerequisite(s) · {bonus}',
+          { count: previewPrerequisiteRows.length, bonus: bonusClause }
+        ),
+      };
+    }
+    if (unmet > 0) {
+      return {
+        tone: worldPrerequisites.gateMode === 'bonus' ? 'warning' : 'danger',
+        icon: 'fas fa-circle-exclamation',
+        label:
+          worldPrerequisites.gateMode === 'bonus'
+            ? text(
+                'FABRICATE.Admin.Manager.Tools.PreviewPanel.BonusWithheld',
+                'Usable, but the check bonus is withheld'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Tools.PreviewPanel.Unusable',
+                'Unusable by this character'
+              ),
+      };
+    }
+    return {
+      tone: 'positive',
+      icon: 'fas fa-circle-check',
+      label: format('FABRICATE.Admin.Manager.Tools.PreviewPanel.Usable', 'Usable, {bonus}', {
+        bonus: bonusClause,
+      }),
+    };
+  });
+
+  /**
+   * How many `Required for` rows the rail shows before it summarises the rest.
+   *
+   * A 300px column, and a Tool a world really uses is named by dozens of records: the lab's
+   * smithing hammer alone is required by eight. An uncapped list is not a list a GM reads, it is
+   * one that pushes every region above it off the top of a scrolled column.
+   *
+   * @type {number}
+   */
+  const REQUIRED_FOR_LIMIT = 5;
+
+  /** Every recipe and gathering task that names this Tool, in projection order. */
+  const requiredByRows = $derived(Array.isArray(entry?.requiredBy) ? entry.requiredBy : []);
+  const requiredByShown = $derived(requiredByRows.slice(0, REQUIRED_FOR_LIMIT));
+  const requiredByOverflow = $derived(Math.max(0, requiredByRows.length - REQUIRED_FOR_LIMIT));
 
   const pageTitle = $derived(text(TITLE_KEY, TITLE_FALLBACK));
 
@@ -1272,7 +1409,14 @@
             ABOVE the tab strip, on every tab including the ones it says nothing about — puts
             the condition away from the thing it conditions.
           -->
-          <div class="manager-world-tool-entry-mode" data-world-tool-entry-break-mode>
+          <!-- A CARD, like everything else in this stack. It was the ONE non-card element in a
+               column of cards — a tinted full-width band with its own edge treatment — so it read
+               as a page banner rather than as the first statement of the tab. It keeps the INFO
+               accent, on the leading edge alone, because what it says is authored elsewhere. -->
+          <div
+            class="manager-world-tool-entry-card manager-world-tool-entry-mode"
+            data-world-tool-entry-break-mode
+          >
             <i class="fas fa-sliders" aria-hidden="true"></i>
             <div class="manager-world-tool-entry-mode-copy">
               <span class="manager-kicker"
@@ -1579,10 +1723,13 @@
         {/if}
       </div>
 
+      <!-- `How it behaves`, not `What a player sees`. That heading made a claim its content did
+           not meet: what followed it was a GM rules list. The region a PLAYER sees is the one the
+           footer opens with, and it is the one that carries that name now. -->
       <ScopedEntityPreview
         hookAttribute="data-world-tool-entry-preview"
         ariaLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.Preview', 'Player preview')}
-        kicker={text('FABRICATE.Admin.Manager.Scoped.Entry.PreviewKicker', 'What a player sees')}
+        kicker={text('FABRICATE.Admin.Manager.Tools.Editor.PreviewKicker', 'How it behaves')}
         identity={{
           name: entryName,
           image: entity?.img || '',
@@ -1599,10 +1746,184 @@
         )}
         rules={previewRules}
         ruleHookAttribute="data-world-tool-entry-preview-rule"
+        footer={previewFooter}
       />
     </div>
   </div>
 </main>
+
+<!--
+  THE THREE REGIONS THE COLUMN WAS MISSING, in the design's own order (issue 1373).
+
+  The column headed `WHAT A PLAYER SEES` showed a GM rules list and stopped — a heading making a
+  claim its content did not meet, over two thirds of an empty pane. What a player actually sees is
+  a COPY in an inventory, and what a GM is asking of this screen is whether one particular
+  character can use it and what would break if the Tool went away. Those are the three questions
+  below, and none of them is answerable from the rules list above.
+-->
+{#snippet previewFooter()}
+  <!-- ── HOW PLAYERS SEE IT ─────────────────────────────────────────────────────────────
+       A real inventory tile rather than a description of one: the art the player sees, the
+       quantity badge their sheet draws, and the pill that states what the copy has left.
+
+       `Show as broken` is a PREVIEW, not a write. A copy carrying `flags.fabricate.toolBroken`
+       is refused by every presence gate, and that refusal is invisible on a screen that can only
+       draw the healthy copy — so the toggle draws the other one. It writes nothing, which is
+       what the line under it says in as many words. -->
+  <p class="manager-kicker">
+    {text('FABRICATE.Admin.Manager.Tools.PreviewPanel.PlayersSee', 'How players see it')}
+  </p>
+  <div class="manager-world-tool-entry-copy" data-world-tool-entry-player-copy>
+    <span
+      class="manager-world-tool-entry-copy-tile"
+      class:is-broken={previewBroken}
+      data-world-tool-entry-copy-state={previewBroken ? 'broken' : 'working'}
+    >
+      <img src={entity?.img || ''} alt="" />
+      <span class="manager-world-tool-entry-copy-count" aria-hidden="true">&times;1</span>
+    </span>
+    <span class="manager-world-tool-entry-copy-body">
+      <Chip
+        tone={previewBroken ? 'warning' : 'neutral'}
+        icon={previewBroken ? 'fas fa-heart-crack' : 'fas fa-hourglass-half'}
+      >
+        {previewBroken
+          ? text('FABRICATE.Admin.Manager.Tools.PreviewPanel.BrokenChip', 'Broken')
+          : previewUsesLabel}
+      </Chip>
+      <label class="manager-world-tool-entry-copy-switch">
+        <input
+          type="checkbox"
+          data-world-tool-entry-show-broken
+          checked={previewBroken}
+          onchange={(event) => (previewBroken = event.currentTarget.checked)}
+        />
+        <span
+          >{text('FABRICATE.Admin.Manager.Tools.PreviewPanel.ShowBroken', 'Show as broken')}</span
+        >
+      </label>
+      <small class="manager-muted" data-world-tool-entry-copy-note>
+        {previewBroken
+          ? text(
+              'FABRICATE.Admin.Manager.Tools.PreviewPanel.BrokenNote',
+              'A broken copy. Recipes and gathering tasks refuse it until it is repaired.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Tools.PreviewPanel.WorkingNote',
+              'A working copy. Recipes and gathering tasks accept it.'
+            )}
+      </small>
+    </span>
+  </div>
+
+  <!-- ── PREVIEW AS ─────────────────────────────────────────────────────────────────────
+       The world defaults' character gate, resolved against one real actor. It is the only way
+       to tell an authored prerequisite that everyone passes from one nobody does, and neither
+       is visible from the rule text. -->
+  <p class="manager-kicker">
+    <i class="fas fa-user" aria-hidden="true"></i>
+    {text('FABRICATE.Admin.Manager.Tools.PreviewPanel.PreviewAs', 'Preview as')}
+  </p>
+  <label class="manager-field manager-world-tool-entry-preview-actor">
+    <!-- `.visually-hidden` is the manager's own shipped utility; `.manager-visually-hidden` is
+         not a class this stylesheet declares, so the caption rendered as a second visible
+         `Preview as` under the kicker that already says it. -->
+    <span class="visually-hidden"
+      >{text('FABRICATE.Admin.Manager.Tools.PreviewPanel.PreviewAs', 'Preview as')}</span
+    >
+    <select
+      data-world-tool-entry-preview-actor
+      value={previewActorId}
+      onchange={(event) => (previewActorId = event.currentTarget.value)}
+    >
+      <option value=""
+        >{text('FABRICATE.Admin.Manager.Tools.PreviewPanel.NoActor', 'No actor')}</option
+      >
+      {#each previewActorRows as actor (actor.id)}
+        <option value={actor.id}>{actor.name}</option>
+      {/each}
+    </select>
+  </label>
+  {#if previewPrerequisiteRows.length === 0}
+    <p class="manager-muted manager-world-tool-entry-preview-line" data-world-tool-entry-gate-line>
+      {text(
+        'FABRICATE.Admin.Manager.Tools.PreviewPanel.NoGate',
+        'No prerequisites — any character may wield it.'
+      )}
+    </p>
+  {:else}
+    <ul class="manager-world-tool-entry-gate" data-world-tool-entry-gate>
+      {#each previewPrerequisiteRows as row (row.id)}
+        <li data-world-tool-entry-gate-row={row.met === null ? 'unknown' : String(row.met)}>
+          <i
+            class={row.met === null
+              ? 'fas fa-circle-question'
+              : row.met
+                ? 'fas fa-circle-check'
+                : 'fas fa-circle-xmark'}
+            aria-hidden="true"
+          ></i>
+          <span>{row.name}</span>
+          <small class="manager-muted">{row.detail}</small>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+  <div
+    class={`manager-world-tool-entry-preview-status is-${previewStatus.tone}`}
+    data-world-tool-entry-preview-status={previewStatus.tone}
+  >
+    <i class={previewStatus.icon} aria-hidden="true"></i>
+    <span>{previewStatus.label}</span>
+  </div>
+
+  <!-- ── REQUIRED FOR ───────────────────────────────────────────────────────────────────
+       What stops working if this Tool is deleted or switched off at world scope. The entry is
+       the one Tool surface with no system context, so it is also the only one that can state
+       this across every system at once — which is exactly the reach the delete card and the
+       master switch beside it warn about in numbers. -->
+  <p class="manager-kicker">
+    {text('FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredFor', 'Required for')}
+  </p>
+  {#if requiredByRows.length === 0}
+    <p
+      class="manager-muted manager-world-tool-entry-preview-line"
+      data-world-tool-entry-required-empty
+    >
+      {text(
+        'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForNone',
+        'Nothing requires this Tool yet.'
+      )}
+    </p>
+  {:else}
+    <ul class="manager-world-tool-entry-required" data-world-tool-entry-required>
+      {#each requiredByShown as row, index (`${row.kind}-${row.systemId}-${row.id}-${index}`)}
+        <li data-world-tool-entry-required-row={row.kind}>
+          <span class="manager-world-tool-entry-required-name" title={row.name}>{row.name}</span>
+          <Chip tone="neutral">
+            {row.kind === 'gathering'
+              ? text('FABRICATE.Admin.Manager.Tools.PreviewPanel.KindGathering', 'Gathering')
+              : text('FABRICATE.Admin.Manager.Tools.PreviewPanel.KindRecipe', 'Recipe')}
+          </Chip>
+        </li>
+      {/each}
+    </ul>
+    {#if requiredByOverflow > 0}
+      <p
+        class="manager-muted manager-world-tool-entry-preview-line"
+        data-world-tool-entry-required-more
+      >
+        {format(
+          requiredByOverflow === 1
+            ? 'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForMoreOne'
+            : 'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForMore',
+          requiredByOverflow === 1 ? 'and 1 more' : 'and {count} more',
+          { count: requiredByOverflow }
+        )}
+      </p>
+    {/if}
+  {/if}
+{/snippet}
 
 <style>
   /* STATIC class names, so `lint:svelte:warnings` stays at zero. `styles/fabricate.css` is
@@ -1729,6 +2050,196 @@
     font-size: 0.62rem;
   }
 
+  /* ── THE PLAYER-COPY TILE ────────────────────────────────────────────────────────────────
+     The art at inventory scale with the quantity badge a sheet draws, so what this states is a
+     COPY rather than a catalogue thumbnail. The broken state dims the art and warms the edge,
+     which is the one difference a player would actually see. */
+  .manager-world-tool-entry-copy {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-copy-tile {
+    position: relative;
+    display: block;
+    flex: 0 0 64px;
+    width: 64px;
+    height: 64px;
+    border: 1px solid var(--fab-border);
+    border-radius: 10px;
+    background: var(--fab-surface-soft);
+    overflow: hidden;
+  }
+
+  .manager-world-tool-entry-copy-tile.is-broken {
+    border-color: var(--fab-warning-border);
+  }
+
+  .manager-world-tool-entry-copy-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .manager-world-tool-entry-copy-tile.is-broken img {
+    opacity: 0.45;
+  }
+
+  .manager-world-tool-entry-copy-count {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    padding: 0 4px;
+    border-radius: 5px;
+    color: var(--fab-text);
+    background: var(--fab-overlay-dark-08);
+    font-size: 0.58rem;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .manager-world-tool-entry-copy-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--fab-space-1);
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-copy-switch {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-1);
+    color: var(--fab-text);
+    font-size: 0.66rem;
+    cursor: pointer;
+  }
+
+  .manager-world-tool-entry-copy-body small {
+    font-size: 0.6rem;
+    line-height: 1.4;
+  }
+
+  /* ── THE `PREVIEW AS` READOUT ────────────────────────────────────────────────────────────
+     One row per selected prerequisite, its glyph carrying the three states the evaluation has:
+     unevaluated, met, unmet. */
+  .manager-world-tool-entry-preview-actor {
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-preview-line {
+    margin: 0;
+    font-size: 0.62rem;
+  }
+
+  .manager-world-tool-entry-gate {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-gate li {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 0 var(--fab-space-1);
+    align-items: baseline;
+    min-width: 0;
+    font-size: 0.66rem;
+  }
+
+  .manager-world-tool-entry-gate li small {
+    grid-column: 2;
+    font-family: var(--fab-font-mono);
+    font-size: 0.58rem;
+    overflow-wrap: anywhere;
+  }
+
+  .manager-world-tool-entry-gate li[data-world-tool-entry-gate-row='true'] i {
+    color: var(--fab-success);
+  }
+
+  .manager-world-tool-entry-gate li[data-world-tool-entry-gate-row='false'] i {
+    color: var(--fab-danger);
+  }
+
+  .manager-world-tool-entry-gate li[data-world-tool-entry-gate-row='unknown'] i {
+    color: var(--fab-text-subtle);
+  }
+
+  .manager-world-tool-entry-preview-status {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    background: var(--fab-surface-soft);
+    font-size: 0.66rem;
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-preview-status.is-positive {
+    border-color: var(--fab-success-border);
+    color: var(--fab-success-text);
+  }
+
+  .manager-world-tool-entry-preview-status.is-warning {
+    border-color: var(--fab-warning-border);
+    color: var(--fab-warning-text);
+  }
+
+  .manager-world-tool-entry-preview-status.is-danger {
+    border-color: var(--fab-danger-border);
+    color: var(--fab-danger-text);
+  }
+
+  .manager-world-tool-entry-preview-status.is-info {
+    border-color: var(--fab-info-border);
+    color: var(--fab-info);
+  }
+
+  /* ── `REQUIRED FOR` ──────────────────────────────────────────────────────────────────────
+     Name leading, kind chip trailing. The name truncates rather than wrapping: this is a
+     300px rail and a three-line recipe name would push the list past the fold. */
+  .manager-world-tool-entry-required {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-required li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-1);
+    padding: var(--fab-space-1) var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-surface-soft);
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-required-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--fab-text);
+    font-size: 0.66rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* THE BREAKAGE VALUE EDITORS. One column, because only ONE of the three ever renders and a
      grid sized for the widest of them would leave the other two floating in a track they do
      not fill. */
@@ -1786,17 +2297,16 @@
      design tints it as information rather than recessing it — `--info-soft` over
      `--info-border` in its own markup. It used to be `--fab-overlay-dark-08`, which read as
      a fourth grey surface saying nothing about why the band is there. */
+  /* IT WEARS THE CARD BOX AND OVERRIDES ONLY THE AXIS AND THE ACCENT, exactly as the master
+     switch and the danger card do. The INFO colour survives as a leading edge rather than as a
+     full tint: what the band says is authored on another screen, which is worth marking, and a
+     whole tinted surface in a stack of neutral cards marks it as a different KIND of thing. */
   .manager-world-tool-entry-mode {
-    display: flex;
-    flex: 0 0 auto;
+    flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-info-border);
-    border-radius: 11px;
-    background: var(--fab-info-soft);
-    min-width: 0;
+    border-left: 3px solid var(--fab-info-border);
   }
 
   .manager-world-tool-entry-mode i {

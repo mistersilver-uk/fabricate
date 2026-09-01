@@ -63,7 +63,11 @@
   import Chip from '../Chip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
-  import { toolBreakageSummary, toolOnBreakSummary } from '../tools/toolStudio.js';
+  import {
+    toolBreakageSummary,
+    toolOnBreakSummary,
+    toolSourceSnapshot,
+  } from '../tools/toolStudio.js';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import {
     breakModeOverrideCount,
@@ -77,6 +81,11 @@
     scope = null,
     actions = null,
     systems = [],
+    // THE GAME-WORLD ITEM ROSTER. A world Tool's `description` is a SNAPSHOT taken when the link
+    // was made, and a record created any other way carries an empty one — so every row on the one
+    // screen whose premise is that the world record IS the Item read `No description` while
+    // wearing a `Linked` chip. This is the roster that resolves the live document.
+    worldItems = [],
     onOpenEntry = () => {},
     onOpenSystemRules = null,
     // CREATE A WORLD TOOL FROM A DROPPED ITEM. The zone is on THIS screen because a Tool is a
@@ -384,6 +393,23 @@
       : []
   );
 
+  /**
+   * The LINKED ITEM's own description, for the frame's second description rung.
+   *
+   * `toolSourceSnapshot` is the shipped resolution and is not restated: it prefers the live Item
+   * and falls back to the record's own snapshot, so this answers `''` only when there is genuinely
+   * nothing to say. The frame owns the PRECEDENCE — the world record's authored description
+   * first, this second, the literal last.
+   *
+   * @param {object|null} entry
+   * @returns {string}
+   */
+  function describeFromLinkedItem(entry) {
+    const entity = entry?.entity ?? null;
+    if (!entity) return '';
+    return toolSourceSnapshot(entity, worldItems).description || '';
+  }
+
   const catalogueTitle = $derived(text(TITLE_KEY, TITLE_FALLBACK));
 </script>
 
@@ -518,11 +544,17 @@
         'Search tools…'
       )}
       inspectorFoot={toolInspectorFoot}
+      inspectorCaption={toolInspectorCaption}
+      describeEntry={describeFromLinkedItem}
+      openEntryLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.RowOpenEntry', 'Edit tool')}
+      rowSecondLine="meta"
+      systemRowAction="navigate"
       bind:selectedId
       onSelect={(entityId) => (selectedId = entityId)}
       {onOpenEntry}
       {onOpenSystemRules}
       {rowMeta}
+      {rowTrailing}
     />
   </div>
 </main>
@@ -545,6 +577,26 @@
   />
 {/snippet}
 
+<!--
+  THE INSPECTOR'S STATE PILL, which is the slot the design fills under the Tool's name.
+
+  It states the WORLD master switch, and it is the only honest thing this panel can say about a
+  Tool's state: a world catalogue has no system, and `enabled` per system is what the rows below
+  answer. World off wins over every one of them, so this is the fact that decides whether the Tool
+  is usable anywhere at all.
+-->
+{#snippet toolInspectorCaption(entry)}
+  <Chip
+    tone={entry?.worldEnabled === false ? 'neutral' : 'positive'}
+    icon={entry?.worldEnabled === false ? 'fas fa-circle-pause' : 'fas fa-circle-check'}
+    data-world-tool-inspector-state={entry?.worldEnabled === false ? 'off' : 'on'}
+  >
+    {entry?.worldEnabled === false
+      ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+      : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+  </Chip>
+{/snippet}
+
 {#snippet rowMeta(entry)}
   <span class="manager-world-tool-row-badges" data-world-tool-row-badges={entry.id}>
     <Chip tone="neutral" data-world-tool-row-breakage>{breakageLabel(entry)}</Chip>
@@ -561,37 +613,45 @@
         { count: memberCount(entry) }
       )}
     </span>
-    <!--
-      THE WORLD MASTER SWITCH, which is a DIFFERENT control from the per-system toggle the
-      inspector's membership rows carry. This one is the world record's own: off here means the
-      Tool is off in every crafting system that has it, whatever each of them says, because
-      `resolveScopedDefinition` ANDs the two flags and world off wins.
-
-      It is the compact pill the system Tool Rules row already wears, so a GM sees one shape for
-      "this Tool is on" across the two scopes. `.manager-tools-enabled-toggle` is a shipped
-      global-sheet class rather than one authored here.
-    -->
-    {#if scope?.worldEnableable}
-      <button
-        type="button"
-        class={`manager-tools-enabled-toggle ${entry.worldEnabled === false ? '' : 'is-on'}`}
-        data-world-tool-row-enabled={entry.id}
-        aria-pressed={entry.worldEnabled !== false}
-        aria-label={format(
-          entry.worldEnabled === false
-            ? 'FABRICATE.Admin.Manager.Tools.WorldEnableAria'
-            : 'FABRICATE.Admin.Manager.Tools.WorldDisableAria',
-          entry.worldEnabled === false
-            ? 'Enable {name} for every crafting system'
-            : 'Disable {name} for every crafting system',
-          { name: entry.entity?.name || entry.id }
-        )}
-        onclick={() => actions?.setWorldEnabled?.(entry.id, entry.worldEnabled === false)}
-      >
-        <span aria-hidden="true"><span></span></span>
-      </button>
-    {/if}
   </span>
+{/snippet}
+
+<!--
+  THE WORLD MASTER SWITCH, which is a DIFFERENT control from the per-system toggle the
+  inspector's membership rows carry. This one is the world record's own: off here means the
+  Tool is off in every crafting system that has it, whatever each of them says, because
+  `resolveScopedDefinition` ANDs the two flags and world off wins.
+
+  It is the compact pill the system Tool Rules row already wears, so a GM sees one shape for
+  "this Tool is on" across the two scopes. `.manager-tools-enabled-toggle` is a shipped
+  global-sheet class rather than one authored here.
+
+  IT IS THE `rowTrailing` SNIPPET RATHER THAN PART OF `rowMeta`, and the split is structural
+  rather than stylistic: the design puts the row's CHIPS under the name, which places `rowMeta`
+  inside the identity `<button>`, and a `<button>` inside a `<button>` is invalid DOM the browser
+  silently reparents. Interactive content therefore stays in the trailing column.
+-->
+{#snippet rowTrailing(entry)}
+  {#if scope?.worldEnableable}
+    <button
+      type="button"
+      class={`manager-tools-enabled-toggle ${entry.worldEnabled === false ? '' : 'is-on'}`}
+      data-world-tool-row-enabled={entry.id}
+      aria-pressed={entry.worldEnabled !== false}
+      aria-label={format(
+        entry.worldEnabled === false
+          ? 'FABRICATE.Admin.Manager.Tools.WorldEnableAria'
+          : 'FABRICATE.Admin.Manager.Tools.WorldDisableAria',
+        entry.worldEnabled === false
+          ? 'Enable {name} for every crafting system'
+          : 'Disable {name} for every crafting system',
+        { name: entry.entity?.name || entry.id }
+      )}
+      onclick={() => actions?.setWorldEnabled?.(entry.id, entry.worldEnabled === false)}
+    >
+      <span aria-hidden="true"><span></span></span>
+    </button>
+  {/if}
 {/snippet}
 
 <style>

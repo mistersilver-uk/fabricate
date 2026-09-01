@@ -40,6 +40,20 @@
    - rules: `{id, icon, title, subtitle, titleAttr}[]`, rendered through the shared
      `IconFactRow`; `ruleHookAttribute` names the per-row `data-*` carrying the rule id.
    - explainer: the shared `ExplainerCard`'s props, or `null`.
+   - footer: a snippet rendered LAST, after every region above.
+
+  ── WHY A FOOTER SNIPPET AND NOT THREE MORE REGIONS ─────────────────────────────────────
+  The world Tool entry's preview column has three regions this shell has no vocabulary for
+  (issue 1373): a player-inventory tile with its own broken-copy toggle, a `Preview as`
+  actor selector with a resolved-prerequisite readout, and a `Required for` list of the
+  recipes and gathering tasks that name the Tool. Every one of them resolves values, holds
+  local state, or reads a corpus — which is precisely what the header above says this shell
+  does NOT do. Growing three typed region props for one caller would make it the union of
+  its callers, which is the failure the deferred `EssenceBehaviorPreview` conversion is
+  already recorded against.
+
+  ONE generic extension point keeps the FIVE regions a fixed pattern and lets a lane own
+  whatever it needs below them. Every existing caller passes none and renders unchanged.
 -->
 <script>
   import Chip from '../Chip.svelte';
@@ -61,6 +75,7 @@
     rules = [],
     ruleHookAttribute = '',
     explainer = null,
+    footer = undefined,
   } = $props();
 
   const asideAttributes = $derived(hookAttribute ? { [hookAttribute]: hookValue } : {});
@@ -126,4 +141,5 @@
       dataAttr={explainer.dataAttr}
     />
   {/if}
+  {#if footer}{@render footer()}{/if}
 </aside>

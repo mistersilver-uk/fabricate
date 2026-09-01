@@ -108,6 +108,13 @@ const VOCABULARY_PROPS = Object.freeze(['actions', 'systems', 'vocabulary']);
  */
 const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../../config/currencyProviders.js',
+  // ADDED BY ISSUE 1373, and deliberately: the world Tool entry's `Preview as` region resolves
+  // its Tool's world-default prerequisites against ONE actor, and the roster it offers is the
+  // shared, GM-configurable player-character predicate rather than a second `type === 'character'`
+  // test. The projection to `{id, name, img}` happens in the shell because the page is a leaf
+  // with no Foundry in its closure; the predicate is what makes that roster the same one the
+  // Checks Studio's picker already offers.
+  '../../../../config/playerCharacterTypes.js',
   '../../../../gatheringImageDefaults.js',
   '../../../../systems/characterModifierPrerequisiteCopy.js',
   '../../../../systems/checkModifierResolver.js',
