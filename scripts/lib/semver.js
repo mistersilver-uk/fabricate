@@ -173,7 +173,35 @@ const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)(?:-([\da-z-]+(?:\.[\da-z-]+)*))?$/i;
 const NUMERIC_IDENTIFIER_RE = /^\d+$/;
 
 /**
+ * Strip the single leading `v` a PUBLISHED manifest version carries (issue 1407), returning the
+ * bare version this file's SemVer parsing reasons about. A value with no prefix is returned
+ * unchanged, so this is safe to apply to any version from any source — which matters during the
+ * transition, when a channel head published before the prefix sits beside one published after it.
+ *
+ * NOT applied inside {@link foundryIsNewerVersion}: that function predicts what a player's client
+ * computes over the LITERAL published strings, and Foundry treats `v1` as a non-numeric part. On a
+ * mixed pair the two genuinely disagree, and Foundry's answer is the one that decides whether a
+ * cohort gets offered an update, so publish safety must keep reading the raw strings.
+ *
+ * Only ONE `v` is removed: `vv1.2.3` keeps a `v` and is then rejected by the anchored pattern,
+ * which is the point — a doubled prefix is a bug in whoever built the string, not something to
+ * absorb silently.
+ *
+ * @param {unknown} version The version to strip, e.g. `v1.5.0-beta.7`.
+ * @returns {string} The version with at most one leading `v` removed.
+ */
+export function bareVersion(version) {
+  const text = String(version ?? '').trim();
+  return text.startsWith('v') ? text.slice(1) : text;
+}
+
+/**
  * Parse a bare SemVer 2.0.0 version. Build metadata is refused — see the pattern above.
+ *
+ * DELIBERATELY strict about the `v` prefix: a TAG is not a version. `releaseTags.js` owns tag
+ * grammar, this file owns version grammar, and the published manifest's prefixed version is
+ * normalised by its READER (see `bareVersion`) rather than by widening this parser.
+ *
  * @param {unknown} version The version to parse, e.g. `1.5.0-beta.7`.
  * @returns {{major: number, minor: number, patch: number, prerelease: string[]}|null} The parsed
  *   version, or `null` when the value is not a valid SemVer version.

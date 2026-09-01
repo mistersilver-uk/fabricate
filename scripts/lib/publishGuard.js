@@ -31,7 +31,7 @@
  *      failure this guard exists to prevent. Only a 404 means absent.
  */
 
-import { compareSemver, foundryIsNewerVersion, parseSemver } from './semver.js';
+import { bareVersion, compareSemver, foundryIsNewerVersion, parseSemver } from './semver.js';
 
 /**
  * @typedef {object} ManifestHead
@@ -603,13 +603,17 @@ function buildRefusal(version, refusals) {
  *   remedy is named without an example rather than guessed at.
  */
 function suggestMinorBump(version, heads) {
-  const parsedVersion = parseSemver(version);
+  // `bareVersion` on both sides: these are PUBLISHED manifest versions, which carry the `v`
+  // prefix (issue 1407), and `parseSemver` deliberately refuses a tag. Only the SemVer
+  // arithmetic below is normalised — the `foundryIsNewerVersion` check at the end still reads
+  // the RAW heads, because that is the comparator a player's client runs against what we ship.
+  const parsedVersion = parseSemver(bareVersion(version));
   if (!parsedVersion) return null;
   const [identifier] = parsedVersion.prerelease;
 
   const candidates = [];
   for (const head of heads) {
-    const parsedHead = parseSemver(head);
+    const parsedHead = parseSemver(bareVersion(head));
     if (!parsedHead) return null;
     const next = `${parsedHead.major}.${parsedHead.minor + 1}.0`;
     candidates.push(identifier ? `${next}-${identifier}.1` : next);

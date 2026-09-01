@@ -253,9 +253,24 @@ test('release.js --dist-version wires the release URLs into the built dist/modul
 
   const built = JSON.parse(readFileSync(join(root, 'dist', 'module.json'), 'utf8'));
   const expected = applyReleaseUrls({}, version);
-  assert.equal(built.version, version, '--dist-version must set the built version');
+  // The PUBLISHED version carries the `v` prefix (issue 1407) while semantic-release still passes
+  // the bare one, so the flag's input and the manifest's output deliberately differ by that prefix.
+  assert.equal(built.version, `v${version}`, '--dist-version must set the built version, prefixed');
   assert.equal(built.manifest, expected.manifest, 'built manifest must be the latest-release URL');
   assert.equal(built.download, expected.download, 'built download must be the version-pinned URL');
+
+  // The prefix must reach the manifest field and NOTHING else. Everything derived from the version
+  // stays bare-derived, so a `vv` can never appear in a URL — which would 404 the download for
+  // every client that took the update, silently, after the release was already public.
+  assert.ok(!built.download.includes('vv'), 'the download URL must not double the `v` prefix');
+  assert.ok(
+    built.download.endsWith(`/download/v${version}/fabricate-v${version}.zip`),
+    `download URL must pin exactly one v-prefixed tag and zip (got ${built.download})`
+  );
+
+  // Passing the ALREADY-prefixed form must be idempotent: the same manifest version, the same URLs.
+  const fromPrefixed = applyReleaseUrls({}, `v${version}`);
+  assert.deepEqual(fromPrefixed, expected, 'applyReleaseUrls must accept either shape identically');
 
   // --dist-version must NOT mutate the tracked source module.json (only --version is allowed to).
   assert.equal(
