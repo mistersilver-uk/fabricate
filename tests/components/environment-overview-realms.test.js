@@ -57,6 +57,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
     writeRawModule('src/gatheringImageDefaults.js');
     writeRawModule('src/ui/svelte/util/gatheringFormat.js');
+    writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/CompositionModeControl.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte.js')).href);

@@ -120,6 +120,8 @@ const RECIPE_COMPILED = [
   // mounted tree renders but the harness does not list HANGS the suite (# cancelled)
   // rather than failing it.
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  // The switch that card composes (issue 1040). Omitting it HANGS the suite.
+  'src/ui/svelte/components/StatusToggle.svelte',
   // The resolution-mode banner heads every editor tab (issue 643 §5).
   'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',

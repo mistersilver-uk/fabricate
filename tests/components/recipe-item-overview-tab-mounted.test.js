@@ -17,6 +17,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',

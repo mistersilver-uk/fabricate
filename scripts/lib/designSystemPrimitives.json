@@ -223,6 +223,12 @@
       "why": "The row and inspector state pill, six tones (13 callers). The library's mark vocabulary (`library.html:835`, `:858`) specifies marks that carry KIND; this pill carries STATE, and `library.html:348` states that colouring a chip background by kind would double-code kind against state — so it is deliberately not one of those marks."
     },
     {
+      "path": "src/ui/svelte/components/StatusToggle.svelte",
+      "library": "<Toggle>",
+      "evidence": "broad",
+      "why": "`library.html:595` — \"Binary state that takes effect immediately\", and the manager's one on/off switch (25 callers, issue 1040). It was a CSS convention over an element TREE — track span, nested knob span, optional reading — hand-written at 37 sites in 26 components, and `scoped/InheritRow.svelte` and `scoped/MembershipActions.svelte` each recorded in their own docblocks that they had to. Carries a three-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because its `as` prop is a closed set of three element HOSTS and no representative frame draws even one of them: `fabricate-app-shell` is the player window and `manager-components-normal` holds only the track-only filter switch. The shipped 34x20 track against this ladder's 38x22 is recorded as a migration in the entry's own delta, not resolved here."
+    },
+    {
       "path": "src/ui/svelte/components/Stepper.svelte",
       "library": "<Stepper>",
       "evidence": "broad",

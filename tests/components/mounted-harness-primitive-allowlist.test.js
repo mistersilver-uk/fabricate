@@ -112,6 +112,13 @@ const SHARED_PRIMITIVES = [
   // markers drops it into another mounted tree, and each omission costs a HUNG suite rather
   // than a failing one.
   'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  // THE manager's on/off switch (issue 1040). Sharper again than `ManagerButton`: the switch
+  // shipped as a hand-rolled element TREE at 37 sites in 26 components, and converting them
+  // dropped this leaf into 25 mounted trees in one change — the browsers, every studio's
+  // overview tab, the Checks rail, the scoped-entity rows and `ToggleCard`, which is itself
+  // rendered by ten more. An omission in any harness that compiles one of those HANGS the
+  // suite as `# cancelled` rather than failing it.
+  'src/ui/svelte/components/StatusToggle.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

@@ -88,7 +88,8 @@ describe('RecordInspector available-node stepper', () => {
       'src/ui/svelte/apps/manager/environment/RecordInspector.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
-      'src/ui/svelte/apps/manager/environment/MatchingEvidenceChips.svelte'
+      'src/ui/svelte/apps/manager/environment/MatchingEvidenceChips.svelte',
+      'src/ui/svelte/components/StatusToggle.svelte'
     ]) {
       writeCompiledSvelte(component);
     }

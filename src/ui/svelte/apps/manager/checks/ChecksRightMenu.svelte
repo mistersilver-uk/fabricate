@@ -74,6 +74,7 @@
   import CheckOddsPanel from './CheckOddsPanel.svelte';
   import CheckOutcomePreview from './CheckOutcomePreview.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import { NO_ACTOR_ID } from './checkPreview.js';
   import {
     formatPreviewDifficulties,
@@ -504,18 +505,12 @@
         data-checks-active={activeTab}
       >
         {#if showActiveToggle}
-          <button
-            type="button"
-            class={`manager-status-toggle ${activeOn ? 'is-on' : 'is-off'}`}
-            data-checks-active-toggle
-            aria-pressed={activeOn}
+          <StatusToggle
+            on={activeOn}
+            label={activeOn ? onLabel : offLabel}
+            data-checks-active-toggle=""
             onclick={() => onToggleActive(!activeOn)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label">{activeOn ? onLabel : offLabel}</span>
-          </button>
+          />
           <p class="manager-muted">{optionalHint}</p>
         {:else}
           <!-- A LOCKED toggle, not a bare sentence. Removing the control removed the STATE
@@ -526,18 +521,17 @@
                a padlock. It is an INDICATOR, not a disabled control: nothing here is
                actionable, so it is announced as one labelled image rather than as a button a
                GM might keep trying to press. -->
-          <span
-            class="manager-status-toggle is-locked is-on"
+          <StatusToggle
+            as="indicator"
+            on
+            label={onLabel}
+            ariaLabel={lockedLabel}
             data-checks-active-locked="on"
-            role="img"
-            aria-label={lockedLabel}
           >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label">{onLabel}</span>
-            <i class="fas fa-lock manager-checks-active-lock" aria-hidden="true"></i>
-          </span>
+            {#snippet trailing()}
+              <i class="fas fa-lock manager-checks-active-lock" aria-hidden="true"></i>
+            {/snippet}
+          </StatusToggle>
           <p class="manager-muted" data-checks-active-required>{requiredHint}</p>
         {/if}
       </section>

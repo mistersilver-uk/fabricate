@@ -1785,12 +1785,16 @@ describe('CraftingSystemManager source contract', () => {
       managerSource.includes('toggleSystemEnabled'),
       'systems browser should expose interactive row status toggles'
     );
+    // `<StatusToggle`, not the class literal (issue 1040). The row's switch renders through
+    // the shared primitive, which is the only thing under `src/` that writes
+    // `manager-status-toggle` now, so a search for the class would read 0 while the control
+    // is present and correct.
     assert.ok(
-      systemsBrowserSource.includes('manager-status-toggle'),
+      systemsBrowserSource.includes('<StatusToggle'),
       'systems browser should render status as a toggle control'
     );
     assert.ok(
-      recipesBrowserSource.includes('manager-status-toggle'),
+      recipesBrowserSource.includes('<StatusToggle'),
       'recipes browser should render status as a toggle control'
     );
     assert.ok(

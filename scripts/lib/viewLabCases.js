@@ -242,6 +242,39 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // DISABLED state. `GatheringEconomyView.svelte:498,514` renders the two bindings, and this
   // case's own steps fill one at `[data-economy-stamina-max]`.
   'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
+  // The manager's on/off switch (issue 1040), and the ONE entry here whose three frames are
+  // chosen per HOST rather than per state. The primitive's `as` prop is a closed set of three
+  // element shapes — a pressable `<button>`, a read-only `<span role="img">` reading, and a
+  // `<label>` wrapping a transparent `<input type="checkbox">` — and they draw different
+  // markup, take different attributes and are painted by different rules, so a change to one
+  // is invisible in a frame that renders another.
+  //
+  // The representative pair does not answer for any of them. `fabricate-app-shell` is the
+  // PLAYER window and contains no manager switch at all, and `manager-components-normal`
+  // contains exactly one: the component browser's grouping filter, which is the TRACK-ONLY
+  // form with no reading beside it, so the label — 28 of the 37 converted sites — appears in
+  // neither.
+  //
+  // `manager-system-edit-normal` is the labelled button host, and the densest frame of it in
+  // the registry: the settings tab's Optional features card
+  // (`SystemEditView.svelte`'s `data-edit-control="advanced-options"`) stacks seven labelled
+  // On/Off switches in one column, so alignment, the 78px cap and the label ellipsis are all
+  // visible at once.
+  //
+  // `coverage-mode-routed-check-checks` is the ONLY frame that draws the indicator host. The
+  // locked activation reading appears when a check's mode requires it, which
+  // `CraftingSystemManagerRoot.svelte`'s `checkActivation` reports as `optional: false` for
+  // `routedByCheck` and `progressive` — and `lab-runework`, this case's system, is the routed
+  // one. Every other checks frame sits on a `simple` or `routedByIngredients` system and draws
+  // the live switch instead.
+  //
+  // `manager-tool-parity-04-requirements-1280x720` is the only frame that draws the checkbox
+  // host: the Tool Studio's Requirements tab is where both of those two switches live.
+  'src/ui/svelte/components/StatusToggle.svelte': Object.freeze([
+    'manager-system-edit-normal',
+    'coverage-mode-routed-check-checks',
+    'manager-tool-parity-04-requirements-1280x720',
+  ]),
   // BOTH band-strip frames, for the same two-mode reasoning `SearchablePopover` carries below. The
   // strip has exactly two importers — `checks/CraftingCheckEditor.svelte` and
   // `checks/SimpleCraftingCheckEditor.svelte` — and they are its two modes, not two instances of

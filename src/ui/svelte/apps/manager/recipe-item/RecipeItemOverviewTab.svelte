@@ -21,6 +21,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../../util/dropUtils.js';
   import ItemDropZone from '../ItemDropZone.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
 
   let {
     recipeItem = null,
@@ -142,26 +143,18 @@
             )}</span
       >
     </div>
-    <button
-      type="button"
-      class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
-      data-recipe-item-enabled
-      aria-pressed={enabled}
-      aria-label={text(
+    <StatusToggle
+      on={enabled}
+      label={enabled
+        ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+        : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+      ariaLabel={text(
         'FABRICATE.Admin.Manager.RecipeItem.Overview.ToggleEnabled',
         'Toggle enabled'
       )}
+      data-recipe-item-enabled=""
       onclick={toggleEnabled}
-    >
-      <span class="manager-status-toggle-track" aria-hidden="true"
-        ><span class="manager-status-toggle-knob"></span></span
-      >
-      <span class="manager-status-toggle-label"
-        >{enabled
-          ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-          : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-      >
-    </button>
+    />
   </div>
 </section>
 
