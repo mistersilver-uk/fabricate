@@ -264,3 +264,79 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
     assert.deepEqual(selected, ['outcomes', 'roll']);
   });
 });
+
+/**
+ * THE GLYPH CHIP (issue 1372), which is a property of the ISSUE vehicle and not a fourth mark.
+ *
+ * The scoped entry editors' Validation tab reads `Validation` plus a tick when everything
+ * passes, because the other two outcomes are counts and a chip reading `0` states the opposite
+ * of what it means. That tick is drawn by `Chip`'s own shipped `icon` prop, so the chip is
+ * still the drawing and the caller supplies no markup, class or shape of its own — which is
+ * the closure property the family rests on, restated for the one vehicle that takes a glyph.
+ *
+ * WHY THIS FILE PINS IT
+ * ---------------------
+ * A glyph chip carries an EMPTY label, so every emptiness rule the strip has ever had is a
+ * live threat to it: the mark is drawn only because `isDrawable` judges a chip on its icon
+ * when it has one. Nothing else in the suite would notice its removal — the tab would simply
+ * render its label and pass — so the capability has to be asserted where the emptiness rules
+ * are, beside the dot's own naming precondition above.
+ */
+describe('EditorTabs draws a glyph chip for a state that is not a count (issue 1372)', () => {
+  it('draws an icon-only chip rather than filtering it away as empty', async () => {
+    const root = await harness.mount({
+      tabs: TABS,
+      activeTab: 'roll',
+      badges: {
+        outcomes: { label: '', tone: 'success', icon: 'fas fa-check', name: 'Everything passes' },
+      },
+    });
+    const button = buttonFor(root, 'outcomes');
+    const marks = marksOn(button);
+    assert.deepEqual(
+      marks.map((mark) => [mark.chip, mark.text, mark.name]),
+      [[true, '', 'Everything passes']],
+      'the pass state is a chip carrying no text and an accessible name, not an absent mark'
+    );
+    assert.ok(
+      Boolean(button.querySelector('.manager-chip > i.fas.fa-check')),
+      'the glyph is drawn by the chip through its own icon prop'
+    );
+    assert.ok(
+      button.querySelector('.manager-chip').classList.contains('is-active'),
+      'a success tone maps onto the chip colour family, which spells success as active'
+    );
+  });
+
+  it('still suppresses a chip that carries neither a label nor a glyph', async () => {
+    const root = await harness.mount({
+      tabs: TABS,
+      activeTab: 'roll',
+      badges: { outcomes: { label: '', tone: 'success' } },
+    });
+    assert.deepEqual(
+      marksOn(buttonFor(root, 'outcomes')),
+      [],
+      'the glyph is what rescues an empty chip, so an empty chip without one stays dropped'
+    );
+  });
+
+  it('keeps the family closed: the count and the dot take no glyph from the caller', async () => {
+    const root = await harness.mount({
+      tabs: TABS,
+      activeTab: 'roll',
+      badges: {
+        roll: { vehicle: 'count', label: 7, icon: 'fas fa-check' },
+        outcomes: { vehicle: 'dot', name: '1 issue', icon: 'fas fa-check' },
+      },
+    });
+    assert.ok(
+      !buttonFor(root, 'roll').querySelector('i.fa-check'),
+      'a record count is a bare numeral; its class is its drawing and a caller cannot add to it'
+    );
+    assert.ok(
+      !buttonFor(root, 'outcomes').querySelector('i.fa-check'),
+      'the dot is a shape, and a glyph inside it would be a mark the family does not name'
+    );
+  });
+});

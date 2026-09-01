@@ -510,10 +510,7 @@
       label: '',
       tone: 'success',
       icon: 'fas fa-check',
-      name: text(
-        'FABRICATE.Admin.Manager.Scoped.Essence.ValidationPassBadge',
-        'Everything passes'
-      ),
+      name: text('FABRICATE.Admin.Manager.Scoped.Essence.ValidationPassBadge', 'Everything passes'),
     };
   }
 

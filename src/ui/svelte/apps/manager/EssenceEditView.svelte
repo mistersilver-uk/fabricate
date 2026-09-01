@@ -48,7 +48,7 @@
   Save. The MEMBERSHIP writes do not: adding this essence to the system and switching a section
   between inherited and overridden are actions on a world-scope record this draft does not
   describe, and each lands immediately, exactly as `### Scoped entity editor patterns`
-  requirement 12 states for the world entry editors.
+  requirement 14 states for the world entry editors.
 -->
 <script>
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';
