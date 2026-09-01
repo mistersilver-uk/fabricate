@@ -2862,11 +2862,72 @@
   // further edit here.
   let worldScopedEntryId = $state('');
   const worldScopedEntryRoute = $derived(scopedEntryRoute(currentView));
+
+  /**
+   * THE BUFFERED IDENTITY OF WHICHEVER SCOPED ENTRY EDITOR IS OPEN (issue 1372, maintainer
+   * parity round 6).
+   *
+   * GENERIC ON PURPOSE, and that is the whole point of it. An entry editor buffers its edit and
+   * is saved explicitly, so every piece of chrome that names the entity has to follow the DRAFT
+   * or the screen contradicts itself — which it did: mid-rename the heading read `Aetherlight`,
+   * the player preview read `Aetherlight`, and the breadcrumb's last crumb read `Aether`.
+   * The crumb is derived once, here, for ALL THREE entry routes out of one route table, so a
+   * per-screen fix would have had to be written into a shared derivation three times. The world
+   * tool entry inherits this by reporting its own buffered identity through the same prop; it
+   * needs no crumb code of its own, exactly as it needs no `scopedEntryRoute` entry of its own.
+   *
+   * A PAGE HANDS ITS WHOLE BUFFERED IDENTITY MAP and this shell reads the chrome fields it
+   * happens to render — the name for the crumb and the heading, the icon and the colour for the
+   * medallion beside them. The two screens buffer different field sets (`scopedEntryDraft.js`
+   * makes that the caller's argument), so a fixed three-key payload would be a second, narrower
+   * statement of a shape the scope descriptor already owns.
+   *
+   * `null` while no entry editor is reporting one, which is what makes every reader below fall
+   * back to the published projection rather than to an empty string. The page withdraws it on
+   * unmount, so leaving an entry route cannot leave a stale name in the trail.
+   *
+   * @type {Record<string, unknown>|null}
+   */
+  let scopedEntryDraftIdentity = $state(null);
+
+  /**
+   * One scoped entry editor's buffered identity, or `null` to withdraw it.
+   *
+   * Stored as a NEW plain object rather than the page's own: Svelte 5 does not proxy a value
+   * that arrives from another component's `$state` through a prop callback, so holding the
+   * caller's object would make a later in-place write invisible here. Every reader below is a
+   * `$derived` over this one assignment.
+   *
+   * @param {unknown} identity
+   */
+  function handleScopedEntryDraftIdentity(identity) {
+    scopedEntryDraftIdentity = identity && typeof identity === 'object' ? { ...identity } : null;
+  }
+
+  /**
+   * One buffered identity field as a string, or `null` when no editor is reporting one.
+   *
+   * `null` and not `''` is the difference the callers depend on: an author who CLEARS a name or
+   * a colour is stating a real value and must see it, so the fallback to the projection has to
+   * be `??` on "no editor" rather than `||` on "nothing authored".
+   *
+   * @param {string} field
+   * @returns {string|null}
+   */
+  function scopedEntryDraftField(field) {
+    if (!scopedEntryDraftIdentity) return null;
+    const value = scopedEntryDraftIdentity[field];
+    return typeof value === 'string' ? value : null;
+  }
+
+  // TRIMMED on both branches, because `scopedEntryName` trims and a crumb that changed its
+  // whitespace handling the moment an editor opened would be a difference nobody authored.
   const worldScopedEntryCrumb = $derived(
-    scopedEntryName(
-      worldScopeState[worldScopedEntryRoute?.entityType]?.entities,
-      worldScopedEntryId
-    )
+    scopedEntryDraftField('name')?.trim() ??
+      scopedEntryName(
+        worldScopeState[worldScopedEntryRoute?.entityType]?.entities,
+        worldScopedEntryId
+      )
   );
 
   // THE ESSENCE ENTRY ROUTE'S HEADER NAMES THE ESSENCE (issue 1372, maintainer parity round 4).
@@ -2941,28 +3002,14 @@
   let worldEssenceEntryHandle = null;
   let worldEssenceEntryDirty = $state(false);
   let worldEssenceEntrySaving = $state(false);
-  /**
-   * The BUFFERED name, for the heading below. `null` while no editor is reporting one, which is
-   * what makes the heading fall back to the projection rather than to an empty string.
-   *
-   * @type {string|null}
-   */
-  let worldEssenceEntryDraftName = $state(null);
 
   function handleWorldEssenceEntryDraft(handle) {
     worldEssenceEntryHandle = handle ?? null;
-    if (!handle) {
-      worldEssenceEntryDirty = false;
-      worldEssenceEntryDraftName = null;
-    }
+    if (!handle) worldEssenceEntryDirty = false;
   }
 
   function handleWorldEssenceEntryDirty(dirty) {
     worldEssenceEntryDirty = dirty === true;
-  }
-
-  function handleWorldEssenceEntryDraftName(name) {
-    worldEssenceEntryDraftName = typeof name === 'string' ? name : null;
   }
 
   // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK (issue 1372, maintainer parity round 5).
@@ -2972,15 +3019,33 @@
   // A heading names the thing being edited, and the enabled `Save essence` beside it is what says
   // the edit is unsaved; the heading is not a second, quieter version of that signal.
   //
-  // It is declared HERE rather than beside `worldEssenceEntrySubtitle` because it reads
-  // `worldEssenceEntryDraftName`, which is declared above and would be in its temporal dead zone
-  // there. The SUBTITLE deliberately stays on the projection — see its own note.
-  //
   // `??` and not `||`: an editor reporting an EMPTY name is reporting a real authored state, and
   // it falls through to `viewTitle()` below exactly as an empty persisted name already does.
   const worldEssenceEntryName = $derived(
     worldEssenceEntryRecord
-      ? (worldEssenceEntryDraftName ?? worldEssenceEntryRecord.entity?.name ?? '')
+      ? (scopedEntryDraftField('name') ?? worldEssenceEntryRecord.entity?.name ?? '')
+      : ''
+  );
+
+  // AND SO DOES THE MEDALLION BESIDE IT (issue 1372, maintainer parity round 6).
+  //
+  // The icon and the colour token are buffered identity fields exactly as the name is — the same
+  // `IDENTITY_FIELDS` list, staged by the same `patchIdentity` — so a GM who re-picks the glyph
+  // or the swatch watched the picker, the preview rail and the tile in the form all move while
+  // the 44px tile at the top of the screen kept the value on disk. That is the same
+  // self-contradiction the heading had, one control to the left of it.
+  //
+  // The SUBTITLE is deliberately NOT in this set. It counts the crafting systems using the
+  // essence, and no buffered edit on this screen changes that count — it moves only when a
+  // membership write lands. See its own note above.
+  const worldEssenceEntryIcon = $derived(
+    worldEssenceEntryRecord
+      ? (scopedEntryDraftField('icon') ?? worldEssenceEntryRecord.entity?.icon ?? '')
+      : ''
+  );
+  const worldEssenceEntryTint = $derived(
+    worldEssenceEntryRecord
+      ? (scopedEntryDraftField('colorToken') ?? worldEssenceEntryRecord.entity?.colorToken ?? '')
       : ''
   );
 
@@ -9335,8 +9400,8 @@
              change with its own frames. -->
           <div class="manager-recipe-edit-heading" data-world-essence-entry-heading>
             <Medallion
-              icon={worldEssenceEntryRecord.entity?.icon || 'fas fa-mortar-pestle'}
-              tint={worldEssenceEntryRecord.entity?.colorToken || ''}
+              icon={worldEssenceEntryIcon || 'fas fa-mortar-pestle'}
+              tint={worldEssenceEntryTint}
               size={44}
               glyph={22}
             />
@@ -11048,7 +11113,7 @@
         onBackToCatalogue={() => setView('world-essences')}
         onDraftChange={handleWorldEssenceEntryDraft}
         onDirtyChange={handleWorldEssenceEntryDirty}
-        onDraftNameChange={handleWorldEssenceEntryDraftName}
+        onDraftIdentityChange={handleScopedEntryDraftIdentity}
       />
     {:else if currentView === 'world-tools'}
       <WorldToolCataloguePage

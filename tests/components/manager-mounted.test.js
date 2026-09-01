@@ -26255,6 +26255,152 @@ describe('CraftingSystemManager mounted behavior', () => {
         await typeName('');
         assert.equal(headingText(), 'Essence entry');
       });
+
+      // ── AND SO DOES THE REST OF THE CHROME (issue 1372, parity round 6) ──────────────
+      //
+      // The heading was fixed on its own in round 5, and the two things beside it were left on
+      // the published corpus: the breadcrumb's last crumb and the 44px medallion. The result was
+      // the same self-contradiction one rung quieter — `Aether` in the trail under an
+      // `Aetherlight` heading, and a tile still wearing the colour on disk.
+      //
+      // THE DOM, NOT THE REPORT, for the reason this whole block is mounted: the shell holds
+      // the reported identity in a rune it can only publish by REASSIGNING, and the wrong
+      // versions of that — a mutated object, a value read off the deliberately non-reactive
+      // draft handle — report correctly and render staleness.
+
+      const crumbText = () =>
+        target
+          .querySelector('[data-breadcrumb-world-scoped="world-essence-entry"]')
+          ?.textContent?.trim();
+
+      const headingMedallion = () =>
+        target.querySelector('[data-world-essence-entry-heading] .fab-medallion');
+
+      /** Pick a preset swatch in the entry editor's inline colour palette. */
+      async function pickColour(token) {
+        const swatch = target.querySelector(
+          `[data-scoped-entry-colour] [data-manager-color-token="${token}"]`
+        );
+        assert.ok(Boolean(swatch), `the entry editor rendered no \`${token}\` colour swatch`);
+        swatch.click();
+        await settleEntryRoute();
+      }
+
+      it('opens with the crumb on the persisted name', async () => {
+        await openAshEntry();
+        assert.equal(
+          crumbText(),
+          'Ash',
+          'an untouched editor must trail the record on disk, exactly as the heading does'
+        );
+      });
+
+      it('FOLLOWS the buffered name in the last crumb, before any Save', async () => {
+        await openAshEntry();
+        await typeName('Aetherlight');
+        assert.equal(
+          headingText(),
+          'Aetherlight',
+          'the heading did not move, so the crumb assertion below would be measuring the ' +
+            'wrong failure'
+        );
+        assert.equal(
+          crumbText(),
+          'Aetherlight',
+          'the trail still names the PERSISTED essence under a heading that names the draft — ' +
+            'one screen naming one essence two ways, one line apart'
+        );
+      });
+
+      it('resolves the crumb GENERICALLY, so every scoped entry route inherits it', async () => {
+        // The crumb is derived once for all three entry routes out of `SCOPED_ENTRY_ROUTES`, and
+        // the buffered name is read from a route-agnostic channel in front of it. This asserts
+        // the SHAPE of that: the leaf carries the route it is on, and the same element answers
+        // for the component and tool entries with no code of their own. A per-essence crumb
+        // would satisfy the test above and leave the tool entry to repeat the fix.
+        await openAshEntry();
+        await typeName('Aetherlight');
+        const leaf = target.querySelector('[data-breadcrumb-world-scoped]');
+        assert.equal(
+          leaf?.getAttribute('data-breadcrumb-world-scoped'),
+          'world-essence-entry',
+          'the buffered name is being rendered somewhere other than the shared entry leaf'
+        );
+        assert.equal(leaf.textContent.trim(), 'Aetherlight');
+      });
+
+      it('falls back to the ROUTE TITLE in the crumb when the buffered name is emptied', async () => {
+        await openAshEntry();
+        await typeName('');
+        assert.equal(
+          crumbText(),
+          'Essence entry',
+          'an authored empty name must reach the crumb — `??` on "no editor", never `||` on ' +
+            '"nothing typed"'
+        );
+      });
+
+      it('opens the heading MEDALLION on the persisted icon and colour', async () => {
+        await openAshEntry();
+        const medallion = headingMedallion();
+        assert.ok(Boolean(medallion), 'the entry heading rendered no medallion');
+        assert.equal(medallion.getAttribute('data-medallion-tint'), 'ember');
+        assert.ok(
+          medallion.querySelector('i')?.className.includes('fa-fire'),
+          'the medallion opened on some icon other than the record on disk'
+        );
+      });
+
+      it('FOLLOWS the buffered colour in the heading medallion, before any Save', async () => {
+        await openAshEntry();
+        await pickColour('lavender');
+        assert.ok(
+          target
+            .querySelector('[data-scoped-entry-colour] [data-manager-color-token="lavender"]')
+            ?.className.includes('is-selected'),
+          'the swatch click never reached the draft, so the medallion assertion below is vacuous'
+        );
+        assert.equal(
+          headingMedallion()?.getAttribute('data-medallion-tint'),
+          'lavender',
+          'the tile at the top of the screen still wears the colour on disk while the picker, ' +
+            'the preview rail and the form tile have all moved'
+        );
+      });
+
+      it('FOLLOWS the buffered icon in the heading medallion, before any Save', async () => {
+        // The COLOUR case above and this one are not one test twice: the colour is a bare palette
+        // key the medallion turns into a tint, the icon is a class it renders directly, and a
+        // shell that read one buffered field and not the other would pass whichever of the two
+        // was written first.
+        await openAshEntry();
+        const trigger = target.querySelector('.essence-icon-picker-trigger');
+        assert.ok(Boolean(trigger), 'the entry editor rendered no icon picker');
+        trigger.click();
+        await settleEntryRoute();
+        // The picker's option list is PORTALLED out of the page, so it is found on the document.
+        const option = [...document.querySelectorAll('.essence-icon-picker-option')].find(
+          (candidate) => !(candidate.querySelector('i')?.className ?? '').includes('fa-fire')
+        );
+        assert.ok(Boolean(option), 'the icon picker offered no glyph other than the persisted one');
+        // The picker's own `<i>` carries ITS component's Svelte scope hash and the medallion's
+        // carries none, so the two are compared on the glyph classes rather than verbatim.
+        const glyphClasses = (element) =>
+          (element?.className ?? '')
+            .split(/\s+/)
+            .filter((token) => token && !token.startsWith('svelte-'))
+            .join(' ');
+        const chosen = glyphClasses(option.querySelector('i'));
+        assert.ok(chosen.length > 0, 'the picker offered an option with no glyph class at all');
+        option.click();
+        await settleEntryRoute();
+        assert.equal(
+          glyphClasses(headingMedallion()?.querySelector('i')),
+          chosen,
+          'the tile at the top of the screen kept the glyph on disk while the picker trigger ' +
+            'and the player preview both moved to the buffered one'
+        );
+      });
     });
   });
 });
