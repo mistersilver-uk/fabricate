@@ -23,6 +23,7 @@
   layout untouched: `fill` still stretches each stepper to a real, sized flex track.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -62,7 +63,7 @@
 <div class="manager-character-modifier-row-bounds">
   <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
   {#each bounds as bound (bound.key)}
-    <div class="manager-field">
+    <Field as="div">
       <span>{bound.label}</span>
       <Stepper
         value={bound.value}
@@ -72,6 +73,6 @@
         {...stepperLabels(bound.label)}
         onChange={(next) => onChange(bound.patch(next))}
       />
-    </div>
+    </Field>
   {/each}
 </div>

@@ -2,10 +2,25 @@
  * Guard for a hand-maintained mirror that fails SILENTLY.
  *
  * Every mounted-Svelte suite names the `.svelte` modules its temp tree compiles. A component
- * the mounted tree renders but the list omits does NOT fail the suite — it HANGS it, and
- * `node --test` reports the blocked tests as `# cancelled N`, never `# fail`. Suites built on
- * `createMountedComponentHarness` are covered by its own dependency-closure validator, but
- * several older suites still hand-roll the compile/mount boilerplate and have no such check.
+ * the mounted tree renders but the list omits does NOT fail the suite: its `before()` hook
+ * throws, so `node --test` cancels every test in the file and reports `# cancelled N`, never
+ * `# fail`. Watch the cancelled count and not just the failure count — this is the omission a
+ * green-looking run hides. Neither form HANGS, so a run that merely looks slow is a different
+ * problem:
+ *
+ * - A `createMountedComponentHarness` suite throws up front out of
+ *   `validateMountedComponentDependencies`, naming the importer, the missing module and the
+ *   list to add it to ("... add it to compiledModules"). That is the loud case, and it is why
+ *   those suites are exempt from the vacuity ratchet below.
+ * - A suite that still hand-rolls the compile/mount boilerplate has no such check, so it gets
+ *   as far as importing the temp tree and dies with `ERR_MODULE_NOT_FOUND` on the compiled
+ *   `<path>.svelte.js`. Same `# cancelled`, but the module is named only in the stack — which
+ *   is what this guard exists to turn into a named, test-time failure.
+ *
+ * This is recorded HERE, once, because it is a property of the harnesses rather than of any
+ * one entry. Issue 1428 restated it beside fifteen individual entries in the compile lists, in
+ * prose that said the suite hangs; it does not, and fifteen byte-identical copies of a wrong
+ * sentence are also precisely the near-identical block SonarCloud's duplication gate counts.
  *
  * Issue 785 made this sharp: `EmptyState` and `Callout` are the manager's shared no-state and
  * standing-statement primitives, so adding either to one more screen silently pulls it into
@@ -127,6 +142,12 @@ const SHARED_PRIMITIVES = [
   // manager tree pulls it in, and the root's 32 deferred sites will pull it into the rest when
   // they convert.
   'src/ui/svelte/components/InspectorCard.svelte',
+  // THE manager's labelled form field, the `.manager-field` column (issue 1428). Sharper again
+  // than `ManagerButton`: `manager-field` was a CSS convention on 88 elements across 24
+  // components, and 81 of them in 23 components became this primitive in one change. It is now
+  // in the static graph of nearly every manager editor tree, so the next screen that grows a
+  // field cancels its suite on an omission here rather than failing it.
+  'src/ui/svelte/components/Field.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

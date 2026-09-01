@@ -88,6 +88,7 @@
   library patch at all — the store's check-modifier saver no longer accepts one.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -729,8 +730,9 @@
              second "Maximum picks" under the first would be the same words twice.
              The Stepper's `ariaLabel` repeats that heading verbatim, so the accessible name
              still starts with the visible one (WCAG 2.5.3). -->
-        <div
-          class="manager-field manager-modifier-max-picks-field"
+        <Field
+          as="div"
+          class="manager-modifier-max-picks-field"
           data-crafting-modifier-max-picks={maxPicksValue === null
             ? 'unlimited'
             : String(maxPicksValue)}
@@ -751,7 +753,7 @@
             }}
             onChange={selectMaxPicks}
           />
-        </div>
+        </Field>
       </div>
     {/if}
   </div>
@@ -879,7 +881,12 @@
      LAYOUT context rather than dropping `fill` (an unfilled `.fab-stepper` is still a
      flex item and `align-items: stretch` widens it to the same box anyway). 160px is the
      width the other four such call sites use. */
-  .manager-modifier-max-picks-field {
+  /* `:global(...)`, chained with `.manager-field`: this class now sits on a `<Field>`, and a
+     scoped rule cannot reach a class the component hands to a child (see `Field.svelte`). The
+     `.manager-field` compound is not decoration — it restores the (0,2,0) the scoped
+     `.manager-modifier-max-picks-field.svelte-hash` form had, which the bare `:global(.manager-modifier-max-picks-field)` would drop to
+     (0,1,0). */
+  :global(.manager-field.manager-modifier-max-picks-field) {
     flex: 0 0 auto;
     width: 160px;
     max-width: 160px;

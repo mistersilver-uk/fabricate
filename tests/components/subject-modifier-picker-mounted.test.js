@@ -41,6 +41,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
   ],
   compiledModules: [
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     PICKER_PATH,

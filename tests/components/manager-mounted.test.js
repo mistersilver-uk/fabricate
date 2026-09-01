@@ -54,6 +54,7 @@ import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
+  'Field',
   'ChanceSlider',
   'ImagePathPicker',
   'IconPicker',

@@ -56,6 +56,7 @@ const harness = createMountedComponentHarness({
     // tab bar and the behavior preview all render it.
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1096). The Modifiers card and the Tool
     // Studio header both render through it; an omission HANGS this suite rather than
     // failing it.

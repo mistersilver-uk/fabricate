@@ -68,6 +68,7 @@
   issue-643 regression the comment above that block records.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { untrack } from 'svelte';
   import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -610,7 +611,7 @@
                engine path reads it, no readiness rule validates it, and export strips it.
                A nonsensical order is allowed on purpose — the panel is here to show what
                the check does, not to police what a recipe would look like. -->
-          <label class="manager-field">
+          <Field as="label">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Checks.PreviewAs.Difficulties',
@@ -628,7 +629,7 @@
               value={sandboxText}
               oninput={(event) => editSandbox(event.currentTarget.value)}
             />
-          </label>
+          </Field>
           <p class="manager-muted" data-checks-preview-difficulties-hint>
             {text(
               'FABRICATE.Admin.Manager.Checks.PreviewAs.DifficultiesHint',
@@ -636,7 +637,7 @@
             )}
           </p>
         {:else}
-          <label class="manager-field">
+          <Field as="label">
             <span class="sr-only"
               >{text(
                 'FABRICATE.Admin.Manager.Checks.PreviewAs.Record',
@@ -652,7 +653,7 @@
                 <option value={record.id}>{record.label}</option>
               {/each}
             </select>
-          </label>
+          </Field>
         {/if}
       </InspectorCard>
 

@@ -15,6 +15,7 @@
   behind here, disabled or otherwise; what stays is the per-system boolean, where there is one.
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import Chip from './Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
@@ -372,17 +373,17 @@
                   </div>
                 </div>
                 <div class="manager-edit-grid">
-                  <label class="manager-field" for="manager-system-name">
+                  <Field as="label" for="manager-system-name">
                     <span>{text('FABRICATE.Admin.SystemSettings.Name', 'Name')}</span>
                     <input id="manager-system-name" type="text" bind:value={systemNameValue} />
-                  </label>
-                  <label class="manager-field is-wide" for="manager-system-description">
+                  </Field>
+                  <Field as="label" class="is-wide" for="manager-system-description">
                     <span>{text('FABRICATE.Admin.SystemSettings.Description', 'Description')}</span>
                     <textarea
                       id="manager-system-description"
                       rows="4"
                       bind:value={systemDescriptionValue}></textarea>
-                  </label>
+                  </Field>
                 </div>
               </section>
 

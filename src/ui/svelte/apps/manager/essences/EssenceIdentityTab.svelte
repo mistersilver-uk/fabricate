@@ -21,6 +21,7 @@
   change does not implement, and that copy is dropped.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import Medallion from '../../../components/Medallion.svelte';
@@ -100,7 +101,7 @@
       </div>
 
       <div class="manager-essence-core-fields">
-        <label class="manager-field" for="manager-essence-edit-name">
+        <Field as="label" for="manager-essence-edit-name">
           <span>{text('FABRICATE.Admin.Manager.Essence.Name', 'Name')}</span>
           <input
             id="manager-essence-edit-name"
@@ -111,9 +112,9 @@
             disabled={saving}
             required
           />
-        </label>
+        </Field>
 
-        <label class="manager-field" for="manager-essence-edit-description">
+        <Field as="label" for="manager-essence-edit-description">
           <span>{text('FABRICATE.Admin.Manager.Essence.Description', 'Description')}</span>
           <textarea
             id="manager-essence-edit-description"
@@ -125,7 +126,7 @@
               'Description'
             )}
             disabled={saving}></textarea>
-        </label>
+        </Field>
       </div>
     </div>
   </section>
