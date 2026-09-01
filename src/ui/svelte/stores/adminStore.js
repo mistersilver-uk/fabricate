@@ -4923,7 +4923,7 @@ export function createAdminStore(services) {
   // INERT until the vocabulary lane declares that family in `worldScopeActions.js` — a file it
   // owns. Supplied here because the store leg is the one half of the pair that lives in a
   // gateway file.
-  const worldScope = createWorldScopeActions({
+  const worldScopeFamilies = createWorldScopeActions({
     getStores: {
       component: () => services.getComponentScopeStore?.() ?? null,
       essence: () => services.getEssenceScopeStore?.() ?? null,
@@ -4931,6 +4931,107 @@ export function createAdminStore(services) {
       vocabulary: () => services.getVocabularyScopeStore?.() ?? null,
     },
   });
+
+  /**
+   * The world essence roster, keyed by id, straight off the published corpus.
+   *
+   * @returns {Map<string, object>}
+   */
+  function _worldEssenceEntities() {
+    const entities = services.getEssenceScopeStore?.()?.corpus?.()?.entities;
+    const byId = new Map();
+    for (const entity of Array.isArray(entities) ? entities : []) {
+      const id = typeof entity?.id === 'string' ? entity.id.trim() : '';
+      if (id) byId.set(id, entity);
+    }
+    return byId;
+  }
+
+  /**
+   * Join a WORLD essence to one crafting system — the membership record AND the in-system record.
+   *
+   * ── WHY THE WORLD HALF ALONE IS NOT A JOIN (issue 1372, maintainer parity round 8) ──────────
+   * `worldScopeActions.addToSystem` writes exactly one thing: a membership row in the world-scope
+   * payload, inheriting every section. Nothing on the system Essence Rules screen reads that row.
+   * `essenceCards` is built from `selectedSystem.essenceDefinitions`, and even the read union
+   * (`unionScopedDefinitions`) iterates the IN-SYSTEM array and only enriches rows it already
+   * finds there — a world entity with a membership record and no in-system row contributes no row
+   * at all. So `Add to this system` wrote a record, published a refresh, and left the list exactly
+   * as it was: a button that silently did nothing, on every essence, forever.
+   *
+   * That is the same root cause as the system-scope create draft this round removes: `addEssence`
+   * writes the in-system array and `addToSystem` did not, so the two halves of "this system has
+   * this essence" were authored by different verbs. Removing `+ Create essence` from the Essence
+   * Rules header (`### GM World Essence Screens` requirement 13) is only safe once the remaining
+   * route actually lands, so this is the other half of that removal rather than an adjacent fix.
+   *
+   * ── IT SEEDS IDENTITY ONLY, AND ONLY WHEN THE ROW IS ABSENT ─────────────────────────────────
+   * The seeded record carries the four lifted identity fields (`name`, `icon`, `colorToken`,
+   * `description`) and nothing else, so every behaviour key — the effect source, the macro — is
+   * unset and therefore INHERITED from the world default, which is exactly the state the
+   * membership record beside it declares. A system that already holds a row for the id is left
+   * alone: the GM is re-adding a membership record to an essence this system already has, and
+   * overwriting its authored behaviour would be a destructive read of "Add".
+   *
+   * ── REMOVE IS DELIBERATELY NOT ITS MIRROR ───────────────────────────────────────────────────
+   * `removeFromSystem` deletes the membership record and leaves the in-system record standing.
+   * Deleting the in-system row would run `_normalizeEssenceQuantities` against a valid-id set that
+   * no longer contains this essence, which STRIPS the stored quantity from every component in the
+   * system that carries it — the opposite of what the reference's own copy promises ("Components
+   * here keep the values, but nothing resolves on craft until the essence is added back"). Making
+   * Remove destructive is a data-model decision, not a parity one, so it is raised rather than
+   * taken here.
+   *
+   * @param {string} entityId the world essence id.
+   * @param {string} systemId the crafting system to join it to.
+   * @returns {Promise<boolean>} whether anything was written.
+   */
+  async function joinEssenceToSystem(entityId, systemId) {
+    const target = typeof entityId === 'string' ? entityId.trim() : '';
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    if (!target || !system) return false;
+    const joined = await worldScopeFamilies.essence.addToSystem(target, system);
+    const seeded = await _seedInSystemEssence(target, system);
+    if (joined || seeded) await refresh();
+    return joined || seeded;
+  }
+
+  /**
+   * Write the in-system `essenceDefinitions` row a joined world essence needs, when it is absent.
+   *
+   * @param {string} entityId
+   * @param {string} systemId
+   * @returns {Promise<boolean>} whether a row was written.
+   */
+  async function _seedInSystemEssence(entityId, systemId) {
+    const entity = _worldEssenceEntities().get(entityId);
+    if (!entity) return false;
+    const systemManager = services.getCraftingSystemManager();
+    const system = systemManager?.getSystem?.(systemId);
+    if (!system) return false;
+    const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    if (existing.some((def) => String(def?.id ?? '').trim() === entityId)) return false;
+    const essenceDefinitions = [
+      ...existing,
+      {
+        id: entityId,
+        name: String(entity.name || entityId),
+        description: String(entity.description || ''),
+        icon: normalizeEssenceIcon(entity.icon || DEFAULT_ESSENCE_ICON),
+        colorToken: entity.colorToken || null,
+      },
+    ];
+    await systemManager.updateSystem(systemId, { essenceDefinitions });
+    return true;
+  }
+
+  // The published write path. Only the ESSENCE family is composed: its `addToSystem` has a second
+  // half in a store this gateway owns, and the generic family cannot reach `CraftingSystemManager`
+  // at all. Every other family and every other essence verb is the generic one, unwrapped.
+  const worldScope = {
+    ...worldScopeFamilies,
+    essence: { ...worldScopeFamilies.essence, addToSystem: joinEssenceToSystem },
+  };
 
   // Read the world character libraries straight from their store on every publish, for the same
   // reasons: cheap, and honest when another GM edits a library, with no per-system cache to
@@ -6459,11 +6560,10 @@ export function createAdminStore(services) {
   /**
    * The comparison key for an essence NAME.
    *
-   * One function, because `addEssence`, `updateEssence` and `duplicateEssence` must agree
-   * exactly on what "already exists" means. `addEssence` and `updateEssence` both REFUSE a
-   * case-insensitive collision while `_uniqueKey` de-duplicates only the ID, so a
-   * duplicate that landed a second same-named definition would leave NEITHER of the two
-   * ever savable again — silently and permanently.
+   * One function, because `addEssence` and `updateEssence` must agree exactly on what
+   * "already exists" means: both REFUSE a case-insensitive collision while `_uniqueKey`
+   * de-duplicates only the ID, so a write that landed a second same-named definition would
+   * leave NEITHER of the two ever savable again — silently and permanently.
    */
   function _essenceNameKey(value) {
     return String(value ?? '')
@@ -6481,31 +6581,6 @@ export function createAdminStore(services) {
   function _essenceNameTaken(existing, name, ignoreId = '') {
     const key = _essenceNameKey(name);
     return existing.some((def) => def.id !== ignoreId && _essenceNameKey(def.name) === key);
-  }
-
-  /**
-   * A name derived from `baseName` that {@link _essenceNameTaken} rejects for no existing
-   * essence — what `duplicateEssence` must produce for its copy to be savable.
-   *
-   * Counts upwards rather than appending repeatedly, so duplicating three times yields
-   * three DISTINCT names rather than "(copy)", "(copy) (copy)", "(copy) (copy) (copy)".
-   * The loop is bounded by the definition count plus one, which is the most collisions
-   * that can exist.
-   */
-  function _uniqueEssenceName(existing, baseName) {
-    const first =
-      services.localize?.('FABRICATE.Admin.Manager.Essence.DuplicateName', { name: baseName }) ||
-      `${baseName} (copy)`;
-    if (!_essenceNameTaken(existing, first)) return first;
-    for (let index = 2; index <= existing.length + 2; index += 1) {
-      const candidate =
-        services.localize?.('FABRICATE.Admin.Manager.Essence.DuplicateNameIndexed', {
-          name: baseName,
-          index,
-        }) || `${baseName} (copy ${index})`;
-      if (!_essenceNameTaken(existing, candidate)) return candidate;
-    }
-    return `${baseName} ${crypto.randomUUID().slice(0, 8)}`;
   }
 
   /**
@@ -6655,47 +6730,6 @@ export function createAdminStore(services) {
     await systemManager.updateSystem(sysId, { essenceDefinitions });
     await refresh();
     return true;
-  }
-
-  /**
-   * Copy an essence into a NEW definition the GM can then edit (issue 1036).
-   *
-   * The copy takes a name `updateEssence` will still accept. Both `addEssence` and
-   * `updateEssence` refuse a case-insensitive name collision and `_uniqueKey` de-duplicates
-   * the ID only, so a naive duplicate would land two same-named definitions after which
-   * NEITHER could ever be saved again.
-   *
-   * Everything else is carried verbatim, including a `false` `enabled` and the property
-   * macro: a duplicate is a starting point for the GM's next essence, and silently
-   * re-enabling a copy of a disabled essence would give it behaviour its original does not
-   * have. The SOURCE link is carried too — it names an in-system component, so the copy
-   * points at the same component the original does.
-   *
-   * @param {string} essenceId
-   * @returns {Promise<?string>} the new essence id, or `null` when nothing was written.
-   */
-  async function duplicateEssence(essenceId) {
-    if (!essenceId) return null;
-    const context = _selectedSystemEssences();
-    if (!context) return null;
-    const { systemManager, sysId, existing } = context;
-
-    const current = existing.find((def) => def.id === essenceId);
-    if (!current) return null;
-
-    const id = crypto.randomUUID();
-    const essenceDefinitions = [
-      ...existing,
-      {
-        ...current,
-        id,
-        name: _uniqueEssenceName(existing, String(current.name || '').trim() || essenceId),
-      },
-    ];
-
-    await systemManager.updateSystem(sysId, { essenceDefinitions });
-    await refresh();
-    return id;
   }
 
   /**
@@ -9795,7 +9829,6 @@ export function createAdminStore(services) {
     removeTag,
     addEssence,
     updateEssence,
-    duplicateEssence,
     setEssenceEnabled,
     applyEssenceBulkEdit,
     // Singular and plural share one verb (issue 1036): `removeEssence` is gone, not

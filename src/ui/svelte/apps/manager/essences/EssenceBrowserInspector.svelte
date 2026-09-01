@@ -21,18 +21,33 @@
      reaches — how many components it strips the essence from and how many recipes it
      rewrites — because the delete is warned, not blocked.
 
-  ── ON CRAFT IS `EssenceBehaviorPreview`, NOT A SECOND LIST ───────────────────────
-  The editor's preview panel and this section answer the same question with the same three
-  facts. Re-authoring them here is what one-implementation-per-meaning forbids, so this
-  renders the same component with its identity header and live-update note suppressed.
+  ── ON CRAFT ANSWERS A DIFFERENT QUESTION FROM THE PREVIEW, AND NOW SAYS SO ───────
+  This section rendered `EssenceBehaviorPreview` with its kicker suppressed, on the reading that
+  the editor's preview and this panel are one list. They are not, and treating them as one is
+  what left this rail with NO PROVENANCE on a screen whose whole subject is inherit-versus-
+  override. The preview answers "what does this essence DO to a crafted result"; the reference's
+  cards answer "what does THIS SYSTEM resolve each section to, and did it author that or inherit
+  it" — titled after the value and ending in `· overridden here` or `· world default`
+  (`tmp/proto/essence-rules.png`, data at `proto:5093`-`5098`). Two meanings had been collapsed
+  rather than shared, so the second one is projected in `essenceStudio.projectEssenceOnCraftCards`
+  and drawn with the SAME `IconFactRow` primitive the preview uses.
+
+  ── THE SYSTEM ROSTER IS `SystemRulesRoster`, THE CATALOGUE'S OWN PANEL ───────────
+  The reference draws `SYSTEM RULES n / m` — a count, a system search, five named rows each with
+  a `Rules ↗` link out, and a pager — on this rail as well as on the world catalogue's. The
+  catalogue's was inlined in `EntityCatalogueShell`; it is now a component, and this composes it
+  rather than growing a second one.
 -->
 <script>
-  import EssenceBehaviorPreview from './EssenceBehaviorPreview.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
+  import IconFactRow from '../IconFactRow.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
+  import SystemRulesRoster from '../scoped/SystemRulesRoster.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { essenceColourName, essenceShortValueName } from '../scoped/essenceScoped.js';
+  import { projectEssenceOnCraftCards } from './essenceStudio.js';
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
 
   let {
@@ -41,13 +56,28 @@
     showPropertyMacroUi = false,
     managedItemOptions = [],
     sourceUuid = '',
+    // ── WHAT THE SYSTEM LAYER NEEDS TO NAME ITSELF (issue 1372, maintainer parity round 8) ──
+    // `systemName` heads the on-craft section, as the reference's `ON CRAFT IN MYTHWRIGHT FORGE`
+    // does; `inherited` is this system's per-section inherit map from the world-scope join, and
+    // it is what turns a resolved value into a resolved value AND the layer it came from. It is
+    // `null` for a system with no membership record, which suppresses the layer clause rather
+    // than guessing one.
+    systemName = '',
+    inherited = null,
+    // The `SYSTEM RULES n / m` panel's own three facts, threaded from the world-scope join the
+    // shell already holds. `systemRows` is that join — one row per crafting system, carrying
+    // `member` and `enabled` — never the narrowed `{id, name}` roster, which answers neither.
+    systemRows = [],
+    memberCount = 0,
+    rosterSize = 0,
+    membershipActions = null,
+    onOpenSystemRules = null,
     onEdit = () => {},
     // THE DEEP LINK OUT TO THE WORLD DEFINITION (issue 1372, `proto:1678`). One callback, and
     // the only reason `CraftingSystemManagerRoot.svelte` is reopened at all: the shell already
     // owns `openWorldScopedEntry`, and this site is the one place the seam can be attached
     // because the inspector is rendered there with explicit props and no bundle spread.
     onOpenWorldDefinition = () => {},
-    onDuplicate = () => {},
     onDelete = () => {},
     onEditComponent = () => {},
     onCopySource = () => {},
@@ -73,6 +103,29 @@
 
   const disabled = $derived(essence?.enabled === false);
   const description = $derived(truncate(essence?.description));
+  // THE META LINE the reference puts under the name: the colour's own display name and how many
+  // components in THIS system carry the essence (`proto:5086`). The colour name is the shared
+  // `essenceColourName`, so this line and the world catalogue's caption cannot disagree about
+  // what a token is called; the hex is the world screen's, because that screen owns the colour.
+  const colourName = $derived(essenceColourName(essence?.colorToken));
+  const carrierLine = $derived(
+    format('FABRICATE.Admin.Manager.Essence.CarriersHere', '{count} components here', {
+      count: essence?.componentUsageCount || 0,
+    })
+  );
+  const identityMeta = $derived(colourName ? `${colourName} · ${carrierLine}` : carrierLine);
+  // AGREEING WITH ITS NUMBER (issue 1372). One key served every count, so the Usage row read
+  // `1 components`. The corpus's convention is a `…One` sibling carrying the singular written
+  // out; `EssenceRow` selects the same pair for the same two keys.
+  const componentUsageSentence = $derived(
+    (essence?.componentUsageCount || 0) === 1
+      ? format('FABRICATE.Admin.Manager.Essence.ComponentUsageCountOne', '1 component', {
+          count: 1,
+        })
+      : format('FABRICATE.Admin.Manager.Essence.ComponentUsageCount', '{count} components', {
+          count: essence?.componentUsageCount || 0,
+        })
+  );
   const usageItems = $derived(
     Array.isArray(essence?.componentUsageItems) ? essence.componentUsageItems : []
   );
@@ -89,6 +142,26 @@
     });
   });
 
+  // THE MACRO NAME FALLS BACK TO ITS ID, exactly as the row's summary line does. `resolveMacroName`
+  // needs `fromUuid`, and until it answers — or where it cannot — an empty name made a CONFIGURED
+  // macro's card read `No macro` while the row two columns left printed `Macro: lab-aether-binding`.
+  // The terminal segment is the closest true thing either surface can say.
+  const macroLabel = $derived(macroName || essenceShortValueName(essence?.propertyMacroUuid));
+  const onCraftCards = $derived(
+    projectEssenceOnCraftCards(
+      essence,
+      {
+        effectTransferEnabled: showSourceUi,
+        propertyMacrosEnabled: showPropertyMacroUi,
+        sourceName: essence?.associatedItem?.name || essence?.sourceName || '',
+        macroName: macroLabel,
+        inherited,
+      },
+      text,
+      format
+    )
+  );
+
   function truncate(value) {
     if (typeof value !== 'string') return '';
     const trimmed = value.trim();
@@ -101,7 +174,7 @@
   }
 </script>
 
-<section class="manager-inspector-card" data-essence-browser-inspector>
+<section class="manager-essence-inspector-section" data-essence-browser-inspector>
   <div class="manager-inspector-title-row is-hero-large">
     <!-- The tile carries the essence's own colour here too, so the inspector and the row
          cannot disagree about what colour an essence is. -->
@@ -115,13 +188,15 @@
         {text('FABRICATE.Admin.Manager.Essence.Selected', 'Selected essence')}
       </p>
       <h2 class="manager-inspector-name" title={essence.name}>{essence.name}</h2>
-      <!-- NO colour-name chip (issue 1036, maintainer round 2). The tinted medallion two
-           columns left already carries the colour, and a display name per theme colour is
-           upkeep with no reader. The palette caption in the EDITOR keeps its name, because
-           there it labels the swatch the GM just picked rather than restating a tile. -->
+      <!-- THE META LINE (issue 1372, maintainer parity round 8, `proto:5086`): the colour's
+           display name and how many components in THIS system carry the essence. It is not the
+           colour-name CHIP that issue 1036 removed — that was a tinted pill restating the
+           medallion beside it. This is a one-line caption whose second half is a fact no other
+           control on the rail states, and the reference draws it in exactly this slot. -->
+      <p class="manager-essence-inspector-meta" data-essence-inspector-meta>{identityMeta}</p>
       <div class="manager-chip-row">
         <StatusPill
-          tone={disabled ? 'neutral' : 'positive'}
+          tone={disabled ? 'subtle' : 'success'}
           icon={disabled ? 'fas fa-circle-pause' : 'fas fa-circle-check'}
           label={disabled
             ? text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')
@@ -184,7 +259,7 @@
 <!-- Two stats, two different questions. Components CARRY the essence, which is what blocks
      a delete; recipes REQUIRE it, which is what a delete rewrites. Neither number is
      derivable from the other. -->
-<section class="manager-inspector-card" data-essence-section="stats">
+<section class="manager-essence-inspector-section" data-essence-section="stats">
   <!-- The SHIPPED two-stat grid, joined rather than re-authored: `.manager-essence-stat-*`
        is added to the `.manager-recipe-stat-*` / `.manager-component-stat-*` selector lists
        in `styles/fabricate.css`. This inspector is one click from those two, and a
@@ -206,23 +281,56 @@
   </div>
 </section>
 
-<section class="manager-inspector-card" data-essence-section="oncraft">
-  <div class="manager-edit-card-heading">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')}
-    </h3>
-  </div>
-  <EssenceBehaviorPreview
-    {essence}
-    effectTransferEnabled={showSourceUi}
-    propertyMacrosEnabled={showPropertyMacroUi}
-    sourceName={essence.associatedItem?.name || essence.sourceName || ''}
-    {macroName}
-    showIdentity={false}
-    showLiveNote={false}
-    showEffectiveKicker={false}
-  />
-</section>
+{#if onCraftCards.length > 0}
+  <section class="manager-essence-inspector-section" data-essence-section="oncraft">
+    <p class="manager-kicker">
+      {#if systemName}
+        {format('FABRICATE.Admin.Manager.Essence.OnCraftIn', 'On craft in {system}', {
+          system: systemName,
+        })}
+      {:else}
+        {text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')}
+      {/if}
+    </p>
+    <ul class="manager-essence-oncraft-cards">
+      {#each onCraftCards as card (card.id)}
+        <li data-essence-oncraft-card={card.id} data-essence-oncraft-suppressed={card.suppressed}>
+          <IconFactRow icon={card.icon} title={card.title} subtitle={card.subtitle} />
+        </li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
+<!--
+  `SYSTEM RULES n / m` (issue 1372, maintainer parity round 8, `proto:1694`-`1716`).
+
+  It answers the one question this rail could not: which OTHER crafting systems have rules for
+  this essence, and how to get to each one's. The reference gives it a count over the whole
+  roster, a `Search systems` field, five named rows each ending in `Rules ↗`, and a pager — the
+  same panel the world Essence Catalogue's inspector already draws, which is why this composes
+  `SystemRulesRoster` rather than authoring a second one.
+
+  It renders only when the world corpus answered: `systemRows` is the world-scope join, and an
+  empty one over an unreadable corpus would report this essence as held by no system at all,
+  which is a false statement rather than an unavailable one.
+-->
+{#if systemRows.length > 0}
+  <section class="manager-essence-inspector-section" data-essence-section="systems">
+    <SystemRulesRoster
+      rows={systemRows}
+      {memberCount}
+      {rosterSize}
+      entityId={essence.id}
+      entityName={essence.name}
+      entityType="essence"
+      enableable={true}
+      actions={membershipActions}
+      {onOpenSystemRules}
+      resetKey={essence.id}
+    />
+  </section>
+{/if}
 
 <!--
   THE ACTIONS SIT ABOVE `Source` AND `Usage`, not below them (issue 1036 fidelity pass).
@@ -232,19 +340,27 @@
   rail's one loud thing was invisible in every frame of it. `Source` and `Usage` are
   reference, so they follow the verb rather than delaying it.
 -->
-<section class="manager-inspector-card" data-essence-section="actions">
+<section class="manager-essence-inspector-section" data-essence-section="actions">
   <!-- The three verbs render through `InspectorActionButton`, the extracted point-of-arrival
        button for every right inspector (issue 1036, maintainer round 2). What changes here
        is not only the size: the primary was `.manager-button.is-primary`, which is the
        SUCCESS family, so `Edit essence` painted green where the design's primary — and the
        recipe and component inspectors a click away — is the accent. -->
+  <!--
+    NO DUPLICATE (issue 1372, maintainer parity round 8).
+
+    `store.duplicateEssence` wrote a second `system.essenceDefinitions` entry with a fresh id and
+    a `(copy)` name — a SYSTEM-owned essence carrying its own name, icon and colour, minted from a
+    rail whose own banner two cards above says that name, icon and colour come from the Essence
+    Catalogue and are shared by every system. Both claims were on screen at once.
+
+    The reference offers no essence duplicate on any of its four essence screens. What it offers
+    instead is `Reuse these rules` on the system rules editor (`proto:3600`+), which copies THIS
+    system's effect source and macro into another system's own rules for the SAME essence — the
+    verb a GM actually wants, without minting an identity. That card is already shipped in
+    `EssenceEditView.svelte` and is one click away through `Edit essence` below.
+  -->
   <div class="manager-essence-inspector-actions">
-    <InspectorActionButton
-      icon="fas fa-clone"
-      label={text('FABRICATE.Admin.Manager.Essence.Duplicate', 'Duplicate essence')}
-      data-essence-action="duplicate"
-      onClick={() => onDuplicate(essence.id)}
-    />
     <InspectorActionButton
       tone="primary"
       icon="fas fa-pen"
@@ -295,12 +411,8 @@
 </section>
 
 {#if showSourceUi}
-  <section class="manager-inspector-card" data-essence-section="source">
-    <div class="manager-edit-card-heading">
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}
-      </h3>
-    </div>
+  <section class="manager-essence-inspector-section" data-essence-section="source">
+    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}</p>
     {#if essence.associatedItem}
       <div class="manager-essence-source-summary manager-essence-inspector-source-summary">
         <img
@@ -352,20 +464,12 @@
   </section>
 {/if}
 
-<section class="manager-inspector-card" data-essence-section="usage">
-  <div class="manager-edit-card-heading">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}
-    </h3>
-  </div>
+<section class="manager-essence-inspector-section" data-essence-section="usage">
+  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</p>
   <div class="manager-requirements-list">
     <div class="manager-requirement-row">
       <span>{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>
-      <strong
-        >{format('FABRICATE.Admin.Manager.Essence.ComponentUsageCount', '{count} components', {
-          count: essence.componentUsageCount || 0,
-        })}</strong
-      >
+      <strong>{componentUsageSentence}</strong>
     </div>
   </div>
   {#if usageItems.length > 0}
@@ -424,6 +528,55 @@
 
   .manager-inspector-card .manager-essence-shared-link i {
     font-size: 0.6rem;
+  }
+
+  /* THE META LINE under the inspected name: the colour and this system's carrier count. It is
+     the same size and colour as the world catalogue's own caption
+     (`.manager-scoped-list-inspector-caption`), so a GM reading one rail and then the other sees
+     one treatment rather than two. */
+  .manager-essence-inspector-meta {
+    margin: 0;
+    color: var(--fab-text-subtle);
+    font-size: 0.66rem;
+  }
+
+  /* The `ON CRAFT IN <system>` cards. `IconFactRow` owns each card's own anatomy; this owns only
+     the stack and the suppression dim, exactly as the behaviour preview's list does. */
+  .manager-essence-oncraft-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A suppressed card is dimmed as well as re-worded. The words carry the state; the dimming
+     only reinforces them. */
+  .manager-essence-oncraft-cards li[data-essence-oncraft-suppressed='true'] {
+    opacity: 0.72;
+  }
+
+  /* A BARE COLUMN, NOT A STACK OF BOXES (issue 1372, maintainer parity round 8).
+
+     `.manager-inspector-card` draws a 1px border, an 8px radius and `--fab-space-3` of padding.
+     Every section on this rail wore it, and four of those sections CONTAIN cards — two on-craft
+     cards, two stat tiles, five system rows — so the reference's one border became three nested
+     ones and the whole right third read as a panel inside a panel inside a window.
+
+     The reference draws the rail as a column on the pane's own surface with a micro-label per
+     section, and only the things that ARE objects keep a box (`tmp/proto/essence-rules.png`).
+     That is also exactly what `RecipeBrowserInspector` already does one click away, and its own
+     header records the same correction — so this brings the fourth library inspector onto the
+     shape the other one already has rather than inventing a treatment.
+
+     THE SHARED-DEFINITION CALLOUT KEEPS ITS BOX, because it IS an object: an info-toned
+     explanation the reference draws as a filled, bordered block. */
+  .manager-essence-inspector-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
   }
 
   .manager-essence-inspector-actions {
