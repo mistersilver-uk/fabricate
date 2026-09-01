@@ -266,49 +266,67 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
 });
 
 /**
- * THE GLYPH CHIP (issue 1372), which is a property of the ISSUE vehicle and not a fourth mark.
+ * THE PASS MARK IS A LABEL (issue 1372, maintainer parity round 8), and the family takes NO glyph
+ * from a caller at all.
  *
- * The scoped entry editors' Validation tab reads `Validation` plus a tick when everything
- * passes, because the other two outcomes are counts and a chip reading `0` states the opposite
- * of what it means. That tick is drawn by `Chip`'s own shipped `icon` prop, so the chip is
- * still the drawing and the caller supplies no markup, class or shape of its own — which is
- * the closure property the family rests on, restated for the one vehicle that takes a glyph.
+ * The scoped entry editors' Validation tab reads `Validation` plus a tick when everything passes,
+ * because the other two outcomes are counts and a chip reading `0` states the opposite of what it
+ * means. That tick briefly arrived as an `icon` property on the mark, defended as "a property of
+ * the chip, not a fourth vehicle" — but a call site passing `fas fa-check` IS a call site choosing
+ * a shape, which is the one thing the family's closure forbids.
+ *
+ * The reference settles it: its tab badge is ONE pill in two states,
+ * `badge: iss.block.length ? String(iss.block.length) : '✓'` (`proto:6221`-`6223`), a numeral
+ * or a tick CHARACTER in the same box, toned danger or recessive. So the pass mark was never a
+ * glyph and never a fourth vehicle — it is the issue chip's own LABEL.
  *
  * WHY THIS FILE PINS IT
  * ---------------------
- * A glyph chip carries an EMPTY label, so every emptiness rule the strip has ever had is a
- * live threat to it: the mark is drawn only because `isDrawable` judges a chip on its icon
- * when it has one. Nothing else in the suite would notice its removal — the tab would simply
- * render its label and pass — so the capability has to be asserted where the emptiness rules
- * are, beside the dot's own naming precondition above.
+ * The `icon` property is gone, and an absence is exactly what a mounted render cannot notice on
+ * its own: a re-added `icon` would render a glyph and every other assertion in this suite would
+ * still pass. So the ban is asserted here, beside the emptiness rules it used to interact with.
  */
-describe('EditorTabs draws a glyph chip for a state that is not a count (issue 1372)', () => {
-  it('draws an icon-only chip rather than filtering it away as empty', async () => {
+describe('EditorTabs takes no glyph from a caller (issue 1372)', () => {
+  it('draws a tick as the ISSUE chip label, in the same box a count uses', async () => {
+    const root = await harness.mount({
+      tabs: TABS,
+      activeTab: 'roll',
+      badges: { outcomes: { label: '✓', tone: 'neutral', name: 'Everything passes' } },
+    });
+    const button = buttonFor(root, 'outcomes');
+    assert.deepEqual(
+      marksOn(button).map((mark) => [mark.chip, mark.text, mark.name]),
+      [[true, '✓', 'Everything passes']],
+      'the pass state is the issue chip carrying a tick character and an accessible name'
+    );
+    assert.ok(
+      !button.querySelector('.manager-chip > i'),
+      'and it draws no glyph, because the primitive emits none for any mark'
+    );
+  });
+
+  it('ignores an `icon` on every vehicle, so no caller can choose a shape', async () => {
     const root = await harness.mount({
       tabs: TABS,
       activeTab: 'roll',
       badges: {
-        outcomes: { label: '', tone: 'success', icon: 'fas fa-check', name: 'Everything passes' },
+        roll: { vehicle: 'count', label: 7, icon: 'fas fa-check' },
+        outcomes: { label: '2', tone: 'danger', icon: 'fas fa-check' },
       },
     });
-    const button = buttonFor(root, 'outcomes');
-    const marks = marksOn(button);
-    assert.deepEqual(
-      marks.map((mark) => [mark.chip, mark.text, mark.name]),
-      [[true, '', 'Everything passes']],
-      'the pass state is a chip carrying no text and an accessible name, not an absent mark'
-    );
     assert.ok(
-      Boolean(button.querySelector('.manager-chip > i.fas.fa-check')),
-      'the glyph is drawn by the chip through its own icon prop'
+      Boolean(buttonFor(root, 'outcomes').querySelector('.manager-chip')),
+      'NON-VACUITY: the issue chip is drawn, so its glyph-free rendering is a measurement'
     );
-    assert.ok(
-      button.querySelector('.manager-chip').classList.contains('is-active'),
-      'a success tone maps onto the chip colour family, which spells success as active'
-    );
+    for (const tab of ['roll', 'outcomes']) {
+      assert.ok(
+        !buttonFor(root, tab).querySelector('i.fa-check'),
+        `${tab}: the mark's class is its drawing, and a caller cannot add to it`
+      );
+    }
   });
 
-  it('still suppresses a chip that carries neither a label nor a glyph', async () => {
+  it('still suppresses a chip that carries no label', async () => {
     const root = await harness.mount({
       tabs: TABS,
       activeTab: 'roll',
@@ -317,26 +335,20 @@ describe('EditorTabs draws a glyph chip for a state that is not a count (issue 1
     assert.deepEqual(
       marksOn(buttonFor(root, 'outcomes')),
       [],
-      'the glyph is what rescues an empty chip, so an empty chip without one stays dropped'
+      'an empty mark is dropped rather than drawn as an empty box'
     );
   });
 
-  it('keeps the family closed: the count and the dot take no glyph from the caller', async () => {
+  it('keeps the dot judged on its NAME, which is the only thing it renders', async () => {
     const root = await harness.mount({
       tabs: TABS,
       activeTab: 'roll',
-      badges: {
-        roll: { vehicle: 'count', label: 7, icon: 'fas fa-check' },
-        outcomes: { vehicle: 'dot', name: '1 issue', icon: 'fas fa-check' },
-      },
+      badges: { outcomes: { vehicle: 'dot', name: '1 issue' } },
     });
-    assert.ok(
-      !buttonFor(root, 'roll').querySelector('i.fa-check'),
-      'a record count is a bare numeral; its class is its drawing and a caller cannot add to it'
-    );
-    assert.ok(
-      !buttonFor(root, 'outcomes').querySelector('i.fa-check'),
-      'the dot is a shape, and a glyph inside it would be a mark the family does not name'
+    assert.deepEqual(
+      marksOn(buttonFor(root, 'outcomes')).map((mark) => mark.name),
+      ['1 issue'],
+      'a named dot draws; a nameless one is dropped by the rule above it'
     );
   });
 });

@@ -72,8 +72,12 @@
       return { tone: 'danger', label: String(blocking), aria: issueCountLabel(blocking) };
     if (warnings > 0)
       return { tone: 'warning', label: String(warnings), aria: issueCountLabel(warnings) };
+    // NEUTRAL, not green. The reference draws its clear tab badge in the recessive
+    // `surface-soft` / `border` / `text2` treatment (`proto:4566`); a green tick claims a result
+    // where the reference states an absence of findings. `WorldEssenceEntryPage` states the same
+    // pair, so the two essence editors' strips cannot disagree about what "clear" looks like.
     return {
-      tone: 'positive',
+      tone: 'neutral',
       label: '✓',
       aria: text('FABRICATE.Admin.Manager.Essence.ValidationAllValid', 'All checks pass'),
     };
@@ -125,7 +129,7 @@
       {:else if tab.id === 'validation'}
         <Chip
           tone={validationBadge.tone}
-          class={`manager-editor-tab-badge ${validationBadge.tone === 'positive' ? 'is-valid' : ''}`}
+          class="manager-editor-tab-badge"
           aria-label={validationBadge.aria}>{validationBadge.label}</Chip
         >
       {/if}

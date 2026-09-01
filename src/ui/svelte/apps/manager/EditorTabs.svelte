@@ -53,6 +53,20 @@
   a call site can supply markup, a class or a shape of its own. An unrecognised vehicle name
   falls back to the chip rather than emitting an unstyled mark.
 
+  ── AND THE MARK CARRIES NO `icon` (issue 1372, maintainer parity round 8) ──────────────
+
+  It briefly did, for one caller: the scoped entry editors' passing Validation badge, drawn as
+  a glyph-only chip because a chip reading `0` would state the opposite of what it means. That
+  was defended as "a property of the chip, not a fourth vehicle", but a call site passing
+  `icon: 'fas fa-check'` IS a call site choosing a shape, which is the one thing the paragraph
+  above says cannot happen.
+
+  It is gone, and the reference is why rather than the principle alone. The prototype's tab badge
+  is ONE pill in two states — `badge: iss.block.length ? String(iss.block.length) : '✓'`
+  (`proto:6221`-`6223`) — a numeral or a tick CHARACTER in the same box, toned danger or
+  recessive. So the pass mark was never a glyph and never a fourth vehicle: it is the issue
+  chip's LABEL, which this primitive already draws and no caller has to be trusted with.
+
   A tab may carry MORE THAN ONE mark, because a section can be both authored and unready at
   once — pass an array, and they render in the order the caller listed them.
 
@@ -66,14 +80,8 @@
      the accessible name (REQUIRED by any mark that renders no text — the `dot`, and the
      glyph-only chip below), and `suppressZero` defaults true so a mark reading `0` is
      omitted rather than stated as zero.
-     `icon` is a leading Font Awesome glyph drawn through `Chip`'s own `icon` prop, and is
-     what lets an ISSUE mark be a GLYPH rather than a number — the scoped entry editors'
-     passing Validation tab is a tick, not a count, and a chip reading `0` would state the
-     opposite of what it means. It is a PROPERTY OF THE CHIP and not a fourth vehicle: the
-     chip is still the drawing, the caller supplies no markup, class or shape of its own,
-     and `count` and `dot` drop it because their classes are their drawing. An icon-only
-     chip (empty `label`) is drawn rather than filtered away as empty, and takes `name` for
-     exactly the reason the dot does.
+     A mark carries NO `icon`; see the note above for the caller that wanted one and what the
+     reference says instead.
    - ariaLabelKey / ariaLabel: the strip's own accessible name.
    - idStem: builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`.
    - buttonIdStem / panelIdStem: override either half of that pair for a site whose ids do
@@ -142,10 +150,6 @@
         vehicle,
         label: mark.label ?? mark.value ?? '',
         tone: mark.tone || fallbackTone,
-        // The glyph belongs to the CHIP alone. `count` and `dot` drop it rather than drawing
-        // it, because their classes ARE their drawing and a caller-chosen shape on either is
-        // the style divergence this capability exists to remove.
-        icon: vehicle === 'issue' && typeof mark.icon === 'string' ? mark.icon : '',
         name: mark.name ?? '',
         suppressZero: mark.suppressZero !== false,
       };
@@ -154,19 +158,17 @@
       vehicle: 'issue',
       label: mark,
       tone: fallbackTone,
-      icon: '',
       name: '',
       suppressZero: true,
     };
   }
 
-  // A mark that renders no text is judged on what it DOES render: the dot on its name, the
-  // glyph-only chip on its icon. Everything else is judged on its label. The zero rule is the
-  // caller's to state, because the canonical text settles it per surface rather than per
-  // vehicle: the rail's record counts render `0` and the Checks strip's do not.
+  // A mark that renders no text is judged on what it DOES render: the dot on its name.
+  // Everything else is judged on its label. The zero rule is the caller's to state, because the
+  // canonical text settles it per surface rather than per vehicle: the rail's record counts
+  // render `0` and the Checks strip's do not.
   function isDrawable(mark) {
     if (mark.vehicle === 'dot') return mark.name !== '';
-    if (mark.icon !== '') return true;
     if (mark.label === '' || mark.label === null || mark.label === undefined) return false;
     return !(mark.label === 0 && mark.suppressZero);
   }
@@ -277,11 +279,8 @@
             {...markAttributes(tab, mark)}
           ></span>
         {:else}
-          <Chip
-            tone={badgeTone(mark.tone)}
-            icon={mark.icon}
-            class={badgeClass}
-            {...markAttributes(tab, mark)}>{mark.label}</Chip
+          <Chip tone={badgeTone(mark.tone)} class={badgeClass} {...markAttributes(tab, mark)}
+            >{mark.label}</Chip
           >
         {/if}
       {/each}
