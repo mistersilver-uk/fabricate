@@ -32,6 +32,7 @@
   import EmptyState from '../EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import ScopedEntityPreview from '../scoped/ScopedEntityPreview.svelte';
   import {
     projectToolBehaviorFacts,
@@ -272,23 +273,21 @@
       />
       <div class="manager-tool-player-toggle">
         <span>{text('FABRICATE.Admin.Manager.Tools.Editor.ShowAsBroken', 'Show as broken')}</span>
-        <label
-          class="manager-status-toggle manager-tool-setting-toggle"
-          class:is-on={showBroken}
-          class:is-off={!showBroken}
-        >
-          <input
-            class="manager-tool-setting-toggle-input"
-            type="checkbox"
-            data-tool-player-broken
-            aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.ShowAsBroken', 'Show as broken')}
-            checked={showBroken}
-            onchange={(event) => (showBroken = event.currentTarget.checked)}
-          />
-          <span class="manager-status-toggle-track" aria-hidden="true"
-            ><span class="manager-status-toggle-knob"></span></span
-          >
-        </label>
+        <!-- The `checkbox` host, which is the one this site hand-rolled: a real
+             `<input type="checkbox">` laid over the track, so a pointer hit-test and
+             `isChecked()` both land on a control the platform owns. `manager-tool-setting-toggle`
+             and the input's own class are HOST STRUCTURE and the primitive emits both, so neither
+             is restated here. `data-tool-player-broken` rides the rest spread onto the INPUT,
+             which is the element `tool-studio-mounted.test.js` resolves and then sets `checked`
+             on; it is spelled `=""` because a bare `data-*` on a COMPONENT tag is the boolean
+             `true` rather than the empty string it is on an element. -->
+        <StatusToggle
+          as="checkbox"
+          on={showBroken}
+          ariaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ShowAsBroken', 'Show as broken')}
+          data-tool-player-broken=""
+          onChange={(checked) => (showBroken = checked)}
+        />
       </div>
       <p data-tool-player-note>{playerPreview.note}</p>
     </div>

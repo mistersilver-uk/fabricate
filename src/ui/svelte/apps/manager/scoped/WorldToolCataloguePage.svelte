@@ -68,6 +68,7 @@
     toolOnBreakSummary,
     toolSourceSnapshot,
   } from '../tools/toolStudio.js';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import {
     breakModeOverrideCount,
@@ -434,10 +435,7 @@
     whichever lane next opens those two files.
   -->
   <div class="manager-world-tool-scope-band">
-    <section
-      class="manager-inspector-card manager-world-tool-break-card"
-      data-world-tool-break-mode
-    >
+    <InspectorCard class="manager-world-tool-break-card" data-world-tool-break-mode="">
       <div class="manager-world-tool-break-head">
         <i class="fas fa-sliders" aria-hidden="true"></i>
         <span class="manager-world-tool-break-title"
@@ -497,7 +495,7 @@
               'Each Tool tracks its own breakage \u00b7 world default for every system'
             )}
       </p>
-    </section>
+    </InspectorCard>
 
     <ItemDropZone
       kind="tool-create"
@@ -687,7 +685,14 @@
     min-width: 0;
   }
 
-  .manager-world-tool-break-card {
+  /* `:global()` AND CHAINED (issue 1427's rule, applied here by issue 1373): this class now
+     sits on an `<InspectorCard>` tag rather than on an element this component writes, so Svelte
+     stamps no `svelte-<hash>` onto it and prunes the local selector outright -
+     `lint:svelte:warnings` fails on the `css_unused_selector` that produces.
+     `.manager-inspector-card` is chained for the specificity the dropped hash carried, exactly
+     as `BulkDeleteCard.svelte` does, so the rule still beats the shipped card box and nothing
+     moves on screen. */
+  :global(.manager-inspector-card.manager-world-tool-break-card) {
     display: flex;
     flex: 2 1 26rem;
     flex-direction: column;

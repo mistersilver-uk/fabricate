@@ -68,6 +68,14 @@ const harness = createMountedComponentHarness({
     // harness omits HANGS this suite rather than failing it.
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    // THE CARD SHELL the world break-mode card is now written as (issue 1427), and THE BROWSE
+    // BAR AND ITS FIELD the list frame is now written as (issue 1039). All three arrived by
+    // conversion rather than by new markup, which is exactly the case this list exists for: the
+    // tree renders the same pixels and the suite would have HUNG as `# cancelled` rather than
+    // failing had they been omitted.
+    'src/ui/svelte/components/InspectorCard.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/ManagerToolbar.svelte',
     // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`: one filter
     // asking the same question as the system Tool Rules screen's, drawn the same way.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',

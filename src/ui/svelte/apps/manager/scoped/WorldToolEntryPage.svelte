@@ -89,6 +89,7 @@
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Field from '../../../components/Field.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
@@ -1330,22 +1331,18 @@
                   )}
                 </p>
               </div>
-              <button
-                type="button"
-                class={`manager-status-toggle ${worldEnabled ? 'is-on' : 'is-off'}`}
+              <!-- The `button` host, which is what this site hand-rolled: a pressable switch
+                   whose visible `label` IS its accessible name, so it passes no `ariaLabel`.
+                   The `data-*` hook rides the rest spread onto the `<button>` itself, which is
+                   the element every selector over it already resolved. -->
+              <StatusToggle
+                on={worldEnabled}
+                label={worldEnabled
+                  ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                  : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
                 data-world-tool-entry-enabled={worldEnabled ? 'on' : 'off'}
-                aria-pressed={worldEnabled}
                 onclick={() => actions?.setWorldEnabled?.(entityId, !worldEnabled)}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true"
-                  ><span class="manager-status-toggle-knob"></span></span
-                >
-                <span class="manager-status-toggle-label"
-                  >{worldEnabled
-                    ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                    : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-                >
-              </button>
+              />
             </section>
           {/if}
 

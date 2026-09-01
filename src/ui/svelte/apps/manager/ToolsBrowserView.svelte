@@ -748,7 +748,13 @@
     gap: var(--fab-space-2);
   }
 
-  [data-manager-tools-search] .manager-search {
+  /* `:global()` ON THE FIELD HALF ONLY (issue 1039). `.manager-search` now sits on a
+     `<ManagerSearchField>` tag rather than on an element this component writes, so Svelte
+     stamps no `svelte-<hash>` onto it and prunes the whole selector - `lint:svelte:warnings`
+     fails on the `css_unused_selector` that produces. The ANCESTOR half stays local, so the
+     hash lands on `[data-manager-tools-search]` instead and the selector keeps the same three
+     components of specificity it had. */
+  [data-manager-tools-search] :global(.manager-search) {
     flex: 1 1 150px;
     min-width: 0;
   }
