@@ -107,13 +107,44 @@
   const description = $derived(
     essence?.description || text('FABRICATE.Admin.Manager.NoDescription', 'No description')
   );
+  /**
+   * A usage sentence that AGREES WITH ITS NUMBER (issue 1372, maintainer parity round 8).
+   *
+   * `{count} components` rendered `1 components` on five of the six grid cards in the lab world,
+   * and on the inspector's Usage row, because one key served every count. The corpus's own
+   * convention for this is a `…One` sibling holding the singular written out (`GroupCountOne`,
+   * `ImpactRecipesOne`, `SelectedHeadingOne`), which is what this selects — never the `(s)`
+   * marker, which `lang-hardcoded-singular-keeps-plural-marker.test.js` exists to keep off a
+   * literal 1.
+   *
+   * BOTH KEYS ARE PASSED AS LITERALS, never composed as `` `${key}One` ``: `lang-keys-no-orphans`
+   * scans `src/` for captured literals, and a key it only ever sees interpolated is reported as
+   * unreferenced while rendering perfectly.
+   *
+   * @param {{plural: string, singular: string, pluralText: string, singularText: string,
+   *   count: number}} spec
+   * @returns {string}
+   */
+  function usageSentence(spec) {
+    if (spec.count === 1) return format(spec.singular, spec.singularText, { count: 1 });
+    return format(spec.plural, spec.pluralText, { count: spec.count });
+  }
+
   const componentUsage = $derived(
-    format('FABRICATE.Admin.Manager.Essence.ComponentUsageCount', '{count} components', {
+    usageSentence({
+      plural: 'FABRICATE.Admin.Manager.Essence.ComponentUsageCount',
+      singular: 'FABRICATE.Admin.Manager.Essence.ComponentUsageCountOne',
+      pluralText: '{count} components',
+      singularText: '1 component',
       count: essence?.componentUsageCount || 0,
     })
   );
   const recipeUsage = $derived(
-    format('FABRICATE.Admin.Manager.Essence.RecipeUsageCount', '{count} recipes', {
+    usageSentence({
+      plural: 'FABRICATE.Admin.Manager.Essence.RecipeUsageCount',
+      singular: 'FABRICATE.Admin.Manager.Essence.RecipeUsageCountOne',
+      pluralText: '{count} recipes',
+      singularText: '1 recipe',
       count: essence?.recipeUsageCount || 0,
     })
   );
@@ -204,13 +235,13 @@
     <span class="manager-system-name" title={essence.name}>{essence.name}</span>
     {#if absent}
       <StatusPill
-        tone="neutral"
+        tone="subtle"
         icon="fas fa-circle-minus"
         label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
       />
     {:else if disabled}
       <StatusPill
-        tone="neutral"
+        tone="subtle"
         icon="fas fa-circle-pause"
         label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
       />
@@ -413,13 +444,13 @@
     {#snippet badges()}
       {#if absent}
         <StatusPill
-          tone="neutral"
+          tone="subtle"
           icon="fas fa-circle-minus"
           label={text('FABRICATE.Admin.Manager.Essence.NotInSystem', 'Not in this system')}
         />
       {:else if disabled}
         <StatusPill
-          tone="neutral"
+          tone="subtle"
           icon="fas fa-circle-pause"
           label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
         />

@@ -22,17 +22,42 @@
   util imports. The caller resolves the localized `label` and the Font Awesome
   `icon` class, so nothing here reaches for `game.i18n`.
 
+  ── AN UNRECOGNISED TONE FALLS BACK; IT DOES NOT RENDER UNSTYLED (issue 1372) ─────
+
+  Every tone rule below is a THREE-property block — colour, border-colour, fill — over a base
+  that declares `border: 1px solid transparent` and no background at all. So a caller naming a
+  tone this component does not have got a pill with no fill and no edge: a bare glyph and some
+  small text, which reads as a deliberately quieter treatment rather than as a mistake. Four
+  essence call sites shipped `neutral` and `positive` — neither is in the ramp — and the result
+  was two visibly different status treatments one click apart on the same state, which survived
+  three review rounds because nothing anywhere fails on it.
+
+  `Chip` already settles this the same way for the same reason ("a typo shows up as the
+  recessive default instead of as nothing at all"), so this is that rule applied to the second
+  pill rather than a new idea. `data-status-pill` reports the RESOLVED tone, so a test can see
+  the fallback happen.
+
   Props:
-   - tone: 'subtle' | 'success' | 'accent' | 'danger' | 'warning' | 'info'.
+   - tone: 'subtle' | 'success' | 'accent' | 'danger' | 'warning' | 'info'; anything else
+     resolves to 'subtle'.
    - icon: a Font Awesome class string (e.g. 'fas fa-lock'); omitted renders none.
    - label: the already-localized pill text.
    - title: optional hover text.
 -->
 <script>
   let { tone = 'subtle', icon = '', label = '', title = '' } = $props();
+
+  /** The whole ramp, closed. @type {ReadonlySet<string>} */
+  const TONES = new Set(['subtle', 'success', 'accent', 'danger', 'warning', 'info']);
+
+  const resolvedTone = $derived(TONES.has(tone) ? tone : 'subtle');
 </script>
 
-<span class={`fab-status-pill is-${tone}`} data-status-pill={tone} title={title || undefined}>
+<span
+  class={`fab-status-pill is-${resolvedTone}`}
+  data-status-pill={resolvedTone}
+  title={title || undefined}
+>
   {#if icon}<i class={icon} aria-hidden="true"></i>{/if}
   <span class="fab-status-pill-label">{label}</span>
 </span>
