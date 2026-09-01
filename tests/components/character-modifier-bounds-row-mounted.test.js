@@ -32,7 +32,11 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-character-modifier-bounds-row-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js', 'src/ui/svelte/components/stepperLabels.js'],
-  compiledModules: [STEPPER_PATH, ROW_PATH],
+  // `Field.svelte` is THE manager's labelled form field (issue 1428): the row's
+  // `.manager-field` column renders through it since the conversion, so it is in this
+  // tree's static graph. Omitting it does not fail the suite — the harness's dependency
+  // validator throws in `before()` and every test here reports as `# cancelled`.
+  compiledModules: ['src/ui/svelte/components/Field.svelte', STEPPER_PATH, ROW_PATH],
   componentPath: ROW_PATH,
 });
 

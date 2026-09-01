@@ -163,6 +163,12 @@
       "why": "The essence source picker (2 callers). `library.html:764` names essences among the catalogues its four existing pickers COLLAPSE INTO `<SearchPopover>`; this file is one of those pickers and is not that panel today, so recording the name would fill the conformant quadrant with work not done."
     },
     {
+      "path": "src/ui/svelte/components/Field.svelte",
+      "library": "<Field>",
+      "evidence": "broad",
+      "why": "THE manager's labelled form field, the `.manager-field` column (issue 1428). 81 callers across 23 components, second only to `ManagerButton` under `components/`. `library.html:646` heads its block `<Field> <Select> <Search>` and states that \"the kicker label above the field is part of the primitive, not something each screen re-invents\" — which is exactly the box this ships. The block's other two names stay in the specified-but-unbuilt register: the 38px control shell, the option list and the `value`/`onChange`/`options` API are not built, and this claims the entry at the same granularity `Chip` claims `<IconChip>` from a block that also names `<Kicker>` and `<StatBox>`. Carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because neither representative frame renders a `.manager-field` at all: `manager-components-normal` is a browse list and `fabricate-app-shell` is the player shell."
+    },
+    {
       "path": "src/ui/svelte/components/FillBar.svelte",
       "library": null,
       "evidence": "broad",

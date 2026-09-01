@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../../util/gatheringFormat.js';
@@ -212,15 +213,15 @@
             </div>
           </div>
           <div class="manager-task-identity-fields">
-            <label class="manager-field">
+            <Field as="label">
               <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Name', 'Name')}</span>
               <input
                 data-environment-field="name"
                 value={environment.name || ''}
                 oninput={(event) => onUpdate({ name: event.currentTarget.value })}
               />
-            </label>
-            <label class="manager-field">
+            </Field>
+            <Field as="label">
               <span
                 >{text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Description',
@@ -232,7 +233,7 @@
                 value={environment.description || ''}
                 oninput={(event) => onUpdate({ description: event.currentTarget.value })}
               ></textarea>
-            </label>
+            </Field>
           </div>
         </div>
       </section>
@@ -247,8 +248,9 @@
         <div class="manager-environment-context-split">
           <div class="manager-environment-context-col">
             {#if realmsEnabled}
-              <div
-                class="manager-field manager-environment-context-field"
+              <Field
+                as="div"
+                class="manager-environment-context-field"
                 data-environment-field="includedRealmIds"
               >
                 <span
@@ -320,10 +322,10 @@
                     {/if}
                   </div>
                 {/if}
-              </div>
+              </Field>
             {/if}
 
-            <label class="manager-field manager-environment-context-field">
+            <Field as="label" class="manager-environment-context-field">
               <span
                 >{text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger',
@@ -345,11 +347,12 @@
                   <option value={option.id}>{dangerLabel(option.id)}</option>
                 {/each}
               </select>
-            </label>
+            </Field>
           </div>
 
-          <div
-            class="manager-field manager-environment-context-field manager-environment-context-biomes"
+          <Field
+            as="div"
+            class="manager-environment-context-field manager-environment-context-biomes"
           >
             <span
               >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Biomes', 'Biomes')}</span
@@ -405,7 +408,7 @@
                 >
               {/if}
             </div>
-          </div>
+          </Field>
         </div>
       </section>
 

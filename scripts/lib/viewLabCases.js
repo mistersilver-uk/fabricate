@@ -287,6 +287,23 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-simple-two-band-strip',
     'coverage-mode-routed-check-checks',
   ]),
+  // THE manager's labelled form field (issue 1428), on 81 call sites across 23 components — and
+  // in NEITHER representative frame. `manager-components-normal` is a browse list and
+  // `fabricate-app-shell` is the player shell; neither renders a `.manager-field` at all, so a
+  // change to the field column would publish two frames that do not contain one.
+  //
+  // TWO entries, because the primitive's `as` set is three hosts and the two frames between them
+  // render all three. `manager-gathering-task-editor-normal` is the densest field surface in the
+  // registry — `GatheringTaskEditView.svelte` alone holds 14 fields, `<label>` and `<div>` hosts
+  // side by side, and it is where four of this conversion's six `:global()` cascade repairs
+  // landed, so a repair that reaches the element but loses the cascade shows up there.
+  // `manager-system-edit-normal` is the frame that renders the corpus's ONE `<fieldset>` field:
+  // `RadioCardGroup` through `ResolutionModeCard`, which that component's own manifest row
+  // already names as its claiming frame.
+  'src/ui/svelte/components/Field.svelte': Object.freeze([
+    'manager-gathering-task-editor-normal',
+    'manager-system-edit-normal',
+  ]),
   // The manager's icon-only button (issue 1422). 36 callers, and the representative pair does
   // reach it — but only ever in its NEUTRAL state. `manager-components-normal` renders
   // `components/ComponentRow.svelte`'s edit pencil and `Pagination`'s two arrows;

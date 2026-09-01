@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../components/Field.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -32,10 +33,10 @@
   }
 </script>
 
-<fieldset
+<Field
+  as="fieldset"
   id={cardId}
-  class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group"
-  class:is-config-cards={configCards}
+  class={`is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}`}
   {disabled}
   data-radio-card-group={dataGroup || undefined}
   {...{ [dataAttr]: dataAttr ? true : undefined }}
@@ -87,4 +88,4 @@
       </label>
     {/each}
   </div>
-</fieldset>
+</Field>

@@ -75,6 +75,7 @@ const harness = createMountedComponentHarness({
     // did. `tests/components/mounted-harness-primitive-allowlist.test.js` is what turned
     // the omission into a failure here rather than a hung suite.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the recipe-tier list and the trigger list are both
     // extended by its `dashed` role now (issue 1096). Manifest only.
     'src/ui/svelte/components/ManagerButton.svelte',

@@ -18,6 +18,7 @@
   untouched form still emits an empty icon and the row falls back to the default.
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
 
@@ -96,7 +97,7 @@
 
 <form class="manager-vocabulary-form" onsubmit={submit} data-inline-vocabulary-add>
   <div class="manager-vocabulary-form-fields">
-    <label class="manager-field" for={inputId}>
+    <Field as="label" for={inputId}>
       <span>{inputLabel}</span>
       <input
         id={inputId}
@@ -106,14 +107,14 @@
         oninput={() => (feedback = '')}
         placeholder={inputPlaceholder}
       />
-    </label>
+    </Field>
     {#if showIcon}
       <!--
         A `<div>`, not a `<label>`: the control is a button that opens the icon popover,
         and a button is not a labelable element, so a wrapping label would name nothing.
         The picker carries its own accessible name through `buttonTitle`.
       -->
-      <div class="manager-field manager-vocabulary-icon-field" data-vocabulary-add-icon>
+      <Field as="div" class="manager-vocabulary-icon-field" data-vocabulary-add-icon="">
         <span>{iconLabel}</span>
         <IconPicker
           value={iconValue.trim() || defaultIcon}
@@ -122,7 +123,7 @@
           buttonTitle={changeIconLabel || iconLabel}
           onChange={(icon) => (iconValue = icon)}
         />
-      </div>
+      </Field>
     {/if}
     <ManagerButton
       role="primary"

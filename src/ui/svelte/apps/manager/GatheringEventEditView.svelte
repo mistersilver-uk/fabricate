@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../components/Field.svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import EmptyState from './EmptyState.svelte';
@@ -304,7 +305,7 @@
         </div>
 
         <div class="manager-task-identity-fields">
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Environment.Events.Name', 'Name')}</span>
             <input
               data-gathering-event-field="name"
@@ -319,8 +320,8 @@
                 )}</span
               >
             {/if}
-          </label>
-          <label class="manager-field">
+          </Field>
+          <Field as="label">
             <span
               >{text('FABRICATE.Admin.Manager.Environment.Events.Description', 'Description')}</span
             >
@@ -329,7 +330,7 @@
               value={event.description || ''}
               oninput={(event) => onUpdateEvent({ description: event.currentTarget.value })}
             ></textarea>
-          </label>
+          </Field>
         </div>
       </div>
     </section>
@@ -350,7 +351,7 @@
       </div>
       <div class="manager-task-availability-row" data-gathering-event-availability>
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
-          <div class="manager-field manager-availability-multi" data-gathering-event-field={kind}>
+          <Field as="div" class="manager-availability-multi" data-gathering-event-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
             <div
               class="manager-availability-picker"
@@ -427,7 +428,7 @@
                 >
               {/if}
             </div>
-          </div>
+          </Field>
         {/each}
       </div>
     </section>
@@ -446,7 +447,7 @@
           </div>
         </div>
         <div class="manager-task-availability-row">
-          <div class="manager-field manager-availability-multi">
+          <Field as="div" class="manager-availability-multi">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Events.DangerTagsField',
@@ -497,7 +498,7 @@
                 {/each}
               </div>
             {/if}
-          </div>
+          </Field>
         </div>
       </section>
 
@@ -514,7 +515,7 @@
           </div>
         </div>
         <div class="manager-task-availability-row">
-          <label class="manager-field manager-drop-rate-editor">
+          <Field as="label" class="manager-drop-rate-editor">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Events.DropRatePercent',
@@ -561,7 +562,7 @@
                 )}</span
               >
             {/if}
-          </label>
+          </Field>
         </div>
       </section>
     </div>

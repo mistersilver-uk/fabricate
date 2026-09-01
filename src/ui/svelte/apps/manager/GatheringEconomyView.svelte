@@ -18,6 +18,7 @@
   getGatheringStaminaState/setGatheringStamina).
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
@@ -338,7 +339,7 @@
         </p>
 
         <div class="manager-economy-regen-grid">
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.MaxStamina', 'Maximum stamina')}</span>
             <input
               type="text"
@@ -350,8 +351,8 @@
               oninput={(e) => updateStamina({ max: e.currentTarget.value })}
               data-economy-stamina-max
             />
-          </label>
-          <label class="manager-field">
+          </Field>
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.StartStamina', 'Starting stamina')}</span>
             <input
               type="text"
@@ -363,7 +364,7 @@
               oninput={(e) => updateStamina({ start: e.currentTarget.value })}
               data-economy-stamina-start
             />
-          </label>
+          </Field>
         </div>
         <p class="manager-economy-card-hint">
           {text(
@@ -376,7 +377,7 @@
           class="manager-economy-regen-grid"
           class:is-single={economy.stamina.regen.policy !== 'overTime'}
         >
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
             <select
               value={economy.stamina.regen.policy}
@@ -393,9 +394,9 @@
                 )}</option
               >
             </select>
-          </label>
+          </Field>
           {#if economy.stamina.regen.policy === 'overTime'}
-            <label class="manager-field">
+            <Field as="label">
               <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
               <select
                 value={economy.stamina.regen.unit}
@@ -408,12 +409,12 @@
                   >
                 {/each}
               </select>
-            </label>
+            </Field>
           {/if}
         </div>
 
         {#if economy.stamina.regen.policy === 'overTime'}
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Amount per interval')}</span
             >
             <input
@@ -426,7 +427,7 @@
               oninput={(e) => updateRegen({ amount: e.currentTarget.value })}
               data-economy-regen-amount
             />
-          </label>
+          </Field>
           <p class="manager-economy-card-hint">
             {text(
               'FABRICATE.Admin.Manager.Economy.RegenAmountHint',

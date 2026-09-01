@@ -60,6 +60,7 @@ const harness = createMountedComponentHarness({
     // renders. Omitting a `.svelte` the tree reaches HANGS the suite (# cancelled).
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). The stamina Add modifier and both
     // Add drop rule controls render it; an omission HANGS the suite (# cancelled).
     'src/ui/svelte/components/ManagerButton.svelte',

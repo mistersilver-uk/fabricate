@@ -15,6 +15,7 @@
   the same way: the World rail states the scope itself now.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { tick } from 'svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
@@ -228,9 +229,10 @@
             {#if open}
               <div class="manager-prerequisite-body" id={`prerequisite-body-${entry.id}`}>
                 <div class="manager-prerequisite-name-row">
-                  <div
-                    class="manager-field manager-prerequisite-icon-field"
-                    data-prerequisite-icon-field
+                  <Field
+                    as="div"
+                    class="manager-prerequisite-icon-field"
+                    data-prerequisite-icon-field=""
                   >
                     <span
                       >{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Icon', 'Icon')}</span
@@ -244,8 +246,8 @@
                       triggerClass="manager-prerequisite-icon-trigger"
                       onChange={(iconClass) => onUpdate(entry.id, { icon: iconClass })}
                     />
-                  </div>
-                  <label class="manager-field manager-prerequisite-name-field">
+                  </Field>
+                  <Field as="label" class="manager-prerequisite-name-field">
                     <span
                       >{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Name', 'Name')}</span
                     >
@@ -255,14 +257,14 @@
                       data-prerequisite-name
                       oninput={(event) => onUpdate(entry.id, { name: event.currentTarget.value })}
                     />
-                  </label>
+                  </Field>
                 </div>
 
                 <span class="manager-prerequisite-condition-label">
                   {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Condition', 'Condition')}
                 </span>
                 <div class="manager-prerequisite-condition">
-                  <label class="manager-field manager-prerequisite-path">
+                  <Field as="label" class="manager-prerequisite-path">
                     <span class="visually-hidden">
                       {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Path', 'Property path')}
                     </span>
@@ -276,8 +278,8 @@
                         oninput={(event) => onUpdate(entry.id, { path: event.currentTarget.value })}
                       />
                     </div>
-                  </label>
-                  <label class="manager-field manager-prerequisite-operator">
+                  </Field>
+                  <Field as="label" class="manager-prerequisite-operator">
                     <span class="visually-hidden">
                       {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Operator', 'Operator')}
                     </span>
@@ -294,9 +296,9 @@
                         >
                       {/each}
                     </select>
-                  </label>
+                  </Field>
                   {#if !isValuelessOperator(entry.op)}
-                    <label class="manager-field manager-prerequisite-value">
+                    <Field as="label" class="manager-prerequisite-value">
                       <span class="visually-hidden">
                         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Value', 'Value')}
                       </span>
@@ -308,7 +310,7 @@
                         oninput={(event) =>
                           onUpdate(entry.id, { value: event.currentTarget.value })}
                       />
-                    </label>
+                    </Field>
                   {/if}
                 </div>
                 <p class="manager-muted manager-prerequisite-note">
