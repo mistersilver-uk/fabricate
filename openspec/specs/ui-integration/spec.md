@@ -1178,9 +1178,14 @@ Component import warnings:
 
 Only shown when essences are enabled.
 
+**IDENTITY IS NOT AUTHORED AT SYSTEM SCOPE.**
+An essence's name, glyph, colour and description belong to its WORLD record, which every crafting system holding the essence resolves the same one of, so the system-scope Essence Rules editor renders no control that writes them — see `### GM World Essence Screens` requirement 10.
+The identity capabilities below are the WORLD essence entry editor's, and the system-scope route reaches them only through that editor.
+The one surface at system scope that still authors identity is a CREATE draft, whose in-system record is the only record there is and which therefore has no shared definition to contradict.
+
 Capabilities:
 
-- Browse, create, edit, duplicate when supported, and delete essence definitions.
+- Browse, create, duplicate when supported, and delete essence definitions; edit an essence's PER-SYSTEM rules in the system-scope editor and its SHARED identity in the world essence entry editor.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
 - Set an optional colour for an essence, chosen from the shared token palette with custom hex entry disabled.
   The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
@@ -1220,7 +1225,7 @@ Capabilities:
   The editor's icon control is one column: the preview tile fills that column's width and the picker and its reset sit inside the same edge, so no control overhangs the tile it belongs to.
   The tile's glyph is sized for the tile rather than inheriting the shared row-medallion glyph size, which reads as a speck at editor scale.
 - Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
-  The essence editor's On-craft tab gates its Active effect source section on `features.effectTransfer` and its property macro section on `features.propertyMacros`.
+  The essence editor's behaviour tab — `Essence rules` in the system-scope editor, `On craft` in a create draft — gates its Active effect source section on `features.effectTransfer` and its macro section on `features.propertyMacros`.
   With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
 - A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
   Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.
@@ -1974,6 +1979,9 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
    The shared list model offers three for a system-scope list; this screen offers two, because "not in this system" alone is a list a GM can only add from, and "all" already contains it with the members for context.
 5. **The System Essence Rules editor renders the shared inherit row over `effectSource` and `macro` and LOCKS the corresponding value card read-only while that section is inherited**, so the editor never presents an edit affordance for a value the system does not own.
    Turning that section's switch off is the one action that unlocks it.
+   Each switch is rendered INSIDE the value card it governs, between that card's explanation and its value, because the switch decides whether the value below it is this system's to change and a GM reading a locked value must find the control that unlocks it without leaving the card.
+   Its head states which way it is set and names the system (`Overridden for <system>` / `Inheriting the world default`) rather than repeating the section name the card's own title carries one line above it, and its note states both what the section resolves to now and what the switch would change that to.
+   A LOCKED value renders as a read-only tile carrying the resolved value's name, its address, and a `World default` marker — never as a drop target, because a drop target is an edit affordance.
    With no membership record at all the editor states the block and offers the one action that fixes it, because nothing in that system reads any value the editor could otherwise present.
 6. **Neither essence screen renders a copy-provenance stamp**, because `copyMembership` writes none and normalization would discard one.
 7. **The System Essence Rules list row's edit affordance is LABELLED and marked as leaving the screen**, carrying the words `Edit rules` and the outbound `fa-arrow-up-right-from-square` glyph rather than a bare pencil.
@@ -1988,6 +1996,19 @@ They are stated here rather than left to `### Scoped entity editor patterns` bec
    The System Essence Rules bar reads `{shown} shown · {members} of {total} in this system`, which is the one count no other control on the screen answers; it falls back to the page range when the world corpus cannot answer membership, because `{members} of {total}` over an unreadable corpus reports every essence as absent from this system, which is false rather than unavailable.
    The range it replaces is rendered verbatim by the pager at the foot of the same list, so the bar was restating it.
    The world essence entry editor renders the shared preview's live-update note; the browser inspector is the one site that suppresses it, because that rail is read-only and has nothing to type into.
+10. **THE SYSTEM ESSENCE RULES EDITOR RENDERS NO IDENTITY CONTROL, AND ITS TAB STRIP IS `Essence rules` AND `Validation`.**
+    Name, glyph, colour and description are the world record's, so a system-scope control that wrote one would rename the essence in every other system holding it from a screen titled with one of them — a model violation rather than a visual divergence, and the reason the shipped Identity tab is removed rather than restyled.
+    The route to those fields is the shared-definition callout's `Edit shared definition`, which opens the world essence entry route on that essence, and it is the ONLY route this screen offers to them.
+    The three-tab editor with its Identity tab survives for a CREATE draft alone, whose in-system record is the only record there is; the moment it is saved the world corpus answers for it and the editor is the two-tab rules screen thereafter.
+11. **The rules tab opens with the SHARED-DEFINITION CALLOUT and closes with the REUSE card, with the per-system enable switch on its own card between them.**
+    The callout carries the essence's own tile and name, a `World definition` marker, the counted sentence saying that name, icon and colour are world vocabulary shared with N other systems while what it does on craft is set here, and the exit above.
+    The enable switch is a card of its own with its own title naming the system — a switch captioned only `Off`, sharing a slab with unrelated controls, states what it is but never what it is off FOR.
+    The reuse card copies this system's effect source and macro into another system's own rules through `copyMembership`, and its copy states that it is a ONE-TIME shortcut and not a live link, because the clone is structural and neither side can reach the other afterwards.
+    Its destination chooser is on this screen because THIS screen knows the source unambiguously — the system whose rules are open — which is the fact the world catalogue's per-system row lacks and the reason that screen renders no copy control at all.
+12. **The page header names the essence and the layer.**
+    The route heads with the essence's medallion, its name, and `<system> rules · enabled | disabled`, with the editor action pair right-aligned beside it; the breadcrumb's leaf is the essence's name, following the recipe and component editors' rule rather than a generic `Edit essence`.
+    The Save verb reads `Save rules`, because the identity the word "essence" names is a world record this route cannot write.
+    The enabled half of the subline follows the DRAFT, because the switch that changes it is buffered and a subline pinned to disk would contradict the card below it until Save.
 
 ### Scoped entity editor patterns
 
