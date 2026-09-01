@@ -5824,20 +5824,35 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
+  // THE ROW'S EDIT CONTROL IS SELECTED BY ITS DATA HOOK, NOT BY A CLASS. Prototype parity
+  // (issue 1373) replaced the pen icon - a `.manager-icon-button`, the shared square glyph
+  // button - with the design's labelled `Edit rules` button, which renders
+  // `class="manager-tools-edit-rules" data-tool-edit-rules={entry.id}`. Classes churn under
+  // design-system refactors and this row has now lost two of them; `data-tool-edit-rules`
+  // is the hook the component states it exists to be selected by, and it carries the Tool's
+  // own id, so every later lookup in this phase is an identity lookup rather than a
+  // descendant-of-a-row lookup.
   const editButton = row.locator('[data-tool-edit-rules]');
   await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection');
   await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle');
   await assertPointerTarget(page, editButton, '[data-tool-edit-rules]', 'Tool Edit');
-  const otherSelectTarget = visibleToolRows.nth(1).locator('.manager-tools-select-target');
+  // ROW TWO IS ONLY HOW A SECOND TOOL IS PICKED, NOT HOW IT IS ADDRESSED. The walk reads
+  // the id off the second row once and resolves that Tool by identity everywhere after,
+  // including the 680px pass further down - which runs after the library has been emptied,
+  // repopulated and re-sorted twice. A positional re-read there silently retargets the
+  // moment a sort default, a page size or the membership filter moves the row, which is
+  // exactly the class of breakage the `:first-child` selection checks already cost a run.
   const otherToolId = await visibleToolRows.nth(1).getAttribute('data-manager-tool-id');
   if (!otherToolId) throw new Error('Tool Studio alternate row has no Tool ID');
+  const otherRow = manager.locator(`[data-manager-tool-id="${otherToolId}"]`);
+  const otherSelectTarget = otherRow.locator('.manager-tools-select-target');
   await withSingleToolDraftTransition(
     page,
     otherToolId,
     'Tool alternate-row selection',
     () => otherSelectTarget.click(),
     async () => {
-      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+      if (!(await otherRow.evaluate((element) => element.classList.contains('is-selected')))) {
         throw new Error('Tool alternate-row selection did not expose selected state');
       }
     },
@@ -6016,9 +6031,9 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     page,
     otherToolId,
     'Tool 680px alternate-row selection',
-    () => visibleToolRows.nth(1).locator('.manager-tools-select-target').click(),
+    () => otherSelectTarget.click(),
     async () => {
-      if (!(await visibleToolRows.nth(1).evaluate((element) => element.classList.contains('is-selected')))) {
+      if (!(await otherRow.evaluate((element) => element.classList.contains('is-selected')))) {
         throw new Error('Tool 680px alternate-row selection did not expose selected state');
       }
     },
@@ -6057,7 +6072,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     () => enabledToggle.click(),
     () => waitForToolEnabledState(page, systemId, fixture.toolId, persistedEnabledBefore680),
   );
-  await assertPointerTarget(page, editButton, '.manager-icon-button', 'Tool Edit at 680px');
+  await assertPointerTarget(page, editButton, '[data-tool-edit-rules]', 'Tool Edit at 680px');
   await withSingleToolDraftTransition(
     page,
     fixture.toolId,
@@ -6325,7 +6340,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   );
   await requireSingleLocator(manager, 'live Fabricate manager before check-driven Edit');
   const checkDrivenEditButton = await requireSingleLocator(
-    manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`),
+    manager.locator(`[data-tool-edit-rules="${fixture.toolId}"]`),
     'check-driven Tool Edit button',
   );
   await withSingleToolDraftTransition(
@@ -6372,7 +6387,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     page,
     fixture.toolId,
     'tool-specific Tool Edit route',
-    () => manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click(),
+    () => manager.locator(`[data-tool-edit-rules="${fixture.toolId}"]`).click(),
     () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
   );
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'tool-specific Tool Breakage tab');
@@ -6488,7 +6503,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertPointerTarget(page, editor.locator('[data-tool-editor-back]'), '[data-tool-editor-back]', 'Tool Back at 900px');
   await editor.locator('[data-tool-editor-back]').click();
   await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
-  await manager.locator(`[data-manager-tool-id="${fixture.toolId}"] .manager-icon-button`).click();
+  await manager.locator(`[data-tool-edit-rules="${fixture.toolId}"]`).click();
   await editorManager.waitFor({ state: 'visible', timeout: 5_000 });
   await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements restore at 900px');
 
