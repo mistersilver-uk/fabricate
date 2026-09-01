@@ -21,6 +21,11 @@ import { fileURLToPath } from 'node:url';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import {
+  TOOL_TREE_COMPILED_MODULES,
+  TOOL_TREE_RAW_MODULES,
+  WORLD_TOOL_SCOPE_RAW_MODULES,
+} from '../helpers/toolMountModules.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -30,48 +35,31 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-world-tool-catalogue-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
   rawModules: [
-    'src/config/flags.js',
-    'src/migration/worldScopeEntityGrouping.js',
-    'src/models/Ingredient.js',
-    'src/models/IngredientGroup.js',
-    'src/models/Tool.js',
-    'src/models/match/matchTypes.js',
-    'src/models/reconstructibleDefaults.js',
-    'src/models/toolDisplay.js',
-    'src/systems/componentScope.js',
-    'src/systems/essenceScope.js',
-    'src/systems/scopedDefinitionStore.js',
-    'src/systems/scopedDefinitions.js',
-    'src/systems/toolScope.js',
+    ...TOOL_TREE_RAW_MODULES,
+    ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // THE DROP ZONE'S TWO LEAVES (issue 1373). The catalogue now renders `ItemDropZone`, whose
     // `use:dragDrop` action and `resolveDropUuid` helper are ordinary modules: a compiled child
     // missing from this list does not fail loudly, it HANGS, and `node --test` reports the
     // whole suite as `# cancelled` with no message.
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
-    'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
-    'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
-    'src/ui/svelte/apps/manager/tools/toolStudio.js',
-    'src/ui/svelte/stores/worldScopeProjection.js',
-    'src/ui/svelte/util/foundryBridge.js',
+    // The list model this page's rows, pager and bulk bar are derived from.
     'src/utils/browserPagination.js',
     'src/utils/bulkSelectionModel.js',
     'src/utils/scopedEntityListModel.js',
   ],
   compiledModules: [
+    ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',

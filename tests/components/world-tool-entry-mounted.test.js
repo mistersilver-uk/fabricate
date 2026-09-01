@@ -22,6 +22,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  TOOL_TREE_COMPILED_MODULES,
+  TOOL_TREE_RAW_MODULES,
+  WORLD_TOOL_SCOPE_RAW_MODULES,
+} from '../helpers/toolMountModules.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -31,33 +36,20 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-world-tool-entry-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
   rawModules: [
-    'src/config/flags.js',
-    'src/migration/worldScopeEntityGrouping.js',
-    'src/models/Ingredient.js',
-    'src/models/IngredientGroup.js',
-    'src/models/Tool.js',
-    'src/models/match/matchTypes.js',
-    'src/models/reconstructibleDefaults.js',
-    'src/models/toolDisplay.js',
-    'src/systems/componentScope.js',
-    'src/systems/essenceScope.js',
-    'src/systems/scopedDefinitionStore.js',
-    'src/systems/scopedDefinitions.js',
-    'src/systems/toolScope.js',
+    ...TOOL_TREE_RAW_MODULES,
+    ...WORLD_TOOL_SCOPE_RAW_MODULES,
+    // The BUFFERED edit this page stages into, and the four leaves its breakage tab authors a
+    // value with: the stepper's accessible names, the chance slider's colour scale and tier
+    // labels, and the rollability predicate the formula field proves a value with.
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
-    'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
-    'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
-    'src/ui/svelte/apps/manager/tools/toolStudio.js',
     'src/ui/svelte/components/stepperLabels.js',
-    'src/ui/svelte/stores/worldScopeProjection.js',
     'src/ui/svelte/util/chanceColorScale.js',
     'src/ui/svelte/util/dropRateTier.js',
-    'src/ui/svelte/util/foundryBridge.js',
     'src/utils/rollFormulaRollability.js',
   ],
   compiledModules: [
+    ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
@@ -66,8 +58,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
-    'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
   ],
 });

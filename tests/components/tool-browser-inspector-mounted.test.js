@@ -21,6 +21,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { TOOL_TREE_COMPILED_MODULES, TOOL_TREE_RAW_MODULES } from '../helpers/toolMountModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -28,23 +29,13 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tool-browser-inspector-',
   componentPath: 'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
-  rawModules: [
-    'src/config/flags.js',
-    'src/models/Ingredient.js',
-    'src/models/IngredientGroup.js',
-    'src/models/Tool.js',
-    'src/models/match/matchTypes.js',
-    'src/models/reconstructibleDefaults.js',
-    'src/models/toolDisplay.js',
-    'src/ui/svelte/apps/manager/tools/toolStudio.js',
-    'src/ui/svelte/util/foundryBridge.js',
-  ],
+  // The panel is fed a system's own library row, so it needs the Tool model closure and
+  // nothing of the world scope stack the two catalogue screens project through.
+  rawModules: [...TOOL_TREE_RAW_MODULES],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
   ],
 });
 
