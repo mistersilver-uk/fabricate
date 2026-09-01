@@ -888,3 +888,67 @@ test('A6 checks a NON-ASCII conflicted path rather than silently skipping it', (
   assert.match(output, /marking a difference that was never resolved/);
   assert.match(output, /caf\u00e9\.txt/, 'the path must be named unquoted, as git records it');
 });
+
+// ── 24 ──────────────────────────────────────────────────────────────────────────────────────────
+
+test('A5 decides composed paths on BLOBS, so a mode-only change does not open a settled path', (t) => {
+  const harness = createGateHarness(t);
+  const { git, write } = harness;
+  // fileMode OFF, deliberately. Windows has no execute bit, so with it ON git reads a phantom mode
+  // change on every checkout and the fixture's merge aborts with "local changes would be
+  // overwritten" — a non-conflict failure, not the conflict this test needs. OFF, git trusts the
+  // index, so `update-index --chmod` records 100755 and the merge conflicts only where intended.
+  git('config', 'core.fileMode', 'false');
+
+  // `git diff --name-only` compares whole tree ENTRIES — mode as well as oid. A path whose MODE
+  // changed on one line and whose CONTENT changed on the other therefore differs from both parents'
+  // entries, while git merged its content cleanly and composed nothing. Decided on entries, such a
+  // path enters the permitted set and a resolution may revert it — silently dropping what the
+  // release line was bringing back, on a path no human ever had to look at. Decided on blobs, as the
+  // rule is stated, it stays out.
+  write('f.txt', fileWith({}));
+  write('run.sh', '#!/bin/sh\necho hi\n');
+  git('add', '-A');
+  git('commit', '-qm', 'chore: the shared base');
+  const base = git('rev-parse', 'HEAD');
+
+  write('f.txt', fileWith({ 5: 'main took this line' }));
+  git('add', 'f.txt');
+  git('update-index', '--chmod=+x', 'run.sh'); // MODE only: main never touches its content.
+  git('commit', '-qm', 'feat: something on main');
+  const mainTip = git('rev-parse', 'HEAD');
+
+  git('checkout', '-q', '--force', '-b', 'release', base);
+  write('f.txt', fileWith({ 5: 'release took the same line' }));
+  write('run.sh', '#!/bin/sh\necho hi\necho THE_HOTFIX\n'); // CONTENT only.
+  git('add', '-A');
+  git('commit', '-qm', 'fix: the same line, differently');
+  const releaseTip = git('rev-parse', 'HEAD');
+
+  git('checkout', '-q', '--force', 'main');
+  git('update-ref', 'refs/remotes/origin/main', mainTip);
+  git('update-ref', 'refs/remotes/origin/release', releaseTip);
+
+  // Resolve the genuine conflict honestly, then ALSO revert run.sh to main's content — dropping the
+  // hotfix line git had already merged in cleanly. That second edit is what must be refused.
+  const resolution = resolveConflictInto(harness, () => {
+    write('f.txt', fileWith({ 5: 'release took the same line' }));
+    write('run.sh', '#!/bin/sh\necho hi\n');
+  });
+  git('reset', '--hard', '-q', mainTip);
+  completeMergeAs(harness, {
+    tree: git('rev-parse', `${resolution}^{tree}`),
+    parents: [mainTip, releaseTip],
+  });
+
+  harness.stub('gh', answering(associationPayload()));
+  const { status, output } = harness.runGate({
+    RESOLUTION_REF: resolution,
+    RESOLUTION_EFFECT: 'content-onto-main',
+    ALLOW_CONTENT: 'true',
+  });
+
+  assert.equal(status, 1, output);
+  assert.match(output, /alters content the two lines could be combined on automatically/);
+  assert.match(output, /run\.sh/);
+});

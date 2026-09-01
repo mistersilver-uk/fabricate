@@ -213,7 +213,10 @@ merge_content_status() {
 # failing command therefore does not end the script — it carries on with an empty variable, which is
 # the fail-open direction, so each read is checked explicitly rather than trusted to abort.
 resolution_blob_oid() {
-  git ls-tree "$1" -- "$2" | awk '{print $3}'
+  # `$2` is the entry TYPE, and only a blob is answerable here. A tree or a gitlink would otherwise
+  # yield an oid that `git cat-file blob` cannot read, and the `|| true` on the marker pipeline would
+  # turn that failure into a count of zero — the same skip-shaped fail-open as an unreadable path.
+  git ls-tree "$1" -- "$2" | awk '$2 == "blob" {print $3}'
 }
 
 # True when a tree-ish genuinely records nothing at a path, as distinct from a lookup that returned
@@ -237,11 +240,33 @@ resolution_blob_lines() {
 
 # The union described above, one path per line, sorted and unique.
 resolution_permitted_paths() {
-  local conflict_tree="$1" main_commit="$2" release_commit="$3" stage_paths="$4"
+  local conflict_tree="$1" main_commit="$2" release_commit="$3" stage_paths="$4" path composed
+  local candidates
+  # Fed by a here-string rather than `done < <(…)`, deliberately: a source-contract assertion bans
+  # that construct outright, because the evidence loop further down must be driven by the commit
+  # listing the verifier is given rather than by a second git invocation over the same range. The
+  # ban is worth more than the convenience, so the candidate list is materialised first.
+  candidates="$(LC_ALL=C comm -12 \
+    <(git diff --name-only "${main_commit}^{tree}" "$conflict_tree" | LC_ALL=C sort -u) \
+    <(git diff --name-only "${release_commit}^{tree}" "$conflict_tree" | LC_ALL=C sort -u))"
   {
-    LC_ALL=C comm -12 \
-      <(git diff --name-only "${main_commit}^{tree}" "$conflict_tree" | LC_ALL=C sort -u) \
-      <(git diff --name-only "${release_commit}^{tree}" "$conflict_tree" | LC_ALL=C sort -u)
+    # The composed half is decided on BLOB oids, not on what `git diff --name-only` reports.
+    # `git diff` compares whole tree ENTRIES — mode as well as oid — so a path whose mode changed on
+    # one line and whose CONTENT changed on the other yields a merged entry differing from both
+    # parents' entries while its content merged cleanly and was composed of nothing. Reported as
+    # composed, such a path enters the permitted set, and a resolution may then take the other side's
+    # blob and silently drop what the release line was bringing back — on a path no human ever had to
+    # look at. The candidate list still comes from `git diff`, which is cheap and a superset; each
+    # candidate is then confirmed against the blobs themselves.
+    while IFS= read -r path; do
+      [ -n "$path" ] || continue
+      composed="$(resolution_blob_oid "$conflict_tree" "$path")"
+      [ -n "$composed" ] || continue
+      if [ "$composed" != "$(resolution_blob_oid "${main_commit}^{tree}" "$path")" ] &&
+        [ "$composed" != "$(resolution_blob_oid "${release_commit}^{tree}" "$path")" ]; then
+        printf '%s\n' "$path"
+      fi
+    done <<<"$candidates"
     printf '%s\n' "$stage_paths"
   } | sed '/^$/d' | LC_ALL=C sort -u
 }

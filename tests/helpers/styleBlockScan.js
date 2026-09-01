@@ -5,8 +5,9 @@
  * Svelte scoped `<style>` blocks are unreachable by stylelint — which is to say the half of
  * the corpus most likely to drift is entirely unlinted. Any gate that wants to police a CSS
  * VALUE therefore has to read both corpora itself, and this is the shared way to do it. Its
- * first customer is `tests/components/control-height-ladder.test.js`; the spacing/px gate is
- * the stated second.
+ * first customer is `tests/components/control-height-ladder.test.js`; its second, and the reason
+ * {@link scanPixelDeclarations} exists under {@link scanPixelValues}, is
+ * `tests/components/spacing-scale-ratchet.test.js`.
  *
  * ── WHY IT RESOLVES `var()` AT ALL ──────────────────────────────────────────────────────
  * A value gate matches on TEXT, so a banned literal written into a custom property and read
@@ -109,13 +110,18 @@ export const MAX_VAR_CHAIN_DEPTH = 8;
  *
  * That is not a defect here — this gate scans heights, and a value gate should scan the
  * properties it means to police rather than everything — but it is the fact the stated second
- * customer has to plan around, so it is recorded rather than left to be discovered by a throw.
+ * customer had to plan around, so it is recorded rather than left to be discovered by a throw.
  *
  * Read what it bounds precisely: it is NOT a bound on the candidate set. `expandFrontier` runs
  * this expansion over every text in the frontier, so a round can grow the frontier by up to this
  * factor and there are up to `maxDepth` rounds. Single-token heights make that distinction inert
  * — one reference, a handful of definitions — but `padding: var(--a) var(--b) var(--c) var(--d)`
- * is four references in one value, which is exactly the shape the spacing gate will bring.
+ * is four references in one value, which is exactly the shape the spacing gate brings.
+ *
+ * MEASURED for that gate too, now it exists: over the 3379 spacing declarations, resolving with
+ * every definition visible reaches depth 1 and throws nothing, and resolving with the published
+ * spacing scale held opaque expands nothing at all. Both sit far under this cap, so the shape
+ * the paragraph above anticipated is real but is not, in this corpus, near the bound.
  */
 const MAX_VALUE_CANDIDATES = 512;
 
@@ -630,14 +636,14 @@ export function pixelValuesIn(text) {
  * order to adjudicate a row whose source line holds no pixel value at all.
  *
  * @param {readonly string[]} candidates
- * @param {Set<number>} banned
+ * @param {(pixels: number) => boolean} accept
  * @returns {Array<[number, string]>} ascending by value.
  */
-function shortestCarriers(candidates, banned) {
+function shortestCarriers(candidates, accept) {
   const carriers = new Map();
   for (const candidate of candidates) {
     for (const pixels of pixelValuesIn(candidate)) {
-      if (!banned.has(pixels)) continue;
+      if (!accept(pixels)) continue;
       const held = carriers.get(pixels);
       if (held === undefined || candidate.length < held.length) carriers.set(pixels, candidate);
     }
@@ -665,16 +671,38 @@ function propertyKey(name) {
 }
 
 /**
- * Scan a corpus for declarations of `properties` carrying any of `values` in pixels, through
+ * Scan a corpus for declarations of `properties` carrying a pixel value `accept` wants, through
  * `var()`.
  *
  * Property matching folds case on BOTH sides — see {@link propertyKey} — so widening
  * {@link DECLARATION} to extract an uppercase spelling actually reaches this far.
  *
+ * ── WHY `accept` IS A PREDICATE AND NOT A LIST ──────────────────────────────────────────
+ * The first customer bans three named heights, so a `Set` was the whole of it. The second — the
+ * spacing ratchet in `tests/components/spacing-scale-ratchet.test.js` — bans EVERY pixel literal
+ * in `padding`/`margin`/`gap` except two exempt bands, and enumerating "every number except
+ * |N|=1 and 34..42" as a list means choosing a ceiling, which is a silent bypass the day someone
+ * writes a bigger one. {@link scanPixelValues} keeps the list-shaped API for the callers that
+ * want it and delegates here.
+ *
+ * ── WHY A DEFINITION CAN BE HELD OPAQUE ─────────────────────────────────────────────────
+ * Resolution exists so a literal moved into a token is still seen (see the header). For a gate
+ * whose banned set is narrow that is a pure gain. For a gate that bans ALL literals it is not:
+ * `padding: var(--fab-space-3)` resolves to `12px`, and a scan that counts that has flagged the
+ * exact thing the spec asks for. Measured on this corpus: 2989 spacing occurrences with every
+ * token substitutable against 1005 with the published scale held opaque, so the difference is
+ * not a rounding error — it is the whole sanctioned population.
+ *
+ * `opaqueProperty` names the definitions the caller treats as an ALLOWED indirection. A held
+ * name simply has no definition to substitute, so `expandOnce` leaves the `var()` text standing
+ * and the walk terminates there. Its fallback, if written, is still a candidate: `var(--x, 12px)`
+ * puts a literal on the line whether or not `--x` is opaque, and a text scan would count it.
+ *
  * @param {object} options
  * @param {Record<string, string>} options.corpus From {@link collectStyleCorpus}.
  * @param {readonly string[]} options.properties Properties to scan, e.g. `['height']`.
- * @param {readonly number[]} options.values Pixel values to find, e.g. `[32, 36, 40]`.
+ * @param {(pixels: number) => boolean} options.accept Which pixel values are findings.
+ * @param {(name: string) => boolean} [options.opaqueProperty] Custom properties NOT substituted.
  * @param {number} [options.maxDepth]
  * @returns {{
  *   occurrences: Array<{file: string, line: number, property: string, value: number,
@@ -686,10 +714,19 @@ function propertyKey(name) {
  *   shortest candidate text actually carrying the value, which for an indirect hit is a text
  *   the source line does not contain.
  */
-export function scanPixelValues({ corpus, properties, values, maxDepth = MAX_VAR_CHAIN_DEPTH }) {
+export function scanPixelDeclarations({
+  corpus,
+  properties,
+  accept,
+  opaqueProperty,
+  maxDepth = MAX_VAR_CHAIN_DEPTH,
+}) {
   const wanted = new Set([...properties].map(propertyKey));
-  const banned = new Set(values);
-  const definitions = definitionsFor(corpus);
+  const visible = definitionsFor(corpus);
+  const definitions =
+    opaqueProperty === undefined
+      ? visible
+      : new Map([...visible].filter(([name]) => !opaqueProperty(name)));
   const declarations = [];
   const occurrences = [];
   const capReached = [];
@@ -702,7 +739,7 @@ export function scanPixelValues({ corpus, properties, values, maxDepth = MAX_VAR
       const resolution = resolveValueCandidates(declaration.value, definitions, { maxDepth });
       observedDepth = Math.max(observedDepth, resolution.depth);
       if (resolution.capReached) capReached.push(`${file}:${declaration.line}`);
-      for (const [value, resolved] of shortestCarriers(resolution.candidates, banned)) {
+      for (const [value, resolved] of shortestCarriers(resolution.candidates, accept)) {
         occurrences.push({
           file,
           line: declaration.line,
@@ -716,4 +753,28 @@ export function scanPixelValues({ corpus, properties, values, maxDepth = MAX_VAR
   }
 
   return { occurrences, declarations, maxDepth: observedDepth, capReached };
+}
+
+/**
+ * Scan a corpus for declarations of `properties` carrying any of `values` in pixels, through
+ * `var()`.
+ *
+ * The named-values spelling of {@link scanPixelDeclarations}, kept because a closed prohibition
+ * — "32, 36 and 40 are retired" — reads as the list it is rather than as a predicate over it.
+ *
+ * @param {object} options
+ * @param {Record<string, string>} options.corpus From {@link collectStyleCorpus}.
+ * @param {readonly string[]} options.properties Properties to scan, e.g. `['height']`.
+ * @param {readonly number[]} options.values Pixel values to find, e.g. `[32, 36, 40]`.
+ * @param {number} [options.maxDepth]
+ * @returns {ReturnType<typeof scanPixelDeclarations>}
+ */
+export function scanPixelValues({ corpus, properties, values, maxDepth = MAX_VAR_CHAIN_DEPTH }) {
+  const banned = new Set(values);
+  return scanPixelDeclarations({
+    corpus,
+    properties,
+    accept: (pixels) => banned.has(pixels),
+    maxDepth,
+  });
 }
