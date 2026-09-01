@@ -976,6 +976,18 @@ function endOfOpeningTag(source, from) {
 }
 
 /**
+ * Container classes a shared primitive emits itself, mapped to the tag that emits them.
+ *
+ * One entry as this lands. It is a mapping rather than a fallback because the two things it
+ * distinguishes must not be conflated: a class WRITTEN in a calling file is found by the marker
+ * below, and a class a CHILD COMPONENT emits can only be found by its tag. Nothing derives this
+ * automatically, so a second bar-shaped primitive needs a line here —
+ * `tests/components/manager-filter-bar-source-contract.test.js` is what makes that visible, by
+ * refusing a raw element carrying the class anywhere else.
+ */
+const CONTAINER_PRIMITIVES = Object.freeze({ 'manager-toolbar': 'ManagerToolbar' });
+
+/**
  * Every region of `source` enclosed by an element whose class list holds `containerClass`.
  *
  * Bounded to that element, by walking its own tag name to a matching close rather than to the
@@ -987,18 +999,34 @@ function endOfOpeningTag(source, from) {
  * `manager-tool-edit-actions` in the Tool Studio — and an exact-string match would silently
  * report the authority screen as rendering none of the buttons the rule types.
  *
+ * A container class may live on a COMPONENT TAG rather than in a `class` attribute, and
+ * {@link CONTAINER_PRIMITIVES} is what keeps this readable across that boundary (issue 1039).
+ * `ComponentsBrowserView` renders `<ManagerToolbar class="manager-component-toolbar">`, so the
+ * literal `manager-toolbar` the rule names is emitted by the primitive and appears nowhere in
+ * the calling file. Without the mapping this walk finds no region, books zero buttons, and reds
+ * a rule whose population has not changed at all — which reads as "the rule went dead" rather
+ * than "the container became a component".
+ *
  * @param {string} source component source text
  * @param {string} containerClass the container's own class token
  * @returns {Array<string>} the inner text of each occurrence of that container
  */
 function regionsInside(source, containerClass) {
   const regions = [];
-  const marker = new RegExp(String.raw`class="[^"]*\b${containerClass}\b[^"]*"`, 'g');
+  const owner = CONTAINER_PRIMITIVES[containerClass];
+  // Both boundaries as lookarounds, never `\b`: `\b` matches before a hyphen AND after one, so a
+  // `\b`-delimited `manager-toolbar` matches `manager-toolbar-pills` and `fab-manager-toolbar`.
+  const marker = new RegExp(
+    owner
+      ? String.raw`class="[^"]*(?<![\w-])${containerClass}(?![\w-])[^"]*"|<${owner}[\s/>]`
+      : String.raw`class="[^"]*(?<![\w-])${containerClass}(?![\w-])[^"]*"`,
+    'g'
+  );
   for (let hit = marker.exec(source); hit; hit = marker.exec(source)) {
-    const open = source.lastIndexOf('<', hit.index);
+    const open = hit[0].startsWith('<') ? hit.index : source.lastIndexOf('<', hit.index);
     const tag = /^<([a-zA-Z][\w-]*)/.exec(source.slice(open))?.[1];
     if (!tag) continue;
-    const cursor = endOfOpeningTag(source, hit.index);
+    const cursor = endOfOpeningTag(source, open);
     if (cursor < 0) continue;
     const boundary = new RegExp(String.raw`<${tag}\b|</${tag}>`, 'g');
     boundary.lastIndex = cursor;

@@ -18,6 +18,8 @@
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     environments = [],
@@ -717,25 +719,18 @@
       role="tabpanel"
       aria-labelledby="manager-gathering-nav-environments"
     >
-      <section
-        class="manager-toolbar manager-environments-toolbar"
-        aria-label={text('FABRICATE.Admin.Manager.Environment.Filters', 'Environment filters')}
+      <ManagerToolbar
+        class="manager-environments-toolbar"
+        ariaLabel={text('FABRICATE.Admin.Manager.Environment.Filters', 'Environment filters')}
       >
-        <label class="manager-search">
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <input
-            type="search"
-            bind:value={searchTerm}
-            placeholder={text(
-              'FABRICATE.Admin.Manager.Environment.SearchPlaceholder',
-              'Search environments...'
-            )}
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Environment.SearchLabel',
-              'Search environments'
-            )}
-          />
-        </label>
+        <ManagerSearchField
+          bind:value={searchTerm}
+          placeholder={text(
+            'FABRICATE.Admin.Manager.Environment.SearchPlaceholder',
+            'Search environments...'
+          )}
+          ariaLabel={text('FABRICATE.Admin.Manager.Environment.SearchLabel', 'Search environments')}
+        />
         <label class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <select
@@ -842,7 +837,7 @@
             <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
           </ManagerButton>
         {/if}
-      </section>
+      </ManagerToolbar>
 
       <section
         class="manager-table-scroll"

@@ -9,6 +9,8 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     tasks = [],
@@ -243,25 +245,21 @@
   aria-labelledby={labelledBy}
   data-gathering-tasks-browser
 >
-  <section
-    class="manager-toolbar manager-task-toolbar"
-    aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.Filters', 'Gathering task filters')}
+  <ManagerToolbar
+    class="manager-task-toolbar"
+    ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.Filters', 'Gathering task filters')}
   >
-    <label class="manager-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        bind:value={searchTerm}
-        placeholder={text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.SearchPlaceholder',
-          'Search gathering tasks...'
-        )}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.SearchLabel',
-          'Search gathering tasks'
-        )}
-      />
-    </label>
+    <ManagerSearchField
+      bind:value={searchTerm}
+      placeholder={text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.SearchPlaceholder',
+        'Search gathering tasks...'
+      )}
+      ariaLabel={text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.SearchLabel',
+        'Search gathering tasks'
+      )}
+    />
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <select value={statusFilter} onchange={(event) => (statusFilter = event.currentTarget.value)}>
@@ -335,7 +333,7 @@
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </ManagerButton>
     {/if}
-  </section>
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll"

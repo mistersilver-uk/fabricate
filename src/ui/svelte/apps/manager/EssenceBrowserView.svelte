@@ -48,6 +48,8 @@
   } from '../../../../utils/essenceBulkEditModel.js';
   import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     // ── THE WORLD-SCOPE SEAM (issue 1374), READ HERE FROM ISSUE 1372 ────────────────────────
@@ -466,30 +468,26 @@
        pressed, and the manager root puts the keyboard here: an inert element, so Space still
        scrolls, with an accessible name that says where the GM now is and the whole selection
        register one Tab away. The root addresses it through `data-essence-toolbar`. -->
-  <section
-    class="manager-toolbar manager-essence-toolbar"
+  <ManagerToolbar
+    class="manager-essence-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
-    data-essence-toolbar
-    aria-label={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}
+    data-essence-toolbar=""
+    ariaLabel={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}
   >
     <div class="manager-essence-filter-row">
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          value={searchTerm}
-          oninput={(event) => {
-            ui.searchTerm = event.currentTarget.value;
-            ui.pageIndex = 0;
-          }}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Essence.SearchPlaceholder',
-            'Search essences...'
-          )}
-          aria-label={text('FABRICATE.Admin.Manager.Essence.SearchLabel', 'Search essences')}
-        />
-      </label>
+      <ManagerSearchField
+        value={searchTerm}
+        onInput={(next) => {
+          ui.searchTerm = next;
+          ui.pageIndex = 0;
+        }}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Essence.SearchPlaceholder',
+          'Search essences...'
+        )}
+        ariaLabel={text('FABRICATE.Admin.Manager.Essence.SearchLabel', 'Search essences')}
+      />
       <!-- NO STATUS SEGMENT AND NO SOURCE SELECT (issue 1372, maintainer parity round 8).
 
            The reference's bar carries ONE filter — the membership pair below — beside the search
@@ -683,7 +681,7 @@
       onSelectAllResults={selectAllResults}
       onClear={clearBulkSelection}
     />
-  </section>
+  </ManagerToolbar>
 
   <!-- The paginated rows/columns are the shared `LibraryShelf`: the scroll section, the two
        empty states, the list-or-grid `<ul>` and the pager, which all four studios re-derived.

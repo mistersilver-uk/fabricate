@@ -14,6 +14,8 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     realms = [],
@@ -113,23 +115,19 @@
   aria-labelledby="manager-travel-nav-realms"
   data-travel-panel="realms"
 >
-  <section
-    class="manager-toolbar manager-travel-realms-toolbar"
-    aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.Filters', 'Realm filters')}
+  <ManagerToolbar
+    class="manager-travel-realms-toolbar"
+    ariaLabel={text('FABRICATE.Admin.Manager.Travel.Realms.Filters', 'Realm filters')}
   >
-    <label class="manager-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        bind:value={searchTerm}
-        placeholder={text(
-          'FABRICATE.Admin.Manager.Travel.Realms.SearchPlaceholder',
-          'Search realms...'
-        )}
-        aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.SearchLabel', 'Search realms')}
-      />
-    </label>
-  </section>
+    <ManagerSearchField
+      bind:value={searchTerm}
+      placeholder={text(
+        'FABRICATE.Admin.Manager.Travel.Realms.SearchPlaceholder',
+        'Search realms...'
+      )}
+      ariaLabel={text('FABRICATE.Admin.Manager.Travel.Realms.SearchLabel', 'Search realms')}
+    />
+  </ManagerToolbar>
 
   {#if filteredRealms.length === 0}
     <EmptyState

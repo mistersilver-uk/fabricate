@@ -29,6 +29,7 @@
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
 
   let {
     label = '',
@@ -188,15 +189,12 @@
   />
 
   <div class="manager-vocabulary-search-row">
-    <label class="manager-search manager-vocabulary-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        bind:value={searchTerm}
-        placeholder={searchPlaceholder}
-        aria-label={searchLabel}
-      />
-    </label>
+    <ManagerSearchField
+      class="manager-vocabulary-search"
+      bind:value={searchTerm}
+      placeholder={searchPlaceholder}
+      ariaLabel={searchLabel}
+    />
     <Chip icon="fas fa-hashtag" class="manager-vocabulary-count" data-vocabulary-shown-count>
       <span>{entriesLabel}</span>
     </Chip>

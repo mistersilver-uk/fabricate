@@ -45,6 +45,8 @@
     deriveRecipeStatuses,
   } from '../../../../utils/recipeBrowserModel.js';
   import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     recipes = [],
@@ -444,27 +446,20 @@
        (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
        keyboard here when an action empties the bulk selection and unmounts the panel that
        was acted on, addressing it through `data-recipe-toolbar`. -->
-  <section
-    class="manager-toolbar manager-recipe-toolbar"
+  <ManagerToolbar
+    class="manager-recipe-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
-    data-recipe-toolbar
-    aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
+    data-recipe-toolbar=""
+    ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
   >
     <div class="manager-recipe-filter-row">
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          value={recipeSearchTerm || ''}
-          oninput={(event) => onSearchChange(event.currentTarget.value)}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Recipe.SearchPlaceholder',
-            'Search recipes...'
-          )}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
-        />
-      </label>
+      <ManagerSearchField
+        value={recipeSearchTerm || ''}
+        onInput={(next) => onSearchChange(next)}
+        placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
+      />
       <SegmentedControl
         options={statusOptions}
         value={ui.statusFilter}
@@ -640,7 +635,7 @@
       onSelectAllResults={selectAllResults}
       onClear={clearBulkSelection}
     />
-  </section>
+  </ManagerToolbar>
 
   {#if flashMessage}
     <!-- The blocked-enable flash. It REPLACES the Foundry notification (the store

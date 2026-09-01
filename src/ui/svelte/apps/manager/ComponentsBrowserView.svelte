@@ -10,6 +10,8 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
   import {
     describeComponentSelection,
     pruneComponentSelection,
@@ -538,27 +540,23 @@
        (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
        keyboard here when an action empties the bulk selection and unmounts the panel that
        was acted on, addressing it through `data-component-toolbar`. -->
-  <section
-    class="manager-toolbar manager-component-toolbar"
+  <ManagerToolbar
+    class="manager-component-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
-    data-component-toolbar
-    aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
+    data-component-toolbar=""
+    ariaLabel={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
   >
     <div class="manager-component-filter-row">
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          value={itemSearchTerm || ''}
-          oninput={(event) => onSearchChange(event.currentTarget.value)}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Component.SearchPlaceholder',
-            'Search components...'
-          )}
-          aria-label={text('FABRICATE.Admin.Manager.Component.SearchLabel', 'Search components')}
-        />
-      </label>
+      <ManagerSearchField
+        value={itemSearchTerm || ''}
+        onInput={(next) => onSearchChange(next)}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Component.SearchPlaceholder',
+          'Search components...'
+        )}
+        ariaLabel={text('FABRICATE.Admin.Manager.Component.SearchLabel', 'Search components')}
+      />
 
       {#if showComponentEssences && componentEssenceOptions.length > 0}
         <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose
@@ -715,7 +713,7 @@
       onSelectAllResults={selectAllResults}
       onClear={clearBulkSelection}
     />
-  </section>
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll"

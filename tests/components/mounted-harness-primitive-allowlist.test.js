@@ -148,6 +148,13 @@ const SHARED_PRIMITIVES = [
   // in the static graph of nearly every manager editor tree, so the next screen that grows a
   // field cancels its suite on an omission here rather than failing it.
   'src/ui/svelte/components/Field.svelte',
+  // THE manager's filter bar and its search field (issue 1039). The pair reaches every browse
+  // screen in the manager — systems, recipes, components, essences, environments, gathering
+  // tasks and events, realms, books-and-scrolls, access and both world scoped-entity lists —
+  // and the field reaches four editors and two rosters on top of that, so between them they sit
+  // in more mounted trees than any entry above except `Chip`.
+  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/ManagerToolbar.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

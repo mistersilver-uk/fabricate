@@ -66,6 +66,7 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte.js')).href);
     RealmEnvironmentsEditor = mod.default;

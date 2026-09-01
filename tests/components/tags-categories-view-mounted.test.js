@@ -47,6 +47,7 @@ const harness = createMountedComponentHarness({
     // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
