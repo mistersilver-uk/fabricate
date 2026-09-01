@@ -108,8 +108,8 @@ function scopeFor(worldDefault = {}, members = 2) {
  * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
  */
 let draftHandle = null;
-/** Every name the page has reported for the shell heading, newest last. */
-let reportedNames = [];
+/** Every buffered identity map the page has reported for the shell chrome, newest last. */
+let reportedIdentities = [];
 /** Every dirty flag the page has reported, newest last. */
 let reportedDirty = [];
 
@@ -121,7 +121,7 @@ let reportedDirty = [];
  */
 async function mountTab({ scope, actions = {}, tab = 'identity' }) {
   draftHandle = null;
-  reportedNames = [];
+  reportedIdentities = [];
   reportedDirty = [];
   const target = await harness.mount({
     scope,
@@ -133,8 +133,8 @@ async function mountTab({ scope, actions = {}, tab = 'identity' }) {
     onDirtyChange: (dirty) => {
       reportedDirty.push(dirty);
     },
-    onDraftNameChange: (name) => {
-      reportedNames.push(name);
+    onDraftIdentityChange: (identity) => {
+      reportedIdentities.push(identity);
     },
   });
   if (tab !== 'identity') target.querySelector(`#world-tool-entry-tab-${tab}`).click();
@@ -228,15 +228,47 @@ describe('the world Tool entry (issue 1373)', () => {
         true,
         'the reactive flag the Save button is disabled from did not re-report'
       );
-      // THE HEADING FOLLOWS THE BUFFERED NAME. A heading names the thing being edited, and the
-      // enabled Save beside it is what says the edit is unsaved.
-      assert.equal(reportedNames.at(-1), 'Miners Pick');
+      // THE HEADING AND THE BREADCRUMB FOLLOW THE BUFFERED NAME. Both name the thing being
+      // edited, and the enabled Save beside them is what says the edit is unsaved. The WHOLE
+      // buffered identity map goes over one route-agnostic prop, so the shell reads whichever
+      // fields the chrome it draws renders rather than a payload shaped for one editor.
+      assert.equal(reportedIdentities.at(-1)?.name, 'Miners Pick');
+      assert.equal(
+        reportedIdentities.at(-1)?.description,
+        'A pick.',
+        'the report carries the editor’s whole buffered identity, not the edited field alone'
+      );
 
       await flushDraft();
       // ONLY THE CHANGED FIELD. `scopedEntryWrites` answers the keys that DIFFER, so a Save
       // never restates the description over whatever another client wrote to it meanwhile.
       assert.deepEqual(calls, [['pick', { name: 'Miners Pick' }]]);
       assert.equal(draftHandle.isDirty(), false, 'a landed Save leaves nothing to write');
+    });
+
+    it('WITHDRAWS the buffered identity on unmount, so it cannot name another route', async () => {
+      // The channel this page reports into is SHARED by all three scoped entry routes, and the
+      // shell's reader is generic across them. A page that reported and never withdrew would
+      // leave `Miners Pick` in the breadcrumb of whichever entry editor opened next, which is
+      // why the withdrawal is this page's own teardown rather than something the shell does for
+      // it from `onDraftChange(null)`.
+      await mountTab({ scope: scopeFor() });
+      const input = harness.target.querySelector('[data-world-tool-entry-name]');
+      input.value = 'Miners Pick';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await harness.setProps({});
+      assert.equal(
+        reportedIdentities.at(-1)?.name,
+        'Miners Pick',
+        'nothing was published, so the withdrawal below would prove nothing'
+      );
+
+      harness.remount();
+      assert.equal(
+        reportedIdentities.at(-1),
+        null,
+        'the editor left its buffered identity behind in a channel the other entry routes read'
+      );
     });
 
     it('leaves the world master switch IMMEDIATE, because it acts on a different decision', async () => {

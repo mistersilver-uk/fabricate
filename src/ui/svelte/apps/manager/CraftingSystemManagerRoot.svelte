@@ -3096,19 +3096,11 @@
   let worldToolEntryHandle = null;
   let worldToolEntryDirty = $state(false);
   let worldToolEntrySaving = $state(false);
-  /**
-   * The BUFFERED name, for the heading below. `null` while no editor is reporting one, which is
-   * what makes the heading fall back to the projection rather than to an empty string.
-   *
-   * @type {string|null}
-   */
-  let worldToolEntryDraftName = $state(null);
 
   function handleWorldToolEntryDraft(handle) {
     worldToolEntryHandle = handle ?? null;
     if (!handle) {
       worldToolEntryDirty = false;
-      worldToolEntryDraftName = null;
       worldToolEntrySubtitle = '';
     }
   }
@@ -3117,16 +3109,21 @@
     worldToolEntryDirty = dirty === true;
   }
 
-  function handleWorldToolEntryDraftName(name) {
-    worldToolEntryDraftName = typeof name === 'string' ? name : null;
-  }
-
   // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK — consistent with the essence entry and
   // with the linked-item tile this page draws from the same buffered value. `??` and not `||`:
   // an editor reporting an EMPTY name is reporting a real authored state, and it falls through
   // to `viewTitle()` below exactly as an empty persisted name already does.
+  //
+  // READ OFF THE SHARED `scopedEntryDraftIdentity` CHANNEL, which is also what the breadcrumb's
+  // last crumb reads: this route holds no buffered-name rune of its own. That channel is
+  // route-agnostic on purpose (see its own note above), so the crumb, the heading and any later
+  // piece of chrome that names an entry all follow one report rather than three. It is not
+  // ambiguous across routes because only one entry editor is mounted at a time and the page
+  // withdraws its report on unmount.
   const worldToolEntryName = $derived(
-    worldToolEntryRecord ? (worldToolEntryDraftName ?? worldToolEntryRecord.entity?.name ?? '') : ''
+    worldToolEntryRecord
+      ? (scopedEntryDraftField('name') ?? worldToolEntryRecord.entity?.name ?? '')
+      : ''
   );
 
   /**
@@ -11410,7 +11407,7 @@
         onBackToCatalogue={() => setView('world-tools')}
         onDraftChange={handleWorldToolEntryDraft}
         onDirtyChange={handleWorldToolEntryDirty}
-        onDraftNameChange={handleWorldToolEntryDraftName}
+        onDraftIdentityChange={handleScopedEntryDraftIdentity}
         onSublineChange={handleWorldToolEntrySubline}
       />
     {:else if currentView === 'world-vocabulary'}

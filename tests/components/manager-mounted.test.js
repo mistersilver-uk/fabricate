@@ -26065,6 +26065,9 @@ describe('CraftingSystemManager mounted behavior', () => {
      * @param {object} [options]
      * @param {object|null} [options.worldToolBreakage] The world scope's `toolBreakage` block.
      * @param {object|null} [options.systemToolBreakage] The selected system's own block.
+     * @param {Array<object>|null} [options.worldTools] The world tool corpus. Named entities,
+     *   for the same reason `worldEssences` is: the default roster is id-only, and a breadcrumb
+     *   is about a name.
      * @param {Array<object>|null} [options.worldEssences] The world essence corpus. Named
      *   entities are what the entry heading below is about; the id-only default keeps the rail
      *   counts every caller above it reads exactly where they were.
@@ -26076,6 +26079,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       worldToolBreakage,
       systemToolBreakage,
       worldEssences,
+      worldTools,
       craftingCheck,
       resolutionMode,
     } = {}) {
@@ -26083,7 +26087,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         component: scopeStore(worldEntities(3, 'comp')),
         essence: scopeStore(worldEssences ?? worldEntities(2, 'ess')),
         tool: scopeStore(
-          worldEntities(1, 'tool'),
+          worldTools ?? worldEntities(1, 'tool'),
           worldToolBreakage ? { toolBreakage: worldToolBreakage } : {}
         ),
         // The FOURTH leg starts absent, which is the shipped state: no world vocabulary store
@@ -26706,6 +26710,102 @@ describe('CraftingSystemManager mounted behavior', () => {
       });
     });
 
+    // ── AND THE WORLD TOOL ENTRY INHERITS IT (issue 1373) ────────────────────────────
+    //
+    // The crumb above is derived once for all three entry routes, so this screen was supposed to
+    // need ONE LINE: reporting its buffered identity through the same `onDraftIdentityChange`
+    // prop the essence entry reports through. This block is what makes that claim falsifiable
+    // rather than an argument — the shell's derivation being generic does nothing at all for a
+    // page that never reports, and the failure would be silent: the crumb keeps rendering, on
+    // the record on disk, under a heading that has moved.
+    //
+    // THE DOM, NOT THE CALLBACK, for the same reason the essence block states: the shell holds
+    // the reported identity in a rune it can only publish by reassigning, and the wrong versions
+    // of that report correctly and render staleness.
+    describe('world tool entry crumb (issue 1373)', () => {
+      /** One NAMED world tool: a breadcrumb is about a name, so the id-only default is mute. */
+      const WORLD_TOOLS = Object.freeze([Object.freeze({ id: 'pick', name: 'Mining Pick' })]);
+
+      async function settleToolEntryRoute() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      const toolCrumbText = () =>
+        target
+          .querySelector('[data-breadcrumb-world-scoped="world-tool-entry"]')
+          ?.textContent?.trim();
+
+      const toolHeadingText = () =>
+        target.querySelector('[data-world-tool-entry-heading] .manager-title')?.textContent?.trim();
+
+      /** Open `pick`'s world entry editor the way a GM does: rail, then the row's pen. */
+      async function openPickEntry() {
+        await mountWithRealStore({ worldTools: [...WORLD_TOOLS] });
+        worldNavItem('tool-catalogue').click();
+        await settleToolEntryRoute();
+        const open = target.querySelector(
+          '[data-scoped-list-row="pick"] [data-scoped-list-action="open-entry"]'
+        );
+        assert.ok(
+          Boolean(open),
+          'the tool catalogue rendered no open-entry action for `pick`, so nothing below ' +
+            'reaches the editor this block is about'
+        );
+        open.click();
+        await settleToolEntryRoute();
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          'world-tool-entry',
+          'the row pen did not commit the tool entry route'
+        );
+      }
+
+      /** Type into the buffered display-label field, which is the only thing that moves the
+       * draft: it is seeded from the persisted record, so a click cannot dirty it. */
+      async function typeToolName(value) {
+        const field = target.querySelector('[data-world-tool-entry-name]');
+        assert.ok(Boolean(field), 'the tool entry editor rendered no display-label field');
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleToolEntryRoute();
+      }
+
+      it('opens with the crumb on the persisted name', async () => {
+        await openPickEntry();
+        assert.equal(toolCrumbText(), 'Mining Pick');
+      });
+
+      it('FOLLOWS the buffered name in the last crumb, before any Save', async () => {
+        await openPickEntry();
+        await typeToolName('Miners Pick');
+        assert.equal(
+          toolHeadingText(),
+          'Miners Pick',
+          'the heading did not move, so the crumb assertion below would be measuring the ' +
+            'wrong failure'
+        );
+        assert.equal(
+          toolCrumbText(),
+          'Miners Pick',
+          'the trail still names the PERSISTED Tool under a heading that names the draft — ' +
+            'the inherited crumb never reached this route'
+        );
+      });
+
+      it('falls back to the ROUTE TITLE in the crumb when the buffered name is emptied', async () => {
+        await openPickEntry();
+        await typeToolName('');
+        assert.equal(
+          toolCrumbText(),
+          'Tool entry',
+          'an authored empty name must reach the crumb — `??` on "no editor", never `||` on ' +
+            '"nothing typed"'
+        );
+      });
     });
   });
 });

@@ -118,11 +118,30 @@
     //    turn, so a stale read would prompt to save a Tool that no longer exists.
     //  - onDirtyChange(dirty): the reactive half, for the header button`s disabled state. A
     //    disabled attribute has to re-render, and the handle deliberately never does.
-    //  - onDraftNameChange(name): the other reactive half, for the header`s TITLE. The
-    //    heading names the Tool being edited, and what is being edited is the draft.
+    //  - onDraftIdentityChange(identity|null): the other reactive half, for the shell chrome
+    //    that NAMES the Tool - the breadcrumb`s last crumb and the heading in the band above.
+    //    Both resolve out of the published corpus by default, and the published corpus is not
+    //    what the GM is editing, so mid-rename the trail read the record on disk under a
+    //    heading that read the draft.
+    //
+    //    THE WHOLE BUFFERED IDENTITY MAP goes over, not the name alone, and that is the
+    //    essence entry`s contract taken verbatim rather than a second design: the shell reads
+    //    whichever of these fields the chrome it draws happens to render, and the three entry
+    //    editors buffer DIFFERENT field sets (`IDENTITY_FIELDS` below is `name` and
+    //    `description`; the essence editor`s is `name`, `icon` and `colorToken`). A fixed
+    //    payload here would restate a shape `shape` already owns, and the shell would have to
+    //    grow a per-entity reader to keep up with it.
+    //
+    //    This screen therefore contributes a NAME and nothing else the chrome renders, which
+    //    is correct: its medallion carries the linked Item`s artwork, which is a property of
+    //    the record`s link rather than an identity field this editor buffers.
+    //
+    //    WITHDRAWN BY THIS PAGE on unmount rather than by the shell`s `onDraftChange(null)`,
+    //    because the shell`s reader is generic across all three entry routes and must not need
+    //    a per-entity teardown to stay correct.
     onDraftChange = () => {},
     onDirtyChange = () => {},
-    onDraftNameChange = () => {},
+    onDraftIdentityChange = () => {},
     // onSublineChange(text): what the record IS, under the name, in the same band.
     //
     // REPORTED RATHER THAN DERIVED IN THE SHELL, unlike the essence entry`s subtitle, and
@@ -306,13 +325,27 @@
   $effect(() => {
     onDirtyChange(dirty);
   });
-  // THE HEADING ABOVE THIS PAGE FOLLOWS THE DRAFT. A heading names the thing being edited,
-  // and the thing being edited is the draft; the enabled `Save tool` beside it is what says
-  // the edit is unsaved. `identity.name` rather than `draft?.identity?.name` so an unseeded
-  // editor reports the persisted name instead of blanking the header for a frame.
+  // THE CHROME ABOVE THIS PAGE FOLLOWS THE DRAFT. The heading and the breadcrumb`s last crumb
+  // both name the thing being edited, and the thing being edited is the draft; the enabled
+  // `Save tool` beside them is what says the edit is unsaved. `identity` rather than
+  // `draft?.identity` so an unseeded editor reports the persisted values instead of blanking
+  // the header for a frame.
+  //
+  // A NEW OBJECT every time, never `identity` itself. The shell holds what it is given in its
+  // own `$state`, and Svelte 5 does not proxy a value that crossed a prop boundary - so
+  // handing over a reference and mutating it later would render nothing. `patchIdentity` above
+  // already reassigns rather than mutates; this spread means the shell does not have to rely
+  // on that staying true.
   $effect(() => {
-    onDraftNameChange(String(identity.name ?? ''));
+    onDraftIdentityChange({ ...identity });
   });
+
+  // WITHDRAWN ON UNMOUNT, from an effect with no dependencies so it runs once and tears down
+  // once. It is separate from the report above because that one re-runs on every keystroke and
+  // a teardown attached to it would publish `null` before each republish. The shell`s reader is
+  // shared by all three entry routes, so a stale identity left behind here would name THIS Tool
+  // in another route`s breadcrumb.
+  $effect(() => () => onDraftIdentityChange(null));
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
   const memberRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
   const repairGroups = $derived(
