@@ -316,6 +316,34 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-modifiers',
     'manager-environment-edit-blind-weights',
   ]),
+  // The manager's card shell (issue 1427), extracted from 80 hand-written
+  // `class="manager-inspector-card"` sections. NEITHER representative frame contains one, and
+  // that is established from the trees rather than assumed: `fabricate-app-shell` is the PLAYER
+  // window and the class is painted only under `.fabricate-manager`, while
+  // `manager-components-normal` renders the components browser with nothing selected — its right
+  // rail is `components/ComponentBrowserInspector.svelte`, which was rebuilt precisely to REPLACE
+  // four stacked cards, and the card-bearing bulk rail only appears once rows are selected. So a
+  // restyle of the shell published two frames that could not contain it.
+  //
+  // Two, because the shell has two painted treatments and one frame cannot hold both.
+  // `manager-essences-disabled-in-use` is the BASE box — `fabricate.css:12937` and `:13663`, the
+  // 8px radius on `--fab-overlay-light-04`: it is the one essence frame whose steps select a row,
+  // and the inspector it opens is six of these stacked, which is the densest run of the base
+  // treatment in the registry.
+  //
+  // `coverage-mode-routed-check-checks` is the CHECKS box — `fabricate.css:2500`, which overrides
+  // the base at (0,3,0) to radius 11, zero padding and `--fab-bg-2` — and it reaches the Checks
+  // rail's own third treatment (`:3308`) in the same frame. Twenty-five of the sweep's 48
+  // converted sites are in that studio.
+  //
+  // The sheet's fourth treatment, `.is-sticky` (`:5404`), is NOT listed here and is not a gap:
+  // measured across `src/`, no component writes that class at all, so it is a dead rule rather
+  // than an unphotographed state. Naming a frame for it would be an override for a state the
+  // product cannot reach.
+  'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
+    'manager-essences-disabled-in-use',
+    'coverage-mode-routed-check-checks',
+  ]),
   // The shared empty panel. Both representative frames are POPULATED states — the components
   // browser lists components and the player app shell lists recipes — so the dashed panel this
   // primitive draws appears in neither, and a restyle of it would publish two frames that do not

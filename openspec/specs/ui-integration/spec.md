@@ -95,7 +95,7 @@ Only two kinds of rule for a primitive stay in the global sheet: what must beat 
 A layout-context rule places the primitive and MUST NOT restyle it: no `font-size`, `font-family`, `font-weight`, `border`, `border-radius`, or `background`.
 The player crafting app's requirement rail, requirement tile, essence pool, consumption-plan panel, and essence-contribution chip are held to that CSS rule as player-side primitives, which is why they added no rules to `styles/fabricate.css`.
 
-Four live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+Five live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
 
 - `FillBar` now EXISTS at `src/ui/svelte/components/FillBar.svelte`, and `src/ui/svelte/apps/gathering/ChanceBar.svelte` is REBUILT on it rather than widened: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would have made it the second component owning half a meaning rather than the primitive that owns one.
   `FillBar` is a LEAF — it renders the track and the value-width fill and declares no `role` or `aria-*`, because the accessible semantics differ per site (`ChanceBar` is a `meter` with its own `aria-valuenow`; an odds row's bar is decorative).
@@ -158,6 +158,23 @@ Four live non-conformances are recorded here rather than left to be discovered, 
   `IconButton.svelte`'s own two occurrences are the emission itself and one line of docblock prose.
   `CraftingSystemManagerRoot.svelte`'s SIX are DEFERRED with a named reason — the converging 12k-line root is the wrong place to land a sweep's tail — and are pinned BY COUNT so a later partial pass fails rather than silently halving a deferral.
   `component/ComponentIdentityStrip.svelte`'s ONE is not a deferral at all: it hands the class to `SearchablePopover`'s `triggerClass`, so the element carrying it is rendered by THAT primitive, and converting it means reworking a trigger contract shared with ten callers.
+- THE manager's card shell exists at `src/ui/svelte/components/InspectorCard.svelte`.
+  It replaces the same kind of CSS CONVENTION its two button siblings replaced — `class="manager-inspector-card"` on a `<section>`, and the padding, hairline border, 8px radius, surface fill and stacked gap `styles/fabricate.css` gives it — written out by hand at 80 sites across 20 components.
+  Every site's element host was measured by walking each component's Svelte AST, and all 80 were `<section>`, so the host set is ONE and the component takes no `as` prop, unlike `StatusToggle`, whose census found three.
+  Nothing about a hand-rolled card renders WRONG, which is the honest difference between this conversion and the icon button's: a card written as a bare `<section>` is visibly not a card, so the convention was self-policing where an accessible name is not.
+  What it was not self-policing about is ENUMERATION — a shell nobody can list the callers of is a shell no change to it can be reasoned about — and that is the obligation `tests/inspector-card-source-contract.test.js` now carries.
+  Like `ManagerButton` and `IconButton` it deliberately has NO scoped `<style>` and claims this section's exception, for the same reason: emitting exactly the class `styles/fabricate.css` already paints is what makes converting a correct call site provably a no-op on screen.
+  It is consequently a MANAGER primitive, and unlike the icon button that consequence is NOT reached in the product: no player-app component renders the shell, directly or through a shared child.
+  It carries NO variant prop, and that is a stated scope line rather than an omission.
+  The sheet paints three further treatments and anchors them three different ways — on the card's own modifier class (`.manager-checks-card`), on an ANCESTOR (`.manager-checks-rail`, which reaches cards carrying no modifier at all) and on a positioning state (`.is-sticky`, which no component under `src/` writes at all, so the sheet declares it and nothing renders it) — so a closed variant set spanning all three is a design ruling rather than a mechanical extraction, and every modifier travels as a pass-through `class` exactly as written today.
+  Its extraction killed a scoped `<style>` rule in THREE components, and only ONE of the three raised `css_unused_selector`.
+  Measured against Svelte 5.56.3 with a probe whose only call site is `<Child class="target" />`: a class living only on a component tag is normally pruned and warned about, but the presence anywhere in the same component of a REGULAR ELEMENT carrying either a spread attribute or a `class` whose value is any expression — a template literal included — makes every class selector in that block possibly-matching, so the rule is emitted with the scope hash attached, matches nothing, and `lint:svelte:warnings` stays green.
+  The same attribute on a COMPONENT tag does not do it, and neither does a `class:` directive nor a static `class`, so the silencing condition is a property of the elements a component WRITES rather than of the ones it renders.
+  An expression-valued `class` on a regular element is ordinary in this codebase, so the silent mode is the DEFAULT rather than the exception, and `tests/components/manager-button-scoped-class-reach.test.js` rather than `lint:svelte:warnings` is what finds it.
+  All six dead rules are repaired as `:global(...)` chained so their specificity is unchanged, and `tests/components/manager-button-scoped-class-reach.test.js` covers this primitive as the mechanical guard.
+  No `.svelte` under `src/` renders a raw `class="manager-inspector-card"` any longer, with two stated exceptions.
+  `InspectorCard.svelte`'s own two occurrences are the emission itself and one line of prose on the `class` prop.
+  `CraftingSystemManagerRoot.svelte`'s THIRTY-TWO are DEFERRED with a named reason — they are 40% of the whole census, and the converging 12k-line root is the wrong place to land a sweep's tail — and are pinned BY COUNT so a later partial pass fails rather than silently reducing a deferral nobody is tracking.
 
 #### Threshold band strip
 

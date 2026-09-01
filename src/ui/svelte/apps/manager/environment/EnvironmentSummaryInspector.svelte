@@ -2,6 +2,7 @@
 <script>
   import { localize, viewScene } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import { sceneDocumentImage } from '../../../util/sceneImages.js';
@@ -64,7 +65,7 @@
   }
 </script>
 
-<section class="manager-inspector-card" data-environment-summary-inspector>
+<InspectorCard data-environment-summary-inspector="">
   <p class="manager-kicker">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Summary', 'Environment summary')}
   </p>
@@ -92,9 +93,9 @@
           )}</Chip
     >
   </div>
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card" data-environment-summary-scene>
+<InspectorCard data-environment-summary-scene="">
   <h3 class="manager-card-title">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}
   </h3>
@@ -165,9 +166,9 @@
       >
     </div>
   {/if}
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card">
+<InspectorCard>
   <h3 class="manager-card-title">
     {text(
       'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ValidationSummary',
@@ -182,9 +183,9 @@
       >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.warning', 'Warning')}: {warning}</Chip
     >
   </div>
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card">
+<InspectorCard>
   <h3 class="manager-card-title">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.RuntimePreview', 'Runtime preview')}
   </h3>
@@ -259,4 +260,4 @@
       >
     </div>
   </div>
-</section>
+</InspectorCard>

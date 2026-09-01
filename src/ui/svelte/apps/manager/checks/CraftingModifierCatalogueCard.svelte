@@ -94,6 +94,7 @@
   import Chip from '../Chip.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import {
     normalizeModifierPolicy,
     policyDefersSelection,
@@ -459,8 +460,8 @@
 </script>
 
 <!-- CARD ONE: the library, read-only, with the selection control on each row. -->
-<section
-  class="manager-inspector-card manager-checks-card"
+<InspectorCard
+  class="manager-checks-card"
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
 >
@@ -659,12 +660,12 @@
       </span>
     </p>
   </div>
-</section>
+</InspectorCard>
 
 <!-- CARD TWO: how the marked entries reduce to the one number the roll gets. Its own studio
      card, as the design draws it — it was an uppercase micro-label inside the card above,
      which is the treatment this studio retired everywhere else. -->
-<section class="manager-inspector-card manager-checks-card" data-crafting-modifier-policy-card>
+<InspectorCard class="manager-checks-card" data-crafting-modifier-policy-card="">
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
       <h3 class="manager-checks-card-title">
@@ -754,7 +755,7 @@
       </div>
     {/if}
   </div>
-</section>
+</InspectorCard>
 
 <style>
   /* The card is its OWN container-query context (issue 1095, D4). The shipped
@@ -763,8 +764,27 @@
      whole `fabricate-manager` shell, i.e. it fired only when the entire manager was
      narrow, never when the centre pane alone was. Declaring the container here makes it
      measure this card, so the 2x2 rule grid reflows to 1x4 against the real ~700-760px
-     pane rather than overflowing it. */
-  .manager-inspector-card {
+     pane rather than overflowing it.
+
+     `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS (issue 1427). Both cards are
+     `<InspectorCard>`s now, so `manager-inspector-card` is written by that primitive and this
+     rule stopped matching — silently, because `<i class={modifier.icon || …}>` at line 581
+     makes every class selector in this block possibly-matching, so it was emitted with the
+     hash attached and `lint:svelte:warnings` reported nothing. Measured against Svelte
+     5.56.3: a REGULAR element carrying either a spread or a `class` whose value is any
+     expression does that; the same attribute on a COMPONENT tag does not, so the
+     `{...stepperLabels(…)}` spread on the `<Stepper>` above is not what silences this.
+
+     Anchored on `[data-crafting-modifier-catalogue]` and `[data-crafting-modifier-policy-card]`
+     rather than on the `.manager-checks-card` modifier the two cards share, because that
+     modifier has eleven other sites across seven components and `container-type` is not a
+     paint: it creates a containment context, so widening this to every checks card would
+     silently re-point every unnamed `@container` query inside all of them — which is the exact
+     defect the block above exists to fix, inverted. An attribute selector weighs the same as a
+     class, so each half stays at (0,2,0), and the two together match exactly the two elements
+     the scoped form matched. */
+  :global(.manager-inspector-card[data-crafting-modifier-catalogue]),
+  :global(.manager-inspector-card[data-crafting-modifier-policy-card]) {
     container-type: inline-size;
   }
 
@@ -796,8 +816,18 @@
      on the Outcomes screen's otherwise identical group, which is the mockup disagreeing with
      itself rather than a second scale to adopt. So this states the measured value where it is
      measured and leaves the primitive alone. Same unlayered-`:global()` route as the chips
-     above, for the same cascade reason. */
-  .manager-inspector-card :global(.manager-resolution-mode-options) {
+     above, for the same cascade reason.
+
+     WHOLLY `:global()` and per-card since issue 1427, for the reason the container rule states:
+     the ancestor half was `.manager-inspector-card`, which this component no longer writes, so
+     it had to move inside the `:global()` and take the two cards' own hooks as its anchor. Each
+     half stays at (0,3,0), so nothing about which declaration wins has moved. */
+  :global(
+    .manager-inspector-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options
+  ),
+  :global(
+    .manager-inspector-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options
+  ) {
     gap: 10px;
   }
 

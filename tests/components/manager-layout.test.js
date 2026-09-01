@@ -1331,8 +1331,12 @@ test('the shared explainer card reuses the card shell and owns only the explaine
 
   // The card shell and the heading come from the manager's ONE contract for each, applied
   // as classes on the primitive's own elements — not re-declared in this scoped block.
+  // RETARGETED at the primitive (issue 1427). The shell is `<InspectorCard>` now, so the class
+  // it once wrote by hand is emitted by that component and the caller passes only its own
+  // modifier. The assertion is the same one — this card does not re-declare the shell — stated
+  // against the markup that carries it today.
   assert.ok(
-    explainerCardSource.includes('class="manager-inspector-card manager-explainer-card"'),
+    explainerCardSource.includes('<InspectorCard class="manager-explainer-card"'),
     'the explainer wears the shared side-panel card shell'
   );
   assert.ok(
@@ -1528,8 +1532,12 @@ test("the checks rail follows the Tool Studio's inspector convention", () => {
   // section with its card directly beneath — never a card wrapping the section with a
   // title inside it. Two studios cannot both be right, so the assertion moves with the
   // ruling rather than being deleted.
-  assert.ok(
-    rightMenu.includes('manager-inspector-card manager-checks-active-card'),
+  // RETARGETED at the primitive (issue 1427), for the reason the explainer-card assertion
+  // above records: the shell class is `<InspectorCard>`'s to emit, and this rail passes only the
+  // Active card's own modifier plus its on/off state.
+  assert.match(
+    rightMenu,
+    /<InspectorCard\s+class=\{`manager-checks-active-card /,
     'the Active card wears the shared inspector-card shell'
   );
   assert.ok(
@@ -7171,9 +7179,14 @@ test('CraftingCheckEditor really wraps the routed tier list in the checks-card c
     resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'),
     'utf8'
   );
+  // RETARGETED at the primitive (issue 1427). The shell is `<InspectorCard>`, which emits
+  // `manager-inspector-card` itself and APPENDS this caller's `class`, so the rendered class
+  // attribute the measurement above is built from is unchanged; what moved is where it is
+  // written. The `=""` on the hook is load-bearing rather than cosmetic: a bare `data-*` on a
+  // COMPONENT tag is the boolean `true` and would render `data-routed-tiers="true"`.
   assert.match(
     withoutComments(craftingCheckEditor),
-    /<section class="manager-inspector-card manager-checks-card" data-routed-tiers>/,
+    /<InspectorCard class="manager-checks-card" data-routed-tiers="">/,
     'the routed tier section must carry manager-checks-card, or it falls back to the bare ' +
       '.manager-inspector-card shell and its own 12px padding re-insets the tier row'
   );
@@ -7298,9 +7311,10 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
     ),
     'utf8'
   );
+  // RETARGETED at the primitive (issue 1427), same reasoning as the routed-tier join above.
   assert.match(
     withoutComments(modifierCatalogueSource),
-    /<section\s+class="manager-inspector-card manager-checks-card"\s+data-crafting-modifier-catalogue=/,
+    /<InspectorCard\s+class="manager-checks-card"\s+data-crafting-modifier-catalogue=/,
     'the modifiers card must carry manager-checks-card, or it falls back to the bare ' +
       '.manager-inspector-card shell and the combination-rule cards fall back to the generic scale'
   );

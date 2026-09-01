@@ -119,6 +119,14 @@ const SHARED_PRIMITIVES = [
   // rendered by ten more. An omission in any harness that compiles one of those HANGS the
   // suite as `# cancelled` rather than failing it.
   'src/ui/svelte/components/StatusToggle.svelte',
+  // THE manager's card shell (issue 1427), extracted from 80 hand-written
+  // `class="manager-inspector-card"` sections. It is the widest entry on this list after `Chip`
+  // by reach rather than by call count: 19 components render it and they are spread across the
+  // Checks Studio, both environment inspectors, the essence inspector, the Tool Studio, the
+  // books-and-scrolls inspector and the shared bulk-delete card — so almost every mounted
+  // manager tree pulls it in, and the root's 32 deferred sites will pull it into the rest when
+  // they convert.
+  'src/ui/svelte/components/InspectorCard.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
