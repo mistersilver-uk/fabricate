@@ -56,13 +56,24 @@
   } = $props();
 
   /**
-   * The two INHERITED world-default sections, named once. `repairRequirements` is deliberately
+   * The FOUR INHERITED world-default sections, named once. `repairRequirements` is deliberately
    * absent: `worldToolStudio` records that it is SEEDED on adoption and then diverges, so it
    * has no inherit state a row could report.
+   *
+   * `prerequisites` and `bonus` joined at `1.31.0` (issue 1373). A row that overrides one of
+   * them now SAYS so, where before it read `Inherits world defaults` over a character gate its
+   * own system authored — which was true of every migrated world, because the model held both
+   * fields per system only and there was no world layer for them to inherit from.
    */
   const TOOL_WORLD_SECTIONS = [
     { id: 'breakage', key: 'FABRICATE.Admin.Manager.Tools.Breakage', label: 'Breakage' },
     { id: 'onBreak', key: 'FABRICATE.Admin.Manager.Tools.OnBreak', label: 'On break' },
+    {
+      id: 'prerequisites',
+      key: 'FABRICATE.Admin.Manager.Scoped.Sections.Prerequisites',
+      label: 'Prerequisites',
+    },
+    { id: 'bonus', key: 'FABRICATE.Admin.Manager.Scoped.Sections.Bonus', label: 'Check bonus' },
   ];
 
   let searchTerm = $state('');

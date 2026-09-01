@@ -207,6 +207,8 @@ function catalogueProps(entityType, overrides = {}) {
       macro: 'Falls back to no macro.',
       breakage: 'Falls back to never breaks.',
       onBreak: 'Falls back to nothing happens.',
+      prerequisites: 'Falls back to anyone may use it.',
+      bonus: 'Falls back to no check bonus.',
     },
     inspectorBody: markerSnippet('data-lane-inspector-body'),
     ...overrides,
@@ -232,6 +234,8 @@ function rulesProps(entityType, overrides = {}) {
       macro: 'Falls back to no macro.',
       breakage: 'Falls back to never breaks.',
       onBreak: 'Falls back to nothing happens.',
+      prerequisites: 'Falls back to anyone may use it.',
+      bonus: 'Falls back to no check bonus.',
     },
     ...overrides,
   };
@@ -319,7 +323,9 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
   const EXPECTED = {
     component: ['category'],
     essence: ['effectSource', 'macro'],
-    tool: ['breakage', 'onBreak'],
+    // FOUR since `1.31.0` (issue 1373): `prerequisites` and `bonus` became world-default
+    // sections, so the catalogue inspector states a card for each of them too.
+    tool: ['breakage', 'onBreak', 'prerequisites', 'bonus'],
   };
   const LABELS = {
     category: 'Category',
@@ -327,6 +333,8 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
     macro: 'Property macro',
     breakage: 'Breakage',
     onBreak: 'On break',
+    prerequisites: 'Prerequisites',
+    bonus: 'Check bonus',
   };
 
   for (const [entityType, sections] of Object.entries(EXPECTED)) {
@@ -430,7 +438,7 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
       selectedId: 'tool-0',
     });
     const notes = [...root.querySelectorAll('[data-scoped-list-inherit-note]')];
-    assert.equal(notes.length, 2);
+    assert.equal(notes.length, 4);
     for (const note of notes) {
       assert.ok(note.textContent.trim().length > 0, 'a count that never says WHAT is inherited');
     }
@@ -561,7 +569,9 @@ describe('the rules list draws one inherit row per inheritable section, with its
   const EXPECTED = {
     component: ['category'],
     essence: ['effectSource', 'macro'],
-    tool: ['breakage', 'onBreak'],
+    // FOUR since `1.31.0` (issue 1373). The row set is derived from the descriptor rather than
+    // listed, so this moves with `TOOL_SECTIONS` and nothing else had to change.
+    tool: ['breakage', 'onBreak', 'prerequisites', 'bonus'],
   };
 
   for (const [entityType, sections] of Object.entries(EXPECTED)) {
@@ -587,7 +597,7 @@ describe('the rules list draws one inherit row per inheritable section, with its
     // list says "Effect source · Inherited" and never says what is being inherited.
     const root = await rulesHarness.mount(rulesProps('tool'));
     const notes = [...rows(root)[0].querySelectorAll('[data-scoped-inherit-note]')];
-    assert.equal(notes.length, 2, 'both sections were given a note');
+    assert.equal(notes.length, 4, 'all four tool sections were given a note');
     for (const note of notes) {
       assert.ok(note.textContent.trim().length > 0);
     }

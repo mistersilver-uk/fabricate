@@ -7847,13 +7847,66 @@
     return true;
   }
 
-  async function stageToolEditorSourceDrop(data) {
+  /**
+   * RE-POINT a world Tool at another world Item, from the world Tool entry's linked-item
+   * card (issue 1373).
+   *
+   * ── WHY THE RESOLUTION IS HERE ──────────────────────────────────────────────────────────
+   * The same reason `createWorldToolFromItemDrop` above gives, and this is its sibling rather
+   * than a second design: `worldScopeActions` reads no Foundry global by design and a page
+   * cannot reach the services bag, so nothing below this file can turn a drag payload into a
+   * name, an image and a description. `resolveDropUuid` covers both shipped drag shapes,
+   * including the compendium `{pack, id}` payload that carries no `uuid` at all.
+   *
+   * ── THE SNAPSHOT IS REWRITTEN, WHICH IS WHAT "REPLACE THE LINKED SOURCE" MEANS ──────────
+   * `name`, `img` and `description` are the world record's snapshot OF the linked Item, so
+   * re-pointing the link and keeping the old Item's name would leave the catalogue naming a
+   * document the record no longer references. `img` is written through or left EMPTY — never
+   * guessed, because Foundry does not validate the path and a wrong one 404s silently.
+   *
+   * IT IS IMMEDIATE rather than staged into the entry's buffered draft, on the rule that
+   * screen already states: the draft buffers what the editor AUTHORS, and the source-link
+   * fields are not among them.
+   *
+   * @param {object} data The raw drag payload.
+   * @returns {Promise<boolean>}
+   */
+  async function relinkWorldToolSource(data) {
+    const entityId = worldScopedEntryId;
+    if (!entityId || !data) return false;
     const uuid = resolveDropUuid(data);
     if (!uuid) return false;
-    const snapshot = await services?.resolveToolSource?.(uuid);
-    if (!snapshot) return false;
-    store.stageToolDraftSource?.(snapshot.uuid || uuid, snapshot);
-    return true;
+    const source = await services?.resolveToolSource?.(uuid);
+    if (!source) return false;
+    const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
+      name: source.name || '',
+      img: source.img || '',
+      description: source.description || '',
+      originItemUuid: source.uuid || uuid,
+      registeredItemUuid: source.uuid || uuid,
+      aliasItemUuids: [],
+    });
+    return patched === true;
+  }
+
+  /**
+   * UNLINK a world Tool from its world Item.
+   *
+   * The three source-link fields are cleared and the SNAPSHOT is kept: `name`, `img` and
+   * `description` are what the catalogue and every system row render, so blanking them would
+   * turn an unlinked record into an unfindable one. The world entry says so on the card.
+   *
+   * @param {string} entityId
+   * @returns {Promise<boolean>}
+   */
+  async function unlinkWorldToolSource(entityId) {
+    if (!entityId) return false;
+    const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
+      originItemUuid: null,
+      registeredItemUuid: null,
+      aliasItemUuids: [],
+    });
+    return patched === true;
   }
 
   async function toggleFocusedToolEnabled(enabled) {
@@ -11404,7 +11457,12 @@
       <WorldToolEntryPage
         {...toolScopeProps}
         entityId={worldScopedEntryId}
+        worldItems={worldItemOptions}
+        prerequisiteOptions={selectedCharacterPrerequisites}
         onBackToCatalogue={() => setView('world-tools')}
+        onSourceDrop={relinkWorldToolSource}
+        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+        onUnlinkSource={() => unlinkWorldToolSource(worldScopedEntryId)}
         onDraftChange={handleWorldToolEntryDraft}
         onDirtyChange={handleWorldToolEntryDirty}
         onDraftIdentityChange={handleScopedEntryDraftIdentity}
@@ -11820,7 +11878,6 @@
         saveError={$viewState.toolDraftSaveError}
         activeTab={toolEditorActiveTab}
         focusValidationNonce={toolValidationFocusNonce}
-        worldItems={worldItemOptions}
         managedItems={selectedSystem?.managedItemOptions || []}
         itemTags={selectedSystem?.itemTags || []}
         essenceOptions={selectedSystem?.features?.essences === true
@@ -11840,10 +11897,8 @@
           toolEditorActiveTab = tab;
         }}
         onPatch={(patch) => store.patchToolDraft?.(patch)}
-        onSourceDrop={stageToolEditorSourceDrop}
         onToggleEnabled={toggleFocusedToolEnabled}
-        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
-        onUnlinkSource={() => store.unlinkToolDraftSource?.()}
+        onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView

@@ -75,7 +75,7 @@
       ),
       text: text(
         'FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFromHint',
-        'Drag any Item into the Tool Studio to turn it into a Tool. The Item supplies the name, art, and description.'
+        'Drop an Item on the world Tools Catalogue to turn it into a Tool, and re-point the link from that Tool’s entry. The Item supplies the name, art, and description every crafting system shows.'
       ),
     },
     {

@@ -19,14 +19,32 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * effective-authority readers from that release onward, because the crafting-system normalizer
  * became absence-preserving in the same change.
  *
- * THREE WORLD-DEFAULT SECTIONS, TWO OF THEM INHERITED. `breakage` and `onBreak` are ordinary
- * sections with their own inherit switches. `repairRequirements` is the third, and it is a SEED
- * rather than a live parent: it is copied out of the world defaults when a tool is added to a
- * system and then diverges freely, so `seedToolRepairRequirements` is a function the membership
- * action calls once and NOT a section the resolver reads through. Modelling it as a section with a
- * permanently-false inherit switch would be a lie the UI would then have to hide, and it would be
- * untrue on its own terms: a repair recipe names ingredient groups over the OWNING SYSTEM's
- * components, which the world scope cannot address.
+ * FIVE WORLD-DEFAULT SECTIONS, FOUR OF THEM INHERITED. `breakage`, `onBreak`, `prerequisites` and
+ * `bonus` are ordinary sections with their own inherit switches. `repairRequirements` is the
+ * fifth, and it is a SEED rather than a live parent: it is copied out of the world defaults when a
+ * tool is added to a system and then diverges freely, so `seedToolRepairRequirements` is a
+ * function the membership action calls once and NOT a section the resolver reads through.
+ * Modelling it as a section with a permanently-false inherit switch would be a lie the UI would
+ * then have to hide, and it would be untrue on its own terms: a repair recipe names ingredient
+ * groups over the OWNING SYSTEM's components, which the world scope cannot address.
+ *
+ * `prerequisites` AND `bonus` JOINED THE LIST AT `1.31.0` (issue 1373), because the design treats
+ * a Tool's character gate and its check bonus as world defaults a system INHERITS and may
+ * override, not as per-system-only fields. They are the shipped `Tool.prerequisites` and
+ * `Tool.bonus` unchanged. Two properties separate them from `breakage` and `onBreak`, and both
+ * matter:
+ *
+ *  - AN EMPTY OVERRIDE IS EXPRESSIBLE for both. `{enabled: false, ids: [], gateMode: 'usability'}`
+ *    and `{enabled: false, expression: ''}` are real values every reader treats as "no
+ *    prerequisites" and "no bonus", exactly as `### Essence scope`'s `effectSource: {}` means "no
+ *    source". So a membership record can say "this system requires nothing", and the every-member
+ *    precondition `breakage` and `onBreak` need does not apply to them.
+ *  - THE `1.31.0` MIGRATION WRITES NO WORLD DEFAULT FOR EITHER, on the unknowable-PROVENANCE rule
+ *    this file already records for the world break mode: `Tool#toJSON` mints both keys on EVERY
+ *    save, so a persisted `{enabled: false}` is indistinguishable from a GM's deliberate choice.
+ *    An ABSENT world default resolves to the membership record's own value, which the same
+ *    migration writes verbatim from that system's in-system Tool - so every existing system reads
+ *    exactly what it read before, and a world default exists only once a GM authors one.
  *
  * `enabled` KEEPS ITS SHIPPED MEANING VERBATIM. A reference to a tool that does not resolve, or
  * that resolves to a disabled tool, BLOCKS the attempt with `TOOL_BLOCKED` (`## Tool`
@@ -57,7 +75,7 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  *
  * @type {readonly string[]}
  */
-export const TOOL_SECTIONS = Object.freeze(['breakage', 'onBreak']);
+export const TOOL_SECTIONS = Object.freeze(['breakage', 'onBreak', 'prerequisites', 'bonus']);
 
 /**
  * The world-default section that is SEEDED onto a membership record rather than inherited.
@@ -237,9 +255,9 @@ export function resolveToolBreakageAuthority(worldToolBreakage, systemToolBreaka
 /**
  * Resolve one `(tool, system)` pair.
  *
- * The answer carries `breakage` and `onBreak` (each when authored at the winning scope),
- * `repairRequirements` when the membership record authored some, `member`, the per-section
- * `inherited` map, and `enabled`.
+ * The answer carries `breakage`, `onBreak`, `prerequisites` and `bonus` (each when authored at
+ * the winning scope), `repairRequirements` when the membership record authored some, `member`, the
+ * per-section `inherited` map, and `enabled`.
  *
  * `repairRequirements` is answered from the MEMBERSHIP RECORD ALONE and is never read back out of
  * the world defaults - a seeded value that a system has since edited is the only truth about that
@@ -247,8 +265,9 @@ export function resolveToolBreakageAuthority(worldToolBreakage, systemToolBreaka
  *
  * @param {object|null} worldDefault
  * @param {object|null} membership
- * @returns {{breakage?: unknown, onBreak?: unknown, repairRequirements?: Array<object>,
- *   member: boolean, enabled: boolean, inherited: {[section: string]: boolean}}}
+ * @returns {{breakage?: unknown, onBreak?: unknown, prerequisites?: unknown, bonus?: unknown,
+ *   repairRequirements?: Array<object>, member: boolean, enabled: boolean,
+ *   inherited: {[section: string]: boolean}}}
  */
 export function resolveTool(worldDefault, membership) {
   const record = membership && typeof membership === 'object' ? membership : null;
@@ -285,7 +304,12 @@ export function toolAttemptBlockReason(resolved) {
  * read time, and the world layer supplies only the keys it does not carry. The world-wins
  * precedence below is the TARGET contract and is SUSPENDED, not consumed, for the duration; it
  * re-arms when requirement 36 retires.**
- * So the surviving record supplies `componentId`, `label`, `requirement`, `prerequisites`, `bonus` and `checkBreakable` as it always did, AND every
+ * So the surviving record supplies `componentId`, `label`, `requirement` and `checkBreakable` as
+ * it always did - and, while requirement 36 holds, `prerequisites` and `bonus` too, because
+ * `Tool#toJSON` emits both keys unconditionally and the in-system record decides every key it
+ * carries. Those two are world-default SECTIONS as of `1.31.0` and the membership record is where
+ * the per-system override is authored, but their world layer is SUSPENDED on this read path for
+ * exactly as long as `breakage` and `onBreak` are - AND every
  * identity and behaviour key it carries; a lifted identity field it does NOT carry is DELETED
  * from the merged row, because absence is a value. A lane adding a world-scope WRITER here
  * must not implement against world-wins precedence: doing so reverts the GM's own edits on

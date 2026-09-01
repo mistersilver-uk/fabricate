@@ -97,7 +97,7 @@ export const SCOPE_PAYLOAD_KEYS = Object.freeze({
 const OVERRIDING_INHERIT = Object.freeze({
   components: Object.freeze({ category: false }),
   essences: Object.freeze({ effectSource: false, macro: false }),
-  tools: Object.freeze({ breakage: false, onBreak: false }),
+  tools: Object.freeze({ breakage: false, onBreak: false, prerequisites: false, bonus: false }),
 });
 
 const ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
@@ -210,6 +210,41 @@ function applyIdentity(record, identity, entityType) {
 }
 
 /**
+ * One system's `prerequisites` override, as the migration writes it.
+ *
+ * The shape is `Tool`'s own, and an unauthored input answers the canonical EMPTY gate rather
+ * than absence — see the write in {@link buildMembershipRecord} for why absence is the wrong
+ * answer for a section whose world layer would otherwise be inherited.
+ *
+ * @param {unknown} raw
+ * @returns {{enabled: boolean, ids: string[], gateMode: string}}
+ */
+export function toolPrerequisitesOverride(raw) {
+  const source = isPlainObject(raw) ? raw : {};
+  const ids = arrayOf(source.ids)
+    .filter((entry) => typeof entry === 'string' && entry.trim())
+    .map((entry) => entry.trim());
+  return {
+    enabled: source.enabled === true && ids.length > 0,
+    ids: [...new Set(ids)],
+    gateMode: source.gateMode === 'bonus' ? 'bonus' : 'usability',
+  };
+}
+
+/**
+ * One system's `bonus` override, as the migration writes it. See
+ * {@link toolPrerequisitesOverride}.
+ *
+ * @param {unknown} raw
+ * @returns {{enabled: boolean, expression: string}}
+ */
+export function toolBonusOverride(raw) {
+  const source = isPlainObject(raw) ? raw : {};
+  const expression = typeof source.expression === 'string' ? source.expression.trim() : '';
+  return { enabled: source.enabled === true && expression !== '', expression };
+}
+
+/**
  * The membership record one in-system definition produces — every section OVERRIDDEN, each
  * value copied verbatim from that system's own definition (`#### D6`).
  *
@@ -263,6 +298,17 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
   // default is DECLINED instead whenever any member left the section unauthored.
   if (record.breakage !== undefined) membership.breakage = cloneJson(record.breakage);
   if (record.onBreak !== undefined) membership.onBreak = cloneJson(record.onBreak);
+  // WRITTEN UNCONDITIONALLY, on the `effectSource` / `macro` rule rather than the `breakage` one,
+  // and the difference is what an EMPTY override means. `{enabled: false, ids: [], gateMode:
+  // 'usability'}` and `{enabled: false, expression: ''}` are real values every reader treats as
+  // "no prerequisites" and "no bonus", so a member that authored neither can SAY so rather than
+  // carrying an absent section that falls back to the world value.
+  //
+  // AN ABSENT KEY IS FILLED WITH THAT CANONICAL EMPTY rather than skipped, because `Tool` mints
+  // both on construction: a raw record without them ALREADY resolves to exactly these values
+  // today, so writing them states that system's current behaviour rather than inventing one.
+  membership.prerequisites = toolPrerequisitesOverride(record.prerequisites);
+  membership.bonus = toolBonusOverride(record.bonus);
   // NOT A RESOLVER SECTION. `resolveTool` answers `repairRequirements` from the membership record
   // ALONE and never reads the world defaults, so an unauthored one cannot fall back to the
   // donor's and needs no decline.

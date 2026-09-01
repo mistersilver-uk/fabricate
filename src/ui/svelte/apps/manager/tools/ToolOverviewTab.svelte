@@ -1,63 +1,47 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  The SYSTEM Tool editor's Overview tab.
+
+  == THE LINKED-ITEM CARD IS GONE, AND ITS ABSENCE IS THE POINT (issue 1373) ================
+  This tab used to open with a `LINKED ITEM` drop zone carrying a copy-uuid action, an unlink
+  action and the linked Item's description — the full identity card. That let a CRAFTING SYSTEM
+  re-point which game-world Item a Tool IS, which the model forbids: a Tool is one world record
+  every system adopts, its identity is world-scoped, and `## Scoped Entity Definitions` prohibits
+  one field authored at two places. The design's own system rules editor has no Overview tab at
+  all for the same reason, and states `identity comes from the world Tool` in its header instead.
+
+  The capability was not deleted. It MOVED, whole, to `scoped/WorldToolEntryPage`, which is the
+  scope that owns identity and which previously could not link an Item at all.
+
+  What is left here is what a system genuinely authors about a Tool: the per-system display-label
+  OVERRIDE, and whether the Tool is enabled in this system.
+
+  == THE LABEL IS AN OVERRIDE, AND THE COPY NOW SAYS SO ====================================
+  The maintainer's ruling is that BOTH fields ship: the world authors the shared name and a system
+  may override it locally. The two scopes used to carry contradictory help text — the world said
+  it was the name every system shows, this said blank falls back to the linked Item — so neither
+  named the other. Each names the other now.
+-->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { toolDisplayName, toolSourceSnapshot } from './toolStudio.js';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import { toolDisplayName } from './toolStudio.js';
   import ToggleCard from '../ToggleCard.svelte';
 
   let {
     tool = null,
-    worldItems = [],
     managedItems = [],
     persisted = true,
     onPatch = () => {},
     onToggleEnabled = () => {},
-    onSourceDrop = () => {},
-    onCopySourceUuid = () => {},
-    onUnlinkSource = () => {},
   } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-  const source = $derived(toolSourceSnapshot(tool, worldItems, managedItems));
 </script>
 
 <div class="manager-tool-tab-stack" data-tool-overview-tab>
-  <section class="manager-tool-overview-source" data-tool-overview-region="source">
-    <div class="manager-tool-editor-card-heading">
-      <div>
-        <p class="manager-kicker">
-          {text('FABRICATE.Admin.Manager.Tools.Editor.Source', 'Linked game-world Item')}
-        </p>
-      </div>
-    </div>
-    <ItemDropZone
-      kind="tool-source"
-      item={source.linked ? source : null}
-      title={source.name}
-      hint={source.linked
-        ? text(
-            'FABRICATE.Admin.Manager.Tools.Editor.SourceDropHint',
-            'Drop another Item here to replace the linked source.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Tools.Editor.SourceEmptyDropHint',
-            'Drop an Item here to link this Tool.'
-          )}
-      onDrop={onSourceDrop}
-      copyLabel={text('FABRICATE.Admin.Manager.Tools.Editor.CopySourceUuid', 'Copy source UUID')}
-      unlinkLabel={text('FABRICATE.Admin.Manager.Tools.UnlinkItem', 'Unlink Item')}
-      onCopy={source.linked ? () => onCopySourceUuid(source.uuid) : null}
-      onUnlink={source.linked ? onUnlinkSource : null}
-    />
-    <div class="manager-tool-source-description" data-tool-description>
-      {source.description ||
-        text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-    </div>
-  </section>
-
   <section class="manager-tool-overview-fields" data-tool-overview-region="identity">
     <label class="manager-recipe-field"
       ><span class="manager-recipe-micro-label"
@@ -71,7 +55,7 @@
       /><small
         >{text(
           'FABRICATE.Admin.Manager.Tools.Editor.LabelFallback',
-          'Leave blank to use the linked Item name.'
+          'Overrides the world Tool name in this crafting system only. Leave blank to use the world Tool name.'
         )}</small
       ></label
     >

@@ -21,6 +21,7 @@ import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
   TOOL_TREE_COMPILED_MODULES,
@@ -46,14 +47,31 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/chanceColorScale.js',
     'src/ui/svelte/util/dropRateTier.js',
     'src/utils/rollFormulaRollability.js',
+    // The LINKED-ITEM CARD's two leaves (issue 1373): the drag action the shipped drop zone
+    // attaches, and the payload reader that accepts a compendium `{pack, id}` drag as well as a
+    // sidebar `{uuid}` one.
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/util/dropUtils.js',
+    // The REQUIREMENTS TAB's two: the prerequisite one-line preview the checklist rows render,
+    // and the roll-data display/store conversion its bonus field is written through.
+    'src/systems/characterModifierPrerequisiteCopy.js',
+    'src/systems/characterPrerequisites.js',
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/apps/manager/ChecklistCardRow.svelte',
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+    // THE LINKED-ITEM CARD AND THE REQUIREMENTS TAB (issue 1373). Both are shipped components
+    // this page now renders rather than second copies of them, so both join the manifest; a
+    // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
@@ -119,7 +137,16 @@ let reportedDirty = [];
  * @param {object} options
  * @returns {Promise<HTMLElement>}
  */
-async function mountTab({ scope, actions = {}, tab = 'identity' }) {
+async function mountTab({
+  scope,
+  actions = {},
+  tab = 'identity',
+  worldItems = [],
+  prerequisiteOptions = [],
+  onSourceDrop = () => {},
+  onCopySourceUuid = () => {},
+  onUnlinkSource = () => {},
+}) {
   draftHandle = null;
   reportedIdentities = [];
   reportedDirty = [];
@@ -127,6 +154,11 @@ async function mountTab({ scope, actions = {}, tab = 'identity' }) {
     scope,
     actions,
     entityId: 'pick',
+    worldItems,
+    prerequisiteOptions,
+    onSourceDrop,
+    onCopySourceUuid,
+    onUnlinkSource,
     onDraftChange: (handle) => {
       draftHandle = handle;
     },
@@ -516,6 +548,211 @@ describe('the world Tool entry (issue 1373)', () => {
 
       const empty = await mountWithDice('');
       assert.ok(!empty.querySelector('[data-world-tool-entry-formula-error]'));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // THE LINKED-ITEM CARD, RELOCATED FROM THE SYSTEM EDITOR (issue 1373)
+  // -------------------------------------------------------------------------
+  describe('the linked-item card', () => {
+    const LINKED_ITEM = {
+      uuid: 'Item.pick',
+      name: 'Mining Pick',
+      img: 'icons/tools/pick.webp',
+      description: 'A sturdy iron pick.',
+    };
+
+    it('renders the drop target, both actions and the linked Item OWN description', async () => {
+      const target = await mountTab({ scope: scopeFor(), worldItems: [LINKED_ITEM] });
+      const card = target.querySelector('[data-world-tool-entry-card="linked-item"]');
+      assert.ok(Boolean(card), 'the world entry owns the card now');
+
+      const zone = card.querySelector('[data-tool-source-card]');
+      assert.ok(Boolean(zone), 'and it is the SHIPPED drop zone rather than a static tile');
+      assert.match(
+        zone.querySelector('[data-tool-source-drop-hint]').textContent,
+        /Drop another Item here to replace the linked source\./
+      );
+      assert.ok(Boolean(zone.querySelector('[data-tool-source-copy-uuid]')), 'copy uuid');
+      assert.ok(Boolean(zone.querySelector('[data-world-tool-entry-source-unlink]')), 'unlink');
+      // THE DESCRIPTION IS THE ITEM'S, not the world record's: the projection's entity says
+      // `A pick.` and the live Item says otherwise, so a card reading the record would show the
+      // wrong one here.
+      assert.match(
+        target.querySelector('[data-world-tool-entry-source-description]').textContent,
+        /A sturdy iron pick\./
+      );
+    });
+
+    it('routes copy, unlink and a replacement drop through their named callbacks', async () => {
+      const calls = [];
+      const target = await mountTab({
+        scope: scopeFor(),
+        worldItems: [LINKED_ITEM],
+        onCopySourceUuid: (uuid) => calls.push(['copy', uuid]),
+        onUnlinkSource: () => calls.push(['unlink']),
+        onSourceDrop: (data) => calls.push(['drop', data.uuid]),
+      });
+
+      target.querySelector('[data-tool-source-copy-uuid]').click();
+      target.querySelector('[data-world-tool-entry-source-unlink]').click();
+      const zone = target.querySelector('[data-tool-source-card]');
+      dispatchDrop(zone, { type: 'Item', uuid: 'Item.replacement' });
+
+      assert.deepEqual(calls, [['copy', 'Item.pick'], ['unlink'], ['drop', 'Item.replacement']]);
+
+      // The document-type check is what keeps an Actor or a Macro out of a Tool's source link,
+      // and the widened uuid guard is what lets a compendium `{pack, id}` drag through.
+      dispatchRejectedDrops(zone);
+      assert.equal(calls.filter(([kind]) => kind === 'drop').length, 1);
+      dispatchDrop(zone, { type: 'Item', pack: 'fabricate.items', id: 'legacy' });
+      assert.equal(calls.filter(([kind]) => kind === 'drop').length, 2);
+    });
+
+    it('offers a LINKING prompt, and no copy or unlink, for a record with no source', async () => {
+      const scope = scopeFor();
+      const entry = scope.entries.find((candidate) => candidate.id === 'pick');
+      entry.entity = { ...entry.entity, originItemUuid: '', registeredItemUuid: '' };
+      entry.hasSourceLink = false;
+
+      const target = await mountTab({ scope });
+
+      assert.ok(!target.querySelector('[data-tool-source-copy-uuid]'), 'nothing to copy');
+      assert.ok(!target.querySelector('[data-world-tool-entry-source-unlink]'), 'nothing to cut');
+      assert.ok(!target.querySelector('[data-world-tool-entry-source-description]'));
+      // THE COPY MATCHES THE CONTROLS. It used to promise `name, art and description are
+      // authored here` on a screen with no art control and no colour control; the art comes
+      // from the linked Item and there is nothing to author it with, so the hint says that.
+      const hint = target.querySelector('[data-world-tool-entry-unlinked]').textContent;
+      assert.match(hint, /name and description/);
+      assert.match(hint, /art comes from the linked Item/);
+    });
+
+    it('marks a link whose Item has gone MISSING, without accusing an unloaded roster', async () => {
+      const loaded = await mountTab({
+        scope: scopeFor(),
+        worldItems: [{ uuid: 'Item.something-else', name: 'Other' }],
+      });
+      assert.equal(
+        loaded.querySelector('[data-tool-source-card]').dataset.itemDropState,
+        'missing'
+      );
+
+      const unloaded = await mountTab({ scope: scopeFor(), worldItems: [] });
+      assert.ok(
+        !unloaded.querySelector('[data-tool-source-card]').hasAttribute('data-item-drop-state'),
+        'an EMPTY roster is a roster that has not loaded, not a broken link'
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // THE REQUIREMENTS TAB (issue 1373)
+  // -------------------------------------------------------------------------
+  describe('the Requirements tab', () => {
+    const PREREQUISITES = [
+      { id: 'trained', name: 'Trained in Smithing', expression: '@prof >= 2' },
+      { id: 'strong', name: 'Strength 13 or higher', expression: '@abilities.str.mod >= 2' },
+    ];
+
+    it('is the FOURTH tab, between Breakage and Validation', async () => {
+      const target = await mountTab({ scope: scopeFor() });
+      const tabs = [...target.querySelectorAll('[data-world-tool-entry-tab]')];
+      assert.deepEqual(
+        tabs.map((tab) => tab.dataset.worldToolEntryTab),
+        ['identity', 'breakage', 'requirements', 'validation']
+      );
+      // THE VALIDATION BADGE STILL HOLDS. The strip grew a tab, and the badge is attached by
+      // id rather than by position, so this is what proves the fourth tab did not displace it.
+      assert.ok(
+        Boolean(target.querySelector('[data-world-tool-entry-tab-badge="validation"]')),
+        'the Validation tab keeps its own count badge'
+      );
+    });
+
+    it('keeps the tab panel focusable and labelled by the tab it belongs to', async () => {
+      const target = await mountTab({ scope: scopeFor(), tab: 'requirements' });
+      const panel = target.querySelector('[role="tabpanel"]');
+      assert.equal(panel.id, 'world-tool-entry-panel-requirements');
+      assert.equal(panel.getAttribute('aria-labelledby'), 'world-tool-entry-tab-requirements');
+      assert.equal(panel.getAttribute('tabindex'), '-1');
+      assert.equal(panel.getAttribute('data-keyboard-focus'), 'true');
+    });
+
+    it('renders the SHIPPED requirements tab over the world defaults', async () => {
+      const target = await mountTab({
+        scope: scopeFor({
+          prerequisites: { enabled: true, ids: ['trained'], gateMode: 'usability' },
+          bonus: { enabled: true, expression: '@prof' },
+        }),
+        tab: 'requirements',
+        prerequisiteOptions: PREREQUISITES,
+      });
+
+      assert.ok(Boolean(target.querySelector('[data-tool-requirements-tab]')));
+      assert.equal(target.querySelector('[data-tool-prerequisites-enabled]').checked, true);
+      assert.equal(target.querySelector('[data-tool-bonus-enabled]').checked, true);
+      // Scoped to the prerequisite LIST, not the whole tab: the two section enable switches are
+      // checkboxes too, and they carry the browser default value `on`.
+      const checked = [
+        ...target.querySelectorAll('.manager-tool-prerequisite-list input[type=checkbox]'),
+      ]
+        .filter((input) => input.checked)
+        .map((input) => input.value);
+      assert.deepEqual(checked, ['trained']);
+    });
+
+    it('BUFFERS a prerequisite edit and writes it as a world-default SECTION on Save', async () => {
+      const writes = [];
+      const target = await mountTab({
+        scope: scopeFor(),
+        tab: 'requirements',
+        prerequisiteOptions: PREREQUISITES,
+        actions: {
+          updateWorldDefaultSection: (id, section, value) => {
+            writes.push([id, section, value]);
+            return true;
+          },
+        },
+      });
+
+      const toggle = target.querySelector('[data-tool-prerequisites-enabled]');
+      toggle.checked = true;
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      assert.deepEqual(writes, [], 'nothing is persisted before the flush');
+
+      await flushDraft();
+      assert.deepEqual(writes, [
+        ['pick', 'prerequisites', { enabled: true, ids: [], gateMode: 'usability' }],
+      ]);
+    });
+
+    it('states the inherit count for BOTH new sections, before an edit lands', async () => {
+      const target = await mountTab({ scope: scopeFor(), tab: 'requirements' });
+      for (const section of ['prerequisites', 'bonus']) {
+        assert.match(
+          target.querySelector(`[data-world-tool-entry-inherit-count="${section}"]`).textContent,
+          /2 crafting systems inherit this world default today\./,
+          `${section} states its reach`
+        );
+      }
+    });
+
+    it('adds the two missing preview rules, so the resolved column states four rules', async () => {
+      const target = await mountTab({
+        scope: scopeFor({
+          prerequisites: { enabled: true, ids: ['trained'], gateMode: 'usability' },
+          bonus: { enabled: true, expression: '@prof' },
+        }),
+      });
+      const rules = [...target.querySelectorAll('[data-world-tool-entry-preview-rule]')].map(
+        (row) => row.dataset.worldToolEntryPreviewRule
+      );
+      assert.ok(rules.includes('prerequisites'), 'the character gate is stated');
+      assert.ok(rules.includes('bonus'), 'and so is the check bonus');
+      const text = target.querySelector('[data-world-tool-entry-preview]').textContent;
+      assert.match(text, /1 prerequisite/);
+      assert.match(text, /Adds @prof/);
     });
   });
 });

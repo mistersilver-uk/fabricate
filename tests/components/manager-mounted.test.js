@@ -20037,41 +20037,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tools');
   });
 
-  it('always resolves a Tool source replacement and stages the complete snapshot only on success', async () => {
-    const resolved = {
-      uuid: 'Compendium.mythwright.items.Item.smith-hammer',
-      name: "Smith's Hammer",
-      img: 'icons/tools/hand/hammer-and-nail.webp',
-      type: 'weapon',
-      description: 'A complete resolved Tool source snapshot.',
-    };
-    const requested = [];
-    const calls = await mountToolRoute({
-      services: {
-        resolveToolSource: async (uuid) => {
-          requested.push(uuid);
-          return uuid === resolved.uuid ? resolved : null;
-        },
-      },
-    });
+  it('offers NO source drop zone on the system Tool editor, at any tab', async () => {
+    // THE RELOCATION, MEASURED AT THE ROUTE (issue 1373). The system editor used to carry the
+    // linked-item card, so a crafting system could re-point which world Item a Tool IS.
+    // Identity is world-scoped; the card and its resolve-then-write behaviour moved to the
+    // world Tool entry, where the block at the end of this file exercises them.
+    const calls = await mountToolRoute({});
     await openFixtureToolEditor(calls);
 
-    for (const uuid of [resolved.uuid, 'Compendium.mythwright.items.Item.missing']) {
-      const drop = new Event('drop', { bubbles: true, cancelable: true });
-      Object.defineProperty(drop, 'dataTransfer', {
-        value: { getData: () => JSON.stringify({ type: 'Item', uuid }) },
-      });
-      target.querySelector('[data-item-drop-zone="tool-source"]').dispatchEvent(drop);
-      await Promise.resolve();
-      await tick();
-      flushSync();
-    }
-
-    assert.deepEqual(requested, [resolved.uuid, 'Compendium.mythwright.items.Item.missing']);
-    assert.deepEqual(
-      calls.filter((call) => call[0] === 'stageToolDraftSource'),
-      [['stageToolDraftSource', resolved.uuid, resolved]]
-    );
+    assert.ok(!target.querySelector('[data-item-drop-zone="tool-source"]'));
+    assert.ok(!target.querySelector('[data-tool-source-copy-uuid]'));
+    assert.ok(!target.querySelector('[data-tool-source-unlink]'));
   });
 
   it('keeps a dirty Tool mounted when navigation chooses Keep editing', async () => {
@@ -26209,6 +26185,31 @@ describe('CraftingSystemManager mounted behavior', () => {
       return {
         corpus: () => corpus,
         isSeeded: () => true,
+        // ── THE TWO SEAMS A WORLD-SCOPE WRITE NEEDS (issue 1373) ───────────────────────────
+        // `worldScopeActions` reads the PERSISTED payload, edits it and saves it back, so a
+        // double carrying `corpus()` alone cannot serve a write at all: it throws on the
+        // missing `save`. The persisted shape is a map per sub-key and the published corpus is
+        // an array per sub-key, and these two are where that conversion lives in production, so
+        // the double does it rather than pretending the two shapes are one.
+        //
+        // `save` REPLACES the corpus object rather than mutating it, which is the property the
+        // resolved-union memo keys on.
+        get: () => ({
+          ...extraCorpus,
+          entities: corpus.entities.map((entry) => ({ ...entry })),
+          defaults: Object.fromEntries(corpus.defaults.map((entry) => [entry.id, entry])),
+          membership: Object.fromEntries(
+            corpus.membership.map((entry) => [`${entry.entityId}|${entry.systemId}`, entry])
+          ),
+        }),
+        save(payload) {
+          corpus = {
+            ...extraCorpus,
+            entities: [...(payload?.entities ?? [])],
+            defaults: Object.values(payload?.defaults ?? {}),
+            membership: Object.values(payload?.membership ?? {}),
+          };
+        },
         replace(next) {
           corpus = { entities: next, defaults: [], membership: [], ...extraCorpus };
         },
@@ -26257,6 +26258,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       worldTools,
       craftingCheck,
       resolutionMode,
+      // The COMPONENT's services bag, which is a different one from the admin store's: the
+      // shell reaches `services.resolveToolSource` to turn a drag payload into a snapshot, and
+      // that seam has no other route into the mounted tree (issue 1373).
+      componentServices = {},
     } = {}) {
       scopeStores = {
         component: scopeStore(worldEntities(3, 'comp')),
@@ -26293,7 +26298,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       await store.refresh();
       target = document.createElement('div');
       document.body.appendChild(target);
-      mounted = mount(Component, { target, props: { store, services: {} } });
+      mounted = mount(Component, { target, props: { store, services: componentServices } });
       flushSync();
       await tick();
       flushSync();

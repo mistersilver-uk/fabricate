@@ -157,6 +157,11 @@ const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
 const toolOverviewSource = readFileSync(toolOverviewPath, 'utf8');
 const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
 const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
+// The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
+const worldToolEntrySource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte'),
+  'utf8'
+);
 const appSource = readFileSync(appPath, 'utf8');
 const hostSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'),
@@ -3253,29 +3258,65 @@ describe('CraftingSystemManager source contract', () => {
       !toolBreakageSource.includes('BreakageKicker'),
       'Breakage should not restore the redundant BREAKAGE kicker'
     );
+    // ── THE LINKED-ITEM CARD IS NOT AT SYSTEM SCOPE, AND THAT IS THE ASSERTION (issue 1373) ──
+    // These four used to require the drop zone, the copy-uuid action, the unlink action and the
+    // replace hint on THIS tab. They were a capability the model forbids: identity is
+    // world-scoped, so a crafting system must not be able to re-point which world Item a Tool
+    // IS. The card moved whole to the world Tool entry, and the requirements below follow it
+    // there rather than being deleted — a removed assertion proves nothing about where the
+    // capability went.
     assert.ok(
-      !toolOverviewSource.includes('compactSourceId'),
-      'Overview should not expose the raw or compact source UUID'
+      !toolOverviewSource.includes('<ItemDropZone'),
+      'the system Overview must not carry a source drop zone'
     );
     assert.ok(
-      !toolOverviewSource.includes('<code title={source.uuid'),
-      'Overview should not render the source UUID below the source name'
+      !toolOverviewSource.includes('onSourceDrop') &&
+        !toolOverviewSource.includes('onUnlinkSource') &&
+        !toolOverviewSource.includes('onCopySourceUuid'),
+      'nor any of the three source-link callbacks'
     );
     assert.ok(
-      toolOverviewSource.includes('<ItemDropZone'),
-      'Overview should reuse the shared drag-only Item drop zone'
+      worldToolEntrySource.includes('<ItemDropZone'),
+      'the world Tool entry reuses the shared drag-only Item drop zone'
     );
     assert.ok(
-      /copyLabel=[\s\S]*?unlinkLabel=/.test(toolOverviewSource),
-      'Overview should place the Copy source UUID action before Unlink'
+      /copyLabel=[\s\S]*?unlinkLabel=/.test(worldToolEntrySource),
+      'and places the Copy source UUID action before Unlink'
     );
     assert.ok(
-      toolOverviewSource.includes('SourceDropHint'),
-      'Overview should explain that dropping an Item replaces the linked source'
+      worldToolEntrySource.includes('SourceDropHint'),
+      'and explains that dropping an Item replaces the linked source'
     );
     assert.ok(
-      !toolOverviewSource.includes('data-tool-source-replace'),
-      'Overview should not offer the removed source picker'
+      !worldToolEntrySource.includes('data-tool-source-replace'),
+      'without reviving the removed source picker'
+    );
+    // THE SYSTEM LABEL FIELD SURVIVES, and names itself as an OVERRIDE of the world value.
+    // The maintainer's ruling keeps both fields; what was wrong was that neither scope's copy
+    // acknowledged the other.
+    assert.ok(
+      toolOverviewSource.includes('data-tool-label'),
+      'the per-system display-label override still ships'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Tools.Editor.LabelFallback,
+      'Overrides the world Tool name in this crafting system only. Leave blank to use the world Tool name.'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelHint,
+      'The shared name for this Tool. Every crafting system shows it unless that system overrides the name in its own rules.'
+    );
+    // TASK 4: the editor behind `Edit rules` offers the route the rules LIST already advertises.
+    assert.ok(
+      toolEditSource.includes('data-tool-editor-world-tool') &&
+        toolEditSource.includes('onEditWorldTool'),
+      'the focused Tool editor offers a route out to the world Tool'
+    );
+    assert.ok(
+      rootSource.includes(
+        "onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}"
+      ),
+      'and the root wires it to the same navigation the rules inspector takes'
     );
     assert.ok(
       toolValidationSource.includes('<ScopedValidationTab'),

@@ -211,7 +211,7 @@ describe('InheritRow (mounted)', () => {
     assert.equal(root.querySelectorAll(EMPTY_STATE_SELECTOR).length, 0, 'no empty state');
   });
 
-  it('draws exactly TWO rows for a tool, and none for the SEEDED section', async () => {
+  it('draws exactly FOUR rows for a tool, and none for the SEEDED section', async () => {
     // NON-VACUITY FIRST. "A seeded section renders none" is satisfied by an EMPTY seeded list,
     // which removes nothing — and the tool list is inert today for a second reason:
     // `TOOL_SECTIONS` never carried `repairRequirements`, so the resolver does not read
@@ -232,7 +232,9 @@ describe('InheritRow (mounted)', () => {
     const rows = [...root.querySelectorAll('[data-scoped-inherit-row]')].map((row) =>
       row.getAttribute('data-scoped-inherit-row')
     );
-    assert.deepEqual(rows, ['breakage', 'onBreak']);
+    // FOUR since `1.31.0` (issue 1373): `prerequisites` and `bonus` became world-default
+    // sections with inherit switches of their own.
+    assert.deepEqual(rows, ['breakage', 'onBreak', 'prerequisites', 'bonus']);
     for (const seeded of SCOPED_SEEDED_SECTIONS.tool) {
       assert.equal(
         rows.includes(seeded),
@@ -260,11 +262,15 @@ describe('InheritRow (mounted)', () => {
     const states = [...root.querySelectorAll('[data-scoped-inherit-state]')].map((chip) =>
       chip.getAttribute('data-scoped-inherit-state')
     );
-    assert.deepEqual(states, ['overridden', 'inherited'], 'an absent key reads as inheriting');
+    assert.deepEqual(
+      states,
+      ['overridden', 'inherited', 'inherited', 'inherited'],
+      'an absent key reads as inheriting'
+    );
     const toggles = [...root.querySelectorAll('[data-scoped-inherit-toggle]')];
     assert.deepEqual(
       toggles.map((toggle) => toggle.getAttribute('aria-pressed')),
-      ['false', 'true']
+      ['false', 'true', 'true', 'true']
     );
   });
 
@@ -292,6 +298,8 @@ describe('InheritRow (mounted)', () => {
     assert.deepEqual(calls, [
       ['breakage', false],
       ['onBreak', true],
+      ['prerequisites', false],
+      ['bonus', false],
     ]);
   });
 

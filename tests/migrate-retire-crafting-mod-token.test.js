@@ -446,12 +446,14 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
   // the currency configuration to world scope (issue 1278), `1.27.0` lifts travel — realms and
   // their map links — to world scope too (issue 1282), `1.28.0` lifts both character libraries
   // (issue 1308), `1.29.0` folds manual force lists into their picked lists (issue 1315), and
-  // `1.30.0` lifts components, essences and tools to world scope (issue 1363).
-  // The count is asserted rather than loosened so an ELEVENTH migration landing here is noticed
-  // rather than absorbed — which is exactly how the fourth through tenth were.
-  assert.equal(result.ran, 10);
+  // `1.30.0` lifts components, essences and tools to world scope (issue 1363), and `1.31.0`
+  // backfills each system's own tool prerequisites and check bonus as its own override
+  // (issue 1373).
+  // The count is asserted rather than loosened so a TWELFTH migration landing here is noticed
+  // rather than absorbed — which is exactly how the fourth through eleventh were.
+  assert.equal(result.ran, 11);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.30.0');
+  assert.equal(store.get('migrationVersion'), '1.31.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner

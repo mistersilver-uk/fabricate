@@ -18,6 +18,12 @@
 
   let {
     tool = null,
+    // THE WORLD TOOL CORPUS, read for ONE question: does a world record exist for this Tool?
+    // `toolScopeProps` was already being spread in by the call site and silently dropped, so
+    // declaring it costs no new wiring. The button below must not offer a route to an entry
+    // editor that would open on nothing, which is the state a pre-migration in-system Tool with
+    // no world half is in.
+    scope = null,
     systemName = '',
     validation = { valid: false, errors: [] },
     persisted = true,
@@ -26,7 +32,6 @@
     saveError = null,
     activeTab = 'overview',
     focusValidationNonce = 0,
-    worldItems = [],
     managedItems = [],
     itemTags = [],
     essenceOptions = [],
@@ -43,9 +48,18 @@
     onTabChange = () => {},
     onPatch = () => {},
     onToggleEnabled = () => {},
-    onSourceDrop = () => {},
-    onCopySourceUuid = () => {},
-    onUnlinkSource = () => {},
+    // ── THE ROUTE OUT TO THE WORLD TOOL (issue 1373) ────────────────────────────────────────
+    // The rules LIST already claims this Tool inherits world defaults, offers `What it would
+    // inherit here`, and pins an `Edit the world Tool` button to its inspector. The editor
+    // behind `Edit rules` offered no route to that record at all, so the list advertised a
+    // destination the next screen could not reach. This is the same navigation the inspector's
+    // button takes, wired to the same shell handler; the design puts it in the header band, as
+    // `World Tool`, beside `Back to Tool Rules`.
+    //
+    // The LINK ITSELF is not authored here any more, and the three wires that used to do it —
+    // `onSourceDrop`, `onCopySourceUuid`, `onUnlinkSource` — are gone with the card that used
+    // them. See `tools/ToolOverviewTab` for why.
+    onEditWorldTool = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -71,6 +85,18 @@
   const requirementCount = $derived(
     (tool?.prerequisites?.enabled ? tool.prerequisites.ids?.length || 0 : 0) +
       (tool?.bonus?.enabled ? 1 : 0)
+  );
+
+  /**
+   * Whether the world catalogue actually holds a record for this Tool.
+   *
+   * `false` is a real answer rather than a fallback: a pre-migration in-system Tool that no
+   * `1.30.0` pass has lifted has no world half, and routing to its entry editor would land the
+   * GM on the `no longer in the corpus` state. The button is simply absent there.
+   */
+  const worldRecordExists = $derived(
+    Array.isArray(scope?.entries) &&
+      scope.entries.some((entry) => String(entry?.id ?? '') === String(tool?.id ?? ''))
   );
 </script>
 
@@ -112,6 +138,17 @@
              that lands here now lands everywhere the primitive is used. Their rendering is
              unchanged: `fab-manager-button` re-declares the same `.manager-header-actions`
              values these already inherit from their ancestor. -->
+        {#if worldRecordExists}
+          <ManagerButton
+            data-tool-editor-world-tool={String(tool?.id ?? '')}
+            aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
+            onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
+            disabled={saving}
+            ><i class="fas fa-globe" aria-hidden="true"></i><span
+              >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span
+            ></ManagerButton
+          >
+        {/if}
         <ManagerButton
           role="ghost"
           data-tool-editor-back
@@ -170,17 +207,7 @@
       tabindex="0"
     >
       {#if activeTab === 'overview'}
-        <ToolOverviewTab
-          {tool}
-          {worldItems}
-          {managedItems}
-          {persisted}
-          {onPatch}
-          {onToggleEnabled}
-          {onSourceDrop}
-          {onCopySourceUuid}
-          {onUnlinkSource}
-        />
+        <ToolOverviewTab {tool} {managedItems} {persisted} {onPatch} {onToggleEnabled} />
       {:else if activeTab === 'breakage'}
         <ToolBreakageTab
           {tool}

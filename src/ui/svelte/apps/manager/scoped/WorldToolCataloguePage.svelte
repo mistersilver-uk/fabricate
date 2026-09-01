@@ -41,7 +41,8 @@
   nothing there rather than guessing.
 
   == THE THIRD SECTION HAS NO INHERIT COUNT, AND THE INSPECTOR SAYS SO ====================
-  The shell renders one inherit count per `scope.sections`, which is `['breakage', 'onBreak']`.
+  The shell renders one inherit count per `scope.sections`, which is
+  `['breakage', 'onBreak', 'prerequisites', 'bonus']` since `1.31.0`.
   `repairRequirements` is deliberately absent from that list - it is SEEDED once when a tool
   joins a system and then diverges - so a shell iterating the counts drops it silently. It is
   restored through `extraCards`, the shell's own slot for a card the SECTION LOOP cannot
@@ -253,7 +254,53 @@
   const sectionIcons = $derived({
     breakage: worldCheckDriven ? 'fas fa-dice-d20' : 'fas fa-hourglass-half',
     onBreak: 'fas fa-heart-crack',
+    prerequisites: 'fas fa-user-shield',
+    bonus: 'fas fa-plus-minus',
   });
+
+  /**
+   * The world-default `prerequisites` card's title: how many gates a character must pass.
+   *
+   * The wording is the SHIPPED preview copy `projectToolBehaviorFacts` uses for the same fact at
+   * system scope, so the catalogue and the editor cannot describe one rule two ways.
+   *
+   * @param {object|null} entry
+   * @returns {string}
+   */
+  function prerequisiteLabel(entry) {
+    const prerequisites = entry?.defaults?.prerequisites;
+    const ids = Array.isArray(prerequisites?.ids) ? prerequisites.ids : [];
+    if (prerequisites?.enabled !== true) {
+      return text(
+        'FABRICATE.Admin.Manager.Tools.Editor.PreviewPrerequisitesDisabled',
+        'No prerequisites to use'
+      );
+    }
+    return format(
+      ids.length === 1
+        ? 'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteOne'
+        : 'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteCount',
+      ids.length === 1 ? '1 prerequisite' : '{count} prerequisites',
+      { count: ids.length }
+    );
+  }
+
+  /**
+   * The world-default `bonus` card's title: what the Tool adds to the check.
+   *
+   * @param {object|null} entry
+   * @returns {string}
+   */
+  function bonusLabel(entry) {
+    const bonus = entry?.defaults?.bonus;
+    const expression = String(bonus?.expression ?? '').trim();
+    if (bonus?.enabled !== true || expression === '') {
+      return text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusDisabled', 'No check bonus');
+    }
+    return format('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusValue', 'Adds {expression}', {
+      expression,
+    });
+  }
 
   const sectionTitles = $derived(
     selectedEntry
@@ -264,6 +311,8 @@
             'On break: {action}',
             { action: onBreakActionLabel(selectedEntry).toLocaleLowerCase() }
           ),
+          prerequisites: prerequisiteLabel(selectedEntry),
+          bonus: bonusLabel(selectedEntry),
         }
       : {}
   );
@@ -286,6 +335,26 @@
             'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak',
             'Runs immediately after breakage'
           ),
+          prerequisites:
+            selectedEntry.defaults?.prerequisites?.enabled === true
+              ? text(
+                  'FABRICATE.Admin.Manager.Tools.Editor.PreviewPrerequisites',
+                  'A character must satisfy every selected prerequisite'
+                )
+              : text(
+                  'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoPrerequisites',
+                  'Any character may use it'
+                ),
+          bonus:
+            selectedEntry.defaults?.bonus?.enabled === true
+              ? text(
+                  'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus',
+                  'Added to the crafting check'
+                )
+              : text(
+                  'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
+                  'Adds nothing to the crafting check'
+                ),
         }
       : {}
   );

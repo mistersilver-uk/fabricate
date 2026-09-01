@@ -161,7 +161,7 @@ test('the untorn pass writes all SEVEN legs, with the re-key map FIRST and the t
       `${scopeKey} is a DESTINATION and must precede its source`
     );
   }
-  assert.equal(store.get('migrationVersion'), '1.30.0');
+  assert.equal(store.get('migrationVersion'), '1.31.0');
   // The `defaults` sub-key is WRITTEN and POPULATED: since the maintainer's donor ruling it
   // carries one record per entity whose oldest contributing system authored a liftable section.
   // Seededness still keys on key PRESENCE, so the key must be written either way.
@@ -220,7 +220,7 @@ for (const leg of LEGS) {
     const rerun = makeRunner(Object.fromEntries(torn.store.entries()));
     const rerunSummary = await rerun.runner.run();
     assert.equal(rerunSummary.aborted, false);
-    assert.equal(rerun.store.get('migrationVersion'), '1.30.0');
+    assert.equal(rerun.store.get('migrationVersion'), '1.31.0');
     assert.deepEqual(
       finalState(rerun.store),
       untornFinal,
@@ -273,7 +273,7 @@ test('the ready-pass interaction: a same-boot pass must NOT destroy the map of a
   // AT THE NEXT BOOT the map is STILL PRESENT and the re-run repairs `gatheringConfig`.
   const rerun = makeRunner(Object.fromEntries(torn.store.entries()));
   await rerun.runner.run();
-  assert.equal(rerun.store.get('migrationVersion'), '1.30.0');
+  assert.equal(rerun.store.get('migrationVersion'), '1.31.0');
 
   // AND THE MAP IS EVENTUALLY CLEARED. Without this assertion the arm passes against a pass
   // that withholds the clear but advances its own version, which orphans the map permanently.
@@ -334,8 +334,16 @@ test('idempotence (d): a world already at 1.30.0 never re-enters the migration',
   initial.migrationVersion = '1.30.0';
   const { runner, writes } = makeRunner(initial);
   const summary = await runner.run();
-  assert.equal(summary.ran, 0);
-  assert.deepEqual(writes, [], 'nothing is persisted at all');
+  // ONE entry is pending, and it is NOT this one: issue 1373's `1.31.0` sits above `1.30.0` on
+  // the ladder. What this test measures is that the world-scope LIFT does not re-enter, and the
+  // empty write list is what proves it — the `1.31.0` pass finds no tool membership record here
+  // to backfill, so it changes nothing and no leg is written.
+  assert.equal(summary.ran, 1, 'only the 1.31.0 backfill above it is pending');
+  assert.deepEqual(
+    writes,
+    ['migrationVersion'],
+    'no CORPUS leg is persisted — the version bump the 1.31.0 entry earns is the only write'
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,6 @@ import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
@@ -170,7 +169,7 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('Tool Studio editor (mounted)', () => {
-  it('renders header-only actions, four accessible tabs, linked Item evidence, and no Kind', async () => {
+  it('renders header-only actions, four accessible tabs, and no Kind', async () => {
     const navigation = [];
     const root = await harness.mount(
       props({
@@ -215,12 +214,12 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(tabPanel.id, 'tool-panel-overview');
     assert.equal(tabPanel.getAttribute('aria-labelledby'), 'tool-tab-overview');
     assert.equal(tabPanel.getAttribute('tabindex'), '0');
-    assert.match(root.querySelector('[data-tool-source-card]').textContent, /Smith's Hammer/);
-    assert.equal(root.querySelector('[data-tool-source-card] code'), null);
-    assert.match(
-      root.querySelector('[data-tool-description]').textContent,
-      /well-balanced forge hammer/
-    );
+    // THE LINKED-ITEM CARD IS NOT HERE, and its absence is the assertion (issue 1373). It used
+    // to open this tab with a drop zone, a copy-uuid action and an unlink action, which let a
+    // CRAFTING SYSTEM re-point which game-world Item a Tool IS. Identity is world-scoped, so the
+    // whole card moved to the world Tool entry; `world-tool-entry-mounted` exercises it there.
+    assert.ok(!root.querySelector('[data-tool-source-card]'), 'no source card at system scope');
+    assert.ok(!root.querySelector('[data-tool-description]'), 'and no linked-Item description');
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Smith's Hammer/);
     assert.match(
       root.querySelector('[data-tool-preview-identity]').textContent,
@@ -234,26 +233,13 @@ describe('Tool Studio editor (mounted)', () => {
     const root = await harness.mount(props());
     const sections = [...root.querySelector('[data-tool-overview-tab]').children];
 
+    // TWO REGIONS, not three: the `source` region moved to world scope with the linked-item
+    // card it held (issue 1373). What a crafting system authors about a Tool is the per-system
+    // display-label override and whether the Tool is on here.
     assert.deepEqual(
       sections.map((section) => section.dataset.toolOverviewRegion),
-      ['source', 'identity', 'enabled']
+      ['identity', 'enabled']
     );
-    assert.ok(root.querySelector('[data-tool-source-card][data-tool-source-layout="compact"]'));
-    const sourceCard = root.querySelector('[data-tool-source-card]');
-    assert.equal(sourceCard.getAttribute('role'), null);
-    assert.equal(sourceCard.getAttribute('tabindex'), null);
-    assert.ok(sourceCard.querySelector('[data-tool-source-drop-hint]'));
-    const sourceActions = [
-      ...sourceCard.querySelectorAll('.manager-item-drop-zone-actions > button'),
-    ];
-    assert.deepEqual(
-      sourceActions.map((button) =>
-        button.hasAttribute('data-tool-source-copy-uuid') ? 'copy' : 'unlink'
-      ),
-      ['copy', 'unlink']
-    );
-    assert.equal(sourceCard.querySelector('[data-tool-source-picker]'), null);
-    assert.equal(sourceCard.querySelector('.manager-tool-source-replace'), null);
     assert.equal(root.querySelectorAll('[data-tool-how-it-works] li').length, 6);
     // The bold lead-in and its prose are one sentence and need a separator between them.
     // A literal space in the template is the last token inside the `{#if}`, and Svelte
@@ -285,6 +271,12 @@ describe('Tool Studio editor (mounted)', () => {
         `explainer lead-in "${lead}" must be followed by exactly one space, got ${JSON.stringify(prose.textContent.slice(0, 60))}`
       );
     }
+    // THE EXPLAINER NAMES THE SCREEN THAT CAN ACTUALLY DO IT. It read `Drag any Item into the
+    // Tool Studio to turn it into a Tool` on a screen that no longer has a drop zone.
+    assert.match(
+      root.querySelector('[data-tool-how-it-works] li:nth-child(1)').textContent,
+      /Tools Catalogue/
+    );
     assert.match(
       root.querySelector('[data-tool-how-it-works] li:nth-child(1)').textContent,
       /supplies the name, art, and description/
@@ -317,42 +309,49 @@ describe('Tool Studio editor (mounted)', () => {
       'Read the docs'
     );
     assert.equal(root.querySelector('[data-tool-name]'), null);
-    assert.equal(root.querySelector('[data-tool-description]').matches('input, textarea'), false);
     assert.ok(root.querySelector('[data-tool-label]').closest('.manager-recipe-field'));
     assert.ok(root.querySelector('[data-tool-enabled] .manager-recipe-status-card'));
   });
 
-  it('routes Copy UUID, unlink, and drag-only source replacement through named callbacks', async () => {
-    const calls = [];
+  it('offers NO route to re-point the linked Item, at any of its three former controls', async () => {
+    // The negative half of issue 1373's relocation, asserted as three named absences rather
+    // than one: the drop target, the copy-uuid action and the unlink action were three separate
+    // controls, and a partial removal would leave one of them writing world identity from a
+    // crafting system. The positive half lives in `world-tool-entry-mounted`.
+    const root = await harness.mount(props());
+
+    assert.ok(!root.querySelector('[data-tool-source-card]'), 'no drop target');
+    assert.ok(!root.querySelector('[data-tool-source-copy-uuid]'), 'no copy-uuid action');
+    assert.ok(!root.querySelector('[data-tool-source-unlink]'), 'no unlink action');
+    assert.ok(!root.querySelector('[data-manager-item-drop-zone]'), 'and no drop zone at all');
+  });
+
+  it('routes the header World Tool button out to the world record, when one exists', async () => {
+    // Task 4's whole scope: the rules LIST advertises `Inherits world defaults`, `What it would
+    // inherit here` and an `Edit the world Tool` button, and the editor behind `Edit rules` had
+    // no route to that record at all. This is the same navigation the list's inspector takes.
+    const routed = [];
     const root = await harness.mount(
       props({
-        onCopySourceUuid: (uuid) => calls.push(['copy', uuid]),
-        onUnlinkSource: () => calls.push(['unlink']),
-        onSourceDrop: (data) => calls.push(['drop', data.uuid]),
+        scope: { entries: [{ id: 'hammer' }] },
+        onEditWorldTool: (id) => routed.push(id),
       })
     );
 
-    root.querySelector('[data-tool-source-copy-uuid]').click();
-    root.querySelector('[data-tool-source-unlink]').click();
-    const sourceCard = root.querySelector('[data-tool-source-card]');
-    dispatchDrop(sourceCard, { type: 'Item', uuid: 'Item.replacement' });
+    const button = root.querySelector('[data-tool-editor-world-tool="hammer"]');
+    assert.ok(button, 'the header offers the route');
+    assert.match(button.textContent, /World Tool/);
+    button.click();
+    assert.deepEqual(routed, ['hammer']);
+  });
 
-    assert.deepEqual(calls, [['copy', 'Item.hammer'], ['unlink'], ['drop', 'Item.replacement']]);
+  it('withholds that button for a Tool the world catalogue has no record of', async () => {
+    // `false` is a real answer rather than a fallback: a pre-migration in-system Tool that no
+    // `1.30.0` pass lifted has no world half, and routing there would land the GM on the entry
+    // editor's `no longer in the corpus` state.
+    const root = await harness.mount(props({ scope: { entries: [{ id: 'someone-else' }] } }));
 
-    // Issue 1036/7, at THIS call site: the widened `resolveDropUuid` guard resolves a uuid
-    // out of more drag shapes than the old `data.uuid` read did, so the document-type check
-    // is now the only thing keeping an Actor or a Macro out of a Tool's source link.
-    dispatchRejectedDrops(sourceCard);
-    assert.equal(
-      calls.filter(([kind]) => kind === 'drop').length,
-      1,
-      'the tool source zone still refuses every non-Item and document-less payload'
-    );
-
-    // And the legacy compendium pair IS now accepted here, exactly as its `onDrop` — which
-    // calls `resolveDropUuid` itself — always expected.
-    dispatchDrop(sourceCard, { type: 'Item', pack: 'fabricate.items', id: 'legacy' });
-    assert.equal(calls.filter(([kind]) => kind === 'drop').length, 2);
+    assert.ok(!root.querySelector('[data-tool-editor-world-tool]'));
   });
 
   it('stages only Display label and routes Enabled through immediate persistence', async () => {
@@ -366,7 +365,6 @@ describe('Tool Studio editor (mounted)', () => {
     );
 
     assert.equal(root.querySelector('[data-tool-name]'), null);
-    assert.equal(root.querySelector('[data-tool-description]').matches('input, textarea'), false);
     const label = root.querySelector('[data-tool-label]');
     label.value = 'Display-only name';
     label.dispatchEvent(new Event('input', { bubbles: true }));
