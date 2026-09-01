@@ -5741,22 +5741,61 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (visibleToolRowCount !== 8) {
     throw new Error(`Tool Studio parity library must render exactly 8 rows; found ${visibleToolRowCount}`);
   }
+  // NAME-ASCENDING, not authored order. The Tool Rules screen gained the design's
+  // `SORT BY [Name] [Asc]` control (issue 1373), and `sortKey`/`sortDirection` default to
+  // name/asc exactly as the design draws them. This list previously encoded the order the
+  // fixtures were authored in, which is what a screen with no sort control renders. Do not
+  // "restore" it: an authored-order library here now means the sort defaults regressed.
   const expectedToolNames = [
-    "Smith's Hammer",
-    'Arcane Forge',
     "Alchemist's Supplies",
+    'Arcane Forge',
     'Ley-Line Nexus',
     "Master's Anvil",
     'Moonwell',
+    "Smith's Hammer",
     'Volcanic Vent',
     'Woodcarving Tools',
   ];
-  const visibleToolNames = await visibleToolRows.locator('.manager-tools-select-target strong').allTextContents();
+  const readToolNames = () =>
+    visibleToolRows.locator('.manager-tools-select-target strong').allTextContents();
+  const visibleToolNames = await readToolNames();
   if (JSON.stringify(visibleToolNames) !== JSON.stringify(expectedToolNames)) {
     throw new Error(`Tool Studio parity library order drifted: ${JSON.stringify(visibleToolNames)}`);
   }
+  // Drive the direction toggle, so the constant above is a gate on a working sort rather than a
+  // record of whatever order the library happened to come back in. Descending must be the exact
+  // reverse, and toggling back must restore it — a control that renders but sorts nothing passes
+  // the first assertion and fails these two.
+  const sortDirectionToggle = await requireSingleLocator(
+    manager.locator('[data-tool-sort-direction]'),
+    'Tool Studio sort direction toggle'
+  );
+  await sortDirectionToggle.click();
+  const descendingState = await sortDirectionToggle.getAttribute('data-tool-sort-direction');
+  if (descendingState !== 'desc') {
+    throw new Error(`Tool Studio sort toggle did not report descending; read "${descendingState}"`);
+  }
+  const descendingToolNames = await readToolNames();
+  if (JSON.stringify(descendingToolNames) !== JSON.stringify([...expectedToolNames].reverse())) {
+    throw new Error(
+      `Tool Studio descending sort is not the reverse of ascending: ${JSON.stringify(descendingToolNames)}`
+    );
+  }
+  await sortDirectionToggle.click();
+  const restoredState = await sortDirectionToggle.getAttribute('data-tool-sort-direction');
+  if (restoredState !== 'asc') {
+    throw new Error(`Tool Studio sort toggle did not report ascending; read "${restoredState}"`);
+  }
+  const restoredToolNames = await readToolNames();
+  if (JSON.stringify(restoredToolNames) !== JSON.stringify(expectedToolNames)) {
+    throw new Error(
+      `Tool Studio sort did not restore ascending order: ${JSON.stringify(restoredToolNames)}`
+    );
+  }
   if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
-    throw new Error("Tool Studio parity library did not automatically select Smith's Hammer in the first row");
+    throw new Error(
+      `Tool Studio parity library did not automatically select its first row (${expectedToolNames[0]})`
+    );
   }
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
