@@ -4807,7 +4807,8 @@
               "AddDone": "Done",
               "CandidateUnassigned": "In no party",
               "CandidateInParty": "In {name} — adding moves them",
-              "NoActorsConfigured": "No player-character actors are available to add. Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if a character is missing.",
+              "NoActorsConfigured": "No player-character actors are available to add.",
+              "NoActorsConfiguredHint": "Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if a character is missing.",
               "AllAlreadyMembers": "Every character is already in this party.",
               "NoAddMatches": "No characters match your search."
             },
