@@ -286,6 +286,28 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       /\.fab-inspector-action\.is-danger \{[^}]*color: var\(--fab-danger-text\);/s.test(styles),
       'and the danger treatment preserved on delete'
     );
+    // THE TWO UNFILLED TONES STAY UNFILLED (issue 1372, maintainer parity round 6).
+    //
+    // The rendered symptom the maintainer measured: `Duplicate essence` filled a rung two steps
+    // above the pane its own rail sits on, so a secondary verb read as RAISED where the
+    // prototype's equivalent reads recessed. Unfilled and bounded by `--fab-border` is the
+    // treatment every other card on these screens wears and the one the prototype's own
+    // `← Back` wears, so it is the answer; an exact match is not available, because the
+    // prototype's value sits below the bottom of the ramp and has no token.
+    //
+    // ASSERTED, because this is the fourth parity round on this rail and a fill is the single
+    // easiest declaration to reintroduce while tuning a hover: the hover states directly beneath
+    // these two rules DO carry fills, and a copy-paste between them is all it takes.
+    for (const [selector, pattern] of [
+      ['neutral', /\.fab-inspector-action \{[^}]*background: transparent;/s],
+      ['danger', /\.fab-inspector-action\.is-danger \{[^}]*background: transparent;/s],
+    ]) {
+      assert.ok(
+        pattern.test(styles),
+        `the ${selector} tone must sit ON the pane, not a rung above it — an unfilled button ` +
+          'bounded by --fab-border is what the rail and the prototype both already use'
+      );
+    }
     // It must beat Foundry's host button geometry itself, because it is not `.manager-button`
     // and therefore inherits none of the manager's reset.
     for (const declaration of ['appearance: none;', 'height: auto;', 'font-family: inherit;']) {

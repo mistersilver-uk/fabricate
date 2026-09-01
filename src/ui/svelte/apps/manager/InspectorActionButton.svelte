@@ -128,7 +128,24 @@
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     color: var(--fab-text);
-    background: var(--fab-bg-2);
+
+    /* NO FILL — THE NEUTRAL VERB SITS ON THE PANE, IT DOES NOT STAND OFF IT (issue 1372,
+       maintainer parity round 6).
+
+       This was `--fab-bg-2`, and the rail it lives in was moved onto `--fab-bg-0` in the same
+       epic (`EntityListInspectorFrame.svelte`) — so `Duplicate essence` was painting two rungs
+       ABOVE its own surface and reading as raised. The prototype's equivalent secondary is a
+       step BELOW its surface, on a value that sits under `--fab-bg-0` and has no token; minting
+       one would have to be authored into all seven themes and would move every theme's ramp
+       contour, so the exact value is not available.
+
+       Unfilled and bounded by `--fab-border` is: it is the treatment the prototype's own
+       `← Back` wears next to `Save essence` (`essEntry.png`, where the button's fill measures
+       identical to the header behind it), and it is what every other card on these three screens
+       already does. The affordance is not lost with it — the hover below still washes to
+       `--fab-surface-raised`, the border is the same one the cards carry, and the accent primary
+       directly beneath it is what the eye lands on first, which is the ordering the rail wants. */
+    background: transparent;
     font-family: inherit;
 
     /* 0.72rem (~11.5px), the Tool Studio's header label size. The essence rail rendered
@@ -174,11 +191,14 @@
   }
 
   /* DANGER keeps the panel surface and speaks in danger text and a danger-tinted edge, so a
-     destructive verb reads as destructive without ever out-shouting the primary. */
+     destructive verb reads as destructive without ever out-shouting the primary. It restates
+     the neutral's absent fill rather than inheriting it, because that is the declaration a
+     later tone edit is most likely to reintroduce here on its own: "keeps the panel surface"
+     is the sentence, and a rung is not the panel surface. */
   .fab-inspector-action.is-danger {
     border-color: var(--fab-danger-border);
     color: var(--fab-danger-text);
-    background: var(--fab-bg-2);
+    background: transparent;
   }
 
   .fab-inspector-action.is-danger:not(:disabled):hover {
