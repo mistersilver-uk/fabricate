@@ -152,6 +152,10 @@
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
   import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
   import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
+  // The shipped two-step destructive control, for the world Tool entry's header `Delete`
+  // (issue 1373). It is the manager's one destructive idiom, so the header's Delete is guarded
+  // exactly as the row and card ones already are.
+  import ArmedDangerButton from './ArmedDangerButton.svelte';
   import { confirmScopedEntryExit } from './scoped/scopedEntryDraft.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
@@ -3212,6 +3216,27 @@
 
   function handleWorldToolEntryDirty(dirty) {
     worldToolEntryDirty = dirty === true;
+  }
+
+  /**
+   * THE WORLD TOOL ENTRY'S HEADER `Delete`, which the design draws between Back and Save
+   * (`tmp/proto/tool-entry.png`) and which this screen did not have (issue 1373).
+   *
+   * The page reports an ACTION DESCRIPTOR rather than the shell resolving one: the two labels,
+   * the two consequence sentences and the ordering the write needs all name THIS record and are
+   * derived from values only the editor holds. This half is the arm token, which is the shell's
+   * because `ArmedDangerButton` requires exactly one armed control at a time across the window
+   * and this is where that invariant already lives for every other header action.
+   *
+   * @type {{token: string, label: string, armedLabel: string, idleAriaLabel: string,
+   *   armedAriaLabel: string, run: () => Promise<void>}|null}
+   */
+  let worldToolEntryDelete = $state(null);
+  let worldToolEntryDeleteArmed = $state('');
+
+  function handleWorldToolEntryDelete(descriptor) {
+    worldToolEntryDelete = descriptor ?? null;
+    if (!descriptor) worldToolEntryDeleteArmed = '';
   }
 
   // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK — consistent with the essence entry and
@@ -10038,8 +10063,13 @@
               gate as the rail and the breadcrumb — so an unsaved edit prompts whichever of the
               three ways out a GM takes.
 
-              DELETE IS NOT HERE. It is on the Overview tab, where the sentence stating its
-              reach can sit beside it; see that card's own note.
+              DELETE IS HERE, between them (issue 1373). It used to be a danger CARD on the
+              Overview tab, on the argument that a header button has nowhere to state the reach.
+              That argument was answered rather than overruled: the reach is the armed button's
+              accessible name and hover title, which is where a consequence belongs on a control
+              that has one — and the card idiom it borrowed is the SYSTEM rules editor's `Stop
+              using this Tool here`, so the two scopes had swapped their destructive treatments
+              and a GM met the same verb in two different places one route apart.
             -->
             <ScopedEntryHeaderActions
               backAttribute="data-world-tool-back"
@@ -10050,6 +10080,7 @@
               saving={worldToolEntrySaving}
               onBack={() => setView('world-tools')}
               onSave={saveWorldToolEntry}
+              danger={worldToolEntryDelete ? worldToolDeleteAction : undefined}
             />
           {:else if currentView === 'world-essences'}
             <!--
@@ -11676,12 +11707,12 @@
         getPreviewRollData={worldToolPreviewRollData}
         onBackToCatalogue={() => setView('world-tools')}
         onSourceDrop={relinkWorldToolSource}
-        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
         onUnlinkSource={() => unlinkWorldToolSource(worldScopedEntryId)}
         onDraftChange={handleWorldToolEntryDraft}
         onDirtyChange={handleWorldToolEntryDirty}
         onDraftIdentityChange={handleScopedEntryDraftIdentity}
         onSublineChange={handleWorldToolEntrySubline}
+        onDeleteChange={handleWorldToolEntryDelete}
       />
     {:else if currentView === 'world-vocabulary'}
       <WorldVocabularyPage
@@ -15418,3 +15449,29 @@
         >{/if}{/key}
   </p>
 </div>
+
+<!--
+  THE WORLD TOOL ENTRY'S HEADER `Delete` (issue 1373).
+
+  Rendered into `ScopedEntryHeaderActions`' `danger` slot, which places it between `Back to
+  tools` and `Save tool` — the design's own order. The copy and the write are the PAGE's, and
+  arrive as a descriptor over `onDeleteChange`; what lives here is the arm token, because the
+  manager's invariant is one armed control at a time across the whole window.
+-->
+{#snippet worldToolDeleteAction()}
+  <ArmedDangerButton
+    token={worldToolEntryDelete?.token ?? ''}
+    armed={Boolean(worldToolEntryDelete?.token) &&
+      worldToolEntryDeleteArmed === worldToolEntryDelete.token}
+    idleLabel={worldToolEntryDelete?.label ?? ''}
+    armedLabel={worldToolEntryDelete?.armedLabel ?? ''}
+    idleAriaLabel={worldToolEntryDelete?.idleAriaLabel ?? ''}
+    armedAriaLabel={worldToolEntryDelete?.armedAriaLabel ?? ''}
+    onArm={(token) => (worldToolEntryDeleteArmed = token)}
+    onDisarm={() => (worldToolEntryDeleteArmed = '')}
+    onConfirm={() => {
+      worldToolEntryDeleteArmed = '';
+      worldToolEntryDelete?.run?.();
+    }}
+  />
+{/snippet}

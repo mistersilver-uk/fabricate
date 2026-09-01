@@ -167,9 +167,9 @@ describe('world Tools Catalogue (issue 1373)', () => {
     );
   });
 
-  it('offers a LABELLED row action and a segmented membership filter, not a pen and a select', async () => {
-    // Both are the design's, and both were also the idiom our own system Tool Rules screen
-    // already used — so the two list screens disagreed with each other as well as with it.
+  it('offers a LABELLED row action, and NO membership filter at all', async () => {
+    // The labelled action is the design's, and it was also the idiom our own system Tool Rules
+    // screen already used — so the two list screens disagreed with each other as well as with it.
     const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
 
     const action = target.querySelector(
@@ -178,13 +178,59 @@ describe('world Tools Catalogue (issue 1373)', () => {
     assert.ok(Boolean(action), 'the row still offers its entry action');
     assert.match(action.textContent, /Edit tool/, 'and it NAMES the verb and the noun');
 
-    const segments = [
-      ...target.querySelectorAll('[data-scoped-list-membership-option]'),
-    ].map((segment) => segment.getAttribute('data-scoped-list-membership-option'));
-    assert.deepEqual(segments, ['all', 'member', 'unused']);
+    // THE `All / In a system / Unused` TRACK IS GONE (issue 1373's parity round). It sat between
+    // the search box and `SORT BY`, the design's toolbar has no such control, and its width was
+    // what pushed `Asc` and the result count onto a second row — orphaning the count from the
+    // controls it qualifies. `membershipFilter={false}` is the frame's own opt-out, which the
+    // essence catalogue already takes for the same reason.
     assert.ok(
-      !target.querySelector('select[data-scoped-list-membership]'),
-      'and the bare select is gone rather than rendered beside it'
+      !target.querySelector('[data-scoped-list-membership]'),
+      'the extra segmented filter is gone rather than merely narrowed'
+    );
+    assert.ok(!target.querySelector('select[data-scoped-list-membership]'));
+    // AND THE BULK SELECTION SURVIVES IT, which is the distinction that makes this safe: the
+    // ruled-in `All` box and the per-row checkboxes are a different control from the filter.
+    assert.ok(Boolean(target.querySelector('[data-scoped-list-select-all-page]')), 'select-all');
+    assert.ok(Boolean(target.querySelector('[data-scoped-list-select="hammer"]')), 'row box');
+  });
+
+  it('opens the LIST with the creation zone, not a band beside the breakage card', async () => {
+    const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+    // THE DESIGN PUTS IT UNDER THE TOOLBAR AS THE LIST'S FIRST ELEMENT. It was hoisted out into
+    // the band above, sharing a row with the world breakage card and taking a third of its
+    // width, so the card that states a world-wide rule never spanned its column.
+    const zone = target.querySelector('[data-item-drop-zone="tool-create"]');
+    assert.ok(Boolean(zone), 'the catalogue still owns the surface that makes a Tool');
+    assert.ok(
+      Boolean(zone.closest('[data-scoped-list="world-tools"]')),
+      'and it is inside the list rather than a sibling of it'
+    );
+    assert.ok(
+      !zone.closest('[data-world-tool-break-mode]'),
+      'the world breakage card no longer shares its row'
+    );
+    // IT IS NOT A ROW. Every row affordance below it — selection, inspection, the entry action —
+    // would be a lie on a drop target, so it sits outside the `<ul>`.
+    assert.ok(!zone.closest('li'), 'the zone is not a list item');
+  });
+
+  it('resolves a BLANK display label to the linked Item name on the row', async () => {
+    const scope = scopeFor();
+    const entry = scope.entries.find((candidate) => candidate.id === 'hammer');
+    entry.entity = { ...entry.entity, name: '' };
+    const target = await harness.mount({
+      scope,
+      systems: SYSTEMS,
+      actions: {},
+      worldItems: [{ uuid: entry.entity.originItemUuid, name: 'Smith’s Hammer' }],
+    });
+    // THE ENTRY EDITOR DRAWS THAT LABEL AS OPTIONAL (issue 1373's parity round), so a blank is a
+    // real authored state and the row has to answer it the same way the editor does. Without the
+    // frame's `nameEntry` rung the row prints the record id under a screen that promised the
+    // Item's name would stand in.
+    assert.match(
+      target.querySelector('[data-scoped-list-row="hammer"]').textContent,
+      /Smith’s Hammer/
     );
   });
 

@@ -144,6 +144,12 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../util/dropUtils.js',
   '../../util/foundryBridge.js',
   './AccessTabView.svelte',
+  // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete`
+  // (issue 1373's parity round). The design draws `Back to tools · Delete · Save tool` on
+  // the title line, and `.manager-header` is a sibling of `.manager-main`, so the page
+  // structurally cannot render into that band - it reports an action descriptor and the shell
+  // draws the control. The verb, the reach and the write are all still the page's.
+  './ArmedDangerButton.svelte',
   './BooksScrollsView.svelte',
   './Chip.svelte',
   './ComponentEditView.svelte',

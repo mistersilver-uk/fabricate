@@ -57,21 +57,22 @@
   prohibits one field authored at two places, and the failure it prevents is concrete: two
   controls over one setting disagree the moment either is edited with the other on screen.
 
-  == THE THIRD SECTION IS A SEED RATHER THAN A PARENT =====================================
-  `breakage` and `onBreak` are world defaults a membership record INHERITS: each states how
-  many systems inherit it before an edit lands, read from `entry.inheritCounts`, which
-  `worldScopeProjection` populates from `descriptor.sections` alone.
+  == THE INHERITED SECTIONS ARE WHAT THIS SCREEN AUTHORS ==================================
+  `breakage`, `onBreak`, `prerequisites` and `bonus` are world defaults a membership record
+  INHERITS: each states how many systems inherit it before an edit lands, read from
+  `entry.inheritCounts`, which `worldScopeProjection` populates from `descriptor.sections`
+  alone.
 
-  `repairRequirements` is the third, is NOT in `descriptor.sections`, and therefore carries no
-  inherit count at all - correctly, because it is copied ONCE when a tool joins a system and
-  then diverges freely. A count here would claim a live parent the resolver does not honour,
-  and `resolveTool` reads the list from the MEMBERSHIP RECORD ALONE. So the card states the
-  seed rule instead of a count.
-
-  Its full ingredient-group editor is deliberately NOT here. A repair recipe names ingredient
-  groups over the OWNING SYSTEM's components, which world scope cannot address - `toolScope.js`
-  says so in those terms - so what world scope can honestly own is the seed's PRESENCE, and
-  what it cannot is the group contents. The system Tool rules editor owns those.
+  `repairRequirements` IS NOT AMONG THEM AND IS NOT DRAWN HERE AT ALL. It is not in
+  `descriptor.sections` - correctly, because it is copied ONCE when a tool joins a system and
+  then diverges freely, so an inherit count would claim a live parent the resolver does not
+  honour and `resolveTool` reads the list from the MEMBERSHIP RECORD ALONE. But the deeper
+  reason it is absent is that world scope cannot say anything USEFUL about it: a repair group
+  names ingredient quantities over the OWNING SYSTEM's components, which world scope cannot
+  address - `toolScope.js` says so in those terms - so a card here could only ever state a bare
+  group COUNT and offer to destroy the list behind it. It said exactly that, and offered exactly
+  that, until issue 1373's parity round removed it. The system Tool rules editor owns the seed's
+  contents and therefore owns the seed.
 
   == THE TAB STRIP IS THE SHIPPED ONE ====================================================
   `EditorTabs` was promoted to `apps/manager/` for exactly this, and `tools/ToolEditorTabs`
@@ -79,27 +80,20 @@
   is what stops a second near-identical `.svelte` tab block, which SonarCloud counts.
 -->
 <script>
-  import {
-    evaluatePrerequisite,
-    prerequisitePreview,
-  } from '../../../../../systems/characterPrerequisites.js';
   import { formulaRolls } from '../../../../../utils/rollFormulaRollability.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Field from '../../../components/Field.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
   import Chip from '../Chip.svelte';
   import EditorTabs from '../EditorTabs.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
+  import ToolBehaviorPreview from '../tools/ToolBehaviorPreview.svelte';
   import ToolRequirementsTab from '../tools/ToolRequirementsTab.svelte';
   import { toolBreakageSummary, toolSourceSnapshot } from '../tools/toolStudio.js';
-  import ScopedEntityPreview from './ScopedEntityPreview.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
   import {
@@ -140,6 +134,22 @@
     previewActors = [],
     getPreviewRollData = () => null,
     onBackToCatalogue = () => {},
+    // ── DELETE IS THE HEADER'S, AND THE PAGE STILL OWNS IT (issue 1373) ───────────────────
+    // The design draws `Back to tools · Delete · Save tool` on the title line and puts the
+    // danger-CARD idiom on the SYSTEM screen, where it says `Stop using this Tool here`. The
+    // two scopes had swapped treatments; this screen carried the card and no header button.
+    //
+    // `.manager-header` is a SIBLING of `.manager-main`, so this page structurally cannot draw
+    // into that band — the same reason `Back` and `Save` are the shell's. What crosses is an
+    // ACTION DESCRIPTOR rather than the button: the reach sentence, the two labels and the two
+    // consequence strings all name THIS record and are resolved from values only this page
+    // holds, and the ordering `deleteTool` needs (clear the draft, then write, then leave) is a
+    // rule about this editor rather than about a header.
+    //
+    // REPUBLISHED ON EVERY CHANGE and withdrawn on unmount, exactly as the identity report
+    // beside it: a stale descriptor left behind would arm a Delete against a Tool the GM has
+    // navigated away from.
+    onDeleteChange = () => {},
     // ── THE LINK IS AUTHORED HERE, AND ONLY HERE (issue 1373) ─────────────────────────────
     // The three wires below moved OFF the system Tool editor, which had them and should not
     // have: a crafting system could re-point which game-world Item a Tool IS, while the world
@@ -150,8 +160,10 @@
     // payload into a name, an image and a description needs `services.resolveToolSource`,
     // which reads a Foundry global, and `worldScopeActions` deliberately reads none. So the
     // page raises the RAW drag data and the root resolves and writes.
+    // `onCopySourceUuid` IS GONE with the Copy action beside Unlink (issue 1373). The design's
+    // tile carries one button and two lines; the third line it displaced was a raw uuid, which
+    // is not a fact this screen states anywhere else.
     onSourceDrop = () => {},
-    onCopySourceUuid = () => {},
     onUnlinkSource = () => {},
     // THE BUFFERED EDIT`S THREE WIRES TO THE SHELL. Same contract the world essence entry
     // declares, and deliberately the same names: the shell holds one pattern for both.
@@ -217,9 +229,14 @@
    * the catalogue - so buffering them would put fields in a draft that no control on this
    * screen can move, and `scopedEntryWrites` would send them back unchanged on every Save.
    *
+   * `description` LEFT THE LIST with the textarea that authored it (issue 1373). The design's
+   * Overview has one editable identity field, and the description a Tool has is the linked
+   * game-world Item's — stated read-only on the card above, which is where the design puts it.
+   * A buffered field no control can move is a field `scopedEntryWrites` re-sends on every Save.
+   *
    * @type {readonly string[]}
    */
-  const IDENTITY_FIELDS = Object.freeze(['name', 'description']);
+  const IDENTITY_FIELDS = Object.freeze(['name']);
 
   const BREAKAGE_MODES = ['limitedUses', 'breakageChance', 'diceExpression'];
   const DEFAULT_BREAK_MODE = 'toolSpecific';
@@ -233,7 +250,6 @@
   };
 
   let activeTab = $state('identity');
-  let armedToken = $state('');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -249,21 +265,17 @@
   }
 
   /**
-   * One section's tab and heading label.
+   * One section's tab and heading label, from the ONE shared table.
    *
-   * `scopedSectionLabel` answers from `SECTION_COPY`, which carries the five INHERITED section
-   * names and deliberately not the seeded one - a seeded section renders no inherit row, so
-   * that table never had a reason to name it, and an unknown section falls back to its own key.
-   * `repairRequirements` is exactly that case, and this screen is the one place it is a
-   * heading, so its copy lives here rather than widening a shared table for one caller.
+   * `scopedSectionLabel` answers from `SECTION_COPY`, which carries the INHERITED section names
+   * and deliberately not the seeded one. This screen used to special-case `repairRequirements`
+   * here because it drew that section as a card; it no longer draws it, so the special case
+   * went with it and every section this function is asked about is in the shared table.
    *
    * @param {string} section
    * @returns {string}
    */
   function sectionLabel(section) {
-    if (isSeededToolSection(section)) {
-      return text('FABRICATE.Admin.Manager.Scoped.Sections.RepairRequirements', 'Repair materials');
-    }
     return scopedSectionLabel(section, text);
   }
 
@@ -394,16 +406,6 @@
   $effect(() => () => onDraftIdentityChange(null));
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
   const memberRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
-  const repairGroups = $derived(
-    Array.isArray(defaults.repairRequirements) ? defaults.repairRequirements : []
-  );
-
-  // THE BUFFERED NAME, so the linked-item tile and every aria label on this screen name the
-  // Tool the GM is editing rather than the one still on disk.
-  const entryName = $derived.by(() => {
-    const buffered = String(identity.name ?? '').trim();
-    return buffered || String(entityId || '');
-  });
 
   const tabs = $derived([
     {
@@ -736,6 +738,46 @@
   );
 
   /**
+   * THE NAME THIS SCREEN SHOWS, and the ONE place the optional display label is resolved.
+   *
+   * The buffered value first, so the linked-item tile, the header band and every aria label
+   * name the Tool the GM is editing rather than the one still on disk. Then the LINKED ITEM's
+   * live name, which is what `Leave blank to use the linked Item name.` promises and what makes
+   * the field genuinely optional. The record id last, which is all an unlinked, unnamed record
+   * has.
+   *
+   * It reads `source` rather than the entity's own snapshot on purpose: the snapshot is the
+   * Item as it was when the link was made, and a Tool whose Item has since been renamed would
+   * otherwise inherit a name the Item no longer has.
+   */
+  /**
+   * THE LINKED ITEM'S NAME, which is what a blank display label falls back to.
+   *
+   * TWO RUNGS, and the second is not optional. The live Item first, out of the roster the shell
+   * publishes. Then the world record's OWN persisted snapshot, taken when the link was made -
+   * because the roster is a Foundry read that is empty until the Items directory has loaded, and
+   * a placeholder that vanishes for the first second of every visit is worse than one naming the
+   * Item as it was. `toolSourceSnapshot` makes exactly this substitution for the description one
+   * card above.
+   *
+   * IT IS NOT `source.name`, deliberately: that helper substitutes the literal `Unlinked Tool`
+   * for a missing name, which is right for a tile and wrong for a fallback - a record with a
+   * blank label and no loaded roster would take that string as its name everywhere on the
+   * screen. This answers the empty string instead, and `entryName` falls through to the id.
+   */
+  const linkedItemName = $derived(
+    sourceLinked
+      ? String(
+          worldItems.find((item) => item?.uuid === sourceUuid)?.name ?? entity?.name ?? ''
+        ).trim()
+      : ''
+  );
+
+  const entryName = $derived(
+    String(identity.name ?? '').trim() || linkedItemName || String(entityId || '')
+  );
+
+  /**
    * Whether the selected breakage MODE has a usable VALUE behind it.
    *
    * A mode with no value is not a neutral default: `limitedUses` with no `maxUses` is an
@@ -846,250 +888,56 @@
   });
 
   /**
-   * The world defaults, resolved, as the preview's fact rows.
+   * THE WORLD DEFAULTS AS A TOOL-SHAPED RECORD, for the shared rail.
    *
-   * THE SUBLINE SAYS WHAT THE RULE DOES, never how many systems inherit it. `1 systems
-   * inherit it` was an unpluralised count of a fact the tab bodies already state, in the one
-   * place a GM is asking what the Tool will DO - and it read as debug output beside the
-   * prototype's `Tool-specific · tracked per copy`. The inherit counts stay where they answer
-   * a question: on the section itself, before an edit lands.
+   * `ToolBehaviorPreview` reads `name`, `img` and the four world-default sections and nothing
+   * else, so the world defaults ARE the record from its point of view - the same argument
+   * `requirementsTool` above already makes for `ToolRequirementsTab`. `name` is the BUFFERED
+   * one, so the rail's identity block renames as the GM types rather than lagging the header
+   * above it by a Save.
    */
-  const worldPrerequisites = $derived(
-    defaults.prerequisites && typeof defaults.prerequisites === 'object'
-      ? defaults.prerequisites
-      : {}
+  const previewTool = $derived({
+    ...worldDefaultTool(),
+    name: entryName,
+    img: entity?.img || '',
+    prerequisites: defaults.prerequisites ?? null,
+    bonus: defaults.bonus ?? null,
+  });
+
+  /**
+   * The previewable actor roster in the rail's own shape.
+   *
+   * The shell publishes `{id, name, img}` per actor and the shared rail reads `{uuid, name}`,
+   * because at system scope the roster arrives already keyed by uuid. Mapping here rather than
+   * widening the rail keeps ONE key name inside the component.
+   */
+  const previewActorOptions = $derived(
+    (Array.isArray(previewActors) ? previewActors : [])
+      .filter((actor) => actor && typeof actor.id === 'string' && actor.id)
+      .map((actor) => ({ uuid: actor.id, name: actor.name }))
   );
-  const worldBonus = $derived(
-    defaults.bonus && typeof defaults.bonus === 'object' ? defaults.bonus : {}
-  );
-
-  const prerequisitePreviewTitle = $derived.by(() => {
-    const count = Array.isArray(worldPrerequisites.ids) ? worldPrerequisites.ids.length : 0;
-    if (worldPrerequisites.enabled !== true) {
-      return text(
-        'FABRICATE.Admin.Manager.Tools.Editor.PreviewPrerequisitesDisabled',
-        'No prerequisites to use'
-      );
-    }
-    return format(
-      count === 1
-        ? 'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteOne'
-        : 'FABRICATE.Admin.Manager.Tools.Editor.PrerequisiteCount',
-      count === 1 ? '1 prerequisite' : '{count} prerequisites',
-      { count }
-    );
-  });
-
-  const bonusPreviewTitle = $derived.by(() => {
-    const expression = String(worldBonus.expression ?? '').trim();
-    if (worldBonus.enabled !== true || expression === '') {
-      return text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusDisabled', 'No check bonus');
-    }
-    return format('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusValue', 'Adds {expression}', {
-      expression,
-    });
-  });
-
-  // ── FOUR ROWS, WHICH IS THE DESIGN'S OWN SET ──────────────────────────────────────────────
-  // It was six. The two that went are the ones this column was RESTATING rather than resolving:
-  // the world BREAK MODE, which the Breakage tab already leads with in a read-only band of its
-  // own, and the repair SEED count, which the repair card states with the sentence that makes it
-  // meaningful. Neither is a rule a player is subject to, which is what this column answers, and
-  // together they cost the column ~150px — enough that `Preview as` and `Required for` fell below
-  // the fold on a 900px window.
-  const previewRules = $derived([
-    {
-      id: 'breakage',
-      icon: 'fas fa-hourglass-half',
-      title: breakageSummaryLabel,
-      subtitle:
-        (worldAuthority || DEFAULT_BREAK_MODE) === 'checkDriven'
-          ? text(
-              'FABRICATE.Admin.Manager.Tools.Editor.PreviewCheckDriven',
-              'Check-driven · follows the crafting roll'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Tools.Editor.PreviewToolSpecific',
-              'Tool-specific · tracked per copy'
-            ),
-    },
-    {
-      id: 'on-break',
-      icon: 'fas fa-heart-crack',
-      title: format(
-        'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreakValue',
-        'On break: {action}',
-        {
-          action: (
-            onBreakModeLabel(defaults.onBreak?.mode) || onBreakModeLabel('destroy')
-          ).toLocaleLowerCase(),
-        }
-      ),
-      subtitle: text(
-        'FABRICATE.Admin.Manager.Tools.Editor.PreviewOnBreak',
-        'Runs immediately after breakage'
-      ),
-    },
-    // THE TWO ROWS THE STACK WAS MISSING (issue 1373). The design's `EFFECTIVE RULES` column
-    // names four facts and two of them are the character gate and the check bonus; the column
-    // could not state either while the model held them per system only. The copy is the SHIPPED
-    // preview wording `projectToolBehaviorFacts` already uses for the same two facts at system
-    // scope, so the two scopes cannot describe one rule differently.
-    {
-      id: 'prerequisites',
-      icon: 'fas fa-user-shield',
-      title: prerequisitePreviewTitle,
-      subtitle: worldPrerequisites.enabled
-        ? text(
-            'FABRICATE.Admin.Manager.Tools.Editor.PreviewPrerequisites',
-            'A character must satisfy every selected prerequisite'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoPrerequisites',
-            'Any character may use it'
-          ),
-    },
-    {
-      id: 'bonus',
-      icon: 'fas fa-plus-minus',
-      title: bonusPreviewTitle,
-      subtitle: worldBonus.enabled
-        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus', 'Added to the crafting check')
-        : text(
-            'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
-            'Adds nothing to the crafting check'
-          ),
-    },
-  ]);
-
-  // ── THE PLAYER PREVIEW'S OWN STATE ─────────────────────────────────────────────────────
-  // Neither is persisted, and neither should be: `Show as broken` asks what a copy carrying the
-  // `toolBroken` flag would look like, and `Preview as` asks what one actor would resolve. Both
-  // are questions ABOUT the record rather than fields OF it, so staging them into the buffered
-  // draft would put a preview toggle behind `Save tool`.
-  let previewBroken = $state(false);
-  let previewActorId = $state('');
-
-  /** The previewable actor roster, with the `No actor` case first. */
-  const previewActorRows = $derived(
-    Array.isArray(previewActors)
-      ? previewActors.filter((actor) => actor && typeof actor.id === 'string' && actor.id)
-      : []
-  );
-
-  /**
-   * What ONE copy of this Tool shows in a player's inventory.
-   *
-   * `limitedUses` is the only mode with a per-copy tally, so it is the only one that can state
-   * uses left; the other two answer with the rule itself, which is what the copy in an inventory
-   * would actually be governed by.
-   */
-  const previewUsesLabel = $derived.by(() => {
-    const maxUses = Number(defaults.breakage?.maxUses);
-    if (breakMode === 'limitedUses' && Number.isInteger(maxUses) && maxUses > 0) {
-      return format(
-        maxUses === 1
-          ? 'FABRICATE.Admin.Manager.Tools.PreviewPanel.UsesLeftOne'
-          : 'FABRICATE.Admin.Manager.Tools.PreviewPanel.UsesLeft',
-        maxUses === 1 ? '{count} use left' : '{count} uses left',
-        { count: maxUses }
-      );
-    }
-    return breakageSummaryLabel;
-  });
-
-  /**
-   * The prerequisites resolved against the previewed actor.
-   *
-   * The gate is the WORLD default's `ids`, resolved against the world prerequisite library; a
-   * selected id the library no longer holds is DROPPED rather than reported as failing, because
-   * a missing definition is a validation problem rather than a character one.
-   *
-   * `met` is `null` with no actor, which is a THIRD state and not a pessimistic `false`: nothing
-   * was evaluated, so nothing passed or failed, and the readout says exactly that.
-   */
-  const previewPrerequisiteRows = $derived.by(() => {
-    if (worldPrerequisites.enabled !== true) return [];
-    const ids = Array.isArray(worldPrerequisites.ids) ? worldPrerequisites.ids : [];
-    const rollData = previewActorId ? getPreviewRollData(previewActorId) : null;
-    return ids
-      .map((id) => prerequisiteOptions.find((option) => option?.id === id) ?? null)
-      .filter(Boolean)
-      .map((option) => ({
-        id: option.id,
-        name: option.name || option.label || option.id,
-        detail: prerequisitePreview(option),
-        met: rollData ? evaluatePrerequisite(rollData, option) : null,
-      }));
-  });
-
-  /**
-   * The status card under `Preview as`: whether this actor may wield the Tool, and what it adds.
-   *
-   * THREE OUTCOMES, and the third is the one a two-state readout gets wrong. With no actor
-   * nothing has been evaluated, so the card states the RULE rather than a verdict — a
-   * `Usable` on an unevaluated gate is the plausible-wrong-answer failure the checks preview
-   * already refuses.
-   */
-  const previewStatus = $derived.by(() => {
-    const bonus = worldBonus.enabled === true && String(worldBonus.expression ?? '').trim();
-    const bonusClause = bonus
-      ? format('FABRICATE.Admin.Manager.Tools.PreviewPanel.WithBonus', 'adds {expression}', {
-          expression: String(worldBonus.expression).trim(),
-        })
-      : text('FABRICATE.Admin.Manager.Tools.PreviewPanel.NoBonus', 'with no check bonus');
-    const unmet = previewPrerequisiteRows.filter((row) => row.met === false).length;
-    if (previewPrerequisiteRows.length > 0 && !previewActorId) {
-      return {
-        tone: 'info',
-        icon: 'fas fa-circle-info',
-        label: format(
-          'FABRICATE.Admin.Manager.Tools.PreviewPanel.Ungated',
-          'Gated on {count} prerequisite(s) · {bonus}',
-          { count: previewPrerequisiteRows.length, bonus: bonusClause }
-        ),
-      };
-    }
-    if (unmet > 0) {
-      return {
-        tone: worldPrerequisites.gateMode === 'bonus' ? 'warning' : 'danger',
-        icon: 'fas fa-circle-exclamation',
-        label:
-          worldPrerequisites.gateMode === 'bonus'
-            ? text(
-                'FABRICATE.Admin.Manager.Tools.PreviewPanel.BonusWithheld',
-                'Usable, but the check bonus is withheld'
-              )
-            : text(
-                'FABRICATE.Admin.Manager.Tools.PreviewPanel.Unusable',
-                'Unusable by this character'
-              ),
-      };
-    }
-    return {
-      tone: 'positive',
-      icon: 'fas fa-circle-check',
-      label: format('FABRICATE.Admin.Manager.Tools.PreviewPanel.Usable', 'Usable, {bonus}', {
-        bonus: bonusClause,
-      }),
-    };
-  });
-
-  /**
-   * How many `Required for` rows the rail shows before it summarises the rest.
-   *
-   * A 300px column, and a Tool a world really uses is named by dozens of records: the lab's
-   * smithing hammer alone is required by eight. An uncapped list is not a list a GM reads, it is
-   * one that pushes every region above it off the top of a scrolled column.
-   *
-   * @type {number}
-   */
-  const REQUIRED_FOR_LIMIT = 5;
 
   /** Every recipe and gathering task that names this Tool, in projection order. */
   const requiredByRows = $derived(Array.isArray(entry?.requiredBy) ? entry.requiredBy : []);
-  const requiredByShown = $derived(requiredByRows.slice(0, REQUIRED_FOR_LIMIT));
-  const requiredByOverflow = $derived(Math.max(0, requiredByRows.length - REQUIRED_FOR_LIMIT));
+
+  /**
+   * How many `Required for` rows the rail shows at a time.
+   *
+   * A 300px column, and a Tool a world really uses is named by dozens of records: the lab's
+   * smithing hammer is required by ten. It was capped at five with `and 5 more` printed under
+   * it, which is a sentence that states there is more and offers no way to reach it; the rail's
+   * overflow idiom is a PAGER, and the shared preview draws the shipped one.
+   *
+   * FOUR, NOT FIVE, AND THE NUMBER IS MEASURED. This region is the LAST of four in a column
+   * that scrolls inside a 900px window, and it now carries a pager as well as its rows: at five
+   * the section overran the rail's own scroll box, which the View Lab reported as
+   * `[data-tool-required-for] is clipped or extends outside [data-world-tool-entry-preview]`.
+   * The catalogue inspector's roster window one route away states five because it has a taller
+   * column and no three regions above it.
+   *
+   * @type {number}
+   */
+  const REQUIRED_FOR_PAGE_SIZE = 4;
 
   const pageTitle = $derived(text(TITLE_KEY, TITLE_FALLBACK));
 
@@ -1120,12 +968,38 @@
    * @returns {Promise<void>}
    */
   async function deleteTool() {
-    armedToken = '';
     draft = null;
     flushed = null;
     await actions?.deleteEntity?.(entityId);
     onBackToCatalogue();
   }
+
+  // THE DESCRIPTOR THE HEADER DRAWS. A NEW OBJECT on every republish, never a mutated one: the
+  // shell holds it in its own `$state` and Svelte 5 does not proxy a value that crossed a prop
+  // boundary, so handing over a reference and editing it later would render nothing. Withdrawn
+  // on unmount from an effect of its own, for the reason the identity report gives.
+  $effect(() => {
+    onDeleteChange({
+      token: deleteToken,
+      label: text('FABRICATE.Admin.Manager.Scoped.Entry.Delete', 'Delete'),
+      armedLabel: text('FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirm', 'Delete for good?'),
+      // THE REACH IS THE ACCESSIBLE NAME, which is where it can still be stated once the card
+      // that used to carry it as a visible sentence is gone. `ArmedDangerButton` also exposes
+      // the same string as the hover `title`, so it is reachable by mouse as well.
+      idleAriaLabel: `${format(
+        'FABRICATE.Admin.Manager.Scoped.Entry.DeleteAria',
+        'Delete {name} from the world catalogue',
+        { name: entryName }
+      )} — ${deleteNote}`,
+      armedAriaLabel: format(
+        'FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirmAria',
+        'Confirm deleting {name} from every system that has it',
+        { name: entryName }
+      ),
+      run: deleteTool,
+    });
+  });
+  $effect(() => () => onDeleteChange(null));
 </script>
 
 <main class="manager-main" data-scoped-page="world-tool-entry" aria-label={pageTitle}>
@@ -1183,19 +1057,30 @@
             not buffer because no control here could move them.
           -->
           <section class="manager-world-tool-entry-card" data-world-tool-entry-card="linked-item">
+            <!--
+              THE CHIP STATES THE EXCEPTION, NOT THE RULE (issue 1373). A `Linked` pill on the
+              card of a record whose whole premise is that it IS a game-world Item says nothing:
+              the design draws the kicker alone. `No source item` is a real answer and keeps its
+              pill, which is the identical split the catalogue row already makes for the same
+              badge one route away.
+            -->
             <div class="manager-world-tool-entry-card-heading">
               <p class="manager-kicker">
                 {text('FABRICATE.Admin.Manager.Scoped.Entry.LinkedItem', 'Linked item')}
               </p>
-              <Chip
-                tone={sourceLinked ? 'neutral' : 'warning'}
-                icon={sourceLinked ? 'fas fa-link' : 'fas fa-link-slash'}
-              >
-                {sourceLinked
-                  ? text('FABRICATE.Admin.Manager.Scoped.List.SourceLinked', 'Linked')
-                  : text('FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked', 'No source item')}
-              </Chip>
+              {#if !sourceLinked}
+                <Chip tone="warning" icon="fas fa-link-slash">
+                  {text('FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked', 'No source item')}
+                </Chip>
+              {/if}
             </div>
+            <!--
+              TWO LINES AND ONE BUTTON, which is what the design's tile carries. It had a raw
+              `Item.sm-tool-hammer` on a third line and a Copy action beside Unlink: an id is not
+              a fact this screen states anywhere else, and it displaced the hint that says what
+              dropping onto the tile DOES. The uuid is still resolved here — `sourceMissing`
+              reads it — it is simply not printed at a GM.
+            -->
             <ItemDropZone
               kind="tool-source"
               item={sourceLinked ? source : null}
@@ -1210,15 +1095,9 @@
                     'FABRICATE.Admin.Manager.Scoped.Entry.SourceEmptyDropHint',
                     'Drop an Item from the Items directory or a compendium to link this Tool.'
                   )}
-              subline={sourceLinked ? sourceUuid : ''}
               onDrop={onSourceDrop}
-              copyLabel={text(
-                'FABRICATE.Admin.Manager.Tools.Editor.CopySourceUuid',
-                'Copy source UUID'
-              )}
               unlinkLabel={text('FABRICATE.Admin.Manager.Tools.UnlinkItem', 'Unlink Item')}
               unlinkAttr="data-world-tool-entry-source-unlink"
-              onCopy={sourceLinked ? () => onCopySourceUuid(sourceUuid) : null}
               onUnlink={sourceLinked ? onUnlinkSource : null}
             />
             <!-- READ-ONLY, and it is the linked Item's OWN description rather than this
@@ -1240,16 +1119,40 @@
               <p class="manager-muted manager-world-tool-entry-hint" data-world-tool-entry-unlinked>
                 {text(
                   'FABRICATE.Admin.Manager.Scoped.Entry.UnlinkedItemHint',
-                  'No Item linked — the name and description below are all this record has. Its art comes from the linked Item, so it has none until you link one.'
+                  'No Item linked — the name below is all this record has, and its art comes from the linked Item, so it has none until you link one.'
                 )}
               </p>
             {/if}
           </section>
 
           <!--
-            THE TWO BUFFERED IDENTITY FIELDS, TOGETHER, because together is what they are: the
-            draft this screen's `Save tool` flushes is exactly `name` and `description`, and
-            splitting them across two cards asked a GM to learn that from the Save button.
+            ONE FIELD, WHICH IS WHAT THE DESIGN'S SECOND CARD HOLDS: a kicker, an input and a
+            helper (issue 1373).
+
+            IT HELD TWO. A bold `Description` caption and a three-row textarea sat under a
+            heading that names only the first of them, and what the textarea edited was ALREADY
+            on the tab — the card above states the linked Item's description in its own
+            read-only box, so the same paragraph rendered twice, 150px apart, once editable and
+            once not. The description a Tool has is the game-world Item's, which is the premise
+            of the whole screen; a second authored copy of it is a second answer to a question
+            that has one.
+
+            `description` therefore leaves `IDENTITY_FIELDS` as well as this card. A buffered
+            field with no control is a field `scopedEntryWrites` sends back unchanged on every
+            Save.
+          -->
+          <!--
+            AND THE FIELD IS OPTIONAL, WHICH IS THE AFFORDANCE IT LOST. The design draws it
+            EMPTY with the linked Item's name as the placeholder, under `Leave blank to use the
+            linked Item name.` — so a GM can see both that the field may be left alone and what
+            answers for it when they do. The shipped copy said the opposite kind of thing: it
+            described the field's REACH across crafting systems, which is a fact about the
+            system editor's override rather than about this control, and nothing on the card
+            said the field was optional at all.
+
+            `entryName` below resolves the blank, and it is the ONE resolution: the header band,
+            the breadcrumb crumb, the rail's identity block and the drop tile's title all read
+            it, and the catalogue row reads the same fallback through the frame's `nameEntry`.
           -->
           <section class="manager-world-tool-entry-card" data-world-tool-entry-card="display-label">
             <p class="manager-kicker">
@@ -1266,29 +1169,22 @@
                   'Display label'
                 )}
                 data-world-tool-entry-name
+                placeholder={linkedItemName}
                 value={String(identity.name ?? '')}
                 oninput={(event) => setIdentity('name', event.currentTarget.value)}
               />
             </Field>
-            <!-- THE COPY SAYS WHAT THE FIELD DOES, and it used to say something the model
-                 contradicts. `The name every crafting system shows for this Tool` is false
-                 while the per-system `label` override ships: a system that sets one shows
-                 THAT. The maintainer's ruling keeps both fields, so this names itself as the
-                 shared default and the system editor names itself as the override of it. -->
-            <p class="manager-muted manager-world-tool-entry-hint">
-              {text(
-                'FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelHint',
-                'The shared name for this Tool. Every crafting system shows it unless that system overrides the name in its own rules.'
-              )}
+            <p class="manager-muted manager-world-tool-entry-hint" data-world-tool-entry-name-hint>
+              {linkedItemName
+                ? text(
+                    'FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelInheritHint',
+                    'Leave blank to use the linked Item name.'
+                  )
+                : text(
+                    'FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelUnlinkedHint',
+                    'No Item is linked, so this record has no name to fall back on.'
+                  )}
             </p>
-            <Field as="label" data-world-tool-entry-field="description">
-              <span>{text('FABRICATE.Admin.Manager.Scoped.Entry.Description', 'Description')}</span>
-              <textarea
-                rows="3"
-                value={String(identity.description ?? '')}
-                oninput={(event) => setIdentity('description', event.currentTarget.value)}
-              ></textarea>
-            </Field>
           </section>
 
           <!--
@@ -1319,27 +1215,28 @@
                     'Recipes can require this Tool while it is enabled. Systems may still disable it for themselves.'
                   )}
                 </p>
-                <p class="manager-muted" data-world-tool-entry-enabled-reach>
-                  {format(
-                    memberSystemCount === 1
-                      ? 'FABRICATE.Admin.Manager.Tools.WorldEnabledReachOne'
-                      : 'FABRICATE.Admin.Manager.Tools.WorldEnabledReach',
-                    memberSystemCount === 1
-                      ? '{count} crafting system has this Tool and loses it while this is off.'
-                      : '{count} crafting systems have this Tool and lose it while this is off.',
-                    { count: memberSystemCount }
-                  )}
-                </p>
               </div>
-              <!-- The `button` host, which is what this site hand-rolled: a pressable switch
-                   whose visible `label` IS its accessible name, so it passes no `ariaLabel`.
-                   The `data-*` hook rides the rest spread onto the `<button>` itself, which is
-                   the element every selector over it already resolved. -->
+              <!-- ONE SENTENCE, AND NO CAPTION BESIDE THE PILL (issue 1373).
+                   The design's card is a title, one line and a bare switch. This carried a THIRD
+                   sentence restating the reach as a count and an `On` word printed next to a
+                   control whose whole job is to show its own position — a switch that says `On`
+                   beside itself is the state stated twice, and the count restated a fact the
+                   line above it already makes ("Systems may still disable it for themselves").
+
+                   THE REACH IS NOT LOST: it is the switch's accessible name, which is where a
+                   consequence belongs on a control that has one. `ariaLabel` is passed for that
+                   reason — the visible label is gone, so the pill needs a name of its own. -->
               <StatusToggle
                 on={worldEnabled}
-                label={worldEnabled
-                  ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                  : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+                ariaLabel={format(
+                  memberSystemCount === 1
+                    ? 'FABRICATE.Admin.Manager.Tools.WorldEnabledReachOne'
+                    : 'FABRICATE.Admin.Manager.Tools.WorldEnabledReach',
+                  memberSystemCount === 1
+                    ? '{count} crafting system has this Tool and loses it while this is off.'
+                    : '{count} crafting systems have this Tool and lose it while this is off.',
+                  { count: memberSystemCount }
+                )}
                 data-world-tool-entry-enabled={worldEnabled ? 'on' : 'off'}
                 onclick={() => actions?.setWorldEnabled?.(entityId, !worldEnabled)}
               />
@@ -1347,54 +1244,16 @@
           {/if}
 
           <!--
-            DELETE IS A CARD ON THIS TAB, not an action in the header band beside Save.
+            DELETE IS NOT A CARD ON THIS TAB. It is `Back to tools · Delete · Save tool` in the
+            header band, which is where the design draws it and which this page reports the
+            action descriptor for; see `onDeleteChange` in the props block.
 
-            It is the same placement the world essence entry makes, and for the same two
-            reasons. The reach has to be STATED beside the control - deleting a world Tool
-            removes its world defaults and every membership record naming it, in every system,
-            with no undo - and a header button has nowhere to say so. And it is the one
-            immediate action on a screen whose other controls are buffered, so it belongs where
-            a sentence can mark it as different rather than next to the verb it isn't.
-
-            ARMED, through the shipped two-step control every other destructive manager action
-            uses; a bare button here would be the only unguarded one.
+            THE TWO SCOPES HAD SWAPPED THEIR DESTRUCTIVE TREATMENTS. The danger-CARD idiom — a
+            glyph, a reach sentence and an armed button in a bordered row — is the SYSTEM Tool
+            rules editor's `Stop using this Tool here`, and that screen has it. This screen had
+            the card and no header button, so a GM moving between the two met the same verb in
+            two places and neither in the place the other put it.
           -->
-          <section
-            class="manager-world-tool-entry-card manager-world-tool-entry-danger"
-            data-world-tool-entry-card="delete"
-          >
-            <span class="manager-world-tool-entry-danger-glyph" aria-hidden="true">
-              <i class="fas fa-triangle-exclamation"></i>
-            </span>
-            <div class="manager-world-tool-entry-danger-copy">
-              <strong>
-                {text('FABRICATE.Admin.Manager.Scoped.Entry.DeleteTitle', 'Delete this Tool')}
-              </strong>
-              <p class="manager-muted" data-world-tool-entry-delete-note>{deleteNote}</p>
-            </div>
-            <ArmedDangerButton
-              token={deleteToken}
-              armed={armedToken === deleteToken}
-              idleLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.Delete', 'Delete')}
-              armedLabel={text(
-                'FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirm',
-                'Delete for good?'
-              )}
-              idleAriaLabel={format(
-                'FABRICATE.Admin.Manager.Scoped.Entry.DeleteAria',
-                'Delete {name} from the world catalogue',
-                { name: entryName }
-              )}
-              armedAriaLabel={format(
-                'FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirmAria',
-                'Confirm deleting {name} from every system that has it',
-                { name: entryName }
-              )}
-              onArm={(token) => (armedToken = token)}
-              onDisarm={() => (armedToken = '')}
-              onConfirm={deleteTool}
-            />
-          </section>
         {:else if activeTab === 'breakage'}
           <!--
             ONE TAB FOR THE WHOLE BREAKAGE STORY. It used to be three — `Breakage`, `On break`
@@ -1503,6 +1362,13 @@
                     )}</small
                   >
                 </div>
+                <!-- NO MULTI-HUE TRACK, AND NO PER-VALUE HUE (issue 1373). The design uses a
+                     gradient track nowhere, at either scope, and what this one was saying is not
+                     true of a world DEFAULT: `toolBreakageChanceColor` ramps green-to-red on the
+                     premise that a high number is a worse outcome, which is the reading a drop
+                     RATE has and a break chance does not — a 90% breakage Tool is an authored
+                     rule, not a warning. The control keeps the shipped accent track every other
+                     slider in the manager wears. -->
                 <ChanceSlider
                   value={defaults.breakage?.breakageChance ?? 0}
                   numberLabel={text(
@@ -1513,9 +1379,6 @@
                     'FABRICATE.Admin.Manager.Tools.BreakageChance',
                     'Breakage chance'
                   )}
-                  resolveColor={toolBreakageChanceColor}
-                  trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
-                  controlClass="manager-tool-breakage-chance-control"
                   numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
                   rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}
                   onChange={(breakageChance) => patchSection('breakage', { breakageChance })}
@@ -1615,46 +1478,28 @@
             </p>
           </section>
 
-          <section class="manager-world-tool-entry-card" data-world-tool-entry-card="repair">
-            <!-- NO INHERIT COUNT, and the copy says why. See the header: a seed has no live
-                 parent, so a count would claim an inheritance the resolver does not honour. -->
-            <p class="manager-kicker">
-              {text(
-                'FABRICATE.Admin.Manager.Scoped.Sections.RepairRequirements',
-                'Repair materials'
-              )}
-            </p>
-            <p data-world-tool-entry-repair-count>
-              {format(
-                repairGroups.length === 1
-                  ? 'FABRICATE.Admin.Manager.Tools.RepairGroupOne'
-                  : 'FABRICATE.Admin.Manager.Tools.RepairGroupCount',
-                repairGroups.length === 1 ? '{count} group' : '{count} groups',
-                { count: repairGroups.length }
-              )}
-            </p>
-            <p class="manager-muted" data-world-tool-entry-seed-note>
-              {text(
-                'FABRICATE.Admin.Manager.Tools.RepairSeedNote',
-                'Copied once when a system adopts this Tool, then edited there. Changing it here never reaches a system that already has it.'
-              )}
-            </p>
-            <p class="manager-muted" data-world-tool-entry-repair-scope-note>
-              {text(
-                'FABRICATE.Admin.Manager.Tools.RepairScopeNote',
-                'A repair group names components in the owning crafting system, which world scope cannot address, so the groups themselves are edited in that system Tool Rules editor.'
-              )}
-            </p>
-            {#if repairGroups.length > 0}
-              <ManagerButton
-                class="manager-world-tool-entry-inline-action"
-                data-world-tool-entry-repair-clear
-                onclick={() => actions?.setWorldRepairRequirements?.(entityId, [])}
-              >
-                {text('FABRICATE.Admin.Manager.Tools.RepairClearSeed', 'Clear the seed')}
-              </ManagerButton>
-            {/if}
-          </section>
+          <!--
+            THERE IS NO `REPAIR MATERIALS` SECTION HERE, and its removal is the answer to a
+            question the section asked and could not answer (issue 1373).
+
+            WHAT IT SAID ABOUT ITSELF IS WHY IT WENT. Its own body read `A repair group names
+            components in the owning crafting system, which world scope cannot address` — and
+            then offered `Clear the seed`, a write. A control that destroys a list whose contents
+            the screen has just said it cannot show is worse than no control: the only fact a GM
+            could read was a bare `1 group`, and a group is a set of ingredient quantities over
+            components this scope cannot name, so `1` is not a number they can check anything
+            against before pressing.
+
+            THE DESIGN DRAWS NO SUCH SECTION AT EITHER SCOPE. The seed is real, it is world
+            scoped, and it is copied once when a system adopts the Tool — but everything that
+            makes it MEANING rather than a count lives in the system Tool Rules editor, which
+            owns the components and already edits the groups. So the honest thing world scope can
+            say about repair materials is nothing, and it says nothing.
+
+            `setWorldRepairRequirements` is untouched: import, migration and the system editor's
+            adoption copy all still write the seed. What is gone is one screen's claim to author
+            it blind.
+          -->
         {:else if activeTab === 'requirements'}
           <!--
             THE SAME COMPONENT THE SYSTEM EDITOR MOUNTS. `prerequisites` and `bonus` became world
@@ -1666,8 +1511,13 @@
             point of view: it reads `tool.prerequisites` and `tool.bonus` and nothing else.
           -->
           <section class="manager-world-tool-entry-card" data-world-tool-entry-card="requirements">
+            <!-- `headingStyle` IS THE ONE SCOPE DIFFERENCE, and it is a treatment rather than a
+                 behaviour: every other card on this screen heads itself with an uppercase
+                 kicker, and the system editor's design frame heads its sections in sentence-case
+                 display type. Mounting the tab unchanged put both idioms on this screen. -->
             <ToolRequirementsTab
               tool={requirementsTool}
+              headingStyle="kicker"
               {prerequisiteOptions}
               onPatch={stageRequirementSections}
             />
@@ -1721,207 +1571,48 @@
         {/if}
       </div>
 
-      <!-- `How it behaves`, not `What a player sees`. That heading made a claim its content did
-           not meet: what followed it was a GM rules list. The region a PLAYER sees is the one the
-           footer opens with, and it is the one that carries that name now. -->
-      <ScopedEntityPreview
+      <!--
+        THE RAIL IS THE SHARED `ToolBehaviorPreview`, NOT A SECOND ONE (issue 1373).
+
+        This screen carried a FORK of it: the same five regions, re-implemented, and each
+        re-implementation lost the treatment the shared component already had. The player tile
+        was a 64px thumbnail with an unbacked badge and no name caption instead of a 110px
+        bordered tile on a card; `Show as broken` was a bare `<input type="checkbox">` with its
+        label on the wrong side instead of the shipped `StatusToggle` pill; the prerequisite-gate
+        line was a plain paragraph instead of the dashed `EmptyState` ghost panel; the
+        `Required for` rows had no glyph tile and no emphasis; and the usability card was
+        recoloured to success-green over a sentence that is a statement of fact, not a pass
+        state.
+
+        Adopting it closes all five at once, and the three places world scope genuinely differs
+        are OPT-IN props on the shared component rather than a scope test inside it.
+
+        `contextText` IS THE RECORD`S OWN SUBLINE, resolved once on this page and reported to the
+        header band as well: the rail used to print `In 1 crafting systems`, an unpluralised
+        count of a fact the catalogue answers, where the design restates what the record IS.
+
+        THE RULES KICKER IS THE SHARED ONE, `EFFECTIVE RULES`. It read `THE WORLD DEFAULTS,
+        RESOLVED` here, which is the same four facts under a second name one route away.
+      -->
+      <ToolBehaviorPreview
+        classPrefix="manager-scoped-preview"
         hookAttribute="data-world-tool-entry-preview"
-        ariaLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.Preview', 'Player preview')}
-        kicker={text('FABRICATE.Admin.Manager.Tools.Editor.PreviewKicker', 'How it behaves')}
-        identity={{
-          name: entryName,
-          image: entity?.img || '',
-          context: format(
-            'FABRICATE.Admin.Manager.Scoped.Entry.PreviewContext',
-            'In {count} crafting systems',
-            { count: memberRows.filter((row) => row.member).length }
-          ),
-          hookAttribute: 'data-world-tool-entry-preview-identity',
-        }}
-        rulesKicker={text(
-          'FABRICATE.Admin.Manager.Scoped.Entry.PreviewRules',
-          'The world defaults, resolved'
+        tool={previewTool}
+        authority={worldAuthority || DEFAULT_BREAK_MODE}
+        contextText={sourceSubline}
+        actorOptions={previewActorOptions}
+        {prerequisiteOptions}
+        getActorRollData={(uuid) => getPreviewRollData(uuid)}
+        requiredFor={requiredByRows}
+        requiredForPageSize={REQUIRED_FOR_PAGE_SIZE}
+        requiredForEmptyText={text(
+          'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForNone',
+          'Nothing requires this Tool yet.'
         )}
-        rules={previewRules}
-        ruleHookAttribute="data-world-tool-entry-preview-rule"
-        children={previewFooter}
       />
     </div>
   </div>
 </main>
-
-<!--
-  THE THREE REGIONS THE COLUMN WAS MISSING, in the design's own order (issue 1373).
-
-  The column headed `WHAT A PLAYER SEES` showed a GM rules list and stopped — a heading making a
-  claim its content did not meet, over two thirds of an empty pane. What a player actually sees is
-  a COPY in an inventory, and what a GM is asking of this screen is whether one particular
-  character can use it and what would break if the Tool went away. Those are the three questions
-  below, and none of them is answerable from the rules list above.
--->
-{#snippet previewFooter()}
-  <!-- ── HOW PLAYERS SEE IT ─────────────────────────────────────────────────────────────
-       A real inventory tile rather than a description of one: the art the player sees, the
-       quantity badge their sheet draws, and the pill that states what the copy has left.
-
-       `Show as broken` is a PREVIEW, not a write. A copy carrying `flags.fabricate.toolBroken`
-       is refused by every presence gate, and that refusal is invisible on a screen that can only
-       draw the healthy copy — so the toggle draws the other one. It writes nothing, which is
-       what the line under it says in as many words. -->
-  <p class="manager-kicker">
-    {text('FABRICATE.Admin.Manager.Tools.PreviewPanel.PlayersSee', 'How players see it')}
-  </p>
-  <div class="manager-world-tool-entry-copy" data-world-tool-entry-player-copy>
-    <span
-      class="manager-world-tool-entry-copy-tile"
-      class:is-broken={previewBroken}
-      data-world-tool-entry-copy-state={previewBroken ? 'broken' : 'working'}
-    >
-      <img src={entity?.img || ''} alt="" />
-      <span class="manager-world-tool-entry-copy-count" aria-hidden="true">&times;1</span>
-    </span>
-    <span class="manager-world-tool-entry-copy-body">
-      <Chip
-        tone={previewBroken ? 'warning' : 'neutral'}
-        icon={previewBroken ? 'fas fa-heart-crack' : 'fas fa-hourglass-half'}
-      >
-        {previewBroken
-          ? text('FABRICATE.Admin.Manager.Tools.PreviewPanel.BrokenChip', 'Broken')
-          : previewUsesLabel}
-      </Chip>
-      <label class="manager-world-tool-entry-copy-switch">
-        <input
-          type="checkbox"
-          data-world-tool-entry-show-broken
-          checked={previewBroken}
-          onchange={(event) => (previewBroken = event.currentTarget.checked)}
-        />
-        <span
-          >{text('FABRICATE.Admin.Manager.Tools.PreviewPanel.ShowBroken', 'Show as broken')}</span
-        >
-      </label>
-      <small class="manager-muted" data-world-tool-entry-copy-note>
-        {previewBroken
-          ? text(
-              'FABRICATE.Admin.Manager.Tools.PreviewPanel.BrokenNote',
-              'A broken copy. Recipes and gathering tasks refuse it until it is repaired.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Tools.PreviewPanel.WorkingNote',
-              'A working copy. Recipes and gathering tasks accept it.'
-            )}
-      </small>
-    </span>
-  </div>
-
-  <!-- ── PREVIEW AS ─────────────────────────────────────────────────────────────────────
-       The world defaults' character gate, resolved against one real actor. It is the only way
-       to tell an authored prerequisite that everyone passes from one nobody does, and neither
-       is visible from the rule text. -->
-  <p class="manager-kicker">
-    <i class="fas fa-user" aria-hidden="true"></i>
-    {text('FABRICATE.Admin.Manager.Tools.PreviewPanel.PreviewAs', 'Preview as')}
-  </p>
-  <Field as="label" class="manager-world-tool-entry-preview-actor">
-    <!-- `.visually-hidden` is the manager's own shipped utility; `.manager-visually-hidden` is
-         not a class this stylesheet declares, so the caption rendered as a second visible
-         `Preview as` under the kicker that already says it. -->
-    <span class="visually-hidden"
-      >{text('FABRICATE.Admin.Manager.Tools.PreviewPanel.PreviewAs', 'Preview as')}</span
-    >
-    <select
-      data-world-tool-entry-preview-actor
-      value={previewActorId}
-      onchange={(event) => (previewActorId = event.currentTarget.value)}
-    >
-      <option value=""
-        >{text('FABRICATE.Admin.Manager.Tools.PreviewPanel.NoActor', 'No actor')}</option
-      >
-      {#each previewActorRows as actor (actor.id)}
-        <option value={actor.id}>{actor.name}</option>
-      {/each}
-    </select>
-  </Field>
-  {#if previewPrerequisiteRows.length === 0}
-    <p class="manager-muted manager-world-tool-entry-preview-line" data-world-tool-entry-gate-line>
-      {text(
-        'FABRICATE.Admin.Manager.Tools.PreviewPanel.NoGate',
-        'No prerequisites — any character may wield it.'
-      )}
-    </p>
-  {:else}
-    <ul class="manager-world-tool-entry-gate" data-world-tool-entry-gate>
-      {#each previewPrerequisiteRows as row (row.id)}
-        <li data-world-tool-entry-gate-row={row.met === null ? 'unknown' : String(row.met)}>
-          <i
-            class={row.met === null
-              ? 'fas fa-circle-question'
-              : row.met
-                ? 'fas fa-circle-check'
-                : 'fas fa-circle-xmark'}
-            aria-hidden="true"
-          ></i>
-          <span>{row.name}</span>
-          <small class="manager-muted">{row.detail}</small>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-  <div
-    class={`manager-world-tool-entry-preview-status is-${previewStatus.tone}`}
-    data-world-tool-entry-preview-status={previewStatus.tone}
-  >
-    <i class={previewStatus.icon} aria-hidden="true"></i>
-    <span>{previewStatus.label}</span>
-  </div>
-
-  <!-- ── REQUIRED FOR ───────────────────────────────────────────────────────────────────
-       What stops working if this Tool is deleted or switched off at world scope. The entry is
-       the one Tool surface with no system context, so it is also the only one that can state
-       this across every system at once — which is exactly the reach the delete card and the
-       master switch beside it warn about in numbers. -->
-  <p class="manager-kicker">
-    {text('FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredFor', 'Required for')}
-  </p>
-  {#if requiredByRows.length === 0}
-    <p
-      class="manager-muted manager-world-tool-entry-preview-line"
-      data-world-tool-entry-required-empty
-    >
-      {text(
-        'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForNone',
-        'Nothing requires this Tool yet.'
-      )}
-    </p>
-  {:else}
-    <ul class="manager-world-tool-entry-required" data-world-tool-entry-required>
-      {#each requiredByShown as row, index (`${row.kind}-${row.systemId}-${row.id}-${index}`)}
-        <li data-world-tool-entry-required-row={row.kind}>
-          <span class="manager-world-tool-entry-required-name" title={row.name}>{row.name}</span>
-          <Chip tone="neutral">
-            {row.kind === 'gathering'
-              ? text('FABRICATE.Admin.Manager.Tools.PreviewPanel.KindGathering', 'Gathering')
-              : text('FABRICATE.Admin.Manager.Tools.PreviewPanel.KindRecipe', 'Recipe')}
-          </Chip>
-        </li>
-      {/each}
-    </ul>
-    {#if requiredByOverflow > 0}
-      <p
-        class="manager-muted manager-world-tool-entry-preview-line"
-        data-world-tool-entry-required-more
-      >
-        {format(
-          requiredByOverflow === 1
-            ? 'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForMoreOne'
-            : 'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForMore',
-          requiredByOverflow === 1 ? 'and 1 more' : 'and {count} more',
-          { count: requiredByOverflow }
-        )}
-      </p>
-    {/if}
-  {/if}
-{/snippet}
 
 <style>
   /* STATIC class names, so `lint:svelte:warnings` stays at zero. `styles/fabricate.css` is
@@ -1975,15 +1666,6 @@
     border-radius: 12px;
     background: var(--fab-bg-1);
     min-width: 0;
-  }
-
-  /* INLINE, not stretched. The button fills its flex column here because the card is a column
-     of full-width blocks, and a full-width `Clear the seed` reads as the card's primary action
-     rather than the small destructive escape hatch it is. The selector is `:global` because
-     the class is passed into a child component and never receives this block's scoping
-     attribute, so a scoped selector would be pruned as unused. */
-  :global(.manager-world-tool-entry-inline-action) {
-    align-self: flex-start;
   }
 
   .manager-world-tool-entry-hint {
@@ -2046,207 +1728,6 @@
   .manager-world-tool-entry-switch-copy p {
     margin: 0;
     font-size: 0.62rem;
-  }
-
-  /* ── THE PLAYER-COPY TILE ────────────────────────────────────────────────────────────────
-     The art at inventory scale with the quantity badge a sheet draws, so what this states is a
-     COPY rather than a catalogue thumbnail. The broken state dims the art and warms the edge,
-     which is the one difference a player would actually see. */
-  .manager-world-tool-entry-copy {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-copy-tile {
-    position: relative;
-    display: block;
-    flex: 0 0 64px;
-    width: 64px;
-    height: 64px;
-    border: 1px solid var(--fab-border);
-    border-radius: 10px;
-    background: var(--fab-surface-soft);
-    overflow: hidden;
-  }
-
-  .manager-world-tool-entry-copy-tile.is-broken {
-    border-color: var(--fab-warning-border);
-  }
-
-  .manager-world-tool-entry-copy-tile img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .manager-world-tool-entry-copy-tile.is-broken img {
-    opacity: 0.45;
-  }
-
-  .manager-world-tool-entry-copy-count {
-    position: absolute;
-    right: 3px;
-    bottom: 3px;
-    padding: 0 4px;
-    border-radius: 5px;
-    color: var(--fab-text);
-    background: var(--fab-overlay-dark-08);
-    font-size: 0.58rem;
-    font-weight: 700;
-    line-height: 1.5;
-  }
-
-  .manager-world-tool-entry-copy-body {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--fab-space-1);
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-copy-switch {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-1);
-    color: var(--fab-text);
-    font-size: 0.66rem;
-    cursor: pointer;
-  }
-
-  .manager-world-tool-entry-copy-body small {
-    font-size: 0.6rem;
-    line-height: 1.4;
-  }
-
-  /* ── THE `PREVIEW AS` READOUT ────────────────────────────────────────────────────────────
-     One row per selected prerequisite, its glyph carrying the three states the evaluation has:
-     unevaluated, met, unmet. */
-  /* `:global()` because `Field` (issue 1428) writes this element, not this template: the class
-     reaches it through the primitive's `class` prop and never carries this block's scoping
-     attribute, so the scoped form compiles to a selector that matches nothing.
-
-     THE COMPILED SPECIFICITY DOES DROP, from (0,2,0) to (0,1,0), because the scoper's own hash
-     class is what the rule loses — the same drop `EditorTabs.svelte` takes for the same repair.
-     It is inert HERE, and that is checked rather than assumed: every `.manager-field` rule in
-     `styles/fabricate.css` is written under `.fabricate-manager` and is therefore (0,2,x)
-     already, so it beat both forms; and none of them declares `flex` or `min-width` on a plain
-     `.manager-field`, which is all these two rules set. The descendant rule below keeps its
-     hash on the `input`, which this template still writes, so its specificity is unchanged. */
-  :global(.manager-world-tool-entry-preview-actor) {
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-preview-line {
-    margin: 0;
-    font-size: 0.62rem;
-  }
-
-  .manager-world-tool-entry-gate {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-1);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-gate li {
-    display: grid;
-    grid-template-columns: 14px minmax(0, 1fr);
-    gap: 0 var(--fab-space-1);
-    align-items: baseline;
-    min-width: 0;
-    font-size: 0.66rem;
-  }
-
-  .manager-world-tool-entry-gate li small {
-    grid-column: 2;
-    font-family: var(--fab-font-mono);
-    font-size: 0.58rem;
-    overflow-wrap: anywhere;
-  }
-
-  .manager-world-tool-entry-gate li[data-world-tool-entry-gate-row='true'] i {
-    color: var(--fab-success);
-  }
-
-  .manager-world-tool-entry-gate li[data-world-tool-entry-gate-row='false'] i {
-    color: var(--fab-danger);
-  }
-
-  .manager-world-tool-entry-gate li[data-world-tool-entry-gate-row='unknown'] i {
-    color: var(--fab-text-subtle);
-  }
-
-  .manager-world-tool-entry-preview-status {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-    font-size: 0.66rem;
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-preview-status.is-positive {
-    border-color: var(--fab-success-border);
-    color: var(--fab-success-text);
-  }
-
-  .manager-world-tool-entry-preview-status.is-warning {
-    border-color: var(--fab-warning-border);
-    color: var(--fab-warning-text);
-  }
-
-  .manager-world-tool-entry-preview-status.is-danger {
-    border-color: var(--fab-danger-border);
-    color: var(--fab-danger-text);
-  }
-
-  .manager-world-tool-entry-preview-status.is-info {
-    border-color: var(--fab-info-border);
-    color: var(--fab-info);
-  }
-
-  /* ── `REQUIRED FOR` ──────────────────────────────────────────────────────────────────────
-     Name leading, kind chip trailing. The name truncates rather than wrapping: this is a
-     300px rail and a three-line recipe name would push the list past the fold. */
-  .manager-world-tool-entry-required {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-1);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-required li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fab-space-1);
-    padding: var(--fab-space-1) var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-required-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    color: var(--fab-text);
-    font-size: 0.66rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   /* THE BREAKAGE VALUE EDITORS. One column, because only ONE of the three ever renders and a
@@ -2375,40 +1856,5 @@
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
-  }
-  /* THE DANGER CARD: glyph, the copy that states the reach, and the armed control at the
-     trailing edge. It wears `.manager-world-tool-entry-card` for its surface and adds only the
-     row layout, so it cannot drift from the cards above it. */
-  .manager-world-tool-entry-danger {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-3);
-  }
-
-  .manager-world-tool-entry-danger-glyph {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    color: var(--fab-danger);
-    background: var(--fab-danger-soft);
-    font-size: 0.8rem;
-  }
-
-  .manager-world-tool-entry-danger-copy {
-    display: flex;
-    flex: 1 1 14rem;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-danger-copy p {
-    margin: 0;
-    font-size: 0.66rem;
   }
 </style>

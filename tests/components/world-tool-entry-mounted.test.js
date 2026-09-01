@@ -82,6 +82,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
+    // THE RAIL IS THE SHARED `ToolBehaviorPreview` NOW (issue 1373's parity round), not a fork of
+    // it, so this tree gains that component and the four leaves it renders: the no-state ghost
+    // panel the prerequisite-gate line is drawn as, the status pill on the player tile, and the
+    // shipped pager the `Required for` window ends with. `IconFactRow` and `Chip` arrive with
+    // `TOOL_TREE_COMPILED_MODULES` above. A rendered `.svelte` the harness omits HANGS this suite
+    // and reports `# cancelled` with no message rather than failing it.
+    'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/StatusPill.svelte',
+    'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The design-system primitives this editor's tree renders: the icon action (issue 1422),
@@ -145,6 +155,17 @@ let draftHandle = null;
 let reportedIdentities = [];
 /** Every dirty flag the page has reported, newest last. */
 let reportedDirty = [];
+/**
+ * The DELETE ACTION DESCRIPTOR the page reports up, newest last.
+ *
+ * Delete moved out of the tab body and into the shell's header band (issue 1373's parity
+ * round): the design draws `Back to tools · Delete · Save tool` on the title line and puts the
+ * danger-CARD idiom on the SYSTEM screen. `.manager-header` is a sibling of `.manager-main`, so
+ * this page cannot render into it — what crosses is the descriptor, and this is where a mounted
+ * suite reads it.
+ * @type {Array<object|null>}
+ */
+let reportedDeletes = [];
 
 /**
  * Mount the entry and open one tab.
@@ -159,12 +180,12 @@ async function mountTab({
   worldItems = [],
   prerequisiteOptions = [],
   onSourceDrop = () => {},
-  onCopySourceUuid = () => {},
   onUnlinkSource = () => {},
 }) {
   draftHandle = null;
   reportedIdentities = [];
   reportedDirty = [];
+  reportedDeletes = [];
   const target = await harness.mount({
     scope,
     actions,
@@ -172,7 +193,6 @@ async function mountTab({
     worldItems,
     prerequisiteOptions,
     onSourceDrop,
-    onCopySourceUuid,
     onUnlinkSource,
     onDraftChange: (handle) => {
       draftHandle = handle;
@@ -182,6 +202,9 @@ async function mountTab({
     },
     onDraftIdentityChange: (identity) => {
       reportedIdentities.push(identity);
+    },
+    onDeleteChange: (descriptor) => {
+      reportedDeletes.push(descriptor);
     },
   });
   if (tab !== 'identity') target.querySelector(`#world-tool-entry-tab-${tab}`).click();
@@ -217,19 +240,26 @@ describe('the world Tool entry (issue 1373)', () => {
         'on',
         'ABSENT reads as enabled, so an existing world sees no change'
       );
-      // THE COUNT IS ON SCREEN BEFORE THE CLICK. There is no confirmation on a world-scope
-      // write - every field here persists on change - so the consequence has to be readable
-      // beside the control rather than after it.
+      // THE COUNT IS THE SWITCH'S ACCESSIBLE NAME. There is no confirmation on a world-scope
+      // write - every field here persists on change - so the consequence has to reach a GM
+      // before the click rather than after it; it was a THIRD visible sentence on a card the
+      // design draws as a title, one line and a bare pill (issue 1373's parity round), so it
+      // moved onto the control it qualifies, where `ArmedDangerButton` and `StatusToggle` both
+      // also expose it as the hover title.
       assert.match(
-        card.querySelector('[data-world-tool-entry-enabled-reach]').textContent,
+        target.querySelector('[data-world-tool-entry-enabled]').getAttribute('aria-label'),
         /2 crafting systems have this Tool and lose it while this is off\./
+      );
+      assert.ok(
+        !card.querySelector('[data-world-tool-entry-enabled-reach]'),
+        'the reach is stated once, on the control, not again as a third body line'
       );
     });
 
     it('pluralises the reach for a single member', async () => {
       const target = await mountTab({ scope: scopeFor({}, 1) });
       assert.match(
-        target.querySelector('[data-world-tool-entry-enabled-reach]').textContent,
+        target.querySelector('[data-world-tool-entry-enabled]').getAttribute('aria-label'),
         /1 crafting system has this Tool/
       );
     });
@@ -280,10 +310,14 @@ describe('the world Tool entry (issue 1373)', () => {
       // buffered identity map goes over one route-agnostic prop, so the shell reads whichever
       // fields the chrome it draws renders rather than a payload shaped for one editor.
       assert.equal(reportedIdentities.at(-1)?.name, 'Miners Pick');
-      assert.equal(
-        reportedIdentities.at(-1)?.description,
-        'A pick.',
-        'the report carries the editor’s whole buffered identity, not the edited field alone'
+      // THE WHOLE BUFFERED MAP GOES OVER, and since issue 1373's parity round that map is the
+      // NAME alone: the description textarea left the Overview tab, because the description a
+      // Tool has is the linked game-world Item's and the card above already states it read-only.
+      // A buffered field no control can move is one `scopedEntryWrites` re-sends on every Save.
+      assert.deepEqual(
+        Object.keys(reportedIdentities.at(-1) ?? {}),
+        ['name'],
+        'the report carries the editor’s whole buffered identity, and no field it cannot author'
       );
 
       await flushDraft();
@@ -364,15 +398,25 @@ describe('the world Tool entry (issue 1373)', () => {
       input.dispatchEvent(new Event('input', { bubbles: true }));
       assert.equal(draftHandle.isDirty(), true);
 
-      const card = target.querySelector('[data-world-tool-entry-card="delete"]');
-      assert.ok(Boolean(card), 'Delete is a card on the Overview tab, beside its stated reach');
-      assert.match(
-        card.querySelector('[data-world-tool-entry-delete-note]').textContent,
-        /2 crafting systems that have it/,
-        'the reach a GM cannot recover afterwards has to be beside the control'
+      // DELETE IS THE HEADER'S, and the page reports the action rather than drawing it: the
+      // design puts `Delete` between `Back to tools` and `Save tool`, and the danger-CARD idiom
+      // this tab used to carry is the SYSTEM rules editor's `Stop using this Tool here`. The two
+      // scopes had swapped their destructive treatments (issue 1373's parity round).
+      assert.ok(
+        !target.querySelector('[data-world-tool-entry-card="delete"]'),
+        'the body no longer carries the system screen’s danger card'
       );
-      card.querySelector(':scope button').click();
-      card.querySelector(':scope button').click();
+      const descriptor = reportedDeletes.at(-1);
+      assert.ok(Boolean(descriptor), 'the page reported no delete action, so no header can draw one');
+      assert.equal(descriptor.token, 'world-tool-delete:pick', 'the arm token names the record');
+      // THE REACH SURVIVES AS THE CONTROL'S ACCESSIBLE NAME, which `ArmedDangerButton` also
+      // exposes as its hover title. It is the one fact a GM cannot recover after the click.
+      assert.match(
+        descriptor.idleAriaLabel,
+        /2 crafting systems that have it/,
+        'the reach a GM cannot recover afterwards has to reach them before the second press'
+      );
+      await descriptor.run();
       await Promise.resolve();
       await Promise.resolve();
 
@@ -588,8 +632,20 @@ describe('the world Tool entry (issue 1373)', () => {
         zone.querySelector('[data-tool-source-drop-hint]').textContent,
         /Drop another Item here to replace the linked source\./
       );
-      assert.ok(Boolean(zone.querySelector('[data-tool-source-copy-uuid]')), 'copy uuid');
+      // ONE ACTION AND TWO LINES, which is what the design's tile carries (issue 1373's parity
+      // round). A Copy sat beside Unlink and a raw `Item.pick` sat on a third line, displacing
+      // the hint that says what dropping onto the tile DOES; an id is not a fact this screen
+      // states anywhere else.
       assert.ok(Boolean(zone.querySelector('[data-world-tool-entry-source-unlink]')), 'unlink');
+      assert.ok(!zone.querySelector('[data-tool-source-copy-uuid]'), 'no second action');
+      assert.ok(!zone.querySelector('[data-item-drop-zone-subline]'), 'no raw uuid line');
+      // AND NO `Linked` CHIP ON THE HEADING. A pill on the card of a record whose whole premise
+      // is that it IS a game-world Item states the rule rather than the exception; the catalogue
+      // row one route away already makes the identical split for the identical badge.
+      assert.ok(
+        !card.querySelector('.manager-chip'),
+        'a linked record wears no chip; only the unlinked exception does'
+      );
       // THE DESCRIPTION IS THE ITEM'S, not the world record's: the projection's entity says
       // `A pick.` and the live Item says otherwise, so a card reading the record would show the
       // wrong one here.
@@ -599,22 +655,20 @@ describe('the world Tool entry (issue 1373)', () => {
       );
     });
 
-    it('routes copy, unlink and a replacement drop through their named callbacks', async () => {
+    it('routes unlink and a replacement drop through their named callbacks', async () => {
       const calls = [];
       const target = await mountTab({
         scope: scopeFor(),
         worldItems: [LINKED_ITEM],
-        onCopySourceUuid: (uuid) => calls.push(['copy', uuid]),
         onUnlinkSource: () => calls.push(['unlink']),
         onSourceDrop: (data) => calls.push(['drop', data.uuid]),
       });
 
-      target.querySelector('[data-tool-source-copy-uuid]').click();
       target.querySelector('[data-world-tool-entry-source-unlink]').click();
       const zone = target.querySelector('[data-tool-source-card]');
       dispatchDrop(zone, { type: 'Item', uuid: 'Item.replacement' });
 
-      assert.deepEqual(calls, [['copy', 'Item.pick'], ['unlink'], ['drop', 'Item.replacement']]);
+      assert.deepEqual(calls, [['unlink'], ['drop', 'Item.replacement']]);
 
       // The document-type check is what keeps an Actor or a Macro out of a Tool's source link,
       // and the widened uuid guard is what lets a compendium `{pack, id}` drag through.
@@ -624,7 +678,7 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.equal(calls.filter(([kind]) => kind === 'drop').length, 2);
     });
 
-    it('offers a LINKING prompt, and no copy or unlink, for a record with no source', async () => {
+    it('offers a LINKING prompt, and no unlink, for a record with no source', async () => {
       const scope = scopeFor();
       const entry = scope.entries.find((candidate) => candidate.id === 'pick');
       entry.entity = { ...entry.entity, originItemUuid: '', registeredItemUuid: '' };
@@ -632,15 +686,61 @@ describe('the world Tool entry (issue 1373)', () => {
 
       const target = await mountTab({ scope });
 
-      assert.ok(!target.querySelector('[data-tool-source-copy-uuid]'), 'nothing to copy');
       assert.ok(!target.querySelector('[data-world-tool-entry-source-unlink]'), 'nothing to cut');
       assert.ok(!target.querySelector('[data-world-tool-entry-source-description]'));
+      // THE CHIP STATES THE EXCEPTION. `No source item` is a real answer about a record and it
+      // keeps its pill, where `Linked` on every other record stated the rule.
+      const card = target.querySelector('[data-world-tool-entry-card="linked-item"]');
+      assert.match(card.querySelector('.manager-chip').textContent, /No source item/);
       // THE COPY MATCHES THE CONTROLS. It used to promise `name, art and description are
       // authored here` on a screen with no art control and no colour control; the art comes
       // from the linked Item and there is nothing to author it with, so the hint says that.
       const hint = target.querySelector('[data-world-tool-entry-unlinked]').textContent;
-      assert.match(hint, /name and description/);
+      assert.match(hint, /name below is all this record has/);
       assert.match(hint, /art comes from the linked Item/);
+      // AND THE DISPLAY LABEL'S HELPER TELLS THE TRUTH ABOUT THE FALLBACK. With no Item there is
+      // nothing to inherit, so the field is not optional here and the helper says so rather than
+      // promising that a blank resolves to something (issue 1373's parity round).
+      assert.match(
+        target.querySelector('[data-world-tool-entry-name-hint]').textContent,
+        /no name to fall back on/
+      );
+    });
+
+    it('draws the display label as OPTIONAL, naming what a blank falls back to', async () => {
+      const target = await mountTab({ scope: scopeFor(), worldItems: [LINKED_ITEM] });
+      const input = target.querySelector(':scope [data-world-tool-entry-field="name"] input');
+      // THE PLACEHOLDER IS THE LINKED ITEM'S LIVE NAME, which is what makes the helper's promise
+      // checkable rather than a claim: the design draws the field EMPTY under `Leave blank to use
+      // the linked Item name.`, and the shipped screen pre-filled it with no statement that it
+      // was optional or what answered for it.
+      assert.equal(input.getAttribute('placeholder'), 'Mining Pick');
+      assert.match(
+        target.querySelector('[data-world-tool-entry-name-hint]').textContent,
+        /Leave blank to use the linked Item name/
+      );
+      // AND A BLANK RESOLVES rather than leaving the screen unnamed. The drop tile's title is the
+      // resolved name, so it is the one element that proves the fallback is real.
+      input.value = '';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await harness.setProps({});
+      assert.equal(reportedIdentities.at(-1)?.name, '', 'a blank is stored as a blank');
+      assert.match(
+        target.querySelector('[data-tool-source-card]').textContent,
+        /Mining Pick/,
+        'and the screen names the Tool by the Item it is linked to'
+      );
+    });
+
+    it('has NO description field, because the description belongs to the linked Item', async () => {
+      const target = await mountTab({ scope: scopeFor(), worldItems: [LINKED_ITEM] });
+      // TWO FIELDS UNDER A HEADING NAMING ONE, and the second edited a paragraph the card above
+      // already stated read-only - the same text twice on one tab, once editable and once not.
+      assert.ok(
+        !target.querySelector('[data-world-tool-entry-field="description"]'),
+        'the Overview tab authors one identity field, which is what its heading names'
+      );
+      assert.ok(!target.querySelector(':scope textarea'), 'and no textarea survives it');
     });
 
     it('marks a link whose Item has gone MISSING, without accusing an unloaded roster', async () => {
@@ -760,14 +860,88 @@ describe('the world Tool entry (issue 1373)', () => {
           bonus: { enabled: true, expression: '@prof' },
         }),
       });
-      const rules = [...target.querySelectorAll('[data-world-tool-entry-preview-rule]')].map(
-        (row) => row.dataset.worldToolEntryPreviewRule
+      // THE HOOKS ARE THE SHARED RAIL'S. This column was a FORK of `tools/ToolBehaviorPreview`
+      // and composes it since issue 1373's parity round, so the per-rule hook is the one that
+      // component writes; `data-world-tool-entry-preview` survives on the aside as the caller's
+      // own `hookAttribute`.
+      const rules = [...target.querySelectorAll('[data-tool-preview-rule]')].map(
+        (row) => row.dataset.toolPreviewRule
       );
       assert.ok(rules.includes('prerequisites'), 'the character gate is stated');
       assert.ok(rules.includes('bonus'), 'and so is the check bonus');
       const text = target.querySelector('[data-world-tool-entry-preview]').textContent;
       assert.match(text, /1 prerequisite/);
       assert.match(text, /Adds @prof/);
+    });
+  });
+
+  describe('the rail is the shared behaviour preview (issue 1373 parity round)', () => {
+    it('draws the four treatments the fork had lost', async () => {
+      const target = await mountTab({ scope: scopeFor() });
+      const rail = target.querySelector('[data-world-tool-entry-preview]');
+      assert.ok(Boolean(rail), 'the rail keeps this route’s own hook name');
+      // THE PLAYER TILE'S NAME CAPTION, which the fork had no element for at all.
+      assert.ok(Boolean(rail.querySelector('[data-tool-player-name]')), 'the tile names the Tool');
+      // `Show as broken` IS THE SHIPPED PILL TOGGLE, not a hand-rolled bare checkbox with its
+      // label on the wrong side. `StatusToggle`'s `checkbox` host writes the hook onto the input.
+      const broken = rail.querySelector('[data-tool-player-broken]');
+      assert.ok(Boolean(broken), 'the toggle is the primitive’s');
+      assert.equal(broken.type, 'checkbox');
+      // THE PREREQUISITE-GATE LINE IS THE DASHED GHOST PANEL, not a plain paragraph.
+      assert.ok(Boolean(rail.querySelector('[data-tool-preview-gate]')), 'the gate line is a panel');
+      // AND THE USABILITY CARD IS A NEUTRAL STATEMENT OF FACT. `Usable, with no check bonus` is
+      // not a pass state, and the fork recoloured it to success-green.
+      const usability = rail.querySelector('[data-tool-preview-usability]');
+      assert.ok(Boolean(usability), 'the usability fact is stated');
+      assert.match(usability.textContent, /Usable, with no check bonus/);
+    });
+
+    it('states what the RECORD is, under the shared `Effective rules` heading', async () => {
+      const target = await mountTab({ scope: scopeFor() });
+      const rail = target.querySelector('[data-world-tool-entry-preview]');
+      // TWO COPY DEFECTS AT ONCE. The subtitle read `In 1 crafting systems` - an unpluralised
+      // count of a fact the catalogue answers - where the design restates the scope; and the
+      // rules heading read `THE WORLD DEFAULTS, RESOLVED` where the design says `Effective
+      // rules` at BOTH scopes. `contextText` carries the first as an opt-in prop; the second is
+      // simply the shared component's own.
+      assert.match(rail.textContent, /Linked game-world Item/);
+      assert.doesNotMatch(rail.textContent, /crafting systems/);
+      assert.match(rail.textContent, /Effective rules/i);
+    });
+
+    it('pages `Required for` rather than printing a dead `and n more` sentence', async () => {
+      const scope = scopeFor();
+      const entry = scope.entries.find((candidate) => candidate.id === 'pick');
+      entry.requiredBy = Array.from({ length: 7 }, (_, index) => ({
+        id: `recipe-${index}`,
+        name: `Recipe ${index}`,
+        kind: 'recipe',
+        systemId: 'sys-forge',
+      }));
+      const target = await mountTab({ scope });
+      const region = target.querySelector('[data-tool-required-for]');
+      assert.equal(
+        region.querySelectorAll('[data-tool-required-row]').length,
+        4,
+        'the window is four rows deep in a 300px column'
+      );
+      assert.ok(
+        Boolean(region.querySelector('.manager-pagination')),
+        'and the overflow is a pager rather than a sentence with nothing behind it'
+      );
+      assert.doesNotMatch(region.textContent, /more$/);
+    });
+
+    it('names the empty case without an unresolvable {system} token', async () => {
+      const scope = scopeFor();
+      scope.entries.find((candidate) => candidate.id === 'pick').requiredBy = [];
+      const target = await mountTab({ scope });
+      // The shared component's own empty hint interpolates a SYSTEM name, and world scope has
+      // none; `requiredForEmptyText` is the opt-in override rather than a scope test inside it.
+      assert.match(
+        target.querySelector('[data-tool-required-for-empty]').textContent,
+        /Nothing requires this Tool yet\./
+      );
     });
   });
 });

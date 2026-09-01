@@ -2146,12 +2146,24 @@ The two world tool screens and the system-scope Tool Rules list share one break-
    Selection is read from the published authoring scope, one value per branch of the resolver, and never from a comparison of the resolved token against the world's: that comparison is wrong for a REDUNDANT override, which is exactly the state the two-state control produced.
    The inherit option is LABELLED with the world's own token, and where the world authored nothing the label says so rather than crediting the world with the shipped fallback.
    The pill beside it names the layer the current answer came from, and it has THREE states for the resolver's three branches rather than the prototype's two.
-4. **The world Tool entry authors the world `repairRequirements` default, and the screen says it is a SEED.**
-   A later world edit never reaches a system already seeded (`## Scoped Entity Definitions` `### Tool scope` requirement 2), so the entry must not imply a live parent: it states no inherit count for that section, because a count would claim an inheritance the resolver does not honour.
-   The section's own ingredient groups are not authored at world scope, because a repair group names components in the OWNING crafting system, which world scope cannot address.
+4. **NEITHER world Tool screen states anything about `repairRequirements`, and the reason is that neither of them CAN.**
+   A repair group names ingredient quantities over the OWNING crafting system's components, which world scope cannot address (`## Scoped Entity Definitions` `### Tool scope` requirement 2), so the only fact either screen could offer is a bare group COUNT — a number a GM has nothing to check against, over a list the screen has just said it cannot show.
+   The entry offered that count and a `Clear the seed` write beside it, and the catalogue inspector offered the same count as a fifth world-default card; both are removed, and the design draws neither at either scope.
+   The seed itself is untouched: it is still world-scoped, still copied once on adoption, and still written by import, migration and its own tool-family action.
+   Its contents are authored where they can be checked, in the system Tool Rules editor, which owns the components they name.
+
+   **A SCREEN MAY NOT OFFER A WRITE OVER DATA IT HAS DECLARED ITSELF UNABLE TO SHOW.** That is the general rule this requirement is an instance of, and it is stricter than "state the seed rule rather than a count": a destructive control over an unreadable list is worse than no control, because refusing it costs a GM one navigation and taking it costs them a repair recipe they never saw.
 5. **The world Tool entry BUFFERS its edit and is saved explicitly**, under `### Scoped entity editor patterns` requirement 14 and through that requirement's shared module and shared action pair rather than a second implementation of either.
-   What it buffers is the display label, the description and the two INHERITED world-default sections; the world break mode is not among them because this screen does not author it at all.
-   Its Delete is a card on the Overview tab rather than an action in the header band, because the reach a GM cannot recover afterwards — the world record, its world defaults and every membership record naming it, in every system — has to be readable beside the control, and a header button has nowhere to say it.
+   What it buffers is the display label and the two INHERITED world-default sections; the world break mode is not among them because this screen does not author it at all, and the DESCRIPTION is not among them because the screen no longer authors that either — the description a Tool has is the linked game-world Item's, which the Overview tab states read-only on the card that names the Item, and a second editable copy of it was the same paragraph rendered twice on one tab.
+
+   **THE DISPLAY LABEL IS OPTIONAL, AND THE FIELD SAYS SO.** It is drawn empty with the linked Item's name as its placeholder, under a helper naming that fallback, and a blank resolves to the linked Item's name everywhere this record is displayed — the header band, the breadcrumb, the entry's own rail and the catalogue row, which reads the same fallback through the list frame's own per-lane name rung.
+   Where no Item is linked there is nothing to fall back to, and the helper says that instead of promising a resolution the record cannot make.
+   This is a different field from the per-system `label` override, which stays on the system Tool rules editor and names itself as an override of this value.
+
+   **Its `Delete` is in the header band, between Back and Save**, which is where the design draws it and which is the placement the SYSTEM Tool rules editor's danger CARD (`Stop using this Tool here`) is deliberately not: the two scopes had one destructive treatment each and had swapped them, so a GM met the same verb in two different places one route apart.
+   The reach a GM cannot recover afterwards — the world record, its world defaults and every membership record naming it, in every system — is the armed control's accessible name and hover title rather than a body sentence, which is where a consequence belongs on a control that has one.
+   `.manager-header` is a sibling of `.manager-main`, so the page cannot render into that band: it reports an ACTION DESCRIPTOR — the token, the two labels, the two consequence strings and the write — and the shell draws the shipped two-step control from it.
+   The verb, the copy and the ordering the write needs stay with the page that owns the record.
    The two facts the header band states about the record, its NAME and whether it names a game-world Item, are reported UP by the page: the page already resolves both, and deriving them again in the shell would let the band and the page disagree about one record.
 
 ### Scoped entity editor patterns

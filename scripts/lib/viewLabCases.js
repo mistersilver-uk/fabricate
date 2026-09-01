@@ -1391,6 +1391,50 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'world-tool-catalogue-list-head',
+    label: 'Manager — World Tools Catalogue, list head',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ONE STATE THE RESTING CATALOGUE FRAME CANNOT SHOW (issue 1373).
+    //
+    // The design opens the list with a full-width dashed creation zone directly under the
+    // toolbar (`tmp/proto/tool-catalogue.png`); what shipped had it hoisted OUT of the list into
+    // the band above, sharing a row with the world breakage card and taking a third of its
+    // width. Moving it back is `EntityListInspectorFrame`'s new `listLead` snippet.
+    //
+    // IT NEEDS ITS OWN FRAME because the sibling case INSPECTS a row two thirds of the way down
+    // an eleven-row list, and inspecting a row auto-scrolls it into view - which carries the head
+    // of the list, and therefore the zone, off the top. The two frames answer different
+    // questions: that one shows what the catalogue DECIDES, this one shows what it OPENS with.
+    //
+    // NO ROW STEP AT ALL, which is the whole point: the list rests at its own top.
+    steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
+    expectView: 'world-tools',
+    expectSelector: '[data-item-drop-zone="tool-create"]',
+    expectContained: [
+      // THE ZONE, INSIDE THE LIST. Rendered anywhere on the screen it would satisfy
+      // `expectSelector`; this is what proves it is in the list rather than beside the card.
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-item-drop-zone="tool-create"]',
+      },
+      // AND THE BREAKAGE CARD STILL SPANNING THE COLUMN ABOVE IT, which is the other half of the
+      // same move: the card only reaches the pane's edge because the zone left its row.
+      {
+        container: '[data-world-tool-break-mode]',
+        target: '[data-world-tool-break-segment="checkDriven"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      // The frame that owns the `listLead` slot and the list scroller the zone sits in.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'world-tool-catalogue',
     label: 'Manager — World Tools Catalogue',
     reaches: 'beyond',
@@ -1436,10 +1480,16 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-list-inspector]',
         target: '[data-scoped-list-inherit-count="breakage"]',
       },
-      {
-        container: '[data-scoped-list-inspector]',
-        target: '[data-scoped-list-extra-card="repair"]',
-      },
+      // THE FIFTH INSPECTOR CARD IS GONE, and nothing replaces it here.
+      // `[data-scoped-list-extra-card="repair"]` stated `{n} groups` over a seed whose contents
+      // name components world scope cannot address (issue 1373), and the design draws four
+      // world-default cards at either scope.
+      //
+      // THE CREATION ZONE'S NEW PLACE IS THE SIBLING CASE'S FRAME. It is the list's first
+      // element now rather than a third of the band above the toolbar, and inspecting a row two
+      // thirds down an eleven-row list auto-scrolls the head of the list off the top — so this
+      // frame structurally cannot contain it. `world-tool-catalogue-list-head` is the one that
+      // does, and it claims the same two files.
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
@@ -1581,9 +1631,21 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-tool-entry-card="enabled"]',
         target: '[data-world-tool-entry-enabled]',
       },
+      // AND THE OPTIONAL DISPLAY LABEL'S HELPER (issue 1373). The reach sentence that used to be
+      // asserted here is now the switch's accessible name rather than a third visible line — the
+      // design's card is a title, one line and a bare pill — so what this frame proves instead is
+      // the affordance the Overview tab had lost: that the label may be left blank and what
+      // answers for it when it is.
       {
-        container: '[data-world-tool-entry-card="enabled"]',
-        target: '[data-world-tool-entry-enabled-reach]',
+        container: '[data-world-tool-entry-card="display-label"]',
+        target: '[data-world-tool-entry-name-hint]',
+      },
+      // THE HEADER `Delete`, which the design draws between Back and Save and which this screen
+      // did not have. It is claimed on THIS case because the body card it replaces was on this
+      // tab, so the frame that showed the card is the frame that has to show its successor.
+      {
+        container: '.manager-header-actions',
+        target: '[data-arm-token^="world-tool-delete:"]',
       },
     ],
     position: { width: 1280, height: 900 },
@@ -1631,6 +1693,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // The card the tab draws each of its two sections as, and the radio pair whose legend it
+      // un-hides here (issue 1373). This frame is the only one that photographs the WORLD face
+      // of either: the card's `headingStyle="kicker"` and the gate-mode group's visible legend.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RadioCardGroup\.svelte$/,
     ],
   }),
   managerCase({
@@ -1653,36 +1720,64 @@ export const VIEW_LAB_CASES = Object.freeze([
         selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
       },
       // SCROLLED, because the column is what this frame is about and it does not fit. Anchored
-      // on the LAST region rather than the first, so everything this case claims is on screen at
-      // once rather than only the region the scroll landed on.
-      { selector: '[data-world-tool-entry-required]', scroll: true },
+      // on the last region's LAST ELEMENT rather than on the region itself: `scrollIntoView`
+      // aligns what it is given to the TOP of the scroller, so anchoring on the region left its
+      // own pager below the rail's bottom edge and the capture gate reported the region as
+      // clipped. Anchoring on the pager pulls the whole region up with it.
+      { selector: '[data-tool-required-for] .manager-pagination', scroll: true },
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-preview]',
     // ONE ASSERTION PER REGION, against the preview column itself. A frame proving only the
     // inventory tile would be evidence for a third of the change.
+    //
+    // THE HOOKS ARE THE SHARED RAIL'S NOW (issue 1373). This column was a FORK of
+    // `tools/ToolBehaviorPreview` that re-implemented all five regions and lost the treatment of
+    // four of them; it composes the shared component instead, so the per-region hooks are the
+    // ones that component writes. `data-world-tool-entry-preview` survives as the aside's own
+    // name, which is a `hookAttribute` prop for exactly the reason `EditorTabs` carries one.
     expectContained: [
+      // THE PLAYER TILE, ITS NAME CAPTION, THE USABILITY CARD AND THE PAGED `Required for` LIST —
+      // one per region. The fork drew a bare 64px thumbnail with no caption element at all, and a
+      // dead `and 5 more` sentence where the pager is.
       {
         container: '[data-world-tool-entry-preview]',
-        target: '[data-world-tool-entry-player-copy]',
+        target: '[data-tool-player-preview]',
       },
       {
         container: '[data-world-tool-entry-preview]',
-        target: '[data-world-tool-entry-preview-status]',
+        target: '[data-tool-player-name]',
       },
       {
         container: '[data-world-tool-entry-preview]',
-        target: '[data-world-tool-entry-required]',
+        target: '[data-tool-preview-usability]',
+      },
+      // THE `Required for` REGION IS ASSERTED THROUGH ITS TWO PARTS rather than its wrapper, and
+      // that is a real constraint rather than a weaker claim. The region is the LAST of four in a
+      // rail that scrolls inside a 900px window, so its wrapper is taller than the space any
+      // scroll position can leave for it and a rect-containment check on the wrapper can never
+      // pass. A ROW and the PAGER are what findings 20 and 21 are about — the icon-tiled row
+      // treatment the fork had lost, and the pager that replaced its dead `and 5 more` sentence —
+      // and each of them fits.
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-required-row]',
+      },
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-required-for] .manager-pagination',
       },
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // THE PREVIEW SHELL IS CLAIMED TOO, unlike this screen's other two cases: the three regions
-    // render through its `footer` slot, so a change that dropped the slot would render nothing
-    // here and publish neither of the other frames as evidence of it.
+    // THE SHARED RAIL AND THE SHELL UNDER IT ARE BOTH CLAIMED, unlike this screen's other two
+    // cases: every region in this frame is drawn by `ToolBehaviorPreview` through
+    // `ScopedEntityPreview`'s trailing slot, so a change to either that only published a system
+    // scope frame would leave the world rail unphotographed.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
     ],
   }),
   managerCase({

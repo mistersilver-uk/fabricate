@@ -21,6 +21,30 @@
   host (issue 1040) is that shape - a real `<input type="checkbox">` laid transparently over the
   track - so the switch is now the primitive's rather than this file's, and the smoke keeps the
   control it hit-tests.
+
+  == FOUR PARITY REPAIRS FROM ISSUE 1373'S MAINTAINER ROUND ===================================
+  1. THE SENTENCE WAS PRINTED TWICE, forty pixels apart: once as the card's `subtitle` and again
+     as the paragraph under the body's own `<h3>`, from the SAME key. The body's heading now
+     states what the SWITCH beside it does, which is the question that heading actually asks.
+  2. AND IT SENT A GM TO THE WRONG SCREEN. `Prerequisites are defined in the crafting system
+     editor` is false at BOTH scopes: `prerequisiteOptions` is the WORLD character-prerequisite
+     library (issue 1308) at every call site - `CraftingSystemManagerRoot` passes
+     `selectedCharacterPrerequisites`, which reads `viewState.worldCharacterPrerequisites`, to
+     the system editor and to the world entry alike - and that library is authored at
+     `World > Rules & resources > Character prerequisites`.
+  3. THE SLAB IS BROKEN INTO ITS DECISIONS. Card title, a second heading with its own switch, a
+     checklist, an AND summary and two gate tiles ran together in one unbroken card; the
+     checklist and the gate-mode pair are separate questions and now carry separate headings.
+  4. THE GATE-MODE PAIR HAS A VISIBLE ONE. Its `<legend>` was screen-reader-only, because
+     `RadioCardGroup`'s `is-config-cards` face hides every legend, while every other group on
+     these two screens carries a visible kicker.
+
+  == THE HEADING IDIOM IS THE CALLER'S ======================================================
+  The system rules editor sets its section headings in sentence-case bold, which is what its
+  design frame draws; the WORLD entry sets every card heading as an uppercase kicker, which is
+  what ITS frame draws. Mounting this tab unchanged put two heading idioms on the world screen.
+  `headingStyle` carries the caller's, defaults to the system editor's, and is threaded to
+  `ToolInheritCard` rather than tested against a scope in here.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -40,6 +64,8 @@
     member = false,
     inherited = {},
     worldDefaults = null,
+    // `'title'` — the system editor's sentence-case bold — or `'kicker'`. See the file header.
+    headingStyle = 'title',
     onPatch = () => {},
     onToggleInherited = () => {},
   } = $props();
@@ -115,13 +141,14 @@
 <div class="manager-tool-tab-stack" data-tool-requirements-tab>
   <ToolInheritCard
     section="prerequisites"
+    {headingStyle}
     title={text(
       'FABRICATE.Admin.Manager.Tools.Editor.CharacterPrerequisites',
       'Character prerequisites'
     )}
     subtitle={text(
       'FABRICATE.Admin.Manager.Tools.Editor.CharacterPrerequisitesHint',
-      'Gate who may wield this Tool. Prerequisites are defined in the crafting system editor; pick which ones apply.'
+      'Gate who may wield this Tool. Pick from the character prerequisites defined under World, Rules and resources.'
     )}
     inheritable={member}
     {inherited}
@@ -131,6 +158,8 @@
     onToggle={onToggleInherited}
   >
     <section class="manager-tool-requirements-section">
+      <!-- THE HEADING STATES WHAT THE SWITCH BESIDE IT DOES. It used to reprint the card's own
+           subtitle, from the SAME key, one heading below it. -->
       <div class="manager-tool-editor-card-heading">
         <div data-tool-prerequisites-copy>
           <h3>
@@ -141,8 +170,8 @@
           </h3>
           <p>
             {text(
-              'FABRICATE.Admin.Manager.Tools.Editor.CharacterPrerequisitesHint',
-              'Gate who may wield this Tool. Prerequisites are defined in the crafting system editor; pick which ones apply.'
+              'FABRICATE.Admin.Manager.Tools.Editor.RequirePrerequisitesHint',
+              'While this is off the Tool has no character gate and anyone may wield it.'
             )}
           </p>
         </div>
@@ -157,6 +186,12 @@
           onChange={(checked) => patchPrerequisites({ enabled: checked })}
         />
       </div>
+      <!-- ── WHICH PREREQUISITES APPLY ────────────────────────────────────────────────────
+           A HEADING OF ITS OWN, because it is a different question from the switch above it and
+           from the failure mode below it; the three ran together in one unbroken slab. -->
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Tools.Editor.WhichPrerequisites', 'Which prerequisites')}
+      </p>
       <fieldset disabled={!prerequisites.enabled} class="manager-tool-prerequisite-list">
         {#if prerequisiteOptions.length === 0}<p class="manager-muted">
             {text(
@@ -182,7 +217,12 @@
           'All selected prerequisites are required (AND)'
         )}
       </p>
+      <!-- ── AND WHAT FAILING THEM DOES ───────────────────────────────────────────────────
+           `legendVisible` un-hides the fieldset's OWN `<legend>` rather than printing a kicker
+           beside it: a visible heading that is not the group's accessible name is a heading a
+           screen reader announces twice. -->
       <RadioCardGroup
+        legendVisible
         legend={text('FABRICATE.Admin.Manager.Tools.Editor.GateMode', 'When prerequisites fail')}
         options={gateModeOptions}
         selectedValue={prerequisites.gateMode}
@@ -197,6 +237,7 @@
 
   <ToolInheritCard
     section="bonus"
+    {headingStyle}
     title={text('FABRICATE.Admin.Manager.Tools.Editor.BonusToCheck', 'Bonus to the check')}
     subtitle={text(
       'FABRICATE.Admin.Manager.Tools.Editor.BonusToCheckHint',
@@ -209,13 +250,15 @@
     onToggle={onToggleInherited}
   >
     <section class="manager-tool-requirements-section">
+      <!-- SAME REPAIR AS THE CARD ABOVE: the body's heading states what its switch does rather
+           than reprinting the card's subtitle from the same key. -->
       <div class="manager-tool-editor-card-heading">
         <div data-tool-bonus-copy>
           <h3>{text('FABRICATE.Admin.Manager.Tools.Editor.AddCheckBonus', 'Add a check bonus')}</h3>
           <p>
             {text(
-              'FABRICATE.Admin.Manager.Tools.Editor.BonusToCheckHint',
-              'What using this Tool adds to the crafting check, if anything.'
+              'FABRICATE.Admin.Manager.Tools.Editor.AddCheckBonusHint',
+              'While this is off the Tool contributes nothing to the roll.'
             )}
           </p>
         </div>

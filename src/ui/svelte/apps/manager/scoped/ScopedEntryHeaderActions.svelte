@@ -35,6 +35,16 @@
    - backAttribute / saveAttribute: the per-site `data-*` hook names, carried as props exactly as
      `EditorTabs` carries its own, because the two sites' hooks are per-screen selectors that the
      tests and the capture registry name and this component must not rename.
+   - danger: an OPTIONAL snippet rendered BETWEEN back and save. Absent by default, so the
+     essence entry renders exactly the pair it always did.
+
+  ── WHY A SNIPPET AND NOT SIX MORE PROPS ──────────────────────────────────────────────────────
+  The design's world Tool entry draws `← Back to tools · Delete · Save tool` (`tool-entry.png`),
+  and Delete is not a third `ManagerButton`: it is the shipped two-step `ArmedDangerButton`,
+  which carries an arm token, two labels, two consequence sentences and three callbacks. Typing
+  all nine onto this component would make it the union of its callers and would put a Tool's
+  delete vocabulary inside a shell shared by every scoped entry editor. The caller renders its
+  own control into the slot; this component owns only the ORDER, which is the recipe's rule.
 -->
 <script>
   import ManagerButton from '../../../components/ManagerButton.svelte';
@@ -48,6 +58,7 @@
     saving = false,
     backAttribute = 'data-scoped-entry-back-action',
     saveAttribute = 'data-scoped-entry-save-action',
+    danger = undefined,
   } = $props();
 
   // A computed attribute name cannot be written as a literal in markup, so each hook is spread as
@@ -61,6 +72,7 @@
   <i class="fas fa-arrow-left" aria-hidden="true"></i>
   <span>{backLabel}</span>
 </ManagerButton>
+{#if danger}{@render danger()}{/if}
 <ManagerButton
   role="primary"
   {...saveHook}
