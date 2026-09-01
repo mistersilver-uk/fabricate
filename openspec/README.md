@@ -73,6 +73,15 @@ They are unrelated; do not
    delta (and its `### Deviations` note) is updated so it accurately describes what
    shipped.
 
+Step 2 only happens if the reviewing lane is actually given the delta.
+A read-only reviewer works from a detached snapshot and cannot run `gh`, so it cannot fetch the issue
+for itself.
+When the driver's brief omits the `### Spec Deltas` block, the reconciliation is silently not
+performed: the lane reports on the code it can see and says nothing about the check it could not run,
+which reads as a pass.
+The driver must therefore write that block to disk in the lane alongside the diff, and treat "the
+delta was not supplied" as an unperformed check rather than a satisfied one.
+
 ## Rules
 
 - Edit canonical specifications in `openspec/specs/`.
