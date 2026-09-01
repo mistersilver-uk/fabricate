@@ -392,6 +392,36 @@ export function essenceShortValueName(value) {
 }
 
 /**
+ * The single addressable referent an `effectSource` SECTION VALUE names, or `''` when unset.
+ *
+ * ── THE SECTION IS A BLOCK, AND EVERY OTHER READER TREATS A SECTION AS A SCALAR ─────────────
+ * `effectSource` is stored as `{sourceComponentId?, sourceItemUuid?, associatedSystemItemId?}`,
+ * because a source is ONE choice from which `_sourceFieldsForEssenceSelection` derives all three.
+ * {@link essenceSectionValueName} reads a section value as a string id or as `{id, name}`, so
+ * handed this block it found neither and answered `''` - and the editor's inherit note then read
+ * "The world default is unset, so this section resolves to nothing" directly above a locked tile
+ * naming a value. One card, two contradictory statements, on the one screen whose subject is
+ * which layer a value came from.
+ *
+ * THE COMPONENT ID IS PREFERRED over the uuid, and `associatedSystemItemId` last, matching the
+ * order the migration writes the block in and the order the picker chooses in: the component id
+ * is the referent a GM picked, and the uuid is derived from it.
+ *
+ * @param {unknown} value the stored `effectSource` section value.
+ * @returns {string} `''` when the section is unset or authored empty.
+ */
+export function essenceEffectSourceReferent(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+  for (const field of ['sourceComponentId', 'sourceItemUuid', 'associatedSystemItemId']) {
+    const referent = typeof value[field] === 'string' ? value[field].trim() : '';
+    if (referent) return referent;
+  }
+  return '';
+}
+
+/**
  * Whether one candidate referent may be written as a WORLD default `effectSource`.
  *
  * @param {unknown} value the candidate's id or uuid.

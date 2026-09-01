@@ -1,4 +1,8 @@
-import { identityOf, WORLD_IDENTITY_FIELDS } from '../migration/worldScopeEntityGrouping.js';
+import {
+  ESSENCE_EFFECT_SOURCE_FIELDS,
+  identityOf,
+  WORLD_IDENTITY_FIELDS,
+} from '../migration/worldScopeEntityGrouping.js';
 
 import { findWorldDefault, membershipKey } from './scopedDefinitions.js';
 
@@ -193,14 +197,15 @@ function membershipsForSystem(memberships, systemId) {
  * built, and a raw-entity union would hand back world defaults in place of a system's own
  * overrides, bypassing the inherit map.
  *
- * **While `## CraftingSystem` requirement 36 holds, the IN-SYSTEM RECORD DECIDES: the union
- * answers every KEY that record carries, its ROW ORDER and its ROW SET, re-derived from it at
- * read time, and the world layer supplies only the keys it does not carry. The world-wins
- * precedence below is the TARGET contract and is SUSPENDED, not consumed, for the duration; it
- * re-arms when requirement 36 retires.**
- * The two sections below are kept in that order — the `1363` correction first, then the
- * `1370` inversion — because each is the reason the next was needed, and a reader who meets
- * only the first must not read it as the current rule.
+ * **THE INHERIT SWITCH DECIDES WHICH LAYER ANSWERS A SECTION** (issue 1372, retiring
+ * `## CraftingSystem` requirement 36's blanket claim). An OVERRIDING section is answered by the
+ * system's own value, which is the in-system record while the lifted fields have not been shed;
+ * an INHERITING section is answered by the WORLD DEFAULT, applied onto the shipped field names
+ * the section is spelled over. Everything else — the row ORDER, the row SET, and the lifted
+ * IDENTITY fields — is still re-derived from the in-system record on every read.
+ * The three sections below are kept in order — the `1363` correction, the `1370` inversion, then
+ * the `1372` retirement — because each is the reason the next was needed, and a reader who meets
+ * only an earlier one must not read it as the current rule.
  *
  * ## "WORLD WINS" IS PER FIELD, AND WAS PER RECORD (issue 1363)
  *
@@ -213,7 +218,7 @@ function membershipsForSystem(memberships, systemId) {
  * field it authors. Nothing about world precedence is weakened — it is corrected only in that a
  * world record no longer ERASES disjoint in-system fields.
  *
- * ## THE IN-SYSTEM RECORD DECIDES THE KEYS, THE ORDER AND THE ROW SET, WHILE REQUIREMENT 36 HOLDS
+ * ## THE IN-SYSTEM RECORD DECIDED EVERY KEY (issue 1370), AND NOW DECIDES ONLY ITS OWN
  *
  * The two spread hazards this note used to record as INTENDED are now INVERTED, for the duration
  * of `## CraftingSystem` requirement 36, and both are restated here rather than deleted so a
@@ -239,6 +244,45 @@ function membershipsForSystem(memberships, systemId) {
  * `member` and `inherited` survive the re-spread untouched, because no shipped in-system record
  * carries either key.
  *
+ * ## AN INHERITING SYSTEM FOLLOWS ITS WORLD DEFAULT (issue 1372)
+ *
+ * **THE DEFECT THIS RETIRES.** The re-spread above made the in-system record win EVERY key, so a
+ * membership record's `inherit` map decided nothing at read time: a GM who flipped a section to
+ * `Inherited` and then edited that world default changed nothing in the system, while the system
+ * rules editor rendered `Inheriting` with a `World default: …` line and the rules list rendered an
+ * `Inherits world defaults` pill. The claim was true at the instant the switch was flipped and
+ * false the moment the world default moved. `## CraftingSystem` requirement 36 is retired to the
+ * extent that produced it, and no further: an in-system record still decides its own identity and
+ * its own non-section fields.
+ *
+ * **THE RULE IS PER SECTION, AND THE SWITCH IS THE SELECTOR.** For every section the scope
+ * declares:
+ *
+ * - `inherit` is `false` — the system's OWN value answers, and while the lifted fields have not
+ *   been shed that value lives on the in-system record. The membership record's stored block is
+ *   the RETAINED dormant override `setSectionInheritance` keeps; it does not win, because no
+ *   shipped editor writes it and the migration froze it at `1.30.0`, so letting it win would
+ *   revert every post-migration edit — the same failure the identity clause exists to prevent.
+ * - `inherit` is `true` (or the map omits the section) — the WORLD DEFAULT answers, applied onto
+ *   the shipped field names through {@link inheritedSectionWriters}. An UNAUTHORED world default
+ *   applies nothing, so an inheriting system with no world value to take keeps reading what it
+ *   read before, which is exactly what the screen's `The world default is unset` note says.
+ *
+ * **WHY THIS DOES NOT MOVE A SINGLE EXISTING WORLD.** `buildMembershipRecord` writes
+ * `OVERRIDING_INHERIT` — every section `false` — for every `(entity, system)` pair the `1.30.0`
+ * migration creates, so on a migrated world every section is OVERRIDING and every row still
+ * answers from the in-system record, byte for byte. A world that predates the membership record
+ * has no membership half at all and takes the `!membership || !entity` branch, which answers the
+ * in-system row BY REFERENCE. The only rows whose resolution changes are the ones a GM has
+ * explicitly switched to inheriting, which is the opt-in.
+ *
+ * **WHAT IS DELIBERATELY NOT SWITCHED.** `enabled`, component `tags` and tool
+ * `repairRequirements` are NOT sections and carry no inherit switch, so nothing about them is
+ * decidable from the map this rule reads. They keep answering from the in-system record. Naming
+ * them here matters because all three are emitted by a resolver — `enabled` and `tags`
+ * unconditionally — so a future change that deleted the trailing re-spread instead of adding this
+ * per-section pass would silently hand every one of them to a frozen migration-time copy.
+ *
  * ABSENCE IS A VALUE, so the re-spread alone is not enough: a spread cannot DELETE. Every field in
  * `WORLD_IDENTITY_FIELDS` the in-system record does not carry is deleted from the merged row, with
  * {@link identityOf} as the oracle for "which identity keys does this record carry" — it skips
@@ -253,9 +297,10 @@ function membershipsForSystem(memberships, systemId) {
  * repointed reader, silently - so a writer added there must advance the revision, exactly as the
  * component writers do.
  *
- * ROW ORDER and ROW SET are dated to the same requirement, and that is why this walks `legacy`
- * ONCE. The union emits the in-system array's rows, in the in-system array's order, and the world
- * layer contributes rows only after requirement 36 retires. Three resolution tiers are FIRST-WINS
+ * ROW ORDER and ROW SET are NOT dated to requirement 36 and did not move with it, which is why
+ * this still walks `legacy` ONCE. The union emits the in-system array's rows, in the in-system
+ * array's order, and the world layer contributes NO row of its own. Three resolution tiers are
+ * FIRST-WINS
  * over array order (`buildIndex` keeps the first record per id, the first per name, and the
  * earliest position per source reference), so a world-roster-ordered union would silently
  * re-rank them. The row-set rule is what stops a GM's deleted component — whose world entity and
@@ -315,6 +360,7 @@ export function unionScopedDefinitions({
   const bySystem = membershipsForSystem(memberships, system);
   const byId = worldEntitiesById(entities);
   const identityFields = liftedIdentityFields(entityType);
+  const sectionWriters = inheritedSectionWriters(entityType);
 
   const union = [];
   for (const entry of legacy) {
@@ -327,22 +373,138 @@ export function unionScopedDefinitions({
       union.push(entry);
       continue;
     }
+    const worldDefault = findWorldDefault(defaults, id);
+    const resolved = resolve(worldDefault, membership);
     // FIELD BY FIELD, NOT RECORD BY RECORD (issue 1363), and then RE-DERIVED FROM THE IN-SYSTEM
-    // RECORD (issue 1370). The world layer supplies only the keys the in-system record does not
-    // carry, for exactly as long as `## CraftingSystem` requirement 36 holds.
-    const merged = {
-      ...entry,
-      ...entity,
-      ...resolve(findWorldDefault(defaults, id), membership),
-      ...entry,
-    };
+    // RECORD (issue 1370). The in-system record still supplies its own identity and every
+    // non-section key it carries; the world layer supplies the keys it does not.
+    const merged = { ...entry, ...entity, ...resolved, ...entry };
     const carried = identityOf(entry, entityType);
     for (const field of identityFields) {
       if (!(field in carried)) delete merged[field];
     }
+    // AND THEN THE INHERIT SWITCH DECIDES (issue 1372). It runs AFTER the re-spread and after the
+    // identity delete, because it is the one thing the in-system record does NOT get to answer:
+    // a section the membership record marks inheriting resolves to the world default, on the
+    // shipped field names, and an overriding one is left exactly as the two passes above left it.
+    applyInheritedSections(merged, worldDefault, resolved.inherited, sectionWriters);
     union.push(merged);
   }
   return union;
+}
+
+/**
+ * Apply the WORLD DEFAULT for every section this system inherits, onto the shipped field names.
+ *
+ * TWO GUARDS, AND NEITHER IS DEFENSIVE STYLE. The section must be marked inheriting - an absent
+ * `inherit` key reads as inheriting, matching `isSectionInherited`, because that is the state
+ * `addToSystem` creates a record in. And the world default must have AUTHORED the section:
+ * `undefined` means the world says nothing, so there is nothing to follow and the row keeps what
+ * the in-system record gave it. `null` is NOT absence - an authored `macro: null` means "no
+ * macro", and an inheriting system must take that answer rather than keep its own.
+ *
+ * @param {object} row The merged row, mutated in place. It is a fresh object per read.
+ * @param {object|null} worldDefault
+ * @param {{[section: string]: boolean}} inherited The resolver's per-section switch report.
+ * @param {Readonly<Record<string, (row: object, value: unknown) => void>>} writers
+ * @returns {void}
+ */
+function applyInheritedSections(row, worldDefault, inherited, writers) {
+  if (!worldDefault || typeof worldDefault !== 'object') return;
+  for (const [section, write] of Object.entries(writers)) {
+    if (inherited?.[section] === false) continue;
+    const value = worldDefault[section];
+    if (value === undefined) continue;
+    write(row, value);
+  }
+}
+
+/**
+ * The three shipped `EssenceDefinition` source fields an inherited `effectSource` block is
+ * spelled over, in the shape `_sourceFieldsForEssenceSelection` emits.
+ *
+ * `?? null` rather than a conditional write, because the UNSET state of all three is `null` and
+ * not absence on this record: an inheriting system whose world default authored `effectSource: {}`
+ * has NO effect source, and leaving its own stale `sourceComponentId` standing would be the
+ * per-field fallback `## Scoped Entity Definitions` forbids by name.
+ *
+ * @param {object} row
+ * @param {unknown} value
+ * @returns {void}
+ */
+function writeInheritedEffectSource(row, value) {
+  const block = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  for (const field of ESSENCE_EFFECT_SOURCE_FIELDS) row[field] = block[field] ?? null;
+}
+
+/**
+ * How each entity type's world-default SECTIONS are written onto a merged row, per entity type.
+ *
+ * THE SECTION NAME AND THE SHIPPED FIELD NAME ARE NOT ALWAYS THE SAME, which is the whole reason
+ * this table exists rather than a spread. A component's `category` and a tool's `breakage` and
+ * `onBreak` are spelled identically at both scopes, so their writers are assignments. An essence's
+ * two sections are NEW names that collide with nothing on the in-system record - `effectSource` is
+ * a block over three fields and `macro` is `propertyMacroUuid` - so without a projection the
+ * resolved value would sit on the row under a key no consumer reads, and "an inheriting system
+ * follows its world default" would be true of the union's shape and false of every craft.
+ *
+ * The KEY SET is the scope's section list and must stay equal to it: a section with no writer here
+ * silently stops inheriting, which is the defect this change removes.
+ * `tests/world-scope-inherited-section-resolution.test.js` drives every section each scope
+ * DECLARES and asserts the merged row changed, which is a stronger guard than comparing key sets:
+ * a key added here with a projection that writes the wrong field name would pass the comparison.
+ *
+ * `repairRequirements` is deliberately absent. It is a SEED and not a resolver section
+ * (`### Tool scope` requirement 2): `resolveTool` answers it from the membership record alone and
+ * never reads it back out of the world defaults, so there is no inherit switch to read.
+ *
+ * @type {Readonly<Record<string, Readonly<Record<string, (row: object, value: unknown) => void>>>>}
+ */
+const INHERITED_SECTION_WRITERS = Object.freeze({
+  components: Object.freeze({
+    category(row, value) {
+      row.category = value;
+    },
+  }),
+  essences: Object.freeze({
+    effectSource: writeInheritedEffectSource,
+    macro(row, value) {
+      row.propertyMacroUuid = value;
+    },
+  }),
+  tools: Object.freeze({
+    breakage(row, value) {
+      row.breakage = value;
+    },
+    onBreak(row, value) {
+      row.onBreak = value;
+    },
+  }),
+});
+
+/**
+ * The inherited-section writers for one entity type, REFUSING an unrecognised one.
+ *
+ * It throws for the same reason {@link liftedIdentityFields} does, and the failure it catches is
+ * the same shape: a typo would leave every section of that entity type reading the in-system
+ * record whatever its switch said, with every suite green, because the union's other two passes
+ * still produce a complete-looking row.
+ *
+ * @param {'components'|'essences'|'tools'} entityType
+ * @returns {Readonly<Record<string, (row: object, value: unknown) => void>>}
+ */
+function inheritedSectionWriters(entityType) {
+  const writers = INHERITED_SECTION_WRITERS[entityType];
+  if (!writers) {
+    const known = Object.keys(INHERITED_SECTION_WRITERS).join(', ');
+    throw new TypeError(
+      'unionScopedDefinitions: unknown entityType ' +
+        JSON.stringify(entityType) +
+        '; expected one of ' +
+        known
+    );
+  }
+  return writers;
 }
 
 /**

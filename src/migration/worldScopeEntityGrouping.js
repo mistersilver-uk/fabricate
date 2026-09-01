@@ -121,6 +121,29 @@ export const SOURCE_LINK_FIELDS = Object.freeze([
   'aliasItemUuids',
 ]);
 
+/**
+ * The three shipped `EssenceDefinition` fields the `effectSource` SECTION is spelled over.
+ *
+ * ONE LIST, THREE DIRECTIONS OF TRAVEL, which is why it is exported rather than restated at each
+ * site. The migration READS these fields off an in-system record to build a world default
+ * (`worldScopeDefaults.electSection`) and a membership record (`buildMembershipRecord`), and the
+ * read union WRITES them back onto a merged row when a system inherits the section
+ * (`unionScopedDefinitions`). A second copy anywhere in that loop is how a lifted field starts
+ * being read at one scope and written at another.
+ *
+ * The section value is a BLOCK over these three names rather than three sections, because a
+ * source is one choice: `_sourceFieldsForEssenceSelection` derives all three from one selection,
+ * and a per-field inherit switch could express `sourceComponentId` from the world beside
+ * `sourceItemUuid` from the system, which names two different Items.
+ *
+ * @type {readonly string[]}
+ */
+export const ESSENCE_EFFECT_SOURCE_FIELDS = Object.freeze([
+  'sourceComponentId',
+  'sourceItemUuid',
+  'associatedSystemItemId',
+]);
+
 /** The identity fields lifted to a world entity, per entity type (`#### D1`). */
 const IDENTITY_FIELDS = Object.freeze({
   components: Object.freeze([

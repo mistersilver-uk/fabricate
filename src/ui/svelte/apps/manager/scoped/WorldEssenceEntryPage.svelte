@@ -80,6 +80,7 @@
   } from './scopedEntryDraft.js';
   import {
     essenceColourCaption,
+    essenceEffectSourceReferent,
     essenceInheritLine,
     essenceSectionValueName,
     essenceShortValueName,
@@ -419,7 +420,9 @@
     memberSystemCount: memberCount,
     worldEffectSource: defaults?.effectSource ?? null,
     worldMacro: defaults?.macro ?? null,
-    worldEffectSourceName: essenceSectionValueName(defaults?.effectSource),
+    // The REFERENT, for the same reason `sectionValueName` reads one: the block is not a scalar,
+    // so the validation surface was naming an authored effect source `''`.
+    worldEffectSourceName: essenceEffectSourceReferent(defaults?.effectSource),
     worldMacroName: essenceSectionValueName(defaults?.macro),
   });
   const presentation = $derived(
@@ -434,7 +437,10 @@
     colorToken: identity.colorToken || '',
     description: identity.description ?? '',
     enabled: true,
-    hasEffectTransfer: Boolean(defaults?.effectSource),
+    // THE REFERENT, not the block. An authored `effectSource: {}` is a real overriding
+    // value meaning "no source" and it is TRUTHY, so a presence test on the block reported
+    // effect transfer for a default that names nothing.
+    hasEffectTransfer: Boolean(essenceEffectSourceReferent(defaults?.effectSource)),
     hasPropertyMacro: Boolean(defaults?.macro),
   });
 
@@ -539,7 +545,26 @@
     return named || String(row?.systemId ?? '');
   }
 
+  /**
+   * The display name of one section's stored world default, `''` when it is unset.
+   *
+   * `effectSource` GOES THROUGH ITS OWN READER, because it is the one section stored as a BLOCK
+   * rather than as a scalar (`{sourceComponentId?, sourceItemUuid?, associatedSystemItemId?}`).
+   * `essenceSectionValueName` reads a value as a string or as `{id, name}`, so handed the block it
+   * found neither and answered `''` - and this card then wore its `No default` pill and its
+   * `Drop the item…` prompt over a default that WAS authored and that every inheriting system was
+   * already resolving. That is the worst direction for this particular lie to point: it invites a
+   * GM to author a default over one they cannot see.
+   *
+   * It answers the REFERENT rather than a resolved name, because this page holds no component
+   * catalogue to resolve one against - the referent is a world component id or a document uuid,
+   * and it is the closest true thing this screen can say.
+   *
+   * @param {string} section
+   * @returns {string}
+   */
   function sectionValueName(section) {
+    if (section === 'effectSource') return essenceEffectSourceReferent(defaults?.effectSource);
     return essenceSectionValueName(defaults?.[section]);
   }
 
@@ -554,6 +579,7 @@
    * @returns {string}
    */
   function sectionValueAddress(section) {
+    if (section === 'effectSource') return essenceEffectSourceReferent(defaults?.effectSource);
     const value = defaults?.[section];
     if (value && typeof value === 'object') return typeof value.id === 'string' ? value.id : '';
     return typeof value === 'string' ? value : '';
@@ -1148,7 +1174,7 @@
               <EssenceBehaviorPreview
                 essence={previewEssence}
                 scope="world"
-                effectTransferEnabled={Boolean(defaults?.effectSource)}
+                effectTransferEnabled={Boolean(essenceEffectSourceReferent(defaults?.effectSource))}
                 propertyMacrosEnabled={Boolean(defaults?.macro)}
                 sourceName={essenceShortValueName(sectionValueName('effectSource'))}
                 macroName={essenceShortValueName(sectionValueName('macro'))}

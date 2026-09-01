@@ -4973,14 +4973,21 @@ export function createAdminStore(services) {
    * alone: the GM is re-adding a membership record to an essence this system already has, and
    * overwriting its authored behaviour would be a destructive read of "Add".
    *
-   * ── REMOVE IS DELIBERATELY NOT ITS MIRROR ───────────────────────────────────────────────────
-   * `removeFromSystem` deletes the membership record and leaves the in-system record standing.
-   * Deleting the in-system row would run `_normalizeEssenceQuantities` against a valid-id set that
-   * no longer contains this essence, which STRIPS the stored quantity from every component in the
-   * system that carries it — the opposite of what the reference's own copy promises ("Components
-   * here keep the values, but nothing resolves on craft until the essence is added back"). Making
-   * Remove destructive is a data-model decision, not a parity one, so it is raised rather than
-   * taken here.
+   * ── REMOVE IS ITS MIRROR, AND THE QUANTITIES SURVIVE IT ─────────────────────────────────────
+   * {@link partEssenceFromSystem} deletes BOTH halves, because the reference's own copy says
+   * removal takes this system's rules: "Components here keep the values, but nothing resolves on
+   * craft until the essence is added back." Leaving the in-system row standing made the second
+   * clause false — the essence went on resolving on every craft — and deleting it was refused
+   * because `_normalizeEssenceQuantities` was believed to strip the stored quantity from every
+   * component carrying it.
+   *
+   * IT DOES NOT, AND THE REASON IS THE VALID ID BASIS ITSELF. `_scopeBasis` builds the essence
+   * basis as the UNION of the WORLD ROSTER and the system's surviving in-system array, so an
+   * essence that is still a world entity is still in the basis after its in-system row is gone,
+   * and the prune has nothing to act on. That is not a happy accident: it is the same union that
+   * makes an absent membership record a REFUSAL rather than a PRUNE. It is also exactly why this
+   * verb may only ever be reached from a world-scope screen — with no world half at all the basis
+   * is the in-system array alone, and the strip is real.
    *
    * @param {string} entityId the world essence id.
    * @param {string} systemId the crafting system to join it to.
@@ -4992,7 +4999,8 @@ export function createAdminStore(services) {
     if (!target || !system) return false;
     const joined = await worldScopeFamilies.essence.addToSystem(target, system);
     const seeded = await _seedInSystemEssence(target, system);
-    if (joined || seeded) await refresh();
+    // NO `refresh()` HERE. `_republishingFamily` wraps this verb with every other one, so a
+    // second call would re-project twice per click and would leave the wrapper looking optional.
     return joined || seeded;
   }
 
@@ -5025,13 +5033,106 @@ export function createAdminStore(services) {
     return true;
   }
 
-  // The published write path. Only the ESSENCE family is composed: its `addToSystem` has a second
-  // half in a store this gateway owns, and the generic family cannot reach `CraftingSystemManager`
-  // at all. Every other family and every other essence verb is the generic one, unwrapped.
-  const worldScope = {
-    ...worldScopeFamilies,
-    essence: { ...worldScopeFamilies.essence, addToSystem: joinEssenceToSystem },
-  };
+  /**
+   * Remove a WORLD essence from one crafting system — the membership record AND this system's
+   * in-system rules record.
+   *
+   * THE MIRROR OF {@link joinEssenceToSystem}, and see its note for why the quantities survive:
+   * the valid-id basis is the union of the world roster with the in-system array, so an essence
+   * that is still a world entity is still in the basis and nothing prunes a component's stored
+   * quantity for it. Re-adding restores the row and the essence resolves again over quantities it
+   * never lost.
+   *
+   * THE WORLD ENTITY AND EVERY OTHER SYSTEM ARE UNTOUCHED, which is the whole distinction from
+   * `Delete this essence`: that verb removes the world entity, drops it out of the basis, and the
+   * prune that follows is then correct.
+   *
+   * @param {string} entityId the world essence id.
+   * @param {string} systemId the crafting system to remove it from.
+   * @returns {Promise<boolean>} whether anything was written.
+   */
+  async function partEssenceFromSystem(entityId, systemId) {
+    const target = typeof entityId === 'string' ? entityId.trim() : '';
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    if (!target || !system) return false;
+    const parted = await worldScopeFamilies.essence.removeFromSystem(target, system);
+    const dropped = await _dropInSystemEssence(target, system);
+    return parted || dropped;
+  }
+
+  /**
+   * Drop the in-system `essenceDefinitions` row for one essence, when it is present.
+   *
+   * @param {string} entityId
+   * @param {string} systemId
+   * @returns {Promise<boolean>} whether a row was removed.
+   */
+  async function _dropInSystemEssence(entityId, systemId) {
+    const systemManager = services.getCraftingSystemManager();
+    const system = systemManager?.getSystem?.(systemId);
+    if (!system) return false;
+    const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const essenceDefinitions = existing.filter(
+      (def) => String(def?.id ?? '').trim() !== entityId
+    );
+    if (essenceDefinitions.length === existing.length) return false;
+    await systemManager.updateSystem(systemId, { essenceDefinitions });
+    return true;
+  }
+
+  /**
+   * Re-publish after a world-scope write that reported it wrote something.
+   *
+   * ── THE WRITE LANDED AND THE SCREEN DID NOT MOVE ────────────────────────────────────────────
+   * Every world-scope action persists through its own store, and `buildWorldScopeState()` is read
+   * ONCE PER PUBLISH. Nothing else republishes, so before this wrapper `setSectionInherited`
+   * flipped a switch in the setting and the inherit row beside it went on rendering the state
+   * before the click: the projection it reads is a `viewState` key, not a live store read. Only
+   * `addToSystem` looked right, and only because its essence composition happened to call
+   * `refresh()` for its OWN second half.
+   *
+   * It is a WRAPPER over the whole family rather than a `refresh()` inside each verb, because the
+   * families are minted generically per entity type: a verb added to `worldScopeActions.js` — a
+   * file three lanes edit — would otherwise ship the same silent no-op again, and nothing would
+   * fail.
+   *
+   * GATED ON THE RETURN VALUE, which every action already answers honestly: `false` means the
+   * write was abandoned, so a refresh would be a whole re-projection for nothing. An action that
+   * throws is left to throw.
+   *
+   * @param {Record<string, unknown>} family
+   * @returns {Record<string, unknown>} a new family; the input is not mutated.
+   */
+  function _republishingFamily(family) {
+    const wrapped = {};
+    for (const [name, verb] of Object.entries(family)) {
+      if (typeof verb !== 'function') {
+        wrapped[name] = verb;
+        continue;
+      }
+      wrapped[name] = async (...args) => {
+        const answer = await verb(...args);
+        if (answer !== false) await refresh();
+        return answer;
+      };
+    }
+    return wrapped;
+  }
+
+  // The published write path. Only the ESSENCE family is composed: `addToSystem` and
+  // `removeFromSystem` each have a second half in a store this gateway owns, and the generic
+  // family cannot reach `CraftingSystemManager` at all. Every other family and every other essence
+  // verb is the generic one — wrapped, so the screen re-flows on every write that lands.
+  const worldScope = Object.fromEntries(
+    Object.entries({
+      ...worldScopeFamilies,
+      essence: {
+        ...worldScopeFamilies.essence,
+        addToSystem: joinEssenceToSystem,
+        removeFromSystem: partEssenceFromSystem,
+      },
+    }).map(([entityType, family]) => [entityType, _republishingFamily(family)])
+  );
 
   // Read the world character libraries straight from their store on every publish, for the same
   // reasons: cheap, and honest when another GM edits a library, with no per-system cache to
