@@ -31,6 +31,18 @@
 
   Props:
    - entityType: `component`, `essence` or `tool`; the row set is derived from it.
+   - section: render ONLY this section's row, or `''` for the whole set. It is a FILTER over
+     the descriptor's sections and never a way to add one, so a caller still cannot draw a
+     switch the resolver does not read through. It exists because the essence rules editor
+     puts each switch inside the value card it governs — the reference draws the pair that
+     way, and a GM has to see the state and the control that changes it beside the value.
+   - headings: `{[section]: string}` overriding the row's head text. The default head is the
+     section's own NAME, which is the right answer for a row set rendered as a group; a row
+     rendered INSIDE the card that already carries that name would repeat it, so that caller
+     supplies the state sentence instead.
+   - stateChip: whether the head carries the Inherited / Overridden chip. Off for a caller
+     whose enclosing card already states the resolution in its own pill, because two pills
+     one line apart saying the same thing is the state duplication this flag avoids.
    - inherited: the membership record's `inherit` map. An ABSENT key reads as inheriting,
      matching `isSectionInherited`.
    - notes: `{ [section]: string }`, the one-line summary of the inherited value. The calling
@@ -47,6 +59,9 @@
 
   let {
     entityType = 'component',
+    section = '',
+    headings = {},
+    stateChip = true,
     inherited = {},
     notes = {},
     disabled = false,
@@ -58,18 +73,24 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const rows = $derived(scopedInheritRows({ entityType, inherited, notes, text }));
+  const rows = $derived(
+    scopedInheritRows({ entityType, inherited, notes, text }).filter(
+      (row) => !section || row.section === section
+    )
+  );
 </script>
 
 {#each rows as row (row.section)}
   <div class="manager-scoped-inherit-row" data-scoped-inherit-row={row.section}>
     <div class="manager-scoped-inherit-head">
-      <span class="manager-scoped-inherit-label">{row.label}</span>
-      <Chip
-        tone={row.inherited ? 'neutral' : 'accent'}
-        data-scoped-inherit-state={row.inherited ? 'inherited' : 'overridden'}
-        >{row.stateLabel}</Chip
-      >
+      <span class="manager-scoped-inherit-label">{headings?.[row.section] || row.label}</span>
+      {#if stateChip}
+        <Chip
+          tone={row.inherited ? 'neutral' : 'accent'}
+          data-scoped-inherit-state={row.inherited ? 'inherited' : 'overridden'}
+          >{row.stateLabel}</Chip
+        >
+      {/if}
     </div>
     {#if row.note}
       <p class="manager-scoped-inherit-note" data-scoped-inherit-note={row.section}>{row.note}</p>

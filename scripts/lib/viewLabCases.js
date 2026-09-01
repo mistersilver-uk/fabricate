@@ -5620,17 +5620,53 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    id: 'manager-tool-parity-02-overview-1280x720',
-    label: 'Manager — Tool parity 02 overview 1280x720',
-    smokeLabels: ['manager-tool-parity-02-overview-1280x720'],
+    // THE INHERITING STATE OF THE RULES EDITOR (issue 1373), and the only frame that shows it.
+    //
+    // `beyond` with no smoke label, for the same reason its sibling adoption case is: the live
+    // smoke walks no world-Tool adoption, and a MIGRATED Tool is `Overridden` on all four
+    // sections by construction — `migrateToolRequirementSections` records every existing
+    // system's own value as its own override, so every other Tool frame in this registry shows
+    // the override face. Adopting `hb-tool-mortar` into Smithing is what produces a membership
+    // record that inherits every section, and opening its rules is what photographs the
+    // `Inheriting` pill, the `World default: …` line and the read-only world value beneath it.
+    id: 'manager-tool-rules-inheriting-1280x720',
+    label: 'Manager — Tool rules inheriting the world defaults 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      { selector: '[data-tool-add-to-system="hb-tool-mortar"]' },
+      { selector: '[data-tool-edit-rules="hb-tool-mortar"]' },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-rule-card="breakage"][data-tool-rule-state="inheriting"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/],
+  }),
+  managerCase({
+    // THE OVERVIEW FRAME IS GONE BECAUSE THE OVERVIEW TAB IS (issue 1373). The system Tool rules
+    // editor's tabs are `Breakage · Requirements · Validation`; identity is world scope's, and
+    // `#tool-tab-overview` no longer exists to click, so a case pointed at it would fail its
+    // `expectView` rather than photograph anything.
+    //
+    // The slot photographs the tab's CLOSING state instead — the `Stop using this Tool here`
+    // callout, which is system scope's counterpart to the world entry's `Delete` and which no
+    // other frame reaches: 03 and 06 capture the same tab from the top, above the fold.
+    id: 'manager-tool-parity-02-remove-1280x720',
+    label: 'Manager — Tool parity 02 remove from system 1280x720',
+    smokeLabels: ['manager-tool-parity-02-remove-1280x720'],
     reaches: 'exact',
     query: {},
     steps: [
       { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-edit-rules]' },
-      { selector: '#tool-tab-overview' },
+      { selector: '[data-tool-remove-from-system]', scroll: true },
     ],
     expectView: 'tool-edit',
+    expectSelector: '[data-tool-remove-from-system]',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
@@ -5645,15 +5681,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-runework' },
     // A long DISPLAY LABEL, authored on the fixture rather than typed: the field is the one
     // the smoke fills, and an authored value reaches the same overflow without a keystroke.
+    //
+    // NO TAB STEP. The field used to be on an `Overview` tab this case clicked; the system rules
+    // editor has no such tab (issue 1373), and the per-system label OVERRIDE the field became
+    // opens the `Breakage` tab, which is where the editor already lands.
     steps: [
       { selector: '#manager-nav-tool-rules' },
       {
         selector:
           '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] [data-tool-edit-rules]',
       },
-      { selector: '#tool-tab-overview' },
     ],
     expectView: 'tool-edit',
+    expectSelector: '[data-tool-label]',
     kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),

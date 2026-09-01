@@ -86,11 +86,6 @@
       "sha256": "99d2ec6b07b3229210cd5bc627be037718b8abf2324c19930df89d52abb9223e"
     },
     {
-      "case": "manager-tool-parity-02-overview-1280x720",
-      "alt": "The Overview tab of the tool editor, showing the game-world Item a tool is linked to, its display label and description, and the toggle that enables it.",
-      "sha256": "30a323777f8d0a75e35e11c89f6ff510792752715c3488ec8a712bbf644ce9f7"
-    },
-    {
       "case": "manager-tool-parity-03-breakage-1280x720",
       "alt": "The breakage tab of the tool editor, where the chance of breaking and what happens on a break are set.",
       "sha256": "1a072dd1410dd3bcd2c4b0fe4ab1e8f40d6f4313478acaefbc2a2ae894c89ee0"

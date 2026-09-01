@@ -6,15 +6,9 @@
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
   import ToolEditorTabs from './tools/ToolEditorTabs.svelte';
-  import ToolOverviewTab from './tools/ToolOverviewTab.svelte';
   import ToolRequirementsTab from './tools/ToolRequirementsTab.svelte';
   import ToolValidationTab from './tools/ToolValidationTab.svelte';
-  import {
-    toolDisplayImage,
-    toolDisplayName,
-    toolEditorValidation,
-    toolSourceUuid,
-  } from './tools/toolStudio.js';
+  import { toolDisplayImage, toolDisplayName, toolEditorValidation } from './tools/toolStudio.js';
 
   let {
     tool = null,
@@ -24,13 +18,23 @@
     // editor that would open on nothing, which is the state a pre-migration in-system Tool with
     // no world half is in.
     scope = null,
+    // WHICH SYSTEM THIS EDITOR IS SCOPED TO. It arrives in the `toolScopeProps` bundle the call
+    // site already spreads, so declaring it costs no new wiring — and `scope` was already
+    // declared and already read in a reactive scope here, so the bundle-subscription hazard
+    // that declaration note warns about was taken long ago and is not deepened by this one.
+    //
+    // `actions` is deliberately NOT declared. The two membership writes this screen performs go
+    // out as `onToggleInherited` and `onRemoveFromSystem` callbacks, because both have to be
+    // composed with a DRAFT write the shell owns and a route the shell owns; reaching the world
+    // family directly from here would do half of each.
+    systemId = '',
     systemName = '',
     validation = { valid: false, errors: [] },
     persisted = true,
     dirty = false,
     saving = false,
     saveError = null,
-    activeTab = 'overview',
+    activeTab = 'breakage',
     focusValidationNonce = 0,
     managedItems = [],
     itemTags = [],
@@ -38,12 +42,16 @@
     currencyUnits = [],
     currencyEnabled = false,
     prerequisiteOptions = [],
+    // The rail's `PREVIEW AS` roster and its roll-data resolver, and its `REQUIRED FOR` list.
+    // All three are projections the store owns: this view counts nothing and reads no document.
+    actorOptions = [],
+    getActorRollData = async () => null,
+    requiredFor = [],
     authority = 'toolSpecific',
     onOpenSystems = () => {},
     onOpenSystem = () => {},
     onOpenTools = () => {},
     onBack = () => {},
-    onDelete = () => {},
     onSave = () => {},
     onTabChange = () => {},
     onPatch = () => {},
@@ -60,11 +68,31 @@
     // `onSourceDrop`, `onCopySourceUuid`, `onUnlinkSource` — are gone with the card that used
     // them. See `tools/ToolOverviewTab` for why.
     onEditWorldTool = () => {},
+    // ── THE TWO WORLD-MEMBERSHIP WRITES THIS SCREEN OWNS (issue 1373) ───────────────────────
+    // `onToggleInherited(section, nextInherit)` moves ONE section between following the world
+    // Tool and setting this system's own, and `onRemoveFromSystem()` takes the whole rules
+    // record away. Both are membership writes rather than draft patches, so both are the
+    // shell's to perform: they persist immediately, exactly as the enable switch already does.
+    //
+    // `onDelete` is GONE with the header button that called it. The design puts `Delete` on the
+    // world entry, which is the record it destroys; system scope gets the explained
+    // `Stop using this Tool here` callout on `Breakage` instead, because a bare `Delete` on a
+    // screen whose subject is one world Tool adopted by many systems names no scope at all.
+    onToggleInherited = () => {},
+    onRemoveFromSystem = () => {},
   } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+  function formattedText(key, data, fallback) {
+    const template = localize(key);
+    if (template && template !== key) return localize(key, data);
+    return Object.entries(data).reduce(
+      (copy, [name, value]) => copy.replace(`{${name}}`, String(value)),
+      fallback
+    );
   }
   const displayName = $derived(
     toolDisplayName(
@@ -74,10 +102,25 @@
     )
   );
   const displayImage = $derived(toolDisplayImage(tool, managedItems));
+  /**
+   * THE HEADER'S SUBTITLE, AND IT IS A STATEMENT OF SCOPE (issue 1373).
+   *
+   * It read `Linked game-world Item` — the WORLD editor's subtitle, describing the one thing
+   * this screen cannot change. What a GM needs to know on arriving here is which half of a Tool
+   * this screen owns, and the design says it in one sentence: the rules are this system's, the
+   * identity is the world Tool's.
+   */
   const sourceContext = $derived(
-    toolSourceUuid(tool) || tool?.componentId
-      ? text('FABRICATE.Admin.Manager.Tools.Editor.HeaderLinked', 'Linked game-world Item')
-      : text('FABRICATE.Admin.Manager.Tools.Editor.HeaderUnlinked', 'Unlinked Tool')
+    systemName
+      ? formattedText(
+          'FABRICATE.Admin.Manager.Tools.Editor.HeaderSystemScope',
+          { system: systemName },
+          'Rules in {system} · identity comes from the world Tool'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Tools.Editor.HeaderSystemScopeUnnamed',
+          'System rules · identity comes from the world Tool'
+        )
   );
   const editorErrorCount = $derived(
     toolEditorValidation(tool, authority, validation.errors).issueCount
@@ -94,10 +137,39 @@
    * `1.30.0` pass has lifted has no world half, and routing to its entry editor would land the
    * GM on the `no longer in the corpus` state. The button is simply absent there.
    */
-  const worldRecordExists = $derived(
-    Array.isArray(scope?.entries) &&
-      scope.entries.some((entry) => String(entry?.id ?? '') === String(tool?.id ?? ''))
+  const worldEntry = $derived(
+    (Array.isArray(scope?.entries) ? scope.entries : []).find(
+      (entry) => String(entry?.id ?? '') === String(tool?.id ?? '')
+    ) ?? null
   );
+  const worldRecordExists = $derived(worldEntry !== null);
+
+  /**
+   * THIS `(tool, system)` PAIR'S ROW IN THE WORLD PROJECTION — the only thing that can say
+   * whether a section is inherited or overridden.
+   *
+   * The system's own Tool record carries the RESOLVED values and cannot tell the two apart,
+   * which is exactly why this editor had no inheritance model: it was reading the only source
+   * that does not hold the answer. `ToolsBrowserView` already reads the same join for its
+   * per-row `Inherits world defaults` pill.
+   */
+  const systemRow = $derived(
+    (Array.isArray(worldEntry?.systems) ? worldEntry.systems : []).find(
+      (row) => String(row?.systemId ?? '') === String(systemId ?? '')
+    ) ?? null
+  );
+  /**
+   * Whether this crafting system holds a MEMBERSHIP record for the Tool, and therefore whether
+   * the editor can offer an inherit affordance at all.
+   *
+   * `false` is a real answer: a pre-migration in-system Tool that no `1.30.0` pass lifted has no
+   * world half, so there is nothing to inherit FROM and nothing to be removed from. Every card
+   * then renders its controls with no switch and no pill — which is exactly what this screen did
+   * before, so nothing about that state changed.
+   */
+  const member = $derived(systemRow?.member === true);
+  const inherited = $derived(systemRow?.inherited ?? {});
+  const worldDefaults = $derived(worldEntry?.defaults ?? null);
 </script>
 
 <main class="manager-main manager-tool-edit-main" data-tool-edit-view>
@@ -149,31 +221,33 @@
             ></ManagerButton
           >
         {/if}
+        <!-- `Back to Tool Rules` and `Save rules`, not `Back to tools` and `Save tool`. Both
+             old labels named the WORLD editor's job: they came from a time when this was the
+             only Tool editor there was. What this screen saves is one crafting system's RULES
+             for a Tool, and where it goes back to is the Tool Rules list its breadcrumb already
+             names — a `Save tool` on a screen that cannot change the Tool is the same category
+             error as the `Delete` that used to sit between them. -->
         <ManagerButton
           role="ghost"
           data-tool-editor-back
-          aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')}
-          title={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Tools.Editor.BackLabel',
+            'Back to the Tool Rules list'
+          )}
+          title={text(
+            'FABRICATE.Admin.Manager.Tools.Editor.BackLabel',
+            'Back to the Tool Rules list'
+          )}
           onclick={onBack}
           disabled={saving}
           ><i class="fas fa-arrow-left" aria-hidden="true"></i><span
-            >{text('FABRICATE.Admin.Manager.Tools.BackToTools', 'Back to tools')}</span
-          ></ManagerButton
-        >
-        <ManagerButton
-          role="danger"
-          data-tool-editor-delete
-          aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.DeleteLabel', 'Delete Tool')}
-          onclick={onDelete}
-          disabled={saving}
-          ><i class="fas fa-trash" aria-hidden="true"></i><span
-            >{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete')}</span
+            >{text('FABRICATE.Admin.Manager.Tools.BackToToolRules', 'Back to Tool Rules')}</span
           ></ManagerButton
         >
         <ManagerButton
           role="primary"
           data-tool-editor-save
-          aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool')}
+          aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool rules')}
           onclick={onSave}
           disabled={!dirty || !validation.valid || saving}
           title={validation.valid
@@ -183,7 +257,7 @@
                 'Resolve validation issues before saving.'
               )}
           ><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span
-            >{text('FABRICATE.Admin.Manager.Tools.Save', 'Save tool')}</span
+            >{text('FABRICATE.Admin.Manager.Tools.SaveRules', 'Save rules')}</span
           ></ManagerButton
         >
       </div>
@@ -206,9 +280,29 @@
       data-tool-editor-panel={activeTab}
       tabindex="0"
     >
-      {#if activeTab === 'overview'}
-        <ToolOverviewTab {tool} {managedItems} {persisted} {onPatch} {onToggleEnabled} />
-      {:else if activeTab === 'breakage'}
+      {#if activeTab === 'requirements'}
+        <ToolRequirementsTab
+          {tool}
+          {authority}
+          {prerequisiteOptions}
+          {saving}
+          {member}
+          {inherited}
+          {worldDefaults}
+          {onPatch}
+          {onToggleInherited}
+        />
+      {:else if activeTab === 'validation'}
+        <ToolValidationTab
+          {tool}
+          {authority}
+          {validation}
+          {saveError}
+          {focusValidationNonce}
+          {worldRecordExists}
+          {onEditWorldTool}
+        />
+      {:else}
         <ToolBreakageTab
           {tool}
           {authority}
@@ -217,14 +311,29 @@
           {essenceOptions}
           {currencyUnits}
           {currencyEnabled}
+          {managedItems}
+          {systemName}
+          {persisted}
+          {saving}
+          {member}
+          {inherited}
+          {worldDefaults}
           {onPatch}
+          {onToggleEnabled}
+          {onToggleInherited}
+          {onRemoveFromSystem}
         />
-      {:else if activeTab === 'requirements'}
-        <ToolRequirementsTab {tool} {prerequisiteOptions} {onPatch} />
-      {:else}
-        <ToolValidationTab {tool} {authority} {validation} {saveError} {focusValidationNonce} />
       {/if}
     </div>
-    <ToolBehaviorPreview {tool} {authority} {managedItems} />
+    <ToolBehaviorPreview
+      {tool}
+      {authority}
+      {managedItems}
+      {systemName}
+      {actorOptions}
+      {prerequisiteOptions}
+      {getActorRollData}
+      {requiredFor}
+    />
   </div>
 </main>

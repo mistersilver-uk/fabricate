@@ -1857,6 +1857,10 @@ export function createAdminStore(services) {
     selectedSystem: null,
     itemCards: [],
     essenceCards: [],
+    // WHAT REQUIRES EACH TOOL in the selected system, keyed by tool id (issue 1373). The Tool
+    // rules editor's `Required for` rail region reads it; an empty map is what a world with no
+    // selected system publishes, and the region then states its empty case.
+    toolRequiredFor: {},
     recipes: [],
     recipeCategories: [],
     // The recipe half of the Tags & Categories reference count, folded by the row
@@ -2302,24 +2306,40 @@ export function createAdminStore(services) {
     }
   }
 
-  async function toggleToolEnabled(toolId, enabled, systemId = get(selectedSystemId)) {
+  /**
+   * WRITE A FEW FIELDS ONTO ONE SYSTEM'S LIVE TOOL RECORD WITHOUT COMMITTING THE OPEN DRAFT.
+   *
+   * The Tool rules editor carries two IMMEDIATE-PERSISTENCE controls beside a buffered draft:
+   * the `Enabled in <System>` switch and, since issue 1373, the per-section inherit switch. Both
+   * have to land on disk the moment they are pressed while leaving a half-finished breakage edit
+   * exactly as the GM left it, which is what the dirty branch below is for: it folds only the
+   * written fields into the draft AND its baseline, so the edit stays dirty and the write does
+   * not read as an unsaved change.
+   *
+   * Extracted rather than copied: it was one function's body, and the second caller would have
+   * been a near-identical twenty lines — the new-code duplication the SonarCloud gate fails on,
+   * and a second place for the dirty-draft rule to drift.
+   *
+   * @param {string} toolId
+   * @param {string} systemId
+   * @param {object} patch The fields to write.
+   * @param {string} failureKey The notification key for a refused write.
+   * @param {string} failureFallback
+   * @returns {Promise<boolean>}
+   */
+  async function _writeLiveTool(toolId, systemId, patch, failureKey, failureFallback) {
     const systemManager = services.getCraftingSystemManager?.();
     const live = _systemTools(systemId).find((tool) => String(tool.id) === String(toolId));
     if (!live || typeof systemManager?.upsertTool !== 'function') return false;
     try {
-      const result = await systemManager.upsertTool(systemId, {
-        ...live,
-        enabled: enabled === true,
-      });
+      const result = await systemManager.upsertTool(systemId, { ...live, ...patch });
       if (!result?.item) return false;
       const saved = _normalizeGatheringLibraryTool(result.item, _randomID);
       if (String(get(toolDraft)?.id || '') === String(saved.id)) {
-        const draftWasDirty = get(toolDraftDirty);
-        if (draftWasDirty) {
-          toolDraft.update((draft) => ({ ...draft, enabled: saved.enabled }));
-          toolDraftBaseline.update((baseline) =>
-            baseline ? { ...baseline, enabled: saved.enabled } : baseline
-          );
+        const written = Object.fromEntries(Object.keys(patch).map((key) => [key, saved[key]]));
+        if (get(toolDraftDirty)) {
+          toolDraft.update((draft) => ({ ...draft, ...written }));
+          toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
         } else {
           toolDraft.set(_clonePlain(saved));
           toolDraftBaseline.set(_clonePlain(saved));
@@ -2330,12 +2350,122 @@ export function createAdminStore(services) {
       _patchToolsDraftViewState();
       return true;
     } catch {
+      services.notify?.error?.(services.localize?.(failureKey) || failureFallback);
+      return false;
+    }
+  }
+
+  async function toggleToolEnabled(toolId, enabled, systemId = get(selectedSystemId)) {
+    return _writeLiveTool(
+      toolId,
+      systemId,
+      { enabled: enabled === true },
+      'FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed',
+      'The Tool status could not be changed. Try again.'
+    );
+  }
+
+  /**
+   * MOVE ONE WORLD-DEFAULT SECTION between following the world Tool and this system's own
+   * (issue 1373).
+   *
+   * ── IT IS TWO WRITES, AND THE SECOND ONE IS WHAT MAKES THE FIRST TRUE ──────────────────────
+   * The world membership record carries the SWITCH; the in-system Tool record carries the
+   * VALUE, and while `## CraftingSystem` requirement 36 holds the in-system record is what the
+   * resolver actually answers with. So flipping the switch alone would paint an `Inheriting`
+   * pill over a value this system had authored for itself — the resolver would go on answering
+   * the local value, and the screen would be stating something it had not made true.
+   *
+   * Turning inheritance ON therefore also writes the WORLD DEFAULT onto the in-system record, so
+   * the resolved value is the world's for as long as the pill says it is. Turning it OFF writes
+   * nothing: the in-system record already holds the value that was on screen, which is exactly
+   * the value the GM is about to start editing. `setSectionInheritance` retains the dormant
+   * override on the membership record either way, so nothing is destroyed in either direction.
+   *
+   * A world half with no defaults record for the section writes nothing either: there is no
+   * world value to adopt, and the canonical empty the resolver would answer is already what an
+   * absent section resolves to.
+   *
+   * @param {string} toolId
+   * @param {string} section One of the world-default tool sections.
+   * @param {boolean} inherit
+   * @param {string} [systemId]
+   * @returns {Promise<boolean>}
+   */
+  async function setToolSectionInherited(toolId, section, inherit, systemId = get(selectedSystemId)) {
+    const target = String(toolId || '').trim();
+    const system = String(systemId || '').trim();
+    if (!target || !system || typeof inherit !== 'boolean') return false;
+    const written = await worldScope.tool.setSectionInherited(target, system, section, inherit);
+    if (written !== true) return false;
+    if (!inherit) {
+      await refresh();
+      return true;
+    }
+    const worldDefault = (_worldToolCorpus()?.defaults || []).find(
+      (record) => String(record?.id ?? '').trim() === target
+    );
+    const value = worldDefault?.[section];
+    if (value === undefined) {
+      await refresh();
+      return true;
+    }
+    return _writeLiveTool(
+      target,
+      system,
+      { [section]: _clonePlain(value) },
+      'FABRICATE.Admin.Manager.Tools.Editor.InheritFailed',
+      'This Tool could not be returned to the world default. Try again.'
+    );
+  }
+
+  /**
+   * STOP USING ONE WORLD TOOL IN ONE CRAFTING SYSTEM (issue 1373) — the exact inverse of
+   * {@link adoptWorldTool}, and two writes for the same reason it is.
+   *
+   * The IN-SYSTEM record goes first, because while requirement 36 holds it is the load-bearing
+   * half: deleting it is what actually removes the Tool from the system's list, its recipes'
+   * reach and its inventory matching. The membership record and its overrides go second.
+   *
+   * A refused membership delete after a successful record delete is NOT rolled back, and that is
+   * deliberate: the Tool is already gone from the system either way — a membership record with
+   * no in-system record contributes no row (`## Scoped Entity Definitions` requirement 15
+   * clause 3), which is the same "ghost" state adoption exists to avoid creating. Re-adopting
+   * and removing again clears it. Restoring the deleted record instead would have to invent the
+   * identity fields the delete just took away.
+   *
+   * @param {string} toolId
+   * @param {string} [systemId]
+   * @returns {Promise<boolean>}
+   */
+  async function removeToolFromSystem(toolId, systemId = get(selectedSystemId)) {
+    const target = String(toolId || '').trim();
+    const system = String(systemId || '').trim();
+    if (!target || !system) return false;
+    const systemManager = services.getCraftingSystemManager?.();
+    if (typeof systemManager?.deleteTool !== 'function') return false;
+    try {
+      const deleted = await systemManager.deleteTool(system, target);
+      if (deleted?.deleted !== true) return false;
+    } catch (error) {
       services.notify?.error?.(
-        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed') ||
-          'The Tool status could not be changed. Try again.'
+        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.RemoveFromSystemFailed') ||
+          `The Tool could not be removed from this system. ${error?.message || ''}`.trim()
       );
       return false;
     }
+    await worldScope.tool.removeFromSystem(target, system);
+    if (String(get(toolDraft)?.id || '') === target) {
+      toolDraft.set(null);
+      toolDraftBaseline.set(null);
+      toolDraftSourceItemUuid.set('');
+      toolDraftDirty.set(false);
+      toolDraftSaveError.set(null);
+      toolDraftValidation.set({ valid: false, errors: ['missing'] });
+    }
+    await refresh();
+    _patchToolsDraftViewState();
+    return true;
   }
 
   async function saveAllDirtyToolDrafts() {
@@ -2655,8 +2785,7 @@ export function createAdminStore(services) {
       return services.getGatheringLocationService?.() || null;
     }
     function getActorOptions() {
-      const options = services.getActorOptions?.() || [];
-      return Array.isArray(options) ? _clonePlain(options) : [];
+      return _actorOptions();
     }
 
     // Reads the SHARED gate helper off the system, not `enabled` through the realm store.
@@ -4635,6 +4764,7 @@ export function createAdminStore(services) {
 
     let selectedSystemData = null;
     let essenceCards = [];
+    let toolRequiredFor = {};
     let recipeListData = {
       recipes: [],
       recipeCategories: [],
@@ -4715,6 +4845,7 @@ export function createAdminStore(services) {
         get(recipeSearch),
         { roster: systemRecipes }
       );
+      toolRequiredFor = _buildToolRequiredFor(selectedSystem.id, systemRecipes);
     }
 
     const visibleTab = _resolveVisibleTab(get(activeTab), selectedSystem);
@@ -4744,6 +4875,12 @@ export function createAdminStore(services) {
       accessCharacters,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
+      // THE TOOL RULES EDITOR'S RAIL DATA (issue 1373). `actorOptions` is published from the
+      // MAIN refresh now as well as from `travel.patch()`: the key was top level all along but
+      // only World > Travel ever wrote it, so every other reader saw the empty default until a
+      // scene change happened to fire.
+      actorOptions: _actorOptions(),
+      toolRequiredFor,
     }));
     await Promise.resolve();
 
@@ -5109,6 +5246,84 @@ export function createAdminStore(services) {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * EVERY world actor, name-sorted, as the `{uuid, id, name, img, isPlayerCharacter}` records
+   * the app service projects.
+   *
+   * Read at MODULE-INSTANCE scope rather than inside the travel closure, because it now has two
+   * readers: World > Travel's party pickers and the Tool rules editor's `Preview as` selector.
+   * The travel closure delegates here so there is one read and one clone, not two.
+   *
+   * @returns {Array<object>}
+   */
+  function _actorOptions() {
+    const options = services.getActorOptions?.() || [];
+    return Array.isArray(options) ? _clonePlain(options) : [];
+  }
+
+  /**
+   * ONE ACTOR'S PREPARED ROLL DATA, for the Tool rules editor's `Preview as` evaluation.
+   *
+   * The ONLY thing on the Tool editor's path that touches a live Foundry document, which is why
+   * it is a service call rather than anything derived: `evaluatePrerequisite` reads roll-data
+   * paths, and `characterPrerequisites.js` records that every call site must spell
+   * `actor?.getRollData?.() ?? actor?.system ?? {}` because `pf2e`'s `getRollData()` answers
+   * `{actor: this}` alone. The app service owns that spelling; this is the seam it arrives
+   * through.
+   *
+   * `null` for an unresolvable uuid, which the preview reads as "no actor chosen".
+   *
+   * @param {string} actorUuid
+   * @returns {Promise<object|null>}
+   */
+  async function getActorRollData(actorUuid) {
+    const uuid = String(actorUuid || '').trim();
+    if (!uuid) return null;
+    try {
+      return (await services.getActorRollData?.(uuid)) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * WHAT IN ONE CRAFTING SYSTEM REQUIRES EACH TOOL, by tool id (issue 1373).
+   *
+   * The Tool rules editor's rail states this per Tool, with a kind chip per row, and nothing
+   * published it: `_worldToolUsage` counts recipe references and carries no names, and gathering
+   * tasks were not counted at all. Both corpora are walked here, ONCE per publish, for the
+   * SELECTED system only — the only system whose editor can be open.
+   *
+   * A recipe's tool references live in FOUR places and `_recipeToolIds` already owns that walk;
+   * a gathering task carries a flat `toolIds`.
+   *
+   * @param {string} systemId
+   * @param {Array<object>} recipes The selected system's recipe cohort, already fetched.
+   * @returns {Record<string, Array<{id: string, name: string, kind: string}>>}
+   */
+  function _buildToolRequiredFor(systemId, recipes) {
+    const byTool = {};
+    const record = (toolId, entry) => {
+      const key = String(toolId || '').trim();
+      if (!key) return;
+      (byTool[key] ??= []).push(entry);
+    };
+    for (const recipe of Array.isArray(recipes) ? recipes : []) {
+      const id = String(recipe?.id ?? '');
+      const name = String(recipe?.name ?? '').trim() || id;
+      for (const toolId of _recipeToolIds(recipe)) record(toolId, { id, kind: 'recipe', name });
+    }
+    const tasks = _currentGatheringConfig()?.systems?.[String(systemId || '')]?.tasks;
+    for (const task of Array.isArray(tasks) ? tasks : []) {
+      const id = String(task?.id ?? '');
+      const name = String(task?.name ?? '').trim() || id;
+      for (const toolId of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+        record(toolId, { id, kind: 'gathering', name });
+      }
+    }
+    return byTool;
   }
 
   // The world-scope WRITE path (issue 1362). It is exposed on the store API and is reachable
@@ -10174,6 +10389,9 @@ export function createAdminStore(services) {
     // seam, then Foundry's own, so exposing it hands every caller the same order of preference.
     randomID: _randomID,
     openToolDraft,
+    getActorRollData,
+    setToolSectionInherited,
+    removeToolFromSystem,
     patchToolDraft,
     stageToolDraftSource,
     unlinkToolDraftSource,

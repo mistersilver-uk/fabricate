@@ -1746,7 +1746,7 @@
         )}
         rules={previewRules}
         ruleHookAttribute="data-world-tool-entry-preview-rule"
-        footer={previewFooter}
+        children={previewFooter}
       />
     </div>
   </div>

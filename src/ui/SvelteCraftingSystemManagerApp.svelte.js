@@ -318,6 +318,21 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter((actor) => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
+      // ONE ACTOR'S PREPARED ROLL DATA, for the Tool rules editor's `Preview as` region
+      // (issue 1373). The editor evaluates a Tool's character prerequisites against a chosen
+      // actor, and `characterPrerequisites.js` states the spelling every call site must use:
+      // `actor?.getRollData?.() ?? actor?.system ?? {}`, because `ActorPF2e#getRollData()`
+      // answers `{actor: this}` and nothing else, so a bare `actor.system` read would resolve
+      // every path to `undefined` and silently fail every prerequisite.
+      //
+      // It answers `null` rather than `{}` for an unresolvable uuid, so the preview can tell
+      // "no actor" from "an actor with no data" — the first states nothing, the second would
+      // fail every gate.
+      getActorRollData: async (actorUuid) => {
+        const actor = await fromUuid(String(actorUuid || ''));
+        if (!actor) return null;
+        return actor.getRollData?.() ?? actor.system ?? {};
+      },
       // Player-character actors, name-sorted, for the Access tab's grantable
       // Characters roster under the `restricted` visibility mode. Membership is the
       // shared, GM-CONFIGURABLE player-character predicate (issue 1024), imported

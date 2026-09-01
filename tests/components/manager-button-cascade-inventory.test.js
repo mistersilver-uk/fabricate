@@ -451,7 +451,15 @@ const REVIEWED = [
         // 3 -> 4 with issue 1373's `World Tool` header action: the rules LIST already
         // advertised `Edit the world Tool`, and the editor behind `Edit rules` had no route to
         // that record, so the list promised a destination the next screen could not reach.
-        buttons: 4,
+        //
+        // 4 -> 3 in the same issue, once the rules editor was rebuilt against its design. The
+        // header lost `Delete`: at SYSTEM scope the destructive verb is `Remove from system`,
+        // an explained callout at the foot of the Breakage tab, because removing a Tool from
+        // one system and deleting the world record are different acts and a bare header button
+        // could say which it was. `Delete` survives only on the world Tool entry, which is the
+        // scope that owns the record. So this container renders `World Tool`, `Back to Tool
+        // Rules` and `Save rules`.
+        buttons: 3,
       },
     ],
     why:

@@ -94,9 +94,15 @@ const toolBreakagePath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte'
 );
-const toolOverviewPath = resolve(
+// The system-scope band that replaced the retired Overview tab (issue 1373), and the
+// inherit/override card every behaviour section of both tool editors is drawn as.
+const toolSystemScopePath = resolve(
   repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte'
+  'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte'
+);
+const toolInheritCardPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte'
 );
 const toolRequirementsPath = resolve(
   repoRoot,
@@ -154,7 +160,12 @@ const armedDangerButtonSource = readFileSync(armedDangerButtonPath, 'utf8');
 const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
 const toolEditSource = readFileSync(toolEditPath, 'utf8');
 const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
-const toolOverviewSource = readFileSync(toolOverviewPath, 'utf8');
+const toolSystemScopeSource = readFileSync(toolSystemScopePath, 'utf8');
+const toolInheritCardSource = readFileSync(toolInheritCardPath, 'utf8');
+const toolEditorTabsSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte'),
+  'utf8'
+);
 const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
 const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
 // The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
@@ -3160,7 +3171,15 @@ describe('CraftingSystemManager source contract', () => {
       'selectLibraryTool',
       'backToToolsBrowser',
       'saveSelectedToolDraft',
-      'deleteSelectedLibraryTool',
+      // `deleteSelectedLibraryTool` IS GONE, and its replacement is named rather than merely
+      // dropped (issue 1373). The system editor's bare `Delete` named no scope on a screen whose
+      // subject is one world Tool adopted by many crafting systems; the design puts `Delete` on
+      // the world entry and gives system scope an explained removal that takes THIS system's
+      // rules and leaves the world Tool and every other system untouched.
+      'removeFocusedToolFromSystem',
+      // The per-section inherit switch, which is a world MEMBERSHIP write composed with an
+      // in-system one — so the root owns it, exactly as it owns the enable switch.
+      'setFocusedToolSectionInherited',
       'confirmToolsRouteExit',
       // `store.createToolDraft?.` IS GONE FROM THIS LIST, and its absence is the change rather
       // than an omission (issue 1373). Tool CREATION moved to the world Tools Catalogue: the
@@ -3171,7 +3190,12 @@ describe('CraftingSystemManager source contract', () => {
       // `createWorldToolFromItemDrop` below is what replaced it.
       'store?.openToolDraft',
       'store?.saveToolDraft',
-      'store?.deleteToolDraft',
+      // `store?.deleteToolDraft` GOES WITH THE HEADER BUTTON THAT CALLED IT. It deleted this
+      // system's in-system record alone, leaving the world membership record behind as a ghost
+      // nothing can read; `removeToolFromSystem` is the pair of writes that actually undoes an
+      // adoption, and it is what the removal callout reaches (issue 1373).
+      'store?.removeToolFromSystem',
+      'store?.setToolSectionInherited',
       'toolsNavCount',
     ]) {
       assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
@@ -3248,11 +3272,46 @@ describe('CraftingSystemManager source contract', () => {
       toolRequirementsSource.includes('RollDataExpressionInput'),
       'Tool requirements should reuse the roll-data expression input'
     );
+    // ── EVERY BEHAVIOUR SECTION IS A CARD, NOT A BARE HEADING (issue 1373) ────────────────
+    // This used to require a `manager-tool-section-heading` block — an unenclosed `<h3>` with a
+    // glyph and a hint, sitting on the page background above loose controls. The design encloses
+    // each section in its own bordered, filled card whose head states the section, whether this
+    // system inherits the world Tool's answer or overrides it, what the world's answer is, and
+    // the switch between the two. `ToolInheritCard` is that card and both tabs are its callers.
     assert.ok(
-      /manager-tool-section-heading[\s\S]*?<h3>\s*<i class="fas fa-heart-crack"[\s\S]*?<\/h3>[\s\S]*?<p>/.test(
-        toolBreakageSource
-      ),
-      'Breakage should render its icon heading and immediate hint before the method cards'
+      !toolBreakageSource.includes('manager-tool-section-heading'),
+      'Breakage must not restore the bare page-background section heading'
+    );
+    for (const [label, source] of [
+      ['Breakage', toolBreakageSource],
+      ['Requirements', toolRequirementsSource],
+    ]) {
+      assert.ok(
+        source.includes('<ToolInheritCard'),
+        `${label} must draw its sections as inherit-aware cards`
+      );
+    }
+    assert.deepEqual(
+      [...toolBreakageSource.matchAll(/section="(\w+)"/g)].map((match) => match[1]),
+      ['breakage', 'onBreak'],
+      'Breakage owns exactly the two world-default sections it authors'
+    );
+    assert.deepEqual(
+      [...toolRequirementsSource.matchAll(/section="(\w+)"/g)].map((match) => match[1]),
+      ['prerequisites', 'bonus'],
+      'and Requirements owns the other two'
+    );
+    // THE SWITCH IS THE SHIPPED PRIMITIVE, not a second one. `stateChip={false}` is the essence
+    // rules editor's own use of it: the enclosing card already states the resolution in its pill.
+    assert.ok(
+      toolInheritCardSource.includes("import InheritRow from '../scoped/InheritRow.svelte';") &&
+        toolInheritCardSource.includes('stateChip={false}'),
+      'the card reuses the shared scoped inherit row rather than hand-rolling a second switch'
+    );
+    // AND `Always fires` IS GONE. The design uses that slot for the inheritance state.
+    assert.ok(
+      !toolBreakageSource.includes('AlwaysFires'),
+      'the on-break legend badge must not survive the card conversion'
     );
     assert.ok(
       !toolBreakageSource.includes('BreakageKicker'),
@@ -3266,15 +3325,52 @@ describe('CraftingSystemManager source contract', () => {
     // there rather than being deleted — a removed assertion proves nothing about where the
     // capability went.
     assert.ok(
-      !toolOverviewSource.includes('<ItemDropZone'),
-      'the system Overview must not carry a source drop zone'
+      !toolSystemScopeSource.includes('<ItemDropZone'),
+      'the system-scope band must not carry a source drop zone'
     );
     assert.ok(
-      !toolOverviewSource.includes('onSourceDrop') &&
-        !toolOverviewSource.includes('onUnlinkSource') &&
-        !toolOverviewSource.includes('onCopySourceUuid'),
+      !toolSystemScopeSource.includes('onSourceDrop') &&
+        !toolSystemScopeSource.includes('onUnlinkSource') &&
+        !toolSystemScopeSource.includes('onCopySourceUuid'),
       'nor any of the three source-link callbacks'
     );
+    // THERE IS NO OVERVIEW TAB AT SYSTEM SCOPE AT ALL. The tab strip is three tabs, opening on
+    // Breakage: identity is world scope's, so a tab for it here would have nothing to put on it.
+    assert.ok(
+      !toolEditorTabsSource.includes("'overview'"),
+      'the system tab strip must not declare an Overview tab'
+    );
+    assert.match(
+      toolEditorTabsSource,
+      /const tabs = \[\s*\['breakage'[\s\S]*?\['requirements'[\s\S]*?\['validation'/,
+      'and must declare Breakage, Requirements and Validation, in that order'
+    );
+    assert.ok(
+      toolEditorTabsSource.includes("activeTab = 'breakage'"),
+      'and must default to Breakage rather than a tab that no longer exists'
+    );
+    // NO BARE `Delete` IN THE SYSTEM HEADER, and an explained removal callout instead. `Delete`
+    // names the WORLD record; what system scope can do is stop using the Tool here.
+    assert.ok(
+      !toolEditSource.includes('data-tool-editor-delete'),
+      'the system header must not carry a bare Delete'
+    );
+    assert.ok(
+      toolBreakageSource.includes('data-tool-remove-from-system') &&
+        toolBreakageSource.includes('StopUsingHereHint'),
+      'and the Breakage tab closes with the explained remove-from-system callout'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Tools.Editor.StopUsingHereHint,
+      'Removes the rules in {system} only. The world Tool and every other system are untouched.'
+    );
+    // THE HEADER STATES SCOPE AND SAVES RULES.
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Tools.Editor.HeaderSystemScope,
+      'Rules in {system} · identity comes from the world Tool'
+    );
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.BackToToolRules, 'Back to Tool Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.SaveRules, 'Save rules');
     assert.ok(
       worldToolEntrySource.includes('<ItemDropZone'),
       'the world Tool entry reuses the shared drag-only Item drop zone'
@@ -3295,7 +3391,7 @@ describe('CraftingSystemManager source contract', () => {
     // The maintainer's ruling keeps both fields; what was wrong was that neither scope's copy
     // acknowledged the other.
     assert.ok(
-      toolOverviewSource.includes('data-tool-label'),
+      toolSystemScopeSource.includes('data-tool-label'),
       'the per-system display-label override still ships'
     );
     assert.equal(

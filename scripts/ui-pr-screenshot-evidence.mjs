@@ -618,7 +618,7 @@ export const VIEW_RECIPES = Object.freeze([
   },
   toolStudioFrame('01-library-1280x720', 'Tool Studio — library parity', 'manager-tool-parity-01-library-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('zero-state-empty-library-1280x720', 'Tool Studio — empty library zero state', 'manager-tool-zero-state-empty-library-1280x720', TOOL_STUDIO_MATCHES),
-  toolStudioFrame('02-overview-1280x720', 'Tool Studio — Overview parity', 'manager-tool-parity-02-overview-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('02-remove-1280x720', 'Tool Studio — remove from system', 'manager-tool-parity-02-remove-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('03-breakage-1280x720', 'Tool Studio — Breakage parity', 'manager-tool-parity-03-breakage-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('04-requirements-1280x720', 'Tool Studio — Requirements parity', 'manager-tool-parity-04-requirements-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('05-validation-1280x720', 'Tool Studio — all-pass Validation parity', 'manager-tool-parity-05-validation-1280x720', TOOL_STUDIO_MATCHES),
