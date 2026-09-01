@@ -1,10 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
   Tab strip for the recipe editor (Overview / Ingredients / Results / Tools / Access /
-  Books & Scrolls / Validation),
-  mirroring EnvironmentEditorTabs: roving tabindex, arrow-key navigation, and
-  per-tab badge chips. Uses the shared generic `.manager-editor-tabs*` classes so
-  it does not duplicate the environment editor's tab CSS.
+  Books & Scrolls / Validation).
+
+  A thin caller of the promoted `EditorTabs` primitive (issue 1038): this file owns the TAB
+  LIST — including the mode gate below — and this site's DOM contract: the
+  `data-recipe-tab-button` hook, the `recipe-tab-*` / `recipe-panel-*` id stem whose panels
+  `RecipeEditView.svelte` renders, and the strip's own aria-label. Every class it used to
+  render by hand is the primitive's default, so it passes no class override at all, and no
+  rendered id, `aria-controls`, `data-*` attribute or class changed in the conversion.
 
   Access and Books & Scrolls are MODE-CONDITIONAL (issue 676), driven by the system's
   canonical `visibilityMode` through `craftingEffect(mode)` — the same single source of
@@ -21,8 +25,7 @@
   select a tab that does not exist.
 -->
 <script>
-  import Chip from '../Chip.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import EditorTabs from '../EditorTabs.svelte';
 
   let {
     activeTab = 'overview',
@@ -34,94 +37,72 @@
     onSelect = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
+  // The label keys are written out as LITERALS rather than interpolated from a tab key,
+  // because `ui-lang-keys-resolve` and `lang-keys-no-orphans` both read the source: an
+  // interpolated key is invisible to either, so a missing label would ship as a raw key
+  // with no gate catching it. Before the conversion these were built as
+  // `FABRICATE.Admin.Manager.Recipe.Tabs.${tab.key}` and were unreachable to both gates.
   const TABS = $derived([
-    { id: 'overview', icon: 'fas fa-circle-info', key: 'Overview', fallback: 'Overview' },
-    { id: 'ingredients', icon: 'fas fa-flask', key: 'Ingredients', fallback: 'Ingredients' },
-    { id: 'results', icon: 'fas fa-box-open', key: 'Results', fallback: 'Results' },
-    { id: 'tools', icon: 'fas fa-screwdriver-wrench', key: 'Tools', fallback: 'Tools' },
+    {
+      id: 'overview',
+      icon: 'fas fa-circle-info',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.Tabs.Overview',
+      label: 'Overview',
+    },
+    {
+      id: 'ingredients',
+      icon: 'fas fa-flask',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.Tabs.Ingredients',
+      label: 'Ingredients',
+    },
+    {
+      id: 'results',
+      icon: 'fas fa-box-open',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.Tabs.Results',
+      label: 'Results',
+    },
+    {
+      id: 'tools',
+      icon: 'fas fa-screwdriver-wrench',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.Tabs.Tools',
+      label: 'Tools',
+    },
     ...(visibilityEffect?.showAccess
-      ? [{ id: 'access', icon: 'fas fa-user-shield', key: 'Access', fallback: 'Access' }]
+      ? [
+          {
+            id: 'access',
+            icon: 'fas fa-user-shield',
+            labelKey: 'FABRICATE.Admin.Manager.Recipe.Tabs.Access',
+            label: 'Access',
+          },
+        ]
       : []),
     ...(visibilityEffect?.showBooksScrolls
       ? [
           {
             id: 'books-scrolls',
             icon: 'fas fa-book',
-            key: 'BooksScrolls',
-            fallback: 'Books & Scrolls',
+            labelKey: 'FABRICATE.Admin.Manager.Recipe.Tabs.BooksScrolls',
+            label: 'Books & Scrolls',
           },
         ]
       : []),
-    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' },
+    {
+      id: 'validation',
+      icon: 'fas fa-clipboard-check',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.Tabs.Validation',
+      label: 'Validation',
+    },
   ]);
-
-  function badgeList(tab) {
-    const value = badges?.[tab.id];
-    const values = Array.isArray(value) ? value : value ? [value] : [];
-    return values
-      .map((badge) => {
-        if (badge && typeof badge === 'object') {
-          return {
-            label: badge.label ?? badge.value ?? '',
-            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral'),
-          };
-        }
-        return {
-          label: badge,
-          tone: tab.id === 'validation' ? 'danger' : 'neutral',
-        };
-      })
-      .filter((badge) => badge.label !== '' && badge.label !== 0);
-  }
-
-  // A badge tone name is this component's own vocabulary; translate it to a `Chip`
-  // colour family rather than leaking one spelling into the other (issue 883).
-  function badgeTone(tone) {
-    if (tone === 'danger') return 'danger';
-    if (tone === 'warning') return 'warning';
-    return 'neutral';
-  }
-
-  function onKeydown(event, index) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-    event.preventDefault();
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (index + delta + TABS.length) % TABS.length;
-    onSelect(TABS[nextIndex].id);
-    const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
-    buttons?.[nextIndex]?.focus();
-  }
 </script>
 
-<div
-  class="manager-editor-tabs"
-  role="tablist"
-  aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Label', 'Recipe editor sections')}
->
-  {#each TABS as tab, index (tab.id)}
-    <button
-      type="button"
-      role="tab"
-      id={`recipe-tab-${tab.id}`}
-      class={`manager-editor-tab-button ${activeTab === tab.id ? 'is-active' : ''}`}
-      aria-selected={activeTab === tab.id}
-      aria-controls={`recipe-panel-${tab.id}`}
-      tabindex={activeTab === tab.id ? 0 : -1}
-      data-keyboard-focus="true"
-      data-recipe-tab-button={tab.id}
-      onclick={() => onSelect(tab.id)}
-      onkeydown={(event) => onKeydown(event, index)}
-    >
-      <i class={tab.icon} aria-hidden="true"></i>
-      <span>{text(`FABRICATE.Admin.Manager.Recipe.Tabs.${tab.key}`, tab.fallback)}</span>
-      {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
-        <Chip tone={badgeTone(badge.tone)} class="manager-editor-tab-badge">{badge.label}</Chip>
-      {/each}
-    </button>
-  {/each}
-</div>
+<EditorTabs
+  tabs={TABS}
+  {activeTab}
+  {badges}
+  {onSelect}
+  ariaLabelKey="FABRICATE.Admin.Manager.Recipe.Tabs.Label"
+  ariaLabel="Recipe editor sections"
+  idStem="recipe"
+  hookAttribute="data-recipe-tab-button"
+/>

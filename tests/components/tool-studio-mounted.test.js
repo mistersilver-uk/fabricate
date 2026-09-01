@@ -86,6 +86,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',

@@ -65,6 +65,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/EssenceSourceSelector.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceEditorTabs.svelte',
+    'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte',
     // The shared scoped validation shell (issue 1362).

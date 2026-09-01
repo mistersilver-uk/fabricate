@@ -142,7 +142,7 @@
  *
  * spec.md requirement "The primitive set is a closed, versioned vocabulary" — two or more
  * INDEPENDENT callers. An importer is any other file under `src/` that imports the component by
- * path. Six ADJUDICATED candidates fall below the bar and are recorded in {@link NOT_A_PRIMITIVE}
+ * path. Eight ADJUDICATED candidates fall below the bar and are recorded in {@link NOT_A_PRIMITIVE}
  * rather than omitted, because that same requirement obliges a candidate with fewer to be "recorded
  * as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a
  * decision rather than an oversight".
@@ -256,7 +256,7 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * broad-signal set, a `library.html` entry it does or does not implement, an entry on the
  * mounted-harness hang guard. It is NOT a census of the directory. 48 of the 72 top-level files
  * under `apps/manager/` sit below the two-caller bar, and `components/` holds screen regions and
- * dead code besides; listing all of them would bury the six judgements that were actually made in
+ * dead code besides; listing all of them would bury the eight judgements that were actually made in
  * dozens that were not, and the requirement cited above asks for recorded DECISIONS, not for an
  * inventory.
  *
@@ -270,12 +270,13 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * `BROAD_SIGNAL_PATTERN` DOES with the path, not what anyone thinks the file deserves. The five
  * under `src/ui/svelte/components/` are `'broad'` because that directory leg matches them today
  * whatever anyone thinks of them, which is the point issue 1378 makes: a directory cannot tell a
- * primitive from a component that merely lives there. `InspectorActionButton` is `'targeted'`
- * because it sits under `apps/manager/`, where membership is by name and it is on no name list, so
- * the four essence frames that claim it by `sourceMatches` are reached.
+ * primitive from a component that merely lives there. The three under `apps/manager/` —
+ * `InspectorActionButton`, `checks/ChecksEditorTabs` and `downtime/WorldDowntimeTabs` — are
+ * `'targeted'` because membership there is by NAME and none of them is on a name list, so the
+ * frames that claim each by `sourceMatches` are reached.
  *
  * That is why the integrity test runs its per-row clauses over THESE rows too. The disk clause in
- * particular is live here: two of the six name files nothing imports.
+ * particular is live here: two of the eight name files nothing imports.
  *
  * @type {readonly {path: string, library: string|null, evidence: string, why: string}[]}
  */
