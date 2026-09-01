@@ -2003,6 +2003,10 @@ The two world tool screens and the system-scope Tool Rules list share one break-
 4. **The world Tool entry authors the world `repairRequirements` default, and the screen says it is a SEED.**
    A later world edit never reaches a system already seeded (`## Scoped Entity Definitions` `### Tool scope` requirement 2), so the entry must not imply a live parent: it states no inherit count for that section, because a count would claim an inheritance the resolver does not honour.
    The section's own ingredient groups are not authored at world scope, because a repair group names components in the OWNING crafting system, which world scope cannot address.
+5. **The world Tool entry BUFFERS its edit and is saved explicitly**, under `### Scoped entity editor patterns` requirement 12 and through that requirement's shared module and shared action pair rather than a second implementation of either.
+   What it buffers is the display label, the description and the two INHERITED world-default sections; the world break mode is not among them because this screen does not author it at all.
+   Its Delete is a card on the Overview tab rather than an action in the header band, because the reach a GM cannot recover afterwards — the world record, its world defaults and every membership record naming it, in every system — has to be readable beside the control, and a header button has nowhere to say it.
+   The two facts the header band states about the record, its NAME and whether it names a game-world Item, are reported UP by the page: the page already resolves both, and deriving them again in the shell would let the band and the page disagree about one record.
 
 ### Scoped entity editor patterns
 
@@ -2039,6 +2043,11 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
     **MEMBERSHIP AND DELETE ARE NOT BUFFERED.**
     Adding an entity to a crafting system, removing it, switching it on or off, and deleting the world record are actions on records this draft does not describe, each with its own armed confirmation; an armed `Remove` that removed nothing until a later button states the opposite of what arming an action says.
     A delete drops the draft before it navigates, because the record the draft is an edit of no longer exists and the exit guard would otherwise offer to save into it.
+    **THE BUFFERED FIELD SET IS PER SCREEN, and it is exactly what that editor AUTHORS.**
+    It is the shared module's one per-screen argument, so an editor states its own list rather than taking the entity type's lifted identity wholesale: the world tool entry authors a display label and a description, and buffering the item art and the three source-link uuids beside them would put fields in a draft that no control on the screen can move and send them back unchanged on every Save.
+    A world-scope value the screen authors OUTSIDE the draft is immediate on the same rule membership is — the tool entry's world master switch reaches every crafting system at once and states that reach beside itself, and the repair seed is cleared by its own control — because staging either behind Save would show a GM a consequence that had not happened.
+    **THE PAGE HEADING FOLLOWS THE BUFFERED NAME**, not the persisted one, because a heading names the thing being edited and the enabled `Save` beside it is what says the edit is unsaved.
+    The name is REPORTED by the page from an effect rather than read off the draft handle, which is deliberately a live accessor that never re-renders; the same wire carries whatever else the band states about the record that the page already renders elsewhere, so one sentence is resolved once.
 13. **A scoped entity's IDENTITY FIELD SET is per entity type and is never assumed.**
     A component and a tool carry a source-item link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`) and an `img`; an ESSENCE carries neither, and carries a `colorToken` instead.
     A shared catalogue or entry shell therefore treats the source link, the item thumbnail, the unlinked flag and the missing-source blocking check as OPTIONAL CAPABILITIES of the entity type rather than as shell furniture, read from the scope descriptor rather than tested at a call site — and an essence screen renders none of them.

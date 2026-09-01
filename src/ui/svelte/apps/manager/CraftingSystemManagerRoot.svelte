@@ -3049,6 +3049,130 @@
       : ''
   );
 
+  // THE TOOL ENTRY ROUTE'S HEADER NAMES THE TOOL. Same decision as the essence route above,
+  // reached the same way and for the same reason: the reference heads that screen with the
+  // Tool's own tile, its NAME and one line saying what the record IS (`PROTO-tool-entry.png`),
+  // where what shipped was the generic page header every route falls through to. The page
+  // cannot draw it — `.manager-header` is a SIBLING of `.manager-main` — so the RECORD is
+  // resolved here, out of the corpus this shell already publishes to the page.
+  //
+  // A MISSING RECORD FALLS BACK to the generic title and subtitle below rather than printing an
+  // empty header, which is the same guard the essence branch makes.
+  const worldToolEntryRecord = $derived(
+    currentView === 'world-tool-entry'
+      ? ((worldScopeState.tool?.entries ?? []).find(
+          (candidate) => candidate?.id === worldScopedEntryId
+        ) ?? null)
+      : null
+  );
+
+  /**
+   * WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here.
+   *
+   * The page already renders this sentence on its linked-item card, so resolving it a second
+   * time up here would put one pair of copy keys in two files and let the band and the card
+   * disagree about one record. The essence entry states its subtitle here instead because its
+   * subtitle is a COUNT this shell already holds and its page does not draw.
+   *
+   * @type {string}
+   */
+  let worldToolEntrySubtitle = $state('');
+
+  function handleWorldToolEntrySubline(subline) {
+    worldToolEntrySubtitle = typeof subline === 'string' ? subline : '';
+  }
+
+  /**
+   * THE WORLD TOOL ENTRY EDITOR'S BUFFERED EDIT, held where its two consumers are.
+   *
+   * The tool entry takes the seam the essence entry shipped — `scoped/scopedEntryDraft.js` and
+   * `ScopedEntryHeaderActions` — so this is the twin of the block below rather than a second
+   * design, and every note there applies verbatim. The handle is a LIVE accessor because the
+   * route-exit guard reads it at the moment of a click; the dirty flag is reported separately
+   * because a disabled attribute has to re-render and the handle deliberately never does.
+   *
+   * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
+   */
+  let worldToolEntryHandle = null;
+  let worldToolEntryDirty = $state(false);
+  let worldToolEntrySaving = $state(false);
+  /**
+   * The BUFFERED name, for the heading below. `null` while no editor is reporting one, which is
+   * what makes the heading fall back to the projection rather than to an empty string.
+   *
+   * @type {string|null}
+   */
+  let worldToolEntryDraftName = $state(null);
+
+  function handleWorldToolEntryDraft(handle) {
+    worldToolEntryHandle = handle ?? null;
+    if (!handle) {
+      worldToolEntryDirty = false;
+      worldToolEntryDraftName = null;
+      worldToolEntrySubtitle = '';
+    }
+  }
+
+  function handleWorldToolEntryDirty(dirty) {
+    worldToolEntryDirty = dirty === true;
+  }
+
+  function handleWorldToolEntryDraftName(name) {
+    worldToolEntryDraftName = typeof name === 'string' ? name : null;
+  }
+
+  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK — consistent with the essence entry and
+  // with the linked-item tile this page draws from the same buffered value. `??` and not `||`:
+  // an editor reporting an EMPTY name is reporting a real authored state, and it falls through
+  // to `viewTitle()` below exactly as an empty persisted name already does.
+  const worldToolEntryName = $derived(
+    worldToolEntryRecord ? (worldToolEntryDraftName ?? worldToolEntryRecord.entity?.name ?? '') : ''
+  );
+
+  /**
+   * Flush the world tool entry editor's buffered edit. Same contract as its essence twin: it
+   * answers whether the write landed, because the route-exit guard gates navigation on it.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function saveWorldToolEntry() {
+    if (!worldToolEntryHandle) return false;
+    worldToolEntrySaving = true;
+    try {
+      return (await worldToolEntryHandle.save()) !== false;
+    } finally {
+      worldToolEntrySaving = false;
+    }
+  }
+
+  /**
+   * The world tool entry editor's route-exit prompt.
+   *
+   * Re-entering the SAME Tool is not leaving it, so it never prompts — `world-tool-entry` is one
+   * of the routes whose view token does not change when its subject does, which is exactly what
+   * `nextRouteId` exists for.
+   *
+   * The prompt is the store's three-way one for this record type. It is not the boolean
+   * `confirmDiscardDirtyToolsDraft` beside it: that one asks about the SYSTEM tool editor's row
+   * draft, answers true/false, and offers no Save — three differences over one word.
+   *
+   * @param {string} nextView
+   * @param {string} nextRouteId
+   * @returns {boolean|Promise<boolean>}
+   */
+  function confirmWorldToolEntryRouteExit(nextView, nextRouteId = '') {
+    if (activeView !== 'world-tool-entry') return true;
+    if (nextView === 'world-tool-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
+      return true;
+    }
+    return confirmScopedEntryExit({
+      dirty: worldToolEntryHandle?.isDirty() === true,
+      confirm: () => store?.confirmDiscardDirtyToolEntryDraft?.(),
+      save: () => saveWorldToolEntry(),
+      discard: () => worldToolEntryHandle?.discard?.(),
+    });
+  }
+
   /**
    * Flush the world essence entry editor's buffered edit.
    *
@@ -3153,6 +3277,25 @@
     if (!systemId) return false;
     return afterTruthyResult(selectSystem(systemId, 'essences'), () => {
       activeView = 'essences';
+    });
+  }
+
+  /**
+   * Open one crafting system's TOOL RULES from the world tool catalogue's inspector row.
+   *
+   * The twin of `openSystemEssenceRules` above, and every note it carries applies: the pair
+   * of moves — select the system, then commit the route — already exists separately, and the
+   * entity id is accepted and deliberately unused because the rules list opens on the
+   * system's whole tool list rather than on one Tool.
+   *
+   * @param {string} _entityId the Tool the row belongs to; see above.
+   * @param {string} systemId the crafting system whose rules to open.
+   * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
+   */
+  function openSystemToolRules(_entityId, systemId) {
+    if (!systemId) return false;
+    return afterTruthyResult(selectSystem(systemId, 'tools'), () => {
+      activeView = 'tools';
     });
   }
 
@@ -5348,17 +5491,34 @@
   // companion's navigation guard is being asked about. Every other caller keeps its
   // one-argument shape.
   function confirmRouteExitGuards(nextView, nextRouteId = '') {
-    // THE WORLD SCOPED-ENTRY EDITOR IS ASKED FIRST, and the order is immaterial rather than
+    // THE WORLD SCOPED-ENTRY EDITORS ARE ASKED FIRST, and the order is immaterial rather than
     // arbitrary: every guard below is gated on an `activeView` that a world route cannot also
-    // be, so on `world-essence-entry` the whole rest of this cascade is already a synchronous
-    // `true`. Asking first therefore reorders nothing and keeps the new link to one function.
+    // be, so on `world-essence-entry` or `world-tool-entry` the whole rest of this cascade is
+    // already a synchronous `true`. Asking first therefore reorders nothing.
+    //
+    // THE TWO ARE ASKED IN SEQUENCE RATHER THAN COMBINED because each is gated on its own
+    // `activeView` and the two routes are mutually exclusive: exactly one of them can answer
+    // anything but a synchronous `true`, so the pair costs one extra comparison and never two
+    // prompts. Combining them into one guard with a route lookup would put the third entry
+    // editor's wiring somewhere other than beside its own state.
     const worldEntryConfirmed = confirmWorldEssenceEntryRouteExit(nextView, nextRouteId);
     if (isPromise(worldEntryConfirmed)) {
       return worldEntryConfirmed.then((value) =>
-        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
+        value === false ? false : confirmWorldToolEntryExitThenRest(nextView, nextRouteId)
       );
     }
     if (worldEntryConfirmed === false) return false;
+    return confirmWorldToolEntryExitThenRest(nextView, nextRouteId);
+  }
+
+  function confirmWorldToolEntryExitThenRest(nextView, nextRouteId = '') {
+    const toolEntryConfirmed = confirmWorldToolEntryRouteExit(nextView, nextRouteId);
+    if (isPromise(toolEntryConfirmed)) {
+      return toolEntryConfirmed.then((value) =>
+        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
+      );
+    }
+    if (toolEntryConfirmed === false) return false;
     return continueRouteExitAfterWorldEntry(nextView, nextRouteId);
   }
 
@@ -9486,6 +9646,27 @@
               </p>
             </div>
           </div>
+        {:else if worldToolEntryRecord}
+          <!-- The Tool's own identity header, the twin of the essence branch above. The
+             medallion carries the linked Item's art where there is one; `Medallion` falls back
+             to the glyph when `src` is empty, which is the unlinked case and the one this
+             screen has to draw without inventing a picture for. -->
+          <div class="manager-recipe-edit-heading" data-world-tool-entry-heading>
+            <Medallion
+              src={worldToolEntryRecord.entity?.img ?? ''}
+              icon="fas fa-screwdriver-wrench"
+              size={44}
+              glyph={22}
+            />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={worldToolEntryName}>
+                {worldToolEntryName || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-world-tool-entry-subline>
+                {worldToolEntrySubtitle}
+              </p>
+            </div>
+          </div>
         {:else if currentView !== 'tool-edit'}
           <h1 class="manager-title">{viewTitle()}</h1>
           <p class="manager-subtitle">{viewSubtitle()}</p>
@@ -9559,7 +9740,7 @@
         So each route is admitted BY NAME and lands on its OWN branch below — neither reaches the
         fallthrough — and the other five world scoped routes stay excluded exactly as before.
       -->
-      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry'}
+      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-essence-entry'}
             <!--
@@ -9593,6 +9774,34 @@
               saving={worldEssenceEntrySaving}
               onBack={() => setView('world-essences')}
               onSave={saveWorldEssenceEntry}
+            />
+          {:else if currentView === 'world-tool-entry'}
+            <!--
+              THE SAME PAIR, THROUGH THE SAME COMPONENT (issue 1373). The reference draws
+              `← Back to tools` and `Save tool` on this screen's title line
+              (`PROTO-tool-entry.png`), which is the EDITOR recipe's
+              "action pair with back before save" — so this is the second caller
+              `ScopedEntryHeaderActions` was extracted for rather than a copy of it.
+
+              THE HOOKS ARE PER SITE. The tests and the capture registry address this screen's
+              actions by their own names, which is why the component takes them as props.
+
+              BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit
+              gate as the rail and the breadcrumb — so an unsaved edit prompts whichever of the
+              three ways out a GM takes.
+
+              DELETE IS NOT HERE. It is on the Overview tab, where the sentence stating its
+              reach can sit beside it; see that card's own note.
+            -->
+            <ScopedEntryHeaderActions
+              backAttribute="data-world-tool-back"
+              saveAttribute="data-world-tool-save"
+              backLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.BackToTools', 'Back to tools')}
+              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.Save', 'Save tool')}
+              saveDisabled={!worldToolEntryDirty}
+              saving={worldToolEntrySaving}
+              onBack={() => setView('world-tools')}
+              onSave={saveWorldToolEntry}
             />
           {:else if currentView === 'world-essences'}
             <!--
@@ -11191,6 +11400,7 @@
       <WorldToolCataloguePage
         {...toolScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+        onOpenSystemRules={(entityId, systemId) => openSystemToolRules(entityId, systemId)}
         onCreateFromItemDrop={createWorldToolFromItemDrop}
       />
     {:else if currentView === 'world-tool-entry'}
@@ -11198,6 +11408,10 @@
         {...toolScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-tools')}
+        onDraftChange={handleWorldToolEntryDraft}
+        onDirtyChange={handleWorldToolEntryDirty}
+        onDraftNameChange={handleWorldToolEntryDraftName}
+        onSublineChange={handleWorldToolEntrySubline}
       />
     {:else if currentView === 'world-vocabulary'}
       <WorldVocabularyPage

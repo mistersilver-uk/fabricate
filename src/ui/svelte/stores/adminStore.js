@@ -2511,6 +2511,27 @@ export function createAdminStore(services) {
   }
 
   /**
+   * Route-exit prompt for the WORLD TOOL ENTRY editor (issue 1373).
+   *
+   * A THIRD prompt rather than a reuse of `confirmDiscardDirtyToolsDraft` above, which is
+   * about a different record and answers a different question: that one asks whether to
+   * DISCARD the system tool editor's row draft and answers a boolean, offering no Save at
+   * all. This one is the three-way `save | discard | cancel` the world entry editors need,
+   * because their header carries a Save and the guard has to be able to run it.
+   *
+   * Like the other Svelte-layer-dirty kinds it does NOT check dirtiness itself: the root
+   * gates on the editor's live handle before calling.
+   *
+   * @returns {Promise<'save'|'discard'|'cancel'>} the chosen action, never a boolean
+   */
+  function confirmDiscardDirtyToolEntryDraft() {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Tools.DiscardDirtyEntryContent',
+      'The current Tool has unsaved changes. Save them and continue, or discard them?'
+    );
+  }
+
+  /**
    * Route-exit prompt for the System Overview → Settings identity sub-form (Name +
    * Description only — the optional-feature toggles and the modifier/prerequisite/currency
    * cards on the same tab live-apply and stage no draft, so they never reach this prompt).
@@ -10042,6 +10063,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyEnvironmentDraft,
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
+    confirmDiscardDirtyToolEntryDraft,
     confirmDiscardDirtySystemDetailsDraft,
     confirmDiscardDirtyChecksDraft,
     confirmDiscardDirtyRecipeDraft,

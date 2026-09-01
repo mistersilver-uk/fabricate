@@ -44,6 +44,7 @@ const harness = createMountedComponentHarness({
     'src/systems/scopedDefinitionStore.js',
     'src/systems/scopedDefinitions.js',
     'src/systems/toolScope.js',
+    'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
@@ -93,7 +94,9 @@ function scopeFor(worldDefault = {}, members = 2) {
   return projectWorldScopeEntity({
     entityType: 'tool',
     corpus: {
-      entities: [{ id: 'pick', name: 'Mining Pick', description: 'A pick.', originItemUuid: 'Item.pick' }],
+      entities: [
+        { id: 'pick', name: 'Mining Pick', description: 'A pick.', originItemUuid: 'Item.pick' },
+      ],
       defaults: [{ id: 'pick', ...worldDefault }],
       membership,
     },
@@ -102,15 +105,60 @@ function scopeFor(worldDefault = {}, members = 2) {
 }
 
 /**
+ * THE LIVE DRAFT HANDLE THE PAGE REPORTS, captured by the mount below.
+ *
+ * The edit is BUFFERED (issue 1373): a control stages into a draft and `Save tool` flushes it,
+ * and that Save is rendered by the SHELL, not by this page — `.manager-header` is a sibling of
+ * `.manager-main`. So a suite that mounts the page alone reaches the flush the only way the shell
+ * does, through the handle, and every write assertion below runs after it.
+ *
+ * It is also what keeps these cases honest about the buffering itself: each asserts that NOTHING
+ * was written before the flush, which is the half a markup read cannot see.
+ *
+ * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
+ */
+let draftHandle = null;
+/** Every name the page has reported for the shell heading, newest last. */
+let reportedNames = [];
+/** Every dirty flag the page has reported, newest last. */
+let reportedDirty = [];
+
+/**
  * Mount the entry and open one tab.
  *
  * @param {object} options
  * @returns {Promise<HTMLElement>}
  */
 async function mountTab({ scope, actions = {}, tab = 'identity' }) {
-  const target = await harness.mount({ scope, actions, entityId: 'pick' });
+  draftHandle = null;
+  reportedNames = [];
+  reportedDirty = [];
+  const target = await harness.mount({
+    scope,
+    actions,
+    entityId: 'pick',
+    onDraftChange: (handle) => {
+      draftHandle = handle;
+    },
+    onDirtyChange: (dirty) => {
+      reportedDirty.push(dirty);
+    },
+    onDraftNameChange: (name) => {
+      reportedNames.push(name);
+    },
+  });
   if (tab !== 'identity') target.querySelector(`#world-tool-entry-tab-${tab}`).click();
   return target;
+}
+
+/**
+ * Flush the buffered edit the way the shell's `Save tool` does.
+ *
+ * @returns {Promise<void>}
+ */
+async function flushDraft() {
+  assert.ok(Boolean(draftHandle), 'the page reported no draft handle, so nothing can flush it');
+  await draftHandle.save();
 }
 
 describe('the world Tool entry (issue 1373)', () => {
@@ -162,6 +210,110 @@ describe('the world Tool entry (issue 1373)', () => {
     });
   });
 
+  describe('the buffered edit, and the Save that writes it (issue 1373)', () => {
+    it('stages the display label, reports it to the shell, and persists NOTHING until Save', async () => {
+      const calls = [];
+      const target = await mountTab({
+        scope: scopeFor(),
+        actions: {
+          updateEntity: (id, patch) => {
+            calls.push([id, patch]);
+          },
+        },
+      });
+      const input = target.querySelector(':scope [data-world-tool-entry-field="name"] input');
+      assert.equal(input.value, 'Mining Pick', 'the field opens on the record as it stands');
+      assert.equal(draftHandle.isDirty(), false, 'a never-touched editor opens clean');
+
+      input.value = 'Miners Pick';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      // The REPORTED flag is published by an effect, so it needs a settle; the HANDLE below
+      // does not, and that difference is the whole reason the page reports both.
+      await harness.setProps({});
+
+      assert.deepEqual(calls, [], 'a keystroke reached the write path before Save');
+      assert.equal(draftHandle.isDirty(), true, 'the handle the route-exit guard reads is live');
+      assert.equal(
+        reportedDirty.at(-1),
+        true,
+        'the reactive flag the Save button is disabled from did not re-report'
+      );
+      // THE HEADING FOLLOWS THE BUFFERED NAME. A heading names the thing being edited, and the
+      // enabled Save beside it is what says the edit is unsaved.
+      assert.equal(reportedNames.at(-1), 'Miners Pick');
+
+      await flushDraft();
+      // ONLY THE CHANGED FIELD. `scopedEntryWrites` answers the keys that DIFFER, so a Save
+      // never restates the description over whatever another client wrote to it meanwhile.
+      assert.deepEqual(calls, [['pick', { name: 'Miners Pick' }]]);
+      assert.equal(draftHandle.isDirty(), false, 'a landed Save leaves nothing to write');
+    });
+
+    it('leaves the world master switch IMMEDIATE, because it acts on a different decision', async () => {
+      const writes = [];
+      const target = await mountTab({
+        scope: scopeFor(),
+        actions: {
+          setWorldEnabled: (id, enabled) => {
+            writes.push([id, enabled]);
+          },
+        },
+      });
+      target.querySelector('[data-world-tool-entry-enabled]').click();
+      assert.deepEqual(
+        writes,
+        [['pick', false]],
+        'the master switch was staged behind Save, which would leave a GM believing every ' +
+          'system had lost the Tool while nothing had happened'
+      );
+      assert.equal(draftHandle.isDirty(), false, 'an immediate action must not open the draft');
+    });
+
+    it('discards back to the record on disk, and reports itself clean again', async () => {
+      const target = await mountTab({ scope: scopeFor() });
+      const input = target.querySelector(':scope [data-world-tool-entry-field="name"] input');
+      input.value = 'Miners Pick';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      assert.equal(draftHandle.isDirty(), true);
+
+      draftHandle.discard();
+      assert.equal(draftHandle.isDirty(), false, 'discard left the editor dirty');
+    });
+
+    it('clears the draft on Delete, so the route-exit guard cannot offer to save a gone record', async () => {
+      const removed = [];
+      const target = await mountTab({
+        scope: scopeFor(),
+        actions: {
+          deleteEntity: (id) => {
+            removed.push(id);
+          },
+        },
+      });
+      const input = target.querySelector(':scope [data-world-tool-entry-field="name"] input');
+      input.value = 'Miners Pick';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      assert.equal(draftHandle.isDirty(), true);
+
+      const card = target.querySelector('[data-world-tool-entry-card="delete"]');
+      assert.ok(Boolean(card), 'Delete is a card on the Overview tab, beside its stated reach');
+      assert.match(
+        card.querySelector('[data-world-tool-entry-delete-note]').textContent,
+        /2 crafting systems that have it/,
+        'the reach a GM cannot recover afterwards has to be beside the control'
+      );
+      card.querySelector(':scope button').click();
+      card.querySelector(':scope button').click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      assert.deepEqual(removed, ['pick']);
+      // The guard reads the LIVE handle at click time, so a draft still standing here would
+      // prompt to save a Tool that no longer exists.
+      assert.equal(draftHandle.isDirty(), false, 'the draft outlived the record it was about');
+    });
+  });
+
   describe('the breakage VALUE, one editor per mode', () => {
     it('offers a uses-per-copy stepper under `Limited uses`, and writes the section MERGED', async () => {
       const calls = [];
@@ -179,6 +331,10 @@ describe('the world Tool entry (issue 1373)', () => {
       input.value = '5';
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
+      // BUFFERED, so moving the number writes NOTHING until Save. This half is what a markup
+      // read cannot see, and it is the whole of the maintainer's explicit-save decision.
+      assert.deepEqual(calls, [], 'the stepper persisted its value without a Save');
+      await flushDraft();
       assert.deepEqual(calls.at(-1), [
         'pick',
         'breakage',
@@ -203,6 +359,8 @@ describe('the world Tool entry (issue 1373)', () => {
       input.value = '17';
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
+      assert.deepEqual(calls, [], 'the chance control persisted its value without a Save');
+      await flushDraft();
       assert.deepEqual(calls.at(-1), [
         'pick',
         'breakage',
@@ -224,6 +382,8 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.equal(field.value, '1d20');
       field.value = '2d6';
       field.dispatchEvent(new Event('input', { bubbles: true }));
+      assert.deepEqual(calls, [], 'the formula field persisted its value without a Save');
+      await flushDraft();
       assert.deepEqual(calls.at(-1), [
         'pick',
         'breakage',
@@ -296,7 +456,9 @@ describe('the world Tool entry (issue 1373)', () => {
     it('accepts a formula that really rolls', async () => {
       const target = await mountWithDice('2d6');
       assert.ok(!target.querySelector('[data-world-tool-entry-formula-error]'));
-      assert.ok(!target.querySelector('[data-world-tool-entry-formula]').hasAttribute('aria-invalid'));
+      assert.ok(
+        !target.querySelector('[data-world-tool-entry-formula]').hasAttribute('aria-invalid')
+      );
     });
 
     it('REJECTS one that parses and then throws', async () => {

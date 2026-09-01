@@ -24,12 +24,27 @@
   the CATALOGUE inspector's, which renders it for every world entity through
   `EntityCatalogueShell`; a second copy behind a tab here was one meaning implemented twice.
 
-  == THERE IS NO SAVE BUTTON, AND THAT IS THE DECISION ====================================
-  World-scope writes land on change - `updateEntity` and `updateWorldDefaultSection` persist
-  the moment a field or a segment is touched - so there is no draft for a Save to flush. The
-  prototype's header carries one because its own fixture is draft-based. A button that saved
-  nothing because everything was already saved would teach a GM that their edits are pending
-  when they are not, so the header carries Back and Delete and stops there.
+  == THE EDIT IS BUFFERED, AND SAVE IS WHAT WRITES IT ====================================
+  This screen persisted every keystroke and every segment on change, and its header therefore
+  said there was nothing to save. The maintainer ruled the other way for the world entry
+  editors: they adopt the reference's explicit-save model, so an edit accumulates locally and
+  `Save tool` flushes it. The mechanism is `scopedEntryDraft.js`, built by the essence lane and
+  TAKEN here rather than written twice - a draft is a SHAPE, and the same shape reached by two
+  implementations is how a persisted record and its editors drift apart. The only per-screen
+  argument is the FIELD LIST.
+
+  WHAT IS BUFFERED IS WHAT THIS EDITOR AUTHORS: the display label, the description, and the
+  two inherited world-default sections. Everything else on the screen stays immediate and
+  each has the same reason - it acts on a DIFFERENT record, or it ends the record the draft
+  is about. The world master switch is a world-wide enable a GM flips deliberately with the
+  reach stated beside it; the repair seed is cleared by its own button; Delete removes the
+  world record, its defaults and every membership naming it. Staging any of them behind Save
+  would mean an armed action that did nothing until a later button.
+
+  THE HEADER PAIR IS THE SHELL`S, and it cannot be anything else: `.manager-header` is a
+  SIBLING of `.manager-main`, so this page structurally cannot render into the band the
+  reference draws `Back to tools` and `Save tool` in. The three wires below are how the shell
+  reaches this editor.
 
   == THE WORLD BREAK MODE IS READ-ONLY HERE, AND THAT IS ALSO A DECISION ==================
   It is authored on the Tools Catalogue and nowhere else. `## Scoped Entity Definitions`
@@ -73,6 +88,14 @@
   import ScopedEntityPreview from './ScopedEntityPreview.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
+  import {
+    flushScopedEntryDraft,
+    scopedEntryBaseline,
+    scopedEntryDirty,
+    scopedEntryWrites,
+    withScopedEntryDefault,
+    withScopedEntryIdentity,
+  } from './scopedEntryDraft.js';
   import { isSeededToolSection, toolBreakModeLabel } from './worldToolStudio.js';
 
   // `systems` IS DELIBERATELY NOT DECLARED, though the call site passes it in the tool bundle.
@@ -80,7 +103,59 @@
   // `inherited` or `enabled` - and this screen needs all three per row. `entry.systems` is the
   // projection's own JOIN and answers them, so declaring the roster would add an unread prop
   // beside the value that is actually correct.
-  let { scope = null, actions = null, entityId = '', onBackToCatalogue = () => {} } = $props();
+  let {
+    scope = null,
+    actions = null,
+    entityId = '',
+    onBackToCatalogue = () => {},
+    // THE BUFFERED EDIT`S THREE WIRES TO THE SHELL. Same contract the world essence entry
+    // declares, and deliberately the same names: the shell holds one pattern for both.
+    //
+    //  - onDraftChange(handle|null): a LIVE handle, `{isDirty, save, discard}`, reported once
+    //    on mount and withdrawn on unmount. Live rather than a snapshot because the
+    //    route-exit guard reads it at the moment of a click, and a snapshot published by an
+    //    effect can be one turn behind - Delete changes the answer and navigates in the same
+    //    turn, so a stale read would prompt to save a Tool that no longer exists.
+    //  - onDirtyChange(dirty): the reactive half, for the header button`s disabled state. A
+    //    disabled attribute has to re-render, and the handle deliberately never does.
+    //  - onDraftNameChange(name): the other reactive half, for the header`s TITLE. The
+    //    heading names the Tool being edited, and what is being edited is the draft.
+    onDraftChange = () => {},
+    onDirtyChange = () => {},
+    onDraftNameChange = () => {},
+    // onSublineChange(text): what the record IS, under the name, in the same band.
+    //
+    // REPORTED RATHER THAN DERIVED IN THE SHELL, unlike the essence entry`s subtitle, and
+    // the reason is that this sentence is one this page ALREADY renders on its linked-item
+    // card. Deriving it up there would put the same two copy keys in two files and let the
+    // header and the card disagree about one record. It follows the persisted link rather
+    // than the draft, because relinking a Tool is not authored here.
+    onSublineChange = () => {},
+  } = $props();
+
+  // Read by `manager-contract.test.js``s SWAP DETECTOR against the title `viewTitle` renders
+  // for this route. A page that DELEGATES its body states these four as attributes on the
+  // shared placeholder; a page with its own body states them as module constants, and this is
+  // one of those.
+  const PAGE_ID = 'world-tool-entry';
+  // DISTINCT from the catalogue's, and that is a contract rather than a preference: the swap
+  // detector asserts the seven world routes wear seven different glyphs, so a route sharing its
+  // catalogue's icon is a route wearing another identity.
+  const PAGE_ICON = 'fas fa-hammer';
+  const TITLE_KEY = 'FABRICATE.Admin.Manager.Scoped.ToolEntryTitle';
+  const TITLE_FALLBACK = 'Tool entry';
+
+  /**
+   * The identity fields this editor BUFFERS, which is what it authors and no more.
+   *
+   * `WORLD_IDENTITY_FIELDS.tools` also lifts `img` and the three source-link uuids. None of
+   * them is authored here - the art comes from the linked Item and the link is re-pointed from
+   * the catalogue - so buffering them would put fields in a draft that no control on this
+   * screen can move, and `scopedEntryWrites` would send them back unchanged on every Save.
+   *
+   * @type {readonly string[]}
+   */
+  const IDENTITY_FIELDS = Object.freeze(['name', 'description']);
 
   const BREAKAGE_MODES = ['limitedUses', 'breakageChance', 'diceExpression'];
   const DEFAULT_BREAK_MODE = 'toolSpecific';
@@ -130,16 +205,126 @@
   const entries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
   const entry = $derived(entries.find((candidate) => candidate.id === entityId) ?? null);
   const entity = $derived(entry?.entity ?? null);
-  const defaults = $derived(entry?.defaults ?? {});
+  const sections = $derived(Array.isArray(scope?.sections) ? scope.sections : []);
+
+  /**
+   * THE BUFFERED EDIT. See the file header for what is in it and what deliberately is not.
+   */
+  const shape = $derived({ identityFields: IDENTITY_FIELDS, sections });
+  const persisted = $derived(scopedEntryBaseline(entry, shape));
+
+  /**
+   * WHAT THIS EDITOR KNOWS IS ON DISK, which is the persisted projection EXCEPT immediately
+   * after its own Save.
+   *
+   * A world-scope write reaches this screen back through Foundry: the store writes the
+   * setting, the replicated `updateSetting` hook reloads it, and only then does the admin
+   * store republish. Between a successful Save and the end of that round trip the projection
+   * still holds the OLD record, so a dirty flag measured against it alone would leave `Save`
+   * lit over an edit that had already landed and have the route-exit guard offer to write it
+   * a second time. So a Save records what it wrote and the next publish drops that record.
+   *
+   * @type {{identity: Record<string, unknown>, defaults: Record<string, unknown>}|null}
+   */
+  let flushed = $state(null);
+  const baseline = $derived(flushed ?? persisted);
+  $effect(() => {
+    // Read for the DEPENDENCY, not for the value: any publish of the world corpus makes the
+    // projection the better answer again.
+    void persisted;
+    flushed = null;
+  });
+
+  /** @type {{identity: Record<string, unknown>, defaults: Record<string, unknown>}|null} */
+  let draft = $state(null);
+  let seededEntityId = $state(undefined);
+
+  // Seed on IDENTITY change ONLY, never on every publish: the admin store republishes
+  // `viewState` twice on a refresh and again on any unrelated world-corpus write, so a
+  // reference-triggered re-seed would overwrite whatever the GM had typed since. Discard
+  // re-seeds through `discardDraft` rather than through this effect, so a second discard on
+  // the same Tool still lands.
+  $effect(() => {
+    const currentId = entry?.id ?? '';
+    if (currentId === seededEntityId) return;
+    seededEntityId = currentId;
+    draft = currentId ? scopedEntryBaseline(entry, shape) : null;
+    flushed = null;
+  });
+
+  const identity = $derived(draft?.identity ?? persisted.identity);
+
+  // THE WHOLE SCREEN READS THE DRAFT. The buffered sections sit over the persisted record
+  // rather than replacing it, because `repairRequirements` is NOT one of the buffered
+  // sections - it is seeded rather than inherited - and a bare swap would drop it.
+  const defaults = $derived({ ...(entry?.defaults ?? {}), ...(draft?.defaults ?? {}) });
+  const dirty = $derived(scopedEntryDirty(draft, baseline));
+
+  /** Stage one identity field into the draft. REASSIGNED, never mutated in place. */
+  function setIdentity(field, value) {
+    draft = withScopedEntryIdentity(draft ?? persisted, field, value);
+  }
+
+  /**
+   * Flush the buffered edit. Answers `false` when a write refused, which is what the
+   * route-exit guard gates navigation on: a Save that did not land must leave the GM here
+   * with the edit still in front of them.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function saveDraft() {
+    const pending = draft;
+    if (!pending) return true;
+    const landed = await flushScopedEntryDraft({
+      entityId: entry?.id ?? '',
+      writes: scopedEntryWrites(pending, baseline),
+      actions,
+    });
+    if (landed) flushed = pending;
+    return landed;
+  }
+
+  /** Throw the buffered edit away and re-seed from the record on disk. */
+  function discardDraft() {
+    draft = scopedEntryBaseline(entry, shape);
+    flushed = null;
+  }
+
+  /**
+   * THE SHELL HANDLE, and it is a LIVE ACCESSOR rather than a reported snapshot. See the
+   * props block for why, and the essence entry`s twin for the same argument at length.
+   */
+  const draftHandle = {
+    isDirty: () => dirty,
+    save: saveDraft,
+    discard: discardDraft,
+  };
+  $effect(() => {
+    onDraftChange(draftHandle);
+    return () => onDraftChange(null);
+  });
+  $effect(() => {
+    onDirtyChange(dirty);
+  });
+  // THE HEADING ABOVE THIS PAGE FOLLOWS THE DRAFT. A heading names the thing being edited,
+  // and the thing being edited is the draft; the enabled `Save tool` beside it is what says
+  // the edit is unsaved. `identity.name` rather than `draft?.identity?.name` so an unseeded
+  // editor reports the persisted name instead of blanking the header for a frame.
+  $effect(() => {
+    onDraftNameChange(String(identity.name ?? ''));
+  });
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
   const memberRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
   const repairGroups = $derived(
     Array.isArray(defaults.repairRequirements) ? defaults.repairRequirements : []
   );
 
-  const entryName = $derived(
-    typeof entity?.name === 'string' && entity.name.trim() ? entity.name : String(entityId || '')
-  );
+  // THE BUFFERED NAME, so the linked-item tile and every aria label on this screen name the
+  // Tool the GM is editing rather than the one still on disk.
+  const entryName = $derived.by(() => {
+    const buffered = String(identity.name ?? '').trim();
+    return buffered || String(entityId || '');
+  });
 
   const tabs = $derived([
     {
@@ -328,10 +513,11 @@
   }
 
   /**
-   * Patch one world-default section, preserving every field it already carries.
+   * Stage a patch to one world-default section, preserving every field it already carries.
    *
    * SECTION VALUES ARE OPAQUE to the write path, so the merge happens here where the shape is
-   * known, and the action stores whatever it is handed verbatim.
+   * known, and `Save` stores whatever it is handed verbatim. REASSIGNED rather than mutated:
+   * `scopedEntryDraft.js` returns a new object for a reason its own doc gives.
    *
    * @param {string} section
    * @param {object} patch
@@ -340,7 +526,7 @@
   function patchSection(section, patch) {
     const current =
       defaults[section] && typeof defaults[section] === 'object' ? defaults[section] : {};
-    actions?.updateWorldDefaultSection?.(entityId, section, { ...current, ...patch });
+    draft = withScopedEntryDefault(draft ?? persisted, section, { ...current, ...patch });
   }
 
   /**
@@ -351,6 +537,17 @@
    * testing the old names after a rename.
    */
   const sourceLinked = $derived(entry?.hasSourceLink === true);
+
+  // ONE SENTENCE, ONE PLACE. The header band and the linked-item card say the same thing
+  // about the same record, so the page resolves it once and reports it up.
+  const sourceSubline = $derived(
+    sourceLinked
+      ? text('FABRICATE.Admin.Manager.Scoped.Entry.LinkedItemSub', 'Linked game-world Item')
+      : text('FABRICATE.Admin.Manager.Scoped.Entry.UnlinkedItemSub', 'No Item linked')
+  );
+  $effect(() => {
+    onSublineChange(sourceSubline);
+  });
 
   // ── THE WORLD MASTER SWITCH ────────────────────────────────────────────────────────────
   // A world-disabled Tool is off in EVERY crafting system that has it, whatever each of them
@@ -568,78 +765,44 @@
     },
   ]);
 
-  const pageTitle = $derived(text('FABRICATE.Admin.Manager.Scoped.ToolEntryTitle', 'Tool entry'));
+  const pageTitle = $derived(text(TITLE_KEY, TITLE_FALLBACK));
+
+  const deleteToken = $derived(`world-tool-delete:${entityId}`);
+
+  // THE REACH, IN THE SENTENCE. `deleteEntity` sweeps the world record, its world defaults and
+  // every membership record naming it, so the number of systems that lose the Tool is the one
+  // fact a GM needs before the second press rather than after it.
+  const deleteNote = $derived(
+    format(
+      memberSystemCount === 1
+        ? 'FABRICATE.Admin.Manager.Scoped.Entry.DeleteReachOne'
+        : 'FABRICATE.Admin.Manager.Scoped.Entry.DeleteReach',
+      memberSystemCount === 1
+        ? 'Removes it from the world catalogue and from the 1 crafting system that has it.'
+        : 'Removes it from the world catalogue and from the {count} crafting systems that have it.',
+      { count: memberSystemCount }
+    )
+  );
+
+  /**
+   * Delete the world record, then leave. IMMEDIATE rather than buffered, for the reason the
+   * file header gives: it ends the record the draft is about.
+   *
+   * The draft is cleared FIRST so the shell`s route-exit guard, which reads the live handle at
+   * click time, cannot prompt to save a Tool that no longer exists.
+   *
+   * @returns {Promise<void>}
+   */
+  async function deleteTool() {
+    armedToken = '';
+    draft = null;
+    flushed = null;
+    await actions?.deleteEntity?.(entityId);
+    onBackToCatalogue();
+  }
 </script>
 
 <main class="manager-main" data-scoped-page="world-tool-entry" aria-label={pageTitle}>
-  <!--
-    THE ENTITY HEADER, not a second breadcrumb strip.
-
-    It carried a Back button, a bare `<h2>` and a source pill and nothing else, so the screen
-    opened with a generic page title over a name over a tab strip, and the two actions a GM
-    comes here to reach - leave, and delete - were one of them and hidden respectively. The
-    prototype's is a medallion, the name, what the record IS, and the actions right-aligned on
-    the same line, and that is what this is.
-
-    THERE IS NO SAVE BUTTON, and its absence is the decision. World-scope writes land on
-    change: `updateEntity` and `updateWorldDefaultSection` persist the moment a field or a
-    segment is touched, so there is no draft for a Save to flush. A button that saved nothing
-    because everything was already saved is worse than no button, because it teaches a GM that
-    their edits are pending when they are not.
-  -->
-  <header class="manager-world-tool-entry-head">
-    <img
-      class="manager-world-tool-entry-medallion"
-      src={entity?.img || ''}
-      alt=""
-      data-world-tool-entry-medallion
-    />
-    <div class="manager-world-tool-entry-identity">
-      <h2 class="manager-world-tool-entry-name" data-world-tool-entry-name>{entryName}</h2>
-      <p
-        class="manager-muted manager-world-tool-entry-kind"
-        data-world-tool-entry-source={sourceLinked ? 'linked' : 'unlinked'}
-      >
-        {sourceLinked
-          ? text('FABRICATE.Admin.Manager.Scoped.Entry.LinkedItemSub', 'Linked game-world Item')
-          : text('FABRICATE.Admin.Manager.Scoped.Entry.UnlinkedItemSub', 'No Item linked')}
-      </p>
-    </div>
-    <div class="manager-world-tool-entry-actions">
-      <ManagerButton role="ghost" data-world-tool-entry-back onclick={() => onBackToCatalogue()}>
-        <i class="fas fa-arrow-left" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Scoped.Entry.BackToTools', 'Back to tools')}</span>
-      </ManagerButton>
-      <!-- ARMED, because this deletes the world record, its world defaults AND every
-           membership record naming it - `deleteEntity` sweeps all three - and there is no
-           undo. The shipped two-step control is what every other destructive manager action
-           uses; a bare button here would be the only unguarded one. -->
-      <ArmedDangerButton
-        token={`world-tool-delete:${entityId}`}
-        armed={armedToken === `world-tool-delete:${entityId}`}
-        idleLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.Delete', 'Delete')}
-        armedLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirm', 'Delete for good?')}
-        idleAriaLabel={format(
-          'FABRICATE.Admin.Manager.Scoped.Entry.DeleteAria',
-          'Delete {name} from the world catalogue',
-          { name: entryName }
-        )}
-        armedAriaLabel={format(
-          'FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirmAria',
-          'Confirm deleting {name} from every system that has it',
-          { name: entryName }
-        )}
-        onArm={(token) => (armedToken = token)}
-        onDisarm={() => (armedToken = '')}
-        onConfirm={async () => {
-          armedToken = '';
-          await actions?.deleteEntity?.(entityId);
-          onBackToCatalogue();
-        }}
-      />
-    </div>
-  </header>
-
   <div class="manager-world-tool-entry-body">
     <EditorTabs
       {tabs}
@@ -657,6 +820,7 @@
     <div class="manager-world-tool-entry-columns">
       <div
         class="manager-world-tool-entry-panel"
+        data-scoped-entry={PAGE_ID}
         id={`world-tool-entry-panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`world-tool-entry-tab-${activeTab}`}
@@ -665,6 +829,7 @@
       >
         {#if !entry}
           <p class="manager-muted" data-world-tool-entry-missing>
+            <i class={PAGE_ICON} aria-hidden="true"></i>
             {text(
               'FABRICATE.Admin.Manager.Scoped.Entry.Missing',
               'This world record is no longer in the corpus. Return to the catalogue to pick another.'
@@ -707,9 +872,8 @@
               <span>{text('FABRICATE.Admin.Manager.Scoped.Entry.Description', 'Description')}</span>
               <textarea
                 rows="3"
-                value={entity?.description ?? ''}
-                onchange={(event) =>
-                  actions?.updateEntity?.(entityId, { description: event.currentTarget.value })}
+                value={String(identity.description ?? '')}
+                oninput={(event) => setIdentity('description', event.currentTarget.value)}
               ></textarea>
             </label>
           </section>
@@ -728,9 +892,9 @@
                   'FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabel',
                   'Display label'
                 )}
-                value={entity?.name ?? ''}
-                onchange={(event) =>
-                  actions?.updateEntity?.(entityId, { name: event.currentTarget.value })}
+                data-world-tool-entry-name
+                value={String(identity.name ?? '')}
+                oninput={(event) => setIdentity('name', event.currentTarget.value)}
               />
             </div>
             <p class="manager-muted manager-world-tool-entry-hint">
@@ -799,6 +963,56 @@
               </button>
             </section>
           {/if}
+
+          <!--
+            DELETE IS A CARD ON THIS TAB, not an action in the header band beside Save.
+
+            It is the same placement the world essence entry makes, and for the same two
+            reasons. The reach has to be STATED beside the control - deleting a world Tool
+            removes its world defaults and every membership record naming it, in every system,
+            with no undo - and a header button has nowhere to say so. And it is the one
+            immediate action on a screen whose other controls are buffered, so it belongs where
+            a sentence can mark it as different rather than next to the verb it isn't.
+
+            ARMED, through the shipped two-step control every other destructive manager action
+            uses; a bare button here would be the only unguarded one.
+          -->
+          <section
+            class="manager-world-tool-entry-card manager-world-tool-entry-danger"
+            data-world-tool-entry-card="delete"
+          >
+            <span class="manager-world-tool-entry-danger-glyph" aria-hidden="true">
+              <i class="fas fa-triangle-exclamation"></i>
+            </span>
+            <div class="manager-world-tool-entry-danger-copy">
+              <strong>
+                {text('FABRICATE.Admin.Manager.Scoped.Entry.DeleteTitle', 'Delete this Tool')}
+              </strong>
+              <p class="manager-muted" data-world-tool-entry-delete-note>{deleteNote}</p>
+            </div>
+            <ArmedDangerButton
+              token={deleteToken}
+              armed={armedToken === deleteToken}
+              idleLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.Delete', 'Delete')}
+              armedLabel={text(
+                'FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirm',
+                'Delete for good?'
+              )}
+              idleAriaLabel={format(
+                'FABRICATE.Admin.Manager.Scoped.Entry.DeleteAria',
+                'Delete {name} from the world catalogue',
+                { name: entryName }
+              )}
+              armedAriaLabel={format(
+                'FABRICATE.Admin.Manager.Scoped.Entry.DeleteConfirmAria',
+                'Confirm deleting {name} from every system that has it',
+                { name: entryName }
+              )}
+              onArm={(token) => (armedToken = token)}
+              onDisarm={() => (armedToken = '')}
+              onConfirm={deleteTool}
+            />
+          </section>
         {:else if activeTab === 'breakage'}
           <!--
             ONE TAB FOR THE WHOLE BREAKAGE STORY. It used to be three — `Breakage`, `On break`
@@ -1124,67 +1338,13 @@
      is (0,3,1) against the shipped rule's (0,3,0), so it wins wherever it is injected. The
      catalogue page carries the identical rule for the identical reason.
 
-     TWO TRACKS NOW, not three: the read-only break-mode band moved INSIDE the Breakage tab,
-     so the header and the tabbed body are the whole of this screen's vertical structure. */
+     ONE TRACK NOW. It was three, then two; the read-only break-mode band moved INSIDE the
+     Breakage tab and the entity header moved into the shell's own band beside `Save tool`, so
+     the tabbed body is the whole of this screen`s vertical structure. The rule stays rather
+     than being deleted back to the shipped one, because the shipped one is what an earlier
+     revision of this page was already fighting and the element selector is what settles it. */
   main.manager-main[data-scoped-page='world-tool-entry'] {
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  /* THE MEDALLION, THE NAME AND WHAT IT IS on the left; the actions pushed to the trailing
-     edge. `flex-wrap` so a long name and three controls stack rather than crushing each
-     other at a narrow window, and `margin-left: auto` on the cluster rather than a spacer. */
-  .manager-world-tool-entry-head {
-    display: flex;
-    grid-row: 1;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-2) var(--fab-space-3) 0;
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-medallion {
-    width: 42px;
-    height: 42px;
-    flex: 0 0 auto;
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: 10px;
-    object-fit: cover;
-  }
-
-  .manager-world-tool-entry-identity {
-    display: flex;
-    flex: 1 1 12rem;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .manager-world-tool-entry-actions {
-    display: flex;
-    flex: 0 0 auto;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-2);
-    margin-left: auto;
-    min-width: 0;
-  }
-
-  /* An ELEMENT rule, not an inherited colour: Foundry's core sheet styles bare `h1`-`h6`, and
-     an element rule beats whatever this heading would otherwise inherit. */
-  h2.manager-world-tool-entry-name {
-    margin: 0;
-    color: var(--fab-mv2-text);
-    font-family: var(--fab-font-serif);
-    font-size: 1.05rem;
-    font-weight: 600;
-    line-height: 1.2;
-    overflow-wrap: break-word;
-  }
-
-  .manager-world-tool-entry-kind {
-    margin: 0;
-    font-size: 0.66rem;
+    grid-template-rows: minmax(0, 1fr);
   }
 
   /* ── THE TAB BODY'S CARDS ──────────────────────────────────────────────────────────────
@@ -1206,7 +1366,7 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     padding: var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 12px;
     background: var(--fab-bg-1);
     min-width: 0;
@@ -1217,7 +1377,7 @@
     align-items: center;
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 10px;
     background: var(--fab-surface-soft);
     min-width: 0;
@@ -1227,7 +1387,7 @@
     width: 38px;
     height: 38px;
     flex: 0 0 auto;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     object-fit: cover;
   }
@@ -1241,7 +1401,7 @@
   }
 
   .manager-world-tool-entry-tile-copy strong {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-family: var(--fab-font-serif);
     font-size: 0.82rem;
     font-weight: 600;
@@ -1294,7 +1454,7 @@
   }
 
   .manager-world-tool-entry-switch-copy strong {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.78rem;
     font-weight: 600;
   }
@@ -1397,7 +1557,7 @@
      tabs off screen. */
   .manager-world-tool-entry-body {
     display: grid;
-    grid-row: 2 / -1;
+    grid-row: 1;
     grid-template-rows: auto minmax(0, 1fr);
     gap: var(--fab-space-2);
     padding: 0 var(--fab-space-3) var(--fab-space-3);
@@ -1420,5 +1580,40 @@
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
+  }
+  /* THE DANGER CARD: glyph, the copy that states the reach, and the armed control at the
+     trailing edge. It wears `.manager-world-tool-entry-card` for its surface and adds only the
+     row layout, so it cannot drift from the cards above it. */
+  .manager-world-tool-entry-danger {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-3);
+  }
+
+  .manager-world-tool-entry-danger-glyph {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    color: var(--fab-danger);
+    background: var(--fab-danger-soft);
+    font-size: 0.8rem;
+  }
+
+  .manager-world-tool-entry-danger-copy {
+    display: flex;
+    flex: 1 1 14rem;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-danger-copy p {
+    margin: 0;
+    font-size: 0.66rem;
   }
 </style>

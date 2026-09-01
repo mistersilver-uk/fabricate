@@ -271,14 +271,18 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
   });
 
   it('SEAM 3 renders the action pair through ONE shared component, not a hand-rolled pair', () => {
-    // The RENDER bound: one element, in the branch that already existed, and it is the component
-    // the world tool entry takes next rather than two buttons this file spells out. A second copy
-    // of the pair is exactly the recipe drift `design-system/spec.md` orders "back before save"
-    // to prevent.
+    // The RENDER bound: ONE ELEMENT PER WORLD ENTRY ROUTE, each in its own branch, and never a
+    // pair of buttons a screen spells out for itself. A hand-rolled copy is exactly the recipe
+    // drift `design-system/spec.md` orders "back before save" to prevent.
+    //
+    // The count is TWO because the world tool entry took this component next (issue 1373),
+    // which is what this seam was extracted for. It is asserted rather than left unbounded so
+    // that a THIRD site — the world component entry, when that lane lands — has to come here
+    // and say so, and so that a second pair inside one branch still reds.
     assert.equal(
       [...rootSource.matchAll(/<ScopedEntryHeaderActions\b/g)].length,
-      1,
-      'the header carries exactly one scoped-entry action pair'
+      2,
+      'one scoped-entry action pair per world entry route, and no route carrying two'
     );
     const attributes = staticAttributesAt('ScopedEntryHeaderActions');
     assert.deepEqual(
@@ -300,6 +304,11 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     // selector out from under a site.
     assert.match(rootSource, /backAttribute="data-world-essence-back"/);
     assert.match(rootSource, /saveAttribute="data-world-essence-save"/);
+    // The tool entry's own two, for the same reason: they are per-site selectors the capture
+    // registry and the mounted suites name, and the component takes them as props so that a
+    // shared change cannot rename one site out from under the other.
+    assert.match(rootSource, /backAttribute="data-world-tool-back"/);
+    assert.match(rootSource, /saveAttribute="data-world-tool-save"/);
   });
 
   it('SEAM 3 puts the editor in the route-exit chain, so the rail and the breadcrumb prompt too', () => {

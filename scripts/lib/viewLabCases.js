@@ -1255,7 +1255,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       {
         container: '[data-scoped-list-inspector]',
-        target: '[data-world-tool-defaults="sm-tool-hammer"]',
+        target: '[data-scoped-list-extra-card="repair"]',
       },
     ],
     position: { width: 1280, height: 900 },
@@ -1311,6 +1311,62 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+      // The buffered-save seam (issue 1373), claimed by the SECOND screen that renders it.
+      // The essence entry's own claim set says this is what a shared seam's claims are
+      // supposed to look like: a change to the pair or to the draft leaf publishes every
+      // window that draws them, rather than one of them standing in for the other.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-dirty',
+    label: 'Manager — World Tool entry, unsaved',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE EXPLICIT SAVE EXISTS FOR (issue 1373), and the twin of
+    // `world-essence-entry-dirty` beside it.
+    //
+    // The entry editor buffers its edit now, so `Save tool` is DISABLED until there is
+    // something to flush — which means every other frame of this screen photographs the button
+    // in its disabled treatment, and the whole change is a control nobody can see working.
+    // This case types into the display label and captures the same band with the edit
+    // standing: an enabled, primary Save, and the heading following the buffered name.
+    //
+    // `fill` rather than a click, because a dirty form is unreachable by clicking: the draft is
+    // seeded from the persisted record and only an `input` event moves it.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-name]', fill: 'Smith\u{2019}s Great Hammer' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-scoped-page="world-tool-entry"]',
+    // THE HEADER PAIR, proved present and inside the band that owns it. A frame in which the
+    // Save had not rendered at all would satisfy `expectSelector` on its own, and that is the
+    // one thing this case exists to show.
+    expectContained: [
+      {
+        container: '.manager-header-actions',
+        target: '[data-world-tool-save]',
+      },
+      {
+        container: '.manager-header-actions',
+        target: '[data-world-tool-back]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    // THE SAME FILES THE RESTING CASE CLAIMS, deliberately: one screen photographed in two
+    // states, where the resting frame shows the screen and this one shows that its Save is a
+    // live control. A change to the header pair or the draft leaf that only ever published the
+    // resting frame would publish a DISABLED button as its evidence.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
     ],
   }),
   managerCase({

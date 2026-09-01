@@ -5262,7 +5262,8 @@
             "Title": "Delete Tool?",
             "Content": "Delete {name}? This cannot be undone."
           },
-          "SaveBlockedInvalid": "Can't save: assign a component to every tool first. The highlighted tool still needs one."
+          "SaveBlockedInvalid": "Can't save: assign a component to every tool first. The highlighted tool still needs one.",
+          "DiscardDirtyEntryContent": "The current Tool has unsaved changes. Save them and continue, or discard them?"
         },
         "Checks": {
           "Title": "Checks",
@@ -5907,7 +5908,10 @@
             "Preview": "Player preview",
             "PreviewKicker": "What a player sees",
             "PreviewContext": "In {count} crafting systems",
-            "PreviewRules": "The world defaults, resolved"
+            "PreviewRules": "The world defaults, resolved",
+            "DeleteTitle": "Delete this Tool",
+            "DeleteReach": "Removes it from the world catalogue and from the {count} crafting systems that have it.",
+            "DeleteReachOne": "Removes it from the world catalogue and from the 1 crafting system that has it."
           },
           "Inherit": {
             "StateInherited": "Inherited",
@@ -5999,6 +6003,14 @@
             "ValidationTitle": "World defaults",
             "WorldBanner": "World definition · shared by every system",
             "WorldDefaults": "World defaults"
+          },
+          "Tool": {
+            "Save": "Save tool",
+            "InspectorKicker": "Tool page",
+            "CountUnit": "tools",
+            "SelectAllShort": "All",
+            "SearchPlaceholder": "Search tools\u2026",
+            "OpenEntry": "Edit tool"
           },
           "List": {
             "ClearFilters": "Clear filters",
