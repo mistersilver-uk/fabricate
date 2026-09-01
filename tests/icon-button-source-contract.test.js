@@ -21,6 +21,10 @@
  * checking it, which is the state every convention in this repository's history was in
  * immediately before it drifted.
  *
+ * It is also the clause that is NOT shared. No card has an equivalent, so it is stated here,
+ * over the corpus the shared factory returns, rather than folded into that factory behind an
+ * option only this caller would ever pass.
+ *
  * ── THE EXEMPTIONS, AND WHY EACH IS ONE ───────────────────────────────────────────────────
  * `IconButton.svelte` is the primitive; it writes the class because writing it is what it is
  * for. `CraftingSystemManagerRoot.svelte` is DEFERRED, not exempt. `ComponentIdentityStrip`
@@ -29,53 +33,31 @@
  * that converts some of a file's sites reds here instead of quietly halving a deferral nobody
  * is tracking any more.
  *
- * ── WHAT THIS DELIBERATELY DOES NOT POLICE ────────────────────────────────────────────────
- * `<style>` blocks are stripped before matching. Six player-app components — the recipe
- * browser, three gathering panels, the inventory grid and the journal history list — carry
- * `:global(.manager-icon-button)` rules, because `components/Pagination.svelte` renders two
- * icon buttons and is area-agnostic while the class is painted only under
- * `.fabricate-manager`. Those rules are CORRECT: they style what a child component renders,
- * which is what `:global` is for, and they are the reason the pagination arrows are visible
- * outside the manager at all. A gate that counted them would be answered by exempting the six
- * files it exists to protect.
+ * ── WHERE THE SHARED CLAUSES LIVE ─────────────────────────────────────────────────────────
+ * `tests/helpers/primitiveSourceContract.js`, shared with `inspector-card-source-contract.test.js`,
+ * which asks the same four questions about `<InspectorCard>`. That file records why — SonarCloud
+ * measured 88 duplicated lines between the two guards while each carried its own copy, and two
+ * copies drift into disagreeing about what a call site IS.
  *
- * Whether a rule in a `<style>` block still REACHES its button is a different question with a
- * different owner: `tests/components/manager-button-scoped-class-reach.test.js`, which covers
- * this primitive as well as `<ManagerButton>` and which caught both of this conversion's dead
- * rules — including the one `lint:svelte:warnings` cannot see.
- *
- * ── WHY IT READS THE FILES ITSELF ─────────────────────────────────────────────────────────
- * Never by shelling to `grep`, for the reason `manager-button-source-contract.test.js`
- * records: GNU grep classifies a file holding a raw NUL byte as BINARY and omits it from a
- * recursive search with no `-a`, silently. `checks/ChecksView.svelte` was one such file and
- * was absent from three rounds of census. `collectSources` reads the working tree directly —
- * which also matters here for a duller reason: a newly added, still-untracked primitive is
- * invisible to `git ls-files`, and an earlier census of this very change under-reported
- * itself for exactly that reason.
+ * The corpus is read from the working tree rather than by shelling to `grep` (a raw NUL byte
+ * makes a file BINARY to a recursive grep, and `checks/ChecksView.svelte` was absent from three
+ * rounds of census for exactly that reason), `<style>` blocks and comments are stripped before
+ * matching — six player-app components carry legitimate `:global(.manager-icon-button)` rules,
+ * because `components/Pagination.svelte` renders two icon buttons and is area-agnostic while the
+ * class is painted only under `.fabricate-manager` — and the tag scan tracks `{}` DEPTH so a
+ * COMPARISON inside an expression attribute cannot end a tag early, which is the case that hid
+ * `VocabularyPanel.svelte`'s `ariaLabel` from an earlier scan. Each of those is argued where it
+ * lives: `helpers/primitiveSourceContract.js` and `helpers/svelteTagScan.js`.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import path from 'node:path';
 
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-import { withoutComments } from './helpers/stepperSourceContract.js';
-import { openingTagsNamed } from './helpers/svelteTagScan.js';
+import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
 
 /** The class only the primitive may write. */
 const CONTRACT_CLASS = 'manager-icon-button';
 
 const PRIMITIVE = 'src/ui/svelte/components/IconButton.svelte';
-
-/**
- * `<style>` blocks removed as well as comments.
- *
- * The order matters: comments go first, so a `<style>` mentioned inside a docblock cannot
- * open a region that swallows the markup after it. That is not hypothetical — a line-based
- * scan written during this change did exactly that and mis-filed two real call sites as CSS.
- */
-function markupOf(source) {
-  return withoutComments(source).replace(/<style[\s\S]*?<\/style>/g, '');
-}
 
 /**
  * The `.svelte` files under `src/` that may still write the class, each with its reason and
@@ -117,95 +99,66 @@ const CLASS_EXCEPTIONS = Object.freeze([
   }),
 ]);
 
-/** `{ path: text }` for every `.svelte` under `src/`, comments and `<style>` blocks removed. */
-const COMPONENTS = Object.fromEntries(
-  Object.entries(collectSources(path.join(repoRoot, 'src'), { extensions: ['.svelte'] })).map(
-    ([file, source]) => [file, markupOf(source)]
-  )
-);
+const contract = definePrimitiveSourceContract({
+  label: 'icon-button',
+  tag: 'IconButton',
+  contractClass: CONTRACT_CLASS,
+  primitive: PRIMITIVE,
+  exemptions: CLASS_EXCEPTIONS,
 
-/** Every component that renders the primitive. The floor below is stated over these. */
-const CALL_SITE_FILES = Object.keys(COMPONENTS).filter((file) =>
-  COMPONENTS[file].includes('<IconButton')
-);
+  // 35 components render the primitive as this lands; 28 is a real floor with headroom.
+  callSiteFloor: 28,
 
-/** Every `<IconButton …>` opening tag in the corpus, as `[file, tagSource]`. */
-const CALL_SITE_TAGS = CALL_SITE_FILES.flatMap((file) =>
-  openingTagsNamed(COMPONENTS[file], 'IconButton').map((tag) => [file, tag])
-);
+  primitiveEmits: {
+    source: `'${CONTRACT_CLASS}'`,
+    otherwise:
+      'the primitive no longer emits the contract class, so the restatement clause is policing ' +
+      'a token that reaches nothing',
+  },
 
-/**
- * The floor every clause below leans on.
- *
- * Stated over `<IconButton` CALL SITES rather than over the literal the first clause asserts
- * the absence of, because a floor over that string would be self-contradictory. 35 components
- * render the primitive as this lands; 28 is a real floor with headroom, deliberately below the
- * measured number so that deleting a screen does not red this.
- */
-function assertCallSitesAlive() {
-  assert.ok(
-    CALL_SITE_FILES.length >= 28,
-    `expected the manager's icon-button call sites to be here, found ` +
-      `${CALL_SITE_FILES.length} files rendering <IconButton across ` +
-      `${Object.keys(COMPONENTS).length} components`
-  );
-}
+  // Three probes. `type` and `aria-label` would still WORK from a call site — both ride the rest
+  // spread, which lands last and therefore wins — which is exactly why they need a gate: a site
+  // that kept the old spelling would bypass the required-prop contract below while rendering
+  // identically.
+  restatements: Object.freeze([
+    Object.freeze({ name: 'type', present: (tag) => /\btype=/.test(tag) }),
+    Object.freeze({ name: 'aria-label', present: (tag) => /\baria-label=/.test(tag) }),
+    Object.freeze({ name: CONTRACT_CLASS, present: (tag) => tag.includes(CONTRACT_CLASS) }),
+  ]),
 
-test('the icon-button class is written only by the primitive', () => {
-  // NON-VACUITY, in the precedent's style and for the precedent's reason: an absence check
-  // over an empty corpus passes forever and reports itself satisfied. A wrong root, a bad
-  // extension filter or a walk that stopped recursing all read as zero here.
-  assertCallSitesAlive();
-
-  const exempt = new Set(CLASS_EXCEPTIONS.map((entry) => entry.file));
-  const offenders = Object.keys(COMPONENTS)
-    .filter((file) => !exempt.has(file))
-    .filter((file) => COMPONENTS[file].includes(CONTRACT_CLASS));
-
-  assert.deepEqual(
-    offenders,
-    [],
+  classOnlyRemedy:
     'a manager icon button is an `<IconButton>`, never a hand-written ' +
-      '`class="manager-icon-button"`. A per-site modifier travels as a pass-through on the ' +
-      '`class` prop, the accessible name is the required `ariaLabel` prop, and a per-site ' +
-      '`data-*` hook rides the rest spread — see `IconButton.svelte`:\n  ' +
-      offenders.join('\n  ')
-  );
-});
+    '`class="manager-icon-button"`. A per-site modifier travels as a pass-through on the ' +
+    '`class` prop, the accessible name is the required `ariaLabel` prop, and a per-site ' +
+    '`data-*` hook rides the rest spread — see `IconButton.svelte`',
 
-test('every recorded exemption is still earned, at the count it was recorded with', () => {
-  // An exemption for a file that no longer writes the class is a permission nobody is using,
-  // and the next file added to this list gets to lean on the precedent of an unchecked one.
-  for (const entry of CLASS_EXCEPTIONS) {
-    const source = COMPONENTS[entry.file];
-    assert.ok(source, `${entry.file} is exempted (${entry.why}) but is not in the corpus`);
-    assert.ok(entry.why.length > 40, `${entry.file} is exempted with no stated reason`);
-    const found = source.split(CONTRACT_CLASS).length - 1;
-    assert.equal(
-      found,
-      entry.count,
-      `${entry.file} is exempted for ${entry.count}x \`${CONTRACT_CLASS}\` and writes it ` +
-        `${found}x. Reason on record: ${entry.why}`
-    );
-  }
+  restatementRemedy:
+    'the primitive emits `type="button"` and `manager-icon-button` itself, and takes the ' +
+    'accessible name as `ariaLabel`. Restating any of them from a call site re-opens the ' +
+    'convention this component exists to close',
+
+  bareDataRemedy:
+    'a bare `data-*` on a COMPONENT tag is the boolean `true`, not the empty string it is on ' +
+    'an element, so the rest spread renders `="true"` where the hand-rolled button rendered ' +
+    '`=""`. 17 attributes were written bare before this conversion; spell it `data-x=""`',
 });
 
 test('every icon button is given an accessible name', () => {
-  assertCallSitesAlive();
+  contract.assertCallSitesAlive();
 
   // Positive control: the clause is only meaningful while the primitive actually turns
   // `ariaLabel` into an `aria-label`. If that stops being true, every call site below can
   // carry the prop and announce nothing, and this clause would keep passing.
-  const primitive = COMPONENTS[PRIMITIVE] ?? '';
+  const primitive = contract.components[PRIMITIVE] ?? '';
   assert.ok(
     primitive.includes('aria-label={accessibleName}'),
     'the primitive no longer emits `aria-label` from `ariaLabel`, so this clause is ' +
       'measuring a prop that reaches nothing'
   );
 
-  const offenders = CALL_SITE_TAGS.filter(([, tag]) => !/\bariaLabel=/.test(tag)).map(
-    ([file, tag]) => `${file}: ${tag.replaceAll(/\s+/g, ' ').slice(0, 120)}`
-  );
+  const offenders = contract.callSiteTags
+    .filter(([, tag]) => !/\bariaLabel=/.test(tag))
+    .map(([file, tag]) => `${file}: ${tag.replaceAll(/\s+/g, ' ').slice(0, 120)}`);
 
   assert.deepEqual(
     offenders,
@@ -214,57 +167,5 @@ test('every icon button is given an accessible name', () => {
       'nothing else. It is invisible on screen, so no frame and no geometry probe can catch ' +
       'it — `design-system/spec.md:171-175` requires the name to be a REQUIRED prop:\n  ' +
       offenders.join('\n  ')
-  );
-});
-
-test('no call site restates what the primitive owns', () => {
-  assertCallSitesAlive();
-
-  // `type` and `class="manager-icon-button"` are the primitive's to emit, and `aria-label`
-  // is the pre-rename spelling. All three would still WORK from a call site — `type` and
-  // `aria-label` ride the rest spread, which lands last and therefore wins — which is exactly
-  // why they need a gate: a site that kept the old spelling would bypass the required-prop
-  // contract above while rendering identically.
-  const offenders = [];
-  for (const [file, tag] of CALL_SITE_TAGS) {
-    const restated = [
-      /\btype=/.test(tag) ? 'type' : '',
-      /\baria-label=/.test(tag) ? 'aria-label' : '',
-      tag.includes(CONTRACT_CLASS) ? CONTRACT_CLASS : '',
-    ].filter(Boolean);
-    if (restated.length) offenders.push(`${file}: restates ${restated.join(', ')}`);
-  }
-
-  assert.deepEqual(
-    offenders,
-    [],
-    'the primitive emits `type="button"` and `manager-icon-button` itself, and takes the ' +
-      'accessible name as `ariaLabel`. Restating any of them from a call site re-opens the ' +
-      'convention this component exists to close:\n  ' + offenders.join('\n  ')
-  );
-});
-
-test('no call site passes a BARE data-* attribute', () => {
-  assertCallSitesAlive();
-
-  // THE trap of this conversion, and it is silent in both directions that matter. On an
-  // ELEMENT, `<button data-x>` renders `data-x=""`. On a COMPONENT, a bare attribute is the
-  // boolean `true`, so the rest spread stamps `data-x="true"`. Presence selectors —
-  // `[data-x]`, which is what every suite and every smoke step uses — resolve either way, so
-  // the DOM changes and nothing reports it. 17 attributes were written bare before this
-  // conversion and every one of them is spelled `data-x=""` for this reason.
-  const offenders = [];
-  for (const [file, tag] of CALL_SITE_TAGS) {
-    for (const match of tag.matchAll(/\s(data-[\w-]+)(?=[\s/>])/g)) {
-      offenders.push(`${file}: ${match[1]}`);
-    }
-  }
-
-  assert.deepEqual(
-    offenders,
-    [],
-    'a bare `data-*` on a COMPONENT tag is the boolean `true`, not the empty string it is on ' +
-      'an element, so the rest spread renders `="true"` where the hand-rolled button rendered ' +
-      '`=""`. Spell it `data-x=""`:\n  ' + offenders.join('\n  ')
   );
 });
