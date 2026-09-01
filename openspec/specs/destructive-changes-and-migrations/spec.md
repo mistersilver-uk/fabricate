@@ -880,7 +880,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
 
 **The identity divergence this migration accepts is REPAIRED BY THE READ UNION, not by a second pass.**
 The world entity and the in-system record are equal at migration time by construction, and they diverge on the first post-migration identity edit, because every shipped identity writer writes the in-system copy.
-While `## CraftingSystem` requirement 36 holds, the read union re-derives world identity FROM the in-system record at READ TIME, so the divergence is resolved on every read by the same mechanism that answers it — never by a boot-time rewrite of the three settings, which could not hold anyway: the component metadata refresh bound to the item-update hook rewrites `name`, `img` and `description` in place at any point in a session.
+While `## CraftingSystem` requirement 36 holds, the read union re-derives world IDENTITY FROM the in-system record at READ TIME — a clause issue 1372 kept verbatim when it retired the blanket key rule beside it — so the divergence is resolved on every read by the same mechanism that answers it — never by a boot-time rewrite of the three settings, which could not hold anyway: the component metadata refresh bound to the item-update hook rewrites `name`, `img` and `description` in place at any point in a session.
 The divergence is also REPORTED once per session to the active GM, as a disclosure; nothing is written by that report.
 
 1. **GROUPING: components and tools by TRANSITIVE CLOSURE over source-reference sets; essences by trimmed `id`.**
@@ -931,9 +931,10 @@ The divergence is also REPORTED once per session to the active GM, as a disclosu
    **Why an empty override is inexpressible differs between `category` and the two tool sections, and both reasons are stated because only one of them generalizes.**
    For `category` it is the shape rule: `coerceComponentSection` coerces `''` to ABSENCE, so an empty category cannot be stored at all.
    For `breakage` and `onBreak` it is a NAME COLLISION with the surviving in-system record rather than a normalizer quirk - both are spelled identically at world scope and on the shipped `Tool`, so an override of `{}` would ERASE a live in-system block instead of meaning "no breakage".
-   **That erasure is DORMANT while `## CraftingSystem` requirement 36 holds and RE-ARMS when it retires, so the decline is kept rather than relaxed.**
-   The read union no longer spreads the resolved sections LAST: for the duration of requirement 36 it re-applies the whole in-system record over them (`## Scoped Entity Definitions` requirement 15), so a `{}` override cannot reach a live in-system block today.
-   Requirement 36 keeps those in-system records authoritative, so that block is still where a GM's post-migration edits land, which is what would make the erasure durable rather than cosmetic the moment the record stops deciding its own keys.
+   **That erasure is LIVE as of issue 1372 for an INHERITING member and DORMANT for an OVERRIDING one, so the decline is kept rather than relaxed.**
+   `## Scoped Entity Definitions` requirement 15's clause 1a answers an INHERITING section from the world default and applies it onto the shipped field name, so a `{}` override DOES reach a live in-system block for a system whose switch is on.
+   That is what makes this decline load-bearing rather than precautionary, and it is also what makes the 1372 transition safe: no world default is written for a section any member left unauthored, so a later inherit switch has nothing to fall back INTO.
+   An OVERRIDING section is still answered by the in-system record, so that block is still where a GM's post-migration edits land.
    `effectSource` and `macro` are exempt for exactly the converse reason: they are NEW section names that collide with nothing the in-system record carries, so `{}` and `null` are storable overrides, both are written UNCONDITIONALLY onto every membership record, and no member is ever left falling back.
    `repairRequirements` is exempt because it is not a resolver section at all - `### Tool scope` requirement 2 answers it from the membership record alone and never reads the world defaults.
    (a) `category` is NEVER the reserved `general` (`### Component scope` requirement 2), because an absence-preserving world category that mints it resets every inheriting system on the first resolve.

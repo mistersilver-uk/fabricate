@@ -100,6 +100,8 @@
  *    own system.
  */
 
+import { ESSENCE_EFFECT_SOURCE_FIELDS } from './worldScopeEntityGrouping.js';
+
 /** The world-default section each entity type may take, in the order they are elected. */
 export const WORLD_DEFAULT_SECTIONS = Object.freeze({
   components: Object.freeze(['category']),
@@ -300,7 +302,7 @@ function electSection({
       return { value: macro ?? undefined, refused: false };
     }
     const effectSource = {};
-    for (const field of ['sourceComponentId', 'sourceItemUuid', 'associatedSystemItemId']) {
+    for (const field of ESSENCE_EFFECT_SOURCE_FIELDS) {
       if (donorRecord[field] !== undefined && donorRecord[field] !== null) {
         effectSource[field] = donorRecord[field];
       }

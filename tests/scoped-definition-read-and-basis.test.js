@@ -435,21 +435,45 @@ describe('the READ union and the BASIS union', () => {
     const { manager, system } = pairFixture();
     const member = manager.resolveScopedComponents(system).find((e) => e.id === 'w-member');
     assert.equal(member.category, 'ore', 'the world DEFAULT, resolved through the inherit map');
+    assert.equal(member.name, 'Legacy Member', 'while identity still comes from the in-system row');
     assert.equal(member.member, true);
     assert.deepEqual(member.inherited, { category: true });
     assert.equal('enabled' in member, false, 'a component carries no enabled flag at all');
   });
 
-  it('lets the IN-SYSTEM record win an id collision while requirement 36 holds', () => {
-    // INVERTED at issue 1370. `1363` had the world entity win `name` and the resolved section win
-    // `category`, which reverts the GM's own edit: every shipped identity writer writes the
+  it('lets the IN-SYSTEM record win an id collision on IDENTITY', () => {
+    // INVERTED at issue 1370, and issue 1372 kept the identity half verbatim. `1363` had the world
+    // entity win `name`, which reverts the GM's own edit: every shipped identity writer writes the
     // in-system copy and nothing writes the world entity.
     const { manager, system } = pairFixture();
     const shared = manager.resolveScopedComponents(system).filter((e) => e.id === 'shared');
     assert.equal(shared.length, 1, 'one entry, not two');
     assert.equal(shared[0].name, 'Legacy Shared');
-    assert.equal(shared[0].category, 'general');
     assert.equal(shared[0].member, true, 'and the membership facts the record cannot carry remain');
+  });
+
+  it('and lets the WORLD DEFAULT win a SECTION the membership record inherits', () => {
+    // THE OTHER HALF, and the one issue 1372 moved. `shared` carries `category: 'general'` in the
+    // system and `category: 'ingot'` at world scope, and its membership record's `inherit` map is
+    // EMPTY, which reads as inheriting. Before 1372 the row answered `general` while reporting
+    // `inherited: {category: true}` in the same object - which is the contradiction the world-scope
+    // screens rendered as an `Inherits world defaults` pill over a value that never followed it.
+    const { manager, system } = pairFixture();
+    const shared = manager.resolveScopedComponents(system).find((e) => e.id === 'shared');
+    assert.equal(shared.category, 'ingot');
+    assert.deepEqual(shared.inherited, { category: true }, 'and the row says so about itself');
+  });
+
+  it('while an OVERRIDING section keeps the in-system value', () => {
+    // The compatibility half, on the same fixture: `buildMembershipRecord` writes exactly this
+    // switch for every pair the `1.30.0` migration creates, so this is the state every migrated
+    // world is in and the reason no existing world moves.
+    const { manager, store, system } = pairFixture();
+    const payload = store.get();
+    payload.membership['shared|sys-a'].inherit = { category: false };
+    store.save(payload);
+    const shared = manager.resolveScopedComponents(system).find((e) => e.id === 'shared');
+    assert.equal(shared.category, 'general');
   });
 
   it('does not RESURRECT a world entity the in-system array no longer carries', () => {

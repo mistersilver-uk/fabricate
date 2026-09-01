@@ -5,6 +5,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
   import {
     breakModeSourcePill,
@@ -426,19 +427,15 @@
     </InspectorCard>
 
     <section class="manager-tools-library-card" data-manager-tools-search>
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          value={searchTerm}
-          oninput={(event) => {
-            searchTerm = event.currentTarget.value;
-            pageIndex = 0;
-          }}
-          placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
-          aria-label={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
-        />
-      </label>
+      <ManagerSearchField
+        value={searchTerm}
+        onInput={(next) => {
+          searchTerm = next;
+          pageIndex = 0;
+        }}
+        placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
+        ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
+      />
       <div
         class="manager-tools-membership-filter"
         role="radiogroup"

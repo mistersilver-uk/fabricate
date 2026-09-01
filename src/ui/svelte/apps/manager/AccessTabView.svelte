@@ -24,6 +24,8 @@
   import Pagination from '../../components/Pagination.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     recipes = [],
@@ -115,21 +117,14 @@
     </div>
   </section>
 
-  <section
-    class="manager-toolbar"
-    aria-label={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}
-  >
-    <label class="manager-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        value={recipeSearchTerm || ''}
-        oninput={(event) => onSearchChange(event.currentTarget.value)}
-        placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
-        data-access-search
-      />
-    </label>
+  <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}>
+    <ManagerSearchField
+      value={recipeSearchTerm || ''}
+      onInput={(next) => onSearchChange(next)}
+      placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
+      ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
+      inputAttrs={{ 'data-access-search': '' }}
+    />
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
       <select
@@ -183,7 +178,7 @@
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </ManagerButton>
     {/if}
-  </section>
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll manager-access-scroll"

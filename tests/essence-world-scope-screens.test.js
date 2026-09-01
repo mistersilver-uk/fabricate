@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { declaredPropNames } from './helpers/sveltePropsDeclaration.js';
 import {
   ESSENCE_SYSTEM_STATES,
+  essenceEffectSourceReferent,
   essenceInheritCounts,
   essenceInheritLine,
   essenceSectionNote,
@@ -792,6 +793,111 @@ describe('criterion 12 — every added validation check actually RENDERS', () =>
 });
 
 // ── (5) THE PRESENTATION LEAF ─────────────────────────────────────────────────────────────────
+
+describe('the effectSource SECTION is a block, and every screen that names it reads one', () => {
+  // ── THE DEFECT THIS PINS ────────────────────────────────────────────────────────────────
+  // `effectSource` is the only section stored as a BLOCK over three shipped field names, and
+  // `essenceSectionValueName` reads a section value as a string or as `{id, name}`. Handed the
+  // block it found neither and answered `''`, so THREE screens reported an authored world default
+  // as unset at once: the catalogue card read `No default effect source`, the entry editor's card
+  // wore its `No default` pill over a `Drop the item…` prompt, and the system rules editor's
+  // inherit note read `The world default is unset, so this section resolves to nothing` directly
+  // above a locked tile naming a value.
+  //
+  // All three were unreachable until issue 1372 made an inheriting section resolve to its world
+  // default AND seeded one in the lab world, which is why every one of them shipped: the
+  // migration writes every membership record fully overriding, so no locked card could be drawn
+  // and no world-default card had a reason to be read.
+  //
+  // THE THREE SCREEN-LEVEL READS are asserted as SOURCE TEXT below, because each is a one-line
+  // call inside a `.svelte` and a mounted test that rendered them would need the world corpus,
+  // the projection and the shell — three seams away from the one-line fact.
+
+  it('answers the referent a block names, preferring the component id', () => {
+    assert.equal(
+      essenceEffectSourceReferent({
+        sourceComponentId: 'sm-ruby',
+        sourceItemUuid: 'Item.ruby',
+        associatedSystemItemId: 'sm-ruby',
+      }),
+      'sm-ruby',
+      'the component id is the referent a GM picked; the uuid is derived from it'
+    );
+    assert.equal(
+      essenceEffectSourceReferent({ sourceItemUuid: 'Item.ruby' }),
+      'Item.ruby',
+      'and a uuid-only block still names something'
+    );
+    assert.equal(
+      essenceEffectSourceReferent({ associatedSystemItemId: 'sm-ruby' }),
+      'sm-ruby',
+      'the derived id is last, but it is not nothing'
+    );
+  });
+
+  it('answers `` for the states that really are unset', () => {
+    // An AUTHORED EMPTY BLOCK is what `buildMembershipRecord` writes for a system with no source,
+    // and `null`-valued fields are what `_sourceFieldsForEssenceSelection` writes when a GM
+    // unlinks one. Both mean "no source", and both must read as unset rather than as a referent.
+    assert.equal(essenceEffectSourceReferent({}), '');
+    assert.equal(
+      essenceEffectSourceReferent({
+        sourceComponentId: null,
+        sourceItemUuid: null,
+        associatedSystemItemId: null,
+      }),
+      ''
+    );
+    assert.equal(essenceEffectSourceReferent({ sourceComponentId: '   ' }), '');
+    assert.equal(essenceEffectSourceReferent(null), '');
+    assert.equal(essenceEffectSourceReferent(undefined), '');
+    assert.equal(essenceEffectSourceReferent([]), '');
+  });
+
+  it('tolerates a bare string, because a hand-authored or imported value may be one', () => {
+    assert.equal(essenceEffectSourceReferent('Item.ruby'), 'Item.ruby');
+  });
+
+  it('is what all THREE world-default readers call for this section', () => {
+    // A MIRROR GUARD. Each of these is a single call in a `.svelte`, and the failure it catches is
+    // a fourth reader added later that goes back to reading the block as a scalar — which is
+    // silent, because the screen then reports an authored default as unset and nothing reds.
+    const readers = [
+      'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
+      'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
+      'src/ui/svelte/apps/manager/EssenceEditView.svelte',
+    ];
+    for (const reader of readers) {
+      const source = readFileSync(resolve(repoRoot, reader), 'utf8');
+      assert.match(
+        source,
+        /essenceEffectSourceReferent\(/,
+        `${reader} must read the effectSource block through the shared referent reader`
+      );
+      // NON-VACUITY: it also has to be reached for the effectSource section specifically, not
+      // merely imported.
+      assert.match(source, /essenceEffectSourceReferent\([^)]*effectSource/);
+    }
+  });
+
+  it('and the locked cards render the WORLD layer rather than the draft', () => {
+    // The `World default` pill sat over the two fields the UNLOCKED card edits — the draft's own
+    // source and macro — so a locked card labelled this system's own value as the world's. Equal
+    // by construction on a migrated world, and wrong the moment either side moved.
+    const tab = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte'),
+      'utf8'
+    );
+    assert.match(tab, /worldDefaults = \{\}/, 'the tab takes the world layer as a prop');
+    assert.match(tab, /lockedSourceName \|\|/, 'and the locked source card renders it');
+    assert.match(tab, /lockedMacroName \|\|\s*lockedMacroUuid/, 'as does the locked macro card');
+    const editor = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte'),
+      'utf8'
+    );
+    assert.match(editor, /worldDefaults=\{worldDefaultCards\}/, 'and the editor supplies it');
+  });
+});
 
 describe('the essence world-scope presentation leaf', () => {
   const format = (key, fallback, data) =>

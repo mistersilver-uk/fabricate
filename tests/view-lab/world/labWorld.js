@@ -143,6 +143,42 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
           },
         ]
   );
+  // ── ONE INHERITING SECTION, seeded so the state can be PHOTOGRAPHED (issue 1372) ───────────
+  //
+  // The lab runs every migration, and `buildMembershipRecord` writes every section OVERRIDING for
+  // every `(entity, system)` pair it creates. So with no seed here every essence in every lab
+  // system is fully overridden, and NO View Lab case can render an inheriting inherit row or a
+  // `· world default` on-craft card — the two states the whole world-scope model exists to
+  // express. Both were unit-covered and neither was in the registry, which is the shape that lets
+  // a regression ship green.
+  //
+  // The seed is the MEMBERSHIP RECORD ALONE. The migration's lift half is gated PER PAIR
+  // (`if (payload.membership[key]) continue;`), so this record survives it, while its defaults
+  // half is gated per ENTITY and therefore still ELECTS `aether`'s world defaults from the donor
+  // system exactly as it would have. Seeding a world default here as well would take that election
+  // out of the frame and put a hand-written value in its place.
+  //
+  // `aether` in `lab-smithing` is the pair, because it is the one the three essence-editor cases
+  // open, and `effectSource` is the section, because `manager-essence-edit-on-craft` documents the
+  // MACRO card's missing state and scrolling to it is how that frame stays distinct from the
+  // first-state frame. Leaving `macro` overridden keeps both of those true, so exactly one row on
+  // one screen changes and it is a row a case already photographs.
+  //
+  // `enabled: false` matches what the migration would have written for this record (`aether` is a
+  // disabled essence), so the catalogue's three-state per-system cell reads `disabled` here as it
+  // did before rather than flipping to `enabled`.
+  put('essenceScope', {
+    entities: [],
+    defaults: {},
+    membership: {
+      [`aether|${LAB_SYSTEM_IDS.SMITHING}`]: {
+        entityId: 'aether',
+        systemId: LAB_SYSTEM_IDS.SMITHING,
+        inherit: { effectSource: true, macro: false },
+        enabled: false,
+      },
+    },
+  });
   // Selection preferences, so the player app opens on a populated actor and system rather than on
   // an empty-state prompt that says nothing about the UI.
   put('lastCraftingActor', characterActors[0].id);

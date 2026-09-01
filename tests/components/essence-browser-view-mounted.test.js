@@ -70,6 +70,8 @@ const harness = createMountedComponentHarness({
     // filtered empty state's Clear filters both render it. Omitting it HANGS this suite.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/ManagerToolbar.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/EssenceBrowserView.svelte',
   ],

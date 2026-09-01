@@ -337,7 +337,18 @@ function makeEssenceScopeStore(entities) {
     payload,
     store: {
       get: () => JSON.parse(JSON.stringify(payload)),
-      corpus: () => payload,
+      // THE PUBLISHED CORPUS IS THE ARRAY SHAPE, and the persisted value is the MAP shape. The
+      // real store converts between them on `load()` and `save()`, and a fake that published the
+      // map made `projectWorldScopeEntity` see NO memberships at all - so every world-scope
+      // projection read `member: false` and `inherited` all-true, which reads exactly like a
+      // switch that will not move. It is also a NEW object per publish, because the resolved-union
+      // memo keys on the corpus object's identity.
+      corpus: () => ({
+        entities: [...payload.entities],
+        defaults: Object.values(payload.defaults),
+        membership: Object.values(payload.membership),
+      }),
+      isSeeded: () => payload.entities.length > 0,
       save: async (next) => {
         payload.entities = next.entities;
         payload.defaults = next.defaults;
@@ -382,6 +393,116 @@ test('1372: joining a world essence to a system writes the in-system record too'
     get(store.viewState).essenceCards.map((card) => card.id).sort(),
     ['aether', 'fire']
   );
+});
+
+// ---------------------------------------------------------------------------
+// `worldScope.essence.removeFromSystem` WRITES BOTH HALVES TOO (issue 1372)
+//
+// The reference's copy for Remove says it takes this system's rules: "Components here keep the
+// values, but nothing resolves on craft until the essence is added back." Deleting only the
+// membership record left the in-system row standing, so the essence went on resolving on every
+// craft and the second clause was false. The first clause holds for free — the valid-id basis is
+// the union of the world roster with the in-system array, so the id is still vouched for and the
+// quantities are not pruned. `tests/world-scope-essence-removal-quantities.test.js` proves that
+// against a REAL `CraftingSystemManager`, with the no-world-half negative control; this harness
+// does not normalize, so it can only pin the two writes.
+// ---------------------------------------------------------------------------
+
+test('1372: removing a world essence from a system deletes the in-system record too', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire' }), makeEssence({ id: 'ice', name: 'Ice' })],
+  });
+  const scope = makeEssenceScopeStore([
+    { id: 'fire', name: 'Fire' },
+    { id: 'ice', name: 'Ice' },
+  ]);
+  scope.payload.membership = {
+    'fire|sys1': { entityId: 'fire', systemId: 'sys1', inherit: {}, enabled: true },
+    'ice|sys1': { entityId: 'ice', systemId: 'sys1', inherit: {}, enabled: true },
+  };
+  harness.services.getEssenceScopeStore = () => scope.store;
+  const store = await openStore(harness);
+
+  assert.equal(await store.worldScope.essence.removeFromSystem('fire', 'sys1'), true);
+
+  assert.deepEqual(Object.keys(scope.payload.membership), ['ice|sys1'], 'the WORLD half');
+  assert.deepEqual(
+    harness.system.essenceDefinitions.map((def) => def.id),
+    ['ice'],
+    'and the IN-SYSTEM half, which is the one that decides whether it resolves on craft'
+  );
+  assert.deepEqual(
+    cardsOf(store).map((card) => card.id),
+    ['ice'],
+    'and the library the GM is looking at re-flows'
+  );
+});
+
+test('1372: removing an essence a system does not hold writes nothing', async () => {
+  const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire', name: 'Fire' })] });
+  const scope = makeEssenceScopeStore([{ id: 'aether', name: 'Aether' }]);
+  harness.services.getEssenceScopeStore = () => scope.store;
+  const store = await openStore(harness);
+  harness.writes.length = 0;
+
+  assert.equal(await store.worldScope.essence.removeFromSystem('aether', 'sys1'), false);
+  assert.deepEqual(harness.writes, [], 'no membership record and no in-system row: nothing to do');
+});
+
+// ---------------------------------------------------------------------------
+// EVERY world-scope write REPUBLISHES (issue 1372)
+//
+// `buildWorldScopeState()` is read ONCE PER PUBLISH, so an action that persisted through its own
+// store and did not refresh left the screen rendering the state before the click. Measured in the
+// View Lab: clicking the inherit switch changed nothing visible, while the enable switch beside
+// it — which reads local draft state — flipped immediately. Only `addToSystem` looked right, and
+// only because its essence composition happened to call `refresh()` for its own second half.
+//
+// PINNED ON A GENERIC VERB, deliberately. `setSectionInherited` is one of the family
+// `createWorldScopeActions` mints per entity type, so it is the shape a verb added later will
+// have; asserting on the two composed essence verbs would leave the wrapper untested exactly
+// where it is doing the work.
+// ---------------------------------------------------------------------------
+
+test('1372: flipping an inherit switch re-flows the published world-scope projection', async () => {
+  const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire', name: 'Fire' })] });
+  const scope = makeEssenceScopeStore([{ id: 'fire', name: 'Fire' }]);
+  scope.payload.membership = {
+    'fire|sys1': { entityId: 'fire', systemId: 'sys1', inherit: { macro: false }, enabled: true },
+  };
+  harness.services.getEssenceScopeStore = () => scope.store;
+  const store = await openStore(harness);
+
+  const inheritedBefore = get(store.viewState).worldScope.essence.entries[0].systems[0].inherited;
+  assert.equal(inheritedBefore.macro, false, 'NEGATIVE CONTROL: the switch starts OVERRIDING');
+
+  assert.equal(
+    await store.worldScope.essence.setSectionInherited('fire', 'sys1', 'macro', true),
+    true
+  );
+
+  assert.equal(
+    get(store.viewState).worldScope.essence.entries[0].systems[0].inherited.macro,
+    true,
+    'the PUBLISHED projection moved, not just the setting underneath it'
+  );
+});
+
+test('1372: a world-scope write that is REFUSED does not republish', async () => {
+  // Gated on the return value every action already answers honestly: `false` means the write was
+  // abandoned, so a refresh would be a whole re-projection for nothing.
+  const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire', name: 'Fire' })] });
+  const scope = makeEssenceScopeStore([{ id: 'fire', name: 'Fire' }]);
+  harness.services.getEssenceScopeStore = () => scope.store;
+  const store = await openStore(harness);
+  const before = get(store.viewState);
+
+  // No membership record for this pair, so `setSectionInherited` abandons the write.
+  assert.equal(
+    await store.worldScope.essence.setSectionInherited('fire', 'sys1', 'macro', true),
+    false
+  );
+  assert.equal(get(store.viewState), before, 'the same published object: nothing was re-projected');
 });
 
 test('1372: re-joining an essence the system already holds writes no in-system record', async () => {

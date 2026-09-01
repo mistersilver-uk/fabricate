@@ -21,6 +21,7 @@ const harness = createMountedComponentHarness({
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',

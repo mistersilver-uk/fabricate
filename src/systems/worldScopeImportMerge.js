@@ -89,6 +89,7 @@ import {
   sectionIsAuthoredBy,
   WORLD_DEFAULT_SECTIONS,
 } from '../migration/worldScopeDefaults.js';
+import { ESSENCE_EFFECT_SOURCE_FIELDS } from '../migration/worldScopeEntityGrouping.js';
 
 import { membershipKey } from './scopedDefinitions.js';
 import { subKeyEntries } from './scopedDefinitionStore.js';
@@ -216,9 +217,7 @@ function sectionPasses({
     if (section === 'macro') return { ok: true };
     const effectSource = isPlainObject(value) ? value : {};
     const offending = firstUnaddressable(
-      ['sourceComponentId', 'sourceItemUuid', 'associatedSystemItemId'].map(
-        (field) => effectSource[field]
-      ),
+      ESSENCE_EFFECT_SOURCE_FIELDS.map((field) => effectSource[field]),
       worldComponentIds
     );
     return offending ? { ok: false, referenceValue: offending } : { ok: true };

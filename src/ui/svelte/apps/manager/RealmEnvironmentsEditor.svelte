@@ -11,6 +11,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
 
   let {
     realm = null,
@@ -87,21 +88,17 @@
           'Available environments'
         )}
       </h4>
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          bind:value={availableSearch}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
-            'Search environments...'
-          )}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel',
-            'Search environments'
-          )}
-        />
-      </label>
+      <ManagerSearchField
+        bind:value={availableSearch}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
+          'Search environments...'
+        )}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel',
+          'Search environments'
+        )}
+      />
       {#if filteredAvailable.length === 0}
         <p class="manager-muted">
           {availableEnvironments.length === 0
@@ -165,21 +162,17 @@
           'Included environments'
         )}
       </h4>
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          bind:value={includedSearch}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
-            'Search environments...'
-          )}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel',
-            'Search environments'
-          )}
-        />
-      </label>
+      <ManagerSearchField
+        bind:value={includedSearch}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
+          'Search environments...'
+        )}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel',
+          'Search environments'
+        )}
+      />
       {#if filteredIncluded.length === 0}
         <p class="manager-muted">
           {includedEnvironments.length === 0

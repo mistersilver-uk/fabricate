@@ -68,6 +68,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
     EDITOR_PATH,
   ],
   componentPath: EDITOR_PATH,

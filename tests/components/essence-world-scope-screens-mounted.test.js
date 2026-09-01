@@ -68,6 +68,8 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
+  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/ManagerToolbar.svelte',
   // THE manager's on/off switch (issue 1040). Not mounted directly by anything here: it arrives
   // through `MembershipActions`, which converted to it, so it is a TRANSITIVE dependency of the
   // shell rather than a new control on these screens. Listed before `MembershipActions.svelte`

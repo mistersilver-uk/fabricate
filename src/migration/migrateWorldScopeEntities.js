@@ -74,6 +74,7 @@ import { electWorldDefault } from './worldScopeDefaults.js';
 import {
   buildWorldScopeGrouping,
   ENTITY_TYPE_FIELDS,
+  ESSENCE_EFFECT_SOURCE_FIELDS,
   isRefusedPair,
   REKEYABLE_ENTITY_TYPES,
   WORLD_IDENTITY_FIELDS,
@@ -284,7 +285,7 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
     // are real, overriding values that every reader treats as "no source" and "no macro" — so
     // neither needs the world default to be declined the way `category` does.
     const effectSource = {};
-    for (const field of ['sourceComponentId', 'sourceItemUuid', 'associatedSystemItemId']) {
+    for (const field of ESSENCE_EFFECT_SOURCE_FIELDS) {
       if (record[field] !== undefined) effectSource[field] = record[field];
     }
     membership.effectSource = effectSource;

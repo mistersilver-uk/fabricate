@@ -536,12 +536,28 @@ test('the world-scope write path is supplied FOUR store legs', () => {
     ['component', 'essence', 'tool', 'vocabulary'],
     'the write path reads the same four store legs the read path does'
   );
-  // ONE verb is overridden, and only on the essence family: a spread of the generic families with
-  // an essence override. A composition that replaced the whole family, or that reached another
-  // entity type, would be a second write path rather than one seam on one verb.
+  // TWO verbs are overridden, and only on the essence family: a spread of the generic families
+  // with an essence override. A composition that replaced the whole family, or that reached
+  // another entity type, would be a second write path rather than two seams on two verbs.
+  //
+  // The pair is `addToSystem` and `removeFromSystem` (issue 1372), because BOTH have a second
+  // half in a store `worldScopeActions.js` cannot reach: joining writes the in-system
+  // `essenceDefinitions` row and removing deletes it, and a membership-only verb on either side
+  // leaves the screen and the runtime disagreeing about whether the system has the essence.
   assert.match(
     adminStore,
-    /const worldScope = \{\s*\.\.\.worldScopeFamilies,\s*essence: \{ \.\.\.worldScopeFamilies\.essence, addToSystem: joinEssenceToSystem \},\s*\};/,
-    'the published write path is the generic families with ONE essence verb composed over them'
+    /essence: \{\s*\.\.\.worldScopeFamilies\.essence,\s*addToSystem: joinEssenceToSystem,\s*removeFromSystem: partEssenceFromSystem,\s*\},/,
+    'the published write path composes the two essence verbs that have an in-system half'
+  );
+  // AND EVERY FAMILY IS WRAPPED so a write that lands re-publishes (issue 1372).
+  // `buildWorldScopeState()` is read once per publish, so before the wrapper a generic verb
+  // persisted through its own store and left the screen rendering the state before the click.
+  // Pinned as SOURCE TEXT beside the legs because the failure is a silent no-op on a verb that
+  // does not exist yet: a family minted later in `worldScopeActions.js` inherits the wrapper only
+  // if the composition keeps mapping over ALL of them.
+  assert.match(
+    adminStore,
+    /const worldScope = Object\.fromEntries\(\s*Object\.entries\(\{[\s\S]*?\}\)\.map\(\(\[entityType, family\]\) => \[entityType, _republishingFamily\(family\)\]\)\s*\);/,
+    'every world-scope family is published through the republishing wrapper'
   );
 });

@@ -46,6 +46,7 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     recipeItems = [],
@@ -276,9 +277,8 @@
     </span>
   </section>
 
-  <section
-    class="manager-toolbar"
-    aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}
+  <ManagerToolbar
+    ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}
   >
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
@@ -363,7 +363,7 @@
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </ManagerButton>
     {/if}
-  </section>
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll manager-books-scrolls-scroll"

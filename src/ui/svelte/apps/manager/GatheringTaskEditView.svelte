@@ -16,6 +16,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
 
   let {
     task = null,
@@ -272,8 +273,10 @@
     );
   }
 
-  function onToolSearchInput(event) {
-    toolSearchTerm = event.currentTarget.value;
+  // Takes the VALUE rather than the event: `<ManagerSearchField>` hands its `onInput` the new
+  // string, having already updated its own `value`.
+  function onToolSearchInput(next) {
+    toolSearchTerm = next;
     toolPageIndex = 0;
   }
 
@@ -290,8 +293,9 @@
     componentPageIndex = 0;
   }
 
-  function onComponentSearchInput(event) {
-    componentSearchTerm = event.currentTarget.value;
+  // Takes the VALUE rather than the event, for the reason `onToolSearchInput` records.
+  function onComponentSearchInput(next) {
+    componentSearchTerm = next;
     componentPageIndex = 0;
   }
 
@@ -1610,22 +1614,20 @@
 
       {#if libraryToolList.length > 0}
         <div class="manager-task-required-tools-search">
-          <label class="manager-search is-compact" data-gathering-task-required-tools-search>
-            <i class="fas fa-search" aria-hidden="true"></i>
-            <input
-              type="search"
-              value={toolSearchTerm}
-              oninput={onToolSearchInput}
-              placeholder={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.SearchTools',
-                'Search tools...'
-              )}
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.SearchToolsByName',
-                'Search tools by name'
-              )}
-            />
-          </label>
+          <ManagerSearchField
+            compact
+            value={toolSearchTerm}
+            onInput={onToolSearchInput}
+            placeholder={text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.SearchTools',
+              'Search tools...'
+            )}
+            ariaLabel={text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.SearchToolsByName',
+              'Search tools by name'
+            )}
+            data-gathering-task-required-tools-search=""
+          />
         </div>
       {/if}
 
@@ -1728,22 +1730,20 @@
           </p>
         </div>
         <div class="manager-task-component-browser-controls">
-          <label class="manager-search is-compact" data-gathering-component-name-search>
-            <i class="fas fa-search" aria-hidden="true"></i>
-            <input
-              type="search"
-              value={componentSearchTerm}
-              oninput={onComponentSearchInput}
-              placeholder={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsPlaceholder',
-                'Search components...'
-              )}
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsByName',
-                'Search component names'
-              )}
-            />
-          </label>
+          <ManagerSearchField
+            compact
+            value={componentSearchTerm}
+            onInput={onComponentSearchInput}
+            placeholder={text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsPlaceholder',
+              'Search components...'
+            )}
+            ariaLabel={text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsByName',
+              'Search component names'
+            )}
+            data-gathering-component-name-search=""
+          />
           <label
             class="manager-search is-compact manager-task-component-tag-search"
             data-gathering-component-tag-search
@@ -1921,21 +1921,18 @@
           </p>
         </div>
         <div class="manager-task-drop-controls">
-          <label class="manager-search is-compact">
-            <i class="fas fa-search" aria-hidden="true"></i>
-            <input
-              type="search"
-              bind:value={searchTerm}
-              placeholder={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.SearchDropsPlaceholder',
-                'Search drop rules...'
-              )}
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.SearchDrops',
-                'Search drop rules'
-              )}
-            />
-          </label>
+          <ManagerSearchField
+            compact
+            bind:value={searchTerm}
+            placeholder={text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.SearchDropsPlaceholder',
+              'Search drop rules...'
+            )}
+            ariaLabel={text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.SearchDrops',
+              'Search drop rules'
+            )}
+          />
           <!-- Primary (issue 1118, row 35): the section's CREATE action in toolbar chrome is
                the loud one, and the identical verb in this screen's own empty state — same
                `onAddDrop`, same label — was already `is-primary`. Two spellings of one verb

@@ -48,6 +48,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/ManagerToolbar.svelte',
     'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',

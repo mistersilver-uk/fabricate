@@ -161,6 +161,13 @@ const SHARED_PRIMITIVES = [
   // whose screen composes the rules-list shell adds it in that change.
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
+  // THE manager's filter bar and its search field (issue 1039). The pair reaches every browse
+  // screen in the manager — systems, recipes, components, essences, environments, gathering
+  // tasks and events, realms, books-and-scrolls, access and both world scoped-entity lists —
+  // and the field reaches four editors and two rosters on top of that, so between them they sit
+  // in more mounted trees than any entry above except `Chip`.
+  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/ManagerToolbar.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

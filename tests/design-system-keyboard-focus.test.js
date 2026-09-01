@@ -73,7 +73,20 @@ function svelteFiles(dir, found = []) {
 }
 
 /**
- * Visit every `RegularElement` in a parsed template.
+ * Visit every `RegularElement` AND every `Component` in a parsed template.
+ *
+ * COMPONENTS COUNT, and leaving them out is how this gate goes blind as the corpus converges
+ * (issue 1039). `<ManagerToolbar tabindex="-1" data-keyboard-focus="true">` forwards both through
+ * a rest spread onto the `<section>` the primitive writes, so the RENDERED element is exactly
+ * the unrecognised non-form focus target this file exists to police — but the AST node is a
+ * `Component`, so an element-only walk stops seeing it. Three of the manager's browser landmarks
+ * became component tags in one change; had the walk stayed element-only, all three would have
+ * silently left the compliance clause below AND taken the non-vacuity floor down with them,
+ * which reads as "the corpus converged" rather than as "the guard lost three sites".
+ *
+ * A component tag can only be a focus target through its own rest spread, so what is checked is
+ * the same pair of attributes in the same place: nothing here knows or needs to know which
+ * element the primitive renders.
  *
  * Recurses over EVERY own property rather than a hand-listed set of child keys, because an
  * element nested in an `{#if}`, an `{#each}`, a `{#snippet}` or a component's default slot hangs
@@ -92,9 +105,11 @@ function walkElements(node, visit, inForm = false, seen = new Set()) {
     return;
   }
   let descendantsAreInForm = inForm;
-  if (node.type === 'RegularElement') {
+  if (node.type === 'RegularElement' || node.type === 'Component') {
     visit(node, inForm);
-    if (node.name.toLowerCase() === 'form') descendantsAreInForm = true;
+    if (node.type === 'RegularElement' && node.name.toLowerCase() === 'form') {
+      descendantsAreInForm = true;
+    }
   }
   for (const key of Object.keys(node)) {
     if (key === 'parent') continue;

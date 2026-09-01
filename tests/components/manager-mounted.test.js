@@ -393,6 +393,11 @@ function compileManagerRoot() {
   // browser, every studio overview tab, the Checks rail, the scoped-entity rows and
   // `ToggleCard` — so omitting it HANGS every mounted manager test as `# cancelled`.
   writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');
+  // THE manager's filter bar and its search field (issue 1039). The root reaches the pair
+  // through every browse screen it routes to, and the field through four editors and two
+  // rosters besides.
+  writeCompiledSvelte('src/ui/svelte/components/ManagerToolbar.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

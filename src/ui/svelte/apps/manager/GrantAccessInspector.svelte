@@ -21,6 +21,7 @@
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import RosterRow from './RosterRow.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
 
   // Fixed roster page size (design: 6 per roster). A search box appears only when
   // the roster is longer than one page.
@@ -215,17 +216,14 @@
           <span>{section.title}</span>
         </div>
         {#if section.showSearch}
-          <label class="manager-search manager-access-roster-search">
-            <i class="fas fa-search" aria-hidden="true"></i>
-            <input
-              type="search"
-              value={section.query}
-              oninput={(event) => section.onSearch(event.currentTarget.value)}
-              placeholder={section.searchPlaceholder}
-              aria-label={section.searchPlaceholder}
-              data-access-roster-search={section.key}
-            />
-          </label>
+          <ManagerSearchField
+            class="manager-access-roster-search"
+            value={section.query}
+            onInput={(next) => section.onSearch(next)}
+            placeholder={section.searchPlaceholder}
+            ariaLabel={section.searchPlaceholder}
+            inputAttrs={{ 'data-access-roster-search': section.key }}
+          />
         {/if}
         {#if section.slice.filtered.length === 0}
           <p class="manager-access-roster-empty" data-access-roster-empty={section.key}>

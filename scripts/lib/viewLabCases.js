@@ -333,6 +333,65 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-modifiers',
     'manager-environment-edit-blind-weights',
   ]),
+  // The manager's FILTER BAR (issue 1039), extracted from 11 hand-written
+  // `class="manager-toolbar"` sections. Unlike the card shell below, one representative frame
+  // DOES contain it, and that was established from the static import closure rather than
+  // assumed either way: `ComponentsBrowserView` reaches `components/ManagerToolbar.svelte`, so
+  // `manager-components-normal` draws the bar in its BASE treatment; `FabricateAppRoot` does
+  // NOT reach it — measured over the whole transitive `.svelte` import graph, not by looking at
+  // the frame — so the player window cannot contain one at all. Both entries here are therefore
+  // additive states the base frame cannot hold, not a repair for a blind pair.
+  //
+  // `world-component-catalogue` is the ONLY published frame that renders
+  // `.manager-scoped-list-toolbar`, and it is the one bar in the corpus whose sizing is stated
+  // from a SCOPED rule in its own component rather than from `styles/fabricate.css`:
+  // `scoped/EntityListInspectorFrame.svelte` declares `flex: 0 0 auto` inside a
+  // `flex-direction: column` column. That rule died SILENTLY to this conversion — emitted with
+  // the hash attached, `lint:svelte:warnings` green, compiled `css.code` byte-identical — and
+  // is repaired as `:global(.manager-toolbar.manager-scoped-list-toolbar)` at unchanged
+  // specificity. If the repair is ever wrong the bar absorbs the column's slack instead of the
+  // row list, which is a whole-frame collapse and is visible in exactly this frame.
+  //
+  // `manager-environments-browse-normal` is the SCROLLING cap. `.manager-environments-toolbar`
+  // is `max-height: 100px; overflow-y: auto` (`fabricate.css:5684`) and
+  // `.manager-task-toolbar` is the same shape at 112px; the component browser's bar has no cap
+  // at all, so the representative frame cannot show either. This is the frame the environments
+  // bar is drawn in.
+  //
+  // The sheet's remaining branch, `.manager-toolbar:not(:has(.manager-toolbar-primary))`
+  // (`:5679`), is NOT listed and is not a gap: measured across `src/`, no component writes
+  // `.manager-toolbar-primary`, so every shipped bar takes that branch and the grid form at
+  // `:5671` is declared and never rendered. Naming a frame for it would be an override for a
+  // state the product cannot reach.
+  'src/ui/svelte/components/ManagerToolbar.svelte': Object.freeze([
+    'world-component-catalogue',
+    'manager-environments-browse-normal',
+  ]),
+  // The manager's SEARCH FIELD (issue 1039). Same closure argument as the bar above, with the
+  // same two answers: `ComponentsBrowserView` reaches `components/ManagerSearchField.svelte`
+  // and `FabricateAppRoot` does not, so the base 34px pill is in the representative frame and
+  // the player window holds none. The two entries are the treatments that frame cannot hold.
+  //
+  // `manager-gathering-task-editor-normal` is the COMPACT density — `is-compact`, the
+  // `min(220px, 30%)` 32px form at `fabricate.css:15183`, which three of the twenty converted
+  // sites take and all three live in that editor. Its drop-rules card renders one
+  // unconditionally, and the sheet gives that card's controls a second override on top
+  // (`:15196`), so the frame draws the density and its per-card refinement together.
+  //
+  // `manager-knowledge-owned-copies` is the one place the field is NOT the flexible member of
+  // a row: `.manager-knowledge-roster .manager-search` overrides the shared `flex: 1 1 260px`
+  // to `flex: 0 0 auto` (`fabricate.css:13986`), authored alongside the Access roster's
+  // identical rule. `KnowledgeView.svelte:159` renders the roster unconditionally, so this
+  // frame always contains it.
+  //
+  // Three `.manager-search` sites are NOT this primitive and are deliberately unphotographed
+  // here: the tag combobox in the gathering task editor and the manager root's two character
+  // modifier comboboxes, which are `SearchablePopover`'s surface and are recorded as
+  // adjudicated opt-outs in `tests/components/manager-filter-bar-source-contract.test.js`.
+  'src/ui/svelte/components/ManagerSearchField.svelte': Object.freeze([
+    'manager-gathering-task-editor-normal',
+    'manager-knowledge-owned-copies',
+  ]),
   // The manager's card shell (issue 1427), extracted from 80 hand-written
   // `class="manager-inspector-card"` sections. NEITHER representative frame contains one, and
   // that is established from the trees rather than assumed: `fabricate-app-shell` is the PLAYER

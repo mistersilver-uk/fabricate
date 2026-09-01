@@ -8,6 +8,8 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js';
   import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     systems = [],
@@ -124,22 +126,15 @@
     </div>
   </section>
 
-  <section
-    class="manager-toolbar"
-    aria-label={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}
-  >
-    <label class="manager-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        bind:value={searchTerm}
-        placeholder={text(
-          'FABRICATE.Admin.Manager.SearchPlaceholder',
-          'Search by name or description'
-        )}
-        aria-label={text('FABRICATE.Admin.Manager.SearchLabel', 'Search systems')}
-      />
-    </label>
+  <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}>
+    <ManagerSearchField
+      bind:value={searchTerm}
+      placeholder={text(
+        'FABRICATE.Admin.Manager.SearchPlaceholder',
+        'Search by name or description'
+      )}
+      ariaLabel={text('FABRICATE.Admin.Manager.SearchLabel', 'Search systems')}
+    />
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <select
@@ -169,7 +164,7 @@
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </ManagerButton>
     {/if}
-  </section>
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll"
