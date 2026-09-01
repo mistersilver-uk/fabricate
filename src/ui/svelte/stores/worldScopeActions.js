@@ -549,9 +549,9 @@ export function createWorldScopeEntityActions({ entityType, getStore }) {
      * Replace one tool's WORLD `repairRequirements` default.
      *
      * ITS OWN ACTION, because `repairRequirements` is deliberately NOT a tool section:
-     * `TOOL_SECTIONS` is `['breakage', 'onBreak']`, so `updateWorldDefaultSection` refuses the
-     * name and writes nothing. Without this action the world Tool entry would display a seed
-     * source nobody can author.
+     * `TOOL_SECTIONS` is `['breakage', 'onBreak', 'prerequisites', 'bonus']` and does not name
+     * it, so `updateWorldDefaultSection` refuses the name and writes nothing. Without this
+     * action the world Tool entry would display a seed source nobody can author.
      *
      * THE WRITE PATH AND THE READ PATH ARE DELIBERATELY ASYMMETRIC. The world holds this list;
      * the MEMBERSHIP RECORD answers it. `seedToolRepairRequirements` copies it once, when a

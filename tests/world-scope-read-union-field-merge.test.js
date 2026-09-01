@@ -211,6 +211,68 @@ describe('an unrecognised entityType is REFUSED, never defaulted', () => {
   });
 });
 
+describe('a DECLARED section with no writer is REFUSED, on the same rule', () => {
+  // THE SAME FAILURE ONE LEVEL DOWN, and unlike the entity-type typo above this one has already
+  // shipped. Issue 1373 added `prerequisites` and `bonus` to `TOOL_SECTIONS` while
+  // `INHERITED_SECTION_WRITERS.tools` still wrote `breakage` and `onBreak` alone. Nothing near
+  // the table went red: the two new sections kept answering from the in-system record whatever
+  // their switch said, which is precisely what an entity-type typo does, and only the suite that
+  // happens to drive every DECLARED section caught it.
+  //
+  // The section list and the writer table must stay equal and live in two modules, so this pins
+  // the check at the point the two MEET rather than in a suite a future lane may not run.
+  const corpus = collidingCorpus({ id: 't1' }, { entityId: 't1', systemId: 'sys-a', inherit: {} });
+
+  /** A resolver that declares one extra section, exactly as widening `TOOL_SECTIONS` would. */
+  const declaringAnExtraSection = (worldDefault, membership) => {
+    const resolved = resolveTool(worldDefault, membership);
+    return { ...resolved, inherited: { ...resolved.inherited, sharpeningKit: true } };
+  };
+
+  it('throws, naming the section and what its silence would have cost', () => {
+    assert.throws(
+      () =>
+        unionScopedDefinitions({
+          corpus,
+          systemId: 'sys-a',
+          systemDefinitions: [{ id: 't1' }],
+          resolve: declaringAnExtraSection,
+          entityType: 'tools',
+        }),
+      {
+        name: 'TypeError',
+        message:
+          'unionScopedDefinitions: entityType "tools" declares section(s) "sharpeningKit" that ' +
+          'INHERITED_SECTION_WRITERS does not write; an inheriting system would silently answer ' +
+          'them from the in-system record',
+      }
+    );
+  });
+
+  it('accepts every section the three shipped scopes actually declare', () => {
+    // NON-VACUITY, and it is the arm that would have gone red on this branch before the two
+    // writers landed: `TOOL_SECTIONS` is four names now, and a table that writes two of them
+    // fails here rather than passing quietly.
+    for (const [entityType, resolve] of [
+      ['components', resolveComponent],
+      ['essences', resolveEssence],
+      ['tools', resolveTool],
+    ]) {
+      assert.doesNotThrow(
+        () =>
+          unionScopedDefinitions({
+            corpus,
+            systemId: 'sys-a',
+            systemDefinitions: [{ id: 't1' }],
+            resolve,
+            entityType,
+          }),
+        `every section ${entityType} declares must have a writer`
+      );
+    }
+  });
+});
+
 describe('the two spread hazards stay RETIRED for a row with no section to inherit', () => {
   it('an authored EMPTY-STRING world description no longer overwrites a populated legacy one', () => {
     // RETIRED. It was defended as "an authored empty string is an authored value", and that is
