@@ -119,7 +119,10 @@ const ACKNOWLEDGED_UNGATED_COUNT = 15;
  * reason `ACKNOWLEDGED_UNGATED_COUNT` is pinned exactly — a derived list would grow silently, and
  * growth here means a new unlinted shell script on the release path.
  */
-const SHELL_SCRIPTS = ['scripts/forward-port-content-gate.sh'];
+const SHELL_SCRIPTS = [
+  'scripts/forward-port-complete-merge.sh',
+  'scripts/forward-port-content-gate.sh',
+];
 
 /** Characters that make a `scripts/…` token something other than one literal path. */
 const NOT_A_LITERAL_PATH = /["'*?{]/;

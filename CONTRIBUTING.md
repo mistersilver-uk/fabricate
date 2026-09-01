@@ -1298,6 +1298,50 @@ From a promotion, that means dispatching `.github/workflows/forward-port.yml` ma
 `allow_content` is settable only on `forward-port.yml`'s own dispatch, and deliberately so: `promote-to-public.yml`'s inputs are `version` / `source_channel` / `dry_run` only, and it will not grow a content override.
 That is the same composition the `override_hint` inputs carry into the failure message, so the message and this manual never disagree.
 
+#### Recovering a conflicted forward-port
+
+`git merge --no-ff origin/release` can conflict, and until this existed the only recovery was a human resolving it by hand and pushing the merge to `main` — the one manual push `main`'s ruleset still has to allow.
+The workflow now completes the merge itself from a resolution you supply.
+
+**Is it a conflict, or a failure?**
+`scripts/forward-port-complete-merge.sh` runs only when the merge fails, and says which it was.
+A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` followed by one `::error::` line per path that could not be combined.
+Anything else prints `left no conflicting paths behind` and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.
+
+**Produce the resolution.**
+In a local clone, `git fetch origin main release`, `git checkout -B resolve origin/main`, `git merge --no-ff origin/release`, resolve the paths the job named, and `git commit`.
+Do **not** push it to `main`.
+Push the branch and **open a pull request against `main`** — this is required, not optional.
+Its tree is exactly what `main` will look like afterwards, so `main`'s own CI runs on the resolved result and the pull request shows the whole forward-port diff.
+It is also the only place a human sees the two things the gate cannot: a resolution that silently dropped what the release line was bringing back, and a duplication of content both lines already carry.
+Do not merge that pull request; it exists to be read.
+Then dispatch `.github/workflows/forward-port.yml` with `resolution_ref` set to the resolution's sha and `resolution_effect` set to its outcome.
+Both inputs are required together, and both are dispatch-only — no caller can supply them.
+
+**Choosing `resolution_effect`.**
+It states the outcome the completed forward-port must produce, and the gate then establishes it rather than believing it.
+Use `no-content-onto-main` when `main` already carries everything `release` has and the conflict is a squash collision — the completed merge must leave `main`'s content byte-identical.
+Use `content-onto-main` when the forward-port genuinely brings content back, as a hotfix bring-back does.
+The wrong one is refused with the difference printed, because a tree that differs from `main`'s falsifies the first claim and a tree identical to it falsifies the second.
+A value that is neither is refused too: an unrecognised statement is one nothing checks.
+
+**Rehearse it.**
+`workflow_dispatch` defaults to `dry_run: true`, and a dry run performs the merge, completes it from your resolution, and runs the entire content gate including every check of the resolution — stopping only before the push.
+It reports the exact commit it would push.
+So the first use of this path on a real conflict is itself a full rehearsal whose blast radius is a red job.
+
+**A moved `main` invalidates the resolution.**
+The resolution is pinned to the exact `origin/main` and `origin/release` it was produced against, and is refused rather than reapplied if either has moved.
+Without that pin, a run whose push was rejected would re-merge against the newer `main` and take the stale tree verbatim, silently deleting whatever `main` gained in the meantime.
+The remedy is always to recompute the resolution against the current `origin/main` and dispatch again.
+For the same reason a conflicted forward-port has no retry: the retry exists because `main` moved, which is exactly what invalidates the resolution.
+
+**A resolution is not an override.**
+`scripts/forward-port-content-gate.sh` still applies in full: the completed merge reaches the same provenance verification as any other, and `allow_content` overrides none of the resolution's own refusals — they live in the own-merge guard, upstream of it.
+What the checks do establish is that the resolution reached no further than the conflict, invented no line neither side contains, left no unresolved difference behind, and produced the outcome you declared.
+What they do not establish is that it kept everything `release` was bringing back, or that it did not duplicate content both sides already had — the latter only where the declaration is `no-content-onto-main`.
+That is what the pull request above is for.
+
 #### The `release` branch ruleset
 
 The gate above establishes that content reaching `main` was reviewed.

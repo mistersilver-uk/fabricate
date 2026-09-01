@@ -91,6 +91,19 @@ on:
         required: false
         type: string
         default: "re-run this dispatch with allow_content: true once the content has been reviewed."
+      resolution_ref:
+        # DISPATCH ONLY, and deliberately absent from workflow_call below. No automated caller has a
+        # resolution to supply, and a called workflow able to carry one would be a route for a tree
+        # to reach `main` from inside a promotion. A structural absence beats an asserted one.
+        description: "A commit in this repository whose tree completes a CONFLICTED forward-port. Its parents must be exactly the current origin/main and origin/release. This is NOT an override: the content gate applies to it in full, and every check of it is non-overridable."
+        required: false
+        type: string
+        default: ""
+      resolution_effect:
+        description: "Required with resolution_ref. The outcome the resolution is expected to produce, which is then established rather than believed: no-content-onto-main (main's content is unchanged, the squash-collision case) or content-onto-main (it carries content onto main, the hotfix bring-back case)."
+        required: false
+        type: string
+        default: ""
   workflow_call:
     inputs:
       enabled:
@@ -276,11 +289,24 @@ jobs:
         if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' }}
         env:
           REASON: ${{ inputs.reason }}
+          # Consulted ONLY by the completion script below, and only when the merge conflicts. The
+          # gate re-reads them itself at the next step, which is where every judgment about the
+          # resolution is made (githubactions:S7630 — env:, never interpolated into the body).
+          RESOLUTION_REF: ${{ inputs.resolution_ref }}
+          RESOLUTION_EFFECT: ${{ inputs.resolution_effect }}
         run: |
           # --no-ff, NEVER a squash: `release` carries semantic-release's tags and notes. The
           # `chore:` subject is load-bearing — the merge message must not be a RELEASING
           # Conventional Commit type, or landing it on main would itself mint a version.
-          git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"
+          #
+          # The merge stays INLINE and only its CONFLICT handling moves into a script: the source
+          # contract counts the implementations of this merge across the workflow directory, and
+          # moving it out would leave that count scanning an empty list. `if !` is exempt from the
+          # runner's `bash -e`, and the completion script makes no verdict — the content gate step
+          # below decides this run, including every check of the resolution.
+          if ! git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"; then
+            bash scripts/forward-port-complete-merge.sh || exit 1
+          fi
 
       # ── STEP 9 ────────────────────────────────────────────────────────────────────────────────
       - name: Content gate
@@ -293,6 +319,10 @@ jobs:
           # into a shell body (githubactions:S7630).
           ALLOW_CONTENT: ${{ inputs.allow_content }}
           OVERRIDE_HINT: ${{ inputs.override_hint }}
+          # A conflicted forward-port completed from a resolution is decided HERE. A resolution is
+          # not an override: its refusals live in the own-merge guard, upstream of ALLOW_CONTENT.
+          RESOLUTION_REF: ${{ inputs.resolution_ref }}
+          RESOLUTION_EFFECT: ${{ inputs.resolution_effect }}
           # The API read authenticates as the App installation, never as GITHUB_TOKEN: the job holds
           # only `contents: read`, and a called workflow can never exceed its caller's grant.
           GH_TOKEN: ${{ steps.apptoken.outputs.token }}
@@ -304,11 +334,25 @@ jobs:
       # ── STEP 10 ───────────────────────────────────────────────────────────────────────────────
       - name: Dry run — report and stop
         if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' && inputs.dry_run }}
+        env:
+          RESOLUTION_REF: ${{ inputs.resolution_ref }}
+          RESOLUTION_EFFECT: ${{ inputs.resolution_effect }}
         run: |
+          echo "----- the exact merge commit this forward-port would push to main -----"
+          git log -1 --format='%H%n  parents: %P%n  subject:  %s' HEAD
           echo "----- commits this forward-port would push to main -----"
           git log --oneline origin/main..HEAD
-          echo "----- file changes it would carry (expected: none) -----"
+          # NOT "expected: none". A forward-port carrying a hotfix bring-back legitimately changes
+          # main's content, and the content gate has already decided whether it may — so a banner
+          # promising none reads as a fault on exactly the runs where it is correct.
+          echo "----- file changes it would carry (none when the forward-port is redundant) -----"
           git diff --stat origin/main
+          if [ -n "${RESOLUTION_REF:-}" ]; then
+            echo "----- completed from a supplied conflict resolution -----"
+            echo "resolution_ref:    ${RESOLUTION_REF} -> $(git rev-parse --verify --quiet "${RESOLUTION_REF}^{commit}" || echo '(does not resolve in this clone)')"
+            echo "resolution_effect: ${RESOLUTION_EFFECT:-(empty)}"
+            echo "The dry run performed the merge, completed it from that resolution, and ran the whole content gate including every check of the resolution. Only the push was skipped."
+          fi
           echo "::notice::DRY RUN — nothing was pushed. origin/main is unchanged."
 
       # ── STEP 11 ───────────────────────────────────────────────────────────────────────────────
@@ -319,6 +363,8 @@ jobs:
           OVERRIDE_HINT: ${{ inputs.override_hint }}
           GH_TOKEN: ${{ steps.apptoken.outputs.token }}
           REASON: ${{ inputs.reason }}
+          RESOLUTION_REF: ${{ inputs.resolution_ref }}
+          RESOLUTION_EFFECT: ${{ inputs.resolution_effect }}
         run: |
           if git push origin HEAD:main; then
             echo "::notice::Forward-ported release into main and pushed it. This triggers beta.yml, which mints the next prerelease ABOVE the released version."
@@ -332,7 +378,14 @@ jobs:
           # nothing gated.
           git fetch origin main --force
           git checkout -B main origin/main
-          git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"
+          # A CONFLICT here has no retry that can pass, and the message says so rather than implying
+          # one: this retry runs because main moved, and a moved main is exactly what invalidates a
+          # resolution pinned to the main this run started from. Both reachable outcomes are red, and
+          # that is correct — the remedy is a new resolution, not another attempt at this one.
+          if ! git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"; then
+            echo "::error::this retry re-merged against a MOVED origin/main and conflicted. A conflicted forward-port has no retry: any resolution supplied for this run was pinned to the origin/main this run started from. Recompute the resolution against the current origin/main and dispatch the forward-port again."
+            bash scripts/forward-port-complete-merge.sh || exit 1
+          fi
           # The WHOLE gate is RE-RUN rather than assumed, through the same script the first pass
           # used — not a second, drifting copy of it, and not just the diff. "An advanced main can
           # only make an empty diff more true" holds when `theirs` equals the merge base, but an
