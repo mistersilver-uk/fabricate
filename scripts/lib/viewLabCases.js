@@ -1174,12 +1174,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     // case types into the name field and captures the same header with the edit standing: an
     // enabled, primary Save, and the identity card showing the buffered value.
     //
-    // `fill` rather than a click, because a dirty form is unreachable by clicking: the draft is
-    // seeded from the persisted record and only an `input` event moves it.
+    // `fill` rather than a click for the NAME, because a dirty form is unreachable by clicking:
+    // the draft is seeded from the persisted record and only an `input` event moves it.
+    //
+    // The COLOUR swatch is clicked as well, and that is what makes this frame evidence rather
+    // than decoration (maintainer parity round 6). Name, icon and colour are all buffered
+    // identity fields, and the chrome above the page — the breadcrumb's last crumb, the heading
+    // and the 44px medallion beside it — has to follow all of them. A case that moved only the
+    // name photographs a medallion that cannot be wrong, so the one control the round-6 fix is
+    // about would have been unphotographed in the frame published as its proof.
     steps: [
       { selector: '#manager-world-nav-essence-catalogue' },
       { selector: '[data-scoped-list-action="open-entry"]' },
       { selector: '[data-scoped-entry-name]', fill: 'Aetherlight' },
+      { selector: '[data-scoped-entry-colour] [data-manager-color-token="sage"]' },
     ],
     expectView: 'world-essence-entry',
     expectSelector: '[data-scoped-page="world-essence-entry"]',

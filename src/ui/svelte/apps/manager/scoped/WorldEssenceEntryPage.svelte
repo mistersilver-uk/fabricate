@@ -104,10 +104,16 @@
     //    own comment gives: the guard reads it at click time and a snapshot published by an
     //    effect can be one turn behind.
     //  - onDirtyChange(dirty): the reactive half, for the header button's disabled state.
-    //  - onDraftNameChange(name): the other reactive half, for the header's TITLE. The shell's
-    //    heading names the essence being edited, and what is being edited is the draft — the
-    //    same value the player preview beside it already renders. Withdrawn the way the dirty
-    //    flag is: the shell drops it when `onDraftChange(null)` says there is no editor.
+    //  - onDraftIdentityChange(identity|null): the other reactive half, for the shell chrome
+    //    that NAMES the essence — the breadcrumb's last crumb, the heading, and the medallion
+    //    beside it. All three showed the persisted record while the name field and the player
+    //    preview showed the buffered one, so one screen described one essence two ways.
+    //    The WHOLE buffered identity map goes over, not the name alone: the shell reads
+    //    whichever of those fields its chrome renders, and the three entry editors buffer
+    //    different field sets — so a fixed payload here would restate a shape `shape` owns.
+    //    WITHDRAWN BY THIS PAGE on unmount rather than by the shell's `onDraftChange(null)`,
+    //    because the shell's reader is generic across all three entry routes and must not need
+    //    a per-entity teardown to stay correct.
     //
     // There is deliberately NO `reseedNonce` prop, which is how `SystemEditView` spells discard:
     // the handle carries `discard()` directly, and a nonce the call site did not pass would fall
@@ -115,7 +121,7 @@
     // corpus — the hazard this file's header records.
     onDraftChange = () => {},
     onDirtyChange = () => {},
-    onDraftNameChange = () => {},
+    onDraftIdentityChange = () => {},
   } = $props();
 
   // Read by `manager-contract.test.js`'s SWAP DETECTOR against the title `viewTitle` renders for
@@ -325,23 +331,39 @@
     onDirtyChange(dirty);
   });
 
-  // THE HEADING ABOVE THIS PAGE FOLLOWS THE DRAFT (issue 1372, maintainer parity round 5).
+  // THE CHROME ABOVE THIS PAGE FOLLOWS THE DRAFT (issue 1372, maintainer parity rounds 5 and 6).
   //
-  // It named the PERSISTED essence while the name field and the player preview both showed the
-  // buffered one, so a GM mid-rename read `Aetherlight` in two places and `Aether` in a third on
-  // one screen. A heading names the thing being edited, and the thing being edited is the draft;
-  // the unsaved state is signalled by the enabled `Save essence` beside it, which is that
-  // control's whole job.
+  // The heading named the PERSISTED essence while the name field and the player preview both
+  // showed the buffered one, so a GM mid-rename read `Aetherlight` in two places and `Aether` in
+  // a third on one screen. The BREADCRUMB's last crumb and the 44px MEDALLION beside the heading
+  // had the same split, and for the same reason: they resolve out of the published corpus, and
+  // the published corpus is not what the GM is editing. Name, icon and colour are all buffered
+  // identity fields here — one `IDENTITY_FIELDS` list, one `patchIdentity` — so all three follow
+  // the draft together. What signals the unsaved state is the enabled `Save essence`, which is
+  // that control's whole job; the chrome is not a second, quieter version of it.
   //
   // REPORTED, not read off the handle: the handle is deliberately a live accessor that never
-  // re-renders, and a heading has to. It is `identity.name` rather than `draft?.identity?.name`
-  // so an unseeded editor reports the persisted name instead of blanking the header for a frame.
+  // re-renders, and chrome has to. It is `identity` rather than `draft?.identity` so an unseeded
+  // editor reports the persisted values instead of blanking the header for a frame.
+  //
+  // A NEW OBJECT every time, never `identity` itself. The shell holds what it is given in its
+  // own `$state`, and Svelte 5 does not proxy a value that crossed a prop boundary — so handing
+  // over a reference and mutating it later would render nothing. `withScopedEntryIdentity`
+  // already reassigns rather than mutates; this spread means the shell does not have to rely on
+  // that staying true.
   //
   // The SUBTITLE stays on the projection, and that is not an oversight: it counts the systems
   // using this essence, and a count of systems does not change until the write lands.
   $effect(() => {
-    onDraftNameChange(String(identity.name ?? ''));
+    onDraftIdentityChange({ ...identity });
   });
+
+  // WITHDRAWN ON UNMOUNT, from an effect with no dependencies so it runs once and tears down
+  // once. It is separate from the report above because that one re-runs on every keystroke and
+  // a teardown attached to it would publish `null` before each republish. The shell's reader is
+  // shared by all three entry routes, so a stale identity left behind here would name THIS
+  // essence in another route's breadcrumb.
+  $effect(() => () => onDraftIdentityChange(null));
 
   const normalizedIcon = $derived(normalizeEssenceIcon(identity.icon || DEFAULT_ESSENCE_ICON));
 
