@@ -85,9 +85,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
-    // `ToolEditorTabs` became a thin caller of the promoted primitive (issue 1038), putting
-    // `EditorTabs` into the Tool Studio tree as a static import. A rendered `.svelte` missing
-    // from this list hangs the run instead of failing it.
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',

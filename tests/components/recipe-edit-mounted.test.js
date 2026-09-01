@@ -137,9 +137,6 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
-  // `RecipeEditorTabs` became a thin caller of the promoted primitive (issue 1038), so
-  // `EditorTabs` is now a static import of the recipe editor tree. An omission here is a
-  // hang, not a failure — the suite reports `# cancelled`.
   'src/ui/svelte/apps/manager/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
