@@ -1130,6 +1130,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       // cases that RENDER them, exactly as the placeholder body was: a shell edit that selected no
       // frame would publish nothing, and one that selected an unrelated frame would be worse.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+      // The `SYSTEM RULES n / m` panel the shell's inspector composes (issue 1372). It renders
+      // only once a row is selected, which the second step above does, and it is claimed HERE as
+      // well as on `manager-essences-normal` because the reference draws the identical panel on
+      // both rails and a change to it has to publish both.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
       /^src\/utils\/scopedEntityListModel\.js$/,
     ],
@@ -3648,6 +3653,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      // The `SYSTEM RULES n / m` panel, which the browser inspector composes from the world
+      // catalogue's own component (issue 1372). This is the OTHER rail the reference draws it on,
+      // so a change to it publishes this frame beside `world-essence-catalogue`'s.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       // The shared studio-library SHELF — the scroll section, the empty states, the
       // list-or-grid `<ul>` and the pager — is rendered by every essence browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,

@@ -60,6 +60,11 @@
     // a GM editing a record every crafting system resolves against is told so on the one panel
     // that shows them the consequence. `'system'` keeps the shipped wording verbatim.
     scope = 'system',
+    // THIS SYSTEM'S PER-SECTION INHERIT MAP, or `null` when there is no membership record. With
+    // it the two behaviour rows become the reference's resolved-rule cards — named after the
+    // value and ending in the layer — which is what the system rules EDITOR rail draws. Without
+    // it they keep the shipped capability wording, because there is no layer to attribute.
+    inherited = null,
   } = $props();
 
   function text(key, fallback) {
@@ -82,7 +87,7 @@
   const facts = $derived(
     projectEssenceBehaviourFacts(
       essence,
-      { effectTransferEnabled, propertyMacrosEnabled, sourceName, macroName, scope },
+      { effectTransferEnabled, propertyMacrosEnabled, sourceName, macroName, scope, inherited },
       text,
       format
     )

@@ -185,14 +185,19 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     );
   });
 
-  it('SEAM 2 imports one NAMED helper from a leaf that imports nothing itself', () => {
+  it('SEAM 2 imports NAMED helpers from a leaf that imports nothing itself', () => {
     // A NAMESPACE import would turn this line into a permanent door: every future addition to the
     // leaf would be reachable from the gateway with no diff here at all. The named form makes the
     // next thing the gateway wants from that module a visible edit to this file and to this test.
+    //
+    // `essenceShortValueName` joined `mintEssenceId` at the round-8 parity pass: the editor rail's
+    // macro card is titled after its VALUE now, and a macro stored as a uuid whose document has
+    // not resolved has to fall back to its terminal segment — the same trim the list row's summary
+    // line prints — or the card reads `No macro` for a macro that is configured.
     assert.match(
       rootSource,
-      /import \{ mintEssenceId \} from '\.\/scoped\/essenceScoped\.js';/,
-      'the gateway takes exactly `mintEssenceId`, by name'
+      /import \{ essenceShortValueName, mintEssenceId \} from '\.\/scoped\/essenceScoped\.js';/,
+      'the gateway takes exactly those two, by name'
     );
     const leaf = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/essenceScoped.js'),

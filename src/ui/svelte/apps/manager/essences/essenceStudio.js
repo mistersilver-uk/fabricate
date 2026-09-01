@@ -195,6 +195,35 @@ export function projectEssenceBehaviourFacts(
   ];
 
   const world = context.scope === 'world';
+
+  // ── AT SYSTEM SCOPE WITH A MEMBERSHIP RECORD, THE TWO ROWS ARE THE ON-CRAFT CARDS ──────────
+  //
+  // The reference's system rules EDITOR rail names each row after the VALUE its section resolves
+  // to and ends it in the layer — `Effects from Ember Brand / Copied onto anything crafted with
+  // it here. Overridden here.` (`tmp/proto/essence-rules-editor.png`) — which is the same
+  // question, and the same answer, as the rules LIST inspector one click away. Rendering
+  // `Transfers active effects / From Iron Ore` here left the editor stating a CAPABILITY where
+  // the reference states a resolved rule and its provenance, on the screen that changes it.
+  //
+  // So the two rows are `projectEssenceOnCraftCards`, not a third wording of the same two facts.
+  // The ARITHMETIC row above them is retained, and that is a stated divergence: the reference's
+  // editor rail draws only the two, and a disabled essence still matches, accumulates and is
+  // consumed, which is the one thing neither behaviour row can say.
+  if (!world && context.inherited && typeof context.inherited === 'object') {
+    for (const card of projectEssenceOnCraftCards(essence, context, text, format)) {
+      // ONLY A CONFIGURED SECTION, which is the gate the two blocks below already apply: this
+      // rail describes what the essence DOES, and an unconfigured section does nothing. The
+      // inspector's own panel is the one that lists both sections unconditionally, because there
+      // it is a readout of this system's rules rather than of the essence's behaviour.
+      const configured =
+        card.id === 'effects'
+          ? essence?.hasEffectTransfer === true
+          : essence?.hasPropertyMacro === true;
+      if (configured) facts.push(card);
+    }
+    return facts;
+  }
+
   const sourceName =
     context.sourceName || text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None');
   const macroName =

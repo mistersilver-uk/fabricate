@@ -149,7 +149,7 @@
   import WorldToolEntryPage from './scoped/WorldToolEntryPage.svelte';
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
-  import { mintEssenceId } from './scoped/essenceScoped.js';
+  import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
   import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
   import { confirmScopedEntryExit } from './scoped/scopedEntryDraft.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
@@ -14321,7 +14321,9 @@
               effectTransferEnabled={showEssenceSourceUi}
               propertyMacrosEnabled={showEssencePropertyMacroUi}
               sourceName={essenceEditDraft.sourceName || ''}
-              macroName={essenceEditDraft.macroName || ''}
+              macroName={essenceEditDraft.macroName ||
+                essenceShortValueName(essenceEditDraft.propertyMacroUuid)}
+              inherited={inspectedEssenceInherited}
               sampleComponentName={essenceEditDraft.componentUsageItems?.[0]?.name || ''}
             />
           {:else if currentView === 'essences' && essenceBulkSelectionCount > 0}
