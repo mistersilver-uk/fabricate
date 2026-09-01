@@ -12210,10 +12210,24 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('does NOT lift the task editor four session search terms — they still reset', async () => {
     // The other half of the rule, and the half a future change is most likely to erode. The
-    // editor's component / tag / drop-rule / modifier pickers belong to ONE editing session:
-    // they name what the GM is attaching to THIS task right now, so carrying them back into
-    // the next task would apply a filter nobody set on a record nobody was editing.
-    mountManager([]);
+    // editor's component / tag / drop-rule / tool pickers belong to ONE editing session: they
+    // name what the GM is attaching to THIS task right now, so carrying them back into the next
+    // task would apply a filter nobody set on a record nobody was editing.
+    //
+    // WHAT ACTUALLY ENFORCES IT is the editor's task-change effect, keyed on a COMPONENT-LOCAL
+    // `lastTaskId`. That sentinel re-initialises to '' on every mount, so re-entry always reads
+    // as a task change and always clears all four — which is why the four declared defaults are
+    // not what this test measures. Perturbing them alone leaves it green; the guard that would
+    // fail it is the one that matters, a term given a home that outlives the mount.
+    //
+    // The library tool is fixture data, not decoration: the tool picker's search box renders
+    // only behind `{#if libraryToolList.length > 0}`, so without it the fourth term is not on
+    // screen and the loop below would silently assert over three.
+    mountManager([], {
+      gatheringLibraryTools: [
+        { id: 'tool-chisel', label: 'Fine Chisel', enabled: true, componentId: 'c1' },
+      ],
+    });
     await tick();
     flushSync();
     navButton('Gathering').click();
@@ -12226,11 +12240,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
+    // The FOUR the issue names, all four declared in `GatheringTaskEditView.svelte`. The
+    // manager root's own `Search character modifiers to add` box is NOT one of them — it is the
+    // shell's modifier picker, a different surface with a different owner, and asserting on it
+    // here would have measured something this component does not control.
     const EDITOR_SEARCHES = [
       'Search component names',
       'Search component tags',
       'Search drop rules',
-      'Search character modifiers to add',
+      'Search tools by name',
     ];
     for (const label of EDITOR_SEARCHES) {
       typeIntoSearch(label, 'zzz');
