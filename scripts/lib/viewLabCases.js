@@ -3832,8 +3832,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-essence-edit-first-state'],
     // The smoke opens an essence row's Edit action and photographs the editor as it arrives, and
     // this lands in the same place. It is REPOINTED at `aether` (issue 1036): the editor's headline
-    // state is a DISABLED essence — the Enabled row switched off, the On-craft badge counting two
-    // configured behaviours — and `earth` cannot show it.
+    // state is a DISABLED essence — the enable card switched off, both behaviour cards wearing
+    // their `Suppressed` pill — and `earth` cannot show it.
+    //
+    // WHAT "FIRST STATE" MEANS CHANGED AT ISSUE 1372 and this case follows it rather than
+    // photographing the old one: the editor now opens on `Essence rules`, whose head is the
+    // shared-definition callout naming the world record, the `Edit shared definition` exit and
+    // the per-system enable card. There is no Identity tab to open on, because identity is a
+    // world field a system-scope screen may not write.
     //
     // The step still navigates by the row's FIRST `.manager-icon-button`, which must remain the
     // Edit pencil. The row now also carries an enable toggle and a selection box: the toggle wears
@@ -3859,6 +3865,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // frames because those are the frames that show them, exactly as the placeholder body was
       // claimed by every case that rendered it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
@@ -3867,16 +3877,27 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essence edit On craft',
     reaches: 'beyond',
     smokeLabels: [],
-    // The tab the two persisted fields live on. `aether` carries BOTH — a linked source component
-    // and a property macro — so both sections render populated, both wear their `Suppressed` pill
-    // (the essence is disabled), and the macro card photographs in its MISSING state, because the
-    // lab world declares no `Macro` documents at all. The resolved state routes to smoke or
-    // maintainer evidence rather than being implied here.
+    // The two behaviour cards, SCROLLED INTO THE FRAME rather than reached by a tab click.
+    //
+    // Issue 1372 collapsed the editor's three tabs to two — `Essence rules` and `Validation` —
+    // because identity is a world field a system-scope screen may not edit, so there is no longer
+    // an `On craft` tab to select. What that tab held is now the lower half of the rules tab,
+    // below the shared-definition callout and the enable card, and a frame taken at the top of
+    // the page would be `manager-essence-edit-first-state` a second time. Scrolling the macro
+    // page's FOOT in is what keeps the two frames distinct states of one screen: it lands the
+    // macro card and the `Reuse these rules` card in one frame, which is the half of the reference
+    // the first-state frame cannot reach.
+    //
+    // `aether` carries BOTH persisted fields — a linked source component and a property macro —
+    // so both sections render populated, both wear their `Suppressed` pill (the essence is
+    // disabled), and the macro card photographs in its MISSING state, because the lab world
+    // declares no `Macro` documents at all. The resolved state routes to smoke or maintainer
+    // evidence rather than being implied here.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
       { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
-      { selector: '[data-essence-tab="oncraft"]' },
+      { selector: '[data-scoped-copy-rules]', scroll: true },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
@@ -3892,6 +3913,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // frames because those are the frames that show them, exactly as the placeholder body was
       // claimed by every case that rendered it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
@@ -3927,6 +3952,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // frames because those are the frames that show them, exactly as the placeholder body was
       // claimed by every case that rendered it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),

@@ -2847,6 +2847,60 @@
     systemId: selectedSystemId || '',
   });
 
+  // ── THE SYSTEM ESSENCE RULES HEADER (issue 1372, maintainer parity round 7) ───────────────
+  //
+  // The route heads with the essence's own tile, its NAME, and `<system> rules · enabled`
+  // (`proto:5091`). What shipped was the generic page header every route falls through to — the
+  // static title `Edit essence` over the sentence "Update identity, icon, and source linkage for
+  // this essence", which ADVERTISED the capability this change removes and named nothing the GM
+  // had opened.
+  //
+  // IT IS DERIVED HERE FOR THE REASON THE WORLD ENTRY HEADING ABOVE IS: `.manager-header` is a
+  // SIBLING of `.manager-main`, so the page structurally cannot render into it, exactly as it
+  // cannot render its own breadcrumb.
+  //
+  // THE FALLBACK IS THE SHIPPED HEADER, and the condition is the same one the editor forks on: a
+  // world record exists for this essence, so its identity is not this screen's to edit and the
+  // screen is the rules screen. A create draft and a world corpus that cannot answer both keep
+  // the generic heading, because in those states the in-system record IS the record.
+  const essenceRulesWorldEntry = $derived(
+    currentView === 'essence-edit' && selectedEssenceId
+      ? ((worldScopeState.essence?.entries ?? []).find(
+          (candidate) => candidate?.id === selectedEssenceId
+        ) ?? null)
+      : null
+  );
+  const essenceRulesMode = $derived(
+    worldScopeState.essence?.available === true && essenceRulesWorldEntry !== null
+  );
+
+  // NAME, GLYPH AND COLOUR FOLLOW THE DRAFT and fall back to the persisted card. They are not
+  // editable on this route any more, so the draft can only carry what the record already holds —
+  // but reading the draft first keeps this heading correct for the CREATE state too, where the
+  // Identity tab is live and a heading pinned to the record would print an empty name while the
+  // GM typed one.
+  const essenceEditName = $derived(essenceEditDraft?.name || selectedEssenceStrict?.name || '');
+  const essenceEditIcon = $derived(
+    essenceEditDraft?.icon || selectedEssenceStrict?.icon || 'fas fa-mortar-pestle'
+  );
+  const essenceEditTint = $derived(
+    essenceEditDraft?.colorToken ?? selectedEssenceStrict?.colorToken ?? ''
+  );
+
+  // The subline states the two facts the reference states: WHICH system's rules these are, and
+  // whether the essence is on in it. The enabled half follows the DRAFT, because the switch that
+  // changes it is buffered and a subline pinned to disk would contradict the card two inches
+  // below it until Save.
+  const essenceEditSubline = $derived(
+    interpolate(text('FABRICATE.Admin.Manager.Essence.RulesSubtitle', '{system} rules · {state}'), {
+      system: selectedSystem?.name || '',
+      state:
+        (essenceEditDraft?.enabled ?? selectedEssenceStrict?.enabled) === false
+          ? text('FABRICATE.Admin.Manager.Essence.RulesDisabled', 'disabled')
+          : text('FABRICATE.Admin.Manager.Essence.RulesEnabled', 'enabled'),
+    })
+  );
+
   // WHICH WORLD ENTITY AN ENTRY ROUTE IS OPEN ON (issue 1362).
   //
   // The three entry routes are the only World screens whose trail is THREE crumbs — the
@@ -5852,8 +5906,13 @@
 
   function essenceEditSaveLabel() {
     if (essenceEditSaving) return text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...');
-    return isCreatingEssenceDraft
-      ? text('FABRICATE.Admin.Manager.Essence.Create', 'Create essence')
+    if (isCreatingEssenceDraft)
+      return text('FABRICATE.Admin.Manager.Essence.Create', 'Create essence');
+    // `Save rules` on the rules screen, because that is what the screen holds: the identity the
+    // word "essence" names is a world record this route cannot write. The generic label survives
+    // for the state where the in-system record IS the essence.
+    return essenceRulesMode
+      ? text('FABRICATE.Admin.Manager.Essence.SaveRules', 'Save rules')
       : text('FABRICATE.Admin.Manager.Essence.Save', 'Save essence');
   }
 
@@ -9218,10 +9277,15 @@
               >{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</button
             >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
+            <!-- Name the essence, not the generic "Edit essence" — the same rule the recipe and
+               component breadcrumbs already follow, and the reference's own trail
+               (`Crafting systems > <system> > Essence Rules > <essence>`). The generic word
+               survives as the fallback for a subject with no name yet. -->
+            <span title={essenceEditName}
               >{isCreatingEssenceDraft
                 ? text('FABRICATE.Admin.Manager.Essence.CreateBreadcrumb', 'Create essence')
-                : text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span
+                : essenceEditName ||
+                  text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span
             >
           {/if}
           {#if currentView === 'recipe-edit'}
@@ -9412,6 +9476,20 @@
               <p class="manager-subtitle" data-world-essence-entry-subline>
                 {worldEssenceEntrySubtitle}
               </p>
+            </div>
+          </div>
+        {:else if currentView === 'essence-edit' && essenceRulesMode}
+          <!-- The essence's own identity header on the SYSTEM rules route. See
+             `essenceRulesMode` above for why it is derived in the shell, and the world essence
+             entry branch above for why it reuses the recipe editor's heading block wholesale
+             rather than being a fifth implementation of one meaning. -->
+          <div class="manager-recipe-edit-heading" data-essence-edit-heading>
+            <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={44} glyph={22} />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={essenceEditName}>
+                {essenceEditName || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-essence-edit-subline>{essenceEditSubline}</p>
             </div>
           </div>
         {:else if currentView !== 'tool-edit'}
@@ -11591,6 +11669,7 @@
         onDraftChange={handleEssenceDraftChange}
         onImportSourceDrop={importEssenceSourceDrop}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+        onOpenSharedDefinition={(entityId) => openWorldScopedEntry('world-essence-entry', entityId)}
       />
     {:else if currentView === 'tags' && selectedSystem}
       <TagsCategoriesView

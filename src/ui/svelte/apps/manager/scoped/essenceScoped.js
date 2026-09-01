@@ -116,34 +116,136 @@ export function essenceInheritLine(entry, section, format) {
  * The copy says "fall back", never "discard", because `setSectionInheritance` RETAINS the dormant
  * local override when a switch goes back on.
  *
+ * ── THE SENTENCE NAMES THE ACTION THE SWITCH PERFORMS, PER SECTION ────────────────────────────
+ * The reference draws the override row's note as two clauses: what this system resolves the
+ * section to today, and what the switch beside it would change that to — "This system uses its own
+ * effect source. Turn off to fall back to Rimeglass Charm." / "World default: Radiant Blessing.
+ * Turn on to run a different macro here." A note that stated only the first clause left the switch
+ * beside it unexplained, and the switch is the only control on the card.
+ *
+ * The second clause is SECTION-SPECIFIC because the verb is: a macro is RUN and an effect source is
+ * USED, and one sentence covering both would have to name neither. `section` is optional so the
+ * shipped generic form survives for a caller that has no section in hand.
+ *
  * @param {object} options
  * @param {boolean} options.inherited whether the section is currently inherited.
  * @param {string} [options.worldName] the world default's display name, `''` when unset.
+ * @param {string} [options.section] `effectSource` or `macro`; picks the action clause.
  * @param {(key: string, fallback: string, data: object) => string} options.format
  * @returns {string}
  */
-export function essenceSectionNote({ inherited, worldName = '', format }) {
+export function essenceSectionNote({ inherited, worldName = '', section = '', format }) {
   const name = String(worldName || '').trim();
   if (inherited) {
-    return name
-      ? format('FABRICATE.Admin.Manager.Scoped.Essence.NoteInheriting', 'World default: {name}', {
-          name,
-        })
-      : format(
-          'FABRICATE.Admin.Manager.Scoped.Essence.NoteInheritingUnset',
-          'The world default is unset, so this section resolves to nothing.',
-          {}
-        );
+    if (!name)
+      return format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.NoteInheritingUnset',
+        'The world default is unset, so this section resolves to nothing.',
+        {}
+      );
+    const head = format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.NoteInheriting',
+      'World default: {name}',
+      { name }
+    );
+    const action = inheritActionClause(section, true, format);
+    return action ? `${head}. ${action}` : head;
   }
-  return format(
-    'FABRICATE.Admin.Manager.Scoped.Essence.NoteOverridden',
-    'Overridden for this system. Turn the switch back on to fall back to {name}.',
-    {
-      name:
-        name ||
-        format('FABRICATE.Admin.Manager.Scoped.Essence.TheWorldDefault', 'the world default', {}),
-    }
+  const fallbackName =
+    name ||
+    format('FABRICATE.Admin.Manager.Scoped.Essence.TheWorldDefault', 'the world default', {});
+  const head = overrideHeadClause(section, format);
+  const tail = format(
+    'FABRICATE.Admin.Manager.Scoped.Essence.NoteOverriddenTail',
+    'Turn off to fall back to {name}.',
+    { name: fallbackName }
   );
+  return `${head} ${tail}`;
+}
+
+/**
+ * The "turn it the other way" clause of an inherit note, or `''` for an unknown section.
+ *
+ * @param {string} section
+ * @param {boolean} inherited
+ * @param {(key: string, fallback: string, data: object) => string} format
+ * @returns {string}
+ */
+function inheritActionClause(section, inherited, format) {
+  if (!inherited) return '';
+  if (section === 'macro')
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.NoteInheritingMacroAction',
+      'Turn on to run a different macro here.',
+      {}
+    );
+  if (section === 'effectSource')
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.NoteInheritingSourceAction',
+      'Turn on to use a different effect source here.',
+      {}
+    );
+  return '';
+}
+
+/**
+ * The first clause of an OVERRIDDEN note: what this system resolves the section to today.
+ *
+ * @param {string} section
+ * @param {(key: string, fallback: string, data: object) => string} format
+ * @returns {string}
+ */
+function overrideHeadClause(section, format) {
+  if (section === 'macro')
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.NoteOverriddenMacro',
+      'This system uses its own macro.',
+      {}
+    );
+  if (section === 'effectSource')
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.NoteOverriddenSource',
+      'This system uses its own effect source.',
+      {}
+    );
+  return format(
+    'FABRICATE.Admin.Manager.Scoped.Essence.NoteOverriddenGeneric',
+    'This system overrides the world default.',
+    {}
+  );
+}
+
+/**
+ * The BOLD HEAD LINE of a system-scope inherit row: which way the switch beside it is set.
+ *
+ * The reference gives each override row a state sentence rather than the section's own name — the
+ * section is already the card's title one line above, so repeating it there said nothing, while
+ * "Overridden for <system>" states the thing the row exists to report and names the system it is
+ * true of.
+ *
+ * @param {object} options
+ * @param {boolean} options.inherited
+ * @param {string} [options.systemName]
+ * @param {(key: string, fallback: string, data: object) => string} options.format
+ * @returns {string}
+ */
+export function essenceInheritHeading({ inherited, systemName = '', format }) {
+  if (inherited)
+    return format(
+      'FABRICATE.Admin.Manager.Scoped.Essence.HeadInheriting',
+      'Inheriting the world default',
+      {}
+    );
+  const system = String(systemName || '').trim();
+  return system
+    ? format('FABRICATE.Admin.Manager.Scoped.Essence.HeadOverriddenIn', 'Overridden for {system}', {
+        system,
+      })
+    : format(
+        'FABRICATE.Admin.Manager.Scoped.Essence.HeadOverridden',
+        'Overridden for this system',
+        {}
+      );
 }
 
 /**

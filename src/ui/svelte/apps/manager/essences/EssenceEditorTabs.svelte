@@ -1,6 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The essence editor's tab strip (issue 1036) — Identity, On craft, Validation.
+  The essence editor's tab strip (issue 1036) — `Essence rules` and `Validation` for an essence
+  the world catalogue holds, and the shipped `Identity, On craft, Validation` for a CREATE draft,
+  which has no shared definition to contradict. The SET is the caller's, passed as `tabs`; this
+  file owns the strip, its keyboard model and its badges.
 
   It is the EIGHTH `{activeTab, badges, onSelect}` strip in the manager and it is authored
   in the same shape as the other seven rather than extracted into a shared `EditorTabs`
@@ -11,8 +14,8 @@
   ── THE TAB IDS ARE LITERALS, TWICE ───────────────────────────────────────────────
   `id={`essence-tab-${tab.id}`}` is an interpolation, so the View Lab's source-coverage scan
   cannot credit the ids it produces. The ids are therefore ALSO present as literals in
-  `ESSENCE_EDITOR_TABS` in `essenceStudio.js`, which this file imports — and the scan reads
-  the literal `'identity'`, `'oncraft'` and `'validation'` there.
+  `ESSENCE_EDITOR_TABS` and `ESSENCE_RULES_TABS` in `essenceStudio.js` — and the scan reads the
+  literals `'identity'`, `'oncraft'`, `'rules'` and `'validation'` there.
 
   ── THE ON-CRAFT BADGE COUNTS CONFIGURED BEHAVIOURS ───────────────────────────────
   0, 1 or 2 — a linked source and a linked property macro — following
@@ -25,6 +28,10 @@
   import { ESSENCE_EDITOR_TABS } from './essenceStudio.js';
 
   let {
+    // The SET, supplied by the caller: `ESSENCE_RULES_TABS` for an essence with a shared world
+    // definition, `ESSENCE_EDITOR_TABS` for a create draft. Defaulted to the shipped three so a
+    // caller that passes none renders exactly what it always did.
+    tabs = ESSENCE_EDITOR_TABS,
     activeTab = 'identity',
     onCraftCount = 0,
     blockingCount = 0,
@@ -35,6 +42,7 @@
   const TAB_LABEL_KEYS = {
     identity: 'FABRICATE.Admin.Manager.Essence.Tabs.Identity',
     oncraft: 'FABRICATE.Admin.Manager.Essence.Tabs.OnCraft',
+    rules: 'FABRICATE.Admin.Manager.Essence.Tabs.Rules',
     validation: 'FABRICATE.Admin.Manager.Essence.Tabs.Validation',
   };
 
@@ -72,7 +80,7 @@
   }
 
   function handleKeydown(event, index) {
-    const lastIndex = ESSENCE_EDITOR_TABS.length - 1;
+    const lastIndex = tabs.length - 1;
     let nextIndex = null;
     if (event.key === 'ArrowRight') nextIndex = index === lastIndex ? 0 : index + 1;
     if (event.key === 'ArrowLeft') nextIndex = index === 0 ? lastIndex : index - 1;
@@ -80,7 +88,7 @@
     if (event.key === 'End') nextIndex = lastIndex;
     if (nextIndex === null) return;
     event.preventDefault();
-    const nextTab = ESSENCE_EDITOR_TABS[nextIndex].id;
+    const nextTab = tabs[nextIndex].id;
     onChange(nextTab);
     event.currentTarget
       .closest('[role="tablist"]')
@@ -94,7 +102,7 @@
   role="tablist"
   aria-label={text('FABRICATE.Admin.Manager.Essence.Tabs.Label', 'Essence editor sections')}
 >
-  {#each ESSENCE_EDITOR_TABS as tab, index (tab.id)}
+  {#each tabs as tab, index (tab.id)}
     <button
       type="button"
       role="tab"

@@ -50,10 +50,44 @@ export const ESSENCE_VIEW_MODE_SEGMENTS = Object.freeze([
   }),
 ]);
 
-/** The editor's three tabs, in render order: id, English fallback, glyph. */
+/**
+ * The CREATE editor's three tabs, in render order: id, English fallback, glyph.
+ *
+ * ## This set is reached only where there is no shared world definition to contradict
+ *
+ * `ui-integration/spec.md` `### GM World Essence Screens` requirement 10 makes identity a WORLD
+ * field that a system-scope screen may never edit, and the system Essence Rules editor therefore
+ * renders {@link ESSENCE_RULES_TABS} for every essence the world catalogue holds — which, after
+ * the `1.30.0` lift, is every essence a GM can open from a rules list.
+ *
+ * What is left on this set is the CREATE draft: an essence that exists nowhere yet, whose
+ * in-system record is the only record there is and whose identity is therefore being AUTHORED
+ * rather than overridden. It keeps the shipped three tabs because there is no shared layer for it
+ * to disagree with, and the moment the draft is saved the world corpus answers for it and the
+ * editor is the two-tab rules screen forever after.
+ */
 export const ESSENCE_EDITOR_TABS = Object.freeze([
   Object.freeze({ id: 'identity', fallback: 'Identity', icon: 'fas fa-fingerprint' }),
   Object.freeze({ id: 'oncraft', fallback: 'On craft', icon: 'fas fa-wand-magic-sparkles' }),
+  Object.freeze({ id: 'validation', fallback: 'Validation', icon: 'fas fa-clipboard-check' }),
+]);
+
+/**
+ * The SYSTEM ESSENCE RULES editor's two tabs — the set every existing essence opens on.
+ *
+ * There is no Identity tab, and its absence is the requirement rather than a simplification: a
+ * world record holds an essence's name, glyph, colour and description, every crafting system that
+ * has the essence resolves the same one, and a system-scope screen offering to edit them would be
+ * offering to rename the essence in eight other systems from a screen titled with the ninth. The
+ * route to those fields is the shared-definition callout's `Edit shared definition`, which opens
+ * the world essence entry editor that owns them.
+ *
+ * `rules` rather than `oncraft` as the id, because the tab is no longer a third of an editor: it
+ * carries the shared-definition callout, the per-system enable switch, both behaviour cards and
+ * the copy-to-other-systems action, which is the whole of what a system authors for an essence.
+ */
+export const ESSENCE_RULES_TABS = Object.freeze([
+  Object.freeze({ id: 'rules', fallback: 'Essence rules', icon: 'fas fa-mortar-pestle' }),
   Object.freeze({ id: 'validation', fallback: 'Validation', icon: 'fas fa-clipboard-check' }),
 ]);
 

@@ -299,6 +299,11 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/EntityRulesListShell.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/MembershipActions.svelte');
+  // The two cards the system Essence Rules editor opens and closes with (issue 1372). Both are
+  // in `EssenceEditView`'s STATIC graph, so an omission does not fail this file — it HANGS it,
+  // reported as `# cancelled` with no message.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/CopyRulesCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte');
   // The world scoped-entry editor's header action pair (issue 1372). The ROOT renders it, so it
   // is in this root's static graph and an omission HANGS every test in this file.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ScopedEntryHeaderActions.svelte');
