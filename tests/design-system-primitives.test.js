@@ -155,6 +155,11 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
+  // Issue 1458: the pill multi-select's add menu became a `SearchablePopover`, which left the
+  // component exactly one painted rule of its own — the at-cap trigger treatment — and that rule
+  // had to be re-anchored through `:global()` because the button is the primitive's element now.
+  // Its override names the one frame that draws the capped reading.
+  'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
@@ -223,7 +228,9 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * lives in it. Two of them are dead code and can leave this list by being deleted.
  *
  * Each later primitive extraction in this programme removes its own entry, and the only accepted
- * edit is a REMOVAL.
+ * edit is a REMOVAL. `ModifierPillSelect` left it that way at issue 1458, when its add menu became
+ * a `SearchablePopover` and the at-cap trigger treatment it was left holding acquired an override
+ * naming the one frame that draws it.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -248,7 +255,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerColorPopover.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -269,7 +275,7 @@ test('the inputs every property below quantifies over are alive', () => {
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 44, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 9, 'the recorded non-member set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

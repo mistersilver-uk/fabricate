@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PILL_SELECT_PATH = 'src/ui/svelte/components/ModifierPillSelect.svelte';
@@ -31,12 +32,25 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // `SearchablePopover` portals its panel to the manager host and lays it out against
+    // the trigger, so the add menu reaches these two as well (issue 1458).
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
   ],
   // `Field.svelte` is THE manager's labelled form field (issue 1428): this control's
   // `.manager-field` column renders through it since the conversion, so it is in this
   // tree's static graph. Omitting it does not fail the suite — the harness's dependency
   // validator throws in `before()` and every test here reports as `# cancelled`.
-  compiledModules: ['src/ui/svelte/components/Field.svelte', PILL_SELECT_PATH],
+  compiledModules: [
+    'src/ui/svelte/components/Field.svelte',
+    // `SearchablePopover` and the two primitives IT renders (issue 1458). The add menu is
+    // the shared picker now, so this tree reaches all three; an omission does not fail this
+    // suite, it cancels every test in it.
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    PILL_SELECT_PATH,
+  ],
   componentPath: PILL_SELECT_PATH,
 });
 
@@ -58,6 +72,23 @@ before(async () => {
 });
 after(() => harness.teardown());
 afterEach(() => harness.remount());
+
+/**
+ * Let Svelte flush, twice over.
+ *
+ * TWO rounds rather than one, and it is the popover's own contract that needs the second:
+ * `SearchablePopover.restoreTriggerFocus` schedules the focus move inside `tick().then(...)`,
+ * because in its inline-search mode the trigger is unmounted while the panel is open and the
+ * element focus must return to does not exist until Svelte has remounted it. One round settles
+ * the close; the focus lands in the round after.
+ */
+async function settle() {
+  flushSync();
+  await tick();
+  flushSync();
+  await tick();
+  flushSync();
+}
 
 /** Name the focused node without ever handing a mounted element to `node:assert`. */
 function focusDescriptor(element) {
@@ -162,6 +193,139 @@ describe('ModifierPillSelect focus contract (issue 1055)', () => {
       toggles.map(({ focused }) => focused),
       ['menu'],
       'with no neighbour left, focus stays in the control instead of dropping to <body>'
+    );
+  });
+});
+
+/**
+ * The picker conversion's INTERACTION contract (issue 1458).
+ *
+ * The add menu is `SearchablePopover` now, and everything below is invisible to a markup
+ * comparison — which is the point. A parsed-DOM diff of this component before and after the
+ * conversion reports exactly four differences on the closed trigger, every one of them a class
+ * or a scoping hash, and reports NOTHING about whether the menu still opens, still announces
+ * itself, still closes on Escape, still returns focus, or still refuses to open at the cap. A
+ * lost key handler looks identical to a kept one in a snapshot.
+ *
+ * The at-cap clause is the sharpest of them, because the wrong repair is the plausible one:
+ * `disabled` would have made the button refuse to open with no code at all, and it would also
+ * have removed it from several screen readers' tab order and broken the focus fallback pinned
+ * above — `focus()` on a disabled button silently no-ops. `triggerAriaDisabled` is the prop
+ * that separates "refuses" from "is not there", and these two clauses are what say so.
+ */
+describe('ModifierPillSelect popover contract (issue 1458)', () => {
+  const menuButton = (root) => root.querySelector('[data-modifier-pill-menu-button]');
+  const menuOptions = (root) =>
+    Array.from(root.querySelectorAll('[data-modifier-pill-option]')).map((option) =>
+      option.getAttribute('data-modifier-pill-option')
+    );
+
+  it('announces a listbox on the trigger and opens one', async () => {
+    const { root } = await mountPills(['med']);
+    const trigger = menuButton(root);
+    assert.equal(
+      trigger.getAttribute('aria-haspopup'),
+      'listbox',
+      'this menu has no search field, so a listbox is what activating the trigger opens'
+    );
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false', 'closed to begin with');
+    assert.deepEqual(menuOptions(root), [], 'and rendering no options while closed');
+
+    trigger.click();
+    await settle();
+    assert.equal(trigger.getAttribute('aria-expanded'), 'true', 'the trigger announces the open');
+    assert.deepEqual(
+      menuOptions(root),
+      ['alch', 'herb'],
+      'the still-unselected options, each keeping the hook four suites address it by'
+    );
+    const listbox = root.querySelector('[role="listbox"]');
+    assert.ok(Boolean(listbox), 'the options sit in a real listbox');
+    assert.ok(
+      Boolean(listbox.getAttribute('aria-label')),
+      'and it is named — an unnamed listbox is announced as a list with no purpose'
+    );
+    assert.deepEqual(
+      Array.from(listbox.querySelectorAll('[data-modifier-pill-option]')).map((option) => [
+        option.getAttribute('role'),
+        option.getAttribute('aria-selected'),
+      ]),
+      [
+        ['option', 'false'],
+        ['option', 'false'],
+      ],
+      'every row is an option, and none is the current value — this menu ADDS'
+    );
+  });
+
+  it('closes on Escape and returns focus to the trigger', async () => {
+    const { root } = await mountPills(['med']);
+    menuButton(root).click();
+    await settle();
+    assert.equal(menuButton(root).getAttribute('aria-expanded'), 'true', 'pre-condition: open');
+
+    globalThis.document.dispatchEvent(
+      new globalThis.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    );
+    await settle();
+    await settle();
+
+    assert.equal(
+      menuButton(root).getAttribute('aria-expanded'),
+      'false',
+      'Escape closes the menu — a lost key handler is invisible in a markup diff'
+    );
+    assert.deepEqual(menuOptions(root), [], 'and the options go with it');
+    assert.equal(
+      focusDescriptor(globalThis.document.activeElement),
+      'menu',
+      'focus returns to the trigger rather than dropping to <body>'
+    );
+  });
+
+  it('refuses to open at the cap while staying focusable', async () => {
+    const { root } = await mountPills(['med'], { addDisabled: true });
+    const trigger = menuButton(root);
+    assert.equal(
+      trigger.getAttribute('aria-disabled'),
+      'true',
+      'the cap is announced on the control that cannot act'
+    );
+    assert.equal(
+      trigger.disabled,
+      false,
+      'and NOT through `disabled`: that drops the button from several screen readers` tab ' +
+        'order and makes the post-removal focus fallback a silent no-op'
+    );
+
+    trigger.click();
+    await settle();
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false', 'the click is refused');
+    assert.deepEqual(menuOptions(root), [], 'and no options are rendered');
+
+    trigger.focus();
+    assert.equal(
+      focusDescriptor(globalThis.document.activeElement),
+      'menu',
+      'the refusing trigger is still a real focus target'
+    );
+  });
+
+  it('adds the chosen option and closes, without renaming the hook it is addressed by', async () => {
+    const { root, toggles } = await mountPills(['med']);
+    menuButton(root).click();
+    await settle();
+    root.querySelector('[data-modifier-pill-option="herb"]').click();
+    await settle();
+    assert.deepEqual(
+      toggles.map(({ id, next }) => [id, next]),
+      [['herb', true]],
+      'choosing emits the add'
+    );
+    assert.equal(
+      menuButton(root).getAttribute('aria-expanded'),
+      'false',
+      'and the menu closes behind it'
     );
   });
 });

@@ -290,7 +290,7 @@ test('no library entry recorded as unbuilt ships as a component', () => {
 });
 
 /**
- * The 28 shipped rows the library does not name.
+ * The 31 shipped rows the library does not name.
  *
  * Pinned by EQUALITY rather than as a ceiling, for the reason
  * `tests/design-system-primitives.test.js` records for its own baselines: a ceiling loosens by one
@@ -315,6 +315,12 @@ test('no library entry recorded as unbuilt ships as a component', () => {
  * adjudication rather than a primitive that shipped undocumented.
  */
 const UNDOCUMENTED_ROWS = [
+  // Three arrived together at issue 1458, and none of them is an undocumented PRIMITIVE: all
+  // three are adjudicated NON-MEMBERS recorded with the measurement that ruled them out of the
+  // `SearchablePopover` conversion — a multi-select checklist in the player window, two typeahead
+  // comboboxes, and four `role="menu"` action menus. That is the register doing its job, and it
+  // is the same growth-is-not-always-debt case `downtime/WorldDowntimeTabs` records below.
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
@@ -330,7 +336,9 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
+  'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
+  'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   'src/ui/svelte/components/ActorSelectTopBar.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',

@@ -275,6 +275,10 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // The availability menus and `ModifierPillSelect`'s add menu are `SearchablePopover`
+    // now (issue 1458), which portals its panel and lays it out against the trigger.
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
     'src/gatheringImageDefaults.js',
   ],
   compiledModules: [
@@ -292,6 +296,10 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
+    // The three availability add menus, and `ModifierPillSelect`'s, are this primitive
+    // (issue 1458). `Chip` and `EmptyState` are already above; an omission of this one
+    // cancels every test in the suite rather than failing one.
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     GATHERING_PATH,
   ],

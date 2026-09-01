@@ -1796,22 +1796,30 @@ test('changed files map to the windows they affect', () => {
   assert.deepEqual(ids(['src/ui/svelte/apps/SomeBrandNewRoot.svelte']), [FALLBACK_CASE_ID]);
 });
 
-test('the broad SearchablePopover signal captures BOTH of its deliberate picker states', () => {
+test('the broad SearchablePopover signal captures ALL THREE of its deliberate picker states', () => {
   const selected = mapChangedFilesToCases([
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   ]).map((viewCase) => viewCase.id);
 
-  // Two overrides, not one, because the primitive has two modes and neither frame shows
-  // the other's chrome. `inlineSearchTrigger` (the actor picker) replaces its trigger with
+  // Three overrides, not one, because the primitive has three modes and no frame shows
+  // another's chrome. `inlineSearchTrigger` (the actor picker) replaces its trigger with
   // the search field and renders NO in-popover search row at all, so the compact search
   // field, its leading glyph and its position below the title/count header are invisible
   // in that frame; the realm-override picker keeps its value-bearing trigger and is the
   // only surface that renders them.
+  //
+  // The third arrived with issue 1458's conversion and is the `showSearch={false}` panel:
+  // an option list with no query field at all, which is the shape that keeps
+  // `triggerHasPopup="listbox"` truthful on the trigger. Both parties frames render the
+  // field, so neither can show what the panel looks like without one, and every other
+  // gathering-task frame draws the menu CLOSED — where the whole conversion is a wrapper
+  // class and a scoping hash.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
       'fabricate-app-shell',
       'manager-components-normal',
+      'manager-gathering-task-availability-menu',
       'manager-world-parties-actor-picker',
       'manager-world-parties-realm-override-picker',
     ]
