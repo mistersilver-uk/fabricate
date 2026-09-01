@@ -771,10 +771,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'system-edit',
     kinds: ['manager', 'system-edit'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
-      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
-      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
-      // the source-coverage gate exists to close.
+      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
+      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
+      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
+      // no placeholder case: a regex pasted onto a page that renders no tabs is the
+      // unrelated-evidence exit the source-coverage gate exists to close.
       /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(ResolutionModeCard|CraftingEffectPanel|ItemPageInspector)\.svelte$/,
@@ -1607,10 +1608,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'recipe-item-edit',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
-      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
-      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
-      // the source-coverage gate exists to close.
+      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
+      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
+      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
+      // no placeholder case: a regex pasted onto a page that renders no tabs is the
+      // unrelated-evidence exit the source-coverage gate exists to close.
       /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
@@ -2853,6 +2855,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      // The editor tab strip draws BOTH of this frame's markers since issue 1429, so a
+      // change to it must be photographed here. This is the only case in the registry that
+      // renders a tab wearing a count and a dot at once, which makes it the one frame where
+      // a regression in either drawing — or in how they share the slot — is visible.
+      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
     ],
     kinds: ['manager', 'checks'],
   }),
@@ -3904,10 +3911,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the THREE CONVERTED SITES'
-      // cases — environment-edit, system-edit and recipe-item-edit — and on no placeholder
-      // case: a regex pasted onto a page that renders no tabs is the unrelated-evidence exit
-      // the source-coverage gate exists to close.
+      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
+      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
+      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
+      // no placeholder case: a regex pasted onto a page that renders no tabs is the
+      // unrelated-evidence exit the source-coverage gate exists to close.
       /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\//,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
@@ -5377,6 +5385,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+      // The editor tab strip draws this surface's two tab counts since issue 1429, which
+      // moved them off the chip and onto the Rail Marker Family's record-count vehicle. This
+      // frame is the one that opens on the OTHER tab, so it is the case where the count's
+      // active and inactive treatments appear together.
+      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
     ],
   }),
   managerCase({

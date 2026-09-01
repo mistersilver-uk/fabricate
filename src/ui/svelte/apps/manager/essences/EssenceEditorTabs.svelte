@@ -65,20 +65,20 @@
 
   // Blocking outranks warning, and a clean tab shows a tick rather than a zero: a badge
   // reading `0` is indistinguishable at a glance from a badge reading `8`. The tick has no
-  // readable name of its own, so it carries `ariaLabel`; `is-valid` is the shipped success
+  // readable name of its own, so it carries `name`; `is-valid` is the shipped success
   // treatment for a tab badge.
   function validationBadgeFor(blocking, warnings) {
     if (blocking > 0) {
-      return { tone: 'danger', label: String(blocking), ariaLabel: issueCountLabel(blocking) };
+      return { tone: 'danger', label: String(blocking), name: issueCountLabel(blocking) };
     }
     if (warnings > 0) {
-      return { tone: 'warning', label: String(warnings), ariaLabel: issueCountLabel(warnings) };
+      return { tone: 'warning', label: String(warnings), name: issueCountLabel(warnings) };
     }
     return {
       tone: 'positive',
       label: '✓',
       class: 'is-valid',
-      ariaLabel: text('FABRICATE.Admin.Manager.Essence.ValidationAllValid', 'All checks pass'),
+      name: text('FABRICATE.Admin.Manager.Essence.ValidationAllValid', 'All checks pass'),
     };
   }
 

@@ -96,12 +96,6 @@ const SHARED_PRIMITIVES = [
   // Tool Studio header, which is the authority the primitive reproduces — and they already
   // sit in four different mounted trees between them.
   'src/ui/svelte/components/ManagerButton.svelte',
-  // THE manager's editor tab strip (issue 1362, converted onto by issue 1038). Six wrapping
-  // editors call it — system, environment, recipe-item, recipe, essence and tool — and each
-  // of those wrappers sits in a different mounted tree, so it entered three more of them in
-  // one change. That is the shape this list exists for: the omission does not fail the
-  // suite that rendered the newly-converted strip, it hangs it.
-  'src/ui/svelte/apps/manager/EditorTabs.svelte',
   // THE manager's icon-only push-button (issue 1422), and the widest entry on this list by
   // reach: 36 components render it as this lands, against `ManagerButton`'s 50 but spread
   // across nearly every studio, browser, inspector and editor tab. `Pagination.svelte`
@@ -110,6 +104,14 @@ const SHARED_PRIMITIVES = [
   // without naming any icon button at all, and an omission costs a HUNG suite rather than a
   // failing one.
   'src/ui/svelte/components/IconButton.svelte',
+  // THE manager's editor tab strip (issue 1362), and on this list since issue 1429 gave it
+  // the Rail Marker Family and converted the Checks section strip and the Knowledge tabs
+  // onto it. Issue 1038 converted three more — the recipe, essence and tool editors — so
+  // EIGHT wrapping strips call it, and each of those wrappers sits in a different mounted
+  // tree. That is what makes it sharp: every further strip that stops hand-rolling its
+  // markers drops it into another mounted tree, and each omission costs a HUNG suite rather
+  // than a failing one.
+  'src/ui/svelte/apps/manager/EditorTabs.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

@@ -789,6 +789,7 @@ The warning dot carries a text accessible name, and a section carrying both a co
 The dot is EXPLAINED IN THE PANEL: the open section renders the shared `Callout` for each of its own issues, carrying the same sentence the Validation route renders for that issue id from one exported copy map, toned `warning` for an issue that blocks enabling and `info` for one that does not.
 A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
+It renders through the ONE editor tab strip primitive, which draws both of its marks and offers that selected-tab-only mode; this route owns the section-to-tab mapping, its `checks-section-*` and `data-checks-*` hooks and the issue count's localized unit, and nothing about how a mark looks.
 Outcomes renders in EVERY mode and hosts that mode's own outcome model: the two-outcome pass/fail statement on `simple`, the `awardMode` selector on `progressive`, the band strip plus the tier rows on `routed`.
 Its count badge is emitted only where there is a tier list to count, so `simple` and `progressive` render it unbadged.
 Modifiers renders in every mode too, INCLUDING the two that roll nothing — gathering `d100` and alchemy `none` — because the modifier card is the one owned path for reporting that a selection reaches no roll, and hiding the section it lives in would take that report away from the two states that need it.
@@ -1983,6 +1984,13 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
 10. **The check bonus picks from the world modifier library and never a free-text expression**, through the shared subject picker; the tool subject is a third member of that picker's subject vocabulary rather than a second picker.
 11. **The editor tab strip is ONE primitive**, and it carries each site's DOM CONTRACT as props — the hook attribute name, the button `id` and `aria-controls` stem, and the strip's own accessible-name key — because the shipped sites share no common stem and their PANEL ids are rendered by files outside the strip.
     A promotion that changed a rendered id, `aria-controls`, `data-*` attribute name or badge class at a converted site is a defect, not a cleanup.
+    A site whose button stem and panel stem differ — `checks-section-<id>` beside `checks-panel-<id>` — overrides either half rather than being kept out of the primitive.
+12. **The strip DRAWS the Rail Marker Family**, so a caller names which vehicle its mark uses — a record count, an issue summary, or the dot — and the primitive owns each drawing; the count and the dot take no class from the caller.
+    A tab may carry more than one mark, because a section can be both authored and unready at once.
+    The dot renders only with a text accessible name naming its unit, and a nameless one is dropped rather than drawn, because a mark separated from its siblings by colour alone is not a signal.
+    A record count of zero is the CALLER's decision and not the primitive's, because the shipped record-count vehicle answers it both ways: the rail states `0` unconditionally while the Checks section strip omits it, and a conversion must not settle a product question as a side effect.
+13. **A strip that renders ONE panel at a time puts `aria-controls` on the selected tab only**, because the unselected IDREFs would resolve to nothing and assistive technology reports that as a broken relationship rather than as "not currently shown".
+    It is a mode of the one primitive, never a reason for a second implementation.
 
 ### Scoped entity list shells
 

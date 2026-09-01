@@ -74,17 +74,17 @@
 
   // The Requirements count is suppressed at zero by the primitive's own badge rule. The
   // Validation badge is always present: a danger count, or the `is-valid` tick, whose
-  // `ariaLabel` is its only readable name.
+  // `name` is its only readable name.
   const badges = $derived({
     requirements: requirementCount,
     validation:
       errorCount > 0
-        ? { tone: 'danger', label: errorCount, ariaLabel: issueCountText(errorCount) }
+        ? { tone: 'danger', label: errorCount, name: issueCountText(errorCount) }
         : {
             tone: 'positive',
             label: '✓',
             class: 'is-valid',
-            ariaLabel: text('AllValid', 'All checks pass'),
+            name: text('AllValid', 'All checks pass'),
           },
   });
 </script>
