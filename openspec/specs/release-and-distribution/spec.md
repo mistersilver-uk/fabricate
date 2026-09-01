@@ -35,6 +35,7 @@ It has no tester group and no retained cohort: it exists so a hotfix can be publ
 - **build profile** — which variant of the module a build produced, such as the community build.
 It identifies the bytes, as distinct from the cohort that receives them.
 - **build provenance** — the recorded identity of the build an artefact came from: its version, its source commit, and its build profile.
+- **change provenance** — evidence that a commit reaching the release or prerelease line is attributable to a specific reviewed change, as distinct from **build provenance**, which is the recorded identity of a build.
 
 A release artefact exists, and is not publicly obtainable, from the moment its version is minted.
 It becomes publicly obtainable only at release promotion.
@@ -75,6 +76,7 @@ A hotfix line MUST accept fixes only; a change that would raise the minor or maj
 A hotfix MUST NOT be published to any channel whose head is a version Foundry considers newer than it, because that would move the head backwards.
 A hotfix MUST NOT raise the module's declared minimum Foundry version, because Foundry refuses to install a package whose minimum exceeds the running core version, stranding exactly the users the hotfix is for.
 A hotfix MUST be brought back into the release line and then the prerelease line, so neither loses the fix and both remain numbered above it.
+That bring-back into the release line MUST itself be a reviewed change, because the forward-port that carries it onward has no other evidence of its change provenance and will otherwise refuse it.
 The release line and the prerelease line MUST NOT be merged into a hotfix line.
 
 #### Scenario: hotfixing while a version carrying features is soaking
@@ -259,6 +261,7 @@ A stable version minted on the release line MUST be forward-ported into the prer
 A release promotion of a version built on the release line MUST confirm that the forward-port has happened, and MUST perform it if it has not, before any prerelease channel is written.
 The forward-port obligation binds the release line only, never a hotfix line.
 A forward-port that has already happened MUST be a no-op rather than a repetition, so that it can be invoked more than once without conflicting.
+A forward-port MUST NOT assume the release line is content-identical to the prerelease line; what it must instead establish is stated in **Forward-port content provenance**.
 A release artefact MUST be created only from a pre-existing, pushed tag and MUST be pinned to that tag's commit; a release creation allowed to create a missing tag will create it from the default branch's head rather than the tested commit.
 The notes published with a version's release artefact MUST be the notes generated for that version when its branch built it, together with the notes of any version that was minted and published to a channel but superseded before it was ever made public — without which the public record silently omits every change a superseded version carried.
 
@@ -278,6 +281,54 @@ The notes published with a version's release artefact MUST be the notes generate
 
 - **WHEN** a stable version is minted and published to a channel, but a later version reaches `public` before it does
 - **THEN** the later version's public notes include the superseded version's notes
+
+### Requirement: Release line change provenance
+
+Every change to the release line MUST be reviewed before it lands there.
+A change MUST NOT reach the release line by a direct, unreviewed write, and that MUST be prevented at the point of writing rather than detected afterwards, because the release line is the source the forward-port carries onto the prerelease line through an automated write that bypasses review.
+A prerelease promotion MAY advance the release line without a per-change review of its own, but only where what it carries has ALREADY been reviewed on the prerelease line, and only where it verifies that before writing.
+
+#### Scenario: an unreviewed change is written directly to the release line
+
+- **WHEN** a change is written to the release line without having been reviewed
+- **THEN** the write is refused at the point it is attempted, rather than detected later by the forward-port
+- **AND** the remedy named is to propose the same change for review against the release line
+
+#### Scenario: automation advances the release line with already-reviewed content
+
+- **WHEN** the prerelease promotion advances the release line with a commit already carried by the prerelease line
+- **THEN** it is permitted without a further review, because it verifies that ancestry before writing
+
+### Requirement: Forward-port content provenance
+
+When a forward-port would carry file content onto the prerelease line, it MUST establish mechanically that every commit it carries is attributable to a change reviewed **against the release line**, as **Release line change provenance** requires, and MUST NOT accept an operator's assertion that this is so.
+A change reviewed against a different line MUST NOT be treated as accounted for merely because that review took place and was merged.
+A merge commit that introduces no content beyond what its parents already carry satisfies this without a review of its own; a merge commit that introduces content present in no parent does not.
+Whether a merge introduced content of its own MUST be established by reproducing the merge from its parents and comparing the result with what the merge recorded, never inferred from which files the merge touched, because a clean automatic merge and a merge carrying invented content touch exactly the same files.
+A forward-port that cannot establish change provenance MUST refuse, and MUST NOT treat an absence of evidence as an absence of unreviewed content.
+A refusal MUST name the commits it could not account for.
+An override MAY exist, but it MUST NOT be the routine path, and a forward-port whose content IS accounted for MUST proceed without one.
+
+#### Scenario: a forward-port carrying content authored through review
+
+- **WHEN** every commit it carries is attributable to a change reviewed against the release line
+- **THEN** it proceeds without an override and without a manual confirmation
+
+#### Scenario: a forward-port carrying content of unestablished change provenance
+
+- **WHEN** it would carry a commit it cannot attribute to a change reviewed against the release line
+- **THEN** it fails, naming that commit, and does not offer the reader's own confirmation as the ordinary remedy
+
+#### Scenario: the forward-port's own merge introduces content
+
+- **WHEN** the merge it performs introduces content present in none of its parents
+- **THEN** it fails, because that content has been reviewed nowhere
+
+#### Scenario: change provenance cannot be established
+
+- **WHEN** the evidence it needs is unavailable or incomplete
+- **THEN** it refuses and reports the state as unverifiable, rather than proceeding
+- **AND** the override does not apply to it, and is not offered as its remedy, because there is no established refusal to vouch for
 
 ### Requirement: Promotion-gated public availability
 
