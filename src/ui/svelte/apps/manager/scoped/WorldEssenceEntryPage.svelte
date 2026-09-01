@@ -960,7 +960,6 @@
                         title={text(ui?.promptKey ?? '', ui?.prompt ?? label)}
                         hint={sectionAddressLine(section, value)}
                         documentType={ui?.documentType ?? 'Item'}
-                        emptyIcon="fas fa-arrow-down-to-bracket"
                         unlinkAttr="data-scoped-world-default-clear"
                         unlinkLabel={format(
                           'FABRICATE.Admin.Manager.Scoped.Essence.DefaultClearNamed',

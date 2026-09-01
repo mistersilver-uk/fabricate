@@ -3948,7 +3948,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
-      { selector: '[data-essence-membership-filter]', select: 'all' },
+      // The membership filter became a SegmentedControl (issue 1372) — the prototype states both
+      // counts at once, which a <select> cannot. Driven by clicking its option, not by selectOption.
+      { selector: '[data-essence-membership-option="all"]' },
     ],
     expectView: 'essences',
     expectSelector: '[data-essence-membership-filter]',
