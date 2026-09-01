@@ -119,8 +119,13 @@ function createGateHarness(t) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'forward-port-gate-'));
   t.after(() => rmSync(directory, { recursive: true, force: true, maxRetries: 3 }));
 
+  // `timeout` is not optional here. Without it a wedged child hangs the whole file, and node:test
+  // reports a hang as `# cancelled`, not `# fail` — a shape this repository already reads as load
+  // flake, on what is the slowest file in `tests/*.test.js`. A `git` stub whose passthrough
+  // re-resolved through the stub-prefixed PATH did exactly that while this suite was being written.
+  // Callers may raise it; they may not remove it.
   const run = (command, args, options = {}) =>
-    spawnSync(command, args, { cwd: directory, encoding: 'utf8', ...options });
+    spawnSync(command, args, { cwd: directory, encoding: 'utf8', timeout: 60000, ...options });
 
   const git = (...args) => {
     const result = run('git', args);
