@@ -1246,6 +1246,16 @@ It will then take the already-forward-ported no-op.
 `allow_content` is settable only on `forward-port.yml`'s own dispatch, and deliberately so: `promote-to-public.yml`'s inputs are `version` / `source_channel` / `dry_run` only, and it will not grow a content override.
 That is the same composition the `override_hint` inputs carry into the failure message, so the message and this manual never disagree.
 
+#### What a change landing on the release line may reference
+
+A change landing on the release line must be self-contained ON THAT LINE.
+Being byte-identical to its counterpart on the prerelease line is not sufficient, because a file can be internally valid there and still depend on other content the release line does not carry.
+
+The gate that catches this is `scripts/validate-agent-bindings.mjs`, which resolves every backticked repository path in the agent skills and in the root documents, this file included, and fails when one does not exist.
+A paragraph copied verbatim from the prerelease line can therefore cite a path that arrived with later work and is absent from the release line, and the copy is refused even though its own text was reviewed and merged.
+
+Prefer prose that cites nothing, or cite only paths you have confirmed exist on the release line.
+
 ### Prerelease promotion (promote to early access)
 
 File: `.github/workflows/promote-to-early-access.yml`

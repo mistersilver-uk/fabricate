@@ -782,8 +782,8 @@ describe('KnowledgeView mounted behaviour', () => {
     for (const id of ['g-labelled', 'g-unlabelled', 'g-long', 'g-dollar', 'g-nonstring']) {
       assert.equal(icon(id), 'fas fa-hand-holding', `${id}: granted rows carry the non-book glyph`);
     }
-    assert.equal(icon('g-auto'), 'fas fa-book-sparkles');
-    assert.equal(icon('g-both'), 'fas fa-book-sparkles');
+    assert.equal(icon('g-auto'), 'fas fa-book');
+    assert.equal(icon('g-both'), 'fas fa-book');
 
     // Every granted entry has `sourceItemUuid: null`, so erasing it frees no budget
     // for the SAME reason auto-learn does. Asserted rather than discovered.

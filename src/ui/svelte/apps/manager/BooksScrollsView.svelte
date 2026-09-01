@@ -369,7 +369,7 @@
   >
     {#if (recipeItems || []).length === 0}
       <EmptyState
-        icon="fas fa-book-sparkles"
+        icon="fas fa-book"
         title={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}
         hint={text(
           'FABRICATE.Admin.Manager.BooksScrolls.EmptyHint',
