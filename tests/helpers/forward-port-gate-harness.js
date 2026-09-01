@@ -20,6 +20,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveExecutable } from '../../scripts/lib/resolveExecutable.js';
+
 export const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** POSIX-separated, because these are handed to bash rather than to a Windows program. */
@@ -60,7 +62,7 @@ export const MARKERS = {
  * hung this suite, silently, the first time it was written, and a hang is reported as `# cancelled`
  * rather than `# fail`.
  */
-export const REAL_GIT = spawnSync('bash', ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim();
+export const REAL_GIT = resolveExecutable('git') ?? '';
 
 const BASE_LINES = Array.from({ length: 10 }, (_, index) => `line ${index + 1}`);
 
