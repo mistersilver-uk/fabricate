@@ -33,6 +33,13 @@
     // track it; this view stays a controlled component over that one piece of state.
     activeTab = 'recipe',
     onTabChange = () => {},
+    // The three vocabulary panels' lifted search terms (issue 1438), owned by the root. The
+    // three panels are mutually exclusive branches below, so switching tab unmounts one and
+    // mounts another; a slot held HERE would still die when this whole view unmounts on a
+    // route change, which is the other half of the same defect.
+    recipeCategoryBrowserState = $bindable(null),
+    componentCategoryBrowserState = $bindable(null),
+    componentTagBrowserState = $bindable(null),
   } = $props();
 
   function text(key, fallback) {
@@ -330,6 +337,7 @@
         onAdd={onAddCategory}
         onRemove={(row) => onRemoveCategory(row.name)}
         onSetIcon={onSetCategoryIcon}
+        bind:browserState={recipeCategoryBrowserState}
       />
     {:else if activeTab === 'component'}
       <VocabularyPanel
@@ -405,6 +413,7 @@
         onAdd={onAddComponentCategory}
         onRemove={(row) => onRemoveComponentCategory(row.name)}
         onSetIcon={onSetComponentCategoryIcon}
+        bind:browserState={componentCategoryBrowserState}
       />
     {:else}
       <VocabularyPanel
@@ -462,6 +471,7 @@
         decorativeIcon="fas fa-tag"
         onAdd={onAddTag}
         onRemove={(row) => onRemoveTag(row.name)}
+        bind:browserState={componentTagBrowserState}
       />
     {/if}
   </div>

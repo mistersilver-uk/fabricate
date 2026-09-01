@@ -61,6 +61,8 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    // The editor's lifted picker view-state (issue 1438).
+    writeRawModule('src/utils/managerBrowserViewState.js');
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');

@@ -743,6 +743,11 @@ function compileManagerRoot() {
     // siblings above: this suite hand-rolls its temp tree with no dependency validator, so
     // omitting either HANGS the whole suite as `# cancelled` rather than naming the file.
     'src/utils/essenceBrowserModel.js',
+    // The lifted browser view-state every remaining browse surface reads (issue 1438). The
+    // root imports it directly and so do eleven of the components compiled above; this list
+    // has NO validator, so omitting it does not fail a test — the whole suite dies in its
+    // `before` hook with ERR_MODULE_NOT_FOUND and reports every test as `# cancelled`.
+    'src/utils/managerBrowserViewState.js',
     'src/utils/essenceBulkEditModel.js',
     // The category totals both browser models group with (issue 676). Imported by BOTH
     // of the two above, so omitting it HANGS every mounted manager test.
@@ -11925,6 +11930,349 @@ describe('CraftingSystemManager mounted behavior', () => {
       calls.some((call) => call[0] === 'cancelEssenceDraft'),
       'Back republishes the persisted projections through the store'
     );
+  });
+
+  // ── THE LIFTED BROWSE VIEW-STATE (issue 1438) ────────────────────────────────────────
+  //
+  // Issue 1036 lifted the Essence Studio's view-state and the test directly above proves it;
+  // this block is the same property for the remaining browse surfaces, and it is written as
+  // ONE table walked by ONE test body rather than as eight near-identical tests. That is not
+  // only economy: the claim IS uniform — "make the surface's state non-default, take the trip
+  // that unmounts it, come back and find the state" — and eight copies of it would be eight
+  // places for the claim to drift, plus the `tests/**` duplication SonarCloud counts.
+  //
+  // WHAT COUNTS AS "THE TRIP" DIFFERS BY SURFACE, AND THE TABLE SAYS WHICH. Four of these have
+  // an editor route, so the trip is the editor round-trip the issue names. The rest have no
+  // editor at all — a realm is authored in the inspector, a vocabulary entry inline, a
+  // character's knowledge in place — so what destroyed their state was leaving the route or
+  // switching a sub-tab. Both unmount the component, which is the whole of the defect; calling
+  // the second one an "editor round-trip" would be a false description of a real trip.
+  //
+  // EACH ENTRY ALSO PROVES ITS OWN NON-VACUITY: the trip is asserted to have CHANGED the route
+  // (or the rendered panel), because a `leave` step that silently did nothing would leave the
+  // surface mounted throughout and the restore assertion would pass without a remount.
+  const LIFTED_BROWSE_SURFACES = [
+    {
+      name: 'the system library',
+      trip: 'an editor round-trip',
+      open: async () => {},
+      searchLabel: 'Search systems',
+      term: 'Alch',
+      leave: () => target.querySelector('[aria-label="Edit Alchemy"]').click(),
+      leftView: 'system-edit',
+      back: () => target.querySelector('[data-system-edit-back]').click(),
+      view: 'systems',
+    },
+    {
+      name: 'the environment library',
+      trip: 'an editor round-trip',
+      open: async () => {
+        navButton('Gathering').click();
+      },
+      searchLabel: 'Search environments',
+      term: 'Moon',
+      leave: () => target.querySelector('[aria-label="Edit Moonlit Forest"]').click(),
+      leftView: 'environment-edit',
+      back: () => target.querySelector('[data-environment-edit-back]').click(),
+      view: 'environments',
+    },
+    {
+      name: 'the gathering task library',
+      trip: 'an editor round-trip',
+      open: async () => {
+        navButton('Gathering').click();
+        await tick();
+        flushSync();
+        target.querySelector('#manager-gathering-nav-tasks').click();
+      },
+      searchLabel: 'Search gathering tasks',
+      term: 'Moon',
+      leave: () => target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click(),
+      leftView: 'gathering-task-edit',
+      back: () => target.querySelector('[data-gathering-task-back]').click(),
+      view: 'environments',
+    },
+    {
+      name: 'the gathering encounter library',
+      trip: 'an editor round-trip',
+      storeOptions: {
+        gatheringLibraryEvents: [
+          {
+            id: 'ev-storm',
+            name: 'Sudden Storm',
+            enabled: true,
+            biomes: ['forest'],
+            dangerTags: ['safe'],
+          },
+        ],
+      },
+      open: async () => {
+        navButton('Gathering').click();
+        await tick();
+        flushSync();
+        target.querySelector('#manager-gathering-nav-encounters').click();
+      },
+      searchLabel: 'Search gathering events',
+      term: 'Storm',
+      leave: () => target.querySelector('[aria-label="Edit Sudden Storm"]').click(),
+      leftView: 'gathering-event-edit',
+      back: () => target.querySelector('[data-gathering-event-back]').click(),
+      view: 'environments',
+    },
+    {
+      name: 'the tool library',
+      trip: 'leaving the route and coming back',
+      open: async () => {
+        navButton('Tool Rules').click();
+      },
+      searchLabel: 'Search Tools',
+      term: 'Hammer',
+      leave: () => navButton('Essence Rules').click(),
+      leftView: 'essences',
+      back: () => navButton('Tool Rules').click(),
+      view: 'tools',
+    },
+    {
+      name: 'the recipe-category vocabulary panel',
+      trip: 'switching vocabulary tab and back',
+      open: async () => {
+        navButton('Tags & Categories').click();
+      },
+      searchLabel: 'Search recipe categories',
+      term: 'Poti',
+      // A tab switch UNMOUNTS this panel and mounts the component one: the three are mutually
+      // exclusive branches. That is why each panel binds its OWN slot — proved by the sibling
+      // assertion below, which finds the component tab's box empty rather than carrying "Poti".
+      leave: () => target.querySelector('[data-vocabulary-tab="component"]').click(),
+      leftPanel: 'Search component categories',
+      back: () => target.querySelector('[data-vocabulary-tab="recipe"]').click(),
+      view: 'tags',
+    },
+    {
+      name: 'the knowledge roster',
+      trip: 'leaving the route and coming back',
+      storeOptions: { experimentalFeaturesEnabled: true },
+      open: async () => {
+        craftingParent().click();
+        await tick();
+        flushSync();
+        craftingSubitem('Knowledge').click();
+      },
+      searchLabel: 'Search characters',
+      term: 'Ast',
+      leave: () => navButton('Tags & Categories').click(),
+      leftView: 'tags',
+      back: () => craftingSubitem('Knowledge').click(),
+      view: 'knowledge',
+    },
+    {
+      name: 'the world travel realm list',
+      trip: 'switching Travel sub-tab and back',
+      open: async () => {
+        worldNavButton('Travel').click();
+      },
+      searchLabel: 'Search realms',
+      term: 'North',
+      leave: () => target.querySelector('[data-world-travel-item="map"]').click(),
+      leavesSearchBehind: true,
+      back: () => target.querySelector('[data-world-travel-item="realms"]').click(),
+      view: 'world-travel',
+    },
+  ];
+
+  /** Drive a `ManagerSearchField` the way a GM does: type into its input. */
+  function typeIntoSearch(ariaLabel, value) {
+    const input = target.querySelector(`input[type="search"][aria-label="${ariaLabel}"]`);
+    assert.ok(input, `no search field is labelled "${ariaLabel}"`);
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return input;
+  }
+
+  function searchValue(ariaLabel) {
+    return target.querySelector(`input[type="search"][aria-label="${ariaLabel}"]`)?.value;
+  }
+
+  for (const surface of LIFTED_BROWSE_SURFACES) {
+    it(`keeps ${surface.name} search across ${surface.trip}`, async () => {
+      mountManager([], surface.storeOptions || {});
+      await tick();
+      flushSync();
+      await surface.open();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        surface.view,
+        'the surface is on screen before anything is typed'
+      );
+      typeIntoSearch(surface.searchLabel, surface.term);
+      await tick();
+      flushSync();
+      assert.equal(
+        searchValue(surface.searchLabel),
+        surface.term,
+        'the field took the term, so the restore below is a measurement'
+      );
+
+      surface.leave();
+      await tick();
+      flushSync();
+      // NON-VACUITY: the trip really did replace the surface. Without this a `leave` that
+      // resolved to nothing would leave the browser mounted and the restore would be trivial.
+      if (surface.leftView) {
+        assert.equal(
+          target.querySelector('.fabricate-manager').dataset.managerView,
+          surface.leftView,
+          'the trip changed route, so the surface was unmounted'
+        );
+      }
+      if (surface.leftPanel) {
+        assert.ok(
+          searchValue(surface.leftPanel) !== undefined,
+          'the trip mounted the sibling panel, so this one was unmounted'
+        );
+        assert.equal(
+          searchValue(surface.leftPanel),
+          '',
+          'and the sibling has its OWN slot — the term did not leak across the tabs'
+        );
+      }
+      if (surface.leavesSearchBehind) {
+        assert.ok(
+          searchValue(surface.searchLabel) === undefined,
+          'the trip removed the surface, so its search box is gone from the document'
+        );
+      }
+
+      surface.back();
+      await tick();
+      flushSync();
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        surface.view,
+        'and the GM is back where they were'
+      );
+      assert.equal(
+        searchValue(surface.searchLabel),
+        surface.term,
+        `${surface.name} kept the search term across ${surface.trip}`
+      );
+    });
+  }
+
+  it('keeps a gathering task filter, not just its search, across the editor round-trip', async () => {
+    // The search box is the axis every surface in the table shares, so it is what the table
+    // asserts. A FILTER is a different control writing a different field of the same object,
+    // and a lift that carried only `searchTerm` would pass every row above.
+    mountManager([]);
+    await tick();
+    flushSync();
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-gathering-nav-tasks').click();
+    await tick();
+    flushSync();
+
+    const statusFilter = target.querySelector(
+      '[aria-label="Filter gathering tasks by status"], [data-gathering-tasks-browser] select'
+    );
+    assert.ok(statusFilter, 'the task toolbar offers a status filter');
+    // `active` rather than `disabled`: both are non-default, but filtering to `disabled` hides
+    // the only enabled task and with it the Edit button this test has to press next.
+    statusFilter.value = 'active';
+    statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(statusFilter.value, 'active', 'the filter took the value');
+
+    target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-task-edit'
+    );
+    target.querySelector('[data-gathering-task-back]').click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector(
+        '[aria-label="Filter gathering tasks by status"], [data-gathering-tasks-browser] select'
+      ).value,
+      'active',
+      'the status filter survived the editor round-trip'
+    );
+  });
+
+  it('does NOT lift the task editor four session search terms — they still reset', async () => {
+    // The other half of the rule, and the half a future change is most likely to erode. The
+    // editor's component / tag / drop-rule / tool pickers belong to ONE editing session: they
+    // name what the GM is attaching to THIS task right now, so carrying them back into the next
+    // task would apply a filter nobody set on a record nobody was editing.
+    //
+    // WHAT ACTUALLY ENFORCES IT is the editor's task-change effect, keyed on a COMPONENT-LOCAL
+    // `lastTaskId`. That sentinel re-initialises to '' on every mount, so re-entry always reads
+    // as a task change and always clears all four — which is why the four declared defaults are
+    // not what this test measures. Perturbing them alone leaves it green; the guard that would
+    // fail it is the one that matters, a term given a home that outlives the mount.
+    //
+    // The library tool is fixture data, not decoration: the tool picker's search box renders
+    // only behind `{#if libraryToolList.length > 0}`, so without it the fourth term is not on
+    // screen and the loop below would silently assert over three.
+    mountManager([], {
+      gatheringLibraryTools: [
+        { id: 'tool-chisel', label: 'Fine Chisel', enabled: true, componentId: 'c1' },
+      ],
+    });
+    await tick();
+    flushSync();
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    target.querySelector('#manager-gathering-nav-tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    // The FOUR the issue names, all four declared in `GatheringTaskEditView.svelte`. The
+    // manager root's own `Search character modifiers to add` box is NOT one of them — it is the
+    // shell's modifier picker, a different surface with a different owner, and asserting on it
+    // here would have measured something this component does not control.
+    const EDITOR_SEARCHES = [
+      'Search component names',
+      'Search component tags',
+      'Search drop rules',
+      'Search tools by name',
+    ];
+    for (const label of EDITOR_SEARCHES) {
+      typeIntoSearch(label, 'zzz');
+    }
+    await tick();
+    flushSync();
+    for (const label of EDITOR_SEARCHES) {
+      assert.equal(searchValue(label), 'zzz', `${label} took the term`);
+    }
+
+    target.querySelector('[data-gathering-task-back]').click();
+    await tick();
+    flushSync();
+    target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    for (const label of EDITOR_SEARCHES) {
+      assert.equal(
+        searchValue(label),
+        '',
+        `${label} is editor-session state and must still reset on re-entry`
+      );
+    }
   });
 
   it('states the bulk delete impact before arming, deletes every member, and needs two clicks', async () => {
@@ -26365,3 +26713,4 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
   });
 });
+

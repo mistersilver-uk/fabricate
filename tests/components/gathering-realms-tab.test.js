@@ -55,6 +55,8 @@ describe('GatheringRealmsTab mounted behavior', () => {
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    // The lifted browse view-state (issue 1438), imported by BOTH components below.
+    writeRawModule('src/utils/managerBrowserViewState.js');
     // The shared no-state primitive (issue 785) and the manager's ONE chip (issue 883).
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
     // rather than failing it.

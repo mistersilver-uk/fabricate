@@ -9,6 +9,10 @@
   import { filterTools, projectToolRow } from './tools/toolStudio.js';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import {
+    DEFAULT_BROWSER_PAGE_SIZE,
+    createToolsBrowserState,
+  } from '../../../../utils/managerBrowserViewState.js';
 
   let {
     tools = [],
@@ -20,11 +24,22 @@
     onCreateToolDrop = () => {},
     onToggleToolEnabled = () => {},
     onSetBreakageAuthority = () => {},
+    // ── THE VIEW-STATE IS LIFTED (issue 1438) ────────────────────────────────────────────
+    // Search and page live on an object the manager root owns and binds here: opening a tool
+    // switches `currentView` to `tool-edit`, which unmounts this component, so held locally
+    // both were reset by the trip out and back. Unbound, the local fallback keeps the controls
+    // reactive in-component for the isolated mounted tests.
+    browserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
-  let pageIndex = $state(0);
-  let pageSize = $state(8);
+  let ownBrowserState = $state(createToolsBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
+  const pageIndex = $derived(ui.pageIndex || 0);
+  const pageSize = $derived(ui.pageSize || DEFAULT_BROWSER_PAGE_SIZE);
+  // NOT lifted: this is the "nothing is selected, pick the first row" guard, and it names one
+  // mount's worth of auto-selection rather than anything the GM chose.
   let autoSelectedToolId = $state('');
 
   function text(key, fallback) {
@@ -38,7 +53,7 @@
   );
 
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredTools.length) pageIndex = 0;
+    if (pageIndex > 0 && pageIndex * pageSize >= filteredTools.length) ui.pageIndex = 0;
   });
 
   $effect(() => {
@@ -170,8 +185,8 @@
       <ManagerSearchField
         value={searchTerm}
         onInput={(next) => {
-          searchTerm = next;
-          pageIndex = 0;
+          ui.searchTerm = next;
+          ui.pageIndex = 0;
         }}
         placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
         ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search Tools')}
@@ -296,11 +311,11 @@
         pageSizeOptions={[8, 16, 24]}
         persistent
         onPageChange={(next) => {
-          pageIndex = next;
+          ui.pageIndex = next;
         }}
         onPageSizeChange={(next) => {
-          pageSize = next;
-          pageIndex = 0;
+          ui.pageSize = next;
+          ui.pageIndex = 0;
         }}
       />
     </div>

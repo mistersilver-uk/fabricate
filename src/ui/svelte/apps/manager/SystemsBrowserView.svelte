@@ -10,6 +10,10 @@
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import {
+    DEFAULT_BROWSER_PAGE_SIZE,
+    createSystemsBrowserState,
+  } from '../../../../utils/managerBrowserViewState.js';
 
   let {
     systems = [],
@@ -21,12 +25,22 @@
     onDeleteSystem = () => {},
     onToggleSystemEnabled = () => {},
     systemsLoading = false,
+    // ── THE VIEW-STATE IS LIFTED (issue 1438) ────────────────────────────────────────────
+    // Search, status, page and page size live on ONE object the manager root owns and binds
+    // here, because opening a system switches `currentView` to `system-edit` and UNMOUNTS this
+    // component: held locally, every control was reset by the trip out and back. When UNBOUND —
+    // the isolated mounted tests — the local fallback below keeps each control reactive
+    // in-component, exactly as the three shipped studios do.
+    browserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
-  let statusFilter = $state('all');
-  let pageIndex = $state(0);
-  let pageSize = $state(10);
+  let ownBrowserState = $state(createSystemsBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
+  const statusFilter = $derived(ui.statusFilter || 'all');
+  const pageIndex = $derived(ui.pageIndex || 0);
+  const pageSize = $derived(ui.pageSize || DEFAULT_BROWSER_PAGE_SIZE);
 
   // Same-named systems are indistinguishable in the rail; disambiguate colliding
   // display names with a short id suffix (issue 346). Built from the FULL list so a
@@ -55,7 +69,7 @@
 
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= filteredSystems.length) {
-      pageIndex = 0;
+      ui.pageIndex = 0;
     }
   });
 
@@ -100,8 +114,8 @@
   }
 
   function clearFilters() {
-    searchTerm = '';
-    statusFilter = 'all';
+    ui.searchTerm = '';
+    ui.statusFilter = 'all';
   }
 
   function toggleEnabled(systemId, enabled, event) {
@@ -128,7 +142,8 @@
 
   <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}>
     <ManagerSearchField
-      bind:value={searchTerm}
+      value={searchTerm}
+      onInput={(next) => (ui.searchTerm = next)}
       placeholder={text(
         'FABRICATE.Admin.Manager.SearchPlaceholder',
         'Search by name or description'
@@ -139,7 +154,7 @@
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <select
         value={statusFilter}
-        onchange={(event) => (statusFilter = event.currentTarget.value)}
+        onchange={(event) => (ui.statusFilter = event.currentTarget.value)}
         aria-label={text('FABRICATE.Admin.Manager.StatusFilterLabel', 'Filter systems by status')}
       >
         <option value="all">{text('FABRICATE.Admin.Manager.StatusAll', 'All systems')}</option>
@@ -203,7 +218,7 @@
           'Clear the search to show all configured systems.'
         )}
       >
-        <ManagerButton onclick={() => (searchTerm = '')}
+        <ManagerButton onclick={() => (ui.searchTerm = '')}
           >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
         >
       </EmptyState>
@@ -338,10 +353,10 @@
     totalCount={filteredSystems.length}
     {pageSize}
     {pageIndex}
-    onPageChange={(next) => (pageIndex = next)}
+    onPageChange={(next) => (ui.pageIndex = next)}
     onPageSizeChange={(next) => {
-      pageSize = next;
-      pageIndex = 0;
+      ui.pageSize = next;
+      ui.pageIndex = 0;
     }}
   />
 </main>

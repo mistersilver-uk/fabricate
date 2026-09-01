@@ -15,6 +15,10 @@
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
+  import {
+    DEFAULT_BROWSER_PAGE_SIZE,
+    createEnvironmentsBrowserState,
+  } from '../../../../utils/managerBrowserViewState.js';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
   import IconButton from '../../components/IconButton.svelte';
@@ -109,16 +113,35 @@
     onClearStaleTravelActor = () => {},
     // eslint-disable-next-line no-unused-vars -- retained unwired Travel CRUD; see note above
     onDropStaleOverrideRealm = () => {},
+    // The lifted browse view-state (issue 1438); see the block below the destructure.
+    browserState = $bindable(null),
+    // The two gathering child browsers' own lifted state, threaded straight through. They are
+    // rendered HERE but owned by the root for the same reason this one is: their editor routes
+    // unmount this whole subtree, so a slot held one level up would die with it.
+    gatheringTasksBrowserState = $bindable(null),
+    gatheringEventsBrowserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
-  let statusFilter = $state('all');
-  let selectionFilter = $state('all');
-  let riskFilter = $state('all');
-  let biomeFilter = $state('all');
-  let lastSystemId = $state('');
-  let pageIndex = $state(0);
-  let pageSize = $state(10);
+  // ── THE BROWSE VIEW-STATE IS LIFTED (issue 1438) ──────────────────────────────────────
+  // Search, the four filter axes, the page AND the system-switch sentinel live on one object
+  // the manager root owns and binds through `browserState`. Opening an environment, a task or
+  // an encounter switches `currentView` to that editor route, which unmounts this component;
+  // held locally, every control was reset by the trip out and back. The SENTINEL comes too: a
+  // component-local one re-initialises to '' on the remount, so the effect below would read
+  // the return as a system switch and wipe the state the lift exists to preserve.
+  //
+  // The vocabulary ADD-FORM inputs below are deliberately NOT lifted. A half-typed biome name
+  // is one sitting's work, not a filter, and it is still cleared by a system switch.
+  let ownBrowserState = $state(createEnvironmentsBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
+  const statusFilter = $derived(ui.statusFilter || 'all');
+  const selectionFilter = $derived(ui.selectionFilter || 'all');
+  const riskFilter = $derived(ui.riskFilter || 'all');
+  const biomeFilter = $derived(ui.biomeFilter || 'all');
+  const pageIndex = $derived(ui.pageIndex || 0);
+  const pageSize = $derived(ui.pageSize || DEFAULT_BROWSER_PAGE_SIZE);
   let weatherInput = $state('');
   let timeOfDayInput = $state('');
   let biomeInput = $state('');
@@ -179,12 +202,12 @@
   ];
 
   $effect(() => {
-    if (selectedSystemId === lastSystemId) return;
-    searchTerm = '';
-    statusFilter = 'all';
-    selectionFilter = 'all';
-    riskFilter = 'all';
-    biomeFilter = 'all';
+    if (selectedSystemId === ui.systemId) return;
+    ui.searchTerm = '';
+    ui.statusFilter = 'all';
+    ui.selectionFilter = 'all';
+    ui.riskFilter = 'all';
+    ui.biomeFilter = 'all';
     weatherInput = '';
     timeOfDayInput = '';
     biomeInput = '';
@@ -194,7 +217,7 @@
     biomeColorTokenInput = 'sage';
     biomeCustomColorInput = '';
     openBiomeColorPickerId = '';
-    lastSystemId = selectedSystemId;
+    ui.systemId = selectedSystemId;
   });
 
   const environmentList = $derived(environments || []);
@@ -281,7 +304,7 @@
 
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= filteredEnvironments.length) {
-      pageIndex = 0;
+      ui.pageIndex = 0;
     }
   });
 
@@ -370,11 +393,11 @@
   }
 
   function clearFilters() {
-    searchTerm = '';
-    statusFilter = 'all';
-    selectionFilter = 'all';
-    riskFilter = 'all';
-    biomeFilter = 'all';
+    ui.searchTerm = '';
+    ui.statusFilter = 'all';
+    ui.selectionFilter = 'all';
+    ui.riskFilter = 'all';
+    ui.biomeFilter = 'all';
   }
 
   function selectGatheringTab(tabId) {
@@ -724,7 +747,8 @@
         ariaLabel={text('FABRICATE.Admin.Manager.Environment.Filters', 'Environment filters')}
       >
         <ManagerSearchField
-          bind:value={searchTerm}
+          value={searchTerm}
+          onInput={(next) => (ui.searchTerm = next)}
           placeholder={text(
             'FABRICATE.Admin.Manager.Environment.SearchPlaceholder',
             'Search environments...'
@@ -735,7 +759,7 @@
           <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <select
             value={statusFilter}
-            onchange={(event) => (statusFilter = event.currentTarget.value)}
+            onchange={(event) => (ui.statusFilter = event.currentTarget.value)}
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.StatusFilterLabel',
               'Filter environments by status'
@@ -760,7 +784,7 @@
           <span>{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
           <select
             value={selectionFilter}
-            onchange={(event) => (selectionFilter = event.currentTarget.value)}
+            onchange={(event) => (ui.selectionFilter = event.currentTarget.value)}
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.SelectionFilterLabel',
               'Filter environments by selection mode'
@@ -781,7 +805,7 @@
           <span>{text('FABRICATE.Admin.Manager.Environment.Risk', 'Risk')}</span>
           <select
             value={riskFilter}
-            onchange={(event) => (riskFilter = event.currentTarget.value)}
+            onchange={(event) => (ui.riskFilter = event.currentTarget.value)}
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.RiskFilterLabel',
               'Filter environments by risk'
@@ -808,7 +832,7 @@
           <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
           <select
             value={biomeFilter}
-            onchange={(event) => (biomeFilter = event.currentTarget.value)}
+            onchange={(event) => (ui.biomeFilter = event.currentTarget.value)}
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.BiomeFilterLabel',
               'Filter environments by biome'
@@ -1079,10 +1103,10 @@
         totalCount={filteredEnvironments.length}
         {pageSize}
         {pageIndex}
-        onPageChange={(next) => (pageIndex = next)}
+        onPageChange={(next) => (ui.pageIndex = next)}
         onPageSizeChange={(next) => {
-          pageSize = next;
-          pageIndex = 0;
+          ui.pageSize = next;
+          ui.pageIndex = 0;
         }}
       />
     </div>
@@ -1100,6 +1124,7 @@
       onDuplicateTask={onDuplicateGatheringTask}
       onDeleteTask={onDeleteGatheringTask}
       onToggleTaskEnabled={onToggleGatheringTaskEnabled}
+      bind:browserState={gatheringTasksBrowserState}
     />
   {:else if activeGatheringTab === 'encounters'}
     <div class="manager-gathering-encounters-shell" data-gathering-encounters-shell>
@@ -1115,6 +1140,7 @@
         onDuplicateEvent={onDuplicateGatheringEvent}
         onDeleteEvent={onDeleteGatheringEvent}
         onToggleEventEnabled={onToggleGatheringEventEnabled}
+        bind:browserState={gatheringEventsBrowserState}
       />
     </div>
   {:else if activeGatheringTab === 'travel'}
