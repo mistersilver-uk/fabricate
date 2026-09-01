@@ -41,6 +41,7 @@ const bulkDeleteCardSource = read('src/ui/svelte/apps/manager/BulkDeleteCard.sve
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
 const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte');
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
+const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
 const onCraftSource = read('src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte');
 const segmentedControlSource = read('src/ui/svelte/apps/manager/SegmentedControl.svelte');
 const globalCss = read('styles/fabricate.css');
@@ -623,21 +624,52 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     assert.ok(actions < usage, 'and the usage card');
   });
 
-  it('titles the inspector behaviour list once', () => {
-    // The rendered symptom: an `On craft` card heading with an `Effective behaviour` kicker
-    // immediately under it, for one list of three rows — the prototype's single `ON CRAFT`
-    // kicker drawn twice.
+  it('titles the behaviour list once, and offers no prop with which to title it twice', () => {
+    // The rendered symptom this began as: an `On craft` card heading with an `Effective
+    // behaviour` kicker immediately under it, for one list of three rows — the reference's
+    // single `ON CRAFT` kicker drawn twice. The fix was a `showEffectiveKicker` prop the
+    // browser inspector passed `false`.
+    //
+    // THE PROP IS GONE NOW, WITH ITS ONLY CALLER (issue 1372, maintainer parity round 8). The
+    // inspector draws the reference's `ON CRAFT IN <system>` cards instead, so `showIdentity`,
+    // `showLiveNote` and `showEffectiveKicker` all had zero callers left — configuration that
+    // cannot be reached rather than a capability.
+    for (const prop of ['showEffectiveKicker', 'showIdentity', 'showLiveNote']) {
+      assert.ok(
+        !new RegExp(`${prop}\s*=`).test(previewSource),
+        `${prop} is declared with no call site that passes it`
+      );
+    }
     assert.ok(
-      previewSource.includes('showEffectiveKicker = true'),
-      'the preview can suppress its own kicker'
+      previewSource.includes("'FABRICATE.Admin.Manager.Essence.Preview.Effective'"),
+      'NON-VACUITY: the kicker the prop used to gate is still rendered, unconditionally'
+    );
+  });
+
+  it('gives the inspector ON CRAFT section the system name and the layer per card', () => {
+    // ── B2 (issue 1372, maintainer parity round 8) ──────────────────────────────────────────
+    // The reference titles this section `ON CRAFT IN <system>` and each card after the VALUE
+    // that section resolves to, with `· overridden here` or `· world default` under it
+    // (`tmp/proto/essence-rules.png`). The shipped section was titled `On craft` and rendered
+    // the generic behaviour preview with no provenance at all, on the one screen whose whole
+    // subject is inherit-versus-override.
+    assert.ok(
+      !inspectorSource.includes('<EssenceBehaviorPreview'),
+      'the inspector no longer answers a different question with the preview component'
     );
     assert.ok(
-      /\{#if showEffectiveKicker\}/.test(previewSource),
-      'and actually gates it rather than declaring an unused prop'
+      inspectorSource.includes('projectEssenceOnCraftCards'),
+      'it projects the resolved-rule cards instead'
     );
     assert.ok(
-      inspectorSource.includes('showEffectiveKicker={false}'),
-      'and the inspector, whose card already carries the heading, suppresses it'
+      inspectorSource.includes("'FABRICATE.Admin.Manager.Essence.OnCraftIn'"),
+      'and its heading names the system'
+    );
+    // The PROVENANCE half, at the projection: a card with an inherit map ends in a layer clause,
+    // and one without a membership record ends in nothing rather than inventing one.
+    assert.ok(
+      studioSource.includes('SuffixOverridden') && studioSource.includes('SuffixWorldDefault'),
+      'the projection reads the same two suffix keys the row summary and the editor already use'
     );
   });
 

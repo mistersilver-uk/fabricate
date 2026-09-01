@@ -1058,6 +1058,22 @@
   }
 
   /*
+     AND THE DESCRIPTION IS THE REFERENCE'S 11px, for the reason the name rule above states.
+
+     `.manager-system-description` is a shared 0.78rem, sized for a browser row whose identity
+     cell is the whole width. In this catalogue's row the cell is about 340px of a 714px row —
+     the same ~49% share the reference gives it, measured on both — so the two rows differ not in
+     LAYOUT but in TYPE: at 0.78rem the same cell holds about 62 characters where the reference's
+     11px holds about 70, and every description longer than that ellipsised two words early while
+     the reference's fitted whole. The row NAME took its own scoped size one rule above for
+     exactly this reason; this is the sibling half of that, and it is the type divergence the
+     standing ruling resolves in the reference's favour.
+  */
+  .manager-scoped-list-row .manager-system-description {
+    font-size: 0.69rem;
+  }
+
+  /*
      THE FILTER ROW IS ONE LINE, AND IT TAKES A RULE TO SAY SO.
 
      Foundry core sizes every `<select>` to `width: 100%`, and neither the global toolbar block
@@ -1165,19 +1181,25 @@
      the `overflow-y`, exactly as `.manager-scoped-list-column` already arranges its own three
      parts. A `grid-template-rows` triple would do the same but charge two row gaps for the two
      tracks the resting and bulk states leave empty. */
+  /* A BARE COLUMN, NOT A CARD (issue 1372, maintainer parity round 8).
+
+     The reference's inspector is an unbordered column on the pane's own surface, with a single
+     hairline above its pinned foot action (`tmp/proto/essence-catalogue.png`). This carried a
+     1px border and a 10px radius around the whole panel, so its world-default cards, its system
+     rows and its roster panel all read as cards inside a card — three nested borders where the
+     reference has one, and a right third that looked like a separate screen.
+
+     The surface stays `--fab-bg-0`, the pane's own: `--fab-bg-2` put the column two rungs above
+     the pane, which is the divergence that made it read as a different screen in the first
+     place. The `padding-inline-start` is what now separates the column from the list, since
+     there is no border to do it. */
   .manager-scoped-list-inspector {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
     min-width: 0;
     min-height: 0;
-    padding: var(--fab-space-2) var(--fab-space-3) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 10px;
-    /* THE PANE'S OWN SURFACE, not a rung above it. The prototype's inspector column is the same
-       shade as the list beside it and is bounded by its border (issue 1372); `--fab-bg-2` put
-       it two rungs above the pane, which is what made the whole right third read as a different,
-       lighter screen. */
+    padding: var(--fab-space-2) 0 var(--fab-space-3) var(--fab-space-3);
     background: var(--fab-bg-0);
   }
 

@@ -328,9 +328,9 @@ export function isDocumentUuid(value) {
  * @returns {string} `''` when no token is set.
  */
 export function essenceColourCaption(token) {
+  const label = essenceColourName(token);
+  if (label === '') return '';
   const name = String(token ?? '').trim();
-  if (name === '') return '';
-  const label = name.charAt(0).toUpperCase() + name.slice(1);
   const target = globalThis.document?.querySelector?.('.fabricate') ?? null;
   if (!target || typeof globalThis.getComputedStyle !== 'function') return label;
   let value = '';
@@ -345,6 +345,28 @@ export function essenceColourCaption(token) {
     return label;
   }
   return value ? `${label} \u00b7 ${value.toUpperCase()}` : label;
+}
+
+/**
+ * The DISPLAY NAME of a `--fab-tag-*` colour token, with no hex.
+ *
+ * The half of {@link essenceColourCaption} that the SYSTEM-scope inspector wants. The reference
+ * captions a world essence `<name> · <hex>` and a system-scope one `<name> · N components here`
+ * (`proto:5086`): the world screen owns the colour and states its resolved value, and the system
+ * screen names it only to say which tile the GM is looking at before it states this system's own
+ * fact. One implementation, so the two captions can never disagree about what a token is called.
+ *
+ * No literal appears here, in the caption or in this comment: `theme-colour-contract.test.js`
+ * scans comments too, and rightly so — a hex in a comment is how one gets copied into a
+ * declaration.
+ *
+ * @param {string} token a `--fab-tag-*` token name, e.g. `lavender`.
+ * @returns {string} `''` when no token is set.
+ */
+export function essenceColourName(token) {
+  const name = String(token ?? '').trim();
+  if (name === '') return '';
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /**

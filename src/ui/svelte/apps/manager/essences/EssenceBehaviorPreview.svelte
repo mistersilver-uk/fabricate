@@ -3,13 +3,18 @@
   What an essence DOES — the editor's live preview panel, and the browser inspector's
   ON CRAFT list (issue 1036).
 
-  ONE component for both, because they are one list. The delta is explicit that
-  `EssenceBrowserInspector` renders this rather than re-authoring the same three facts a
-  second time; the difference between the two sites is the surrounding CHROME (the "How it
-  appears" card and the live-update note), which the inspector suppresses through
-  `showIdentity` / `showLiveNote`. There is no third `is-embedded` treatment: it declared
-  the base rule's own `gap` and its comment described removing padding this block never had,
-  so it changed nothing.
+  TWO CALLERS, ONE SHAPE: the system-scope essence rules editor's rail and the world essence
+  entry editor's preview panel. Both are EDITORS, both draw the whole panel, and the only thing
+  that differs between them is which layer the two behaviour rows are worded for — `scope`.
+
+  ── THE THREE SUPPRESSION PROPS ARE GONE (issue 1372, maintainer parity round 8) ───
+  `showIdentity`, `showLiveNote` and `showEffectiveKicker` existed for ONE caller,
+  `EssenceBrowserInspector`, which rendered this panel with all three off. That rail now draws
+  the reference's `ON CRAFT IN <system>` cards instead — resolved values with the layer each came
+  from, which is a different question from this panel's facts — so all three props had exactly no
+  caller left. Configuration that cannot be reached is not a capability, and a prop kept "in case"
+  is the shape the design-system spec refuses; a future embedder that genuinely needs one adds it
+  back with its call site in the same change.
 
   ── "HOW IT APPEARS" MOUNTS THE REAL PLAYER TILE, NOT A CHIP (issue 1036, round 3) ──
   The maintainer's note: the schematic swatch-chips ("On a component", "As a recipe input")
@@ -49,13 +54,12 @@
     sourceName = '',
     macroName = '',
     sampleComponentName = '',
-    showIdentity = true,
-    showLiveNote = true,
-    // Whether the rules list titles ITSELF. In the editor's rail it must, because three
-    // other kickers precede it. In the browser inspector the enclosing card already carries
-    // an `On craft` heading, so the kicker rendered a second heading immediately under the
-    // first for one list — which is the prototype's ONE `ON CRAFT` kicker drawn twice.
-    showEffectiveKicker = true,
+    // WHICH LAYER THIS PANEL DESCRIBES (issue 1372, maintainer parity round 8). `'world'` words
+    // the two behaviour rows as the reference words them on the world essence entry — `Default
+    // effects from X` over `Systems that inherit copy these onto anything crafted with it` — so
+    // a GM editing a record every crafting system resolves against is told so on the one panel
+    // that shows them the consequence. `'system'` keeps the shipped wording verbatim.
+    scope = 'system',
   } = $props();
 
   function text(key, fallback) {
@@ -78,7 +82,7 @@
   const facts = $derived(
     projectEssenceBehaviourFacts(
       essence,
-      { effectTransferEnabled, propertyMacrosEnabled, sourceName, macroName },
+      { effectTransferEnabled, propertyMacrosEnabled, sourceName, macroName, scope },
       text,
       format
     )
@@ -109,51 +113,47 @@
   data-essence-behavior-preview
   aria-label={text('FABRICATE.Admin.Manager.Essence.Preview.Label', 'Essence behaviour preview')}
 >
-  {#if showIdentity}
-    <div class="manager-essence-preview-appears-head">
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.Essence.Preview.Kicker', 'How players see it')}
-      </p>
-      {#if disabled}
-        <StatusPill
-          tone="neutral"
-          icon="fas fa-circle-pause"
-          label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
-        />
-      {/if}
-    </div>
+  <div class="manager-essence-preview-appears-head">
+    <p class="manager-kicker">
+      {text('FABRICATE.Admin.Manager.Essence.Preview.Kicker', 'How players see it')}
+    </p>
+    {#if disabled}
+      <StatusPill
+        tone="subtle"
+        icon="fas fa-circle-pause"
+        label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
+      />
+    {/if}
+  </div>
 
-    <!-- The REAL player tiles, fed synthetic rows — so the preview can never drift from
+  <!-- The REAL player tiles, fed synthetic rows — so the preview can never drift from
          what a player actually sees. LEFT: the essence's own inventory tile. RIGHT: a fake
          component (a core Foundry icon item) carrying the essence as a pip. -->
-    <div class="manager-essence-preview-appears" data-essence-preview-appears>
-      <div class="manager-essence-preview-appears-cell" data-essence-preview-tile>
-        <span class="manager-muted"
-          >{text(
-            'FABRICATE.Admin.Manager.Essence.Preview.InventoryTile',
-            'As an inventory tile'
-          )}</span
-        >
-        <div class="manager-essence-preview-card">
-          <InventoryItemCard item={previewRows.essence} interactive={false} />
-        </div>
-      </div>
-      <div class="manager-essence-preview-appears-cell" data-essence-preview-component>
-        <span class="manager-muted"
-          >{text('FABRICATE.Admin.Manager.Essence.Preview.OnAComponent', 'On a component')}</span
-        >
-        <div class="manager-essence-preview-card">
-          <InventoryItemCard item={previewRows.component} interactive={false} />
-        </div>
+  <div class="manager-essence-preview-appears" data-essence-preview-appears>
+    <div class="manager-essence-preview-appears-cell" data-essence-preview-tile>
+      <span class="manager-muted"
+        >{text(
+          'FABRICATE.Admin.Manager.Essence.Preview.InventoryTile',
+          'As an inventory tile'
+        )}</span
+      >
+      <div class="manager-essence-preview-card">
+        <InventoryItemCard item={previewRows.essence} interactive={false} />
       </div>
     </div>
-  {/if}
+    <div class="manager-essence-preview-appears-cell" data-essence-preview-component>
+      <span class="manager-muted"
+        >{text('FABRICATE.Admin.Manager.Essence.Preview.OnAComponent', 'On a component')}</span
+      >
+      <div class="manager-essence-preview-card">
+        <InventoryItemCard item={previewRows.component} interactive={false} />
+      </div>
+    </div>
+  </div>
 
-  {#if showEffectiveKicker}
-    <p class="manager-kicker">
-      {text('FABRICATE.Admin.Manager.Essence.Preview.Effective', 'Effective behaviour')}
-    </p>
-  {/if}
+  <p class="manager-kicker">
+    {text('FABRICATE.Admin.Manager.Essence.Preview.Effective', 'Effective behaviour')}
+  </p>
   <ul class="manager-essence-preview-rules">
     {#each facts as fact (fact.id)}
       <li data-essence-preview-rule={fact.id} data-essence-preview-suppressed={fact.suppressed}>
@@ -162,17 +162,16 @@
     {/each}
   </ul>
 
-  {#if showLiveNote}
-    <aside class="manager-essence-preview-live" data-essence-preview-live>
-      <i class="fas fa-circle-check" aria-hidden="true"></i>
-      <span
-        >{text(
-          'FABRICATE.Admin.Manager.Essence.Preview.LiveUpdate',
-          'This preview updates live as you edit.'
-        )}</span
-      >
-    </aside>
-  {/if}
+  <!-- Both callers are editors whose preview recomputes on every keystroke, so both say so. -->
+  <aside class="manager-essence-preview-live" data-essence-preview-live>
+    <i class="fas fa-circle-check" aria-hidden="true"></i>
+    <span
+      >{text(
+        'FABRICATE.Admin.Manager.Essence.Preview.LiveUpdate',
+        'This preview updates live as you edit.'
+      )}</span
+    >
+  </aside>
 </aside>
 
 <style>
@@ -213,6 +212,31 @@
      schematic context, so it reads as a sample tile rather than a hero image. */
   .manager-essence-preview-card {
     max-width: 132px;
+  }
+
+  /* A MATCHED PAIR, AND IT TAKES A RULE TO MAKE THEM ONE (issue 1372, maintainer parity round 8).
+
+     The reference draws two identical tiles with their captions below them and their bottom
+     edges level (`tmp/proto/essence-entry.png`). Measured on `world-essence-entry`, the two cells
+     were the same 149x196 and the two cards the same 132 wide — and 154px against 169px TALL,
+     because `InventoryItemCard`'s name wraps and one of the two names is three words. So the
+     right tile's caption sat lower than the left's, its frame ran deeper, and the pair read as
+     two differently-sized samples rather than as one before/after.
+
+     The name is clamped to ONE line here rather than in `InventoryItemCard`, which is the PLAYER
+     grid's card: there a wrapped two-line name is correct and the whole grid wraps with it. What
+     is specific to this panel is that exactly two of them stand side by side as a comparison, so
+     the equality is a property of the comparison and not of the card.
+
+     `:global()` because the element belongs to `InventoryItemCard`, scoped under this panel's own
+     class so it reaches no other mount of that component. */
+  .manager-essence-preview-card :global(.inventory-card-name) {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    text-overflow: ellipsis;
   }
 
   .manager-essence-preview-rules {
