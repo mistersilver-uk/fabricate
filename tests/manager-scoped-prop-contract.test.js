@@ -186,6 +186,10 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './essences/EssenceBulkEditPanel.svelte',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',
+  // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
+  // beside its sibling below because this list is asserted SORTED. See the note on
+  // `scopedEntryDraft.js` for what the seam is and why both halves are only renderable here.
+  './scoped/ScopedEntryHeaderActions.svelte',
   './scoped/WorldComponentCataloguePage.svelte',
   './scoped/WorldComponentEntryPage.svelte',
   './scoped/WorldEssenceCataloguePage.svelte',
@@ -193,6 +197,19 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './scoped/WorldToolCataloguePage.svelte',
   './scoped/WorldToolEntryPage.svelte',
   './scoped/WorldVocabularyPage.svelte',
+  // ADDED BY ISSUE 1372's HEADER-CREATE SEAM. The prototype puts `+ New essence` in the page
+  // header band, which only this file renders; `mintEssenceId` is the epic's own import-free
+  // presentation leaf and slugs the new record's id with suffix collision resolution, so the
+  // alternative to importing it was a second copy of that logic in the gateway.
+  './scoped/essenceScoped.js',
+  // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4). The world entry editors
+  // buffer their edits and are saved explicitly, and BOTH things that act on a buffered edit are
+  // renderable only here: the header action pair, because `.manager-header` is a sibling of
+  // `.manager-main`, and the route-exit prompt, because leaving via the rail or the breadcrumb
+  // never reaches the page. `scopedEntryDraft.js` is the epic's own import-free draft leaf and
+  // `confirmScopedEntryExit` is the guard shape both entry editors take, so the alternative to
+  // importing it was a second copy of that shape in the gateway.
+  './scoped/scopedEntryDraft.js',
   './scoped/scopedEntryRoutes.js',
   './tools/ToolBrowserInspector.svelte',
   './world/WorldCurrencyTab.svelte',
@@ -495,8 +512,14 @@ test('the world-scope write path is supplied FOUR store legs', () => {
   // declares one. Its falsifiability is here: delete the leg and this reds, and the lane that
   // needs it would otherwise have to reopen a file requirement 7 closes to it.
   const adminStore = readFileSync(resolve(repoRoot, ADMIN_STORE_PATH), 'utf8');
+  //
+  // THE BINDING IS `worldScopeFamilies`, NOT `worldScope` (issue 1372, maintainer parity round 8).
+  // The store now COMPOSES the generic families into its published `worldScope`, overriding
+  // exactly one verb: the essence family's `addToSystem`, whose second half — the in-system
+  // `essenceDefinitions` row — lives in a store `worldScopeActions.js` cannot reach. So the
+  // factory call is read by the name it is assigned to, and the composition is asserted below it.
   const call =
-    /const worldScope = createWorldScopeActions\(\{\s*getStores: \{([\s\S]*?)\},\s*\}\);/.exec(
+    /const worldScopeFamilies = createWorldScopeActions\(\{\s*getStores: \{([\s\S]*?)\},\s*\}\);/.exec(
       adminStore
     );
   assert.ok(call, 'createWorldScopeActions is called with an inline getStores map');
@@ -505,5 +528,13 @@ test('the world-scope write path is supplied FOUR store legs', () => {
     legs.slice().sort(),
     ['component', 'essence', 'tool', 'vocabulary'],
     'the write path reads the same four store legs the read path does'
+  );
+  // ONE verb is overridden, and only on the essence family: a spread of the generic families with
+  // an essence override. A composition that replaced the whole family, or that reached another
+  // entity type, would be a second write path rather than one seam on one verb.
+  assert.match(
+    adminStore,
+    /const worldScope = \{\s*\.\.\.worldScopeFamilies,\s*essence: \{ \.\.\.worldScopeFamilies\.essence, addToSystem: joinEssenceToSystem \},\s*\};/,
+    'the published write path is the generic families with ONE essence verb composed over them'
   );
 });

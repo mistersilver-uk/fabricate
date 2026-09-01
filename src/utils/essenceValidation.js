@@ -93,6 +93,23 @@ export const ESSENCE_VALIDATION_CHECKS = Object.freeze([
   'macro',
   'source',
   'usage',
+  // ── THE WORLD-SCOPE PASS (issue 1372) ────────────────────────────────────────────────────
+  // Three checks over the WORLD DEFAULTS, which exist only on the world entry editor. They are
+  // in this one list rather than a second one because `essenceStudio.js` filters
+  // `ESSENCE_VALIDATION_CHECKS` before it maps: a second list is a second render order, and the
+  // half-registered-check trap this module already guards against would then have two doors.
+  'worldEffectSource',
+  'worldMacro',
+  'worldUsage',
+  // ── THE SYSTEM-SCOPE PASS (issue 1372) ───────────────────────────────────────────────────
+  // Five checks about THIS system's membership record. `systemRules` is the gate: with no
+  // record the other four are not merely passing, they are unanswerable, so the evaluator
+  // returns after it and they are OMITTED rather than reported as passes.
+  'systemRules',
+  'systemEnabled',
+  'systemEffectSource',
+  'systemMacro',
+  'systemCarrier',
 ]);
 
 /** Blocking stops nothing shipping; it is what the editor's Blocking count reports. */
@@ -104,7 +121,56 @@ const SEVERITY = Object.freeze({
   macro: 'warning',
   source: 'warning',
   usage: 'info',
+  worldEffectSource: 'warning',
+  worldMacro: 'warning',
+  worldUsage: 'warning',
+  systemRules: 'blocking',
+  systemEnabled: 'info',
+  systemEffectSource: 'warning',
+  systemMacro: 'warning',
+  systemCarrier: 'blocking',
 });
+
+/**
+ * The scope each check belongs to.
+ *
+ * `both` is the IDENTITY set — name, icon, colour, description — which the world catalogue owns
+ * and every system renders unchanged, so it is the same question on either screen. Everything
+ * else is scope-specific, and a check evaluated out of its scope is not a pass: it is a row about
+ * data the screen does not hold. `essenceStudio.js` drops a check the evaluator did not return,
+ * which is the mechanism this table drives.
+ *
+ * @type {Readonly<Record<string, 'both'|'world'|'system'>>}
+ */
+const CHECK_SCOPE = Object.freeze({
+  name: 'both',
+  icon: 'both',
+  colour: 'both',
+  description: 'both',
+  macro: 'system',
+  source: 'system',
+  usage: 'system',
+  worldEffectSource: 'world',
+  worldMacro: 'world',
+  worldUsage: 'world',
+  systemRules: 'system',
+  systemEnabled: 'system',
+  systemEffectSource: 'system',
+  systemMacro: 'system',
+  systemCarrier: 'system',
+});
+
+/**
+ * The five system-scope membership checks `systemRules` gates, in render order.
+ *
+ * @type {readonly string[]}
+ */
+const SYSTEM_MEMBERSHIP_CHECKS = Object.freeze([
+  'systemEnabled',
+  'systemEffectSource',
+  'systemMacro',
+  'systemCarrier',
+]);
 
 function trimmed(value) {
   return String(value ?? '').trim();
@@ -143,12 +209,41 @@ function trimmed(value) {
  * Every informational check reports `valid: true` and carries a `state`, so `passing +
  * warnings + blocking` always equals the number of checks and no row is uncounted.
  *
+ * ── THE TWO SCOPED PASSES (issue 1372) ────────────────────────────────────────────────────
+ *
+ * `scope: 'world'` swaps the three SYSTEM-RECORD checks (`macro`, `source`, `usage`) for three
+ * about the WORLD DEFAULTS. It is a swap rather than an addition because a world entity holds no
+ * `propertyMacroUuid` and no `sourceState`: evaluated there those three report vacuous passes,
+ * and a pass about data the screen does not hold is worse than no row.
+ *
+ * - **worldEffectSource** *(warning)* — a member system that inherits gains no active effects on
+ *   craft while this is unset.
+ * - **worldMacro** *(warning)* — nothing runs on craft for a system that inherits.
+ * - **worldUsage** *(warning)* — no system has rules for it, so nothing reads its values yet.
+ *
+ * `membershipKnown: true` arms the five SYSTEM-SCOPE checks, and the flag exists so the shipped
+ * essence editor — which cannot answer any of them — keeps reporting exactly the seven checks it
+ * always did. `systemRules` is the gate: with `member: false` it BLOCKS and the evaluator returns
+ * without the other four, because "is the effect source inherited" has no answer for a record
+ * that does not exist, and rendering it as a pass would say it does.
+ *
+ * - **systemRules** *(blocking)* — no membership record in this system.
+ * - **systemEnabled** *(informational, ALWAYS a pass)* — disabled here is a state a GM chose.
+ * - **systemEffectSource** / **systemMacro** *(warning)* — whether the section resolves at all,
+ *   with the state naming which scope won.
+ * - **systemCarrier** *(blocking)* — enabled here, and no component in this system carries it, so
+ *   every recipe requiring it can never be satisfied.
+ *
  * @param {{name?: string, icon?: string, colorToken?: ?string, description?: string,
  *   propertyMacroUuid?: ?string, enabled?: boolean}} essence
  * @param {{propertyMacrosEnabled?: boolean, effectTransferEnabled?: boolean,
  *   macroResolved?: ?boolean, sourceState?: string, componentUsageCount?: number,
- *   recipeUsageCount?: number}} [context] `macroResolved` is `null`/`undefined` while
- *   resolution is still in flight, which passes — a spinner must not read as a defect.
+ *   recipeUsageCount?: number, scope?: string, membershipKnown?: boolean, member?: boolean,
+ *   enabledHere?: boolean, sectionInherited?: {[section: string]: boolean},
+ *   resolvedEffectSource?: unknown, resolvedMacro?: unknown, componentCarrierCount?: number,
+ *   worldEffectSource?: unknown, worldMacro?: unknown, memberSystemCount?: number}} [context]
+ *   `macroResolved` is `null`/`undefined` while resolution is still in flight, which passes — a
+ *   spinner must not read as a defect.
  * @returns {{checks: {id: string, severity: string, valid: boolean, state: string}[],
  *   counts: {passing: number, warnings: number, blocking: number}}}
  */
@@ -161,6 +256,10 @@ export function essenceEditorValidation(essence, context = {}) {
     (sourceState === 'stale' || sourceState === 'missing');
   const inUse = Number(context.componentUsageCount) > 0 || Number(context.recipeUsageCount) > 0;
   const disabled = essence?.enabled === false;
+  const worldScope = context.scope === 'world';
+  const membershipKnown = context.membershipKnown === true;
+  const member = context.member === true;
+  const enabledHere = context.enabledHere !== false;
 
   const states = {
     name: trimmed(essence?.name) ? 'authored' : 'missing',
@@ -170,10 +269,24 @@ export function essenceEditorValidation(essence, context = {}) {
     macro: macroResolutionState(macroApplies, context.macroResolved),
     source: sourceApplies ? sourceState : 'ok',
     usage: usageState(disabled, inUse),
+    worldEffectSource: authoredState(context.worldEffectSource),
+    worldMacro: authoredState(context.worldMacro),
+    worldUsage: Number(context.memberSystemCount) > 0 ? 'used' : 'missing',
+    systemRules: member ? 'member' : 'missing',
+    systemEnabled: enabledHere ? 'enabled' : 'disabled',
+    systemEffectSource: sectionState(
+      context.resolvedEffectSource,
+      context.sectionInherited,
+      'effectSource'
+    ),
+    systemMacro: sectionState(context.resolvedMacro, context.sectionInherited, 'macro'),
+    systemCarrier: enabledHere && Number(context.componentCarrierCount) === 0 ? 'missing' : 'ok',
   };
   const failing = new Set(['missing', 'unresolved', 'stale']);
 
-  const checks = ESSENCE_VALIDATION_CHECKS.map((id) => {
+  const checks = ESSENCE_VALIDATION_CHECKS.filter((id) =>
+    checkApplies(id, { worldScope, membershipKnown, member })
+  ).map((id) => {
     const severity = SEVERITY[id];
     const state = states[id];
     return {
@@ -206,4 +319,49 @@ function macroResolutionState(applies, macroResolved) {
 function usageState(disabled, inUse) {
   if (!disabled) return 'enabled';
   return inUse ? 'disabled-in-use' : 'disabled-unused';
+}
+
+/**
+ * Whether one check is answerable on the screen that is asking.
+ *
+ * THE FOUR MEMBERSHIP CHECKS ARE GATED ON `member`, and that is the "and it returns" clause of
+ * the system-scope pass: with no record their subject does not exist, and the alternative to
+ * omitting them is four rows reporting passes about a record nobody authored.
+ *
+ * @param {string} id
+ * @param {{worldScope: boolean, membershipKnown: boolean, member: boolean}} scope
+ * @returns {boolean}
+ */
+function checkApplies(id, { worldScope, membershipKnown, member }) {
+  const owner = CHECK_SCOPE[id];
+  if (owner === 'both') return true;
+  if (owner === 'world') return worldScope;
+  if (worldScope) return false;
+  if (id === 'systemRules') return membershipKnown;
+  if (SYSTEM_MEMBERSHIP_CHECKS.includes(id)) return membershipKnown && member;
+  return true;
+}
+
+/** `'authored'` when a world default holds a value at all; `'missing'` when it is unset. */
+function authoredState(value) {
+  if (value === null || value === undefined) return 'missing';
+  if (typeof value === 'string') return value.trim() ? 'authored' : 'missing';
+  if (typeof value === 'object') return Object.keys(value).length > 0 ? 'authored' : 'missing';
+  return 'authored';
+}
+
+/**
+ * Which scope a resolved section came from, or `'missing'` when nothing resolves.
+ *
+ * An ABSENT `inherit` key reads as inheriting, matching `isSectionInherited`, so the default is
+ * `inherited` rather than `overridden`.
+ *
+ * @param {unknown} resolved
+ * @param {{[section: string]: boolean}|undefined} inherited
+ * @param {string} section
+ * @returns {string}
+ */
+function sectionState(resolved, inherited, section) {
+  if (authoredState(resolved) === 'missing') return 'missing';
+  return inherited?.[section] === false ? 'overridden' : 'inherited';
 }

@@ -39,7 +39,13 @@ const MOUNTED_ROOTS = [
  * exemption cannot outlive the thing it exempted.
  */
 const UNCLAIMED_BY_DESIGN = Object.freeze([
-  ...['Component', 'Essence', 'Tool'].map((entity) => ({
+  // `Essence` LEFT THIS LIST at issue 1372, and it left rather than being kept alongside a claim.
+  // The exemption's own text names the condition that ends it — "PRs 6a, 6b and 6c ship the row
+  // that opens it and its case together, and delete this entry" — and the world essence catalogue
+  // now ships that row, so `world-essence-entry` is reachable by the walk and claims the page. An
+  // exemption left beside a live claim is a standing waiver for a component that no longer needs
+  // one, which is exactly the stale-exemption shape this file's last clause reds on.
+  ...['Component', 'Tool'].map((entity) => ({
     path: `src/ui/svelte/apps/manager/scoped/World${entity}EntryPage.svelte`,
     reason:
       `The world ${entity} entry route exists and normalizes (issue 1362), but NOTHING NAVIGATES ` +

@@ -37,21 +37,29 @@ Your search, filters, presentation choice, and page position all survive opening
 
 ## Create or edit an essence
 
-Choose **Create essence** to start a new one, or **Edit** an existing row.
+Choose **Create essence** to start a new one, or **Edit rules** on an existing row.
 
-The editor has three tabs:
+An essence's **name, icon, colour and description are shared by every crafting system that has it**, so they are not edited here.
+The editor opens with a card naming that shared definition, and **Edit shared definition** takes you to the Essence Catalogue entry that owns those fields.
+What this screen holds is what the essence does in **this** crafting system.
 
-- **Identity** sets the name, an icon, a description, an optional colour from the shared palette, and whether the essence is **Enabled**.
-- **On craft** sets what the essence does when it contributes to a crafted result, an active effect source and a property macro.
+The editor has two tabs:
+
+- **Essence rules** carries the shared-definition card, an **Enabled in _system_** switch, an **Active effect source** card and a **Macro on craft** card, and a **Reuse these rules** action that copies both behaviours into another system.
 See [Effect Transfer via Essences](#effect-transfer-via-essences) and [The Essence Property Macro](#the-essence-property-macro) below.
 - **Validation** lists anything unfinished, such as a missing description or a macro that no longer resolves.
 
+Each behaviour card carries its own switch saying whether this system **inherits the world default** or **overrides** it.
+While a section is inherited the value below it is read-only, because it belongs to the shared definition; turning the switch off is what makes it this system's to change.
+
 A live preview panel shows how the essence appears and what it currently does, updating as you edit.
 
-{% include screenshot.html case="manager-essence-edit-first-state" caption="The editor's Identity tab beside the live preview, on an essence that is currently disabled." %}
+{% include screenshot.html case="manager-essence-edit-first-state" caption="The Essence rules tab beside the live preview, on an essence that is disabled in this system." %}
 
-Choose **Save** when you are done.
+Choose **Save rules** when you are done.
 An essence always saves, even with warnings, unless it has a blocking issue such as a missing name or icon.
+
+A brand-new essence is the one exception: it has no shared definition yet, so its editor still carries an **Identity** tab for the name, icon, description and colour you are authoring.
 
 ### Example essences
 

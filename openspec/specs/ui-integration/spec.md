@@ -1207,9 +1207,14 @@ Component import warnings:
 
 Only shown when essences are enabled.
 
+**IDENTITY IS NOT AUTHORED AT SYSTEM SCOPE.**
+An essence's name, glyph, colour and description belong to its WORLD record, which every crafting system holding the essence resolves the same one of, so the system-scope Essence Rules editor renders no control that writes them — see `### GM World Essence Screens` requirement 10.
+The identity capabilities below are the WORLD essence entry editor's, and the system-scope route reaches them only through that editor.
+The one surface at system scope that still authors identity is a CREATE draft, whose in-system record is the only record there is and which therefore has no shared definition to contradict.
+
 Capabilities:
 
-- Browse, create, edit, duplicate when supported, and delete essence definitions.
+- Browse, create, duplicate when supported, and delete essence definitions; edit an essence's PER-SYSTEM rules in the system-scope editor and its SHARED identity in the world essence entry editor.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
 - Set an optional colour for an essence, chosen from the shared token palette with custom hex entry disabled.
   The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
@@ -1230,6 +1235,7 @@ Capabilities:
   The editor's palette caption is the one exception and keeps its name: there the name labels the swatch the GM is choosing, and the No-colour cell has no tile to speak for it.
 - The essence library offers a list and a grid presentation of the same rows.
   The grid card carries the same state vocabulary as the list row — the Disabled marker, the capability markers and the usage counts — because a presentation toggle must not silently remove state.
+  Its usage counts AGREE WITH THEIR NUMBER: each has a singular sibling key, so a card carrying one component reads `1 component` rather than `1 components`, and the same pair serves the inspector's usage row.
   In the grid card the capability markers sit in a header row beside the medallion rather than beside the usage counts, so the icon and what it can do read together; in the list row they stay in the trailing cluster and are NOT moved.
   Row actions are list-only; grid selection routes through the inspector.
 - The grid card lays out as a FIXED vertical stack — a header pairing the medallion with the capability markers, then the name, then the description, then the usage counts — and every growable part states its own ceiling so the same element lands at the same vertical offset in every card and every card in a row is the same height.
@@ -1248,8 +1254,11 @@ Capabilities:
 - Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
   The editor's icon control is one column: the preview tile fills that column's width and the picker and its reset sit inside the same edge, so no control overhangs the tile it belongs to.
   The tile's glyph is sized for the tile rather than inheriting the shared row-medallion glyph size, which reads as a speck at editor scale.
-- Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
-  The essence editor's On-craft tab gates its Active effect source section on `features.effectTransfer` and its property macro section on `features.propertyMacros`.
+- The System Essence Rules toolbar carries ONE filter — the membership pair — beside the search field, and no status segment and no source-state select.
+  Both were removed because the row already states its own enabled state as a pill and its own source breakage in the summary line, the search box reads the source name, and the sort key groups by enabled-ness; a second and a third way to narrow a six-row list is chrome the reference does not draw.
+  The presentation toggle is NOT a filter and stays, because it is the only route to the grid above.
+- Manager hides source columns, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
+  The essence editor's behaviour tab — `Essence rules` in the system-scope editor, `On craft` in a create draft — gates its Active effect source section on `features.effectTransfer` and its macro section on `features.propertyMacros`.
   With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
 - A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
   Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.
@@ -1987,6 +1996,78 @@ It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the sepa
    **The published field is `worldScope.vocabulary.total`**, and the name is a contract rather than an implementation detail: the shell reads it and requirement 7 of that section bars the vocabulary lane from the shell, so a producer publishing `count` or `entries.length` instead would leave the badge reading 0 forever with every test still green.
    It reads 0 until a world vocabulary store exists, which is truthful — a world with no vocabulary store has no world vocabulary — rather than a placeholder.
 
+### GM World Essence Screens
+
+The four essence screens — the world Essence Catalogue, the world essence entry editor, the system Essence Rules list and the system Essence Rules editor — render the essence half of `## Scoped Entity Definitions`.
+They are stated here rather than left to `### Scoped entity editor patterns` because three of the six differences between the entity types fall on the essence, and each of them changes what a screen may draw.
+
+1. **The World Essence Catalogue renders every world essence with its glyph and its colour, its membership count, and a per-system indicator carrying THREE states** — not a member, a member that is disabled, a member that is enabled.
+   `enabled: false` KEEPS the membership record and its overrides, so "absent" and "disabled" are different authored states with different repairs: one is fixed by a toggle and the other by an Add.
+   It renders **no source-item badge, column, filter or sort key, and no item image at all**, because a world essence has no source-item link: its lifted identity is exactly `name`, `icon`, `colorToken` and `description`, and its identity is a glyph plus a colour token.
+2. **The world essence entry editor holds identity plus the two world defaults `effectSource` and `macro`**, each stating how many member systems inherit it and how many override it locally BEFORE the change lands, because that count is the whole reach of the edit and a GM cannot recover it afterwards.
+   Only those two fields take a world default; everything else Fabricate carries for an essence — its per-system `enabled` flag above all — stays on the in-system record and takes none.
+3. **A world-defaults `effectSource` picker offers ONLY world-addressable referents** — a world component id or a document UUID — and never a system's own component list.
+   This is requirement 7 of `### Scoped entity editor patterns` applied to the one field that carries it.
+4. **The System Essence Rules list filters membership with exactly TWO options**, `In this system` and `All world essences`, each carrying its count.
+   The shared list model offers three for a system-scope list; this screen offers two, because "not in this system" alone is a list a GM can only add from, and "all" already contains it with the members for context.
+5. **The System Essence Rules editor renders the shared inherit row over `effectSource` and `macro` and LOCKS the corresponding value card read-only while that section is inherited**, so the editor never presents an edit affordance for a value the system does not own.
+   Turning that section's switch off is the one action that unlocks it.
+   Each switch is rendered INSIDE the value card it governs, between that card's explanation and its value, because the switch decides whether the value below it is this system's to change and a GM reading a locked value must find the control that unlocks it without leaving the card.
+   Its head states which way it is set and names the system (`Overridden for <system>` / `Inheriting the world default`) rather than repeating the section name the card's own title carries one line above it, and its note states both what the section resolves to now and what the switch would change that to.
+   A LOCKED value renders as a read-only tile carrying the resolved value's name, its address, and a `World default` marker — never as a drop target, because a drop target is an edit affordance.
+   With no membership record at all the editor states the block and offers the one action that fixes it, because nothing in that system reads any value the editor could otherwise present.
+6. **Neither essence screen renders a copy-provenance stamp**, because `copyMembership` writes none and normalization would discard one.
+7. **The System Essence Rules list row's edit affordance is LABELLED and marked as leaving the screen**, carrying the words `Edit rules` and the outbound `fa-arrow-up-right-from-square` glyph rather than a bare pencil.
+   The words are what say which layer the control opens: the row names a world-shared essence and the control opens this system's rules for it, so an unlabelled pencil beside a shared name reads as "edit the essence".
+   It stays a `.manager-icon-button` wearing a `title` that leads with `Edit`, and that is a contract rather than an inheritance — the View Lab essence-edit cases, the Foundry smoke's `.manager-icon-button[title*="Edit" i]` step and two mounted tests all address it by exactly that, and the smoke's step sits behind a presence guard, so losing either would stop producing the `manager-essence-edit-first-state` frame without failing anything.
+   The GRID presentation keeps the icon-only pencil: its footer is a two-slot strip beside the enable switch, and the reference draws no grid presentation for this screen to copy.
+8. **The System Essence Rules inspector states the SHARED layer and offers the one route out to it.**
+   It renders an info-toned block naming the shared definition, a sentence saying that name, icon and colour come from the Essence Catalogue while everything below belongs to this system alone, and an accent link that opens the world essence entry route on that essence.
+   That link is the only route from a system's rules to the record they resolve against, and without it the inspector's own `Edit essence` action was the loudest thing on a panel describing a layer it does not open.
+   Its sentence is the uncounted variant of the editor's `Scoped.Essence.IdentityBanner`; the counted form needs the system roster size and the selected system's name, which the inspector does not hold.
+9. **Both essence list screens state MEMBERSHIP in the toolbar count, and the world entry editor's preview states that it is live.**
+   The System Essence Rules bar reads `{shown} shown · {members} of {total} in this system`, which is the one count no other control on the screen answers; it falls back to the page range when the world corpus cannot answer membership, because `{members} of {total}` over an unreadable corpus reports every essence as absent from this system, which is false rather than unavailable.
+   The range it replaces is rendered verbatim by the pager at the foot of the same list, so the bar was restating it.
+   The world essence entry editor renders the shared preview's live-update note, and so does the system rules editor's rail: both recompute on every keystroke, the note is not optional, and the browser inspector — the one site that used to suppress it — no longer renders that panel at all.
+10. **THE SYSTEM ESSENCE RULES EDITOR RENDERS NO IDENTITY CONTROL, AND ITS TAB STRIP IS `Essence rules` AND `Validation`.**
+    Name, glyph, colour and description are the world record's, so a system-scope control that wrote one would rename the essence in every other system holding it from a screen titled with one of them — a model violation rather than a visual divergence, and the reason the shipped Identity tab is removed rather than restyled.
+    The route to those fields is the shared-definition callout's `Edit shared definition`, which opens the world essence entry route on that essence, and it is the ONLY route this screen offers to them.
+    The three-tab editor with its Identity tab survives for a CREATE draft alone, whose in-system record is the only record there is; the moment it is saved the world corpus answers for it and the editor is the two-tab rules screen thereafter.
+11. **The rules tab opens with the SHARED-DEFINITION CALLOUT and closes with the REUSE card, with the per-system enable switch on its own card between them.**
+    The callout carries the essence's own tile and name, a `World definition` marker, the counted sentence saying that name, icon and colour are world vocabulary shared with N other systems while what it does on craft is set here, and the exit above.
+    The enable switch is a card of its own with its own title naming the system — a switch captioned only `Off`, sharing a slab with unrelated controls, states what it is but never what it is off FOR.
+    The reuse card copies this system's effect source and macro into another system's own rules through `copyMembership`, and its copy states that it is a ONE-TIME shortcut and not a live link, because the clone is structural and neither side can reach the other afterwards.
+    Its destination chooser is on this screen because THIS screen knows the source unambiguously — the system whose rules are open — which is the fact the world catalogue's per-system row lacks and the reason that screen renders no copy control at all.
+12. **The page header names the essence and the layer.**
+    The route heads with the essence's medallion, its name, and `<system> rules · enabled | disabled`, with the editor action pair right-aligned beside it; the breadcrumb's leaf is the essence's name, following the recipe and component editors' rule rather than a generic `Edit essence`.
+    The Save verb reads `Save rules`, because the identity the word "essence" names is a world record this route cannot write.
+    The enabled half of the subline follows the DRAFT, because the switch that changes it is buffered and a subline pinned to disk would contradict the card below it until Save.
+13. **NEITHER SYSTEM-SCOPE ESSENCE SCREEN AUTHORS AN IDENTITY, AND THAT CLOSES TWO WRITE PATHS.**
+    The Essence Rules header carries the title and the subtitle and NO action, and the browser inspector offers NO duplicate.
+    Both wrote a `system.essenceDefinitions` entry with its own name, icon and colour — a system-owned essence — from a screen whose own panel states that name, icon and colour come from the Essence Catalogue and are shared by every system, so both claims stood a foot apart.
+    Create is the world Essence Catalogue header's `+ New essence` and is the only create; the verb duplicate served is `Reuse these rules` on the rules editor, which copies THIS system's effect source and macro into another system's own rules for the same essence without minting an identity.
+    **Joining a world essence to a crafting system WRITES BOTH HALVES** — the world membership record and the in-system record — because the system's essence list is built from `system.essenceDefinitions` and the read union only enriches rows it already finds there, so a membership-only join left `Add to this system` writing a record no screen reads.
+    The seeded in-system record carries the four lifted identity fields and no behaviour key, so every section resolves as INHERITED, which is what the membership record beside it declares; a system that already holds the id is left alone.
+    Removal is deliberately not its mirror: deleting the in-system record would strip the essence's stored quantity from every component in that system, which is the opposite of what removing a membership promises.
+14. **The System Essence Rules subtitle states what the list holds, what disabling stops and where identity comes from**, naming the system: `What each essence does on craft in <system>. Disabling stops the crafting effect — ingredient matching still sees the value. Names, icons and colours come from the Essence Catalogue.`
+    The world Essence Catalogue's states what that screen owns: `One definition per quality — name, icon, colour. What an essence does on craft is set by rules in each system that uses it.`
+    Neither uses the other's vocabulary; "definitions" is world scope's word and a system authors none.
+15. **BOTH essence inspectors render the same `SYSTEM RULES n / m` panel, from one component.**
+    It carries the members-over-roster count, a system search, one-line rows in which a MEMBER links out to that system's rules and a NON-MEMBER offers Add, and a five-row pager.
+    It answers "which other systems have rules for this essence", which the system rules rail could not answer at all, and a second copy of it on that screen is what extracting it prevents.
+16. **The System Essence Rules inspector's on-craft section names the system and states the LAYER each resolved rule came from.**
+    It is headed `On craft in <system>` and draws one card per world-default section, titled after the value that section resolves to and noting what that value does, ending in `· overridden here` or `· world default`.
+    A system with no membership record resolves nothing, so its cards omit the layer clause rather than attributing a value to a layer.
+    It is NOT the behaviour preview: that panel answers what an essence does to a crafted result and is worded the same at every scope, and collapsing the two left the one screen whose subject is inherit-versus-override with no provenance on it.
+17. **The world essence entry editor's behaviour rows say who INHERITS.**
+    At world scope they read `Default effects from <name>` over `Systems that inherit copy these onto anything crafted with it` and `Default macro <name>` over `Runs on craft in every system that inherits`; an unset default states its consequence instead of interpolating an empty name.
+    The system-scope wording is unchanged, because a system's rules act here rather than being inherited from.
+18. **A system-scope essence inspector is a BARE COLUMN with a micro-label per section**, on the pane's own surface, and only the things that ARE objects keep a box: the info-toned shared-definition callout, the stat tiles, the on-craft cards and the system rows.
+    Every section wearing the bordered inspector-card treatment made four of them cards inside a card, which is the same correction the recipe inspector already records.
+    The world catalogue's inspector column is likewise unbordered, with a single hairline above its pinned foot action.
+19. **One essence state has one shape.**
+    Enabled and Disabled are the shared status pill at every essence site — row, grid card, inspector and preview — and the pill resolves an unrecognised tone to its recessive default rather than rendering unfilled and unbordered, because four essence call sites named tones outside its ramp and produced a second, quieter treatment of the same state one click away.
+
 ### Scoped entity editor patterns
 
 The six scoped-entity editors — a catalogue and an entry editor for each of components, essences and tools — share one set of patterns, built once.
@@ -2020,6 +2101,19 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
     A record count of zero is the CALLER's decision and not the primitive's, because the shipped record-count vehicle answers it both ways: the rail states `0` unconditionally while the Checks section strip omits it, and a conversion must not settle a product question as a side effect.
 13. **A strip that renders ONE panel at a time puts `aria-controls` on the selected tab only**, because the unselected IDREFs would resolve to nothing and assistive technology reports that as a broken relationship rather than as "not currently shown".
     It is a mode of the one primitive, never a reason for a second implementation.
+14. **A WORLD ENTRY EDITOR BUFFERS ITS EDIT AND IS SAVED EXPLICITLY.**
+    A world entry editor is an EDITOR by `design-system/spec.md`'s archetype, so it carries that recipe's action pair — back before save — and its edits accumulate in a draft rather than persisting on change.
+    The pair is ONE shared component rendered by the manager shell, because `.manager-header` is a sibling of `.manager-main` and no page can render into it; `Save` takes the shipped `is-primary` role rather than the reference's peach, and is disabled while there is nothing to flush, because a control that is always available says nothing about whether the last edit landed.
+    Save writes only the fields that DIFFER from the record on disk, so re-pointing one world default does not restate the identity over whatever another client wrote to it meanwhile, and it answers whether every write landed.
+    Leaving with an unflushed edit — by the header's back, by the rail, or by the breadcrumb — raises the shipped three-way save / discard / keep-editing prompt, and navigation is gated on the SAVE having landed rather than on the choice having been made.
+    The draft, the dirty answer, the flush and the guard shape are ONE module shared by the three entry editors: a draft is a SHAPE, and the same shape reached by two implementations is how a persisted record and its editors drift apart.
+    **MEMBERSHIP AND DELETE ARE NOT BUFFERED.**
+    Adding an entity to a crafting system, removing it, switching it on or off, and deleting the world record are actions on records this draft does not describe, each with its own armed confirmation; an armed `Remove` that removed nothing until a later button states the opposite of what arming an action says.
+    A delete drops the draft before it navigates, because the record the draft is an edit of no longer exists and the exit guard would otherwise offer to save into it.
+15. **A scoped entity's IDENTITY FIELD SET is per entity type and is never assumed.**
+    A component and a tool carry a source-item link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`) and an `img`; an ESSENCE carries neither, and carries a `colorToken` instead.
+    A shared catalogue or entry shell therefore treats the source link, the item thumbnail, the unlinked flag and the missing-source blocking check as OPTIONAL CAPABILITIES of the entity type rather than as shell furniture, read from the scope descriptor rather than tested at a call site — and an essence screen renders none of them.
+    A shell that rendered one unconditionally would paint a permanently-false badge on every essence, which is a stated fact that is never true rather than a missing one.
 
 ### Scoped entity list shells
 
@@ -2060,7 +2154,8 @@ The world catalogues and the system-scope rules lists share ONE list composition
     The selection count is the size of the whole selection rather than its intersection with the page; the tri-state box acts on rendered rows; select-all-results acts on the whole filtered set.
     A filter change prunes the selection and clamps the page, and any selection, filter, sort or page change disarms.
 13. **Filter, sort and paging arithmetic and selection reduction are COMPOSED from the shipped pure models, never restated.**
-    A page index is clamped by the model that owns the arithmetic, and the clamped value is what both the row slice and the pagination footer read — a footer fed an unclamped index states a range the list does not show.
+    A page index is clamped by the model that owns the arithmetic, and the clamped value is what the row slice reads — and what the pagination footer reads wherever the footer renders, because a footer fed an unclamped index states a range the list does not show.
+    Where the footer is suppressed under requirement 20 the row slice is the only observation of the clamp, and it is read as an IDENTIFIED slice rather than as a count: any stale index over a single page renders zero rows, so the whole set being present AND starting at its first record is what says the index came back.
 14. **Membership rows come from the projection's joined rows, and the roster prop supplies ONLY `id` and `name`**, with an id fallback.
     The shells read `entries` and never the corpus roster `entities`.
 15. **The snippet parameter lists are part of the contract**, carrying the whole projection so a lane reaches a conditionally present field without adding a shell prop or reaching around the shells.
@@ -2075,6 +2170,11 @@ The world catalogues and the system-scope rules lists share ONE list composition
 19. **A CONTAINER QUERY MUST NOT BE WRITTEN ON THE ELEMENT THAT ESTABLISHES THE CONTAINER.**
     `@container` resolves against the nearest ANCESTOR container, so a `container-type` and an `@container` rule on one element silently answer about something further up — here the manager window, which is a named container and is never narrow enough to trip a column-width threshold.
     The container and the element the query lays out are therefore two elements, and the gate measures BOTH sides of the query at real window widths: a harness sized to one side reports a breakpoint that is not there.
+20. **THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE.**
+    These shells take the browse recipe's single-page suppression (`design-system/spec.md`): the reference draws no foot pager under either shell's list — six rows on the world catalogue, three on the system rules list — and a bar that can only ever say `Page 1 of 1` restates what the rows already show.
+    The condition is MORE THAN ONE PAGE and not "more items than the smallest offered page size", which is the primitive's ordinary hidden state and renders the bar for a single page of eleven rows.
+    Wherever it does render it is unchanged: outside the scroll area, disabled arrows shown, per-page selector offered.
+    The ROWS REGION takes the column's slack whether or not a pager is under it, and the pager never does — the two are separate declarations and a gate that measured only "the pager ends at the foot of the column" is satisfied by a pager that fills it.
 
 ### GM Travel Route
 

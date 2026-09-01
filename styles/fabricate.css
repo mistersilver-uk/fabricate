@@ -6820,8 +6820,7 @@
    sentence case reads as a form, not a bar. */
 .fabricate-manager .manager-recipe-category-filter,
 .fabricate-manager .manager-component-category-filter,
-.fabricate-manager .manager-component-essence-filter,
-.fabricate-manager .manager-essence-source-filter {
+.fabricate-manager .manager-component-essence-filter {
   flex: 0 0 auto;
   min-width: 0;
   max-width: 180px;
@@ -17252,19 +17251,53 @@
     Stacked, the rail is a full-height nav sitting ABOVE the content it navigates to.
     Left at its content height it is ~650px of chrome the GM must scroll past before
     the first row, so it becomes a bounded, self-scrolling strip instead.
+
+    ── THE STRIP SCROLLED THE ONLY WAY OUT OF A SYSTEM OFF ITS OWN TOP (issue 1372) ──────────
+    Measured on `manager-essences-stacked` at 1000x700: the rail is a 232px window over 927px of
+    content, and clicking a nav row scrolls that row into view — so the frame's FIRST VISIBLE
+    STATE showed five destinations and neither the `Crafting system` picker nor its `← All
+    crafting systems` link, which are the only two routes to another system or back to the system
+    list. The four destinations above the clicked row went with them, and an overlay scrollbar
+    says nothing, so the strip reads as the whole rail rather than as a window onto it.
+
+    Two changes, and each fixes half of it. The cap rises to the 320px that the Tools and
+    Knowledge routes already override it to — so the strip is one value at this width rather than
+    three — and the two blocks ABOVE the nav are pinned out of the scroll, so the scope picker
+    cannot leave the screen no matter where the nav is scrolled to. Pinning them rather than
+    handing the scroller to `.manager-nav` is deliberate: the nav keeps the full 320px window it
+    scrolls inside, and only the ~116px the picker occupies is spent, which is the trade the
+    earlier note (below) declined to make when the alternative was shrinking the window twice.
   */
   .fabricate-manager .manager-rail {
-    max-height: 232px;
+    max-height: 320px;
     overflow: hidden auto;
     border-right: 0;
     border-bottom: 1px solid var(--fab-border);
   }
 
-  /* Hand the scrolling back to the rail here. Stacked, the rail is already a bounded 232px
-     strip; if the nav kept the scroller it would grow to that cap and scroll the list inside
-     whatever the pinned label and scope card left of it — a much smaller window than the strip
-     the rule above deliberately built. This also covers the per-view 831px rail overrides,
-     which are nested inside this breakpoint. */
+  /* PINNED, so the crafting-system picker and `← All crafting systems` survive any scroll
+     position of the nav below them. `--fab-bg-0` is the rail's own surface, restated because a
+     sticky element scrolls content underneath itself and a transparent one would show it. */
+  .fabricate-manager .manager-rail > .manager-rail-title,
+  .fabricate-manager .manager-rail > .manager-rail-block {
+    position: sticky;
+    z-index: 1;
+    background: var(--fab-bg-0);
+  }
+
+  .fabricate-manager .manager-rail > .manager-rail-title {
+    top: 0;
+  }
+
+  .fabricate-manager .manager-rail > .manager-rail-block {
+    top: 12px;
+  }
+
+  /* Hand the scrolling back to the rail here. Stacked, the rail is already a bounded strip; if
+     the nav kept the scroller it would grow to that cap and scroll the list inside whatever the
+     pinned label and scope card left of it — a much smaller window than the strip the rule above
+     deliberately built. This also covers the per-view 831px rail overrides, which are nested
+     inside this breakpoint. */
   .fabricate-manager .manager-nav {
     flex: 0 0 auto;
     overflow: visible;
@@ -24936,4 +24969,158 @@
   .fabricate-manager .manager-knowledge-reset-actions > .manager-button {
     flex: 1 1 auto;
   }
+}
+
+/* ── THE ESSENCE SCREENS' SURFACE LADDER (issue 1372) ────────────────────────────────────────
+   THE PROTOTYPE'S CONTENT AREA IS ONE FLAT SURFACE. Its page, its list rows, its inspector
+   column and the cards inside that column are all the SAME shade, and a card reads as a card
+   because of a 1px border rather than because of a fill. Sampled out of `essences.png`,
+   `essEntry.png` and `sysEss.png`, the whole content area is one value, with exactly two others
+   on screen: a darker one for the rail and the app title bar, and a lighter one for FORM
+   CONTROLS — the search field and the selects.
+
+   What shipped stacked six surfaces, every one of them lighter than the prototype's, because
+   each layer helpfully added a rung: `.manager-main` paints `--fab-bg-2` for the whole manager,
+   the list row adds `--fab-overlay-light-03` over that, the inspector column adds `--fab-bg-3`,
+   and the pager band adds another overlay.
+   Measured against the prototype the pane was two rungs light and the inspector three, and the
+   borders between the cards had nothing left to separate.
+
+   `--fab-bg-0` IS the prototype's content shade, so nothing here mints a colour: the screens had
+   simply picked the wrong rungs of a ramp that already had the right one.
+
+   ── WHY IT IS ROUTE-SCOPED, AND WHY THAT IS THE PRECEDENT RATHER THAN A HEDGE ────────────────
+   `.manager-main`'s `--fab-bg-2` is a manager-WIDE default that predates this epic and
+   that a dozen other studios are drawn against. The Checks Studio hit the identical drift and
+   fixed it exactly this way — see the block at `.fabricate-manager[data-manager-view^="checks"]
+   .manager-environment-edit-view[data-checks-editor]` above, whose comment says the manager-wide
+   `--fab-bg-2` "is the CARD shade in the prototype — so the studio's cards were sitting on their
+   own colour and every border between them disappeared", and that other views' backgrounds are
+   deliberately out of that change's scope. This block is that shape, for these three routes.
+
+   ── TOKENS ONLY, AND ONE ACCEPTED DRIFT ─────────────────────────────────────────────────────
+   Seven theme blocks redeclare `--fab-bg-0` through `--fab-bg-3`, so a literal here would freeze
+   one theme's value into all seven. The form controls stay one rung up at `--fab-bg-1`, which is
+   a shade off the prototype's, and that drift is ACCEPTED under the standing ruling recorded at
+   the Component Studio token mapping near the head of this file: map index-aligned onto the
+   existing ramp rather than mint a raw colour that has to be authored into every theme and
+   silently rewrites each one's ramp contour.
+
+   ── OUT OF SCOPE, STATED ────────────────────────────────────────────────────────────────────
+   The RAIL and the app title bar. The prototype paints them a shade below its content surface
+   with no token on this ramp at all, and they are shared chrome that every other manager route
+   renders — so matching them is a manager-wide colour decision rather than one of these three
+   screens', and it is left alone. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-main,
+.fabricate-manager[data-manager-view='world-essence-entry'] .manager-main,
+.fabricate-manager[data-manager-view='essences'] .manager-main {
+  background: var(--fab-bg-0);
+}
+
+/* THE ROWS AND THE PAGER LOSE THEIR FILLS. The border is what makes a row a row here, which is
+   the prototype's own construction; a fill on top of a pane one rung darker is what made five
+   near-identical greys on one screen. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row,
+.fabricate-manager[data-manager-view='world-essences'] .manager-pagination,
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row,
+.fabricate-manager[data-manager-view='essences'] .manager-pagination {
+  background: transparent;
+}
+
+/* THE HOVER AND SELECTED STATES STILL HAVE TO READ. With the resting fill gone, the row's two
+   feedback states are the only things that change its surface, so they are restated one rung up
+   from the pane rather than left pointing at a ladder that no longer starts where they assumed.
+   Without this, hover painted `--fab-surface-raised` — the lightest surface the set has — and
+   the row jumped from flat to the lightest thing on the screen under the pointer. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row:hover,
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row:hover {
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row.is-selected,
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row.is-selected {
+  background: var(--fab-bg-1);
+}
+
+/* THE SYSTEM-SCOPE RULES LIST SHARES THE MANAGER'S OWN INSPECTOR ASIDE, so its surfaces have to
+   be brought onto the same ladder here rather than in a component's scoped `<style>`. The
+   catalogue's inspector is a column this epic's own frame draws and it states its own; this one
+   is `.manager-inspector`, which every manager route renders, and its `--fab-bg-2` fill
+   plus the `--fab-overlay-light-04` on each card put the whole right third of the screen two and
+   three rungs above the list beside it. Scoped to the route for the reason the block above gives:
+   the aside is shared chrome and the other studios' inspectors are not in this change's scope. */
+.fabricate-manager[data-manager-view='essences'] .manager-inspector {
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager[data-manager-view='essences'] .manager-inspector .manager-inspector-card {
+  background: transparent;
+}
+
+/* THE PAGE HEADER BAND IS PART OF THE SAME FLAT SURFACE, and it was the one region the block
+   above could not reach. `.manager-header` is a SIBLING of `.manager-main`, not a descendant, so
+   the `.manager-main` rule never applied to it and the strip carrying the breadcrumb, the title
+   and the subtitle went on painting `--fab-bg-2` while the pane directly beneath it moved to
+   `--fab-bg-0`. Sampled at three heights on all three screens the band read this theme's
+   `--fab-bg-2` where the prototype's reads its `--fab-bg-0` equivalent — a two-rung
+   step across the top ~90px of every screen, which is the first thing on it. (The measured
+   values are not written here: this file's colour-literal gate,
+   `tests/components/theme-colour-contract.test.js`, scans comments too, and rightly so — a hex
+   in a comment is how one gets copied into a declaration.)
+
+   The prototype has no step there at all: its header, its pane and its inspector are one
+   continuous surface and the only thing marking the header's end is the hairline the shared
+   `.manager-header` rule already draws. That `border-bottom` is why this is safe to flatten —
+   remove the fill and the boundary is still stated, by a border, exactly as every card boundary
+   on these screens now is.
+
+   Route-scoped and additive for the same reasons the surface block above gives, and by the same
+   precedent: the shared `.manager-header` rule is manager-wide chrome that a dozen other studios
+   are drawn against, so it is not touched. `--fab-bg-0` again, so no theme is frozen — seven
+   theme blocks redeclare this ramp and a literal would freeze one of them into all seven. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-header,
+.fabricate-manager[data-manager-view='world-essence-entry'] .manager-header,
+.fabricate-manager[data-manager-view='essences'] .manager-header {
+  background: var(--fab-bg-0);
+}
+
+/* THE BROWSER TOOLBAR STRIP IS FLUSH, NOT A RAISED BAND. Last of the surface inversions on these
+   screens, and the same one just corrected on the secondary buttons — ours raised a region the
+   prototype leaves level. The shared `.manager-toolbar` rule paints `--fab-overlay-light-03` and
+   draws a full-bleed `border-bottom`, so the filter bar and the `Select all` row read as one lit
+   band one rung above the pane, closed by a hairline, where the prototype's equivalent strip
+   measures the same value as the pane behind it at every height and has no divider at all.
+
+   With the pane now on `--fab-bg-0`, that overlay is the last thing on these screens still adding
+   a rung to a surface the prototype does not step. Removing the fill AND the hairline together is
+   deliberate: a fill with no border, or a border with no fill, is a half-flush strip that reads as
+   neither construction.
+
+   ── WHAT STILL SEPARATES THE STRIP FROM THE LIST ────────────────────────────────────────────
+   The same two things the prototype uses, and it uses nothing else: the gap between the strip's
+   bottom padding and the first row, and the row cards' own borders. Every row on these routes is
+   a bordered card by the block above — that is what makes a row a row here — so the list's top
+   edge is stated by the first card's border rather than by a divider belonging to the toolbar.
+   Checked on the normal, stacked and grid frames, at 1280 and at the 1000-wide stacked layout
+   where the toolbar wraps to more rows: the boundary still reads.
+
+   ── WHY IT IS ROUTE-SCOPED, AND ONLY TO THE TWO ROUTES THAT DRAW A STRIP ────────────────────
+   `.manager-toolbar` is the shared browser strip for every manager browser — components,
+   recipes, tools, environments, gathering and more — so editing it would re-photograph a dozen
+   studios that are not this change's business. Additive and route-scoped instead, by the
+   precedent this file already sets twice: the Checks Studio block at
+   `.fabricate-manager[data-manager-view^="checks"]` above, and this epic's own surface and header
+   blocks immediately above.
+
+   Two routes, not three. `world-essence-entry` is in this epic and takes the surface and header
+   rules above, but its page is a tabbed editor with no browser strip on it, so a selector for it
+   here would match nothing. A stacked branch adds the tool routes to this same ladder; it owns
+   its own selectors and neither lane owns half of one rule.
+
+   No literals: `--fab-overlay-light-03` is removed rather than replaced, so the pane's own
+   `--fab-bg-0` shows through and no theme's ramp is frozen into the other six. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-toolbar,
+.fabricate-manager[data-manager-view='essences'] .manager-toolbar {
+  border-bottom: 0;
+  background: transparent;
 }

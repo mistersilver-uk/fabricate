@@ -34,6 +34,11 @@
   let {
     // Visual variant appended to the card class (e.g. 'is-info'), toning it when on.
     variant = '',
+    // The leading glyph. `''` renders NO glyph slot at all rather than an empty one, which is
+    // what the essence rules editor's `Enabled in <system>` card needs: the reference draws that
+    // card as a bold title over one line with the switch on the right and no icon, and a slot
+    // holding an empty `<i>` still reserves its column and left-indents the copy away from the
+    // cards above and below it. Every shipped caller passes a real glyph, so nothing moves.
     icon = 'fas fa-circle',
     title = '',
     sub = '',
@@ -70,7 +75,9 @@
   class={`manager-recipe-status-card ${variant} ${on ? 'is-on' : 'is-off'}`}
   data-recipe-section={section || undefined}
 >
-  <span class="manager-recipe-status-icon" aria-hidden="true"><i class={icon}></i></span>
+  {#if icon}
+    <span class="manager-recipe-status-icon" aria-hidden="true"><i class={icon}></i></span>
+  {/if}
   <div class="manager-recipe-status-copy">
     <p class="manager-recipe-status-title">{title}</p>
     <!-- `''` not `true`: a bare attribute renders `=""`, which is the byte the Overview

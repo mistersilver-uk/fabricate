@@ -3,6 +3,21 @@
   The manager's ONE document drop target: a dashed empty prompt that becomes a linked card
   once the caller resolves a document, with optional copy-uuid and unlink actions.
 
+  ── THE UNLINK HOOK IS A PROP, NOT A FOURTH `kind ===` BRANCH (issue 1372) ──────
+  Three consumers name their unlink hook through a `kind` test below, and a fourth would have
+  been a fourth special case in a shared primitive — which `essence-studio-fidelity.test.js`
+  bans by name, correctly: a primitive that grows a branch per caller is a union of its callers.
+  `unlinkAttr` is the generalisation instead, and it is this repository's own idiom for exactly
+  this — `BulkSelectionToolbar` and `EditorTabs` both take their hook attribute NAMES as props,
+  for the same reason. Defaulting to `''` renders nothing extra, so no shipped consumer's output
+  moves; the three `kind` tests stay as they are rather than being converted, because converting
+  a shipped site changes ids at a site this change has no reason to touch.
+
+  WHY A CALLER WANTS ONE: the system-scope essence editor LOCKS a section's value card read-only
+  while the section is inherited, and the whole observable consequence of that lock is that this
+  control is ABSENT. Without a hook on it, the absence assertion runs against a selector nothing
+  renders and passes on a tree where the lock was never built.
+
   ── WHAT IT ACCEPTS (issue 1036) ────────────────────────────────────────────────
   `documentType` (default `'Item'`) is the Foundry DOCUMENT NAME the payload must carry, so
   the same primitive serves an Item card and a Macro card rather than growing a second
@@ -34,6 +49,12 @@
     item = null,
     title = '',
     hint = '',
+    // THE RESOLVED DOCUMENT'S OWN ADDRESS, rendered as a mono line directly under the name
+    // (issue 1372, maintainer parity round 7). It is NOT a sub-line and does not displace one:
+    // the reference draws a linked value as name, then address, then a one-line summary, and the
+    // shipped rule that a sub-line "never restates the raw uuid" is about the SUMMARY slot, which
+    // still instructs. Empty by default, so every shipped call site renders byte-identically.
+    uuid = '',
     subline = '',
     emptyIcon = 'fas fa-download',
     kind = '',
@@ -42,12 +63,16 @@
     disabled = false,
     copyLabel = '',
     unlinkLabel = '',
+    unlinkAttr = '',
     onDrop = () => {},
     onCopy = null,
     onUnlink = null,
   } = $props();
 
   const isMissing = $derived(Boolean(item) && state === 'missing');
+  // `{}` when unnamed, so the spread adds nothing and every shipped consumer's rendered output
+  // is byte-identical.
+  const unlinkAttrs = $derived(unlinkAttr ? { [unlinkAttr]: true } : {});
 
   function handleDrop(data) {
     if (data?.type !== documentType) return;
@@ -82,6 +107,7 @@
   </span>
   <span class="manager-item-drop-zone-copy">
     <strong>{item?.name || title}</strong>
+    {#if uuid}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid>{uuid}</code>{/if}
     {#if hint}<small data-tool-source-drop-hint={kind === 'tool-source' ? true : undefined}
         >{hint}</small
       >{/if}
@@ -108,6 +134,7 @@
           data-tool-source-unlink={kind === 'tool-source' ? true : undefined}
           data-recipe-item-unlink={kind === 'recipe-item' ? true : undefined}
           data-unlink-macro={kind === 'check-macro' ? true : undefined}
+          {...unlinkAttrs}
           onclick={onUnlink}
         >
           <i class="fas fa-link-slash" aria-hidden="true"></i>
@@ -134,5 +161,17 @@
 
   .manager-item-drop-zone.is-missing strong {
     color: var(--fab-danger-text);
+  }
+
+  /* THE ADDRESS LINE. Mono, because it is an identifier a GM copies and compares character by
+     character rather than reads, and one that a proportional face makes ambiguous between `l`,
+     `1` and `I`. Sized under the sub-line so it never competes with the name above it, and
+     allowed to break so a long compendium address cannot widen the card past its column. */
+  .manager-item-drop-zone-uuid {
+    display: block;
+    font-family: var(--fab-font-mono);
+    font-size: 0.68rem;
+    color: var(--fab-text-subtle);
+    overflow-wrap: anywhere;
   }
 </style>

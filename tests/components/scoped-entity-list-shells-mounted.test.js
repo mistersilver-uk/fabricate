@@ -72,6 +72,7 @@ const catalogueHarness = createMountedComponentHarness({
     ...FRAME_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
+    'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
@@ -346,39 +347,83 @@ describe('the catalogue shell labels the inherit counts the descriptor declares'
         cells.map((cell) => cell.getAttribute('data-scoped-list-inherit-count')),
         sections
       );
-      // Labelled through `scopedSectionLabel`, so the five names are read from ONE list.
+      // THE CARD TITLE IS THE LANE'S, WITH `scopedSectionLabel` AS THE FALLBACK (issue 1372).
+      //
+      // The prototype's world-default cards title themselves after the VALUE the default
+      // resolves to — `Effects from Ember Brand` — and put the inherit arithmetic underneath
+      // (`essences.png`). So a lane that supplies `sectionTitles` decides the words, and this
+      // harness supplies none: what it measures is that the FALLBACK is still the one shared
+      // section-name list, which is the property this case was written for.
       assert.deepEqual(
         cells.map((cell) =>
-          cell.querySelector('.manager-scoped-catalogue-fact-label').textContent.trim()
+          cell.querySelector('.manager-scoped-catalogue-card-title').textContent.trim()
         ),
         sections.map((section) => LABELS[section])
       );
-      // Each count is the real membership number, not a placeholder: one of the two systems has
-      // every entity and the second has none.
+      // THE CARD'S SECOND LINE IS THE LANE'S NOTE, AND THE COUNT IS ITS FALLBACK.
+      //
+      // The prototype's card is exactly two lines — the value, then `7 of 13 systems inherit it`
+      // (`essences.png`) — so the shell has one slot to fill, not two. A lane that supplies
+      // `sectionNotes` owns the wording (the essence catalogue's is the inherit line WITH its
+      // override clause, which the bare count cannot say); a lane that supplies none gets the
+      // count. Both branches are asserted, because a shell that dropped the fallback would look
+      // correct on every screen that happens to pass a note.
       for (const cell of cells) {
-        assert.match(cell.textContent, /1 inheriting/);
+        assert.match(cell.textContent, /Falls back to /);
+      }
+      const bare = await catalogueHarness.mount({
+        ...props,
+        selectedId: first.id,
+        sectionNotes: {},
+      });
+      for (const cell of bare.querySelectorAll('[data-scoped-list-inherit-count]')) {
+        assert.match(
+          cell.textContent,
+          /1 inheriting/,
+          'with no lane note the card states the projection count itself'
+        );
       }
     });
   }
 
-  it('renders NO group chrome around a ONE-SECTION entity, and a head above a two-section one', async () => {
-    const component = await catalogueHarness.mount({
-      ...catalogueProps('component'),
-      selectedId: 'component-0',
+  it('heads the world-defaults stack once, whatever the section count', async () => {
+    // ── A REVERSAL, AND THE PROTOTYPE IS THE REASON ────────────────────────────────────────────
+    // This case used to assert the opposite: NO group head above a one-section entity, on the
+    // reading that a header and a divider around a single number cost more than the number. That
+    // held while the region was a run of `label · N inheriting` lines with no other chrome.
+    //
+    // It is now a stack of CARDS, and the prototype heads that stack `WORLD DEFAULTS` on every
+    // screen it draws (`essences.png`). An unheaded card stack is worse than a headed one at any
+    // section count: the cards are titled after their VALUES, so with no kicker there is nothing
+    // on screen that says the values are world defaults rather than this entity's own.
+    for (const entityType of ['component', 'essence', 'tool']) {
+      const props = catalogueProps(entityType);
+      const root = await catalogueHarness.mount({
+        ...props,
+        selectedId: props.scope.entries[0].id,
+      });
+      assert.equal(
+        root.querySelectorAll('[data-scoped-list-defaults] .manager-kicker').length,
+        1,
+        `${entityType}: the world-defaults stack carries exactly one head`
+      );
+    }
+  });
+
+  it('heads the system list and states members over roster beside it', async () => {
+    // `SYSTEM RULES  13 / 24` (`essences.png`). The pair is the fact: a count of member systems
+    // alone cannot tell "every system has it" from "half of them do".
+    const props = catalogueProps('essence');
+    const root = await catalogueHarness.mount({
+      ...props,
+      selectedId: props.scope.entries[0].id,
     });
-    assert.equal(
-      component.querySelectorAll('.manager-scoped-catalogue-facts-head').length,
-      0,
-      'a header and a divider around a single count costs more space than the count'
-    );
-    const tool = await catalogueHarness.mount({
-      ...catalogueProps('tool'),
-      selectedId: 'tool-0',
-    });
-    assert.equal(
-      tool.querySelectorAll('.manager-scoped-catalogue-facts-head').length,
-      1,
-      'the positive control: the head IS rendered when there is a group to label'
+    const count = root.querySelector('[data-scoped-list-system-count]');
+    assert.ok(count, 'the system section states its count');
+    assert.match(
+      count.textContent.trim(),
+      /^\d+ \/ \d+$/,
+      'as members over the roster, not as one number'
     );
   });
 
@@ -627,7 +672,7 @@ describe('the per-system rows come from the join, never from the roster prop', (
       scope: scopeOf('component', { systems: [{ id: 'sys-a', name: 'Forge' }] }),
     });
     assert.equal(
-      named.querySelector('.manager-scoped-catalogue-system-name').textContent.trim(),
+      named.querySelector('.manager-scoped-roster-system-name').textContent.trim(),
       'Forge'
     );
     const unnamed = await catalogueHarness.mount({
@@ -635,7 +680,7 @@ describe('the per-system rows come from the join, never from the roster prop', (
       scope: scopeOf('component', { systems: [{ id: 'sys-a' }] }),
     });
     assert.equal(
-      unnamed.querySelector('.manager-scoped-catalogue-system-name').textContent.trim(),
+      unnamed.querySelector('.manager-scoped-roster-system-name').textContent.trim(),
       'sys-a',
       'an allowlist-omitted field reads undefined, and the literal string "undefined" is not a name'
     );
@@ -910,19 +955,45 @@ describe('the page index is clamped and the footer reads the clamped value', () 
       'the fixture never reached page three, so nothing below has a stale index to clamp'
     );
 
-    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 10 }) });
-
+    // ── (1) CLAMPED INTO A CORPUS THAT IS STILL MULTI-PAGE, where the FOOTER is the observation.
+    //
+    // 30 rows at the default page size is two pages, so the bar renders and states the clamped
+    // index directly. This half is here because the foot pager is `multiPageOnly` since issue
+    // 1372: the shorter-corpus case below no longer draws one, and a clamp gate that only ever
+    // measured the no-footer case would stop covering the footer-reads-the-clamped-value half of
+    // `ui-integration/spec.md`'s list-shell requirement 13 altogether.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 30 }) });
     assert.equal(
       rows(root).length,
-      10,
+      5,
       'an unclamped index slices past the end of the shorter corpus and renders ZERO rows — ' +
         'under a set that is not empty, and therefore with no empty state to explain it'
     );
-    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 1/);
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 2/);
     assert.match(
       root.querySelector('[data-pagination-summary]').textContent,
-      /Showing 1–10 of 10/,
+      /Showing 26–30 of 30/,
       'the footer states a range the list does not show'
+    );
+
+    // ── (2) CLAMPED INTO A ONE-PAGE CORPUS, where the ROW SLICE is the observation.
+    //
+    // The bar is gone here — one page — so the clamped value is read off the rows instead, and it
+    // is read as an IDENTIFIED slice rather than a count: `slice(50, 75)` over ten entries is
+    // empty, and any index above zero over a ten-row single page is empty too, so the whole
+    // corpus being present AND starting at its first record is what says the index came back to
+    // zero. The count alone would be satisfied by a frame that rendered ten unrelated rows.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 10 }) });
+    assert.ok(
+      !root.querySelector('[data-pagination-summary]'),
+      'ten rows on a twenty-five-row page is ONE page, so this half is measuring the no-footer ' +
+        'case it exists for'
+    );
+    assert.deepEqual(
+      rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
+      Array.from({ length: 10 }, (unused, index) => `component-${index}`),
+      'the list does not show the whole ten-record corpus from its first row, so the stale page ' +
+        'index was not clamped back to zero'
     );
     assert.equal(
       root.querySelector('.manager-scoped-list-rows').querySelectorAll('.manager-empty').length,
@@ -945,17 +1016,55 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     search.value = 'Ash 0';
     search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     await catalogueHarness.setProps({});
-    assert.equal(rows(root).length, 10, 'Ash 00–Ash 09');
-    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 1/);
+    // The filtered set is `Ash 00`-`Ash 09` and it is ONE page, so since issue 1372 there is no
+    // footer to read the reset index off. The rows say it instead, and they say it as an
+    // IDENTIFIED slice: a page index left at 1 slices `component-25` onward out of a ten-row set
+    // and renders nothing, and any index above zero renders nothing, so the whole filtered set
+    // being present AND starting at its first record is what says the index went back to zero.
+    assert.deepEqual(
+      rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
+      Array.from({ length: 10 }, (unused, index) => `component-${index}`),
+      'Ash 00–Ash 09, from the first of them: the filter did not reset the page index'
+    );
+    assert.ok(
+      !root.querySelector('[data-pagination-summary]'),
+      'the filtered set is one page, so this half is measuring the no-footer case it exists for'
+    );
   });
 
-  it('keeps the pagination footer present below one page of rows', async () => {
-    // `Pagination` defaults `persistent` to false, which hides the footer — and a browse screen
-    // never hides its disabled arrows.
-    const root = await catalogueHarness.mount(catalogueProps('component', { count: 3 }));
-    assert.ok(Boolean(root.querySelector('[data-pagination-summary]')));
+  it('HIDES the pagination footer at one page of rows and restores it at two', async () => {
+    // THE MAINTAINER'S RULING, IN BOTH DIRECTIONS (issue 1372, parity round 4). The prototype's
+    // catalogue draws no foot pager under its six rows (`essences.png`), and this shipped a
+    // full-width `Showing 1–6 of 6 · Page 1 of 1 · Per page 25` band there — a control with no
+    // reachable second state. `design-system/spec.md`'s browse recipe now permits exactly that
+    // suppression and requires the bar back the moment a second page exists.
+    //
+    // BOTH HALVES, in one case and against one mount, because either alone is passed by a
+    // mutation the other catches: an absent bar is satisfied by a frame that renders no pager at
+    // all, and a present bar is satisfied by `persistent={true}` coming back.
+    const root = await catalogueHarness.mount(catalogueProps('component'));
+    assert.equal(
+      rows(root).length,
+      3,
+      'the fixture rendered no rows at all, so the absence asserted next is vacuous'
+    );
+    assert.ok(
+      !root.querySelector('[data-pagination-summary]'),
+      'three rows on a twenty-five-row page is ONE page, and a bar that can only say ' +
+        '"Page 1 of 1" states nothing the rows do not'
+    );
+
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 60 }) });
+    assert.ok(
+      Boolean(root.querySelector('[data-pagination-summary]')),
+      'sixty rows is three pages, and the browse recipe requires the bar back'
+    );
     assert.ok(Boolean(root.querySelector('[data-pagination-prev]')));
-    assert.equal(root.querySelector('[data-pagination-prev]').disabled, true);
+    assert.equal(
+      root.querySelector('[data-pagination-prev]').disabled,
+      true,
+      'and where it renders it never hides its disabled arrows'
+    );
   });
 });
 

@@ -436,6 +436,16 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
+        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own — the
+        // catalogue's `+ New essence` — and back to 28 at its round-8 parity pass, which deleted
+        // the SYSTEM Essence Rules header's `+ Create essence`: the reference's Essence Rules
+        // header carries nothing on the right, because an essence is a world record and the only
+        // create is the catalogue's. The entry's `Back`/`Save` pair renders into this same
+        // container from `scoped/ScopedEntryHeaderActions.svelte`, which slots into the div and
+        // declares no region of its own, so it is the `ComponentEditorHeader` case the `why`
+        // below already records — reached by the rule, not attributable to this file by a static
+        // count. The number is the container's own population read from the tree, so it moves
+        // whenever a header branch gains or loses a control it renders itself.
         buttons: 28,
       },
       {
@@ -463,6 +473,10 @@ const REVIEWED = [
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
         role: 'primary',
+        // 14 -> 15 with issue 1372's world-essence header create action, and back to 14 at its
+        // round-8 parity pass, which deleted the SYSTEM Essence Rules header's `+ Create essence`
+        // — the reference's Essence Rules header carries nothing on the right, and an essence's
+        // identity is a world record no system-scope screen authors.
         buttons: 14,
       },
       {
@@ -642,6 +656,23 @@ const REVIEWED = [
       '`SearchablePopover` trigger rendered from `RecipeRoutingAssignment``s `triggerClass` ' +
       'string, so naming it by its own trigger class is the only way it keeps the row`s 28px ' +
       'scale beside the two converted controls it sits with.',
+  },
+
+  {
+    id: scopedRule(
+      'scoped/SystemRulesRoster.svelte',
+      '.manager-scoped-roster-system .manager-button.is-danger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved '+
+      'it into `SystemRulesRoster`, which both essence rails compose. The panel`s system ' +
+      'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
+      '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +
+      'so this rule cannot be re-chained onto the primitive. What it states is a SIZE taken ' +
+      'from the layout context — 26px rather than the page-level 34px — because five of those ' +
+      'rows plus three cards, a search field and a pager have to fit one 300px inspector ' +
+      'column, which is the arrangement the prototype draws (`essences.png`).',
   },
 
   {

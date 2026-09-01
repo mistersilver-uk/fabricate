@@ -1265,8 +1265,16 @@ describe('CraftingSystemManager source contract', () => {
     // The route title is `Essence.Title`, which the shell owns and which is asserted above.
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditTitle, 'Edit essence');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditBreadcrumb, 'Edit essence');
-    assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, 'Create essence');
-    assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceLinkedFilter, 'Linked');
+    // `CreateBreadcrumb` — and `Create`, `CreateSubtitle` and `CreateNoSourceSubtitle` with it —
+    // are RETIRED (issue 1372, maintainer parity round 8): the system-scope create draft they
+    // titled had one entry point, the Essence Rules header's `+ Create essence`, and an essence's
+    // identity is a world record. `CreateTitle` survives because `EssenceEditView` still titles a
+    // draft it can be handed directly.
+    assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, undefined);
+    // `SourceAll` / `SourceLinkedFilter` / `SourceNone` / `SourceNeedsAttention` and the status
+    // segment's `Status.All` are RETIRED with the two toolbar filters issue 1372's round-8 parity
+    // pass removed; the orphan gate fails a key nothing references, so they left with them.
+    assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceLinkedFilter, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.SourceNoneShort, 'None');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle,
@@ -2196,14 +2204,27 @@ describe('CraftingSystemManager source contract', () => {
     );
     // The SOURCE COLUMN is retired with the table (issue 1036). It reported one bit — is
     // there an image — in a column of its own; the row now carries an `Effects` capability
-    // pill instead, and the retained needs-attention filter is what finds a BROKEN link.
+    // pill instead.
     assert.ok(
       !essenceBrowserSource.includes('manager-essence-source-cell-image'),
       'the source column and its image cell are retired with the table head'
     );
+    // AND SO IS THE SOURCE-STATE SELECT (issue 1372, maintainer parity round 8). The reference's
+    // bar carries ONE filter beside the search field — the membership pair — and this bar carried
+    // four. A broken link is still findable: the row's summary line NAMES the source and marks
+    // the breakage, the search box reads that name, and the `Effects` chip carries it in its own
+    // tone and title.
     assert.ok(
-      essenceBrowserSource.includes('data-essence-source-filter'),
-      'but the source-state filter is RETAINED: a broken source link is otherwise unfindable'
+      !essenceBrowserSource.includes('data-essence-source-filter'),
+      'the source-state select is a control the reference does not draw'
+    );
+    assert.ok(
+      !essenceBrowserSource.includes('data-essence-status-filter'),
+      'and neither is the status segment'
+    );
+    assert.ok(
+      essenceBrowserSource.includes('data-essence-membership-filter'),
+      'NON-VACUITY: the one filter the reference DOES draw is still on the bar'
     );
     // Browser state is LIFTED to the root, which is criterion 12: search, filters, sort,
     // presentation and page all survive the editor round-trip.
@@ -2286,12 +2307,20 @@ describe('CraftingSystemManager source contract', () => {
       !rootSource.includes('data-essence-action='),
       'the root no longer inlines any essence inspector action'
     );
-    for (const action of ['edit', 'duplicate', 'delete', 'copy-source', 'unlink-source']) {
+    // `duplicate` is NOT in this set (issue 1372, maintainer parity round 8): it wrote a
+    // system-owned essence with its own name, icon and colour from the rail whose own banner says
+    // identity is the Essence Catalogue's. Asserted absent below, so a re-added action fails here
+    // rather than reappearing under a passing loop.
+    for (const action of ['edit', 'delete', 'copy-source', 'unlink-source']) {
       assert.ok(
         essenceStudioSource.includes(`data-essence-action="${action}"`),
         `the extracted inspector exposes the ${action} action`
       );
     }
+    assert.ok(
+      !essenceStudioSource.includes('data-essence-action="duplicate"'),
+      'and it exposes NO duplicate action'
+    );
     assert.ok(
       rootSource.includes('<EssenceBrowserInspector'),
       'and the root renders it as a component'
@@ -3819,18 +3848,41 @@ describe('world scoped-entity source contract (issue 1362)', () => {
         'cross-check below would be against the wrong set'
     );
 
+    // TWO SPELLINGS, AND BOTH ARE READ (issue 1372). A page that still DELEGATES its body states
+    // the four facts as attributes on `ScopedPlaceholderPage`; a page a screen lane has REPLACED
+    // states them as module constants beside its own `<main>`. Reading only the first form makes
+    // every replaced page answer `undefined` on all four, which collapses the distinctness sets
+    // below to fewer than seven and reds a lane that did everything right — and reading only the
+    // second would do the same to the four that have not been replaced yet. The swap detector has
+    // to survive the transition it exists to police, so it resolves either.
+    const declared = (source, attribute, constant) =>
+      source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1] ??
+      source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1];
     const pages = readdirSync(scopedDir)
       .filter((entry) => entry.startsWith('World') && entry.endsWith('.svelte'))
       .map((entry) => {
         const source = readFileSync(resolve(scopedDir, entry), 'utf8');
         return {
           file: entry,
-          pageId: source.match(/pageId="([^"]+)"/)?.[1],
-          icon: source.match(/icon="([^"]+)"/)?.[1],
-          titleKey: source.match(/titleKey="([^"]+)"/)?.[1],
-          titleFallback: source.match(/titleFallback="([^"]+)"/)?.[1],
+          pageId: declared(source, 'pageId', 'PAGE_ID'),
+          icon: declared(source, 'icon', 'PAGE_ICON'),
+          titleKey: declared(source, 'titleKey', 'TITLE_KEY'),
+          titleFallback: declared(source, 'titleFallback', 'TITLE_FALLBACK'),
         };
       });
+    // NON-VACUITY, because the regex pair above is exactly the thing that can silently answer
+    // `undefined` for every page after a rename: a set of seven `undefined`s has size one, which
+    // the distinctness assertions below would catch, but a set of seven MISSING title fallbacks
+    // would not — nothing else reads that field.
+    for (const page of pages) {
+      for (const field of ['pageId', 'icon', 'titleKey', 'titleFallback']) {
+        assert.equal(
+          typeof page[field],
+          'string',
+          `${page.file} declares no ${field} in either supported spelling`
+        );
+      }
+    }
     assert.equal(pages.length, 7, 'seven world scoped-entity pages');
 
     for (const field of ['pageId', 'icon', 'titleKey']) {

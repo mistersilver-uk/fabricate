@@ -53,6 +53,20 @@
   a call site can supply markup, a class or a shape of its own. An unrecognised vehicle name
   falls back to the chip rather than emitting an unstyled mark.
 
+  ── AND THE MARK CARRIES NO `icon` (issue 1372, maintainer parity round 8) ──────────────
+
+  It briefly did, for one caller: the scoped entry editors' passing Validation badge, drawn as
+  a glyph-only chip because a chip reading `0` would state the opposite of what it means. That
+  was defended as "a property of the chip, not a fourth vehicle", but a call site passing
+  `icon: 'fas fa-check'` IS a call site choosing a shape, which is the one thing the paragraph
+  above says cannot happen.
+
+  It is gone, and the reference is why rather than the principle alone. The prototype's tab badge
+  is ONE pill in two states — `badge: iss.block.length ? String(iss.block.length) : '✓'`
+  (`proto:6221`-`6223`) — a numeral or a tick CHARACTER in the same box, toned danger or
+  recessive. So the pass mark was never a glyph and never a fourth vehicle: it is the issue
+  chip's LABEL, which this primitive already draws and no caller has to be trusted with.
+
   A tab may carry MORE THAN ONE mark, because a section can be both authored and unready at
   once — pass an array, and they render in the order the caller listed them.
 
@@ -72,10 +86,13 @@
    - badges: per tab id, one mark or an array of them. A mark is a plain value, or
      `{vehicle, label, tone, name, class, suppressZero}` — `vehicle` ∈ count/issue/dot
      (default `issue`), `tone` ∈ neutral/success/positive/warning/danger and applies to the
-     chip, `name` is the accessible name (REQUIRED by `dot`, which renders no text, and
-     equally required by a chip whose whole label is a bare glyph such as `✓`), `class` is
-     one modifier class appended to `badgeClass` on the CHIP only, and `suppressZero`
-     defaults true so a mark reading `0` is omitted rather than stated as zero.
+     chip, `name` is the accessible name (REQUIRED by any mark that renders no readable text —
+     the `dot`, and equally a chip whose whole label is a bare character such as `✓`),
+     `class` is one modifier class appended to `badgeClass` on the CHIP only, and
+     `suppressZero` defaults true so a mark reading `0` is omitted rather than stated as zero.
+     A mark carries NO `icon`; see the note above for the caller that wanted one and what the
+     reference says instead. `class` is not that route reopened: it appends a token to a chip
+     this primitive still draws, and cannot change which element or which vehicle is rendered.
 
      `positive` is `Chip`'s OWN spelling of the success family — its `is-active` and
      `is-positive` selectors share one rule there, so the two paint identically — and it is
@@ -146,8 +163,9 @@
   function normalizeMark(tab, mark) {
     const fallbackTone = tab.id === 'validation' ? 'danger' : 'neutral';
     if (mark && typeof mark === 'object') {
+      const vehicle = VEHICLES.has(mark.vehicle) ? mark.vehicle : 'issue';
       return {
-        vehicle: VEHICLES.has(mark.vehicle) ? mark.vehicle : 'issue',
+        vehicle,
         label: mark.label ?? mark.value ?? '',
         tone: mark.tone || fallbackTone,
         name: mark.name ?? '',
@@ -165,10 +183,10 @@
     };
   }
 
-  // A dot carries no text, so emptiness is judged on its NAME; every other vehicle is judged
-  // on its label. The zero rule is the caller's to state, because the canonical text settles
-  // it per surface rather than per vehicle: the rail's record counts render `0` and the
-  // Checks strip's do not.
+  // A mark that renders no text is judged on what it DOES render: the dot on its name.
+  // Everything else is judged on its label. The zero rule is the caller's to state, because the
+  // canonical text settles it per surface rather than per vehicle: the rail's record counts
+  // render `0` and the Checks strip's do not.
   function isDrawable(mark) {
     if (mark.vehicle === 'dot') return mark.name !== '';
     if (mark.label === '' || mark.label === null || mark.label === undefined) return false;
@@ -215,6 +233,13 @@
   function markAttributes(tab, mark) {
     if (mark.vehicle === 'count') return countAttribute ? { [countAttribute]: tab.id } : {};
     if (mark.vehicle === 'dot') return dotAttribute ? { [dotAttribute]: tab.id } : {};
+    // A chip whose whole label is a single character renders no READABLE text, so without the
+    // name it would contribute nothing to the tab's accessible name while a COUNT chip
+    // contributes its number: a screen reader would hear `Validation` for a passing tab and
+    // `Validation 3` for a failing one, which is the difference between the two states being
+    // announced and one of them being silent. It rides the chip rather than the button so the
+    // tab's own label stays first. The `dot` states the same thing on its own element two
+    // branches down in the template.
     const attributes = badgeAttribute
       ? { [badgeAttribute]: tab.id, 'data-badge-tone': mark.tone }
       : {};

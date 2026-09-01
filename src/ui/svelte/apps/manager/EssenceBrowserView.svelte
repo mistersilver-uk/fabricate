@@ -46,9 +46,19 @@
     setEssenceSelection,
     toggleEssenceSelection,
   } from '../../../../utils/essenceBulkEditModel.js';
-  import { ESSENCE_STATUS_SEGMENTS, ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
+  import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
+  import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
 
   let {
+    // ── THE WORLD-SCOPE SEAM (issue 1374), READ HERE FROM ISSUE 1372 ────────────────────────
+    // `scope`, `actions` and `systemId` are three of the four keys `essenceScopeProps` supplies,
+    // so declaring them is CORRECT rather than hazardous: the spread owns each name, and the
+    // lookup never falls through to the bundle thunk. `systems` is deliberately NOT declared —
+    // this screen resolves membership against `scope.entries`, which is the projection's join,
+    // and the narrowed `{id, name}` roster answers none of the three questions it asks.
+    scope = null,
+    actions = null,
+    systemId = '',
     essenceCards = [],
     showSourceUi = false,
     showPropertyMacroUi = false,
@@ -65,6 +75,14 @@
     onSelectionCleared = null,
     browserState = $bindable(null),
   } = $props();
+
+  // ── THE MEMBERSHIP FILTER IS COMPONENT-LOCAL, AND THAT IS A DECISION ─────────────────────
+  // Every other axis on this toolbar lives on the LIFTED browser state so it survives the editor
+  // round-trip. This one does not, because it is not a preference: `All world essences` puts rows
+  // on screen that this system does not have, and a GM returning from an editor to a list showing
+  // entities that are not in the system they are editing would read it as data loss. It resets to
+  // `in` on every mount, which is the state the shipped screen has always had.
+  let membershipFilter = $state('in');
 
   let ownBrowserState = $state(createEssenceBrowserState());
   // The active view-state: the root's lifted object when bound, else the local fallback.
@@ -89,6 +107,9 @@
     ui.pageIndex = 0;
     ui.bulkSelectedEssenceIds = new Set();
     ui.systemId = selectedSystemId;
+    // The membership axis names THIS system's records, so it cannot survive a system switch for
+    // the same reason the source filter cannot.
+    membershipFilter = 'in';
   });
 
   function text(key, fallback) {
@@ -104,6 +125,194 @@
     return result;
   }
 
+  // ── MEMBERSHIP, RESOLVED AGAINST THE WORLD CORPUS ────────────────────────────────────────
+  //
+  // TWO OPTIONS, NOT THREE. `In this system` and `All world essences`, each carrying its count.
+  // The shared list model offers `all` / `in` / `out` for a system-scope list, and this screen is
+  // the prototype's `sysEss`, which offers two: `out` alone is a list a GM cannot act on from
+  // here beyond adding, and `all` already contains it with the members for context.
+  const activeSystemId = $derived(String(systemId || selectedSystemId || ''));
+  const worldEntries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
+  // The filter renders only when the world corpus can actually answer it. An unreadable corpus
+  // publishes `available: false`, and a control offering `All world essences` over a corpus
+  // nobody could read would report every essence as absent from this system.
+  const membershipAvailable = $derived(scope?.available === true && activeSystemId !== '');
+  const memberIds = $derived(new Set((essenceCards || []).map((essence) => essence.id)));
+  const systemRows = $derived(
+    new Map(
+      worldEntries.map((entry) => [
+        entry.id,
+        (entry.systems ?? []).find((row) => row.systemId === activeSystemId) ?? null,
+      ])
+    )
+  );
+  const membershipCounts = $derived({
+    in: (essenceCards || []).length,
+    all: Math.max(worldEntries.length, (essenceCards || []).length),
+  });
+
+  // BOTH COUNTS ARE ALWAYS ON SCREEN, which is the whole reason this axis is a segmented control
+  // rather than the `<select>` it shipped as: the pair is the fact, not either half of it.
+  //
+  // The count goes in the primitive's OWN `count` slot rather than into the label string. That is
+  // the same rendering the status segments beside it already use (`All 6 / Enabled 5 /
+  // Disabled 1`), so the two adjacent controls state a count one way on this bar instead of two;
+  // the prototype's `(3)` parenthesis is the mock's spelling of the same slot.
+  const membershipOptions = $derived([
+    {
+      value: 'in',
+      labelKey: 'FABRICATE.Admin.Manager.Essence.MembershipIn',
+      fallback: 'In this system',
+      count: membershipCounts.in,
+    },
+    {
+      value: 'all',
+      labelKey: 'FABRICATE.Admin.Manager.Essence.MembershipAll',
+      fallback: 'All world essences',
+      count: membershipCounts.all,
+    },
+  ]);
+
+  /**
+   * The world essences this system has NO record for, projected into the card shape the row
+   * renders, so one list can carry both.
+   *
+   * `enabled: true` is not a fiction: `addToSystem` seeds a membership record with `enabled: true`,
+   * so it is what this row WILL be the moment the Add beside it is pressed — which is also why the
+   * status segment counts it as enabled under `All world essences`.
+   */
+  const absentCards = $derived(
+    membershipFilter === 'all' && membershipAvailable
+      ? worldEntries
+          .filter((entry) => !memberIds.has(entry.id))
+          .map((entry) => ({
+            id: entry.id,
+            name: entry.entity?.name || entry.id,
+            description: entry.entity?.description || '',
+            icon: entry.entity?.icon || 'fas fa-mortar-pestle',
+            colorToken: entry.entity?.colorToken || '',
+            enabled: true,
+            componentUsageCount: 0,
+            recipeUsageCount: 0,
+            hasEffectTransfer: false,
+            hasPropertyMacro: false,
+            sourceState: 'none',
+          }))
+      : []
+  );
+  const listCards = $derived([...(essenceCards || []), ...absentCards]);
+
+  /**
+   * One row's three-state membership answer.
+   *
+   * @param {object} essence a rendered card.
+   * @returns {string} one of `absent` / `disabled` / `enabled`.
+   */
+  function membershipStateOf(essence) {
+    if (!memberIds.has(essence?.id)) return 'absent';
+    return essenceSystemState({ member: true, enabled: essence?.enabled !== false });
+  }
+
+  /**
+   * ONE ROW'S SUMMARY LINE: what this essence DOES in this system, section by section.
+   *
+   * ── IT NAMES THE VALUE. THE SHIPPED LINE NAMED THE STATE ─────────────────────────────────
+   * The prototype's row reads `Effects from Ember Brand (override) · Macro: Radiant Blessing`
+   * (`sysEss.png`): the effect source item and the macro by NAME, with the local override marked
+   * in parentheses. What shipped was `Effect source overridden here · Property macro overridden
+   * here` — the same four words twice, naming nothing, so a GM could not tell what any essence on
+   * the list actually does without opening it, and two rows overriding different things read
+   * identically.
+   *
+   * THE OVERRIDE MARK IS A SUFFIX, NOT THE SUBJECT. An inheriting section states its value with no
+   * parenthesis, which is also why every member row now carries a line where only overriding rows
+   * did: the value is the point, and the common case is exactly the one a GM most needs stated.
+   *
+   * ── WHAT IT CANNOT SAY, AND WHY ──────────────────────────────────────────────────────────
+   * A macro is stored as a UUID and the store publishes no resolved name for it — naming the
+   * document needs `await fromUuid` per row, which this projection cannot do. So the macro clause
+   * carries `essenceShortValueName`'s terminal segment, which is the id a GM recognises, where the
+   * prototype's mock carries a display name.
+   *
+   * @param {object} essence a rendered card.
+   * @returns {Array<{section: string, label: string}>}
+   */
+  function summaryClauses(essence) {
+    if (!membershipAvailable || !memberIds.has(essence?.id)) return [];
+    const inherited = systemRows.get(essence?.id)?.inherited ?? null;
+    const clauses = [];
+    if (showSourceUi) {
+      clauses.push({
+        section: 'effectSource',
+        label: withOverride(effectClause(essence), inherited?.effectSource === false),
+      });
+    }
+    if (showPropertyMacroUi) {
+      clauses.push({
+        section: 'macro',
+        label: withOverride(macroClause(essence), inherited?.macro === false),
+      });
+    }
+    return clauses;
+  }
+
+  /**
+   * The effect-source clause, in three states.
+   *
+   * A BROKEN LINK IS ITS OWN WORDING rather than the plain phrase. The row's Effects chip already
+   * carries the breakage in a warning tone and a title, and this is the same fact in words beside
+   * it — three channels for a state whose whole consequence is that nothing transfers.
+   *
+   * An early-return chain, not a nested ternary: SonarCloud reports S3358 in a file it indexes.
+   *
+   * @param {object} essence
+   * @returns {string}
+   */
+  function effectClause(essence) {
+    if (essence?.hasEffectTransfer !== true) {
+      return text('FABRICATE.Admin.Manager.Essence.SummaryNoEffects', 'No effects');
+    }
+    const name =
+      essenceShortValueName(essence?.sourceName) ||
+      text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None');
+    if (essence?.sourceState !== 'linked') {
+      return format(
+        'FABRICATE.Admin.Manager.Essence.SummaryEffectsBroken',
+        'Effects from {name} (link broken)',
+        { name }
+      );
+    }
+    return format('FABRICATE.Admin.Manager.Essence.SummaryEffects', 'Effects from {name}', {
+      name,
+    });
+  }
+
+  /**
+   * The macro clause, in two states.
+   *
+   * @param {object} essence
+   * @returns {string}
+   */
+  function macroClause(essence) {
+    const name = essenceShortValueName(essence?.propertyMacroUuid);
+    if (!name) return text('FABRICATE.Admin.Manager.Essence.SummaryNoMacro', 'No macro');
+    return format('FABRICATE.Admin.Manager.Essence.SummaryMacro', 'Macro: {name}', { name });
+  }
+
+  /**
+   * Mark a clause as this system's own rather than the world's.
+   *
+   * @param {string} clause
+   * @param {boolean} overridden
+   * @returns {string}
+   */
+  function withOverride(clause, overridden) {
+    if (!overridden) return clause;
+    return format('FABRICATE.Admin.Manager.Essence.SummaryOverride', '{clause} (override)', {
+      clause,
+    });
+  }
+
   // The SEARCH is applied here rather than in the pure model, which says so in its own
   // header: whether a source name is searchable depends on `showSourceUi`, and that is a
   // presentation fact the model has no business knowing. The TERM still lives on the lifted
@@ -112,7 +321,7 @@
   const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
   const searchedEssences = $derived(
     normalizedSearch
-      ? (essenceCards || []).filter((essence) =>
+      ? listCards.filter((essence) =>
           [
             essence.name || '',
             essence.description || '',
@@ -123,9 +332,16 @@
             .toLowerCase()
             .includes(normalizedSearch)
         )
-      : essenceCards || []
+      : listCards
   );
 
+  // THE STATUS AND SOURCE AXES ARE STILL THREADED, AND THEY ARE NOW ALWAYS `all`.
+  //
+  // The two controls that wrote them are gone from the bar (see the note beside the membership
+  // segment). The pure model keeps both axes because they are a property of a browser pipeline
+  // three studios share rather than of this toolbar, and pinning them here is what makes the
+  // removal a TOOLBAR change: nothing about which rows the model can express has moved, so the
+  // axes remain available to a screen that has a reason to offer them.
   const model = $derived(
     buildEssenceBrowserModel(searchedEssences, {
       status: ui.statusFilter,
@@ -198,18 +414,6 @@
     onSelectionCleared?.();
   }
 
-  // The counts the model computes ARE rendered, on the control they describe. Each is how
-  // many rows choosing that segment would show — the model widens the status axis and keeps
-  // every other active filter, so `Disabled 0` means "nothing to see here" rather than
-  // "nothing within the filter you already have".
-  const statusOptions = $derived(
-    ESSENCE_STATUS_SEGMENTS.map((segment) => ({
-      value: segment.value,
-      labelKey: segment.labelKey,
-      fallback: segment.fallback,
-      count: model.statusCounts?.[segment.value] ?? 0,
-    }))
-  );
   const viewModeOptions = $derived(
     ESSENCE_VIEW_MODE_SEGMENTS.map((segment) => ({
       value: segment.value,
@@ -286,56 +490,71 @@
           aria-label={text('FABRICATE.Admin.Manager.Essence.SearchLabel', 'Search essences')}
         />
       </label>
-      <SegmentedControl
-        options={statusOptions}
-        value={ui.statusFilter}
-        groupName="manager-essence-status-filter"
-        ariaLabel={text(
-          'FABRICATE.Admin.Manager.Essence.StatusFilterLabel',
-          'Filter essences by status'
-        )}
-        dataAttr="data-essence-status-filter"
-        optionDataAttr="data-essence-status-option"
-        onChange={(value) => {
-          ui.statusFilter = value;
-          ui.pageIndex = 0;
-        }}
-      />
-      <!-- ICON-ONLY (issue 1036). The prototype draws this axis as two glyph tiles, and it
-           is the one control on the bar whose options need no words: a list glyph and a
-           grid glyph ARE the two layouts, unlike the status filter beside it, where
-           "All / Enabled / Disabled" is the vocabulary. The labelled track measured ~135px
-           against the prototype's ~86px and crowded the row hard enough that an earlier
-           pass moved the source filter off it to compensate. The compact track lands at
-           ~72px: it is sized to sit with the 34px `.manager-icon-button`s in a toolbar row
-           rather than to match the prototype's pixel count, which is the constraint that
-           actually keeps the row level. The label survives in the a11y tree — see the
-           `is-icon-only` block in `SegmentedControl.svelte`. -->
-      <SegmentedControl
-        options={viewModeOptions}
-        value={ui.viewMode}
-        iconOnly
-        groupName="manager-essence-view-mode"
-        ariaLabel={text('FABRICATE.Admin.Manager.Essence.ViewModeLabel', 'Essence presentation')}
-        dataAttr="data-essence-view-mode"
-        optionDataAttr="data-essence-view-option"
-        onChange={(value) => (ui.viewMode = value)}
-      />
+      <!-- NO STATUS SEGMENT AND NO SOURCE SELECT (issue 1372, maintainer parity round 8).
+
+           The reference's bar carries ONE filter — the membership pair below — beside the search
+           field (`tmp/proto/essence-rules.png`, markup `proto:1537`-`1550`). This bar carried
+           four controls: `All / Enabled / Disabled`, the membership pair, the presentation toggle
+           and an `All sources` select. Two of them are gone.
+
+           NEITHER LOSES A STATE A GM CANNOT REACH. Every row states its own enabled state as a
+           pill and its own source breakage in the summary line and the Effects chip, both of
+           which the search box reads — `sortKey: 'status'` still groups the list by enabled-ness,
+           and a broken source is findable by the name the summary line prints. What the two
+           controls added was a second way to narrow a list that is six rows long in a real world
+           and is already narrowed by search, membership and sort.
+
+           The PRESENTATION toggle stays, on row two: it is not a filter, it is the only route to
+           the grid, and `### GM World Essence Screens` requirement 7 and the essence-library
+           capability list both name that grid. -->
+      <!-- THE MEMBERSHIP AXIS (issue 1372), AS A TWO-SEGMENT CONTROL ON THE TOP ROW.
+
+           The prototype draws it as one control with BOTH counts on screen at once —
+           `[In this system (3)] [All world essences (6)]` (`sysEss.png`) — beside the search box.
+           It shipped as a `<select>` on the second row, which shows one count and hides the other
+           behind a click: a GM cannot see that the world holds six essences and this system has
+           three without opening a menu, and that comparison is the entire subject of the control.
+
+           `SegmentedControl` is the shipped primitive for a two-to-four option axis and the same
+           one the status filter beside it uses, so this is a conversion rather than a new control.
+
+           It renders only when the world corpus can answer it: over an unreadable corpus every
+           essence reports as absent from this system, which is a false statement rather than an
+           empty one. -->
+      {#if membershipAvailable}
+        <SegmentedControl
+          options={membershipOptions}
+          value={membershipFilter}
+          groupName="manager-essence-membership-filter"
+          ariaLabel={text(
+            'FABRICATE.Admin.Manager.Essence.MembershipFilterLabel',
+            'Filter essences by membership of this system'
+          )}
+          dataAttr="data-essence-membership-filter"
+          optionDataAttr="data-essence-membership-option"
+          onChange={(value) => {
+            membershipFilter = value;
+            ui.pageIndex = 0;
+          }}
+        />
+      {/if}
     </div>
 
-    <!-- ROW TWO carries how the list is ARRANGED — the ordering controls and the retained
-         source filter — plus the active-filter chips and the count. They were three separate
-         rows, which made a toolbar the prototype draws as one bar four rows tall, and the
-         chip row was usually EMPTY, so it rendered as a blank band holding nothing but a
-         right-aligned count.
+    <!-- ROW TWO carries how the list is ARRANGED — sort key, direction and the presentation
+         toggle — plus the retained source filter and the count.
 
-         The source filter moved DOWN here rather than staying on row one, so row one is
-         exactly the three controls the prototype draws: search, the status segments, and the
-         presentation toggle. It is a filter sitting among view controls, which is a register
-         mix — but the alternative is a four-control row whose minimum widths sum to within a
-         pixel of the space the 1280px capture has, and a row that wraps is the defect this
-         pass exists to remove. The count keeps its `margin-left: auto`, so it still sits at
-         the far end of the bar. -->
+         ROW ONE IS THE FILTERS AND ROW TWO IS EVERYTHING ELSE, and the split is a WIDTH result
+         rather than a taxonomy. The prototype's bar is three bands: `[search] [In this system]
+         [All world essences]`, then `SORT BY [Name] [Asc] … 3 shown · 3 of 6 in this system`,
+         then `[☐ Select all]` (`sysEss.png`). This screen carries two axes the prototype has
+         no counterpart for — a status filter and a source filter — and a list/grid toggle it
+         also lacks, and the four of them plus search will not fit on one 745px line.
+
+         So the presentation toggle moved DOWN from row one when the membership control arrived,
+         which is what keeps the bar at THREE bands with row one leading exactly as the prototype
+         does. Putting the source filter here too is the same trade the shipped bar already made.
+         The count keeps its `margin-left: auto`, so it sits at the far end of this row as the
+         prototype draws it. -->
     <div class="manager-essence-filter-row is-secondary">
       <div class="manager-essence-filter-field">
         <span class="manager-essence-filter-label"
@@ -373,40 +592,26 @@
         </ManagerButton>
       </div>
 
-      <!-- RETAINED from the shipped browser and reachable only with source UI on: a broken
-           source link is otherwise unfindable, which is the only reason `needs-attention`
-           exists. The `aria-label` is the select's accessible name. -->
-      {#if showSourceUi}
-        <select
-          class="manager-essence-source-filter"
-          data-essence-source-filter
-          value={ui.sourceFilter}
-          onchange={(event) => {
-            ui.sourceFilter = event.currentTarget.value;
-            ui.pageIndex = 0;
-          }}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Essence.SourceFilterLabel',
-            'Filter essences by source state'
-          )}
-        >
-          <option value="all"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceAll', 'All sources')}</option
-          >
-          <option value="linked"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceLinkedFilter', 'Linked')}</option
-          >
-          <option value="none"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source')}</option
-          >
-          <option value="needs-attention"
-            >{text(
-              'FABRICATE.Admin.Manager.Essence.SourceNeedsAttention',
-              'Needs attention'
-            )}</option
-          >
-        </select>
-      {/if}
+      <!-- ICON-ONLY (issue 1036). The prototype draws this axis as two glyph tiles, and it
+           is the one control on the bar whose options need no words: a list glyph and a
+           grid glyph ARE the two layouts, unlike the status filter beside it, where
+           "All / Enabled / Disabled" is the vocabulary. The labelled track measured ~135px
+           against the prototype's ~86px and crowded the row hard enough that an earlier
+           pass moved the source filter off it to compensate. The compact track lands at
+           ~72px: it is sized to sit with the 34px `.manager-icon-button`s in a toolbar row
+           rather than to match the prototype's pixel count, which is the constraint that
+           actually keeps the row level. The label survives in the a11y tree — see the
+           `is-icon-only` block in `SegmentedControl.svelte`. -->
+      <SegmentedControl
+        options={viewModeOptions}
+        value={ui.viewMode}
+        iconOnly
+        groupName="manager-essence-view-mode"
+        ariaLabel={text('FABRICATE.Admin.Manager.Essence.ViewModeLabel', 'Essence presentation')}
+        dataAttr="data-essence-view-mode"
+        optionDataAttr="data-essence-view-option"
+        onChange={(value) => (ui.viewMode = value)}
+      />
 
       {#each chips as chip (chip.id)}
         <Chip tone="info" class="manager-essence-filter-chip" data-essence-filter-chip={chip.id}>
@@ -427,12 +632,36 @@
           </button>
         </Chip>
       {/each}
+      <!-- THE BAR'S COUNT ANSWERS MEMBERSHIP, NOT PAGINATION (`proto:1550`, data at
+           `proto:4971`). The prototype writes `N shown · M of K in this system`: how many the
+           filters left, how many of the world's essences this system has rules for, and how
+           many there are. That is the one number this screen cannot get anywhere else — the
+           range it replaces was already rendered, verbatim, by `Pagination` at the foot of the
+           same list (`Showing 1–6 of 6`), so the bar was spending its far end restating the
+           pager.
+
+           It falls back to that range when the world corpus cannot answer membership. `M of K`
+           over an unreadable corpus would report every essence as absent from this system,
+           which is a false statement rather than an unavailable one — the same rule the
+           membership filter beside it already follows. -->
       <span class="manager-essence-count" data-essence-count>
-        {format('FABRICATE.Admin.Manager.Essence.CountRange', '{start}–{end} of {total}', {
-          start: model.rangeStart,
-          end: model.rangeEnd,
-          total: model.totalCount,
-        })}
+        {#if membershipAvailable}
+          {format(
+            'FABRICATE.Admin.Manager.Essence.CountInSystem',
+            '{shown} shown · {members} of {total} in this system',
+            {
+              shown: model.totalCount,
+              members: membershipCounts.in,
+              total: membershipCounts.all,
+            }
+          )}
+        {:else}
+          {format('FABRICATE.Admin.Manager.Essence.CountRange', '{start}–{end} of {total}', {
+            start: model.rangeStart,
+            end: model.rangeEnd,
+            total: model.totalCount,
+          })}
+        {/if}
       </span>
     </div>
 
@@ -466,7 +695,7 @@
     listClass="manager-essences-table"
     listAttrs={{ 'data-essence-view': ui.viewMode }}
     scrollLabel={text('FABRICATE.Admin.Manager.Essence.TableShort', 'Essences')}
-    isEmpty={(essenceCards || []).length === 0}
+    isEmpty={listCards.length === 0}
     totalCount={model.totalCount}
     pageSize={ui.pageSize}
     pageIndex={model.pageIndex}
@@ -511,12 +740,15 @@
         bulkSelected={bulkSelectedIds.has(essence.id)}
         effectTransferEnabled={showSourceUi}
         propertyMacrosEnabled={showPropertyMacroUi}
+        membershipState={membershipAvailable ? membershipStateOf(essence) : ''}
+        summaryClauses={summaryClauses(essence)}
         {text}
         {format}
         onSelect={(id) => onSelectEssence(id)}
         onEdit={(id) => onEditEssence(id)}
         onToggleEnabled={(id, enabled) => onToggleEssenceEnabled(id, enabled)}
         onToggleBulkSelected={(id) => toggleBulkSelected(id)}
+        onAddToSystem={(id) => actions?.addToSystem?.(id, activeSystemId)}
       />
     {/snippet}
   </LibraryShelf>
@@ -580,6 +812,21 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     align-items: stretch;
+  }
+
+  /* THE SEARCH FIELD SHRINKS BEFORE THE ROW WRAPS.
+
+     The shipped `.manager-search` basis sizes it for a bar carrying one or two controls beside
+     it. Row one now carries TWO segmented tracks — status and membership, about 215px and 250px
+     — and at 1280px the field claimed 355px of a 745px bar, which pushed the membership control
+     onto a fourth toolbar band. The prototype's bar is three bands with search and the membership
+     segments on one line (`sysEss.png`).
+
+     `flex: 1 1 220px` still lets it take every pixel the two tracks do not want, and gives it a
+     floor a query is legible in. */
+  .manager-essence-filter-row :global(.manager-search) {
+    flex: 1 1 220px;
+    min-width: 0;
   }
 
   /* Search wraps onto its own line before the segmented controls start colliding. The row

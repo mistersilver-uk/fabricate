@@ -51,6 +51,26 @@
    - sectionNotes: `{[section]: string}` — the one-line summary of what each world default
      resolves to. Without it a count reads "Category · 3" and never says WHAT three systems are
      inheriting, and a row-count criterion passes green over every note empty.
+   - sectionTitles: `{[section]: string}` — the card TITLE for each world-default section, which
+     is the value the default resolves to stated as a phrase (`Effects from Ember Brand`), not the
+     section's own name. The prototype's cards title themselves after their VALUE and put the
+     inherit arithmetic underneath; a card titled `Effect source` states which row it is and
+     nothing about what a GM would be changing.
+   - sectionIcons: `{[section]: string}` — the leading glyph per card, from the lane's own
+     vocabulary, so a wand means effects on this screen exactly as it does in the row.
+   - extraCards: `{id, icon, title, note}[]` — cards the SECTIONS do not produce. An essence's
+     enabled roll-up is one: it is a per-membership flag rather than a world default, so it has no
+     section and no inherit count, and the prototype still draws it in the same stack.
+   - inspectorKicker / inspectorCaption / inspectorFoot / countUnit / membershipFilter /
+     selectAllLabel: threaded straight to the frame; see its own prop notes. `inspectorCaption`
+     is the one that had to be ADDED after the fact: the essence catalogue passed it, this shell
+     did not declare it, and a snippet a shell does not forward is dropped in SILENCE — the frame
+     rendered its own name-only fallback and the caption looked merely unfinished rather than
+     unwired.
+   - onOpenSystemRules(entityId, systemId): the inspector system row's `Rules ↗` deep link, into
+     that system's own rules for this entity. `null` — the default — falls the row back to the
+     membership cluster, so a lane whose shell has nowhere to route to still gets a usable row.
+     See the row itself for why a MEMBER row prefers the link.
    - selectedId: the inspected row, BINDABLE and threaded straight through to the frame, which
      writes it on every row click. An owner that binds can never hold a different value from the
      list, which is what lets a refused navigation restore the selection it declined to leave.
@@ -63,7 +83,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EntityListInspectorFrame from './EntityListInspectorFrame.svelte';
-  import MembershipActions from './MembershipActions.svelte';
+  import SystemRulesRoster from './SystemRulesRoster.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
 
   let {
@@ -77,7 +97,18 @@
     filters = [],
     sorts = [],
     searchOf = undefined,
+    searchPlaceholder = '',
     sectionNotes = {},
+    sectionTitles = {},
+    sectionIcons = {},
+    extraCards = [],
+    inspectorKicker = '',
+    inspectorCaption = undefined,
+    inspectorFoot = undefined,
+    countUnit = '',
+    membershipFilter = true,
+    selectAllLabel = '',
+    onOpenSystemRules = null,
     selectedId = $bindable(''),
     onSelect = () => {},
     onOpenEntry = () => {},
@@ -104,6 +135,11 @@
   let armedToken = $state('');
 
   const sections = $derived(Array.isArray(scope?.sections) ? scope.sections : []);
+  // The DENOMINATOR of the system-rules count. `systems` is the crafting-system roster the frame
+  // narrows to `{id, name}`; the entry's own `systems` array is the JOIN and has one row per
+  // roster entry, so either would answer — this one because it is what the prototype's `/ 24`
+  // counts, the world's systems, whether or not this essence has been joined to them.
+  const rosterSize = $derived(Array.isArray(systems) ? systems.length : 0);
   const rowActions = $derived([
     {
       id: 'open-entry',
@@ -112,21 +148,6 @@
       run: (entry) => onOpenEntry(entry.id),
     },
   ]);
-
-  /**
-   * A crafting system's display name, with an ID FALLBACK.
-   *
-   * `projectSystems` narrows the roster to `{id, name}` and coerces a missing name to `''`, so a
-   * row rendering `system.name` unguarded prints nothing where a system has no name and a row
-   * rendering `${system.name}` prints the literal `undefined`. Neither is an answer.
-   *
-   * @param {{systemId: string, systemName?: string}} row
-   * @returns {string}
-   */
-  function systemLabel(row) {
-    const named = typeof row?.systemName === 'string' ? row.systemName.trim() : '';
-    return named || String(row?.systemId ?? '');
-  }
 
   /**
    * COPY-FROM IS SUPPRESSED IN THIS SHELL, AND THAT IS A DECISION RATHER THAN AN OMISSION.
@@ -143,20 +164,14 @@
    * button that silently does nothing on every click forever — or a guess at the source, which
    * writes the wrong system's overrides onto a record and is worse.
    *
-   * A "sometimes correct" version is available and is also refused: when exactly one other
-   * system holds the entity the source is unambiguous, and the control would then work on some
-   * rows and not others with nothing on screen saying which.
-   *
    * SO THE AFFORDANCE IS NOT RENDERED, and the chooser is 6a-ii's — the lane that owns this
    * screen's inspector body, where a source picker belongs. `tests/components/
    * scoped-shell-prop-contract.test.js` bans a two-argument `copyMembership` call from this
    * directory, so the lane that adds the picker cannot re-introduce the silent form.
    *
-   * @returns {boolean} always `false`
+   * `SystemRulesRoster` states the same refusal as a literal `copyable={false}`, which is why no
+   * function is threaded to it.
    */
-  function copyable() {
-    return false;
-  }
 </script>
 
 <div class="manager-scoped-catalogue" data-scoped-list={hookValue}>
@@ -171,9 +186,16 @@
     {filters}
     {sorts}
     {searchOf}
+    {searchPlaceholder}
     {rowActions}
     {rowMeta}
     {bulk}
+    {inspectorKicker}
+    {inspectorCaption}
+    {inspectorFoot}
+    {countUnit}
+    {membershipFilter}
+    {selectAllLabel}
     bind:selectedId
     {onSelect}
     bind:armedToken
@@ -189,52 +211,74 @@
 -->
 {#snippet catalogueInspector(entry, ctx)}
   {@const counts = entry?.inheritCounts ?? {}}
-  <div class="manager-scoped-catalogue-facts">
-    {#if sections.length > 1}
-      <h3 class="manager-scoped-catalogue-facts-head">
-        {text('FABRICATE.Admin.Manager.Scoped.List.InheritHead', 'Inheriting systems')}
-      </h3>
-    {/if}
+
+  <!--
+    THE WORLD DEFAULTS ARE CARDS THAT NAME THEIR VALUE, not a label-and-count run.
+
+    Each card is `[glyph] {what this default IS} / {how many systems take it}`
+    (`tmp/proto/essence-catalogue.png`). What shipped was `Effect source · 0 inheriting` with the
+    value on a third line below, which inverts the reference's emphasis: the count is the footnote
+    and the value is the fact. The inherit COUNT is still on the card and still hooked by
+    `data-scoped-list-inherit-count`, so nothing that could read it before has lost it.
+  -->
+  <section class="manager-scoped-catalogue-section" data-scoped-list-defaults>
+    <p class="manager-kicker">
+      {text('FABRICATE.Admin.Manager.Scoped.List.DefaultsHead', 'World defaults')}
+    </p>
     {#each sections as section (section)}
-      <div class="manager-scoped-catalogue-fact" data-scoped-list-inherit-count={section}>
-        <span class="manager-scoped-catalogue-fact-label">{scopedSectionLabel(section, text)}</span>
-        <span class="manager-scoped-catalogue-fact-value">
-          {format('FABRICATE.Admin.Manager.Scoped.List.InheritCount', '{count} inheriting', {
-            count: Number(counts[section]) || 0,
-          })}
+      <div class="manager-scoped-catalogue-card" data-scoped-list-inherit-count={section}>
+        <span class="manager-scoped-catalogue-card-icon" aria-hidden="true">
+          <i class={sectionIcons?.[section] || 'fas fa-sliders'}></i>
         </span>
-        {#if sectionNotes?.[section]}
-          <p class="manager-muted" data-scoped-list-inherit-note={section}>
-            {sectionNotes[section]}
-          </p>
-        {/if}
+        <span class="manager-scoped-catalogue-card-copy">
+          <span class="manager-scoped-catalogue-card-title">
+            {sectionTitles?.[section] || scopedSectionLabel(section, text)}
+          </span>
+          <span class="manager-scoped-catalogue-card-note" data-scoped-list-inherit-note={section}>
+            {sectionNotes?.[section] ||
+              format('FABRICATE.Admin.Manager.Scoped.List.InheritCount', '{count} inheriting', {
+                count: Number(counts[section]) || 0,
+              })}
+          </span>
+        </span>
       </div>
     {/each}
-  </div>
-
-  <ul class="manager-scoped-catalogue-systems" role="list">
-    {#each entry?.systems ?? [] as row (row.systemId)}
-      <li class="manager-scoped-catalogue-system" data-scoped-list-system={row.systemId}>
-        <span class="manager-scoped-catalogue-system-name">{systemLabel(row)}</span>
-        <MembershipActions
-          entityType={scope?.entityType ?? 'component'}
-          entityId={entry?.id ?? ''}
-          systemId={row.systemId}
-          entityName={entry?.entity?.name ?? entry?.id ?? ''}
-          systemName={systemLabel(row)}
-          member={row.member === true}
-          enabled={row.enabled === true}
-          copyable={copyable()}
-          {armedToken}
-          onArm={(token) => (armedToken = token)}
-          onDisarm={() => (armedToken = '')}
-          onAdd={() => actions?.addToSystem?.(entry.id, row.systemId)}
-          onRemove={() => actions?.removeFromSystem?.(entry.id, row.systemId)}
-          onToggleEnabled={(next) => actions?.setEnabled?.(entry.id, row.systemId, next)}
-        />
-      </li>
+    {#each extraCards as card (card.id)}
+      <div class="manager-scoped-catalogue-card" data-scoped-list-extra-card={card.id}>
+        <span class="manager-scoped-catalogue-card-icon" aria-hidden="true">
+          <i class={card.icon || 'fas fa-sliders'}></i>
+        </span>
+        <span class="manager-scoped-catalogue-card-copy">
+          <span class="manager-scoped-catalogue-card-title">{card.title}</span>
+          {#if card.note}
+            <span class="manager-scoped-catalogue-card-note">{card.note}</span>
+          {/if}
+        </span>
+      </div>
     {/each}
-  </ul>
+  </section>
+
+  <!--
+    THE SYSTEM LIST IS `SystemRulesRoster`, COMPOSED RATHER THAN INLINED (issue 1372, maintainer
+    parity round 8). The reference draws the identical panel on the system Essence Rules
+    inspector, which had none; extracting it is what let that screen have this one rather than a
+    second copy of it. Every prop below is a fact this shell holds and the panel does not.
+  -->
+  <SystemRulesRoster
+    rows={Array.isArray(entry?.systems) ? entry.systems : []}
+    memberCount={Number(entry?.membershipCount) || 0}
+    {rosterSize}
+    entityId={entry?.id ?? ''}
+    entityName={entry?.entity?.name ?? entry?.id ?? ''}
+    entityType={scope?.entityType ?? 'component'}
+    enableable={scope?.enableable === true}
+    {actions}
+    {onOpenSystemRules}
+    {armedToken}
+    onArm={(token) => (armedToken = token)}
+    onDisarm={() => (armedToken = '')}
+    resetKey={selectedId}
+  />
 
   {#if inspectorBody}{@render inspectorBody(entry, ctx)}{/if}
 {/snippet}
@@ -250,61 +294,71 @@
     min-height: 0;
   }
 
-  .manager-scoped-catalogue-facts {
+  /* THE PANEL'S VERTICAL BUDGET IS THE WHOLE REASON THIS IS TIGHT.
+
+     A 900px window gives the inspector about 660px, and the prototype fits an identity block,
+     three world-default cards, a section head, a search field, FIVE system rows and a pager into
+     it with the primary action pinned below (`essences.png`). At the manager's default
+     `--fab-space-2` rhythm that stack is roughly 680px and the pager falls below the fold — the
+     one control that says there are more systems than the five on screen. Every gap below is
+     therefore stated rather than inherited. */
+  .manager-scoped-catalogue-section {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-
-  .manager-scoped-catalogue-facts-head {
-    margin: 0;
-    color: var(--fab-text-secondary);
-    font-family: var(--fab-font-serif);
-    font-size: 0.78rem;
-    font-weight: 600;
-  }
-
-  .manager-scoped-catalogue-fact {
-    display: flex;
-    flex-wrap: wrap;
     gap: var(--fab-space-chip);
-    align-items: baseline;
     min-width: 0;
   }
 
-  .manager-scoped-catalogue-fact-label {
+  /* ONE WORLD DEFAULT, AS A CARD. Glyph, then a title that names the VALUE over a note that
+     states the arithmetic — the prototype's `Effects from Ember Brand` / `7 of 13 systems inherit
+     it` (`essences.png`). */
+  .manager-scoped-catalogue-card {
+    display: flex;
+    gap: var(--fab-space-2);
+    align-items: flex-start;
+    padding: 6px var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    /* NO FILL. The prototype draws every card in the content area on the pane's own surface and
+       separates them with a 1px border alone (issue 1372); a fill here put a fifth grey on a
+       screen that has one. */
+    background: transparent;
+    min-width: 0;
+  }
+
+  .manager-scoped-catalogue-card-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    /* The ONE lighter surface inside a card, and it is the prototype's: a glyph tile is a
+       CONTROL-sized inset, so it takes the same rung the search field and the selects do. */
+    background: var(--fab-bg-1);
+    color: var(--fab-accent);
+    font-size: 0.72rem;
+  }
+
+  .manager-scoped-catalogue-card-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .manager-scoped-catalogue-card-title {
     color: var(--fab-text);
     font-size: 0.72rem;
-    font-weight: 600;
+    font-weight: 700;
+    overflow-wrap: break-word;
   }
 
-  .manager-scoped-catalogue-fact-value {
+  .manager-scoped-catalogue-card-note {
     color: var(--fab-text-muted);
-    font-size: 0.72rem;
-  }
-
-  .manager-scoped-catalogue-systems {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    min-width: 0;
-  }
-
-  .manager-scoped-catalogue-system {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-    min-width: 0;
-  }
-
-  .manager-scoped-catalogue-system-name {
-    color: var(--fab-text);
-    font-size: 0.74rem;
-    font-weight: 600;
+    font-size: 0.62rem;
+    line-height: 1.35;
     overflow-wrap: break-word;
   }
 </style>

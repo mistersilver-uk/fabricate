@@ -64,6 +64,10 @@
     onTogglePage = () => {},
     onSelectAllResults = () => {},
     onClear = () => {},
+    // The VISIBLE caption on the select-all box, when a caller wants one shorter than the shared
+    // phrase. `''` — the default — keeps the shipped words, so the three studios are untouched.
+    // See `selectAllCaption` below for why the accessible name does not follow it.
+    selectAllLabel: selectAllLabelOverride = '',
     rowClass = 'manager-component-filter-row',
     toolbarAttr = 'data-component-selection-toolbar',
     pageBoxAttr = 'data-component-select-all-page',
@@ -99,7 +103,14 @@
   const resultsHook = $derived({ [resultsAttr]: '' });
   const clearHook = $derived({ [clearAttr]: '' });
 
+  // THE ACCESSIBLE NAME, always the full phrase.
   const selectAllLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.SelectAll', 'Select all'));
+  // THE VISIBLE CAPTION, which a caller may shorten. The prototype's catalogue toolbar reads
+  // `[☐ All]` where three shipped studios read `[☐ Select all]`, and the two are not the same
+  // string for the same reason the `title` on an icon-only segment is not: `All` beside a box is
+  // legible because the box is right there, and `All` announced on its own is not a verb a
+  // screen-reader user can act on. So only the caption moves and `ariaLabel` stays whole.
+  const selectAllCaption = $derived(String(selectAllLabelOverride || '').trim() || selectAllLabel);
   const countLabel = $derived(
     format('FABRICATE.Admin.Manager.BulkEdit.SelectedCount', '{count} selected', {
       count,
@@ -133,7 +144,7 @@
       {...pageBoxHook}
       onChange={(on) => onTogglePage(on === true)}
     />
-    <span class="fab-bulk-selection-all-label">{selectAllLabel}</span>
+    <span class="fab-bulk-selection-all-label">{selectAllCaption}</span>
   </label>
 
   {#if count > 0}

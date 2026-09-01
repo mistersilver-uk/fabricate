@@ -297,7 +297,7 @@
     },
     {
       "case": "manager-essence-edit-first-state",
-      "alt": "The essence editor's Identity tab, with an icon picker, name, description, a row of palette colours and an enabled switch turned off, and a live preview on the right showing how the essence reads on an inventory tile and on a component.",
+      "alt": "The essence rules editor for one crafting system. A card names the shared world definition and offers Edit shared definition, an Enabled in Karrun Forgecraft switch sits below it turned off, and the Active effect source card carries its own override switch and the linked item. A live preview on the right shows how the essence reads on an inventory tile and on a component.",
       "sha256": "0ea93dcb7b173c8b5b0e385f7acf4210b6d2555acc2fb110874078cde400b8ab"
     },
     {

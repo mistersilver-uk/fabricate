@@ -283,62 +283,142 @@ test('1036: a recipe reference is reported through its OWN key, never as a block
 });
 
 // ---------------------------------------------------------------------------
-// Criterion 9 — duplicateEssence
+// `duplicateEssence` is RETIRED (issue 1372, maintainer parity round 8)
+//
+// It wrote a second `system.essenceDefinitions` entry with a fresh id and a `(copy)` name — a
+// SYSTEM-owned essence carrying its own name, icon and colour, minted from the rail whose own
+// banner says name, icon and colour come from the Essence Catalogue and are shared by every
+// system. Both claims were on screen a foot apart. `### GM World Essence Screens` requirement 13
+// closes the system layer to identity authorship, so the verb has no place to write.
+//
+// Asserted as an ABSENCE on the published API, not merely deleted: `CraftingSystemManagerRoot`
+// called it through `store.duplicateEssence?.()`, so a re-added export would silently wire a
+// button back up, and the surviving `_essenceNameTaken` guard would keep any test of the name
+// arithmetic green while the affordance itself was the defect.
 // ---------------------------------------------------------------------------
 
-test('1036/9: a duplicate takes a name updateEssence will still accept', async () => {
+test('1372: the store publishes no essence duplicate verb', async () => {
   const harness = makeEssenceStoreHarness({
     essences: [makeEssence({ id: 'fire', name: 'Fire' })],
   });
   const store = await openStore(harness);
 
-  const copyId = await store.duplicateEssence('fire');
-  assert.ok(Boolean(copyId), 'the new id is returned so the caller can select the copy');
-
-  // The real proof: SAVE the copy. `addEssence` and `updateEssence` both refuse a
-  // case-insensitive name collision and `_uniqueKey` de-duplicates the ID only, so a naive
-  // duplicate lands two same-named definitions after which NEITHER can ever be saved again.
-  const saved = await store.updateEssence(copyId, { description: 'edited' });
-  assert.equal(saved, true, 'the copy is savable, which a colliding name would prevent');
+  assert.equal(
+    typeof store.addEssence,
+    'function',
+    'NON-VACUITY: the essence write family is on the store at all'
+  );
+  assert.equal(store.duplicateEssence, undefined, 'and duplicate is not one of its verbs');
 });
 
-test('1036/9: duplicating twice yields THREE distinct names', async () => {
-  const harness = makeEssenceStoreHarness({
-    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
-  });
+// ---------------------------------------------------------------------------
+// `worldScope.essence.addToSystem` WRITES BOTH HALVES (issue 1372, maintainer parity round 8)
+//
+// The generic world-scope write family writes exactly one thing: a membership row in the
+// world-scope payload. Nothing on the System Essence Rules screen reads that row — `essenceCards`
+// is built from `selectedSystem.essenceDefinitions`, and the read union only ENRICHES rows it
+// already finds there — so `Add to this system` published a refresh and left the list exactly as
+// it was. A button that silently does nothing, on every essence, forever.
+//
+// That is the same root cause as the system-scope create draft this round removes, and removing
+// `+ Create essence` from the Essence Rules header is only safe once the remaining route lands.
+// ---------------------------------------------------------------------------
+
+/**
+ * A world-scope essence store over an in-memory payload, in the persisted shape the write path
+ * reads: entities as an array, defaults and membership as maps.
+ *
+ * @param {object[]} entities
+ * @returns {{store: object, payload: object}}
+ */
+function makeEssenceScopeStore(entities) {
+  const payload = { entities: [...entities], defaults: {}, membership: {} };
+  return {
+    payload,
+    store: {
+      get: () => JSON.parse(JSON.stringify(payload)),
+      corpus: () => payload,
+      save: async (next) => {
+        payload.entities = next.entities;
+        payload.defaults = next.defaults;
+        payload.membership = next.membership;
+      },
+    },
+  };
+}
+
+test('1372: joining a world essence to a system writes the in-system record too', async () => {
+  const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire', name: 'Fire' })] });
+  const scope = makeEssenceScopeStore([
+    { id: 'aether', name: 'Aether', icon: 'fas fa-atom', colorToken: 'lavender', description: 'Thin' },
+  ]);
+  harness.services.getEssenceScopeStore = () => scope.store;
   const store = await openStore(harness);
 
-  await store.duplicateEssence('fire');
-  await store.duplicateEssence('fire');
+  // NEGATIVE CONTROL FIRST: the world roster holds it and this system does not.
+  assert.deepEqual(
+    harness.system.essenceDefinitions.map((def) => def.id),
+    ['fire'],
+    'the system starts without the world essence'
+  );
 
-  const names = harness.system.essenceDefinitions.map((def) => def.name.toLowerCase());
-  assert.equal(names.length, 3);
-  assert.equal(new Set(names).size, 3, 'counting upwards, not appending "(copy)" repeatedly');
+  assert.equal(await store.worldScope.essence.addToSystem('aether', 'sys1'), true);
+
+  // The WORLD half: a membership record inheriting every section.
+  assert.deepEqual(Object.keys(scope.payload.membership), ['aether|sys1']);
+  // The IN-SYSTEM half, which is what the screen reads.
+  const seeded = harness.system.essenceDefinitions.find((def) => def.id === 'aether');
+  assert.ok(seeded, 'the essence is now in the system the GM joined it to');
+  assert.equal(seeded.name, 'Aether');
+  assert.equal(seeded.icon, 'fas fa-atom');
+  assert.equal(seeded.colorToken, 'lavender');
+  // IDENTITY ONLY: every behaviour key is unset, so both sections resolve as INHERITED, which is
+  // exactly what the membership record beside it declares.
+  assert.equal(seeded.sourceComponentId ?? null, null);
+  assert.equal(seeded.propertyMacroUuid ?? null, null);
+
+  // And it is VISIBLE: the projection the library reads is what a GM sees change.
+  assert.deepEqual(
+    get(store.viewState).essenceCards.map((card) => card.id).sort(),
+    ['aether', 'fire']
+  );
 });
 
-test('1036/9: a FALSE enabled is carried onto the copy', async () => {
+test('1372: re-joining an essence the system already holds writes no in-system record', async () => {
+  // Overwriting would be a DESTRUCTIVE read of "Add": the GM is re-adding a membership record to
+  // an essence this system already has, and its authored behaviour is not the world's to replace.
   const harness = makeEssenceStoreHarness({
-    essences: [makeEssence({ id: 'fire', enabled: false, propertyMacroUuid: 'Macro.heat' })],
+    essences: [makeEssence({ id: 'fire', name: 'Fire', propertyMacroUuid: 'Macro.heat' })],
   });
-  const store = await openStore(harness);
-
-  const copyId = await store.duplicateEssence('fire');
-  const copy = harness.system.essenceDefinitions.find((def) => def.id === copyId);
-
-  // Silently re-enabling a copy would give it behaviour its original does not have.
-  assert.equal(copy.enabled, false);
-  assert.equal(copy.propertyMacroUuid, 'Macro.heat');
-  assert.notEqual(copy.id, 'fire', 'a NEW id, or the copy would overwrite its original');
-});
-
-test('1036/9: duplicating something that is not there writes nothing', async () => {
-  const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire' })] });
+  const scope = makeEssenceScopeStore([{ id: 'fire', name: 'Flame', icon: 'fas fa-fire-flame' }]);
+  harness.services.getEssenceScopeStore = () => scope.store;
   const store = await openStore(harness);
   harness.writes.length = 0;
 
-  assert.equal(await store.duplicateEssence('nope'), null);
-  assert.equal(await store.duplicateEssence(''), null);
+  await store.worldScope.essence.addToSystem('fire', 'sys1');
+
+  assert.deepEqual(
+    harness.writes.filter((write) => write.kind === 'updateSystem'),
+    [],
+    'no system write at all, so the authored macro and the local name are untouched'
+  );
+  const kept = harness.system.essenceDefinitions.find((def) => def.id === 'fire');
+  assert.equal(kept.name, 'Fire');
+  assert.equal(kept.propertyMacroUuid, 'Macro.heat');
+});
+
+test('1372: joining an essence the world roster does not hold writes nothing', async () => {
+  const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire' })] });
+  const scope = makeEssenceScopeStore([]);
+  harness.services.getEssenceScopeStore = () => scope.store;
+  const store = await openStore(harness);
+  harness.writes.length = 0;
+
+  assert.equal(await store.worldScope.essence.addToSystem('nope', 'sys1'), false);
+  assert.equal(await store.worldScope.essence.addToSystem('', 'sys1'), false);
+  assert.equal(await store.worldScope.essence.addToSystem('fire', ''), false);
   assert.deepEqual(harness.writes, [], 'negative control: no write at all');
+  assert.deepEqual(scope.payload.membership, {});
 });
 
 // ---------------------------------------------------------------------------

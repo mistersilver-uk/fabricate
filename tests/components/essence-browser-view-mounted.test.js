@@ -33,6 +33,26 @@ const harness = createMountedComponentHarness({
     'src/utils/browserPagination.js',
     'src/utils/essenceValidation.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
+    // The essence world-scope presentation leaf (issue 1372). `EssenceBrowserView` reads the
+    // three-state membership answer and the inherit suffix from it; it imports nothing, so this
+    // one entry closes the graph. An omission does not fail this suite, it CANCELS it.
+    'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
+    // The scope-to-section mapping (issue 1372). `EssenceBrowserView` reads ONE function from it,
+    // `scopedSectionLabel`, and unlike `essenceScoped.js` this one is not a leaf: it reaches the
+    // world-scope projection, which reaches the scope vocabularies and the grouping migration.
+    // The seven entries below are that closure, and the harness reports only its frontier, so
+    // they were converged by re-running rather than read off the import graph. Seven modules to
+    // render a browser row is worth noticing rather than normalising — the label is presentation
+    // and could live in a UI-free leaf beside `essenceScoped.js`, which is what keeps that one
+    // entry to a single line. Left as-is here because the import is issue 1372's to place.
+    'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
+    'src/systems/toolScope.js',
+    'src/ui/svelte/stores/worldScopeProjection.js',
+    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/componentScope.js',
+    'src/systems/essenceScope.js',
+    'src/systems/scopedDefinitionStore.js',
+    'src/systems/scopedDefinitions.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
@@ -210,54 +230,72 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     harness.remount();
   });
 
-  it('renders each status segment with the count that choosing it would show', async () => {
-    const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
-    const countOf = (value) =>
-      root
-        .querySelector(`[data-essence-status-option="${value}"] [data-segment-count]`)
-        .textContent.trim();
+  it('carries ONE filter control on the bar, and it is the membership pair', async () => {
+    // ── THE TOOLBAR'S WEIGHT IS THE ASSERTION (issue 1372, maintainer parity round 8) ────────
+    // The reference's bar carries a search field and exactly one filter — `In this system (n) |
+    // All world essences (n)` (`tmp/proto/essence-rules.png`). This bar carried four controls:
+    // a status segment, the membership pair, the presentation toggle and an `All sources`
+    // select. The two filters that are gone are asserted ABSENT by their own hooks, and the two
+    // that remain are asserted PRESENT — a test that only counted `SegmentedControl`s would pass
+    // over the source `<select>`, which is not one.
+    //
+    // THE MEMBERSHIP PAIR NEEDS A WORLD CORPUS, so it is asserted over a mount that has one.
+    // Without `scope.available` it is correctly withheld — a control offering `All world
+    // essences` over an unreadable corpus reports every essence as absent from this system —
+    // and asserting its absence here would measure the fixture rather than the bar.
+    const scope = {
+      available: true,
+      entityType: 'essence',
+      enableable: true,
+      entries: [
+        { id: 'aether', entity: { name: 'Aether' }, systems: [{ systemId: 'sys-1', member: true }] },
+        { id: 'water', entity: { name: 'Water' }, systems: [{ systemId: 'sys-1', member: true }] },
+      ],
+    };
+    const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED], { scope }));
 
-    assert.deepEqual([countOf('all'), countOf('enabled'), countOf('disabled')], ['2', '1', '1']);
+    assert.ok(
+      !root.querySelector('[data-essence-status-filter]'),
+      'the status filter is a control the reference bar does not draw, not a hidden one'
+    );
+    assert.ok(!root.querySelector('[data-essence-source-filter]'), 'and so is the source select');
 
-    // The counts FOLLOW the search, because the number's whole job is to say what clicking
-    // the segment shows — a count over the whole roster would promise rows the GM cannot
-    // reach without clearing a filter the count says nothing about.
-    const search = root.querySelector('[aria-label="Search essences"]');
-    search.value = 'Aether';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    assert.deepEqual([countOf('all'), countOf('enabled'), countOf('disabled')], ['1', '0', '1']);
+    assert.ok(
+      Boolean(root.querySelector('[data-essence-membership-filter]')),
+      'the membership pair is the one filter the reference draws, so its absence would be the ' +
+        'opposite defect and this measurement would be vacuous without it'
+    );
+    assert.ok(
+      Boolean(root.querySelector('[data-essence-view-mode]')),
+      'and the presentation toggle survives: it is not a filter, and it is the only route to ' +
+        'the grid the essence-library capability list requires'
+    );
 
-    // And the STATUS axis is widened for its own counts, or the selected segment would be
-    // the only non-zero one by construction.
-    root.querySelector('[data-essence-status-option="disabled"] input').click();
-    flushSync();
-    assert.deepEqual([countOf('all'), countOf('enabled'), countOf('disabled')], ['1', '0', '1']);
+    // EVERY ROW IS STILL ON SCREEN. Removing a filter must not narrow the list it filtered.
+    assert.deepEqual(
+      [...root.querySelectorAll('.manager-essence-row')].map((row) => row.dataset.essenceId),
+      ['aether', 'water']
+    );
     harness.remount();
   });
 
-  it('filters by status with a working negative control, and states what is filtered', async () => {
+  it('states an enabled row and a disabled row through the same pill treatment', async () => {
+    // ── ONE STATE, ONE SHAPE (issue 1372, maintainer parity round 8) ─────────────────────────
+    // The row's Disabled badge is a `StatusPill`, and it passed `tone="neutral"` — a tone that
+    // is not in the pill's ramp at all, so `is-neutral` matched no rule and the badge rendered
+    // with the base `border: 1px solid transparent` and no fill: a bare dot and some small text
+    // beside a bordered, filled pill on the world catalogue one click away. `data-status-pill`
+    // reports the RESOLVED tone, which is what makes the fallback measurable rather than
+    // invisible.
     const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
-    assert.equal(root.querySelectorAll('.manager-essence-row').length, 2);
-
-    root.querySelector('[data-essence-status-option="disabled"] input').click();
-    flushSync();
-    assert.deepEqual(
-      [...root.querySelectorAll('.manager-essence-row')].map((row) => row.dataset.essenceId),
-      ['aether'],
-      'Disabled shows only the disabled essence'
+    const pill = root.querySelector(
+      '.manager-essence-row[data-essence-id="aether"] [data-status-pill]'
     );
-    assert.ok(
-      root.querySelector('[data-essence-filter-chip="status"]'),
-      'and an active filter is stated as a dismissible chip'
-    );
-
-    root.querySelector('[data-essence-status-option="enabled"] input').click();
-    flushSync();
-    assert.deepEqual(
-      [...root.querySelectorAll('.manager-essence-row')].map((row) => row.dataset.essenceId),
-      ['water'],
-      'negative control: Enabled shows the OTHER one, so the filter is not simply hiding rows'
+    assert.ok(Boolean(pill), 'the disabled row states its state as a pill');
+    assert.equal(
+      pill.dataset.statusPill,
+      'subtle',
+      'and the tone it resolves to is one the pill actually paints'
     );
     harness.remount();
   });
@@ -278,6 +316,101 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       row.querySelectorAll('.manager-icon-button').length,
       1,
       'and the row has exactly one, so "first" is unambiguous'
+    );
+    harness.remount();
+  });
+
+  it('labels that control `Edit rules` and marks it as leaving the screen', async () => {
+    // `proto:1576`. The prototype's system essence-rules row ends in a LABELLED pill carrying
+    // the external-link glyph, because the words are what say which layer the control opens:
+    // this screen edits ONE system's rules for a world-shared essence.
+    const root = await harness.mount(props([CONFIGURED_DISABLED]));
+    const row = root.querySelector('.manager-essence-row[data-essence-id="aether"]');
+    const edit = row.querySelector('[data-essence-edit="aether"]');
+    assert.ok(
+      edit.textContent.includes('Edit rules'),
+      'the row action states the layer it opens rather than showing a bare pencil'
+    );
+    assert.ok(
+      edit.querySelector('i.fa-arrow-up-right-from-square'),
+      'and carries the prototype trailing glyph that marks a control leaving this screen'
+    );
+    // THE ACCESSIBLE NAME, ASSERTED BY VALUE (issue 1422). The control is an `<IconButton>`,
+    // which takes the name as the `ariaLabel` PROP and emits it as `aria-label` itself. That
+    // spelling is the whole reason this clause exists: a name handed to the wrong prop is
+    // dropped rather than rejected, the button renders IDENTICALLY, every `data-*` selector
+    // above still resolves, and the frame is unchanged — so nothing else in this file, and no
+    // screenshot, can tell a named control from an unnamed one.
+    assert.equal(
+      edit.getAttribute('aria-label'),
+      'Edit rules for Aether',
+      'the labelled variant names the essence AND the layer it opens'
+    );
+    // NON-VACUITY, and the reason the label could not simply replace the class: the Foundry
+    // smoke reaches this control as `.manager-icon-button[title*="Edit" i]` behind a
+    // `count() > 0` guard, so a lost class or a retitled control would stop producing the
+    // `manager-essence-edit-first-state` frame WITHOUT failing anything.
+    assert.ok(
+      edit.classList.contains('manager-icon-button'),
+      'it is still the primitive three surfaces address it by'
+    );
+    assert.ok(
+      edit.getAttribute('title').startsWith('Edit'),
+      'and its title still leads with Edit, which is what the smoke matches on'
+    );
+    // The GRID card keeps the pencil: its footer is a two-slot strip with no room for a
+    // phrase, and the prototype draws no grid presentation for this screen to copy.
+    root.querySelector('[data-essence-view-option="grid"] input').click();
+    flushSync();
+    const card = root.querySelector('.manager-essence-row[data-essence-id="aether"]');
+    assert.ok(
+      card.querySelector('[data-essence-edit="aether"] i.fa-pen'),
+      'the grid card keeps the icon-only pencil'
+    );
+    assert.ok(
+      !card.textContent.includes('Edit rules'),
+      'and does not carry the phrase, so the two presentations differ deliberately'
+    );
+    // The card's pencil has NO visible text at all, so here the accessible name is the only
+    // thing naming the control — and it takes the other branch of the same ternary, which is
+    // what makes this a second reading of the prop rather than a repeat of the first.
+    assert.equal(
+      card.querySelector('[data-essence-edit="aether"]').getAttribute('aria-label'),
+      'Edit Aether',
+      'the icon-only presentation is still named, and names the essence'
+    );
+    harness.remount();
+  });
+
+  it('states MEMBERSHIP in the bar count, and falls back to the range without a corpus', async () => {
+    // `proto:1550` / `proto:4971`: `N shown · M of K in this system`. The range it replaces was
+    // already rendered verbatim by `Pagination` at the foot of the same list.
+    const scope = {
+      available: true,
+      sections: [],
+      entries: [
+        { id: 'aether', entity: { name: 'Aether' }, systems: [] },
+        { id: 'water', entity: { name: 'Water' }, systems: [] },
+        { id: 'ember', entity: { name: 'Ember' }, systems: [] },
+      ],
+    };
+    const root = await harness.mount(
+      props([CONFIGURED_DISABLED, PLAIN_ENABLED], { scope, systemId: 'sys-1' })
+    );
+    assert.equal(
+      root.querySelector('[data-essence-count]').textContent.replaceAll(/\s+/g, ' ').trim(),
+      '2 shown · 2 of 3 in this system',
+      'the bar answers how many the filters left, and how much of the world this system holds'
+    );
+
+    // THE NEGATIVE HALF. An unreadable corpus cannot answer `M of K`, and answering it anyway
+    // would report every essence as absent from this system — a false statement rather than an
+    // unavailable one. The bar returns to the range, which is always answerable.
+    const noCorpus = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
+    assert.equal(
+      noCorpus.querySelector('[data-essence-count]').textContent.replaceAll(/\s+/g, ' ').trim(),
+      '1–2 of 2',
+      'with no world corpus the count states the page range and claims nothing about membership'
     );
     harness.remount();
   });
@@ -325,6 +458,6 @@ describeBrowserBulkSelection({
   rowControls: {
     scope: '.manager-essence-cluster',
     count: 2,
-    why: 'the cluster holds the enable toggle and the Edit pencil — and the selection control must NOT join them, because the Foundry smoke walk reaches the row actions through button selectors',
+    why: 'the cluster holds the enable toggle and the Edit rules button — and the selection control must NOT join them, because the Foundry smoke walk reaches the row actions through button selectors',
   },
 });

@@ -1144,19 +1144,191 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
     ],
   }),
+  // ── The two world ESSENCE screens, REAL bodies from issue 1372 ─────────────────────────────
+  //
+  // The catalogue's `ScopedPlaceholderPage` claim is DELETED here, not merely joined by the new
+  // patterns. The shared placeholder body is claimed by every case that renders it and this route
+  // no longer does, so a claim left behind would publish this screen as evidence of a change to a
+  // component it does not contain — the exact inversion `manager-scoped-prop-contract.test.js`
+  // reds on, in both directions.
   managerCase({
     id: 'world-essence-catalogue',
     label: 'Manager — World Essence Catalogue',
     reaches: 'beyond',
     smokeLabels: [],
-    steps: [{ selector: '#manager-world-nav-essence-catalogue' }],
+    // THE SECOND STEP SELECTS A ROW, AND WITHOUT IT THIS CASE PHOTOGRAPHS THE WRONG SCREEN.
+    //
+    // The inspector is most of a 300px column and the richest region on the page — the world
+    // defaults, their inherit counts, the per-system rules list and the deep link into the entry
+    // editor all live in it. It renders `Nothing selected` until a row is clicked, so a case that
+    // stops at the rail entry publishes a frame in which the whole right-hand third of the screen
+    // is an empty state. Three review rounds compared that frame against a prototype whose
+    // inspector is full and read the difference as a styling gap.
+    //
+    // `[data-scoped-list-inspect]` matches every row's identity button and the runner takes
+    // `.first()`, so this selects the first row of the default `Name A–Z` page — `Aether`, which
+    // carries a colour token, a linked effect source and a property macro, and is therefore the
+    // one row that exercises every readout the inspector can draw.
+    steps: [
+      { selector: '#manager-world-nav-essence-catalogue' },
+      { selector: '[data-scoped-list-inspect]' },
+    ],
     expectView: 'world-essences',
     expectSelector: '[data-scoped-page="world-essences"]',
+    // THE ROWS AND THE FILLED INSPECTOR, proved present rather than assumed. `expectSelector`
+    // alone passes on a route that rendered its shell and no rows at all, which is what an
+    // unseeded world corpus looks like — and a frame of an empty catalogue is not evidence of a
+    // catalogue.
+    //
+    // The per-system PIP STRIP is no longer asserted because the row no longer draws one: it was
+    // six identical dots the prototype does not have, and the three states it encoded are now
+    // words on the inspector's system rows. What replaces it as the proof that the panel is
+    // populated is the inspector's own content — a world-default card and the foot action — which
+    // is a stricter assertion of the same claim, because both are unreachable until a row is
+    // selected and the previous set was not.
+    expectContained: [
+      {
+        container: '[data-scoped-list]',
+        target: '[data-scoped-list-row] [data-medallion="glyph"]',
+      },
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inherit-note="effectSource"]',
+      },
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inspector-foot]',
+      },
+    ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+      // The two shared list primitives this screen composes (issue 1380). They are claimed by the
+      // cases that RENDER them, exactly as the placeholder body was: a shell edit that selected no
+      // frame would publish nothing, and one that selected an unrelated frame would be worse.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
+      // The `SYSTEM RULES n / m` panel the shell's inspector composes (issue 1372). It renders
+      // only once a row is selected, which the second step above does, and it is claimed HERE as
+      // well as on `manager-essences-normal` because the reference draws the identical panel on
+      // both rails and a change to it has to publish both.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
+      /^src\/utils\/scopedEntityListModel\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-essence-entry',
+    label: 'Manager — World Essence entry',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // REACHED THE WAY A GM REACHES IT, through the catalogue row's pen. That is the whole reason
+    // this case could not exist before issue 1372: the route normalized and rendered, and nothing
+    // navigated to it, so a case would have had to seed a state no GM can produce — the
+    // fixture-bypass hazard this registry already carries against it.
+    steps: [
+      { selector: '#manager-world-nav-essence-catalogue' },
+      { selector: '[data-scoped-list-action="open-entry"]' },
+    ],
+    expectView: 'world-essence-entry',
+    expectSelector: '[data-scoped-page="world-essence-entry"]',
+    // BOTH world-default cards, with their inherit lines. A frame that showed the identity fields
+    // alone would show nothing this screen exists for.
+    //
+    // ── THE MACRO CARD IS MEASURED AGAINST ITS SECTION, NOT THE PAGE, AND THAT IS THE DESIGN ──
+    // The prototype stacks the two world defaults as full-width cards (`essEntry.png`), and its
+    // OWN 900px frame cuts the second one off at the fold — the effect-source card ends around
+    // 710px and the macro card runs from about 730 past the bottom edge. So "both cards inside the
+    // page's rect at 1280x900" is not a fact about this screen being correct; it is a fact about
+    // the cards being side by side, which is the layout this pass replaced.
+    //
+    // What the assertion still buys is everything it was for: the macro card RENDERS, and it is
+    // not clipped by the container that owns it. The effect-source card and its inherit line stay
+    // measured against the page, so a frame that scrolled past the whole defaults region still
+    // fails.
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-essence-entry"]',
+        target: '[data-scoped-world-default="effectSource"]',
+      },
+      {
+        container: '[data-scoped-entry-defaults-section]',
+        target: '[data-scoped-world-default="macro"]',
+      },
+      {
+        container: '[data-scoped-world-default="effectSource"]',
+        target: '[data-scoped-world-default-inherit="effectSource"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/MembershipActions\.svelte$/,
+      // The buffered-save seam (issue 1372): the header's `← Back` / `Save essence` pair and the
+      // draft leaf behind it. Claimed by the case that RENDERS them, exactly as the shared list
+      // primitives are on the catalogue above — a change to either with no claim would publish an
+      // unrelated window as its evidence. The world tool entry claims both too when it ships,
+      // which is what a shared seam's claim set is supposed to look like.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-essence-entry-dirty',
+    label: 'Manager - World Essence entry, unsaved',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE EXPLICIT SAVE EXISTS FOR (issue 1372, maintainer parity round 4).
+    //
+    // The entry editor buffers its edit now, so `Save essence` is disabled until there is
+    // something to flush - which means the resting frame beside this one photographs the button
+    // in its DISABLED treatment, and the whole change is a control nobody can see working. This
+    // case types into the name field and captures the same header with the edit standing: an
+    // enabled, primary Save, and the identity card showing the buffered value.
+    //
+    // `fill` rather than a click for the NAME, because a dirty form is unreachable by clicking:
+    // the draft is seeded from the persisted record and only an `input` event moves it.
+    //
+    // The COLOUR swatch is clicked as well, and that is what makes this frame evidence rather
+    // than decoration (maintainer parity round 6). Name, icon and colour are all buffered
+    // identity fields, and the chrome above the page — the breadcrumb's last crumb, the heading
+    // and the 44px medallion beside it — has to follow all of them. A case that moved only the
+    // name photographs a medallion that cannot be wrong, so the one control the round-6 fix is
+    // about would have been unphotographed in the frame published as its proof.
+    steps: [
+      { selector: '#manager-world-nav-essence-catalogue' },
+      { selector: '[data-scoped-list-action="open-entry"]' },
+      { selector: '[data-scoped-entry-name]', fill: 'Aetherlight' },
+      { selector: '[data-scoped-entry-colour] [data-manager-color-token="sage"]' },
+    ],
+    expectView: 'world-essence-entry',
+    expectSelector: '[data-scoped-page="world-essence-entry"]',
+    // THE HEADER PAIR, proved present and inside the band that owns it. A frame in which the
+    // Save had not rendered at all would satisfy `expectSelector` on its own, and that is the
+    // one thing this case exists to show.
+    expectContained: [
+      {
+        container: '.manager-header-actions',
+        target: '[data-world-essence-save]',
+      },
+      {
+        container: '.manager-header-actions',
+        target: '[data-world-essence-back]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    // THE SAME THREE FILES THE RESTING CASE CLAIMS, deliberately: this is the `-narrow` /
+    // `-normal` relationship, where one screen is photographed in two states and a change to it
+    // publishes both. The two frames answer different questions - the resting one shows the
+    // screen, this one shows that its Save is a live control - and a change to the header pair or
+    // the draft leaf that only ever published the resting frame would publish a DISABLED button
+    // as its evidence.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
     ],
   }),
   managerCase({
@@ -3559,6 +3731,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      // The `SYSTEM RULES n / m` panel, which the browser inspector composes from the world
+      // catalogue's own component (issue 1372). This is the OTHER rail the reference draws it on,
+      // so a change to it publishes this frame beside `world-essence-catalogue`'s.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       // The shared studio-library SHELF — the scroll section, the empty states, the
       // list-or-grid `<ul>` and the pager — is rendered by every essence browser frame.
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
@@ -3743,8 +3919,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-essence-edit-first-state'],
     // The smoke opens an essence row's Edit action and photographs the editor as it arrives, and
     // this lands in the same place. It is REPOINTED at `aether` (issue 1036): the editor's headline
-    // state is a DISABLED essence — the Enabled row switched off, the On-craft badge counting two
-    // configured behaviours — and `earth` cannot show it.
+    // state is a DISABLED essence — the enable card switched off, both behaviour cards wearing
+    // their `Suppressed` pill — and `earth` cannot show it.
+    //
+    // WHAT "FIRST STATE" MEANS CHANGED AT ISSUE 1372 and this case follows it rather than
+    // photographing the old one: the editor now opens on `Essence rules`, whose head is the
+    // shared-definition callout naming the world record, the `Edit shared definition` exit and
+    // the per-system enable card. There is no Identity tab to open on, because identity is a
+    // world field a system-scope screen may not write.
     //
     // The step still navigates by the row's FIRST `.manager-icon-button`, which must remain the
     // Edit pencil. The row now also carries an enable toggle and a selection box: the toggle wears
@@ -3765,6 +3947,16 @@ export const VIEW_LAB_CASES = Object.freeze([
       // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
+      // The world-scope model this editor renders since issue 1372: the inherit switches, the
+      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
+      // frames because those are the frames that show them, exactly as the placeholder body was
+      // claimed by every case that rendered it.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
   managerCase({
@@ -3772,16 +3964,27 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essence edit On craft',
     reaches: 'beyond',
     smokeLabels: [],
-    // The tab the two persisted fields live on. `aether` carries BOTH — a linked source component
-    // and a property macro — so both sections render populated, both wear their `Suppressed` pill
-    // (the essence is disabled), and the macro card photographs in its MISSING state, because the
-    // lab world declares no `Macro` documents at all. The resolved state routes to smoke or
-    // maintainer evidence rather than being implied here.
+    // The two behaviour cards, SCROLLED INTO THE FRAME rather than reached by a tab click.
+    //
+    // Issue 1372 collapsed the editor's three tabs to two — `Essence rules` and `Validation` —
+    // because identity is a world field a system-scope screen may not edit, so there is no longer
+    // an `On craft` tab to select. What that tab held is now the lower half of the rules tab,
+    // below the shared-definition callout and the enable card, and a frame taken at the top of
+    // the page would be `manager-essence-edit-first-state` a second time. Scrolling the macro
+    // page's FOOT in is what keeps the two frames distinct states of one screen: it lands the
+    // macro card and the `Reuse these rules` card in one frame, which is the half of the reference
+    // the first-state frame cannot reach.
+    //
+    // `aether` carries BOTH persisted fields — a linked source component and a property macro —
+    // so both sections render populated, both wear their `Suppressed` pill (the essence is
+    // disabled), and the macro card photographs in its MISSING state, because the lab world
+    // declares no `Macro` documents at all. The resolved state routes to smoke or maintainer
+    // evidence rather than being implied here.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
       { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
-      { selector: '[data-essence-tab="oncraft"]' },
+      { selector: '[data-scoped-copy-rules]', scroll: true },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
@@ -3792,6 +3995,16 @@ export const VIEW_LAB_CASES = Object.freeze([
       // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
+      // The world-scope model this editor renders since issue 1372: the inherit switches, the
+      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
+      // frames because those are the frames that show them, exactly as the placeholder body was
+      // claimed by every case that rendered it.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
   managerCase({
@@ -3821,9 +4034,78 @@ export const VIEW_LAB_CASES = Object.freeze([
       // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
+      // The world-scope model this editor renders since issue 1372: the inherit switches, the
+      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
+      // frames because those are the frames that show them, exactly as the placeholder body was
+      // claimed by every case that rendered it.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
+      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
+      // because those are the frames that show them.
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
   }),
 
+  // ── The two SYSTEM-SCOPE essence states issue 1372 adds ────────────────────────────────────
+  // ── The system-scope essence state issue 1372 adds, and the ONE it cannot photograph ───────
+  managerCase({
+    id: 'manager-essences-membership-all',
+    label: 'Manager — Essences all world essences',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The two-option membership filter with its counts, switched to `All world essences`.
+    //
+    // ── WHAT THIS FRAME DOES NOT SHOW, AND WHY THAT IS NOT AN OVERSIGHT ─────────────────────
+    // It does NOT show an ABSENT row or its Add action, because the lab world cannot reach that
+    // state: `tests/view-lab/world/labContent.js` gives all three crafting systems the SAME
+    // `ESSENCES` list, so after the `1.30.0` lift every system is a member of all six world
+    // essences and none is absent from any of them. The first run of this case failed exactly
+    // there, which is the correct outcome — a case may not assert a state its fixture cannot
+    // produce, and the alternative was to widen a fixture that six other essence frames read for
+    // their counts, their status segments and their disabled-in-use headline.
+    //
+    // The absent row is covered where it can be reached:
+    // `tests/components/essence-world-scope-screens-mounted.test.js` renders it, and
+    // `world-essence-catalogue` photographs all THREE per-system states from the world side,
+    // where the fixture does vary. Recorded here rather than left as a silent gap.
+    query: {},
+    steps: [
+      { selector: '#manager-nav-essence-rules' },
+      // The membership filter became a SegmentedControl (issue 1372) — the prototype states both
+      // counts at once, which a <select> cannot. Driven by clicking its option, not by selectOption.
+      { selector: '[data-essence-membership-option="all"]' },
+    ],
+    expectView: 'essences',
+    expectSelector: '[data-essence-membership-filter]',
+    // CONTAINMENT IS FOR CONTROLS THAT MUST FIT, never for list rows: `expectContained` asserts a
+    // target sits inside its container's BOX, and a row in a scrolling column legitimately
+    // extends past `.manager-main`. Measured — the first run failed for a row that renders
+    // correctly.
+    expectContained: [{ container: '.manager-main', target: '[data-essence-membership-filter]' }],
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EssenceBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceRow\.svelte$/,
+    ],
+  }),
+  // ── `manager-essence-edit-inherit-lock` IS DELIBERATELY NOT REGISTERED ──────────────────────
+  //
+  // The state it would show — one section INHERITED with its value card locked and one OVERRIDDEN
+  // beside it — is reached by flipping an inherit switch, and in the View Lab that write does not
+  // reach the screen: the toggle renders and clicks, and neither its own state chip nor the value
+  // card beneath it changes. The cause is not in this registry and not in the screens: a
+  // world-scope write persists through `ScopedDefinitionStore#save`, and `viewState.worldScope` is
+  // rebuilt ONLY inside `adminStore`'s `refresh()`, which no world-scope action calls and which
+  // the manager app invokes from its own document hooks alone. So every world-scope write is
+  // durable and invisible until the next refresh.
+  //
+  // A CASE THAT CANNOT REACH ITS STATE IS NOT REGISTERED, because a failing case fails the capture
+  // job WHOLE and publishes NOTHING for every other case in the run — which is how one bad
+  // selector costs an entire evidence set. The lock itself is asserted in both directions in
+  // `tests/components/essence-edit-view-mounted.test.js`, which drives `scope` as a prop and so
+  // cannot see the missing refresh. This note stands until that seam is wired, and the change that
+  // wires it registers the case.
   managerCase({
     id: 'manager-environments-browse-normal',
     label: 'Manager — Environments browse normal',

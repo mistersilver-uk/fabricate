@@ -144,7 +144,6 @@ import {
 } from './adminComponentRowProjection.js';
 import {
   buildRecipeList as _buildRecipeList,
-  
   withoutDerivedRecipeProjectionFields,
 } from './adminRecipeRowProjection.js';
 import {
@@ -165,7 +164,6 @@ import {
 // `DERIVED_RECIPE_PROJECTION_FIELDS` and `withoutDerivedRecipeProjectionFields` moved to
 // the row projection alongside the derivation they describe, and are re-exported here so
 // this module's public surface is unchanged for any importer of the old path.
-
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -406,7 +404,9 @@ function _buildManagedItemOptions(managedItems = []) {
     category: item.category || 'general',
     ...(item.originItemUuid && { originItemUuid: item.originItemUuid }),
     ...(item.registeredItemUuid && { registeredItemUuid: item.registeredItemUuid }),
-    ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') && { difficulty: item.difficulty }),
+    ...(Object.prototype.hasOwnProperty.call(item, 'difficulty') && {
+      difficulty: item.difficulty,
+    }),
     // The AUTHORED complication list (issue 1286), for the two GM read-only strips: the
     // Component Studio's progressive salvage rows and the Recipe Studio's progressive stage
     // rows. Both draw the complications of the component the row REFERENCES, which is never
@@ -1291,7 +1291,9 @@ function _environmentValidationMessages(err) {
 
 function _fieldSelectorForPath(path) {
   if (!path) return null;
-  const escaped = String(path).replaceAll('\\', '\\\\').replaceAll('"', String.raw`\"`);
+  const escaped = String(path)
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', String.raw`\"`);
   return `[data-environment-field="${escaped}"]`;
 }
 
@@ -2792,12 +2794,13 @@ export function createAdminStore(services) {
         (sceneRegion) => {
           const linkedRegionId = linkBySceneRegionUuid.get(sceneRegion.sceneRegionUuid) || '';
           // Parties whose travel marker currently sits inside this Scene Region.
-          const insideUuids = markerUuids.length > 0
-            ? new Set(
-                services.getActorUuidsInSceneRegion?.(sceneRegion.sceneRegionUuid, markerUuids) ||
-                  []
-              )
-            : new Set();
+          const insideUuids =
+            markerUuids.length > 0
+              ? new Set(
+                  services.getActorUuidsInSceneRegion?.(sceneRegion.sceneRegionUuid, markerUuids) ||
+                    []
+                )
+              : new Set();
           const partiesInMapRegion = partiesWithMarker
             .filter((party) => insideUuids.has(String(party.travelActorUuid)))
             .map((party) => ({
@@ -2901,8 +2904,10 @@ export function createAdminStore(services) {
         });
         return created;
       },
-      renameParty: async (partyId, name) => withSave((partyStore) => partyStore.update(partyId, { name: String(name ?? '') })),
-      setPartyEnabled: async (partyId, enabled) => withSave((partyStore) => partyStore.setEnabled(partyId, enabled === true)),
+      renameParty: async (partyId, name) =>
+        withSave((partyStore) => partyStore.update(partyId, { name: String(name ?? '') })),
+      setPartyEnabled: async (partyId, enabled) =>
+        withSave((partyStore) => partyStore.setEnabled(partyId, enabled === true)),
       async deleteParty(partyId) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
@@ -2929,7 +2934,8 @@ export function createAdminStore(services) {
           if (get(travelSelectedPartyId) === partyId) travelSelectedPartyId.set('');
         });
       },
-      addPartyMember: async (partyId, actorUuid) => withSave((partyStore) => partyStore.addMember(partyId, actorUuid), 'members'),
+      addPartyMember: async (partyId, actorUuid) =>
+        withSave((partyStore) => partyStore.addMember(partyId, actorUuid), 'members'),
       async addOrMovePartyMember(targetPartyId, actorUuid) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
@@ -2977,16 +2983,17 @@ export function createAdminStore(services) {
         }
         return withSave((store) => store.addMember(targetPartyId, uuid), 'members');
       },
-      removePartyMember: async (partyId, actorUuid) => withSave((partyStore) => partyStore.removeMember(partyId, actorUuid), 'members'),
-      movePartyMember: async (fromPartyId, toPartyId, actorUuid) => withSave(
+      removePartyMember: async (partyId, actorUuid) =>
+        withSave((partyStore) => partyStore.removeMember(partyId, actorUuid), 'members'),
+      movePartyMember: async (fromPartyId, toPartyId, actorUuid) =>
+        withSave(
           (partyStore) => partyStore.moveMember(fromPartyId, toPartyId, actorUuid),
           'members'
         ),
-      setPartyTravelActor: async (partyId, actorUuid) => withSave(
-          (partyStore) => partyStore.setTravelActor(partyId, actorUuid),
-          'travelActor'
-        ),
-      clearPartyTravelActor: async (partyId) => withSave((partyStore) => partyStore.setTravelActor(partyId, null)),
+      setPartyTravelActor: async (partyId, actorUuid) =>
+        withSave((partyStore) => partyStore.setTravelActor(partyId, actorUuid), 'travelActor'),
+      clearPartyTravelActor: async (partyId) =>
+        withSave((partyStore) => partyStore.setTravelActor(partyId, null)),
       async setPartyRealmOverride(partyId, systemId, realmIds) {
         if (!canUsePartyRealmOverrides(systemId)) return false;
         return withSave((partyStore) =>
@@ -2997,8 +3004,10 @@ export function createAdminStore(services) {
         if (!canUsePartyRealmOverrides(systemId)) return false;
         return withSave((partyStore) => partyStore.clearCurrentRealmOverride(partyId));
       },
-      removeStaleMember: async (partyId, actorUuid) => withSave((partyStore) => partyStore.removeMember(partyId, actorUuid)),
-      clearStaleTravelActor: async (partyId) => withSave((partyStore) => partyStore.setTravelActor(partyId, null)),
+      removeStaleMember: async (partyId, actorUuid) =>
+        withSave((partyStore) => partyStore.removeMember(partyId, actorUuid)),
+      clearStaleTravelActor: async (partyId) =>
+        withSave((partyStore) => partyStore.setTravelActor(partyId, null)),
       async dropStaleOverrideRealm(partyId, systemId, realmId) {
         if (!canUsePartyRealmOverrides(systemId)) return false;
         const partyStore = getPartyStore();
@@ -3035,11 +3044,13 @@ export function createAdminStore(services) {
         }
       },
       renameRealm: async (realmId, name) => _realmPatch(realmId, { name: String(name ?? '') }),
-      toggleRealmEnabled: async (realmId, enabled) => _realmPatch(realmId, { enabled: enabled === true }),
+      toggleRealmEnabled: async (realmId, enabled) =>
+        _realmPatch(realmId, { enabled: enabled === true }),
       // Merge-patch a single realm; the store merges over the existing record so
       // fields the caller omits round-trip untouched. Backs the full Travel
       // realm authoring surface (description/img/secret/biomes).
-      updateRealm: async (realmId, patch = {}) => _realmPatch(realmId, patch && typeof patch === 'object' ? patch : {}),
+      updateRealm: async (realmId, patch = {}) =>
+        _realmPatch(realmId, patch && typeof patch === 'object' ? patch : {}),
       // Link (or unlink) a Foundry Scene Region on the current scene to a Fabricate
       // realm. Single-valued: the scene region is stripped from every realm's
       // sceneMappings before being attached to the chosen one; a falsy realmId just
@@ -3364,10 +3375,7 @@ export function createAdminStore(services) {
   async function addCharacterPrerequisite(partial = {}) {
     const entry = normalizeCharacterPrerequisite({ id: _randomID(), ...partial }, _randomID);
     if (!entry) return null;
-    const persisted = await _persistCharacterPrerequisites([
-      ..._characterPrerequisites(),
-      entry,
-    ]);
+    const persisted = await _persistCharacterPrerequisites([..._characterPrerequisites(), entry]);
     if (persisted === null) return null;
     await refresh();
     return entry;
@@ -4800,8 +4808,83 @@ export function createAdminStore(services) {
   // republish it as `null` the moment no system is selected — the NORMAL state for a world
   // screen. The projection ALWAYS answers a new object, so a `$derived` over it re-propagates
   // on every publish rather than only when the corpus identity moves.
+  /**
+   * Every crafting system's components, flattened once.
+   *
+   * A crafting system record carries its own `components`, so this needs no new accessor — the
+   * world-scope projection is already handed the FULL system records rather than the
+   * `$viewState.systems` allowlist.
+   *
+   * @returns {object[]}
+   */
+  function _allComponents() {
+    const all = [];
+    for (const system of _allSystems()) {
+      const components = Array.isArray(system?.components) ? system.components : [];
+      for (const component of components) all.push(component);
+    }
+    return all;
+  }
+
+  /**
+   * Every recipe in the world, across every crafting system.
+   *
+   * `getRecipes()` with no `craftingSystemId` filter returns the whole corpus (`RecipeManager`),
+   * and the recipe manager is already on the injected services bag — so a world-wide recipe count
+   * needs no new plumbing beyond asking for it here.
+   *
+   * @returns {object[]}
+   */
+  function _allRecipes() {
+    try {
+      return services.getRecipeManager?.()?.getRecipes?.({}) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * How many component rule sets and recipes reference each world essence, ACROSS EVERY SYSTEM.
+   *
+   * ── WHY THIS IS COMPUTED HERE AND NOT IN THE PROJECTION ──────────────────────────────────────
+   * Both counters already exist in this module and are already used for the SELECTED system's
+   * essence cards. The only thing that was ever missing is running them over every system instead
+   * of one, so the counting logic stays where it lives and the projection attaches the answer.
+   *
+   * ── WHY THE RECIPE COUNT IS DERIVED RATHER THAN COPIED ───────────────────────────────────────
+   * The prototype's own `essRecipeCount` is `h = (h * 33 + k.charCodeAt(i)) & 0xffff; n + h % 7`
+   * — a string hash, because the prototype has no recipe model. Reproducing the CONTROL while
+   * inventing the NUMBER would put a fabricated figure in front of a GM deciding whether a change
+   * is safe. Fabricate can answer it for real, so it does.
+   *
+   * @returns {Record<string, {componentCount: number, recipeCount: number}>} keyed by essence id.
+   */
+  function _worldEssenceUsage() {
+    const components = _allComponents();
+    const recipes = _allRecipes();
+    const usage = {};
+    for (const system of _allSystems()) {
+      const definitions = Array.isArray(system?.essenceDefinitions)
+        ? system.essenceDefinitions
+        : [];
+      for (const definition of definitions) {
+        const id = String(definition?.id ?? '');
+        if (!id || usage[id]) continue;
+        usage[id] = {
+          componentCount: _essenceUsageCount(id, components),
+          recipeCount: _essenceRecipeUsage(id, recipes).count,
+        };
+      }
+    }
+    return usage;
+  }
+
   function buildWorldScopeState() {
-    return _buildWorldScopeState({ stores: _worldScopeStores(), systems: _allSystems() });
+    return _buildWorldScopeState({
+      stores: _worldScopeStores(),
+      systems: _allSystems(),
+      usage: { essence: _worldEssenceUsage() },
+    });
   }
 
   // FOUR LEGS, AND THE FOURTH IS DELIBERATELY OPTIONAL. The World Vocabulary's corpus arrives
@@ -4840,7 +4923,7 @@ export function createAdminStore(services) {
   // INERT until the vocabulary lane declares that family in `worldScopeActions.js` — a file it
   // owns. Supplied here because the store leg is the one half of the pair that lives in a
   // gateway file.
-  const worldScope = createWorldScopeActions({
+  const worldScopeFamilies = createWorldScopeActions({
     getStores: {
       component: () => services.getComponentScopeStore?.() ?? null,
       essence: () => services.getEssenceScopeStore?.() ?? null,
@@ -4848,6 +4931,107 @@ export function createAdminStore(services) {
       vocabulary: () => services.getVocabularyScopeStore?.() ?? null,
     },
   });
+
+  /**
+   * The world essence roster, keyed by id, straight off the published corpus.
+   *
+   * @returns {Map<string, object>}
+   */
+  function _worldEssenceEntities() {
+    const entities = services.getEssenceScopeStore?.()?.corpus?.()?.entities;
+    const byId = new Map();
+    for (const entity of Array.isArray(entities) ? entities : []) {
+      const id = typeof entity?.id === 'string' ? entity.id.trim() : '';
+      if (id) byId.set(id, entity);
+    }
+    return byId;
+  }
+
+  /**
+   * Join a WORLD essence to one crafting system — the membership record AND the in-system record.
+   *
+   * ── WHY THE WORLD HALF ALONE IS NOT A JOIN (issue 1372, maintainer parity round 8) ──────────
+   * `worldScopeActions.addToSystem` writes exactly one thing: a membership row in the world-scope
+   * payload, inheriting every section. Nothing on the system Essence Rules screen reads that row.
+   * `essenceCards` is built from `selectedSystem.essenceDefinitions`, and even the read union
+   * (`unionScopedDefinitions`) iterates the IN-SYSTEM array and only enriches rows it already
+   * finds there — a world entity with a membership record and no in-system row contributes no row
+   * at all. So `Add to this system` wrote a record, published a refresh, and left the list exactly
+   * as it was: a button that silently did nothing, on every essence, forever.
+   *
+   * That is the same root cause as the system-scope create draft this round removes: `addEssence`
+   * writes the in-system array and `addToSystem` did not, so the two halves of "this system has
+   * this essence" were authored by different verbs. Removing `+ Create essence` from the Essence
+   * Rules header (`### GM World Essence Screens` requirement 13) is only safe once the remaining
+   * route actually lands, so this is the other half of that removal rather than an adjacent fix.
+   *
+   * ── IT SEEDS IDENTITY ONLY, AND ONLY WHEN THE ROW IS ABSENT ─────────────────────────────────
+   * The seeded record carries the four lifted identity fields (`name`, `icon`, `colorToken`,
+   * `description`) and nothing else, so every behaviour key — the effect source, the macro — is
+   * unset and therefore INHERITED from the world default, which is exactly the state the
+   * membership record beside it declares. A system that already holds a row for the id is left
+   * alone: the GM is re-adding a membership record to an essence this system already has, and
+   * overwriting its authored behaviour would be a destructive read of "Add".
+   *
+   * ── REMOVE IS DELIBERATELY NOT ITS MIRROR ───────────────────────────────────────────────────
+   * `removeFromSystem` deletes the membership record and leaves the in-system record standing.
+   * Deleting the in-system row would run `_normalizeEssenceQuantities` against a valid-id set that
+   * no longer contains this essence, which STRIPS the stored quantity from every component in the
+   * system that carries it — the opposite of what the reference's own copy promises ("Components
+   * here keep the values, but nothing resolves on craft until the essence is added back"). Making
+   * Remove destructive is a data-model decision, not a parity one, so it is raised rather than
+   * taken here.
+   *
+   * @param {string} entityId the world essence id.
+   * @param {string} systemId the crafting system to join it to.
+   * @returns {Promise<boolean>} whether anything was written.
+   */
+  async function joinEssenceToSystem(entityId, systemId) {
+    const target = typeof entityId === 'string' ? entityId.trim() : '';
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    if (!target || !system) return false;
+    const joined = await worldScopeFamilies.essence.addToSystem(target, system);
+    const seeded = await _seedInSystemEssence(target, system);
+    if (joined || seeded) await refresh();
+    return joined || seeded;
+  }
+
+  /**
+   * Write the in-system `essenceDefinitions` row a joined world essence needs, when it is absent.
+   *
+   * @param {string} entityId
+   * @param {string} systemId
+   * @returns {Promise<boolean>} whether a row was written.
+   */
+  async function _seedInSystemEssence(entityId, systemId) {
+    const entity = _worldEssenceEntities().get(entityId);
+    if (!entity) return false;
+    const systemManager = services.getCraftingSystemManager();
+    const system = systemManager?.getSystem?.(systemId);
+    if (!system) return false;
+    const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    if (existing.some((def) => String(def?.id ?? '').trim() === entityId)) return false;
+    const essenceDefinitions = [
+      ...existing,
+      {
+        id: entityId,
+        name: String(entity.name || entityId),
+        description: String(entity.description || ''),
+        icon: normalizeEssenceIcon(entity.icon || DEFAULT_ESSENCE_ICON),
+        colorToken: entity.colorToken || null,
+      },
+    ];
+    await systemManager.updateSystem(systemId, { essenceDefinitions });
+    return true;
+  }
+
+  // The published write path. Only the ESSENCE family is composed: its `addToSystem` has a second
+  // half in a store this gateway owns, and the generic family cannot reach `CraftingSystemManager`
+  // at all. Every other family and every other essence verb is the generic one, unwrapped.
+  const worldScope = {
+    ...worldScopeFamilies,
+    essence: { ...worldScopeFamilies.essence, addToSystem: joinEssenceToSystem },
+  };
 
   // Read the world character libraries straight from their store on every publish, for the same
   // reasons: cheap, and honest when another GM edits a library, with no per-system cache to
@@ -5382,7 +5566,12 @@ export function createAdminStore(services) {
     const selectedSystem = systemManager?.getSystem?.(get(selectedSystemId)) || null;
     const nextTab = _resolveVisibleTab(tabName, selectedSystem);
     if (nextTab === get(activeTab)) return true;
-    if (get(activeTab) === ENVIRONMENTS_TAB && nextTab !== ENVIRONMENTS_TAB && !(await _discardDirtyEnvironmentDraftForNavigation())) return false;
+    if (
+      get(activeTab) === ENVIRONMENTS_TAB &&
+      nextTab !== ENVIRONMENTS_TAB &&
+      !(await _discardDirtyEnvironmentDraftForNavigation())
+    )
+      return false;
     activeTab.set(nextTab);
     await refresh();
     return true;
@@ -5518,85 +5707,90 @@ export function createAdminStore(services) {
     for (const [field, value] of Object.entries(updates)) {
       if (!allowed.has(field)) continue;
       switch (field) {
-      case 'enabled': {
-        next.enabled = value === true;
-      
-      break;
-      }
-      case 'compositionMode': {
-        next.compositionMode = value === 'manual' ? 'manual' : 'automatic';
-      
-      break;
-      }
-      case 'sceneUuid': {
-        const normalized = String(value ?? '').trim();
-        next.sceneUuid = normalized || null;
-      
-      break;
-      }
-      case 'img': {
-        const normalized = String(value ?? '').trim();
-        next.img = normalized || null;
-      
-      break;
-      }
-      default: { if (['biomes', 'dangerTags'].includes(field)) {
-        next[field] = _normalizeGatheringTagList(value);
-      } else if (
-        [
-          'includedRealmIds',
-          'enabledTaskIds',
-          'disabledTaskIds',
-          'enabledEventIds',
-          'disabledEventIds',
-          'forcedTaskIds',
-          'forcedEventIds',
-          'taskOrder',
-          'eventOrder',
-        ].includes(field)
-      ) {
-        next[field] = [...new Set(
-            (Array.isArray(value) ? value : [])
-              .map((entry) => String(entry || '').trim())
-              .filter(Boolean)
-          )];
-      } else switch (field) {
- case 'eventDropRateAdjustments': {
-        next.eventDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
-      
- break;
- }
- case 'eventDropRateAdjustmentsEnabled': {
-        next.eventDropRateAdjustmentsEnabled =
-          _normalizeDraftEventDropRateAdjustmentsEnabled(value);
-      
- break;
- }
- case 'taskDropRateAdjustments': {
-        next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
-      
- break;
- }
- case 'taskDropRateAdjustmentsEnabled': {
-        next.taskDropRateAdjustmentsEnabled = _normalizeDraftTaskDropRateAdjustmentsEnabled(value);
-      
- break;
- }
- case 'blindSelection': {
-        next.blindSelection = _normalizeDraftBlindSelection(value);
-      
- break;
- }
- case 'nodeRuntime': {
-        next.nodeRuntime = normalizeNodeRuntime(value);
-      
- break;
- }
- default: {
-        next[field] = String(value ?? '');
-      }
- }
-      }
+        case 'enabled': {
+          next.enabled = value === true;
+
+          break;
+        }
+        case 'compositionMode': {
+          next.compositionMode = value === 'manual' ? 'manual' : 'automatic';
+
+          break;
+        }
+        case 'sceneUuid': {
+          const normalized = String(value ?? '').trim();
+          next.sceneUuid = normalized || null;
+
+          break;
+        }
+        case 'img': {
+          const normalized = String(value ?? '').trim();
+          next.img = normalized || null;
+
+          break;
+        }
+        default: {
+          if (['biomes', 'dangerTags'].includes(field)) {
+            next[field] = _normalizeGatheringTagList(value);
+          } else if (
+            [
+              'includedRealmIds',
+              'enabledTaskIds',
+              'disabledTaskIds',
+              'enabledEventIds',
+              'disabledEventIds',
+              'forcedTaskIds',
+              'forcedEventIds',
+              'taskOrder',
+              'eventOrder',
+            ].includes(field)
+          ) {
+            next[field] = [
+              ...new Set(
+                (Array.isArray(value) ? value : [])
+                  .map((entry) => String(entry || '').trim())
+                  .filter(Boolean)
+              ),
+            ];
+          } else
+            switch (field) {
+              case 'eventDropRateAdjustments': {
+                next.eventDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
+
+                break;
+              }
+              case 'eventDropRateAdjustmentsEnabled': {
+                next.eventDropRateAdjustmentsEnabled =
+                  _normalizeDraftEventDropRateAdjustmentsEnabled(value);
+
+                break;
+              }
+              case 'taskDropRateAdjustments': {
+                next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
+
+                break;
+              }
+              case 'taskDropRateAdjustmentsEnabled': {
+                next.taskDropRateAdjustmentsEnabled =
+                  _normalizeDraftTaskDropRateAdjustmentsEnabled(value);
+
+                break;
+              }
+              case 'blindSelection': {
+                next.blindSelection = _normalizeDraftBlindSelection(value);
+
+                break;
+              }
+              case 'nodeRuntime': {
+                next.nodeRuntime = normalizeNodeRuntime(value);
+
+                break;
+              }
+              default: {
+                next[field] = String(value ?? '');
+              }
+            }
+        }
       }
     }
 
@@ -6366,11 +6560,10 @@ export function createAdminStore(services) {
   /**
    * The comparison key for an essence NAME.
    *
-   * One function, because `addEssence`, `updateEssence` and `duplicateEssence` must agree
-   * exactly on what "already exists" means. `addEssence` and `updateEssence` both REFUSE a
-   * case-insensitive collision while `_uniqueKey` de-duplicates only the ID, so a
-   * duplicate that landed a second same-named definition would leave NEITHER of the two
-   * ever savable again — silently and permanently.
+   * One function, because `addEssence` and `updateEssence` must agree exactly on what
+   * "already exists" means: both REFUSE a case-insensitive collision while `_uniqueKey`
+   * de-duplicates only the ID, so a write that landed a second same-named definition would
+   * leave NEITHER of the two ever savable again — silently and permanently.
    */
   function _essenceNameKey(value) {
     return String(value ?? '')
@@ -6388,31 +6581,6 @@ export function createAdminStore(services) {
   function _essenceNameTaken(existing, name, ignoreId = '') {
     const key = _essenceNameKey(name);
     return existing.some((def) => def.id !== ignoreId && _essenceNameKey(def.name) === key);
-  }
-
-  /**
-   * A name derived from `baseName` that {@link _essenceNameTaken} rejects for no existing
-   * essence — what `duplicateEssence` must produce for its copy to be savable.
-   *
-   * Counts upwards rather than appending repeatedly, so duplicating three times yields
-   * three DISTINCT names rather than "(copy)", "(copy) (copy)", "(copy) (copy) (copy)".
-   * The loop is bounded by the definition count plus one, which is the most collisions
-   * that can exist.
-   */
-  function _uniqueEssenceName(existing, baseName) {
-    const first =
-      services.localize?.('FABRICATE.Admin.Manager.Essence.DuplicateName', { name: baseName }) ||
-      `${baseName} (copy)`;
-    if (!_essenceNameTaken(existing, first)) return first;
-    for (let index = 2; index <= existing.length + 2; index += 1) {
-      const candidate =
-        services.localize?.('FABRICATE.Admin.Manager.Essence.DuplicateNameIndexed', {
-          name: baseName,
-          index,
-        }) || `${baseName} (copy ${index})`;
-      if (!_essenceNameTaken(existing, candidate)) return candidate;
-    }
-    return `${baseName} ${crypto.randomUUID().slice(0, 8)}`;
   }
 
   /**
@@ -6562,47 +6730,6 @@ export function createAdminStore(services) {
     await systemManager.updateSystem(sysId, { essenceDefinitions });
     await refresh();
     return true;
-  }
-
-  /**
-   * Copy an essence into a NEW definition the GM can then edit (issue 1036).
-   *
-   * The copy takes a name `updateEssence` will still accept. Both `addEssence` and
-   * `updateEssence` refuse a case-insensitive name collision and `_uniqueKey` de-duplicates
-   * the ID only, so a naive duplicate would land two same-named definitions after which
-   * NEITHER could ever be saved again.
-   *
-   * Everything else is carried verbatim, including a `false` `enabled` and the property
-   * macro: a duplicate is a starting point for the GM's next essence, and silently
-   * re-enabling a copy of a disabled essence would give it behaviour its original does not
-   * have. The SOURCE link is carried too — it names an in-system component, so the copy
-   * points at the same component the original does.
-   *
-   * @param {string} essenceId
-   * @returns {Promise<?string>} the new essence id, or `null` when nothing was written.
-   */
-  async function duplicateEssence(essenceId) {
-    if (!essenceId) return null;
-    const context = _selectedSystemEssences();
-    if (!context) return null;
-    const { systemManager, sysId, existing } = context;
-
-    const current = existing.find((def) => def.id === essenceId);
-    if (!current) return null;
-
-    const id = crypto.randomUUID();
-    const essenceDefinitions = [
-      ...existing,
-      {
-        ...current,
-        id,
-        name: _uniqueEssenceName(existing, String(current.name || '').trim() || essenceId),
-      },
-    ];
-
-    await systemManager.updateSystem(sysId, { essenceDefinitions });
-    await refresh();
-    return id;
   }
 
   /**
@@ -7689,9 +7816,7 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId || !rowId) return null;
-    const modifierId = String(
-      partial?.modifierId || _firstCharacterModifierId() || ''
-    ).trim();
+    const modifierId = String(partial?.modifierId || _firstCharacterModifierId() || '').trim();
     if (!modifierId) return null;
     let created = null;
     const changed = _updateDropRowOnTask(systemConfig, taskId, rowId, (row) => {
@@ -7807,9 +7932,7 @@ export function createAdminStore(services) {
     const config = _currentGatheringConfig();
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId) return null;
-    const modifierId = String(
-      partial?.modifierId || _firstCharacterModifierId() || ''
-    ).trim();
+    const modifierId = String(partial?.modifierId || _firstCharacterModifierId() || '').trim();
     if (!modifierId) return null;
     const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
     if (eventIndex === -1) return null;
@@ -8546,8 +8669,7 @@ export function createAdminStore(services) {
       : [];
     let changed = false;
     for (const def of definitions) {
-      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map(String
-      );
+      const currentIds = (Array.isArray(def.recipeIds) ? def.recipeIds : []).map(String);
       const has = currentIds.includes(rid);
       const want = wanted.has(String(def.id));
       if (has === want) continue;
@@ -9707,7 +9829,6 @@ export function createAdminStore(services) {
     removeTag,
     addEssence,
     updateEssence,
-    duplicateEssence,
     setEssenceEnabled,
     applyEssenceBulkEdit,
     // Singular and plural share one verb (issue 1036): `removeEssence` is gone, not
@@ -9895,4 +10016,7 @@ export function createAdminStore(services) {
   };
 }
 
-export {withoutDerivedRecipeProjectionFields, DERIVED_RECIPE_PROJECTION_FIELDS} from './adminRecipeRowProjection.js';
+export {
+  withoutDerivedRecipeProjectionFields,
+  DERIVED_RECIPE_PROJECTION_FIELDS,
+} from './adminRecipeRowProjection.js';

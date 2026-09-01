@@ -41,6 +41,7 @@ const bulkDeleteCardSource = read('src/ui/svelte/apps/manager/BulkDeleteCard.sve
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
 const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte');
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
+const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
 const onCraftSource = read('src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte');
 const segmentedControlSource = read('src/ui/svelte/apps/manager/SegmentedControl.svelte');
 const globalCss = read('styles/fabricate.css');
@@ -286,6 +287,28 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       /\.fab-inspector-action\.is-danger \{[^}]*color: var\(--fab-danger-text\);/s.test(styles),
       'and the danger treatment preserved on delete'
     );
+    // THE TWO UNFILLED TONES STAY UNFILLED (issue 1372, maintainer parity round 6).
+    //
+    // The rendered symptom the maintainer measured: `Duplicate essence` filled a rung two steps
+    // above the pane its own rail sits on, so a secondary verb read as RAISED where the
+    // prototype's equivalent reads recessed. Unfilled and bounded by `--fab-border` is the
+    // treatment every other card on these screens wears and the one the prototype's own
+    // `← Back` wears, so it is the answer; an exact match is not available, because the
+    // prototype's value sits below the bottom of the ramp and has no token.
+    //
+    // ASSERTED, because this is the fourth parity round on this rail and a fill is the single
+    // easiest declaration to reintroduce while tuning a hover: the hover states directly beneath
+    // these two rules DO carry fills, and a copy-paste between them is all it takes.
+    for (const [selector, pattern] of [
+      ['neutral', /\.fab-inspector-action \{[^}]*background: transparent;/s],
+      ['danger', /\.fab-inspector-action\.is-danger \{[^}]*background: transparent;/s],
+    ]) {
+      assert.ok(
+        pattern.test(styles),
+        `the ${selector} tone must sit ON the pane, not a rung above it — an unfilled button ` +
+          'bounded by --fab-border is what the rail and the prototype both already use'
+      );
+    }
     // It must beat Foundry's host button geometry itself, because it is not `.manager-button`
     // and therefore inherits none of the manager's reset.
     for (const declaration of ['appearance: none;', 'height: auto;', 'font-family: inherit;']) {
@@ -613,21 +636,52 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     assert.ok(actions < usage, 'and the usage card');
   });
 
-  it('titles the inspector behaviour list once', () => {
-    // The rendered symptom: an `On craft` card heading with an `Effective behaviour` kicker
-    // immediately under it, for one list of three rows — the prototype's single `ON CRAFT`
-    // kicker drawn twice.
+  it('titles the behaviour list once, and offers no prop with which to title it twice', () => {
+    // The rendered symptom this began as: an `On craft` card heading with an `Effective
+    // behaviour` kicker immediately under it, for one list of three rows — the reference's
+    // single `ON CRAFT` kicker drawn twice. The fix was a `showEffectiveKicker` prop the
+    // browser inspector passed `false`.
+    //
+    // THE PROP IS GONE NOW, WITH ITS ONLY CALLER (issue 1372, maintainer parity round 8). The
+    // inspector draws the reference's `ON CRAFT IN <system>` cards instead, so `showIdentity`,
+    // `showLiveNote` and `showEffectiveKicker` all had zero callers left — configuration that
+    // cannot be reached rather than a capability.
+    for (const prop of ['showEffectiveKicker', 'showIdentity', 'showLiveNote']) {
+      assert.ok(
+        !new RegExp(`${prop}\s*=`).test(previewSource),
+        `${prop} is declared with no call site that passes it`
+      );
+    }
     assert.ok(
-      previewSource.includes('showEffectiveKicker = true'),
-      'the preview can suppress its own kicker'
+      previewSource.includes("'FABRICATE.Admin.Manager.Essence.Preview.Effective'"),
+      'NON-VACUITY: the kicker the prop used to gate is still rendered, unconditionally'
+    );
+  });
+
+  it('gives the inspector ON CRAFT section the system name and the layer per card', () => {
+    // ── B2 (issue 1372, maintainer parity round 8) ──────────────────────────────────────────
+    // The reference titles this section `ON CRAFT IN <system>` and each card after the VALUE
+    // that section resolves to, with `· overridden here` or `· world default` under it
+    // (`tmp/proto/essence-rules.png`). The shipped section was titled `On craft` and rendered
+    // the generic behaviour preview with no provenance at all, on the one screen whose whole
+    // subject is inherit-versus-override.
+    assert.ok(
+      !inspectorSource.includes('<EssenceBehaviorPreview'),
+      'the inspector no longer answers a different question with the preview component'
     );
     assert.ok(
-      /\{#if showEffectiveKicker\}/.test(previewSource),
-      'and actually gates it rather than declaring an unused prop'
+      inspectorSource.includes('projectEssenceOnCraftCards'),
+      'it projects the resolved-rule cards instead'
     );
     assert.ok(
-      inspectorSource.includes('showEffectiveKicker={false}'),
-      'and the inspector, whose card already carries the heading, suppresses it'
+      inspectorSource.includes("'FABRICATE.Admin.Manager.Essence.OnCraftIn'"),
+      'and its heading names the system'
+    );
+    // The PROVENANCE half, at the projection: a card with an inherit map ends in a layer clause,
+    // and one without a membership record ends in nothing rather than inventing one.
+    assert.ok(
+      studioSource.includes('SuffixOverridden') && studioSource.includes('SuffixWorldDefault'),
+      'the projection reads the same two suffix keys the row summary and the editor already use'
     );
   });
 

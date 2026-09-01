@@ -149,6 +149,9 @@
   import WorldToolEntryPage from './scoped/WorldToolEntryPage.svelte';
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
+  import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
+  import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
+  import { confirmScopedEntryExit } from './scoped/scopedEntryDraft.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -2333,7 +2336,17 @@
   const selectedEssenceStrict = $derived(
     essenceCards.find((essence) => essence.id === selectedEssenceId) || null
   );
-  const isCreatingEssenceDraft = $derived(currentView === 'essence-edit' && !selectedEssenceId);
+  // NO `isCreatingEssenceDraft` (issue 1372, maintainer parity round 8). `essence-edit` with no
+  // selected essence was the system-scope CREATE draft, and its only entry point was the Essence
+  // Rules header's `+ Create essence`, which is gone: an essence's identity is a world record and
+  // the create that authors one is the Essence Catalogue's `+ New essence`. Every branch that
+  // asked this question — the route title, two subtitles, the save label and the breadcrumb leaf
+  // — answered for a state nothing can reach, so each is now the single answer it always gave.
+  //
+  // The THREE-TAB editor survives, and it is not this state. `EssenceEditView` forks on whether
+  // the world corpus holds a record for the essence being edited, so an unreadable corpus still
+  // renders the Identity tab over an EXISTING essence. That is a fallback with a live trigger;
+  // a create draft is not.
   const selectedEssence = $derived(selectedEssenceStrict || essenceCards[0] || null);
   const selectedEssenceForInspector = $derived(
     currentView === 'essence-edit' ? essenceEditDraft : selectedEssence
@@ -2844,6 +2857,88 @@
     systemId: selectedSystemId || '',
   });
 
+  // ── WHAT THE ESSENCE RULES INSPECTOR NEEDS FROM THE WORLD JOIN (issue 1372, round 8) ──────
+  //
+  // The rail states two facts it could not reach before: which LAYER each on-craft section
+  // resolved from, and which other crafting systems have rules for the inspected essence. Both
+  // live on the world-scope join — `worldScope.essence.entries[].systems` — which is published
+  // here and nowhere a page or a browser view can see it.
+  //
+  // DERIVED FROM `selectedEssenceForInspector`, not from `selectedEssenceId`: while the editor is
+  // open the inspector shows the DRAFT, and pinning the roster to the persisted selection would
+  // put one essence's systems under another essence's name.
+  const inspectedEssenceWorldEntry = $derived(
+    (worldScopeState.essence?.entries ?? []).find(
+      (candidate) => candidate?.id === selectedEssenceForInspector?.id
+    ) ?? null
+  );
+  const inspectedEssenceSystemRows = $derived(
+    worldScopeState.essence?.available === true &&
+      Array.isArray(inspectedEssenceWorldEntry?.systems)
+      ? inspectedEssenceWorldEntry.systems
+      : []
+  );
+  // The inherit map for THIS system, or `null` when there is no membership record. `null` is not
+  // "everything inherited": a system with no record resolves nothing at all, and the on-craft
+  // cards omit their layer clause rather than attributing a value to a layer.
+  const inspectedEssenceInherited = $derived(
+    inspectedEssenceSystemRows.find((row) => row?.systemId === selectedSystemId)?.inherited ?? null
+  );
+
+  // ── THE SYSTEM ESSENCE RULES HEADER (issue 1372, maintainer parity round 7) ───────────────
+  //
+  // The route heads with the essence's own tile, its NAME, and `<system> rules · enabled`
+  // (`proto:5091`). What shipped was the generic page header every route falls through to — the
+  // static title `Edit essence` over the sentence "Update identity, icon, and source linkage for
+  // this essence", which ADVERTISED the capability this change removes and named nothing the GM
+  // had opened.
+  //
+  // IT IS DERIVED HERE FOR THE REASON THE WORLD ENTRY HEADING ABOVE IS: `.manager-header` is a
+  // SIBLING of `.manager-main`, so the page structurally cannot render into it, exactly as it
+  // cannot render its own breadcrumb.
+  //
+  // THE FALLBACK IS THE SHIPPED HEADER, and the condition is the same one the editor forks on: a
+  // world record exists for this essence, so its identity is not this screen's to edit and the
+  // screen is the rules screen. A create draft and a world corpus that cannot answer both keep
+  // the generic heading, because in those states the in-system record IS the record.
+  const essenceRulesWorldEntry = $derived(
+    currentView === 'essence-edit' && selectedEssenceId
+      ? ((worldScopeState.essence?.entries ?? []).find(
+          (candidate) => candidate?.id === selectedEssenceId
+        ) ?? null)
+      : null
+  );
+  const essenceRulesMode = $derived(
+    worldScopeState.essence?.available === true && essenceRulesWorldEntry !== null
+  );
+
+  // NAME, GLYPH AND COLOUR FOLLOW THE DRAFT and fall back to the persisted card. They are not
+  // editable on this route any more, so the draft can only carry what the record already holds —
+  // but reading the draft first keeps this heading correct for the CREATE state too, where the
+  // Identity tab is live and a heading pinned to the record would print an empty name while the
+  // GM typed one.
+  const essenceEditName = $derived(essenceEditDraft?.name || selectedEssenceStrict?.name || '');
+  const essenceEditIcon = $derived(
+    essenceEditDraft?.icon || selectedEssenceStrict?.icon || 'fas fa-mortar-pestle'
+  );
+  const essenceEditTint = $derived(
+    essenceEditDraft?.colorToken ?? selectedEssenceStrict?.colorToken ?? ''
+  );
+
+  // The subline states the two facts the reference states: WHICH system's rules these are, and
+  // whether the essence is on in it. The enabled half follows the DRAFT, because the switch that
+  // changes it is buffered and a subline pinned to disk would contradict the card two inches
+  // below it until Save.
+  const essenceEditSubline = $derived(
+    interpolate(text('FABRICATE.Admin.Manager.Essence.RulesSubtitle', '{system} rules · {state}'), {
+      system: selectedSystem?.name || '',
+      state:
+        (essenceEditDraft?.enabled ?? selectedEssenceStrict?.enabled) === false
+          ? text('FABRICATE.Admin.Manager.Essence.RulesDisabled', 'disabled')
+          : text('FABRICATE.Admin.Manager.Essence.RulesEnabled', 'enabled'),
+    })
+  );
+
   // WHICH WORLD ENTITY AN ENTRY ROUTE IS OPEN ON (issue 1362).
   //
   // The three entry routes are the only World screens whose trail is THREE crumbs — the
@@ -2859,12 +2954,241 @@
   // further edit here.
   let worldScopedEntryId = $state('');
   const worldScopedEntryRoute = $derived(scopedEntryRoute(currentView));
+
+  /**
+   * THE BUFFERED IDENTITY OF WHICHEVER SCOPED ENTRY EDITOR IS OPEN (issue 1372, maintainer
+   * parity round 6).
+   *
+   * GENERIC ON PURPOSE, and that is the whole point of it. An entry editor buffers its edit and
+   * is saved explicitly, so every piece of chrome that names the entity has to follow the DRAFT
+   * or the screen contradicts itself — which it did: mid-rename the heading read `Aetherlight`,
+   * the player preview read `Aetherlight`, and the breadcrumb's last crumb read `Aether`.
+   * The crumb is derived once, here, for ALL THREE entry routes out of one route table, so a
+   * per-screen fix would have had to be written into a shared derivation three times. The world
+   * tool entry inherits this by reporting its own buffered identity through the same prop; it
+   * needs no crumb code of its own, exactly as it needs no `scopedEntryRoute` entry of its own.
+   *
+   * A PAGE HANDS ITS WHOLE BUFFERED IDENTITY MAP and this shell reads the chrome fields it
+   * happens to render — the name for the crumb and the heading, the icon and the colour for the
+   * medallion beside them. The two screens buffer different field sets (`scopedEntryDraft.js`
+   * makes that the caller's argument), so a fixed three-key payload would be a second, narrower
+   * statement of a shape the scope descriptor already owns.
+   *
+   * `null` while no entry editor is reporting one, which is what makes every reader below fall
+   * back to the published projection rather than to an empty string. The page withdraws it on
+   * unmount, so leaving an entry route cannot leave a stale name in the trail.
+   *
+   * @type {Record<string, unknown>|null}
+   */
+  let scopedEntryDraftIdentity = $state(null);
+
+  /**
+   * One scoped entry editor's buffered identity, or `null` to withdraw it.
+   *
+   * Stored as a NEW plain object rather than the page's own: Svelte 5 does not proxy a value
+   * that arrives from another component's `$state` through a prop callback, so holding the
+   * caller's object would make a later in-place write invisible here. Every reader below is a
+   * `$derived` over this one assignment.
+   *
+   * @param {unknown} identity
+   */
+  function handleScopedEntryDraftIdentity(identity) {
+    scopedEntryDraftIdentity = identity && typeof identity === 'object' ? { ...identity } : null;
+  }
+
+  /**
+   * One buffered identity field as a string, or `null` when no editor is reporting one.
+   *
+   * `null` and not `''` is the difference the callers depend on: an author who CLEARS a name or
+   * a colour is stating a real value and must see it, so the fallback to the projection has to
+   * be `??` on "no editor" rather than `||` on "nothing authored".
+   *
+   * @param {string} field
+   * @returns {string|null}
+   */
+  function scopedEntryDraftField(field) {
+    if (!scopedEntryDraftIdentity) return null;
+    const value = scopedEntryDraftIdentity[field];
+    return typeof value === 'string' ? value : null;
+  }
+
+  // TRIMMED on both branches, because `scopedEntryName` trims and a crumb that changed its
+  // whitespace handling the moment an editor opened would be a difference nobody authored.
   const worldScopedEntryCrumb = $derived(
-    scopedEntryName(
-      worldScopeState[worldScopedEntryRoute?.entityType]?.entities,
-      worldScopedEntryId
-    )
+    scopedEntryDraftField('name')?.trim() ??
+      scopedEntryName(
+        worldScopeState[worldScopedEntryRoute?.entityType]?.entities,
+        worldScopedEntryId
+      )
   );
+
+  // THE ESSENCE ENTRY ROUTE'S HEADER NAMES THE ESSENCE (issue 1372, maintainer parity round 4).
+  //
+  // The prototype heads that screen with the essence's own tile, its NAME, and
+  // `World definition · used by 8 of 24 systems` (`essEntry.png`). What shipped was the generic
+  // page header every route falls through to — the static title `Essence entry` over a sentence
+  // describing what the screen is FOR — so the one thing a GM opened the screen to work on was
+  // the one thing the top of it did not say. The breadcrumb named it and the header did not.
+  //
+  // IT REUSES THE RECIPE EDITOR'S HEADING BLOCK WHOLESALE, which is the same move
+  // `data-component-edit-heading` and `data-downtime-chrome-heading` above already make: same
+  // classes, same `Medallion`, same 44px. An entity-named page header is one meaning, and a
+  // fourth parallel block would be a fourth implementation of it that agreed with the other
+  // three only until one of them changed.
+  //
+  // WHY IT IS DERIVED HERE RATHER THAN PASSED UP FROM THE PAGE. `.manager-header` is a SIBLING
+  // of `.manager-main` — that is the whole reason the route's surface fix had to be written
+  // twice — so the page cannot render into it, exactly as it cannot render its own breadcrumb.
+  // The corpus the page reads is the corpus this shell already publishes to it, so the heading
+  // follows from `worldScopeState` with no new prop and no new import.
+  //
+  // A MISSING RECORD FALLS BACK, it does not print an empty header: an entry route with no
+  // subject chosen, or one whose subject the corpus no longer holds, renders the generic title
+  // and subtitle below — which is the state the page itself answers with its entity-not-found
+  // empty state, and the same guard `currentView === 'recipe-edit' && recipeDraft` uses.
+  const worldEssenceEntryRecord = $derived(
+    currentView === 'world-essence-entry'
+      ? ((worldScopeState.essence?.entries ?? []).find(
+          (candidate) => candidate?.id === worldScopedEntryId
+        ) ?? null)
+      : null
+  );
+
+  // `count` is the projection's own member total and `total` is the crafting-system roster the
+  // same entry was built against, so this line cannot disagree with the `n of m systems have
+  // rules` count the page prints below it.
+  const worldEssenceEntrySubtitle = $derived(
+    worldEssenceEntryRecord
+      ? interpolate(
+          text(
+            'FABRICATE.Admin.Manager.Scoped.EssenceEntryIdentitySubtitle',
+            'World definition · used by {count} of {total} systems'
+          ),
+          {
+            count: Number(worldEssenceEntryRecord.membershipCount) || 0,
+            total: Array.isArray(worldEssenceEntryRecord.systems)
+              ? worldEssenceEntryRecord.systems.length
+              : 0,
+          }
+        )
+      : ''
+  );
+
+  /**
+   * THE WORLD ESSENCE ENTRY EDITOR'S BUFFERED EDIT, HELD WHERE ITS TWO CONSUMERS ARE
+   * (issue 1372, maintainer parity round 4).
+   *
+   * That editor persisted every keystroke on change and so carried no Save at all. It buffers now
+   * — the mechanism is `scoped/scopedEntryDraft.js`, shared with the tool entry editor — and the
+   * two things that act on a buffered edit are both HERE and cannot be anywhere else: the header
+   * action pair, because `.manager-header` is a sibling of `.manager-main`, and the route-exit
+   * cascade, because leaving via the rail or the breadcrumb never touches the page at all.
+   *
+   * `handle` is a LIVE accessor the page reports once on mount, not a snapshot: the guard reads
+   * it at the moment of a click, and a snapshot published by an effect can be one turn behind the
+   * click that reads it. `worldEssenceEntryDirty` is the reactive mirror the button is disabled
+   * from, reported separately for the opposite reason — a disabled attribute has to re-render.
+   *
+   * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
+   */
+  let worldEssenceEntryHandle = null;
+  let worldEssenceEntryDirty = $state(false);
+  let worldEssenceEntrySaving = $state(false);
+
+  function handleWorldEssenceEntryDraft(handle) {
+    worldEssenceEntryHandle = handle ?? null;
+    if (!handle) worldEssenceEntryDirty = false;
+  }
+
+  function handleWorldEssenceEntryDirty(dirty) {
+    worldEssenceEntryDirty = dirty === true;
+  }
+
+  // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK (issue 1372, maintainer parity round 5).
+  //
+  // With the edit buffered, the name field and the player preview rail both showed the buffered
+  // name while this heading showed the persisted one — one screen naming one essence two ways.
+  // A heading names the thing being edited, and the enabled `Save essence` beside it is what says
+  // the edit is unsaved; the heading is not a second, quieter version of that signal.
+  //
+  // `??` and not `||`: an editor reporting an EMPTY name is reporting a real authored state, and
+  // it falls through to `viewTitle()` below exactly as an empty persisted name already does.
+  const worldEssenceEntryName = $derived(
+    worldEssenceEntryRecord
+      ? (scopedEntryDraftField('name') ?? worldEssenceEntryRecord.entity?.name ?? '')
+      : ''
+  );
+
+  // AND SO DOES THE MEDALLION BESIDE IT (issue 1372, maintainer parity round 6).
+  //
+  // The icon and the colour token are buffered identity fields exactly as the name is — the same
+  // `IDENTITY_FIELDS` list, staged by the same `patchIdentity` — so a GM who re-picks the glyph
+  // or the swatch watched the picker, the preview rail and the tile in the form all move while
+  // the 44px tile at the top of the screen kept the value on disk. That is the same
+  // self-contradiction the heading had, one control to the left of it.
+  //
+  // The SUBTITLE is deliberately NOT in this set. It counts the crafting systems using the
+  // essence, and no buffered edit on this screen changes that count — it moves only when a
+  // membership write lands. See its own note above.
+  const worldEssenceEntryIcon = $derived(
+    worldEssenceEntryRecord
+      ? (scopedEntryDraftField('icon') ?? worldEssenceEntryRecord.entity?.icon ?? '')
+      : ''
+  );
+  const worldEssenceEntryTint = $derived(
+    worldEssenceEntryRecord
+      ? (scopedEntryDraftField('colorToken') ?? worldEssenceEntryRecord.entity?.colorToken ?? '')
+      : ''
+  );
+
+  /**
+   * Flush the world essence entry editor's buffered edit.
+   *
+   * Answers whether it landed, because the route-exit guard gates navigation on it: a Save that a
+   * write refused must leave the GM on the editor with the edit still in front of them rather
+   * than navigating away from work nothing persisted. Same contract as `saveEssenceEdit` and
+   * `saveSystemDetails` in the guards above.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function saveWorldEssenceEntry() {
+    if (!worldEssenceEntryHandle) return false;
+    worldEssenceEntrySaving = true;
+    try {
+      return (await worldEssenceEntryHandle.save()) !== false;
+    } finally {
+      worldEssenceEntrySaving = false;
+    }
+  }
+
+  /**
+   * The world essence entry editor's route-exit prompt.
+   *
+   * Re-entering the SAME essence is not leaving it, so it never prompts — the same subject
+   * comparison `confirmEssenceRouteExit` and `confirmToolsRouteExit` make, and for the same
+   * reason: `world-essence-entry` is one of the routes whose view token does not change when its
+   * subject does, which is exactly what `nextRouteId` exists for.
+   *
+   * The prompt itself is the shipped three-way essence one. It is not a new dialog: the sentence
+   * is about an essence with unsaved changes, which is what this is, and a second prompt saying
+   * the same thing in different words is how two screens end up disagreeing about one verb.
+   *
+   * @param {string} nextView
+   * @param {string} nextRouteId
+   * @returns {boolean|Promise<boolean>}
+   */
+  function confirmWorldEssenceEntryRouteExit(nextView, nextRouteId = '') {
+    if (activeView !== 'world-essence-entry') return true;
+    if (nextView === 'world-essence-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
+      return true;
+    }
+    return confirmScopedEntryExit({
+      dirty: worldEssenceEntryHandle?.isDirty() === true,
+      confirm: () => store?.confirmDiscardDirtyEssenceDraft?.(),
+      save: () => saveWorldEssenceEntry(),
+      discard: () => worldEssenceEntryHandle?.discard?.(),
+    });
+  }
 
   // Open an entry route ON a world entity. Routed through the same confirm-discard gate every
   // other navigation passes, and the subject is recorded only once that gate has allowed the
@@ -2875,6 +3199,67 @@
       worldScopedEntryId = nextEntryId;
       activeView = view;
     });
+  }
+
+  /**
+   * Create a world essence from the page header and open its entry editor.
+   *
+   * ── THE SEAM, AND ITS WHOLE EXTENT ──────────────────────────────────────────────────────────
+   * `### GM World Scoped Entity Routes` requirement 7 closes this file to the catalogue lanes, and
+   * this is the one place it is opened: the header band the prototype puts `+ New essence` in is
+   * rendered here and cannot be reached from a page. Everything else the button needs already
+   * exists here — `store.worldScope.essence.createEntity` is the same family the page is handed,
+   * and `openWorldScopedEntry` is the same navigation the row's pen already takes.
+   *
+   * THE NAME IS A PLACEHOLDER AND THE EDITOR IS THE POINT. `createEntity` refuses a duplicate id,
+   * so a fixed id would make the second press a button that does nothing and says nothing;
+   * `mintEssenceId` resolves the collision by suffix instead. Navigating straight into the entry
+   * puts the GM on the screen that names it, so the placeholder is never a row they have to find
+   * again.
+   *
+   * @returns {Promise<void>}
+   */
+  /**
+   * Open ONE crafting system's essence rules for a world essence, from the catalogue inspector.
+   *
+   * ── THE SECOND SEAM, AND THE SAME BOUND AS THE FIRST ────────────────────────────────────────
+   * The prototype's catalogue inspector lists the systems that hold an essence and gives each one
+   * a `Rules ↗` deep link (`essences.png`). Both halves of that navigation are the shell's:
+   * selecting a crafting system runs through `selectSystem`, which owns the route-exit gate and
+   * the store write, and changing route sets `activeView`. A page can do neither.
+   *
+   * IT COMPOSES, AND ADDS NOTHING. `selectSystem` is the same function the rail's scope select and
+   * five other navigations call, and `essences` is the shipped system-scope essence rules route.
+   * The one thing this adds is the pairing.
+   *
+   * THE ENTITY ID IS ACCEPTED AND DELIBERATELY UNUSED. The rules list is not addressable by
+   * entity — it opens on the system's whole essence list — and a caller that passed a different
+   * shaped argument would be a defect this signature makes visible rather than one that silently
+   * routes somewhere close enough.
+   *
+   * @param {string} _entityId the essence the row belongs to; see above.
+   * @param {string} systemId the crafting system whose rules to open.
+   * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
+   */
+  function openSystemEssenceRules(_entityId, systemId) {
+    if (!systemId) return false;
+    return afterTruthyResult(selectSystem(systemId, 'essences'), () => {
+      activeView = 'essences';
+    });
+  }
+
+  async function createWorldEssence() {
+    const name = text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence');
+    const id = mintEssenceId(name, worldScopeState.essence?.entities ?? []);
+    const created = await store?.worldScope?.essence?.createEntity?.({
+      id,
+      name,
+      icon: 'fas fa-flask-vial',
+      colorToken: '',
+      description: '',
+    });
+    if (created === false) return;
+    openWorldScopedEntry('world-essence-entry', id);
   }
 
   // -- Full width: ONE mechanically checked decision over a THREE-state classification ---
@@ -4394,9 +4779,7 @@
     if (currentView === 'essences')
       return text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules');
     if (currentView === 'essence-edit')
-      return isCreatingEssenceDraft
-        ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
-        : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
+      return text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
     if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle',
@@ -4534,20 +4917,19 @@
         'FABRICATE.Admin.Manager.TagsCategories.Subtitle',
         'Manage recipe category and item tag vocabulary for the selected crafting system.'
       );
+    // THE SUBTITLE STATES THE SCREEN'S THREE FACTS (issue 1372, maintainer parity round 8,
+    // reference `proto:4970`): what the list holds, what DISABLING actually stops, and where
+    // identity comes from. What shipped — "Manage essence definitions for the selected crafting
+    // system" — used the WORLD-scope word "definitions" for a screen that authors none, and said
+    // nothing about either of the other two, so the panel's own shared-definition banner was the
+    // only thing on the route that named the layer.
     if (currentView === 'essences')
-      return text(
-        'FABRICATE.Admin.Manager.Essence.Subtitle',
-        'Manage essence definitions for the selected crafting system.'
-      );
-    if (currentView === 'essence-edit' && isCreatingEssenceDraft && showEssenceSourceUi)
-      return text(
-        'FABRICATE.Admin.Manager.Essence.CreateSubtitle',
-        'Define identity, icon, and source linkage for a new essence.'
-      );
-    if (currentView === 'essence-edit' && isCreatingEssenceDraft)
-      return text(
-        'FABRICATE.Admin.Manager.Essence.CreateNoSourceSubtitle',
-        'Define identity and icon for a new essence.'
+      return interpolate(
+        text(
+          'FABRICATE.Admin.Manager.Essence.Subtitle',
+          'What each essence does on craft in {system}. Disabling stops the crafting effect — ingredient matching still sees the value. Names, icons and colours come from the Essence Catalogue.'
+        ),
+        { system: selectedSystem?.name || '' }
       );
     if (currentView === 'essence-edit' && showEssenceSourceUi)
       return text(
@@ -4966,10 +5348,9 @@
   // But `essence-edit` is a "same token, different subject" route, exactly like `tool-edit`
   // and `system-edit`, and both of those learned it the hard way. `editEssence` already
   // early-returns on an unchanged id, so EVERY call that reaches this guard from inside the
-  // editor is a switch to a different essence — or `createEssenceDraft`, which switches to
-  // no essence at all — and a bare `nextView === 'essence-edit'` skip returned `true` for
-  // all of them, after which `editEssence` clears `essenceEditDraft` with the draft
-  // unsaved, no prompt, and `store.cancelEssenceDraft()` never called.
+  // editor is a switch to a different essence, and a bare `nextView === 'essence-edit'` skip
+  // returned `true` for all of them, after which `editEssence` clears `essenceEditDraft` with
+  // the draft unsaved, no prompt, and `store.cancelEssenceDraft()` never called.
   // `confirmToolsRouteExit` compares ids for this reason; so does
   // `confirmSystemDetailsScopeChange`.
   function confirmEssenceRouteExit(nextView, nextEssenceId = '') {
@@ -5042,6 +5423,21 @@
   // companion's navigation guard is being asked about. Every other caller keeps its
   // one-argument shape.
   function confirmRouteExitGuards(nextView, nextRouteId = '') {
+    // THE WORLD SCOPED-ENTRY EDITOR IS ASKED FIRST, and the order is immaterial rather than
+    // arbitrary: every guard below is gated on an `activeView` that a world route cannot also
+    // be, so on `world-essence-entry` the whole rest of this cascade is already a synchronous
+    // `true`. Asking first therefore reorders nothing and keeps the new link to one function.
+    const worldEntryConfirmed = confirmWorldEssenceEntryRouteExit(nextView, nextRouteId);
+    if (isPromise(worldEntryConfirmed)) {
+      return worldEntryConfirmed.then((value) =>
+        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
+      );
+    }
+    if (worldEntryConfirmed === false) return false;
+    return continueRouteExitAfterWorldEntry(nextView, nextRouteId);
+  }
+
+  function continueRouteExitAfterWorldEntry(nextView, nextRouteId = '') {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
       return environmentConfirmed.then((value) => {
@@ -5544,8 +5940,11 @@
 
   function essenceEditSaveLabel() {
     if (essenceEditSaving) return text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...');
-    return isCreatingEssenceDraft
-      ? text('FABRICATE.Admin.Manager.Essence.Create', 'Create essence')
+    // `Save rules` on the rules screen, because that is what the screen holds: the identity the
+    // word "essence" names is a world record this route cannot write. The generic label survives
+    // for the state where the in-system record IS the essence.
+    return essenceRulesMode
+      ? text('FABRICATE.Admin.Manager.Essence.SaveRules', 'Save rules')
       : text('FABRICATE.Admin.Manager.Essence.Save', 'Save essence');
   }
 
@@ -5822,16 +6221,6 @@
 
   function selectEssence(essenceId) {
     selectedEssenceId = essenceId;
-  }
-
-  function createEssenceDraft() {
-    if (!canShowEssences) return;
-    afterTruthyResult(confirmRouteExit('essence-edit'), () => {
-      selectedEssenceId = '';
-      essenceEditDirty = false;
-      essenceEditDraft = null;
-      activeView = 'essence-edit';
-    });
   }
 
   function editEssence(essenceId = selectedEssence?.id) {
@@ -6738,16 +7127,6 @@
   function toggleEssenceEnabled(essenceId, enabled) {
     if (!essenceId) return;
     store.setEssenceEnabled?.(essenceId, enabled === true);
-  }
-
-  async function duplicateSelectedEssence(essenceId = selectedEssence?.id) {
-    if (!essenceId) return false;
-    const nextId = await store.duplicateEssence?.(essenceId);
-    if (!nextId) return false;
-    // Select the COPY. A duplicate the GM cannot see is indistinguishable from one that
-    // was not made, and the copy is what they are about to edit.
-    selectedEssenceId = nextId;
-    return true;
   }
 
   // ── Essence bulk edit (issue 1036) ───────────────────────────────────────────────
@@ -8910,10 +9289,13 @@
               >{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</button
             >
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{isCreatingEssenceDraft
-                ? text('FABRICATE.Admin.Manager.Essence.CreateBreadcrumb', 'Create essence')
-                : text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span
+            <!-- Name the essence, not the generic "Edit essence" — the same rule the recipe and
+               component breadcrumbs already follow, and the reference's own trail
+               (`Crafting systems > <system> > Essence Rules > <essence>`). The generic word
+               survives as the fallback for a subject with no name yet. -->
+            <span title={essenceEditName}
+              >{essenceEditName ||
+                text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span
             >
           {/if}
           {#if currentView === 'recipe-edit'}
@@ -9076,6 +9458,50 @@
               <p class="manager-subtitle" data-downtime-chrome-subline>{viewSubtitle()}</p>
             </div>
           </div>
+        {:else if worldEssenceEntryRecord}
+          <!-- The essence's own identity header. See `worldEssenceEntryRecord` above for why it
+             is derived in the shell and why it reuses the recipe editor's heading block. The
+             medallion carries the essence's colour the way every other essence tile in the
+             manager does — `tint` recolours the glyph and washes the surface, and unset
+             resolves to the accent.
+
+             `glyph` is set because the other two headings that reuse this block carry an
+             IMAGE, and `Medallion`'s 0.9rem default is sized for the 40px row tiles: left
+             unset, a 14px glyph inside a 44px tile reads as a speck against the prototype's,
+             which fills about half the tile (`essEntry.png`). It is passed here rather than
+             derived from `size` inside the primitive for the reason its own doc gives —
+             deriving it would re-type all ~40 medallions in the manager at once, which is a
+             change with its own frames. -->
+          <div class="manager-recipe-edit-heading" data-world-essence-entry-heading>
+            <Medallion
+              icon={worldEssenceEntryIcon || 'fas fa-mortar-pestle'}
+              tint={worldEssenceEntryTint}
+              size={44}
+              glyph={22}
+            />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={worldEssenceEntryName}>
+                {worldEssenceEntryName || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-world-essence-entry-subline>
+                {worldEssenceEntrySubtitle}
+              </p>
+            </div>
+          </div>
+        {:else if currentView === 'essence-edit' && essenceRulesMode}
+          <!-- The essence's own identity header on the SYSTEM rules route. See
+             `essenceRulesMode` above for why it is derived in the shell, and the world essence
+             entry branch above for why it reuses the recipe editor's heading block wholesale
+             rather than being a fifth implementation of one meaning. -->
+          <div class="manager-recipe-edit-heading" data-essence-edit-heading>
+            <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={44} glyph={22} />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={essenceEditName}>
+                {essenceEditName || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-essence-edit-subline>{essenceEditSubline}</p>
+            </div>
+          </div>
         {:else if currentView !== 'tool-edit'}
           <h1 class="manager-title">{viewTitle()}</h1>
           <p class="manager-subtitle">{viewSubtitle()}</p>
@@ -9122,9 +9548,83 @@
         sit permanently disabled against an id the route does not have. Each screen's own
         actions belong on the surface that owns them, which PRs 6a-c and 7 build.
       -->
-      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute}
+      <!--
+        ONE WORLD SCOPED ROUTE IS BACK IN, AND IT IS A SEAM RATHER THAN A RELAXATION (issue 1372).
+
+        The exclusion above is about the FALLTHROUGH: a world scoped route has no selected crafting
+        system, so the final `{:else}` branch's Create would create a crafting system and its Export
+        would sit disabled against an id the route does not have. That reasoning is about the
+        DEFAULT branch, not about the band, and the Essence Catalogue needs the band: the prototype
+        puts its one `+ New essence` button in the header, right-aligned on the title line
+        (`essences.png`), and there is nowhere else on a released full-width route to put it that
+        does not cost the list a 60px form band.
+
+        The world essence ENTRY route joins it for the same reason and a sharper one. The prototype
+        heads that screen with `← Back` and a save action beside the essence's own name
+        (`essEntry.png`), and the shipped screen had NO way out of it but the breadcrumb: the page
+        renders a Back only in its entity-not-found empty state, so the one state a GM actually
+        reaches it in offered none.
+
+        `Save` JOINS IT (issue 1372, maintainer parity round 4), and the earlier note here — that
+        a Save could commit nothing because `patchIdentity` wrote on every change — has been
+        answered by changing the screen rather than the header: the editor buffers its edit now,
+        so there IS a dirty state, and `design-system/spec.md`'s EDITOR recipe orders "the action
+        pair with back before save" for every screen of that archetype. Both halves render through
+        `ScopedEntryHeaderActions`, which the world tool entry takes next.
+
+        So each route is admitted BY NAME and lands on its OWN branch below — neither reaches the
+        fallthrough — and the other five world scoped routes stay excluded exactly as before.
+      -->
+      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
-          {#if currentView === 'world-downtime'}
+          {#if currentView === 'world-essence-entry'}
+            <!--
+              THE EDITOR ACTION PAIR, THROUGH THE SHARED COMPONENT (issue 1372, parity round 4).
+
+              `design-system/spec.md`'s EDITOR recipe orders "the action pair with back before
+              save", and the prototype draws exactly that on this screen (`essEntry.png`). The
+              world tool entry takes the same pair next, so it is one component rather than two
+              copies — two screens of one archetype rendering their action pair from two places
+              is the recipe drift that sentence exists to prevent.
+
+              THE BACK LABEL IS A SEPARATE KEY from the page's own `BackToCatalogue`, which reads
+              "Back to the catalogue". That phrase belongs to the entity-not-found empty state,
+              where it is the only thing on screen and has to say where it goes; in the header
+              band it sits beside a breadcrumb that already names the destination, and the
+              prototype writes it as one word.
+
+              BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit
+              gate as the rail and the breadcrumb — so an unsaved edit prompts whichever of the
+              three ways out a GM takes.
+            -->
+            <ScopedEntryHeaderActions
+              backAttribute="data-world-essence-back"
+              saveAttribute="data-world-essence-save"
+              backLabel={text(
+                'FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogueShort',
+                'Back'
+              )}
+              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.Save', 'Save essence')}
+              saveDisabled={!worldEssenceEntryDirty}
+              saving={worldEssenceEntrySaving}
+              onBack={() => setView('world-essences')}
+              onSave={saveWorldEssenceEntry}
+            />
+          {:else if currentView === 'world-essences'}
+            <!--
+              CREATE TAKES NO NAME FIELD. `mintEssenceId` slugs an id from the name and RESOLVES a
+              collision by suffix (`ash`, `ash-2`), so pressing this twice mints two records rather
+              than silently doing nothing the second time — which is the failure the page's old
+              name field existed to prevent and no longer can happen. The new essence opens
+              straight into its own world entry editor, which is where its name, icon, colour and
+              description are authored; a row called "New essence" left on the list would be a
+              record a GM has to go and find.
+            -->
+            <ManagerButton role="primary" data-world-essence-create onclick={createWorldEssence}>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
+            </ManagerButton>
+          {:else if currentView === 'world-downtime'}
             {#if downtimeCoreFallback}
               <!--
                 The design puts this promotional pill at the top of every Downtime screen, in
@@ -9323,10 +9823,24 @@
               <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
             </ManagerButton>
           {:else if currentView === 'essences'}
-            <ManagerButton role="primary" onclick={createEssenceDraft}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Essence.Create', 'Create essence')}</span>
-            </ManagerButton>
+            <!-- NO HEADER ACTION (issue 1372, maintainer parity round 8).
+
+                 The reference's Essence Rules header carries the title, the subtitle and NOTHING
+                 on the right (`tmp/proto/essence-rules.png`, markup `proto:1523`-`1540`), because
+                 an essence is a WORLD record and the only create is the Essence Catalogue's
+                 `+ New essence`. What shipped here was `+ Create essence`, whose handler opened a
+                 system-scope draft that `store.addEssence` writes straight into
+                 `system.essenceDefinitions` — a system-owned essence with its own name, icon and
+                 colour, offered a foot away from this screen's own banner saying that name, icon
+                 and colour come from the Essence Catalogue and are shared by every system.
+
+                 THE ROUTE IS NOT LOST, and this is what makes the removal safe rather than merely
+                 correct. A GM creates an essence on the world Essence Catalogue and joins it to
+                 this system either from that screen's inspector rows or from this list's own
+                 `All world essences` segment, whose absent rows carry `Add to this system`. That
+                 join now seeds the in-system record as well as the membership record — see
+                 `joinEssenceToSystem` in `adminStore.js`, without which the Add wrote a world
+                 membership row this list does not read and appeared to do nothing. -->
           {:else if currentView === 'essence-edit'}
             <!-- The SHARED editor header (issue 1036), wearing this studio's own three data
                  hooks. Its own note said "extract when a second studio wants it"; this is
@@ -10692,12 +11206,16 @@
       <WorldEssenceCataloguePage
         {...essenceScopeProps}
         onOpenEntry={(entityId) => openWorldScopedEntry('world-essence-entry', entityId)}
+        onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
       />
     {:else if currentView === 'world-essence-entry'}
       <WorldEssenceEntryPage
         {...essenceScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-essences')}
+        onDraftChange={handleWorldEssenceEntryDraft}
+        onDirtyChange={handleWorldEssenceEntryDirty}
+        onDraftIdentityChange={handleScopedEntryDraftIdentity}
       />
     {:else if currentView === 'world-tools'}
       <WorldToolCataloguePage
@@ -11175,6 +11693,7 @@
         onDraftChange={handleEssenceDraftChange}
         onImportSourceDrop={importEssenceSourceDrop}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+        onOpenSharedDefinition={(entityId) => openWorldScopedEntry('world-essence-entry', entityId)}
       />
     {:else if currentView === 'tags' && selectedSystem}
       <TagsCategoriesView
@@ -13802,7 +14321,9 @@
               effectTransferEnabled={showEssenceSourceUi}
               propertyMacrosEnabled={showEssencePropertyMacroUi}
               sourceName={essenceEditDraft.sourceName || ''}
-              macroName={essenceEditDraft.macroName || ''}
+              macroName={essenceEditDraft.macroName ||
+                essenceShortValueName(essenceEditDraft.propertyMacroUuid)}
+              inherited={inspectedEssenceInherited}
               sampleComponentName={essenceEditDraft.componentUsageItems?.[0]?.name || ''}
             />
           {:else if currentView === 'essences' && essenceBulkSelectionCount > 0}
@@ -13828,8 +14349,15 @@
               showPropertyMacroUi={showEssencePropertyMacroUi}
               managedItemOptions={selectedSystem?.managedItemOptions || []}
               sourceUuid={selectedEssenceSourceUuid()}
+              systemName={selectedSystem?.name || ''}
+              inherited={inspectedEssenceInherited}
+              systemRows={inspectedEssenceSystemRows}
+              memberCount={Number(inspectedEssenceWorldEntry?.membershipCount) || 0}
+              rosterSize={allSystems.length}
+              membershipActions={store?.worldScope?.essence ?? null}
+              onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
               onEdit={(id) => editEssence(id)}
-              onDuplicate={(id) => duplicateSelectedEssence(id)}
+              onOpenWorldDefinition={(id) => openWorldScopedEntry('world-essence-entry', id)}
               onDelete={(id) => removeEssence(id)}
               onEditComponent={(id) => editComponent(id)}
               onCopySource={copySelectedEssenceSource}
