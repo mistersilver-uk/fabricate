@@ -58,7 +58,7 @@
       "path": "src/ui/svelte/apps/manager/EditorTabs.svelte",
       "library": "<TabBar>",
       "evidence": "targeted",
-      "why": "The editor tab strip (3 callers — the system, environment and recipe-item editors each wrap it). `library.html:1008` specifies `<PageHeader> <TabBar>` and states that a studio never puts its tabs in a side rail. Targeted: one frame per wrapping editor claims it."
+      "why": "The editor tab strip (5 callers: the system, environment, recipe-item, Checks and Knowledge strips each wrap it). `library.html:1008` specifies `<PageHeader> <TabBar>` and states that a studio never puts its tabs in a side rail. Its specimen also draws TWO Rail Marker Family vehicles on one bar — `Tiers 3` and `Businesses 23` as bare counts beside a warning badge on Validation — so drawing the family is part of what the entry specifies, not an extension of it, and spec.md requirement \"Near-neighbour primitives are routed by a stated rule\" forbids substituting one vehicle for another. Issue 1038 ruled the Checks section strip OUT of conversion, led by the reason that its count \"is a bare mono numeral, not a chip — the two treatments are deliberately different\"; that ruling was never recorded in this manifest, and it was wrong twice over — a deliberate STYLE divergence is the one kind a shared primitive may not record, and the strip was RIGHT about the marks while the primitive was too narrow to express them. Issue 1429 made the family a capability instead. Targeted: one frame per wrapping editor claims it."
     },
     {
       "path": "src/ui/svelte/apps/manager/EditorValidationSurface.svelte",

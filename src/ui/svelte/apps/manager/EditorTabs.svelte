@@ -27,28 +27,63 @@
   So each is a prop, and no converted site changes a rendered id, `aria-controls`,
   `data-*` attribute name or badge class.
 
-  ── THE DANGER BADGE IS A CAPABILITY, not a fourth copy ─────────────────────────────────
+  ── THE RAIL MARKER FAMILY IS A CAPABILITY, not a reason for a second strip (issue 1429) ─
 
-  `RecipeItemEditorTabs` alone carried an `is-danger` button class with a scoped style
-  block, a badge hook with a tone attribute, and a `badgeTone` mapping (`success` to the
-  chip's `active`) its siblings lack. A primitive extracted from Environment and System
-  alone would drop all three, so they live here: `danger` turns the button treatment on,
-  `badgeAttribute` names the per-badge hook, and the tone mapping is unconditional —
-  no shipped caller passes `success`, so making it universal changes no rendered output
-  and removes the trap of two tone vocabularies.
+  `DOMAIN.md`'s **Rail Marker Family** and design-system spec.md requirement
+  "Near-neighbour primitives are routed by a stated rule" name FOUR marks that MUST NOT be
+  substituted for one another. Which one a strip draws is decided by what the mark MEANS:
+
+   - `count`  a RECORD COUNT — how many records. A bare mono tabular numeral, no fill and
+              no border. `library.html:1008`'s `<TabBar>` specimen already draws two of
+              them (`Tiers 3`, `Businesses 23`) beside one warning badge, so the tab bar
+              carrying both vehicles is specified, not an extension of the specification.
+   - `issue`  an ISSUE SUMMARY — how many things want attention. The filled chip, toned.
+              It is amber because it asks for attention, not because anything is wrong.
+   - `dot`    the family's 6px filled dot, distinguished from the chip by SHAPE as well as
+              colour and therefore REQUIRING a text accessible name; a nameless dot is
+              dropped rather than drawn, on the rule `Chip` drops an unknown tone.
+
+  The fourth, the PREMIUM chip, is deliberately not offered here: canon scopes it to the
+  manager RAIL, where it rides the count vehicle's own box, and a vehicle with no possible
+  caller on this surface would be configuration that cannot be reached.
+
+  A mark that names no vehicle is the ISSUE chip, which is what every caller predating this
+  change passes and therefore renders exactly what it rendered before. The family is CLOSED:
+  a caller names a vehicle and the primitive owns the drawing, so there is no route by which
+  a call site can supply markup, a class or a shape of its own. An unrecognised vehicle name
+  falls back to the chip rather than emitting an unstyled mark.
+
+  A tab may carry MORE THAN ONE mark, because a section can be both authored and unready at
+  once — pass an array, and they render in the order the caller listed them.
 
   Props:
    - tabs: `{id, icon, labelKey, label}[]`, in render order. `labelKey` is looked up and
      `label` is the English fallback, matching the `text()` contract everywhere else.
-   - activeTab / onSelect(tabId) / badges: as before. A badge is a plain value or
-     `{label, tone}` where tone is one of neutral/success/warning/danger.
+   - activeTab / onSelect(tabId).
+   - badges: per tab id, one mark or an array of them. A mark is a plain value, or
+     `{vehicle, label, tone, name, suppressZero}` — `vehicle` ∈ count/issue/dot (default
+     `issue`), `tone` ∈ neutral/success/warning/danger and applies to the chip, `name` is
+     the accessible name (REQUIRED by `dot`, which renders no text), and `suppressZero`
+     defaults true so a mark reading `0` is omitted rather than stated as zero.
    - ariaLabelKey / ariaLabel: the strip's own accessible name.
    - idStem: builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`.
+   - buttonIdStem / panelIdStem: override either half of that pair for a site whose ids do
+     not share the `-tab-`/`-panel-` shape (`checks-section-<id>` / `checks-panel-<id>`).
+   - activePanelOnly: emit `aria-controls` ONLY on the selected tab. Not cosmetic and not
+     optional for the sites that need it: a strip rendering one panel at a time points every
+     unselected tab at an id that is not in the document, which assistive technology reports
+     as a broken relationship rather than as "not currently shown".
    - hookAttribute: the per-button `data-*` name carrying the tab id.
-   - badgeAttribute: the per-badge `data-*` name carrying the tab id; '' renders none.
+   - containerAttribute: a valueless `data-*` hook on the tablist itself; '' renders none.
+   - badgeAttribute / countAttribute / dotAttribute: the per-mark `data-*` name carrying the
+     tab id, one per vehicle because the shipped hooks do not share a stem; '' renders none.
+     `badgeAttribute` keeps its name rather than becoming `issueAttribute` because three
+     shipped callers pass it.
    - containerClass / buttonClass / badgeClass: the site's existing classes, kept so no
-     shipped rule in `styles/fabricate.css` stops matching.
-   - danger: whether a danger badge also tints its button.
+     shipped rule in `styles/fabricate.css` stops matching. The COUNT and DOT have no such
+     prop: their classes are the drawing, and a drawing a caller can choose is the style
+     divergence this capability exists to remove.
+   - danger: whether a danger chip also tints its button.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -62,39 +97,75 @@
     ariaLabelKey = '',
     ariaLabel = '',
     idStem = 'editor',
+    buttonIdStem = '',
+    panelIdStem = '',
+    activePanelOnly = false,
     hookAttribute = 'data-editor-tab-button',
+    containerAttribute = '',
     badgeAttribute = '',
+    countAttribute = '',
+    dotAttribute = '',
     containerClass = 'manager-editor-tabs',
     buttonClass = 'manager-editor-tab-button',
     badgeClass = 'manager-editor-tab-badge',
     danger = false,
   } = $props();
 
+  // Derived rather than a destructuring default, which cannot safely read a sibling binding.
+  const buttonStem = $derived(buttonIdStem || `${idStem}-tab`);
+  const panelStem = $derived(panelIdStem || `${idStem}-panel`);
+
+  // The family, closed. Anything else a caller names is drawn as the chip rather than
+  // emitted as an unstyled mark, so a typo shows up as the recessive default instead of as
+  // nothing at all.
+  const VEHICLES = new Set(['count', 'issue', 'dot']);
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
-  function badgeList(tab) {
-    const value = badges?.[tab.id];
-    const values = Array.isArray(value) ? value : value ? [value] : [];
-    return values
-      .map((badge) => {
-        if (badge && typeof badge === 'object') {
-          return {
-            label: badge.label ?? badge.value ?? '',
-            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral'),
-          };
-        }
-        return {
-          label: badge,
-          tone: tab.id === 'validation' ? 'danger' : 'neutral',
-        };
-      })
-      .filter((badge) => badge.label !== '' && badge.label !== 0);
+  function normalizeMark(tab, mark) {
+    const fallbackTone = tab.id === 'validation' ? 'danger' : 'neutral';
+    if (mark && typeof mark === 'object') {
+      return {
+        vehicle: VEHICLES.has(mark.vehicle) ? mark.vehicle : 'issue',
+        label: mark.label ?? mark.value ?? '',
+        tone: mark.tone || fallbackTone,
+        name: mark.name ?? '',
+        suppressZero: mark.suppressZero !== false,
+      };
+    }
+    return {
+      vehicle: 'issue',
+      label: mark,
+      tone: fallbackTone,
+      name: '',
+      suppressZero: true,
+    };
   }
 
-  // A badge tone name is this component's own vocabulary; `Chip` names the colour families
+  // A dot carries no text, so emptiness is judged on its NAME; every other vehicle is judged
+  // on its label. The zero rule is the caller's to state, because the canonical text settles
+  // it per surface rather than per vehicle: the rail's record counts render `0` and the
+  // Checks strip's do not.
+  function isDrawable(mark) {
+    if (mark.vehicle === 'dot') return mark.name !== '';
+    if (mark.label === '' || mark.label === null || mark.label === undefined) return false;
+    return !(mark.label === 0 && mark.suppressZero);
+  }
+
+  function markList(tab) {
+    const value = badges?.[tab.id];
+    const values = Array.isArray(value)
+      ? value
+      : value === undefined || value === null
+        ? []
+        : [value];
+    return values.map((mark) => normalizeMark(tab, mark)).filter(isDrawable);
+  }
+
+  // A mark tone name is this component's own vocabulary; `Chip` names the colour families
   // differently (`success` is `active` there), so translate rather than leak one spelling
   // into the other (issue 883).
   function badgeTone(tone) {
@@ -105,38 +176,65 @@
   }
 
   function isDangerTab(tab) {
-    return danger && badgeList(tab).some((badge) => badge.tone === 'danger');
+    return (
+      danger && markList(tab).some((mark) => mark.vehicle === 'issue' && mark.tone === 'danger')
+    );
+  }
+
+  function containerAttributes() {
+    if (!containerAttribute) return {};
+    return { [containerAttribute]: '' };
   }
 
   function buttonAttributes(tab) {
     return { [hookAttribute]: tab.id };
   }
 
-  function badgeAttributes(tab, badge) {
+  function markAttributes(tab, mark) {
+    if (mark.vehicle === 'count') return countAttribute ? { [countAttribute]: tab.id } : {};
+    if (mark.vehicle === 'dot') return dotAttribute ? { [dotAttribute]: tab.id } : {};
     if (!badgeAttribute) return {};
-    return { [badgeAttribute]: tab.id, 'data-badge-tone': badge.tone };
+    return { [badgeAttribute]: tab.id, 'data-badge-tone': mark.tone };
+  }
+
+  // Arrow / Home / End, the four the ARIA tablist pattern asks a horizontal strip for. Home
+  // and End are not a nicety on an ordered strip — "back to the first section" and "the last
+  // one" are the two jumps a GM repeats — and a strip that handled the arrows but swallowed
+  // nothing else left them doing whatever the browser does with Home inside a button row,
+  // which is nothing. Stated once here rather than per caller, on the same rule as the tone
+  // mapping above: universal, so there is no second keyboard vocabulary to get wrong.
+  function targetIndex(key, index) {
+    if (key === 'ArrowRight') return (index + 1) % tabs.length;
+    if (key === 'ArrowLeft') return (index - 1 + tabs.length) % tabs.length;
+    if (key === 'Home') return 0;
+    if (key === 'End') return tabs.length - 1;
+    return -1;
   }
 
   function onKeydown(event, index) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    const nextIndex = targetIndex(event.key, index);
+    if (nextIndex < 0) return;
     event.preventDefault();
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (index + delta + tabs.length) % tabs.length;
     onSelect(tabs[nextIndex].id);
     const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
     buttons?.[nextIndex]?.focus();
   }
 </script>
 
-<div class={containerClass} role="tablist" aria-label={text(ariaLabelKey, ariaLabel)}>
+<div
+  class={containerClass}
+  role="tablist"
+  aria-label={text(ariaLabelKey, ariaLabel)}
+  {...containerAttributes()}
+>
   {#each tabs as tab, index (tab.id)}
     <button
       type="button"
       role="tab"
-      id={`${idStem}-tab-${tab.id}`}
+      id={`${buttonStem}-${tab.id}`}
       class={`${buttonClass} ${activeTab === tab.id ? 'is-active' : ''} ${isDangerTab(tab) ? 'is-danger' : ''}`}
       aria-selected={activeTab === tab.id}
-      aria-controls={`${idStem}-panel-${tab.id}`}
+      aria-controls={activePanelOnly && activeTab !== tab.id ? undefined : `${panelStem}-${tab.id}`}
       tabindex={activeTab === tab.id ? 0 : -1}
       data-keyboard-focus="true"
       {...buttonAttributes(tab)}
@@ -145,10 +243,21 @@
     >
       <i class={tab.icon} aria-hidden="true"></i>
       <span>{text(tab.labelKey, tab.label)}</span>
-      {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
-        <Chip tone={badgeTone(badge.tone)} class={badgeClass} {...badgeAttributes(tab, badge)}
-          >{badge.label}</Chip
-        >
+      {#each markList(tab) as mark, markIndex (`${tab.id}-${markIndex}`)}
+        {#if mark.vehicle === 'count'}
+          <span class="manager-editor-tab-count" {...markAttributes(tab, mark)}>{mark.label}</span>
+        {:else if mark.vehicle === 'dot'}
+          <span
+            class="manager-editor-tab-dot"
+            role="img"
+            aria-label={mark.name}
+            {...markAttributes(tab, mark)}
+          ></span>
+        {:else}
+          <Chip tone={badgeTone(mark.tone)} class={badgeClass} {...markAttributes(tab, mark)}
+            >{mark.label}</Chip
+          >
+        {/if}
       {/each}
     </button>
   {/each}
@@ -159,12 +268,19 @@
      §7.5): the label and its underline follow the danger colour. Authored here rather
      than in `RecipeItemEditorTabs`, because the button this rule targets is rendered by
      THIS component — a scoped block left behind on the caller would match nothing and
-     fail the unused-selector warning gate. */
-  .manager-editor-tab-button.is-danger {
+     fail the unused-selector warning gate.
+
+     `:global()` on both compounds is REQUIRED and is not a loosening. Svelte's scoper adds
+     its hash to a selector it can bind to an element in THIS component's template, and both
+     classes reach the button through the `buttonClass` prop and the `is-active` expression
+     rather than as literal attribute text, so the scoped form emits a hash the button never
+     carries and the rule is dead at runtime while warning about nothing. Specificity is
+     preserved exactly: `:global(.a.b)` is still (0,2,0). */
+  :global(.manager-editor-tab-button.is-danger) {
     color: var(--fab-danger-text);
   }
 
-  .manager-editor-tab-button.is-danger.is-active {
+  :global(.manager-editor-tab-button.is-danger.is-active) {
     border-bottom-color: var(--fab-danger-border);
   }
 </style>
