@@ -6109,89 +6109,24 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   });
   await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
   const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
-  const sourceCard = editor.locator('[data-tool-source-card]');
-  await assertPointerTarget(page, sourceCard, '[data-tool-source-card]', 'Tool Item drop target');
-  await page.locator('#sidebar [data-tab="items"]').first().click({ force: true });
-  // A user must be able to expose Foundry's Item directory before starting a
-  // native drag. Move the live ApplicationV2 window left for that interaction,
-  // then restore the exact 1280px evidence geometry immediately afterwards.
-  await page.evaluate(async () => {
-    await globalThis.__fabricateSmokeManagerApp.setPosition({
-      width: 900,
-      height: 700,
-      left: 0,
-      top: 0,
-    });
-  });
-  await waitForManagerGeometrySettled(page, { timeout: 1500, fallbackMs: 500 });
-  const replacementSourceItem = page.locator([
-    `#sidebar .directory-item[data-entry-id="${fixture.replacementSourceItemId}"]`,
-    `#sidebar .directory-item[data-document-id="${fixture.replacementSourceItemId}"]`,
-  ].join(', ')).first();
-  await replacementSourceItem.waitFor({ state: 'visible', timeout: 10_000 });
-  const [managerBounds, replacementBounds] = await Promise.all([
-    liveManagerApp.boundingBox(),
-    replacementSourceItem.boundingBox(),
-  ]);
-  if (
-    !managerBounds
-    || !replacementBounds
-    || replacementBounds.x + (replacementBounds.width / 2) <= managerBounds.x + managerBounds.width
-  ) {
-    throw new Error(`Tool Item sidebar source remains occluded by the manager: ${JSON.stringify({
-      managerBounds,
-      replacementBounds,
-    })}`);
-  }
-  await withSingleToolStoreMutation(
-    page,
-    'stageToolDraftSource',
-    'Tool Item sidebar drag',
-    () => replacementSourceItem.dragTo(sourceCard),
-    () => sourceCard.filter({ hasText: 'Smoke Tool Studio Replacement Item' })
-      .waitFor({ state: 'visible', timeout: 5_000 }),
-  );
-  wideGeometry = await setManagerWindowSize(page, {
-    width: 1214,
-    height: 724,
-    sourceViewport: { width: 1280, height: 720 },
-  });
-  const copySourceUuid = editor.locator('[data-tool-source-copy-uuid]');
-  await assertPointerTarget(page, copySourceUuid, '[data-tool-source-copy-uuid]', 'Copy source UUID');
-  await withSingleToolClipboardWrite(
-    page,
-    fixture.replacementSourceItemUuid,
-    () => copySourceUuid.click(),
-  );
-  await editor.locator('[data-tool-editor-back]').click();
-  const discardDraft = page.locator(
-    '.dialog button[data-action="discard"], .dialog button:has-text("Discard")'
-  ).first();
-  await discardDraft.waitFor({ state: 'visible', timeout: 5_000 });
-  await discardDraft.click();
-  await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]')
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  await withSingleToolDraftTransition(
-    page,
-    fixture.toolId,
-    'Tool Edit route after source discard',
-    () => editButton.click(),
-    () => liveManagerApp.locator('.fabricate-manager[data-manager-view="tool-edit"]')
-      .waitFor({ state: 'visible', timeout: 5_000 }),
-  );
-  wideGeometry = await setManagerWindowSize(page, {
-    width: 1214,
-    height: 724,
-    sourceViewport: { width: 1280, height: 720 },
-  });
-  await editor.locator('[data-tool-source-card]').filter({ hasText: "Smith's Hammer" })
-    .waitFor({ state: 'visible', timeout: 5_000 });
+  // ── THE SYSTEM EDITOR AUTHORS NO IDENTITY, SO IT DRIVES NO ITEM DRAG (issue 1373) ────────
+  // An Item drop target, its copy-uuid action and the sidebar drag that exercised them are GONE
+  // from this walk because they are gone from this screen: a crafting system may not re-point
+  // which world Item a Tool IS. The capability moved whole to the world Tool entry, and the walk
+  // that exercises it belongs on the world screens with it. Recorded here rather than silently
+  // deleted, because the shape of what is missing is the point: this walk must never grow an
+  // identity edit back at system scope. Its hook names are deliberately NOT spelled out here —
+  // the guard that keeps them out reads this file as TEXT, so naming them in prose would trip it.
+  //
+  // The editor opens on `Breakage` — there is no `Overview` tab to click — and the per-system
+  // display-label OVERRIDE it still carries sits at the top of that tab, so the long-name stress
+  // frame needs no navigation of its own.
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
-  await assertSavedToolStudioCapture(editor, 'Overview parity');
-  await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-02-overview-1280x720', wideGeometry);
+  await assertSavedToolStudioCapture(editor, 'Tool rules editor opening');
+  const enabledInSystem = editor.locator('[data-tool-enabled] .manager-status-toggle');
+  await assertPointerTarget(page, enabledInSystem, '[data-tool-enabled]', 'Enabled in system');
   const displayLabel = editor.locator('[data-tool-label]');
   await displayLabel.fill("Masterwork Smith's Hammer with an Exceptionally Long Display Name");
   await resetToolStudioScroll(page);
@@ -6199,10 +6134,47 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await displayLabel.fill("Smith's Hammer");
   await saveToolStudioDraftIfDirty(editor);
 
+  // ── THE INHERIT SWITCH AND THE REMOVE CALLOUT ────────────────────────────────────────────
+  // Both are new controls on this tab and both are POINTER-TESTED rather than pressed, and the
+  // reason is different for each. The inherit switch is a world-scope WRITE that would rewrite
+  // this Tool's breakage to the world default and change every parity frame captured after it;
+  // the remove callout's button DELETES this system's rules record, which would end the walk.
+  // Their behaviour is covered by `tests/components/tool-studio-mounted.test.js`; what only a
+  // real browser can answer is whether they are hit-testable where they are drawn, which is
+  // exactly what these two assertions ask.
+  const breakageInheritToggle = editor.locator('[data-scoped-inherit-toggle="breakage"]');
+  await breakageInheritToggle.waitFor({ state: 'visible', timeout: 5_000 });
+  await assertPointerTarget(
+    page,
+    breakageInheritToggle,
+    '[data-scoped-inherit-toggle="breakage"]',
+    'Tool breakage inherit switch',
+  );
+  if (await editor.locator('[data-tool-rule-card="breakage"][data-tool-rule-state]').count() !== 1) {
+    throw new Error('the Tool breakage section must state exactly one inheritance state');
+  }
+  const removeCallout = editor.locator('[data-tool-remove-from-system]');
+  await scrollToolEditorPanelToReveal(
+    page,
+    editor,
+    '[data-tool-remove-from-system]',
+    'Remove from system',
+  );
+  await assertPointerTarget(
+    page,
+    removeCallout.locator('button'),
+    '[data-tool-remove-from-system] button',
+    'Tool remove from system',
+  );
+  await assertNoScreenshotOverlays(page);
+  await captureToolStudioProduct(page, 'manager-tool-parity-02-remove-1280x720', wideGeometry);
+  await resetToolStudioScroll(page);
+
   const tab = (name) => editor.locator(`#tool-tab-${name}`);
-  for (const name of ['overview', 'breakage', 'requirements', 'validation']) {
+  for (const name of ['breakage', 'requirements', 'validation']) {
     await assertPointerTarget(page, tab(name), `#tool-tab-${name}`, `Tool ${name} tab`);
   }
+  await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 1280px');
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 1280px');
   await assertSavedToolStudioCapture(editor, 'Breakage parity');
   await resetToolStudioScroll(page);

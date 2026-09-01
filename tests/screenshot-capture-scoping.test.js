@@ -57,7 +57,7 @@ const KNOWLEDGE_LABELS = [
 const TOOL_STUDIO_LABELS = [
   'manager-tool-parity-01-library-1280x720',
   'manager-tool-zero-state-empty-library-1280x720',
-  'manager-tool-parity-02-overview-1280x720',
+  'manager-tool-parity-02-remove-1280x720',
   'manager-tool-stress-long-name',
   'manager-tool-parity-03-breakage-1280x720',
   'manager-tool-stress-repair',
@@ -1160,8 +1160,16 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /async function waitForManagerApplicationRendered[\s\S]*?(?=\n\/\*\*\n \* Resize the rendered Crafting System Manager)/,
   )?.[0];
   assert.ok(managerReadiness, 'manager render-readiness helper source was not found');
+  // The three frames that are DELIBERATELY captured scrolled: two stress states that live below
+  // the fold of a populated breakage tab, and — since issue 1373 — the `Stop using this Tool
+  // here` callout, which closes that tab and is the state its frame exists to show.
   const topOfStateLabels = TOOL_STUDIO_LABELS.filter(
-    (candidate) => !['manager-tool-stress-repair', 'manager-tool-stress-replacement'].includes(candidate)
+    (candidate) =>
+      ![
+        'manager-tool-stress-repair',
+        'manager-tool-stress-replacement',
+        'manager-tool-parity-02-remove-1280x720',
+      ].includes(candidate)
   );
   for (const label of topOfStateLabels) {
     assert.match(
@@ -1301,12 +1309,37 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     HARNESS,
     /route transition asks ApplicationV2[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}/,
   );
-  assert.match(
+  // THE SYSTEM WALK MUST NOT AUTHOR IDENTITY (issue 1373). It used to drag a second world Item
+  // onto a `[data-tool-source-card]` drop target on THIS screen, which is a crafting system
+  // re-pointing which world Item a Tool IS — the capability the epic moved to the world Tool
+  // entry. The pin is inverted rather than deleted: the shape of what must not come back is what
+  // this assertion is for, and a deleted assertion states nothing.
+  assert.doesNotMatch(
     toolStudioWalk,
-    /setPosition\([\s\S]*?width: 900[\s\S]*?replacementSourceItem[\s\S]*?sidebar source remains occluded[\s\S]*?\.dragTo\(sourceCard\)[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}[\s\S]*?withSingleToolClipboardWrite\([\s\S]*?fixture\.replacementSourceItemUuid[\s\S]*?copySourceUuid\.click\(\)[\s\S]*?data-tool-editor-back[\s\S]*?data-action="discard"[\s\S]*?Smith's Hammer/,
-    'the second world Item must replace the source through a real sidebar drag, Copy UUID, and UI Discard restore',
+    /data-tool-source-card|data-tool-source-copy-uuid|data-tool-source-unlink|dragTo\(sourceCard\)/,
+    'the SYSTEM Tool walk must not drive an identity edit — that belongs to the world Tool entry',
   );
   assert.doesNotMatch(toolStudioWalk, /new DataTransfer|dispatchEvent\('drop'|data-tool-source-picker|manager-tool-source-replace/);
+  // THE THREE-TAB STRIP AND THE TWO NEW CONTROLS. `#tool-tab-overview` no longer exists, so a
+  // walk still naming it would fail on a missing locator rather than on a wrong screen; the
+  // inherit switch and the remove callout are pointer-tested rather than pressed, because both
+  // WRITE and would rewrite every parity frame captured after them.
+  assert.doesNotMatch(toolStudioWalk, /tool-tab-overview/);
+  assert.match(
+    toolStudioWalk,
+    /for \(const name of \['breakage', 'requirements', 'validation'\]\)/,
+    'the Tool tab strip is Breakage, Requirements and Validation',
+  );
+  assert.match(
+    toolStudioWalk,
+    /assertPointerTarget\(\s*page,\s*breakageInheritToggle,\s*'\[data-scoped-inherit-toggle="breakage"\]'/,
+    'the per-section inherit switch must be proved hit-testable where it is drawn',
+  );
+  assert.match(
+    toolStudioWalk,
+    /scrollToolEditorPanelToReveal\([\s\S]*?data-tool-remove-from-system[\s\S]*?manager-tool-parity-02-remove-1280x720/,
+    'the remove-from-system frame must reveal the callout it exists to show',
+  );
   assert.match(HARNESS, /async function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length !== 0/);
   assert.match(
     HARNESS,
@@ -1376,7 +1409,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   for (const label of [
     'manager-tool-parity-01-library-1280x720',
     'manager-tool-zero-state-empty-library-1280x720',
-    'manager-tool-parity-02-overview-1280x720',
+    'manager-tool-parity-02-remove-1280x720',
     'manager-tool-parity-03-breakage-1280x720',
     'manager-tool-parity-04-requirements-1280x720',
     'manager-tool-parity-05-validation-1280x720',

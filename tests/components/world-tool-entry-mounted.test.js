@@ -71,6 +71,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
+    // `ToolRequirementsTab` draws each of its two sections as a `ToolInheritCard` now (issue
+    // 1373), so the card and the shared inherit row it wraps are in this tree's static graph.
+    // At WORLD scope the card renders no switch at all — there is no parent to inherit from —
+    // but it is still the component that draws the section, and a rendered `.svelte` the
+    // harness omits HANGS this suite rather than failing it.
+    'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
+    'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',

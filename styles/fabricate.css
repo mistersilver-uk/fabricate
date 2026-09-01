@@ -17973,7 +17973,7 @@
 }
 
 .fabricate-manager .manager-tool-source-picker,
-.fabricate-manager .manager-tool-overview-fields > label,
+.fabricate-manager .manager-tool-system-label > label,
 .fabricate-manager .manager-tool-editor-card > label,
 .fabricate-manager .manager-tool-editor-card fieldset > label {
   display: flex;
@@ -18204,7 +18204,6 @@
 }
 
 .fabricate-manager .manager-tool-overview-source,
-.fabricate-manager .manager-tool-breakage-method,
 .fabricate-manager .manager-tool-on-break,
 .fabricate-manager .manager-tool-requirements-section {
   display: flex;
@@ -18219,18 +18218,318 @@
    heading scale, and keeps its remaining rules in its own scoped block (issue 881). Its
    `li button` rules went with it — nothing has rendered a button in that list. */
 
-.fabricate-manager .manager-tool-overview-fields {
+/* ── THE SYSTEM-SCOPE BAND AND THE RULE CARDS (issue 1373) ─────────────────────────────────
+   The Tool rules editor's `Overview` tab is gone (identity is world scope's), and the two
+   controls a crafting system genuinely authors that are not rules — its enable switch and its
+   display-label override — open the `Breakage` tab as a band instead. The design draws the
+   enable card with no glyph column, unlike every other `ToggleCard` site, so the shared card's
+   icon cell is collapsed HERE rather than by teaching the primitive a variant. */
+.fabricate-manager .manager-tool-system-scope {
   display: grid;
   gap: var(--fab-space-3);
+  min-width: 0;
 }
 
-.fabricate-manager .manager-tool-overview-enabled {
-  display: block;
-}
-
-.fabricate-manager .manager-tool-overview-enabled > .manager-recipe-status-card {
+.fabricate-manager .manager-tool-system-enabled > .manager-recipe-status-card {
   width: 100%;
   box-sizing: border-box;
+}
+
+.fabricate-manager .manager-tool-system-enabled .manager-recipe-status-icon {
+  display: none;
+}
+
+.fabricate-manager .manager-tool-system-label {
+  display: grid;
+  gap: var(--fab-space-1);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 10px;
+  background: var(--fab-bg-1);
+}
+
+/* One behaviour section, as a bordered and filled card with its content inset — the design's
+   own shape for all four of them (`ToolInheritCard`). */
+.fabricate-manager .manager-tool-rule-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 10px;
+  background: var(--fab-bg-1);
+}
+
+/* THE HEAD IS THE GRID AND `InheritRow` IS `display: contents` INSIDE IT.
+   Svelte stamps its scoping hash only on the elements a component itself writes, so a scoped
+   rule in `ToolInheritCard` cannot reach `InheritRow`'s three children at all — which is why
+   this lives in the host sheet. Dissolving the row lets its head (the `World default: …` line)
+   and its switch become grid items here, so the switch sits centred against BOTH copy lines at
+   the card's right edge, exactly as the design draws it, instead of stacking under them. */
+.fabricate-manager .manager-tool-rule-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--fab-space-2xs) var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-3);
+}
+
+.fabricate-manager .manager-tool-rule-card-head > .manager-scoped-inherit-row {
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+  display: contents;
+}
+
+.fabricate-manager .manager-tool-rule-card-title,
+.fabricate-manager .manager-tool-rule-card-head .manager-scoped-inherit-head,
+.fabricate-manager .manager-tool-rule-card-sub {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tool-rule-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  grid-row: 1;
+}
+
+.fabricate-manager .manager-tool-rule-card-title h3 {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fab-font-serif);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-tool-rule-card-title h3 > i {
+  margin-right: var(--fab-space-2);
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-tool-rule-card-sub {
+  grid-row: 2;
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.fabricate-manager .manager-tool-rule-card-head .manager-scoped-inherit-head {
+  grid-row: 2;
+}
+
+.fabricate-manager .manager-tool-rule-card-head .manager-scoped-inherit-label {
+  color: var(--fab-text-muted);
+  font-size: 0.68rem;
+  font-weight: 400;
+}
+
+.fabricate-manager .manager-tool-rule-card-head .manager-status-toggle {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
+}
+
+.fabricate-manager .manager-tool-rule-card-inherited,
+.fabricate-manager .manager-tool-rule-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: 0 var(--fab-space-3) var(--fab-space-3);
+}
+
+/* A HAIRLINE UNDER THE HEAD, on the OVERRIDDEN face only. The inheriting face's body is a single
+   bordered fact row with its own edge, so a rule above it would draw a line the design does not
+   have; the overridden face opens with the section's own controls, and on Requirements those
+   start with a labelled switch that read as a SECOND card head without one. */
+.fabricate-manager .manager-tool-rule-card-body {
+  padding-top: var(--fab-space-3);
+  border-top: 1px solid var(--fab-border);
+}
+
+/* A heading INSIDE a card is subordinate to the card's own. Without this the Requirements body's
+   `Require prerequisites` matched the card title it sits under, at the same size and family, and
+   the two switches an inch apart read as two heads rather than a head and a control. */
+.fabricate-manager .manager-tool-rule-card-body h3 {
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+/* The remove-from-system callout that closes the Breakage tab. Same three-column geometry as
+   the breakage-mode row above it, so the tab opens and closes on the same shape. */
+.fabricate-manager .manager-tool-remove-callout {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-danger-border);
+  border-radius: 10px;
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-tool-remove-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--fab-surface-active);
+  color: var(--fab-danger-text);
+}
+
+.fabricate-manager .manager-tool-remove-copy {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tool-remove-copy h3 {
+  margin: 0;
+  font-family: var(--fab-font-serif);
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
+.fabricate-manager .manager-tool-remove-copy p {
+  margin: var(--fab-space-1) 0 0;
+  color: var(--fab-text-muted);
+  font-size: 0.64rem;
+  line-height: 1.25;
+}
+
+/* ── THE RAIL'S THREE OWN REGIONS ──────────────────────────────────────────────────────────
+   `HOW PLAYERS SEE IT`, `PREVIEW AS` and `REQUIRED FOR` render through the shared preview
+   shell's trailing snippet, so they are flex children of `.manager-tool-preview` and inherit
+   its column gap. */
+.fabricate-manager .manager-tool-player-card {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: var(--fab-space-2) var(--fab-space-3);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tool-player-tile {
+  position: relative;
+  display: block;
+  width: 110px;
+  height: 110px;
+  border: 1px solid var(--fab-border);
+  border-radius: 10px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-tool-player-tile.is-broken {
+  opacity: 0.55;
+}
+
+.fabricate-manager .manager-tool-player-tile > img {
+  width: 100%;
+  height: 100%;
+  border-radius: 9px;
+  object-fit: contain;
+}
+
+.fabricate-manager .manager-tool-player-quantity {
+  position: absolute;
+  top: var(--fab-space-1);
+  right: var(--fab-space-1);
+  padding: 1px var(--fab-space-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  background: var(--fab-bg-0);
+  color: var(--fab-text-muted);
+  font-size: 0.58rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-tool-player-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tool-player-copy p {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.64rem;
+  line-height: 1.3;
+}
+
+.fabricate-manager .manager-tool-player-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+  color: var(--fab-text);
+  font-size: 0.66rem;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-tool-player-name {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--fab-text);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-tool-actor-preview,
+.fabricate-manager .manager-tool-required-for {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-tool-actor-select {
+  width: 100%;
+  min-width: 0;
+
+  /* 34, not 32: the published control-height ladder retires 32, and 34 is what every other
+     bare field in this editor already stands at. */
+  height: 34px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  box-sizing: border-box;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+  font-size: 0.68rem;
+}
+
+.fabricate-manager .manager-tool-required-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager .manager-tool-required-row > i {
+  justify-self: center;
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-tool-required-row > strong {
+  min-width: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-item-drop-zone {
@@ -18395,7 +18694,6 @@
 }
 
 .fabricate-manager .manager-tool-authority-readonly h3,
-.fabricate-manager .manager-tool-section-heading h3,
 .fabricate-manager .manager-tool-requirements-section h3,
 .fabricate-manager .manager-tool-validation h3 {
   margin: 0;
@@ -18404,7 +18702,6 @@
 }
 
 .fabricate-manager .manager-tool-authority-readonly p,
-.fabricate-manager .manager-tool-section-heading p,
 .fabricate-manager .manager-tool-requirements-section p {
   margin: var(--fab-space-1) 0 0;
   color: var(--fab-text-muted);
@@ -18430,20 +18727,6 @@
   height: 34px;
   border-radius: 8px;
   background: var(--fab-surface-active);
-  color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-tool-section-heading {
-  display: block;
-}
-
-.fabricate-manager .manager-tool-section-heading h3 {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-tool-section-heading h3 > i {
   color: var(--fab-accent);
 }
 
@@ -18516,7 +18799,6 @@
    still carries the sibling formula TEXT input, which is not a stepper and must keep this
    rule. Note that dropping the `manager-recipe-name-input` class does not help here — the
    rule keys on `.manager-recipe-field input`, not on that class. */
-.fabricate-manager .manager-tool-breakage-method > .manager-recipe-field input:not(.fab-stepper-input),
 .fabricate-manager .manager-tool-inline-fields .manager-recipe-field input:not(.fab-stepper-input) {
   width: 100%;
   min-width: 0;
@@ -18529,30 +18811,13 @@
   background: var(--fab-bg-1);
 }
 
+/* The on-break fieldset no longer draws its own rule or heading: it is the body of the
+   `When it breaks` card, which carries both. Its `<legend>` went with the `Always fires`
+   badge the design uses that slot for the inheritance pill instead (issue 1373). */
 .fabricate-manager .manager-tool-on-break {
   margin: 0;
-  padding: var(--fab-space-4) 0 0;
-  border: 0;
-  border-top: 1px solid var(--fab-border);
-}
-
-.fabricate-manager .manager-tool-on-break > legend {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
   padding: 0;
-  font-family: var(--fab-font-serif);
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.fabricate-manager .manager-tool-on-break > legend small {
-  padding: var(--fab-space-2xs) var(--fab-space-chip);
-  border-radius: 999px;
-  background: var(--fab-surface-active);
-  color: var(--fab-text-muted);
-  font-family: var(--font-primary);
-  font-size: 0.58rem;
+  border: 0;
 }
 
 .fabricate-manager .manager-tool-on-break > p {

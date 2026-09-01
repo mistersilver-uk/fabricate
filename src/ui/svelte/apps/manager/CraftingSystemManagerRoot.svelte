@@ -553,7 +553,9 @@
   // User-facing failure text for the gathering-event editor, rendered by the header toolbar
   // beside Save (issue 919).
   let gatheringEventSaveError = $state('');
-  let toolEditorActiveTab = $state('overview');
+  // `breakage`, because the system Tool rules editor has no Overview tab: identity is world
+  // scope's, and `ToolEditorTabs` records why (issue 1373).
+  let toolEditorActiveTab = $state('breakage');
   let toolValidationFocusNonce = $state(0);
 
   // Per-check unified trigger block (issue 419), carried on every check draft so
@@ -8260,7 +8262,7 @@
   }
 
   function enterToolEditor() {
-    toolEditorActiveTab = 'overview';
+    toolEditorActiveTab = 'breakage';
     activeView = 'tool-edit';
   }
 
@@ -8319,14 +8321,51 @@
     return saved;
   }
 
-  async function deleteSelectedLibraryTool() {
-    if (!focusedToolDraft) return false;
-    const confirmed = await services?.confirmDeleteTool?.({ tool: focusedToolDraft });
-    if (confirmed !== true) return false;
-    const deleted = await store?.deleteToolDraft?.();
-    if (deleted !== true) return false;
+  /**
+   * STOP USING THE FOCUSED TOOL IN THE SELECTED SYSTEM (issue 1373).
+   *
+   * THE REPLACEMENT FOR THE EDITOR'S `Delete`, and a different action rather than a renamed one.
+   * `Delete` destroyed the crafting system's Tool record and nothing else, under a label that
+   * read as though it destroyed the Tool; the design puts `Delete` on the world entry, which is
+   * the record that word describes, and gives system scope this — the rules in ONE system, with
+   * the world Tool and every other system untouched. The store owns both halves of that.
+   *
+   * @returns {Promise<boolean>}
+   */
+  async function removeFocusedToolFromSystem() {
+    const toolId = String(focusedToolDraft?.id || '');
+    if (!toolId || !selectedSystemId) return false;
+    // NO `confirmDeleteTool` DIALOG, and that is not an omission. The control is an
+    // `ArmedDangerButton`: it already takes two deliberate presses, and the callout it sits in
+    // states the whole consequence in a sentence. `confirmDeleteTool` also asks `Delete <name>?`
+    // over a `Delete` button, which is the WORLD action's wording and the exact confusion this
+    // callout replaced. The service stays for the world Tool entry, which is where a real
+    // deletion is authored.
+    const removed = await store?.removeToolFromSystem?.(toolId, selectedSystemId);
+    if (removed !== true) return false;
     activeView = 'tools';
     return true;
+  }
+
+  /**
+   * Move ONE of the focused Tool's world-default sections between inheriting and overriding.
+   *
+   * Refused for an unpersisted draft on the same rule the enable switch already applies: both
+   * write the LIVE record, and there is no live record to write until the draft has been saved
+   * once.
+   *
+   * @param {string} section
+   * @param {boolean} inherit
+   * @returns {Promise<boolean>}
+   */
+  async function setFocusedToolSectionInherited(section, inherit) {
+    if (!focusedToolDraft?.id || $viewState.toolDraftBaseline === null) return false;
+    return store?.setToolSectionInherited?.(
+      focusedToolDraft.id,
+      section,
+      inherit,
+      selectedSystemId
+    );
   }
 
   function activateGatheringParent() {
@@ -11886,12 +11925,14 @@
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
         prerequisiteOptions={selectedCharacterPrerequisites}
+        actorOptions={$viewState.actorOptions || []}
+        getActorRollData={(uuid) => store.getActorRollData?.(uuid)}
+        requiredFor={$viewState.toolRequiredFor?.[focusedToolDraft.id] || []}
         authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
         onOpenSystems={selectSystemAndShowBrowser}
         onOpenSystem={() => editSystem(selectedSystem.id)}
         onOpenTools={backToToolsBrowser}
         onBack={backToToolsBrowser}
-        onDelete={deleteSelectedLibraryTool}
         onSave={saveSelectedToolDraft}
         onTabChange={(tab) => {
           toolEditorActiveTab = tab;
@@ -11899,6 +11940,8 @@
         onPatch={(patch) => store.patchToolDraft?.(patch)}
         onToggleEnabled={toggleFocusedToolEnabled}
         onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}
+        onToggleInherited={setFocusedToolSectionInherited}
+        onRemoveFromSystem={removeFocusedToolFromSystem}
       />
     {:else if currentView === 'essences' && selectedSystem}
       <EssenceBrowserView

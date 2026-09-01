@@ -1241,6 +1241,10 @@ It owns the sole system-breakage-authority card above search, with self-describi
 The center library accepts an Item drop to create a Tool, rejects non-Items, snapshots source name/image/description, and uses durable Tool identity rather than name matching.
 Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state.
 The right inspector presents the selected Tool's identity and description followed by four headed card sections for breakage mode, on-break action, character prerequisites, and check bonus.
+The Tool editor's own rail states five regions in a fixed order: how the Tool behaves, its effective rules, how players see one copy of it, a per-actor preview, and what requires it in this system.
+The player region shows the Tool's art, its remaining-uses pill and a preview-only `Show as broken` switch whose sentence states what the authored on-break action does to a character's copy; nothing about that switch is stored.
+The per-actor preview evaluates the Tool's selected character prerequisites against a chosen actor's prepared roll data through the same AND-semantics helper the crafting engine gates on, and states the gate mode's consequence — unusable, or usable with the check bonus withheld.
+The required-for region lists this system's recipes and gathering tasks that reference the Tool, each with its kind, and states its empty case rather than rendering an empty region.
 The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
 Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
 When Tools exist and the current selection is absent or stale, the library selects the first Tool exactly once; a valid current selection is preserved and an empty library emits no selection.
@@ -1251,14 +1255,20 @@ Selection, Edit, and enabled toggle are distinct localized named hit targets.
 Activating Edit or the toggle does not select or open through the row handler.
 The enabled toggle persists live through the same immediate path as Recipe enabling, updating both the focused draft and its baseline without marking an otherwise-clean editor dirty; a newly-created, not-yet-persisted Tool cannot be enabled through this path.
 
-The editor uses `210px | 1fr | 320px` and exposes exactly four tabs: Overview, Breakage, Requirements, and Validation.
-The header alone owns Back, Delete, Save, and the dirty-state affordance; there is no footer save bar.
-The body includes a live behavior preview, while the inspector summarizes identity, linkage, usage, and validation context.
+The editor uses `210px | 1fr | 320px` and exposes exactly three tabs: Breakage, Requirements, and Validation.
+It authors a crafting system's RULES for a Tool and never that Tool's identity, so it has no Overview tab: the linked Item, the shared display name, the art and the description are the world Tool's, and its header states that in one sentence — `Rules in {system} · identity comes from the world Tool`.
+The header owns Back to Tool Rules, a World Tool route to the world record, Save rules, and the dirty-state affordance; there is no footer save bar and no bare `Delete`.
+The World Tool route renders only when the world catalogue actually holds a record for the Tool, because a pre-migration in-system Tool has no world half to open.
+The body includes a live behavior preview, while the inspector summarizes identity, effective rules, the player-facing copy, a per-actor preview, and what requires the Tool in this system.
 
-Overview uses the Recipe Studio tab, field, and enabled-card primitives.
-Source name and description are read-only snapshots, while the display label alone is editable.
-A linked source exposes Copy source UUID immediately before Unlink, never renders the raw UUID or a replacement picker, and accepts replacement only through a persistent drag-only drop-zone card with visible instructions and no button role, tabindex, or keyboard-operability claim.
-The persistent behavior inspector explains source Items, recipe requirements, salvage use, character prerequisites, check bonuses, and breakage on every editor tab, followed by a localized link to the published Tools documentation.
+Breakage opens with the two per-system facts that are not rules — `Enabled in {system}` and the per-system display-label OVERRIDE — and closes with `Stop using this Tool here`.
+The label field states that it overrides the world Tool name in this crafting system only and that blank falls back to it.
+The removal callout names the consequence in full — the rules in this system go, the world Tool and every other system are untouched — and its control is the shared armed destructive button rather than a second confirmation dialog.
+Removal is TWO writes and both are required: the in-system record is deleted, because while `## CraftingSystem` requirement 36 holds it is the row the read union answers with, and the world membership record and its overrides go with it.
+
+Each of the four world-default sections — `breakage`, `onBreak`, `prerequisites` and `bonus` — is drawn as a bordered card whose head states the section, whether this system INHERITS the world Tool's answer or OVERRIDES it, what the world's answer is, and the shared scoped inherit switch that moves between the two.
+While a section inherits, the card renders the world value read-only rather than disabled controls, and flipping the switch to inheriting also writes the world default onto the in-system record — without that second write the pill would claim a resolution the resolver does not produce, because requirement 36 keeps the in-system record authoritative.
+A Tool the world catalogue has no record of renders no switch, no pill and no removal callout: there is no parent to inherit from and no membership to remove.
 Disabled preview rules are titled `No prerequisites to use` and `No check bonus`.
 Breakage authors the retained `limitedUses`, `breakageChance`, or `diceExpression` tool-specific configuration, the separate check-driven Breakable/Immune state (`checkBreakable`), and the `destroy`, `flagBroken`, or `replaceWith` action.
 Percentage authoring uses the shared synchronized number-and-range slider primitive also used by Gathering drop chances; Tool breakage supplies its own accessible labels and continuously interpolates across a green, yellow, amber, then red risk scale as the chance increases.
@@ -1271,7 +1281,9 @@ The Tool Studio does not create or edit direct Item targets; legacy direct Item 
 Requirements selects ids from the WORLD character-prerequisite library (issue 1308), the `bonus | usability` gate mode, and the enabled numeric bonus expression without embedding prerequisite definitions in the Tool.
 Its empty state SHALL say the library is empty for the WORLD rather than for this system, and a Tool save SHALL preserve the selected ids: `upsertTool` derives the same Valid Id Basis `_normalizeSystem` does, so a save on a world whose library cannot be vouched for prunes nothing rather than silently clearing the gate.
 The bonus expression input visually supplies a leading `@` for roll-data paths, stores that sigil exactly once, provides explanatory hint text, and does not offer game-system-specific preset values.
-Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Source, Breakage, and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
+Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Breakage and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
+It carries NO identity check: a missing game-world Item is the world Tool's defect and no control on this screen can clear it, so it is stated as a routed notice naming the world Tool and it never counts toward the blocking total or the tab badge.
+The domain still refuses the save, and the notice says so rather than implying the record can be saved as it stands.
 
 Leaving a dirty `tool-edit` route through Back, rail or breadcrumb navigation, a system-scope change, another Tool selection, or application close invokes the standard DialogV2 Save / Discard / Keep editing guard.
 Save proceeds only after successful validation and persistence.
@@ -1280,7 +1292,8 @@ The Validation tab projects domain failures onto stable localized categories and
 Save, delete, and enabled-toggle failures likewise emit only their localized operation-specific message; raw caught errors may remain internal state for control flow but never become notification copy.
 Discard restores the baseline before navigation, while Keep editing preserves the draft and focus.
 Re-entering the same Tool does not prompt.
-Delete uses a separate destructive DialogV2 confirmation; cancellation preserves the draft, and successful deletion returns to the library without a second dirty prompt.
+Stopping use of the Tool in this system is armed at its own control rather than confirmed by a separate DialogV2; successful removal returns to the library without a second dirty prompt.
+`Delete`, which destroys the Tool itself, belongs to the world Tool entry.
 
 Tabs expose `tablist`, `tab`, and `tabpanel` relationships with selected/error state that is not color-only.
 Item creation/drop targets and every icon-only unlink, remove, and menu control have button semantics and localized accessible names.
@@ -1288,7 +1301,7 @@ The Tool editor's sole identity/action header spans the complete Tool shell abov
 Tool routes suppress the generic system status ribbon, generic edit heading, rail scope card, and rail-collapse control so they do not precede the Tool content.
 At product-root widths of `832px` and wider, the library preserves `210px | minmax(0, 1fr) | 340px` and the editor preserves `210px | minmax(0, 1fr) | 320px`; center workspace and inspector own vertical scrolling with `min-width: 0` and `min-height: 0`.
 Only below `832px` do rail, main, and inspector stack in reading order with max-content rows, the body becoming the single vertical scroller while the bounded rail remains independently scrollable and main/inspector overflow becomes visible.
-At `680px` and below, header actions and tab/action clusters wrap without overlap, and Back, Delete, Save, validation state, replacement controls, and repair-row actions remain visible and reachable.
+At `680px` and below, header actions and tab/action clusters wrap without overlap, and Back, World Tool, Save, validation state, replacement controls, and repair-row actions remain visible and reachable.
 
 ### Recipes Tab
 

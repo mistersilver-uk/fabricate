@@ -305,7 +305,11 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolOverviewTab.svelte');
+  // The rules editor's inherit/override card and the system-scope band that opens its Breakage
+  // tab (issue 1373). `ToolOverviewTab` went with the Overview tab they replaced: identity is
+  // world scope's, so the SYSTEM editor has no tab for it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte');
@@ -2315,6 +2319,34 @@ function createStore(calls = [], options = {}) {
         },
       },
     },
+    // THE WORLD SCOPE PROJECTION, seeded from the same tool roster (issue 1373). The rules
+    // editor reads its `(tool, system)` row for the ONE fact the system's own record cannot
+    // state - whether each world-default section is inherited or overridden - and reads
+    // `member` to decide whether to offer the inherit switches and the removal callout at all.
+    // Every seeded row is a MIGRATED one: `migrateToolRequirementSections` writes all four
+    // sections overridden, so that is the state every existing world is actually in.
+    worldScope: {
+      tool: {
+        entities: (options.gatheringLibraryTools || []).map((tool) => ({ id: tool.id })),
+        entries: (options.gatheringLibraryTools || []).map((tool) => ({
+          id: tool.id,
+          defaults: options.worldToolDefaults?.[tool.id] ?? null,
+          systems: [
+            {
+              systemId: 'alchemy',
+              member: options.worldToolMember !== false,
+              enabled: true,
+              inherited: options.worldToolInherit?.[tool.id] ?? {
+                breakage: false,
+                onBreak: false,
+                prerequisites: false,
+                bonus: false,
+              },
+            },
+          ],
+        })),
+      },
+    },
     // Participation is the SELECTED SYSTEM's answer; the reveal/visibility pair beside it is
     // the world's (issue 1282).
     gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
@@ -3206,6 +3238,24 @@ function createStore(calls = [], options = {}) {
         toolDraftDirty: false,
       }));
       return options.deleteToolDraftResult ?? true;
+    },
+    // THE TWO IMMEDIATE-PERSISTENCE WRITES THE RULES EDITOR PERFORMS (issue 1373): stop using a
+    // Tool in this system, and move one world-default section between inheriting and overriding.
+    // Both are the store's because both are TWO writes — a world membership record and the
+    // in-system record — and the editor must not perform half of either.
+    removeToolFromSystem: (...args) => {
+      calls.push(['removeToolFromSystem', ...args]);
+      viewState.update((state) => ({
+        ...state,
+        toolDraft: null,
+        toolDraftBaseline: null,
+        toolDraftDirty: false,
+      }));
+      return options.removeToolFromSystemResult ?? true;
+    },
+    setToolSectionInherited: (...args) => {
+      calls.push(['setToolSectionInherited', ...args]);
+      return true;
     },
     enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
     addToolFromUuidToDraft: (...args) => {
@@ -19890,7 +19940,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(calls.some((call) => call[0] === 'openToolDraft' && call[1] === 'tool-catalyst'));
   });
 
-  it('opens the focused Tool editor with header-only actions, four tabs, and preview', async () => {
+  it('opens the focused Tool editor with header-only actions, three tabs, and preview', async () => {
     const calls = await mountToolRoute();
     await openFixtureToolEditor(calls);
 
@@ -19944,9 +19994,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'the manager shell must not restore its generic Tool subtitle above the editor'
     );
-    assert.equal(editor.querySelectorAll('[role="tab"]').length, 4);
+    // THREE TABS AND NO `Delete` (issue 1373). Identity is world scope's, so the system editor
+    // has no Overview tab to put it on; and a bare `Delete` on a screen whose subject is one
+    // world Tool adopted by many crafting systems names no scope, so system scope gets the
+    // explained `Stop using this Tool here` callout at the foot of Breakage instead.
+    assert.equal(editor.querySelectorAll('[role="tab"]').length, 3);
     assert.ok(editor.querySelector('[data-tool-editor-back]'));
-    assert.ok(editor.querySelector('[data-tool-editor-delete]'));
+    assert.ok(!editor.querySelector('[data-tool-editor-delete]'));
     assert.ok(editor.querySelector('[data-tool-editor-save]'));
     assert.ok(editor.querySelector('[data-tool-behavior-preview]'));
     assert.equal(editor.querySelector('footer'), null);
@@ -20120,19 +20174,31 @@ describe('CraftingSystemManager mounted behavior', () => {
         .startsWith('Validation'),
       true
     );
-    const firstFailure = target.querySelector('[data-tool-validation-check="source"]');
-    assert.match(firstFailure.textContent, /Link an Item or managed Component/);
+    // THE IDENTITY FAILURE IS A ROUTED NOTICE, NOT A CHECK ROW (issue 1373). `Item source is
+    // required` is the world Tool's defect: this screen cannot link an Item, so asking it to
+    // clear a `LINKED ITEM` check was asking it to repair someone else's record. It states the
+    // fact and names where it is fixed, and it does not count toward the blocking total.
+    assert.ok(!target.querySelector('[data-tool-validation-check="source"]'), 'no identity check');
+    assert.match(
+      target.querySelector('[data-tool-identity-notice]').textContent,
+      /Its identity is set on the world Tool, not here/
+    );
     assert.equal(
       target.querySelector('[data-editor-validation-count="blocking"]').textContent,
-      '1'
+      '0'
     );
   });
 
-  it('uses a separate destructive confirmation and returns to the library without a dirty prompt', async () => {
+  it('arms its own removal, takes no second dialog, and returns to the library unprompted', async () => {
+    // THE CONFIRMATION IS THE CONTROL, NOT A DIALOG (issue 1373). This route's destructive action
+    // used to be a header `Delete` behind `confirmDeleteTool`, whose dialog asks `Delete <name>?`
+    // over a `Delete` button — the WORLD action's wording, on the screen that cannot perform it.
+    // What system scope does is stop using the Tool here, and the callout that does it is an
+    // `ArmedDangerButton`: two deliberate presses, with the whole consequence stated beside them.
     const calls = await mountToolRoute({
       services: {
         confirmDeleteTool: () => {
-          calls.push(['confirmDeleteTool']);
+          calls.push(['unexpectedDeleteDialog']);
           return true;
         },
         confirmDirtyToolsNavigation: () => {
@@ -20142,14 +20208,36 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     await openFixtureToolEditor(calls);
-    target.querySelector('[data-tool-editor-delete]').click();
+
+    const remove = target.querySelector('[data-tool-remove-from-system] button');
+    assert.ok(Boolean(remove), 'the Breakage tab closes with the removal callout');
+    remove.click();
+    await tick();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'removeToolFromSystem'),
+      false,
+      'arming must not remove'
+    );
+
+    target.querySelector('[data-tool-remove-from-system] button').click();
     await Promise.resolve();
     await Promise.resolve();
     await tick();
     flushSync();
 
-    assert.ok(calls.some((call) => call[0] === 'confirmDeleteTool'));
-    assert.ok(calls.some((call) => call[0] === 'deleteToolDraft'));
+    assert.ok(
+      calls.some(
+        (call) =>
+          call[0] === 'removeToolFromSystem' && call[1] === 'tool-catalyst' && call[2] === 'alchemy'
+      ),
+      'and confirming removes THIS Tool from THIS system'
+    );
+    assert.equal(
+      calls.some((call) => call[0] === 'unexpectedDeleteDialog'),
+      false,
+      'without a second confirmation the armed control already gave'
+    );
     assert.equal(
       calls.some((call) => call[0] === 'unexpectedDirtyPrompt'),
       false

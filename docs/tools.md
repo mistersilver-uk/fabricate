@@ -45,17 +45,19 @@ Unlinking the Item preserves the draft, but the Tool cannot be saved until it ha
 
 ## Edit a Tool
 
-The editor has four tabs:
+The editor has three tabs:
 
-- **Overview** controls the linked Item, display label, and enabled state.
-- **Breakage** controls wear, check-driven immunity, on-break behavior, replacement, and repair materials.
+- **Breakage** controls whether this system is enabled for the Tool, its display label here, wear, check-driven immunity, on-break behavior, replacement, and repair materials.
 - **Requirements** controls shared character prerequisites and the Tool check bonus.
 - **Validation** lists every issue that blocks saving.
 
-{% include screenshot.html case="manager-tool-parity-02-overview-1280x720" caption="The overview tab of the Tool editor." %}
+A Tool's identity — the linked Item, its art and its description — is not editable here.
+It belongs to the world Tool, which the header's **World Tool** button opens.
+
+Each behavior section states whether this system **inherits** the world Tool's answer or **overrides** it, and the switch at the card's right edge moves between the two.
+While a section inherits, the card shows the world value and the controls are not offered; turning the switch off opens them on that value.
 
 The behavior preview summarizes the draft while you work.
-Its **How Tools work in Fabricate** card remains available on every tab.
 The **Unsaved** state appears after a change.
 Leaving the editor with unsaved changes offers **Save**, **Discard**, and **Keep editing**.
 

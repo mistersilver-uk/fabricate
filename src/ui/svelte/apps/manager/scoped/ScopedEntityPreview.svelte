@@ -40,6 +40,14 @@
    - rules: `{id, icon, title, subtitle, titleAttr}[]`, rendered through the shared
      `IconFactRow`; `ruleHookAttribute` names the per-row `data-*` carrying the rule id.
    - explainer: the shared `ExplainerCard`'s props, or `null`.
+   - children: a TRAILING snippet, rendered last inside the aside. It exists because a caller
+     may own regions this shell does not model - the Tool rules editor's player tile, actor
+     preview and required-for list are three of them - and those regions belong INSIDE the
+     rail, which is a grid item with its own scroll box, border and background. Rendered as
+     siblings of the aside they would be siblings of that grid item instead, and the rail
+     would stop being one column. `ScopedValidationTab` already takes a trailing snippet for
+     the same reason, so this is the shell family's existing answer rather than a new one.
+     Absent by default, so every existing caller renders the identical DOM it always did.
 -->
 <script>
   import Chip from '../Chip.svelte';
@@ -61,6 +69,7 @@
     rules = [],
     ruleHookAttribute = '',
     explainer = null,
+    children,
   } = $props();
 
   const asideAttributes = $derived(hookAttribute ? { [hookAttribute]: hookValue } : {});
@@ -126,4 +135,5 @@
       dataAttr={explainer.dataAttr}
     />
   {/if}
+  {@render children?.()}
 </aside>
