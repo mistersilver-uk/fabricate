@@ -59,6 +59,11 @@ const SHELL_MODULES = [
   // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
+  // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
+  // it arrives through `EntityListInspectorFrame` and through `Pagination`, both of which
+  // converted to it, so it is a TRANSITIVE dependency of the shell rather than a new control
+  // on these screens. Listed before `Pagination.svelte` for that reason.
+  'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
