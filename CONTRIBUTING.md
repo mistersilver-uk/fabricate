@@ -82,7 +82,8 @@ Which route you take depends on what is currently soaking in early access.
 - If a version **carrying features** is soaking, promoting it early would ship those features, so the hotfix is cut on its own line from the public tag, carries only the fix, and goes straight to public through its own channel — the soaking version and any unreleased `main` work stay behind.
 - If a **patch** is soaking, it carries only fixes by construction, so you promote it first and cut a further hotfix on top only if one is still needed.
 
-A hotfix line accepts fixes only, is never offered to the private cohorts (its own channel keeps no cohort), and is brought back into the release line and then `main` by cherry-pick so neither loses the fix.
+A hotfix line accepts fixes only, is never offered to the private cohorts (its own channel keeps no cohort), and is brought back into the release line and then `main` so neither loses the fix.
+That bring-back into `release` must itself be a reviewed pull request based on `release`, because the forward-port that carries it onward has no other evidence of its provenance and will otherwise refuse it.
 Nothing becomes publicly obtainable until the promotion completes — the **Promotion-gated public availability** requirement.
 
 ### The three-channel flow
@@ -102,7 +103,7 @@ flowchart LR
 ### The hotfix path
 
 A hotfix is cut from the public tag onto its own line, carries only the fix, and is promoted straight to public through its own cohort-less channel.
-Neither the soaking early-access version nor unreleased `main` work is dragged in; the fix returns to the release line and `main` by cherry-pick.
+Neither the soaking early-access version nor unreleased `main` work is dragged in; the fix returns to the release line through a reviewed pull request based on `release`, and to `main` by the automation's forward-port.
 
 ```mermaid
 flowchart TD
@@ -111,7 +112,7 @@ flowchart TD
   hc -->|"release promotion (source is the hotfix line)"| pubnew["public v1.4.1 + registry"]
   soak["early-access 1.5.0-beta.N soaking (private)"] -. "NOT dragged in" .-> hl
   work["unreleased main feature work"] -. "NOT dragged in" .-> hl
-  hl -->|"cherry-pick back"| release2["release"]
+  hl -->|"reviewed PR based on release"| release2["release"]
   release2 -->|"forward-port"| main2["main"]
 ```
 
@@ -596,10 +597,10 @@ resolution modes, the visibility modes it does not visit, Foundry's light applic
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
 `scripts/README.md`, not by a per-case comment.
-As of this writing the registry holds 248 cases: 146 `exact`, 3 `window`, 99 `beyond`.
+As of this writing the registry holds 269 cases: 150 `exact`, 3 `window`, 116 `beyond`.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
-By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, plus the light-theme pair — which is 36 of the 248 publishable cases.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, plus the light-theme pair — which is 42 of the 269 publishable cases.
 A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
 It deliberately does not re-photograph every state of every screen: a state is evidence about the files that draw it, those files select it themselves, and 247 frames on every lab-infrastructure PR was a twenty-five minute job producing a wall nobody read.
 A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.
@@ -923,15 +924,98 @@ Tee to a path outside `test-results/` if you need a copy.
 
 ### Documentation screenshot source
 
-The docs increasingly use real Foundry screenshots for each stage of gathering setup and play.
-The source of truth is the local `full` smoke profile, not hand-captured one-off browser images.
-Run `npm run test:foundry` locally, then copy only curated frames from `test-results/screenshot-*.png` into `docs/img/screenshots/` with durable names.
-Do not link docs directly to `test-results/`; that directory is transient and is wiped at the start of the next smoke run.
+A new or replaced screenshot on the documentation site is generated from a named View Lab case.
+Nothing on the site is hand-captured from a browser any more, because a curated frame has no producer and goes stale with nothing to say so.
 
-The reduced `rc`/`ci` smoke profiles intentionally do not regenerate this whole docs source set; local `full` runs provide documentation evidence.
-Only copy a frame into `docs/img/screenshots/` when an authored docs page references it.
-`tests/docs-screenshots.test.js` fails on any committed screenshot that is not referenced from a docs page, so a frame that was deliberately dropped from the docs cannot quietly creep back in from a later smoke run.
-If you remove a screenshot from a page, delete the `.webp` too (and vice versa).
+A page declares an image slot by naming a case id.
+The generator fills the slot, and both halves are gated, so neither can move without the other.
+
+```sh
+node scripts/docs-screenshots.mjs plan   # what a run would rewrite, without starting a browser
+npm run docs:screenshots                 # render, encode what changed, update the map
+npm run docs:screenshots:check           # re-render, and compare every committed frame against it
+```
+
+Three files make up the mechanism.
+
+- `docs/_data/screenshots.json` is the committed map.
+  It carries a provenance header and one entry per case, each with the alternative text the site publishes and the SHA-256 of the source frame the committed image was encoded from.
+  That digest is provenance and only provenance: it records WHICH render produced the committed asset, and it moves only when a frame is actually rewritten.
+  Nothing re-derives it, and nothing can.
+  The renderer is not byte-deterministic, so a fresh render of the same case yields a different source PNG and therefore a different digest while showing the identical view.
+  `docs:screenshots:check` compares pixels, not digests.
+  `tests/docs-screenshot-map.test.js` checks the digest's shape and uniqueness, which is all that can be checked without rendering.
+  The asset path is derived from the case id and never stored, so there is only ever one name for a frame.
+- `docs/_includes/screenshot.html` is the slot.
+  Write `{% raw %}{% include screenshot.html case="manager-recipe-edit-normal" %}{% endraw %}` on a page, optionally with `alt` to override the map's text or `caption` to add a visible one.
+- `docs/img/screenshots/lab/` holds the generated images, one per mapped case.
+
+The generated set has a directory of its own, and that is load-bearing rather than tidiness.
+`docs/img/screenshots/` still holds a hand-curated frame that predates the generator, five case ids share the `fabricate-` prefix with it, and mixed together the only available test for "did the generator produce this" would be "is it in the map".
+That reduces the reverse gate to the map restating itself.
+`tests/docs-screenshots.test.js` owns the flat directory and `tests/docs-screenshot-map.test.js` owns `lab/`, and each says in its own comments which facts keep them apart.
+
+What is left of that pre-existing population stays exactly as it is.
+It remains valid documentation evidence and is not migrated, because retiring evidence that is still accurate buys nothing.
+The rule applies to a new or replaced screenshot.
+The population is also closed and may only shrink, and `tests/docs-screenshots.test.js` now enumerates what is in it and why no view case can reach it, so adding to it is a visible act rather than a silent one.
+
+`npm run docs:screenshots` rewrites only the frames whose view actually moved, and reports which ones it left alone.
+Run it after any change that alters one of the mapped views, and read what it reports before committing.
+Then run `npm run docs:screenshots:check` to confirm every committed frame still matches a fresh render.
+Both verbs decide with the same comparison, so a `check` failure means the same thing a `generate` rewrite would have.
+
+That comparison is perceptual rather than byte-equal, and the reason is measured rather than assumed.
+This renderer is not byte-deterministic: two clean renders of the identical set of mapped cases differ in a handful of frames, and the differing set moves between runs rather than settling, so it is per-run timing and not a property of any case.
+Byte equality would therefore report roughly a tenth of the set as changed on every run forever, which is the churn the selective rewrite exists to prevent.
+
+So a frame is compared like this.
+The fresh render is encoded with the same `cwebp` settings the committed asset uses, and the two WebP files are compared byte for byte.
+Identical means unchanged, and that is the fast path.
+Only on a mismatch are both decoded with `dwebp -ppm` and compared pixel by pixel.
+Comparing WebP against WebP keeps both sides under identical encoder treatment, so nothing but a genuine render difference survives.
+Comparing a fresh PNG against the committed WebP would fold the encoder's own preprocessing into every measurement.
+
+The tolerance has two rules, because a difference can be loud or it can be broad, and this renderer's noise is neither.
+
+The first rule is amplitude, and it was derived from the measurement rather than chosen.
+Four full renders of the forty-six mapped cases give six pairings, which is 276 frame comparisons.
+Nineteen of those frame pairs differed at all.
+The worst carried 2116 differing pixels, and the largest per-channel difference any pair reached anywhere was sixteen levels, on three pixels.
+Not one noise pixel reached twenty-four, so the budget is zero: one pixel differing by twenty-four levels or more is a changed view.
+The other side was measured the same way.
+Changing one character of one recipe name in the View Lab world fixture, between two letters of equal advance width so nothing reflowed, put forty-seven pixels past twenty-four levels in the smallest of the three places that name appears on screen, reaching sixty levels.
+So the threshold sits eight levels above a noise population that never reaches it and well below the weakest real signal, and every scrap of margin the rule has is in amplitude rather than in a pixel budget.
+
+The second rule is area: more than five percent of a frame differing at all, at any amplitude, is a changed view.
+Amplitude alone cannot see a shallow change that covers a lot of frame, and that is not a hypothetical shape.
+Lightening every pixel of a real committed frame by twenty-three levels puts no pixel past twenty-four, and was reported unchanged.
+That is a Fabricate colour token changing across a panel, which is the sort of change documentation exists to show.
+The worst noise measured touched 2116 pixels of a 1280x860 frame, which is 0.19% of it, so five percent sits about twenty-six times above the measurement.
+
+What still passes is a difference under twenty-four levels on every pixel AND under five percent of the frame: a subtle recolour of something small.
+That is the residual cost of a tolerance wide enough to absorb this renderer's jitter at all.
+The cost runs the other way too.
+A libwebp release that changes `-near_lossless` preprocessing would move many pixels a little, trip the area rule, and rewrite the set once with no visual change to review.
+
+`tests/docs-screenshot-frames.test.js` holds every one of these numbers against committed fixtures, and its header records where they came from and which of them are synthesized.
+Do not widen any of them without repeating that measurement.
+A tolerance that cannot separate renderer jitter from a changed character is not a tolerance, it is a blindfold.
+
+Generation fails closed.
+Without the harvested Foundry chrome it aborts naming the harvest command, and without `cwebp` and `dwebp` on `PATH` it aborts naming libwebp.
+The decoder is required even by a run that encodes nothing, because without it the only available comparison is byte equality.
+This renderer's own jitter fails byte equality.
+A case the renderer failed on this run is refused even when an earlier run left a frame for it on disk, because the renderer accumulates output and republishing that frame would ship an older commit's picture as current documentation.
+A run whose renderer died before it produced anything is refused whole, on the modification time of the manifest rather than on its contents: the renderer writes that file last, so a throw before its render loop leaves an earlier run's manifest in place, and every frame in it agrees with its own recorded head by construction.
+Without that, a `check` could report that every committed frame matches a fresh render having rendered nothing.
+A run that refused any case leaves the provenance header alone, because stamping it would certify frames that run never rendered.
+
+There is no CI job that regenerates any of this.
+Generation needs the harvested chrome, which never leaves your machine, so CI builds and deploys what is committed.
+
+A Foundry chrome rotation or a Playwright resolution change rewrites the whole set with no visual change to review.
+The map's provenance header makes that identifiable, and such a rewrite lands as its own commit, separate from any content change.
 
 ## UI PR screenshot evidence
 
@@ -1145,23 +1229,94 @@ Every step after the skip notice is gated so it evaluates false when `enabled` i
 
 A dispatched forward-port defaults to `dry_run: true` (it is a hand-run lever pointed at `main`); a called one defaults to `false` (its caller states its intent).
 
-#### The content gate — a runbook, not a flag
+#### The content gate — a verification, not a question
 
-After the merge, `git diff --stat origin/main` must be **empty**, and the job **fails** when it is not.
-Today the merge is content-empty by construction: `release` carries only `--no-ff` merges of beta tags that `promote-to-early-access.yml` already proved were ancestors of `origin/main`, and `release.config.js` loads no `@semantic-release/git` plugin, so nothing else is ever committed to `release`.
-A failure therefore means something changed that assumption — a stray direct commit on `release`, or a newly added plugin that commits back — and this push bypasses branch protection, so it would be an **unreviewed code path onto the default branch**.
+The gate used to print the diff and ask a human to "confirm that every file listed above was authored through a reviewed pull request", then re-run with `allow_content: true`.
+That was an unverified human assertion, and it was the exception to this repository's own standard — `scripts/lib/promoteGuards.js` insists enforcement "MUST be a verification performed by the promotion, never an assumption".
+It also rested on a premise a hotfix falsifies by definition: `release` is **not** content-empty by construction once a fix has landed on it, and shipping v1.9.1 and v1.9.2 produced both of that premise's failure modes on the same day.
 
-What the check is: read the printed diff and **confirm that every file in it was authored through a reviewed pull request**.
-That is the whole check; it is not "does this look harmless".
+The gate now establishes the answer itself.
+`scripts/forward-port-content-gate.sh` owns it, and both call sites invoke that one script: the first-pass gate step, and the push retry, which re-performs the merge against a freshly fetched `main` and is therefore a second merge no gate has otherwise seen.
+It runs four checks, in this order.
 
-How to recover, from a promotion:
+**First, git must be able to answer the question.**
+The predicate below needs `git merge-tree --write-tree`, which arrived in git 2.38, so the gate asserts that version and refuses if it is not met.
+There is deliberately no fallback: the obvious one is the predicate described immediately below, which answers a different question.
 
-1. Dispatch `.github/workflows/forward-port.yml` manually with `allow_content: true` (and `dry_run: false`) once you have confirmed the content.
-2. Re-run the promotion.
-It will then take the already-forward-ported no-op.
+**Second, the forward-port's own merge must introduce nothing.**
+Its two parents are re-merged with `git merge-tree --write-tree`, and the resulting tree must be *identical* to the tree the merge recorded.
+Equal means the merge is precisely what an unattended three-way merge of its parents produces, so it invented nothing; unequal means it carries something neither parent has, and the refusal prints exactly that difference.
+A re-merge that *conflicts* is also a refusal — the recorded merge necessarily embeds a human resolution — and so is a parent count other than two, because there is then no two-parent re-merge to compare against.
+A HEAD that is not a merge at all is **not** a refusal: on the retry path `git merge --no-ff` reports "Already up to date." and creates no commit, and failing a run for having had nothing to do would be a non-overridable jam.
+This is the only check that looks at the merge the ruleset-bypassing push actually lands, and `allow_content` does **not** override it: an operator can only vouch for content that exists somewhere to be reviewed, and content invented by a conflict resolution exists nowhere else.
+
+**Why not the combined diff.**
+This check was originally `git diff-tree --cc -r --no-commit-id --name-only HEAD` being empty, and that command cannot express the question.
+`--name-only` follows the `-c` *file* selection — "files modified from all parents" — and `--cc`'s hunk compression only ever affects *patch* output, so it never reaches the name list.
+A clean auto-merge in which one file took hunks from both sides, and a genuine evil merge of the same two parents, print exactly the same thing.
+Of the last 38 merges reachable from `origin/main`, five have a non-empty combined diff and every one of them invented nothing — two on `CHANGELOG.md`, which is the release path itself.
+Since "both lines touched a common file" is the ordinary reason a forward-port exists at all, that predicate refused the routine case, non-overridably, on a branch that forbids landing the merge by pull request.
+
+**Third, the fast path.**
+`git diff --stat origin/main` empty means the merge carries no file content onto `main`, so no unreviewed content can reach it and no API call is made.
+The routine forward-port is unchanged and free.
+
+**Fourth, change provenance.**
+Otherwise the script collects the range `origin/main..origin/release` (never `origin/main..HEAD` — by then `HEAD` is the bot's own merge commit, which comes from no pull request, so including it would guarantee a refusal), the per-commit merge-content verdicts, and each commit's associated pull requests, and hands them to `scripts/forward-port-provenance.mjs`.
+The evidence loop is driven by the same commit listing the verifier is given, so the set of commits decided and the set collected cannot diverge.
+The API read authenticates as the App installation token, never `GITHUB_TOKEN`; the job holds only `contents: read`.
+A commit is accounted for when either rule holds:
+
+- **pull-request authored** — associated with a **merged** pull request whose base is `release`.
+Merged-ness is read from `merged_at`, because the REST payload carries no `merged` boolean and reports `state: "closed"` for a merged pull request and an abandoned one alike.
+Being reviewed against a *different* line does not count: that review was never a review for landing on this one.
+- **content-free merge** — two parents whose re-merge reproduces the merge's own tree exactly, so it introduces nothing beyond what its parents already carry.
+This rule is a requirement rather than a loophole: `promote-to-early-access.yml` merges each beta tag into `release` with `--no-ff` under the App token, and that merge is associated with no pull request at all, so a gate demanding one would red every routine release.
+A merge that fails this rule is not refused outright — a merge commit closing a reviewed pull request based on `release` *was* reviewed, its resolution included — so it falls to the rule above, and a refusal then names both halves of why it was not accounted for.
+
+Anything else is refused by sha, with its subject, its author, and which rule it failed.
+
+Every unverifiable state — an unreadable evidence file, an API error, a rate limit, a page that may be truncated, an association naming another repository, a range above 200 commits, a `per_page` above the 100 GitHub honours, a git too old for the predicate — exits 2 and refuses, because an absence of evidence is not an absence of unreviewed content.
+`allow_content` does **not** apply to any of them, and the override hint is not printed under them either: there is no established refusal to vouch for, and telling a reader to override a state that established nothing is how an absence of evidence gets accepted as an absence of unreviewed content.
+The first-run failure most likely to reach this branch is the release-bot App installation missing **Pull requests: Read**, which is a 403 and a configuration fault no retry fixes.
+
+**Known limitation.**
+The rule catches content introduced by a *resolution*.
+It does not catch an additive semantic duplicate: two sides independently adding the same test in different places merge cleanly, the re-merge reproduces the tree exactly, and every hunk is attributable to one parent.
+That is the v1.9.1 shape, and it is handled by the process rule below rather than by the gate.
+
+**Land on `release` first; never squash onto `main` first.**
+When a release-line fix reaches `main` first as a squash, identical content carries a different SHA, the forward-port's `git merge origin/release` conflicts, and the auto-resolution can silently duplicate whole hunks — which is exactly what happened in v1.9.1 and needed a hand-resolved repair PR.
+Land the fix on `release` through its own reviewed pull request and let the forward-port carry it to `main`.
+
+**When the gate refuses.**
+Read the named commits.
+The ordinary remedy is to give them the provenance they lack — open a pull request **based on `release`** carrying that content and merge it with a merge commit — and then re-run the forward-port, which will pass without any override.
+`allow_content: true` survives as a last-resort override on `forward-port.yml`'s own dispatch, and it still prints the refusal it overrode; it is not the ordinary path, and it applies only to a refusal — never to a run that could not complete its verification.
+From a promotion, that means dispatching `.github/workflows/forward-port.yml` manually (with `dry_run: false`) and then re-running the promotion, which then takes the already-forward-ported no-op.
 
 `allow_content` is settable only on `forward-port.yml`'s own dispatch, and deliberately so: `promote-to-public.yml`'s inputs are `version` / `source_channel` / `dry_run` only, and it will not grow a content override.
 That is the same composition the `override_hint` inputs carry into the failure message, so the message and this manual never disagree.
+
+#### The `release` branch ruleset
+
+The gate above establishes that content reaching `main` was reviewed.
+The ruleset is what makes that establishable at all: `release` carried **zero** rules until this was added, so a fix could be — and was — pushed straight to it, and nothing recorded that it had ever been reviewed.
+
+The ruleset targets `refs/heads/release` with `enforcement: active` and the rules `pull_request`, `required_status_checks`, `non_fast_forward` and `deletion`.
+It deliberately does **not** use `required_linear_history`: that forbids the merge-commit shape a hotfix bring-back needs.
+Merge-method availability is a repository-wide setting rather than a per-branch rule, so "merge commit, never squash" is a process rule here, not an enforced one.
+
+**The App bypass is mandatory.**
+`promote-to-early-access.yml` pushes to `release` directly with the release-bot App token, and its own comment anticipates this: "It is the ruleset bypass actor, so a future ruleset on `release` still lets it push."
+Without a `bypass_actors` entry naming that App installation with `bypass_mode: always`, the next prerelease promotion jams.
+The bypass opens no hole: that same workflow already refuses a beta tag whose commit is not an ancestor of `origin/main`, so everything it carries was reviewed on `main` first.
+
+**Preconditions, in order.**
+Confirm the App holds **Pull requests: Read** (the content gate's association read returns 403 without it, and the gate then fails closed), and confirm the `bypass_actors` entry is present, *before* setting `enforcement: active`.
+
+**Rollback.**
+`gh api --method DELETE repos/mistersilver-uk/fabricate/rulesets/<release-ruleset-id>`.
 
 #### What a change landing on the release line may reference
 
@@ -1409,10 +1564,11 @@ This is defense-in-depth: semantic-release also refuses the collision (`EINVALID
 2. Land **`fix:` commits only**; a `feat:` hard-fails with `EINVALIDNEXTVERSION`, the guard rail that keeps feature work off the line.
 3. `release.yml` mints the draft release and publishes the hotfix's own channel (`1.4.x`), never `early-access`.
 4. Promote it with `promote-to-public.yml`, passing `source_channel: 1.4.x`.
-5. **Cherry-pick** the fix into `release`; the automation's forward-port then carries it on to `main`.
+5. Bring the fix back into `release` through a **reviewed pull request based on `release`**, merged with a **merge commit** (never a squash); the automation's forward-port then carries it on to `main`.
 6. Delete the hotfix branch once the fix has landed in `release`.
 
-**Never merge `release` or `main` into a hotfix line** — it fails with `EINVALIDMAINTENANCEMERGE`, and a fix leaves a hotfix line by cherry-pick only.
+**Never merge `release` or `main` into a hotfix line** — it fails with `EINVALIDMAINTENANCEMERGE`.
+A fix leaves a hotfix line by cherry-pick onto a branch that is then reviewed into `release`, never by merging a line back into it.
 
 ### Running the release script locally
 
