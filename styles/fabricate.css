@@ -22041,23 +22041,24 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-travel-scope-note {
-  margin: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border-radius: 8px;
-  background: var(--fab-surface-soft);
-  color: var(--fab-text-muted);
-  font-size: 13px;
-}
-
 /* Travel > Parties accordion list (styled after the gathering tools browser). */
 
-/* Travel > Regions accordion list — mirrors the Parties list mechanics. */
+/* Travel > Regions accordion list — mirrors the Parties list mechanics.
+   The card chrome below used to live in a second, later `.manager-travel-realms` rule
+   shared with four classes of a retired combined Travel view. Those four are gone, so the
+   two rules are merged here; the later block's `gap` and `display` already won the
+   cascade, and they are the values kept. */
 .fabricate-manager .manager-travel-realms {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: var(--fab-space-3);
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  background: var(--fab-surface);
   min-width: 0;
 }
 
@@ -22708,176 +22709,11 @@
   justify-content: center;
 }
 
-.fabricate-manager .manager-travel-error {
-  margin: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border-radius: 8px;
-  border: 1px solid var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
-  font-size: 13px;
-}
-
-.fabricate-manager .manager-travel-field-error {
-  margin: 0 0 var(--fab-space-1) 0;
-  color: var(--fab-danger-text);
-  font-size: 12px;
-}
-
-.fabricate-manager .manager-travel-layout {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-3);
-  align-items: flex-start;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-travel-party-list {
-  flex: 1 1 240px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-travel-party-list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-travel-party-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-manager .manager-travel-party-row {
-  box-sizing: border-box;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: var(--fab-space-1);
-  height: auto;
-  min-height: 48px;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-surface);
-  color: var(--fab-text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-travel-party-row:hover {
-  background: var(--fab-surface-raised);
-}
-
-.fabricate-manager .manager-travel-party-row.is-active {
-  border-color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-}
-
-.fabricate-manager .manager-travel-party-name {
-  font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.fabricate-manager .manager-travel-party-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-manager .manager-travel-panel {
-  flex: 2 1 360px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-travel-party-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-travel-rename {
-  flex: 1 1 200px;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-travel-enable {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-manager .manager-travel-hint {
-  margin: 0;
-  color: var(--fab-text-muted);
-  font-size: 12px;
-}
-
-.fabricate-manager .manager-travel-members,
-.fabricate-manager .manager-travel-actor,
-.fabricate-manager .manager-travel-override,
-.fabricate-manager .manager-travel-stale,
-.fabricate-manager .manager-travel-realms {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-surface);
-  min-width: 0;
-}
-
 .fabricate-manager .manager-card-subtitle {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--fab-text);
-}
-
-.fabricate-manager .manager-travel-member-list,
-.fabricate-manager .manager-travel-stale-list,
-.fabricate-manager .manager-travel-realm-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-manager .manager-travel-member-row,
-.fabricate-manager .manager-travel-actor-row,
-.fabricate-manager .manager-travel-stale-row,
-.fabricate-manager .manager-travel-realm-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-travel-member-row.is-stale .manager-travel-member-name,
-.fabricate-manager .manager-travel-member-name.is-stale {
-  color: var(--fab-text-muted);
-  font-style: italic;
 }
 
 .fabricate-manager .manager-travel-portrait {
@@ -22900,7 +22736,6 @@
   object-fit: cover;
 }
 
-.fabricate-manager .manager-travel-member-name,
 .fabricate-manager .manager-travel-option-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -23060,258 +22895,6 @@
 
 .fabricate-manager .manager-travel-option:hover {
   background: var(--fab-surface-raised);
-}
-
-.fabricate-manager .manager-travel-realm-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-travel-realm-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-1);
-  height: auto;
-  min-height: 28px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 999px;
-  background: var(--fab-surface);
-  color: var(--fab-text);
-  cursor: pointer;
-  white-space: normal;
-}
-
-.fabricate-manager .manager-travel-realm-chip.is-selected {
-  border-color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-  color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-travel-realm-chip-flag {
-  font-size: 11px;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-manager .manager-travel-override-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-travel-checklist {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-surface);
-}
-
-.fabricate-manager .manager-travel-checklist-steps {
-  margin: 0;
-  padding-left: var(--fab-space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  color: var(--fab-text);
-}
-
-.fabricate-manager .manager-travel-realms-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--fab-space-2);
-  height: auto;
-  min-height: 32px;
-  padding: var(--fab-space-1) var(--fab-space-2);
-  border: none;
-  background: transparent;
-  color: var(--fab-text);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-travel-status-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: auto;
-  min-height: 28px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 999px;
-  background: var(--fab-surface);
-  color: var(--fab-text);
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-travel-status-toggle.is-on {
-  border-color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-  color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-travel-status-toggle.is-off {
-  color: var(--fab-text-muted);
-}
-
-.fabricate-manager .manager-travel-status-toggle:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-.fabricate-manager .manager-travel-realm-create {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-  align-items: center;
-}
-
-.fabricate-manager .manager-travel-realm-create-input,
-.fabricate-manager .manager-travel-realm-name {
-  flex: 1 1 160px;
-  min-width: 0;
-}
-
-/* Region authoring: list + detail layout. Wraps to a single column at narrow
-   widths so the detail pane never overflows the Travel surface. */
-.fabricate-manager .manager-travel-realms-title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  font-weight: 600;
-  color: var(--fab-text);
-}
-
-.fabricate-manager .manager-travel-realm-layout {
-  display: grid;
-  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
-  gap: var(--fab-space-3);
-  align-items: start;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-travel-realm-select {
-  flex: 1 1 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  height: auto;
-  min-height: 32px;
-  padding: var(--fab-space-1) var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-surface);
-  color: var(--fab-text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-travel-realm-select.is-selected {
-  border-color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-  color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-travel-realm-select-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-travel-realm-secret-flag {
-  flex: 0 0 auto;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-manager .manager-travel-realm-detail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-surface-raised);
-}
-
-.fabricate-manager .manager-travel-realm-detail-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--fab-space-3);
-}
-
-.fabricate-manager .manager-travel-realm-image {
-  flex: 0 0 auto;
-  position: relative;
-  width: 56px;
-  height: 56px;
-  padding: 0;
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--fab-surface);
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-travel-realm-image img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-travel-realm-image i {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  font-size: 10px;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-manager .manager-travel-realm-detail-toggles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-travel-realm-description {
-  min-height: 60px;
-  resize: vertical;
-}
-
-.fabricate-manager .manager-travel-realm-biomes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-@media (max-width: 720px) {
-  .fabricate-manager .manager-travel-realm-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.fabricate-manager .manager-travel-evidence-source {
-  margin: 0;
-  font-weight: 600;
-}
-
-.fabricate-manager .manager-travel-evidence-realms {
-  list-style: none;
-  margin: var(--fab-space-1) 0 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
 }
 
 /* ==========================================
