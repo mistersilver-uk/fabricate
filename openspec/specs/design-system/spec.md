@@ -47,6 +47,36 @@ A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or wi
 - **THEN** it is recorded in the ruled-out register with the composition that replaces it
 - **AND** it does not enter the set
 
+### Requirement: A shared primitive's class family is rooted at the primitive, not at an app
+
+A primitive is shared by being importable, and it is USABLE only where the rules that paint it match.
+A class family gated on an application root therefore yields a primitive that renders correctly on one screen and entirely unstyled on every other, and a portalled panel reaches for a host that does not exist outside that root at all.
+So no rule on a class a shared primitive WRITES may be rooted at an application root, and a family that still is is NOT adoptable outside that root until it is re-rooted.
+This is the same defect the area-scoped property rule below describes, arriving through a selector rather than through a custom property, and it fails the same way: silently, on the caller, with the owning screen still correct.
+
+The root cannot simply be DELETED, and that is the part a reader will otherwise get wrong.
+`styles/fabricate.css` is loaded page-wide into the Foundry document, so every selector in it must begin with `.fabricate` or it bleeds into other modules' sheets.
+The replacement is therefore a `.fabricate-*` root that the PRIMITIVE ITSELF emits — one class on its own root element, and a second on any panel it portals out of that element, because a portalled node keeps its classes and loses its ancestors.
+Choosing an existing app root, or a second ancestor picked for reach, is the same defect under a new name and MUST NOT be used.
+
+Re-rooting this way is specificity-neutral by construction: one class replaces one class at the same position in the sheet, so nothing in the owning screen's cascade moves.
+A rule whose ancestor chain names a CALLER's own container is exempt and stays where it is, because it can only ever match inside that caller's app and is reachable there whatever the primitive does.
+
+`SearchablePopover` satisfies this requirement, emitting `fabricate-picker` and `fabricate-picker-popover`.
+`tests/components/searchable-popover-area-scope.test.js` derives the class set from the component's own markup and fails when a rule the primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
+
+#### Scenario: A primitive is adopted by a second application
+
+- **WHEN** a surface outside a primitive's original app imports that primitive
+- **THEN** the primitive paints there without the caller restating its rules
+- **AND** every rule it owns is rooted at a namespace class the primitive emits
+
+#### Scenario: A family is still rooted at one app
+
+- **WHEN** a caller outside that root proposes to adopt the primitive
+- **THEN** the family is re-rooted first, in its own change
+- **AND** the adoption is not landed on top of a family that only paints on one screen
+
 ### Requirement: Token foundations are the only source of colour, space and elevation
 
 Every colour, spacing value and shadow MUST come from a `--fab-*` token.
