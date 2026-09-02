@@ -9589,6 +9589,30 @@
   padding: var(--fab-space-4);
 }
 
+/* THE PANE OWNS NO INSET WHERE THE PAGE DRAWS ITS OWN SIDEBAR (issue 1373, maintainer round 4).
+
+   A world route releases the shared `.manager-inspector` column above and the page draws its own
+   sidebar INSIDE `.manager-main` instead. The group's `--fab-space-4` then insets that sidebar
+   too, so it floated: a gap above it, a gap below it and a strip of pane between its right edge
+   and the window, where the system scope's aside is a `.manager-body` grid cell that reaches all
+   three. A GM crossing from Tool Rules to the Tools Catalogue met the same column built two ways.
+
+   The inset does not disappear, it MOVES to the content beside the sidebar, which is exactly
+   where the system scope keeps it — `[data-manager-view="tools"] .manager-main` insets the pane
+   and the aside bleeds past it. The three catalogue routes take it on the shared frame's list
+   column (`EntityListInspectorFrame.svelte`); `world-tool-entry` already carries its own 24px
+   tab-strip and body gutters, so it needs nothing added.
+
+   `world-component-entry`, `world-essence-entry` and `world-vocabulary` are deliberately NOT in
+   this list: they draw no sidebar of their own and their internal gutters have not been checked,
+   so they keep the group's inset until their own screens are reviewed. */
+.fabricate-manager[data-manager-view="world-components"] .manager-main,
+.fabricate-manager[data-manager-view="world-essences"] .manager-main,
+.fabricate-manager[data-manager-view="world-tools"] .manager-main,
+.fabricate-manager[data-manager-view="world-tool-entry"] .manager-main {
+  padding: 0;
+}
+
 /* The scoped-entity preview shell's DEFAULT class stem (issue 1362).
 
    `ScopedEntityPreview` takes its stem as a prop so a converted site keeps the rules that

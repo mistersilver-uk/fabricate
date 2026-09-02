@@ -1349,18 +1349,32 @@
     min-height: 0;
   }
 
-  /* 300px, matching the shared aside this column stands in for, so a GM sees ONE inspector width
-     across both scopes rather than learning a second one per screen. */
+  /* 340px AND NO COLUMN GAP, matching the shared aside this column stands in for, so a GM sees
+     ONE inspector across both scopes rather than learning a second one per screen.
+
+     It said 300px on the same argument and the argument outlived the number: the system Tool
+     Rules route moved its own track to 340 in this epic's parity round
+     (`[data-manager-view="tools"] .manager-body`), so the two scopes' asides drifted 40px apart
+     while this comment still claimed they matched. The gap goes with it — the shared aside is a
+     `.manager-body` grid cell with no gutter, so its `border-left` IS the column divider, and a
+     12px gutter here left ours reading as a floating hairline instead. */
   .manager-scoped-list-layout.has-inspector {
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    column-gap: 0;
   }
 
+  /* THE CONTENT CARRIES THE PANE'S INSET, BECAUSE THE SIDEBAR MUST NOT (issue 1373, round 4).
+     The world catalogue routes drop `.manager-main`'s `--fab-space-4` so the aside beside this
+     column can reach the pane's top, bottom and right edges the way the system scope's aside
+     does. The inset moves here rather than disappearing, which is the same division the system
+     scope already makes: pane insets the content, aside bleeds past it. */
   .manager-scoped-list-column {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
     min-width: 0;
     min-height: 0;
+    padding: var(--fab-space-4);
   }
 
   /* THE ROWS TAKE THE SLACK AND THE CHROME DOES NOT. Without the explicit pair the column hands
@@ -1642,14 +1656,29 @@
      the pane, which is the divergence that made it read as a different screen in the first
      place. The `padding-inline-start` is what now separates the column from the list, since
      there is no border to do it. */
+  /* THE SAME ASIDE AS THE SYSTEM SCOPE, IN FILL, EDGE AND INSET (issue 1373, maintainer round 4).
+
+     This column stands in for the shared `.manager-inspector`, which the world routes release
+     from the body grid, so it has to answer that aside's three surface facts and not invent its
+     own: a `border-left` hairline (the shared rule, `styles/fabricate.css`), `--fab-bg-1` — one
+     rung above the pane, which is `proto:2548` and what the tools route already takes — and a
+     `--fab-space-4` inset on all four sides. It drew `--fab-bg-0` flat against the pane with no
+     edge and an asymmetric inset that left no right-hand margin at all, so a GM crossing from
+     Tool Rules to the Tools Catalogue met a differently-built column stating the same thing.
+
+     AUTHORED HERE AND NOT IN THE SHEET, and that is mechanical rather than stylistic:
+     `styles/fabricate.css` is imported at `layer(modules)` and a Svelte scoped block is injected
+     unlayered, so a sheet rule for a property this block declares matches, out-specifies, and is
+     discarded — silently, with no failing gate. See `tests/view-lab/cascade.css`. */
   .manager-scoped-list-inspector {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
     min-width: 0;
     min-height: 0;
-    padding: var(--fab-space-2) 0 var(--fab-space-3) var(--fab-space-3);
-    background: var(--fab-bg-0);
+    padding: var(--fab-space-4);
+    border-left: 1px solid var(--fab-border);
+    background: var(--fab-bg-1);
   }
 
   .manager-scoped-list-inspector-scroll {

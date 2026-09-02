@@ -63,8 +63,18 @@ const THRESHOLD_PX = Number(
 );
 /** The manager rail's width, which `main` does not get. */
 const RAIL_PX = 220;
-/** The inspector column's declared width, matching the shared aside it stands in for. */
-const INSPECTOR_PX = 300;
+/**
+ * The inspector column's declared width, matching the shared aside it stands in for.
+ *
+ * READ FROM THE FRAME, like the threshold above it, because the hardcoded copy is what let this
+ * drift: the constant said 300 while the system scope's aside moved to 340 (issue 1373's parity
+ * round), so the two scopes' inspectors were 40px apart and this test asserted the gap was right.
+ */
+const INSPECTOR_PX = Number(
+  /\.manager-scoped-list-layout\.has-inspector\s*\{[^}]*?minmax\(0,\s*1fr\)\s+(\d+)px/s.exec(
+    readFileSync(resolve(repoRoot, FRAME), 'utf8')
+  )?.[1]
+);
 /** Sub-pixel tolerance; every defect this catches moves an edge by hundreds of pixels. */
 const EPSILON_PX = 1;
 /**
@@ -534,9 +544,15 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       const layout = document.querySelector('.manager-scoped-list-layout');
       const callout = document.querySelector('[data-scoped-list-state="unavailable"]');
       if (!layout || !callout) return { rendered: false };
+      // The CONTENT box, not the border box. The list column carries the pane's inset now
+      // (issue 1373 round 4 - `.manager-main` dropped it so the aside beside this column can
+      // bleed), so a child that fills its parent stops one inset short of the border edge. The
+      // void this asserts against is an inspector TRACK, which is an order of magnitude larger.
+      const column = document.querySelector('.manager-scoped-list-column');
+      const inset = column ? parseFloat(getComputedStyle(column).paddingRight) || 0 : 0;
       return {
         rendered: true,
-        layoutRight: layout.getBoundingClientRect().right,
+        layoutRight: layout.getBoundingClientRect().right - inset,
         calloutRight: callout.getBoundingClientRect().right,
         columns: getComputedStyle(layout).gridTemplateColumns,
       };
@@ -572,7 +588,11 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       return {
         rendered: true,
         hasPagination: Boolean(pagination),
-        columnBottom: column.getBoundingClientRect().bottom,
+        // The CONTENT box: the column carries the pane's inset (see the unavailable measurement
+        // above), so its border-box bottom sits one inset below anything filling it.
+        columnBottom:
+          column.getBoundingClientRect().bottom -
+          (parseFloat(getComputedStyle(column).paddingBottom) || 0),
         rowsBottom: rowsRegion.getBoundingClientRect().bottom,
         paginationBottom: pagination ? pagination.getBoundingClientRect().bottom : 0,
         paginationHeight: pagination ? pagination.getBoundingClientRect().height : 0,
