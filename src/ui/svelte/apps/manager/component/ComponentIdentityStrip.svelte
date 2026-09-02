@@ -47,7 +47,7 @@
   import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { dragDrop } from '../../../actions/dragDrop.js';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import ActionMenu from '../../../components/ActionMenu.svelte';
 
   let {
     component = null,
@@ -107,7 +107,15 @@
   // a kebab is for. Open-sheet stays on the source NAME, where it is today and where
   // the prototype renders it: it is the common action, and burying it would trade a
   // real affordance for an unprecedented one.
-  const overflowOptions = $derived([
+  //
+  // These are COMMANDS, and until issue 1477 they were announced as a LISTBOX OF OPTIONS.
+  // The comment that used to sit on the control below called `SearchablePopover` "the house
+  // action-menu vehicle"; it is the house SELECTION vehicle, and it renders `role="listbox"` of
+  // `role="option"` rows under an `aria-haspopup="dialog"` trigger. So "Unlink Source Item" —
+  // which restamps the durable roles map and commits immediately — was announced as something a
+  // screen-reader user could SELECT rather than something they could RUN, and `aria-selected`
+  // was meaningful on it. `ActionMenu` is the vehicle that owns this meaning.
+  const overflowItems = $derived([
     {
       id: 'copy-source',
       label: text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID'),
@@ -239,28 +247,25 @@
       {/if}
 
       {#if showOverflow}
-        <!-- SearchablePopover is the house action-menu vehicle and is PORTALED to the
-             `.fabricate-manager` host, so it escapes the panel's `overflow: hidden`. A
-             naive absolutely-positioned menu clips inside a scrolling column — which is
-             exactly what decision 4's single-column editor creates. -->
-        <SearchablePopover
-          options={overflowOptions}
-          showSearch={false}
-          showChevron={false}
+        <!-- The shared overflow ACTION MENU (issue 1477). It is PORTALED to the nearest
+             application root, so it escapes the panel's `overflow: hidden` — a naive
+             absolutely-positioned menu clips inside a scrolling column, which is exactly what
+             decision 4's single-column editor creates. That reason is unchanged; what changed is
+             the widget. The trigger announces `aria-haspopup="menu"` over a `role="menu"` of
+             `role="menuitem"` commands, and nothing here carries `aria-selected` any more.
+
+             `triggerClass` names only the bespoke class: `<ActionMenu>`'s trigger IS an
+             `<IconButton>`, which writes `manager-icon-button` itself, so the rendered class
+             attribute is byte-identical to the one this site used to hand to the picker — and
+             this file stops being the one recorded exception in
+             `tests/icon-button-source-contract.test.js` that could not converge. -->
+        <ActionMenu
+          items={overflowItems}
           disabled={saving}
-          triggerClass="manager-icon-button manager-component-overflow-trigger"
-          triggerIcon="fas fa-ellipsis-vertical"
+          triggerClass="manager-component-overflow-trigger"
           triggerTitle={text('FABRICATE.Admin.Manager.Component.SourceActions', 'Source actions')}
-          triggerAriaLabel={text(
-            'FABRICATE.Admin.Manager.Component.SourceActions',
-            'Source actions'
-          )}
-          dialogAriaLabel={text(
-            'FABRICATE.Admin.Manager.Component.SourceActions',
-            'Source actions'
-          )}
-          popoverClass="manager-component-overflow-popover"
-          onChoose={chooseOverflow}
+          triggerLabel={text('FABRICATE.Admin.Manager.Component.SourceActions', 'Source actions')}
+          onSelect={chooseOverflow}
         />
       {/if}
     </div>

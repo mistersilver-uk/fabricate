@@ -37,7 +37,13 @@ function copyModule(sourcePath) {
 }
 
 async function renderComposition(props = {}) {
+  // A `.fabricate-manager` host, not a bare div (issue 1477). The row menus are `<ActionMenu>`s
+  // now and each PORTALS its panel to the nearest application root, resolved by walking up from
+  // the component. Mounting into a bare div would resolve no root, land every panel on
+  // `document.body` — outside `target`, where nothing below could query it — and emit the
+  // module's missing-host diagnostic on every render. This is the arrangement the product has.
   target = document.createElement('div');
+  target.className = 'fabricate-manager';
   document.body.appendChild(target);
   mounted = mount(Component, {
     target,
@@ -100,11 +106,22 @@ function quickAction(recordId, action) {
   return target.querySelector(`[data-record-id="${recordId}"] .manager-environment-comp-quick-action[data-action="${action}"]`);
 }
 
+/**
+ * Open one row's overflow menu and return the PORTALED panel.
+ *
+ * The panel is no longer a descendant of the row (issue 1477): `<ActionMenu>` portals it to the
+ * application root so it escapes `.manager-environment-tab-panel`'s `overflow: auto`. So the
+ * trigger is still addressed inside the row — which is what proves the right row's menu opened —
+ * and the panel is addressed at the host. Exactly one menu is open at a time, which the
+ * single-panel assertion below holds rather than assumes.
+ */
 async function openRowMenu(recordId) {
   target.querySelector(`[data-record-id="${recordId}"] .manager-icon-button[aria-haspopup="menu"]`).click();
   await tick();
   flushSync();
-  return target.querySelector(`[data-record-id="${recordId}"] [role="menu"]`);
+  const panels = target.querySelectorAll('[role="menu"]');
+  assert.equal(panels.length, 1, 'exactly one row menu is open at a time');
+  return panels[0];
 }
 
 describe('CompositionList mounted layout', () => {
@@ -123,6 +140,10 @@ describe('CompositionList mounted layout', () => {
       // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
       'src/ui/svelte/components/ManagerButton.svelte',
       'src/ui/svelte/components/IconButton.svelte',
+      // THE shared overflow action menu (issue 1477), which the four row menus render and which
+      // renders `IconButton` above as its trigger. Omitting a rendered `.svelte` HANGS the suite
+      // (# cancelled), which is exactly how this conversion first reported.
+      'src/ui/svelte/components/ActionMenu.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
       'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
@@ -152,6 +173,12 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
       'src/ui/svelte/actions/dismissOnOutsideClick.js',
+      // `ActionMenu`'s own import-free leaves: the portal action, the overlay-host resolver and
+      // the pure placement helper. All three are reached only through the menu, so they arrived
+      // in this tree with it.
+      'src/ui/svelte/actions/portal.js',
+      'src/ui/svelte/util/overlayHost.js',
+      'src/ui/svelte/util/actionMenuLayout.js',
       'src/gatheringImageDefaults.js'
     ]) {
       copyModule(modulePath);

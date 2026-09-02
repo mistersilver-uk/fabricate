@@ -173,6 +173,14 @@ const SELECTORS = Object.freeze({
     trigger: 'button.manager-travel-trigger',
     panel: '.fabricate-picker-popover',
   }),
+  // THE overflow action menu (issue 1477). `container` is the SHORT `overflow: auto` column the
+  // trigger sits inside — the fixture's stand-in for `.manager-environment-tab-panel` — and is
+  // measured so the clipping half of the conversion is asserted rather than assumed.
+  menu: Object.freeze({
+    trigger: 'button[aria-haspopup="menu"]',
+    panel: '.fabricate-action-menu-panel',
+    container: '.clipping-column',
+  }),
   // `ActorSelectTopBar`, the primitive's first player-window adopter (issue 1475). `container` is
   // the element the panel used to be positioned INSIDE — the bar — and is measured so the clipping
   // half of the conversion can be asserted rather than assumed.
@@ -248,17 +256,23 @@ async function openOverlayIn({ host, component = 'popover' }) {
           const node = document.querySelector(`.${cls}`);
           rootPositions[cls] = node ? getComputedStyle(node).position : null;
         }
-        // A HIT TEST rather than a rect comparison, for the clipping question. An element clipped
-        // by an ancestor's `overflow` still reports its full, unclipped box from
-        // `getBoundingClientRect`, so geometry alone cannot tell a visible panel from a hidden
-        // one; `elementFromPoint` is the browser answering which element a user's pointer would
-        // actually reach at that coordinate.
+        // A HIT TEST rather than a rect comparison, for the CLIPPING question (issue 1475).
+        // An element clipped by an ancestor's `overflow` still reports its full, unclipped box
+        // from `getBoundingClientRect`, so geometry alone cannot tell a visible panel from a
+        // hidden one; `elementFromPoint` is the browser answering which element a user's pointer
+        // would actually reach at that coordinate.
+        //
+        // Sampled near the panel's BOTTOM rather than at its centre (issue 1477), because a
+        // centre sample cannot see a panel clipped in HALF: the action menu opens inside a
+        // short scrolling column, so the arrangement to rule out is one whose top rows are
+        // reachable and whose last verbs are not. The bottom sample is at least as strong for
+        // the actor picker, whose panel is clipped from its top edge downwards when it fails.
         let panelHit = null;
         if (panelNode) {
           const rect = panelNode.getBoundingClientRect();
           const hit = document.elementFromPoint(
             Math.round(rect.left + rect.width / 2),
-            Math.round(rect.top + Math.min(rect.height / 2, rect.height - 4))
+            Math.round(rect.bottom - 6)
           );
           panelHit = hit ? { inPanel: panelNode.contains(hit), className: hit.className } : null;
         }
@@ -463,8 +477,8 @@ describe('1466 a portaled overlay is positioned against the host it was portaled
     // THE PART A STRUCTURAL ASSERTION CANNOT MAKE. The panel's parent being the frame says where
     // the node HANGS; it does not say the panel is visible, and the shipped arrangement — a panel
     // inside a 64px bar — is the one this has to be distinguished from. Two independent readings:
-    // the panel extends below the bar's own bottom edge, and the browser's own hit test at the
-    // panel's centre resolves inside the panel rather than onto whatever is painted over it.
+    // the panel extends below the bar's own bottom edge, and the browser's own hit test near
+    // the panel's bottom resolves inside the panel rather than onto whatever is painted over it.
     const measured = await openOverlayIn({ host: 'app', component: 'actorbar' });
     const { panel, container, panelHit } = measured;
 
@@ -477,10 +491,81 @@ describe('1466 a portaled overlay is positioned against the host it was portaled
     );
     assert.ok(
       panelHit?.inPanel,
-      'the browser hit test at the panel\'s centre resolved to ' +
+      "the browser hit test near the panel's bottom edge resolved to " +
         `\`${panelHit?.className ?? 'nothing'}\` rather than to the panel, so the panel is drawn ` +
         'but not reachable — clipped or painted over by something in the window'
     );
+  });
+
+  // ── THE OVERFLOW ACTION MENU (issue 1477) ──────────────────────────────────────────────────
+  // Everything above measures a PICKER. This measures the ACTION MENU, and it asks one question
+  // the picker cases cannot: does the panel ESCAPE the scrolling column its trigger sits in.
+  //
+  // That question was live rather than hypothetical. The composition list's four menus were
+  // `position: absolute` inside a `position: relative` wrapper in the row, and the row sits inside
+  // `.manager-environment-tab-panel`, which the shipped sheet declares `overflow: auto` — so a
+  // menu opened near the bottom of a long Tasks list was cut off by the panel's own edge. The
+  // component editor's identity strip said so in its own comment and portaled its overflow for
+  // exactly this reason; the four menus beside it never did.
+  it('the action menu lands at its trigger inside the manager', async () => {
+    const measured = await openOverlayIn({ host: 'manager', component: 'menu' });
+    assertPanelIsAtItsTrigger(measured, 'manager (ActionMenu)');
+    assert.ok(
+      measured.panelParentClass.includes('fabricate-manager'),
+      `the action menu's panel parent is \`${measured.panelParentClass}\`, not the manager root, ` +
+        'so the portal did not land'
+    );
+    assert.deepEqual(measured.consoleErrors, [], 'the action menu reported a missing host');
+  });
+
+  it('the action menu escapes the scrolling column it opens inside, and is hit-testable there', async () => {
+    // THE PART A RECT COMPARISON CANNOT MAKE. A clipped element reports its FULL box, so the
+    // panel's geometry is identical whether or not it escaped — which is why the second reading
+    // is the browser's own hit test rather than another number.
+    const measured = await openOverlayIn({ host: 'manager', component: 'menu' });
+    const { panel, container, panelHit } = measured;
+
+    assert.ok(container, 'the fixture rendered no clipping column to measure the panel against');
+    assert.ok(
+      panel.bottom > container.bottom + EPSILON,
+      `the panel (bottom ${panel.bottom.toFixed(1)}) does not extend past the scrolling column ` +
+        `(bottom ${container.bottom.toFixed(1)}), so the clipping question has not been asked. ` +
+        'Either the column stopped clipping or the menu is short enough to fit inside it, and ' +
+        'both make this measurement vacuous.'
+    );
+    assert.ok(
+      panelHit?.inPanel,
+      "the browser hit test near the panel's bottom edge resolved to " +
+        `\`${panelHit?.className ?? 'nothing'}\` rather than to the panel, so the menu's last ` +
+        'verbs are drawn but unreachable — clipped by the scrolling column, which is the defect ' +
+        'this conversion removes'
+    );
+  });
+
+  it('the action menu paints and lands at its trigger in the player window too', async () => {
+    // THE CLAUSE THE ADOPTION SCENARIO NOW REQUIRES. `design-system/spec.md` requirement "A shared
+    // primitive's class family is rooted at the primitive, not at an app" asks that a panel a
+    // primitive portals be MEASURED landing at its trigger inside the application that adopts it,
+    // and this primitive's family is rooted at `.fabricate-action-menu-panel` rather than at
+    // `.fabricate-manager` precisely so that a second application can.
+    //
+    // The `position` clause inside `assertPanelIsAtItsTrigger` is the one that carries this: root
+    // the family back at an app and the panel lands in the right host and draws `position: static`,
+    // which is the second half of the defect issues 1466 and 1470 removed between them.
+    //
+    // Both callers are manager surfaces today, so this measures a CAPABILITY rather than a shipped
+    // arrangement. What it does not claim is that the whole control paints out there: the trigger
+    // is an `<IconButton>`, whose `manager-icon-button` rules are painted under `.fabricate-manager`
+    // alone — that primitive's own header records the same limitation, and it is a property of the
+    // button rather than of the menu.
+    const measured = await openOverlayIn({ host: 'app', component: 'menu' });
+    assertPanelIsAtItsTrigger(measured, 'player app (ActionMenu)');
+    assert.ok(
+      measured.panelParentClass.includes('fabricate-app'),
+      `the action menu's panel parent is \`${measured.panelParentClass}\`, not the player window ` +
+        'frame, so the portal did not land'
+    );
+    assert.deepEqual(measured.consoleErrors, [], 'the action menu reported a missing host');
   });
 
   it('the fixture can tell a host-relative arrangement from a viewport-relative one', async () => {

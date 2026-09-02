@@ -33,8 +33,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
-    'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
+    // `ActionMenu`'s pure placement helper (issue 1477). It replaced `iconPickerPopover.js` here
+    // when the overflow stopped being a `SearchablePopover`: a picker's layout DECIDES the panel
+    // width, and an overflow menu's width is its longest verb.
+    'src/ui/svelte/util/actionMenuLayout.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -43,10 +46,11 @@ const harness = createMountedComponentHarness({
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // THE shared overflow action menu and the icon-only button it renders as its trigger
+    // (issue 1477). They replaced `SearchablePopover` and its `EmptyState` here: the strip's
+    // source actions are COMMANDS, and the picker announced them as selectable options.
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/ActionMenu.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
@@ -76,11 +80,10 @@ function track(componentOverrides = {}) {
   };
 }
 
-// The overflow is PORTALED to escape the scrolling column's `overflow: hidden`, so its
-// options land outside the mount target — query the document.
-function overflowOption(target, label) {
-  const doc = target.ownerDocument;
-  return Array.from(doc.querySelectorAll('.manager-travel-option')).find((button) =>
+// The overflow is PORTALED to escape the scrolling column's `overflow: hidden`, so its rows are
+// not descendants of the strip. The mount target IS an application root, so they land inside it.
+function overflowItem(target, label) {
+  return Array.from(target.querySelectorAll('[role="menuitem"]')).find((button) =>
     button.textContent.includes(label)
   );
 }
@@ -160,17 +163,95 @@ describe('ComponentIdentityStrip — source capabilities (issue 676, AC3)', () =
     const target = await harness.mount(props);
     await openOverflow(target);
 
-    assert.ok(overflowOption(target, 'Unlink Source Item'), 'unlink is in the kebab');
-    assert.ok(overflowOption(target, 'Copy source UUID'), 'copy UUID is in the kebab');
+    assert.ok(overflowItem(target, 'Unlink Source Item'), 'unlink is in the kebab');
+    assert.ok(overflowItem(target, 'Copy source UUID'), 'copy UUID is in the kebab');
     assert.equal(
-      overflowOption(target, 'Open Source Item'),
+      overflowItem(target, 'Open Source Item'),
       undefined,
       'open-sheet is NOT duplicated into the kebab'
     );
 
-    overflowOption(target, 'Copy source UUID').click();
+    overflowItem(target, 'Copy source UUID').click();
     await flushRender();
     assert.deepEqual(calls.copied, ['Compendium.fabricate.items.iron-ore']);
+    harness.remount();
+  });
+
+  it('1477 the source actions are announced as a MENU, and the listbox announcement is GONE', async () => {
+    // THE POINT OF ISSUE 1477, and both halves are asserted. Presence alone would pass on a tree
+    // that rendered a menu INSIDE a listbox, which is a shape a conversion can plausibly leave
+    // behind; the absence clauses are what make this a change of widget rather than an addition.
+    //
+    // None of this is visible in a frame. A kebab over two rows looks identical whether a screen
+    // reader is told "menu, two items" or "listbox, two options, none selected", which is why the
+    // defect survived the adjudication (issue 1458) that was written to prevent it.
+    const { props } = track();
+    const target = await harness.mount(props);
+
+    const trigger = target.querySelector('.manager-component-overflow-trigger');
+    assert.ok(Boolean(trigger), 'the strip renders its overflow trigger');
+    assert.equal(trigger.getAttribute('aria-haspopup'), 'menu');
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+    assert.equal(
+      trigger.className,
+      'manager-icon-button manager-component-overflow-trigger',
+      'the rendered class attribute is byte-identical to the one the picker trigger carried, ' +
+        'because `<ActionMenu>` renders `<IconButton>` and that primitive writes the shared class'
+    );
+
+    await openOverflow(target);
+    assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+
+    const panel = target.querySelector('[role="menu"]');
+    assert.ok(Boolean(panel), 'the panel is a menu');
+    assert.ok(
+      Boolean(panel.getAttribute('aria-label')),
+      'the panel is named — a portaled panel has no ancestor to take a name from'
+    );
+
+    const items = [...panel.querySelectorAll('[role="menuitem"]')];
+    assert.deepEqual(
+      items.map((item) => item.textContent.trim()),
+      ['Copy source UUID', 'Unlink Source Item'],
+      'both commands are menu items, in the order the strip declares them'
+    );
+    for (const item of items) {
+      assert.ok(!item.hasAttribute('aria-selected'), 'a command is not selected or unselected');
+      assert.equal(item.getAttribute('tabindex'), '-1');
+      assert.equal(item.getAttribute('data-keyboard-focus'), 'true');
+    }
+
+    // THE OLD ANNOUNCEMENT, asserted GONE rather than merely not looked for.
+    assert.ok(!target.querySelector('[role="listbox"]'), 'no listbox anywhere in the strip');
+    assert.ok(!target.querySelector('[role="option"]'), 'no options anywhere in the strip');
+    assert.ok(!target.querySelector('[aria-selected]'), 'nothing in the strip is selectable');
+    assert.ok(
+      !target.querySelector('[aria-haspopup="dialog"]'),
+      'and the trigger no longer promises a dialog'
+    );
+    harness.remount();
+  });
+
+  it('1477 Escape closes the menu and returns focus to the trigger', async () => {
+    // THE KEYBOARD CONTRACT IS THE BAR, NOT THE DOM. A build that dropped the focus restore and
+    // the Escape branch would render byte-identical markup in both states, so nothing structural
+    // can see it — this clause can.
+    const { props } = track();
+    const target = await harness.mount(props);
+    const doc = target.ownerDocument;
+    const trigger = target.querySelector('.manager-component-overflow-trigger');
+
+    await openOverflow(target);
+    const items = [...target.querySelectorAll('[role="menuitem"]')];
+    assert.ok(doc.activeElement === items[0], 'opening moves focus TO the first item');
+
+    doc.dispatchEvent(
+      new doc.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    );
+    await flushRender();
+
+    assert.ok(!target.querySelector('[role="menu"]'), 'Escape closes the menu');
+    assert.ok(doc.activeElement === trigger, 'and focus returns to the trigger');
     harness.remount();
   });
 
@@ -178,7 +259,7 @@ describe('ComponentIdentityStrip — source capabilities (issue 676, AC3)', () =
     const { calls, props } = track();
     const target = await harness.mount(props);
     await openOverflow(target);
-    overflowOption(target, 'Unlink Source Item').click();
+    overflowItem(target, 'Unlink Source Item').click();
     await flushRender();
     assert.deepEqual(calls.unlinked, ['c1']);
     harness.remount();

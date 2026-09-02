@@ -86,18 +86,24 @@ const CLASS_EXCEPTIONS = Object.freeze([
       'tail. Pinned by count so a later root pass that converts some of the six fails here ' +
       'instead of leaving a fraction of a deferral nobody is tracking.',
   }),
-  Object.freeze({
-    file: 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
-    count: 1,
-    why:
-      'NOT a deferral, and not convertible by this change. It writes the class into ' +
-      "`SearchablePopover`'s `triggerClass` prop, so the element carrying it is rendered by " +
-      'THAT primitive, not here. `triggerClass` has ten callers passing `manager-button`, ' +
-      'bespoke classes and this one, so routing it through `<IconButton>` means reworking ' +
-      "`SearchablePopover`'s trigger for all ten — a separate change with its own blast " +
-      'radius, not a line of this one.',
-  }),
 ]);
+
+/*
+ * `component/ComponentIdentityStrip.svelte` WAS the third exemption and is DELIBERATELY GONE,
+ * written out rather than deleted so the resolution is legible.
+ *
+ * It was recorded at count 1 as "NOT a deferral, and not convertible by this change": it wrote the
+ * class into `SearchablePopover`'s `triggerClass`, so the element carrying it was rendered by THAT
+ * primitive, and routing that prop through `<IconButton>` would have meant reworking the picker's
+ * trigger for all ten of its callers.
+ *
+ * Issue 1477 removed the premise rather than doing that work. The strip's overflow was never a
+ * picker — it is an ACTION MENU, and `SearchablePopover` was announcing its two commands as a
+ * listbox of selectable options — so it moved onto `components/ActionMenu.svelte`, whose trigger
+ * IS an `<IconButton>`. The strip now passes only its own `manager-component-overflow-trigger`,
+ * the primitive writes the shared class, and the rendered `class` attribute is byte-identical.
+ * Do not re-add this row.
+ */
 
 const contract = definePrimitiveSourceContract({
   label: 'icon-button',

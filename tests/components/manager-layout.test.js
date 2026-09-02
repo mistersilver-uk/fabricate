@@ -3956,17 +3956,25 @@ test('manager environments browser and edit route define compact responsive geom
     /^\.fabricate-manager \.manager-environment-workspace \{[\s\S]*?\}/m
   ) || [''])[0];
   const weightFieldBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field');
-  const compMenuBlock = blockFor('.fabricate-manager .manager-environment-comp-menu');
-  const compMenuButtonBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button');
+  // The overflow menu is the shared `<ActionMenu>` primitive since issue 1477, so its family is
+  // rooted at the two namespace classes THAT COMPONENT writes rather than at `.fabricate-manager`
+  // and the environment editor's own name. Everything asserted below is the same declaration set
+  // at the same specificity — the item rules keep their `button` type selector precisely so that
+  // re-rooting moves nothing in this screen's cascade.
+  const compMenuBlock = blockFor(
+    '.fabricate-action-menu-panel.manager-action-menu-panel'
+  );
+  const compMenuButtonBlock = blockFor(
+    '.fabricate-action-menu-panel button.manager-action-menu-item'
+  );
   const compMenuIconBlock = blockFor(
-    '.fabricate-manager .manager-environment-comp-menu button > i'
+    '.fabricate-action-menu-panel button.manager-action-menu-item > i'
   );
   const compMenuLabelBlock = blockFor(
-    '.fabricate-manager .manager-environment-comp-menu button > span'
+    '.fabricate-action-menu-panel button.manager-action-menu-item > span'
   );
-  const compMenuNoteBlock = blockFor('.fabricate-manager .manager-environment-comp-menu-note');
-  const compMenuNoteBeforeBlock = blockFor(
-    '.fabricate-manager .manager-environment-comp-menu-note::before'
+  const compMenuDisabledBlock = blockFor(
+    '.fabricate-action-menu-panel button.manager-action-menu-item:disabled'
   );
   const compQuickActionBlock = blockFor(
     '.fabricate-manager .manager-environment-comp-quick-action'
@@ -4133,8 +4141,11 @@ test('manager environments browser and edit route define compact responsive geom
     'composition quick actions should keep the same fixed geometry as manager icon buttons'
   );
   assert.ok(
-    compMenuBlock.includes('right: 0;') && compMenuBlock.includes('top: calc(100% + 4px);'),
-    'composition overflow menus should stay anchored to the row action button'
+    compMenuBlock.includes('position: absolute;') && !compMenuBlock.includes('right: 0;'),
+    'the overflow menu is PORTALED (issue 1477), so its placement is measured against the host ' +
+      'it lands in and written inline by `computeActionMenuLayout`. A `right: 0` here would be ' +
+      'read against the portal host rather than the row, which is a panel in the wrong place ' +
+      'with byte-identical markup — the exact failure `util/overlayHost.js` documents'
   );
   assert.ok(
     compMenuBlock.includes('width: max-content;') &&
@@ -4178,18 +4189,22 @@ test('manager environments browser and edit route define compact responsive geom
       compMenuLabelBlock.includes('text-overflow: ellipsis;'),
     'composition overflow menu labels should truncate inside the bounded menu width'
   );
+  // The disabled NOTE ("Enable in library first") used to be a second, near-identical rule plus a
+  // `::before` spacer, because it was the one menu row with no glyph. `<ActionMenu>` renders the
+  // icon cell for every item, so the note takes the item rule's geometry unchanged and the pair
+  // is retired rather than re-rooted. What is left is the disabled STATE.
   assert.ok(
-    compMenuNoteBlock.includes('grid-template-columns: 18px minmax(0, 1fr);') &&
-      compMenuNoteBlock.includes('min-width: 0;') &&
-      compMenuNoteBlock.includes('white-space: nowrap;') &&
-      compMenuNoteBlock.includes('font-size: 0.82rem;') &&
-      compMenuNoteBlock.includes('font-weight: 500;'),
-    'disabled composition menu notes should share the compact row geometry'
+    compMenuDisabledBlock.includes('opacity: 0.45;') &&
+      compMenuDisabledBlock.includes('cursor: default;'),
+    'a disabled menu item still reads as inert'
   );
+  // A RULE, not a mention: the re-rooting comment above the new family names the retired
+  // selectors in prose, and `css` is the raw sheet. Requiring the opening brace is what makes
+  // this a claim about selectors rather than about words.
   assert.ok(
-    compMenuNoteBeforeBlock.includes('content: "";') &&
-      compMenuNoteBeforeBlock.includes('width: 18px;'),
-    'disabled composition menu notes should reserve the same icon column even without an icon'
+    !/\.manager-environment-comp-menu[\w-]*(::[\w-]+)?[^{}\n]*\{/.test(css),
+    'and the note rule and its icon-column spacer are gone rather than left behind matching ' +
+      'nothing, which is what a class that moves onto a component tag otherwise leaves in a sheet'
   );
   assert.ok(
     compBlock.includes('--fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;') &&
@@ -4529,9 +4544,20 @@ test('manager environment composition overflow menu renders bounded single-line 
               width: 320px;
               height: 180px;
             }
-            .harness .manager-environment-comp-menu-wrap {
+            .harness .fabricate-action-menu {
               width: 34px;
               margin-left: 260px;
+            }
+            /*
+              The panel is PORTALED in the product, so its placement is written inline against the
+              host it lands in. This fixture measures the DECLARATIONS the sheet supplies — sizing,
+              the icon column, truncation — so it supplies that placement itself, right-aligned to
+              the trigger exactly as computeActionMenuLayout computes it. No backticks in here: the
+              whole page is a JS template literal.
+            */
+            .harness .fabricate-action-menu-panel {
+              right: 0;
+              top: 38px;
             }
             .harness .manager-icon-button {
               width: 34px;
@@ -4549,20 +4575,21 @@ test('manager environment composition overflow menu renders bounded single-line 
         <body>
           <main class="fabricate-manager">
             <div class="harness">
-              <div class="manager-environment-comp-menu-wrap">
-                <button type="button" class="manager-icon-button" aria-label="Open task actions">
+              <div class="fabricate-action-menu manager-action-menu">
+                <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-label="Open task actions">
                   <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
                 </button>
-                <div class="manager-environment-comp-menu" role="menu">
-                  <button type="button" role="menuitem">
+                <div class="fabricate-action-menu-panel manager-action-menu-panel" role="menu" tabindex="-1" data-keyboard-focus="true" aria-label="Open task actions">
+                  <button type="button" role="menuitem" tabindex="-1" class="manager-action-menu-item">
                     <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
                     <span>OpenSourceRecordWithAnIntentionallyExtendedLocalizedMenuLabelThatMustTruncateInsideTheBoundedMenuWidth</span>
                   </button>
-                  <button type="button" role="menuitem" class="is-danger">
+                  <button type="button" role="menuitem" tabindex="-1" class="manager-action-menu-item is-danger">
                     <i class="fas fa-ban" aria-hidden="true"></i>
                     <span>Exclude from environment</span>
                   </button>
-                  <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled>
+                  <button type="button" role="menuitem" tabindex="-1" class="manager-action-menu-item" disabled>
+                    <i class="" aria-hidden="true"></i>
                     <span>EnableInLibraryFirstWithAnIntentionallyExtendedLocalizedNoteThatMustTruncateInsideTheBoundedMenuWidth</span>
                   </button>
                 </div>
@@ -4616,11 +4643,11 @@ test('manager environment composition overflow menu renders bounded single-line 
 
       return {
         viewportWidth: window.innerWidth,
-        wrap: rectFor(document.querySelector('.manager-environment-comp-menu-wrap')),
-        menu: rectFor(document.querySelector('.manager-environment-comp-menu')),
-        rows: Array.from(document.querySelectorAll('.manager-environment-comp-menu button')).map(
-          rowFor
-        ),
+        wrap: rectFor(document.querySelector('.fabricate-action-menu')),
+        menu: rectFor(document.querySelector('.fabricate-action-menu-panel')),
+        rows: Array.from(
+          document.querySelectorAll('.fabricate-action-menu-panel button')
+        ).map(rowFor),
       };
     });
 

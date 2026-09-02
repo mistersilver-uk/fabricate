@@ -174,6 +174,15 @@ const SHARED_PRIMITIVES = [
   // picker in without naming a popover anywhere, which is exactly the shape this list exists
   // to turn into a named failure rather than a cancelled run.
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  // THE shared overflow action menu (issue 1477). It is a LEAF TWO RUNGS DOWN, which is the shape
+  // this list exists for: the environment editor's Tasks and Events tabs render it through
+  // `environment/CompositionList`, and the component editor renders it through
+  // `component/ComponentIdentityStrip`, so a suite that mounts either editor pulls this in without
+  // naming a menu anywhere. It also renders `IconButton` as its trigger, which is already here —
+  // so an omission cancels a suite for the reason a reader will not look for, a missing dependency
+  // of a dependency. That is exactly how this conversion first reported: `# cancelled 7`, no
+  // failures, on a suite whose tests never ran.
+  'src/ui/svelte/components/ActionMenu.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

@@ -157,6 +157,31 @@ const PRIMITIVES = Object.freeze([
     ]),
   }),
   Object.freeze({
+    name: 'ActionMenu',
+    components: Object.freeze(['src/ui/svelte/components/ActionMenu.svelte']),
+    roots: Object.freeze(['fabricate-action-menu', 'fabricate-action-menu-panel']),
+    family: 'manager-action-menu[\\w-]*',
+    anchors: Object.freeze([
+      'manager-action-menu',
+      'manager-action-menu-panel',
+      'manager-action-menu-item',
+    ]),
+    // Measured today: 3 written, 9 family selectors, 9 owned, 0 caller overrides. The family is
+    // BORN at the primitive rather than re-rooted onto it (issue 1477) — it was
+    // `.manager-environment-comp-menu*` under `.fabricate-manager`, named for one of its two
+    // callers — so the floors sit just under the measured counts rather than under a re-rooting
+    // margin. The one caller-anchored rule the conversion leaves behind,
+    // `.manager-component-identity-name-row .manager-component-overflow-trigger`, names the
+    // TRIGGER class the caller passes in and is not in this family at all.
+    writtenFloor: 3,
+    familyFloor: 8,
+    ownedFloor: 8,
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-action-menu', root: 'fabricate-action-menu' }),
+      Object.freeze({ anchor: 'manager-action-menu-panel', root: 'fabricate-action-menu-panel' }),
+    ]),
+  }),
+  Object.freeze({
     name: 'ManagerColorPicker + ManagerColorPopover',
     components: Object.freeze([
       'src/ui/svelte/components/ManagerColorPicker.svelte',

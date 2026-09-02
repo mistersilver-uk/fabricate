@@ -261,6 +261,7 @@ The condition is HOLDING FOCUS, not handling keys: an element that handles nothi
 The carve-out for a button is FORM-SCOPED and stays that way: `hasFocus` answers `!!focused.form`, so a button outside a form is exactly as unrecognised as a bare div, and a roving-tabindex tab strip — which handles the arrows and calls `preventDefault()` without `stopPropagation()` — runs its own handler AND pans the canvas.
 The attribute is an OPT-IN that declares the element focused: `data-keyboard-focus="false"` does the opposite and hands the keypress to the canvas, so the value matters as much as the attribute.
 A listbox MUST keep DOM focus on ONE element and drive selection with `aria-activedescendant`; roving focus onto option buttons re-arms those bindings and is forbidden.
+A MENU is the deliberate exception and not a loophole: its pattern requires focus to MOVE to its items, so each item carries the keyboard-focus attribute above and the bindings are declared away rather than avoided.
 Where the list has a search field, that field holds focus.
 Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
 
@@ -397,6 +398,7 @@ Three families are adjudicated NON-MEMBERS and are recorded in `scripts/lib/desi
 It has no trigger, its suggestion list hangs off an input whose expanded state is driven by the query rather than by a control, and it therefore has no closed state to open from.
 - An ACTION MENU is not a picker.
 `role="menu"` with `role="menuitem"` children announces a list of things to DO, while the picker announces `role="listbox"` with `role="option"` children, a list of things to BE — converting one to the other changes what a screen reader says about the widget, not how it looks.
+It is a SET MEMBER in its own right rather than merely a non-member, and the requirement below states what it owns.
 - A MULTI-SELECT CHECKLIST is not a picker.
 It toggles membership, stays open across choices and marks several options selected at once, while the picker carries a single value and closes on choose.
 
@@ -416,6 +418,36 @@ The icon, colour, essence-source and recipe-duration pickers do NOT: their panel
 - **WHEN** a `role="menu"` control is proposed for conversion onto the shared picker
 - **THEN** it is recorded as an adjudicated non-member with its role and child roles measured
 - **AND** it keeps its menu semantics rather than being announced as a listbox
+
+### Requirement: The overflow action menu is a primitive of its own, and never a mode of the picker
+
+An OVERFLOW ACTION MENU — a trigger that opens a short list of COMMANDS to run against the record beside it — MUST be one shared primitive, and that primitive MUST NOT be the shared picker with a `role` prop.
+
+The two are separated by ANNOUNCED SEMANTICS and by FOCUS MODEL, and only the first is cosmetic enough to look absorbable.
+A menu announces `aria-haspopup="menu"` over `role="menu"` and `role="menuitem"`, carries NO `aria-selected`, and MOVES DOM FOCUS to its items; a picker announces a `dialog` or a `listbox` over `role="option"` rows, marks the current value with `aria-selected`, and keeps DOM focus on one element while pointing at its options with `aria-activedescendant`.
+Those focus models are mutually exclusive, so a component offering both would have to branch its entire keyboard implementation on a prop — and a caller reading only that prop's name would not learn which of two widgets it had asked for.
+
+That reading is not hypothetical and the register carries both halves of it.
+A `role="menu"` control was correctly adjudicated as NOT convertible onto the picker; at the same time a sibling had ALREADY been built the forbidden way, so a component's two source commands were announced as selectable options in a listbox and its destructive verb was announced as something to select rather than to run.
+Neither a frame, a computed-style probe nor a `data-*` selector can distinguish the two, which is why the separation is stated here rather than left to review.
+
+The menu's keyboard contract is the W3C ARIA Authoring Practices Guide's MENU BUTTON pattern: Enter, Space and ArrowDown open onto the first item, ArrowUp opens onto the last, the arrows move focus with wrapping, Home and End reach the ends, and Escape closes and RETURNS FOCUS TO THE TRIGGER.
+Where the shipped primitive departs from that pattern it MUST say so at the source: a natively `disabled` item is not focusable and is therefore skipped rather than landed on, and Tab returns focus to the trigger rather than continuing the tab sequence, because the panel is portaled out of the trigger's subtree and the element after the PORTAL HOST is not the element after the trigger.
+
+Its items hold focus and are buttons outside a form, so each MUST carry `data-keyboard-focus="true"` — the same obligation the Foundry contract places on any focusable non-form element, and the reason the listbox prohibition above does not reach a menu.
+The panel MUST be portaled through the shared overlay-host resolver rather than positioned inside its trigger's own container: an absolutely positioned menu is clipped by any scrolling ancestor, and a clipped panel reports its full box, so the failure is invisible to every geometric assertion and has to be proved by hit test.
+
+#### Scenario: A surface needs a kebab over two or more commands
+
+- **WHEN** a surface needs an overflow menu of commands
+- **THEN** it renders the shared action-menu primitive
+- **AND** the trigger announces `aria-haspopup="menu"` over a `role="menu"` of `role="menuitem"` rows carrying no `aria-selected`
+
+#### Scenario: A caller asks the picker to announce a menu
+
+- **WHEN** a change proposes a `role` prop on the shared picker so one component can render both widgets
+- **THEN** it is refused
+- **AND** the action-menu primitive is used instead, because the two differ in focus model and not only in what they announce
 
 ### Requirement: One requirement row serves both sides of a recipe
 

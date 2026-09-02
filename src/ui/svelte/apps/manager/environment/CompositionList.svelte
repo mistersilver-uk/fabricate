@@ -6,7 +6,7 @@
     DEFAULT_GATHERING_TASK_IMG,
   } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
+  import ActionMenu from '../../../components/ActionMenu.svelte';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import CompositionStatePill from './CompositionStatePill.svelte';
   import OverrideIndicator from './OverrideIndicator.svelte';
@@ -48,7 +48,6 @@
   }
 
   let dragIndex = $state(-1);
-  let openMenuId = $state('');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -151,11 +150,150 @@
       : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColTask', 'Task')
   );
 
-  function toggleMenu(id) {
-    openMenuId = openMenuId === id ? '' : id;
+  // ── THE FOUR OVERFLOW MENUS, AS DATA (issue 1477) ────────────────────────────────────────
+  // The four hand-rolled `role="menu"` blocks this file carried are one `<ActionMenu>` each now,
+  // and the only thing that ever differed between them was WHICH VERBS they offered. So the
+  // difference is expressed as four item lists rather than as four copies of a menu, and the
+  // shared primitive owns the ARIA and the keyboard contract that all four had to restate.
+  //
+  // Every `data-action` hook is preserved verbatim — `include`, `force-include`, `exclude`,
+  // `restore` — because mounted suites and the View Lab's automatic-force-add case address these
+  // rows by them. They ride the primitive's per-item `data` map, which is spread onto the item
+  // button before the primitive's own attributes.
+  const moreActionsLabel = $derived(
+    text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')
+  );
+
+  function openSourceLabel() {
+    return kind === 'event'
+      ? text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
+          'Open source event'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
+          'Open source task'
+        );
   }
-  function closeMenu() {
-    openMenuId = '';
+
+  function openSourceItem() {
+    return { id: 'open-source', label: openSourceLabel(), icon: 'fas fa-up-right-from-square' };
+  }
+
+  // The library gate precedes both composition modes, so a disabled record offers a NOTE rather
+  // than a verb. It is a disabled `menuitem` with no icon: the primitive renders the icon cell
+  // regardless, which is what keeps its label in the same text column as every other row.
+  function libraryDisabledNote() {
+    return {
+      id: 'library-disabled',
+      label: text(
+        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',
+        'Enable in library first'
+      ),
+      disabled: true,
+    };
+  }
+
+  function includedMenuItems(index) {
+    const items = [];
+    if (showEventRankControls) {
+      items.push({
+        id: 'move-up',
+        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveUp', 'Move up'),
+        icon: 'fas fa-arrow-up',
+        disabled: index === 0,
+      });
+      items.push({
+        id: 'move-down',
+        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown', 'Move down'),
+        icon: 'fas fa-arrow-down',
+        disabled: index === included.length - 1,
+      });
+    }
+    items.push(openSourceItem());
+    items.push({
+      id: 'exclude',
+      label:
+        mode === 'manual'
+          ? text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove',
+              'Remove from environment'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude',
+              'Exclude from environment'
+            ),
+      icon: 'fas fa-ban',
+      danger: true,
+      data: { 'data-action': 'exclude' },
+    });
+    return items;
+  }
+
+  // The Available-to-add and Non-matching menus are ONE SHAPE offering two different verbs: an add
+  // verb when the row can be composed, the library note when the library gate blocks it, and
+  // Open source either way. Stated once, because the two are otherwise token-identical bodies
+  // differing only in their predicates and their verb — which is a copy the SonarCloud duplication
+  // gate counts and, more to the point, is how the four menus in this file drifted apart before.
+  // Each caller keeps its OWN predicate at its own call site, so the two questions ("does manual
+  // mode allow a plain add?" and "does automatic mode allow a force?") stay visible.
+  function gatedAddMenuItems(verb, allowed, blockedByLibrary) {
+    const items = [];
+    if (allowed) items.push(verb);
+    else if (blockedByLibrary) items.push(libraryDisabledNote());
+    items.push(openSourceItem());
+    return items;
+  }
+
+  function availableMenuItems(entry) {
+    return gatedAddMenuItems(
+      {
+        id: 'include',
+        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include'),
+        icon: 'fas fa-plus',
+        data: { 'data-action': 'include' },
+      },
+      availableRowAction(entry) === 'include',
+      availableRowAction(entry) === 'library-disabled'
+    );
+  }
+
+  function excludedMenuItems() {
+    return [
+      openSourceItem(),
+      {
+        id: 'restore',
+        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore', 'Restore'),
+        icon: 'fas fa-rotate-left',
+        data: { 'data-action': 'restore' },
+      },
+    ];
+  }
+
+  function nonMatchingMenuItems(entry) {
+    return gatedAddMenuItems(
+      {
+        id: 'force-include',
+        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add'),
+        icon: 'fas fa-plus',
+        data: { 'data-action': 'force-include' },
+      },
+      entry.compositionState === 'notMatching',
+      entry.compositionState === 'libraryDisabled'
+    );
+  }
+
+  // ONE dispatcher for all four menus, because the verbs are shared across them: `open-source`
+  // appears in every one and `include` in two. A per-menu handler would be four copies of this
+  // switch with different subsets, which is how the four menus drifted apart in the first place.
+  function runMenuAction(id, entry, index) {
+    if (id === 'move-up') onReorder(kind, index, index - 1);
+    else if (id === 'move-down') onReorder(kind, index, index + 1);
+    else if (id === 'open-source') onOpenSource(kind, entry.id);
+    else if (id === 'include') onInclude(kind, entry.id);
+    else if (id === 'force-include') onForceInclude(kind, entry.id);
+    else if (id === 'exclude') onExclude(kind, entry.id);
+    else if (id === 'restore') onRestore(kind, entry.id);
   }
 
   function handleDrop(targetIndex) {
@@ -351,101 +489,11 @@
                   <i class="fas fa-ban" aria-hidden="true"></i>
                 </IconButton>
               {/if}
-              <div
-                class="manager-environment-comp-menu-wrap"
-                use:dismissOnOutsideClick={{
-                  enabled: openMenuId === entry.id,
-                  onDismiss: closeMenu,
-                }}
-              >
-                <IconButton
-                  aria-haspopup="menu"
-                  aria-expanded={openMenuId === entry.id}
-                  ariaLabel={text(
-                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
-                    'More actions'
-                  )}
-                  onclick={() => toggleMenu(entry.id)}
-                >
-                  <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                </IconButton>
-                {#if openMenuId === entry.id}
-                  <div class="manager-environment-comp-menu" role="menu">
-                    {#if showEventRankControls}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={index === 0}
-                        onclick={() => {
-                          onReorder(kind, index, index - 1);
-                          closeMenu();
-                        }}
-                        ><i class="fas fa-arrow-up" aria-hidden="true"></i><span
-                          >{text(
-                            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveUp',
-                            'Move up'
-                          )}</span
-                        ></button
-                      >
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={index === included.length - 1}
-                        onclick={() => {
-                          onReorder(kind, index, index + 1);
-                          closeMenu();
-                        }}
-                        ><i class="fas fa-arrow-down" aria-hidden="true"></i><span
-                          >{text(
-                            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown',
-                            'Move down'
-                          )}</span
-                        ></button
-                      >
-                    {/if}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onclick={() => {
-                        onOpenSource(kind, entry.id);
-                        closeMenu();
-                      }}
-                      ><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span
-                        >{kind === 'event'
-                          ? text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
-                              'Open source event'
-                            )
-                          : text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
-                              'Open source task'
-                            )}</span
-                      ></button
-                    >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      class="is-danger"
-                      data-action="exclude"
-                      onclick={() => {
-                        onExclude(kind, entry.id);
-                        closeMenu();
-                      }}
-                      ><i class="fas fa-ban" aria-hidden="true"></i><span
-                        >{mode === 'manual'
-                          ? text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove',
-                              'Remove from environment'
-                            )
-                          : text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude',
-                              'Exclude from environment'
-                            )}</span
-                      ></button
-                    >
-                  </div>
-                {/if}
-              </div>
+              <ActionMenu
+                items={includedMenuItems(index)}
+                triggerLabel={moreActionsLabel}
+                onSelect={(action) => runMenuAction(action, entry, index)}
+              />
             </div>
           </li>
         {/each}
@@ -531,78 +579,11 @@
                     <i class="fas fa-circle-plus" aria-hidden="true"></i>
                   </IconButton>
                 {/if}
-                <div
-                  class="manager-environment-comp-menu-wrap"
-                  use:dismissOnOutsideClick={{
-                    enabled: openMenuId === entry.id,
-                    onDismiss: closeMenu,
-                  }}
-                >
-                  <IconButton
-                    aria-haspopup="menu"
-                    aria-expanded={openMenuId === entry.id}
-                    ariaLabel={text(
-                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
-                      'More actions'
-                    )}
-                    onclick={() => toggleMenu(entry.id)}
-                  >
-                    <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                  </IconButton>
-                  {#if openMenuId === entry.id}
-                    <div class="manager-environment-comp-menu" role="menu">
-                      {#if availableRowAction(entry) === 'include'}
-                        <button
-                          type="button"
-                          role="menuitem"
-                          data-action="include"
-                          onclick={() => {
-                            onInclude(kind, entry.id);
-                            closeMenu();
-                          }}
-                          ><i class="fas fa-plus" aria-hidden="true"></i><span
-                            >{text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include',
-                              'Include'
-                            )}</span
-                          ></button
-                        >
-                      {:else if availableRowAction(entry) === 'library-disabled'}
-                        <button
-                          type="button"
-                          role="menuitem"
-                          class="manager-environment-comp-menu-note"
-                          disabled
-                          ><span
-                            >{text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',
-                              'Enable in library first'
-                            )}</span
-                          ></button
-                        >
-                      {/if}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onclick={() => {
-                          onOpenSource(kind, entry.id);
-                          closeMenu();
-                        }}
-                        ><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span
-                          >{kind === 'event'
-                            ? text(
-                                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
-                                'Open source event'
-                              )
-                            : text(
-                                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
-                                'Open source task'
-                              )}</span
-                        ></button
-                      >
-                    </div>
-                  {/if}
-                </div>
+                <ActionMenu
+                  items={availableMenuItems(entry)}
+                  triggerLabel={moreActionsLabel}
+                  onSelect={(action) => runMenuAction(action, entry)}
+                />
               </div>
             </li>
           {/each}
@@ -666,63 +647,11 @@
               </div>
               <div class="manager-environment-comp-actions">
                 {#if kind === 'task'}
-                  <div
-                    class="manager-environment-comp-menu-wrap"
-                    use:dismissOnOutsideClick={{
-                      enabled: openMenuId === entry.id,
-                      onDismiss: closeMenu,
-                    }}
-                  >
-                    <IconButton
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === entry.id}
-                      ariaLabel={text(
-                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
-                        'More actions'
-                      )}
-                      onclick={() => toggleMenu(entry.id)}
-                    >
-                      <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                    </IconButton>
-                    {#if openMenuId === entry.id}
-                      <div class="manager-environment-comp-menu" role="menu">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onclick={() => {
-                            onOpenSource(kind, entry.id);
-                            closeMenu();
-                          }}
-                          ><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span
-                            >{kind === 'event'
-                              ? text(
-                                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
-                                  'Open source event'
-                                )
-                              : text(
-                                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
-                                  'Open source task'
-                                )}</span
-                          ></button
-                        >
-                        <button
-                          type="button"
-                          role="menuitem"
-                          data-action="restore"
-                          onclick={() => {
-                            onRestore(kind, entry.id);
-                            closeMenu();
-                          }}
-                          ><i class="fas fa-rotate-left" aria-hidden="true"></i><span
-                            >{text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore',
-                              'Restore'
-                            )}</span
-                          ></button
-                        >
-                      </div>
-                    {/if}
-                  </div>
+                  <ActionMenu
+                    items={excludedMenuItems()}
+                    triggerLabel={moreActionsLabel}
+                    onSelect={(action) => runMenuAction(action, entry)}
+                  />
                 {:else}
                   <ManagerButton
                     class="manager-environment-restore"
@@ -805,78 +734,11 @@
               </div>
               <div class="manager-environment-comp-actions">
                 {#if kind === 'task'}
-                  <div
-                    class="manager-environment-comp-menu-wrap"
-                    use:dismissOnOutsideClick={{
-                      enabled: openMenuId === entry.id,
-                      onDismiss: closeMenu,
-                    }}
-                  >
-                    <IconButton
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === entry.id}
-                      ariaLabel={text(
-                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
-                        'More actions'
-                      )}
-                      onclick={() => toggleMenu(entry.id)}
-                    >
-                      <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
-                    </IconButton>
-                    {#if openMenuId === entry.id}
-                      <div class="manager-environment-comp-menu" role="menu">
-                        {#if entry.compositionState === 'notMatching'}
-                          <button
-                            type="button"
-                            role="menuitem"
-                            data-action="force-include"
-                            onclick={() => {
-                              onForceInclude(kind, entry.id);
-                              closeMenu();
-                            }}
-                            ><i class="fas fa-plus" aria-hidden="true"></i><span
-                              >{text(
-                                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
-                                'Force add'
-                              )}</span
-                            ></button
-                          >
-                        {:else if entry.compositionState === 'libraryDisabled'}
-                          <button
-                            type="button"
-                            role="menuitem"
-                            class="manager-environment-comp-menu-note"
-                            disabled
-                            ><span
-                              >{text(
-                                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',
-                                'Enable in library first'
-                              )}</span
-                            ></button
-                          >
-                        {/if}
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onclick={() => {
-                            onOpenSource(kind, entry.id);
-                            closeMenu();
-                          }}
-                          ><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span
-                            >{kind === 'event'
-                              ? text(
-                                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
-                                  'Open source event'
-                                )
-                              : text(
-                                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
-                                  'Open source task'
-                                )}</span
-                          ></button
-                        >
-                      </div>
-                    {/if}
-                  </div>
+                  <ActionMenu
+                    items={nonMatchingMenuItems(entry)}
+                    triggerLabel={moreActionsLabel}
+                    onSelect={(action) => runMenuAction(action, entry)}
+                  />
                 {:else}
                   {#if entry.compositionState === 'notMatching'}
                     <!-- THE `warning` REPAIR (issue 1118). This spelt its modifier
