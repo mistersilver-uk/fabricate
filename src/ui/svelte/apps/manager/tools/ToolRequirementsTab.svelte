@@ -58,6 +58,18 @@
      `RadioCardGroup`'s `is-config-cards` face hides every legend, while every other group on
      these two screens carries a visible kicker.
 
+  == TWO HEADINGS THE REFERENCE DOES NOT DRAW (issue 1373, maintainer round 5) ===============
+  `WHICH PREREQUISITES` sat between the section header row and the list, and the reference goes
+  from `proto:2326` straight to `proto:2328` with nothing between them — a heading over the only
+  thing in the section, one line under a card head that has just said the same word twice.
+
+  `WHEN PREREQUISITES FAIL` was the second. `proto:2334` is ONE muted sentence — "All selected
+  prerequisites are required (AND). When a character fails them:" — with the two-column grid
+  immediately beneath it at `proto:2336`. Ours split that into a standing statement plus an
+  uppercase eyebrow, so one sentence became two headings. The grid's `<legend>` is
+  screen-reader-only again, which is `RadioCardGroup`'s shipped `is-config-cards` contract: the
+  group keeps its accessible name and paints no heading, because the sentence introduces it.
+
   == THE HEADING IDIOM IS THE CALLER'S ======================================================
   The system rules editor sets its section headings in sentence-case bold, which is what its
   design frame draws; the WORLD entry sets every card heading as an uppercase kicker, which is
@@ -156,6 +168,28 @@
   converged four selection popovers onto one shared picker for exactly this class of choice, so
   a bespoke presentation for a fifth would be reopening a question this repository has settled.
 
+  == AND THE PREREQUISITE LIST IS THE SAME ROW (issue 1373, maintainer round 5) ==============
+  `proto:4741` states the reference's prerequisite row as `display:flex; align-items:center;
+  gap:11px; padding:10px 12px; border-radius:10px; background: bg1|surface-active; border: 1px
+  solid (border|accent-border)` — and that is `proto:4752`'s BONUS row byte for byte. The
+  reference draws ONE row for both lists on this tab; ours drew two, a bespoke `ChecklistCardRow`
+  above and `ModifierLibraryRow` below, with different metrics, a different fill and a different
+  selected treatment. Both lists are now that one component, and `ChecklistCardRow` — whose only
+  caller this was — is removed rather than left standing for a fourth row to be copied from.
+
+  THE ONLY DIFFERENCE THAT SURVIVES IS THE TRAILING CONTROL, which is exactly the seam the row
+  already has. A CHECKBOX here, because several prerequisites apply at once and the AND sentence
+  below says so; a radio below, because a Tool adds one modifier. The row took no contortion to
+  carry it: `children` is the caller's, so the row never knew which control it was trailing.
+
+  TWO THINGS THE REFERENCE'S PREREQUISITE ROW DOES THAT OURS DOES NOT, recorded rather than
+  drifted into. It leads with the box (`proto:2331`) where ours trails it, and it stacks the name
+  over the expression (`proto:2333`) where ours sets them on one line. Both are consequences of
+  the maintainer's ruling that this is ONE row: the reference's own two rows differ in exactly
+  these two ways, so a row that served both would have to be two rows wearing one name. The
+  ruling asked for the trailing control by name, and the shared anatomy is the bonus row's,
+  which is the one the Checks Studio also draws.
+
   WHAT IS NOT REPRODUCED is `proto:4754`'s click-the-selected-row-to-clear. A radio group cannot
   be un-checked by re-clicking it, and faking that on a `<label>` wrapping a real `<input>` is
   the nested-interaction trap this studio has already paid for; the section's own enable switch
@@ -176,7 +210,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
   import Field from '../../../components/Field.svelte';
-  import ChecklistCardRow from '../ChecklistCardRow.svelte';
+  import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
@@ -191,6 +225,10 @@
   // so the radio has to name it explicitly or the explanation is announced by nothing. One
   // constant id is enough because at most one row can ever carry it.
   const CUSTOM_BONUS_HINT_ID = 'manager-tool-bonus-hand-typed-hint';
+  // The glyph a character prerequisite with no icon of its own falls back to. `proto:2332` draws
+  // this cell as a bare accent glyph and the library's own normalizer already defaults one, so
+  // this only covers a caller that passes a raw record.
+  const DEFAULT_PREREQUISITE_ICON = 'fas fa-users';
 
   let {
     tool = null,
@@ -428,44 +466,87 @@
           {@render prerequisitesSwitch()}
         </div>
       {/if}
-      <!-- ── WHICH PREREQUISITES APPLY ────────────────────────────────────────────────────
-           A HEADING OF ITS OWN, because it is a different question from the switch above it and
-           from the failure mode below it; the three ran together in one unbroken slab. It sits
-           inside the enabled branch: with the section off there are no decisions to head. -->
+      <!-- ── THE LIST, AND NOTHING HEADING IT ────────────────────────────────────────────
+           `proto:2326` closes the section header row and `proto:2328` opens the list: there is
+           no eyebrow between them at either scope (`proto:2860` is the system twin). Ours put a
+           `WHICH PREREQUISITES` micro-label there, which is a heading over the ONLY thing in the
+           section, above a card head that has just said the same word twice.
+
+           THE ROW IS `ModifierLibraryRow`, THE SAME ONE THE BONUS LIST BELOW DRAWS (round 5).
+           `proto:4741` and `proto:4752` state the two rows with one identical string, so the
+           reference draws one row where this tab drew two — a bespoke `ChecklistCardRow` here
+           and the shared row one section down, with different metrics, a different fill and a
+           different selected treatment. The trailing control is the only difference that
+           survives, which is exactly the seam the row already has: a CHECKBOX here, because
+           several prerequisites apply at once, and a radio below, because one modifier does.
+
+           `<Field as="fieldset">` is the group, for the reasons the bonus list records: a
+           `<legend>` is only valid as a fieldset's first child and is what names the group, and
+           `disabled` on a fieldset reaches every descendant control without a per-row prop. The
+           legend is visually hidden because the card head above already names the section. -->
       {#if prerequisites.enabled}
-        <p class="manager-kicker">
-          {text('FABRICATE.Admin.Manager.Tools.Editor.WhichPrerequisites', 'Which prerequisites')}
-        </p>
-        <div class="manager-tool-prerequisite-list" data-tool-prerequisite-list>
-          {#if prerequisiteOptions.length === 0}<p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites',
-                'No character prerequisites are defined in this world yet.'
-              )}
-            </p>{/if}
-          {#each prerequisiteOptions as option (option.id)}
-            <ChecklistCardRow
-              value={option.id}
-              title={option.name || option.label || option.id}
-              detail={prerequisitePreview(option)}
-              icon={option.icon || 'fas fa-users'}
-              checked={(prerequisites.ids || []).includes(option.id)}
-              onChange={(checked) => togglePrerequisite(option.id, checked)}
-            />
-          {/each}
-        </div>
-        <p class="manager-tool-requirements-summary">
+        {#if prerequisiteOptions.length === 0}
+          <p class="manager-muted" data-tool-prerequisite-empty>
+            {text(
+              'FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites',
+              'No character prerequisites are defined in this world yet. They are defined under World, Rules and resources.'
+            )}
+          </p>
+        {:else}
+          <Field
+            as="fieldset"
+            class="manager-tool-prerequisite-list"
+            disabled={saving}
+            data-tool-prerequisite-list=""
+          >
+            <legend class="visually-hidden"
+              >{text(
+                'FABRICATE.Admin.Manager.Tools.Editor.CharacterPrerequisites',
+                'Character prerequisites'
+              )}</legend
+            >
+            {#each prerequisiteOptions as option (option.id)}
+              <ModifierLibraryRow
+                as="label"
+                icon={option.icon || DEFAULT_PREREQUISITE_ICON}
+                label={option.name || option.label || option.id}
+                expression={prerequisitePreview(option)}
+                class={(prerequisites.ids || []).includes(option.id)
+                  ? 'manager-tool-prerequisite-row is-active'
+                  : 'manager-tool-prerequisite-row'}
+                rowAttributes={{ 'data-tool-prerequisite-row': option.id }}
+              >
+                <!-- The manager's ONE selection control, in `contents` mode because the row host
+                     is already a `<label>` and a nested label is invalid HTML and an ambiguous
+                     click target. The input is NESTED rather than the row being converted into a
+                     `role="checkbox"` wrapper, which is the trap the row's own header records. -->
+                <SelectionCheckbox
+                  size="sm"
+                  wrapper="contents"
+                  value={option.id}
+                  checked={(prerequisites.ids || []).includes(option.id)}
+                  onChange={(checked) => togglePrerequisite(option.id, checked)}
+                />
+              </ModifierLibraryRow>
+            {/each}
+          </Field>
+        {/if}
+        <!-- ── ONE SENTENCE, WHICH ALSO INTRODUCES THE PAIR BELOW IT ─────────────────────
+             `proto:2334` is a single muted line — "All selected prerequisites are required (AND).
+             When a character fails them:" — and `proto:2336` is the two-column grid immediately
+             under it. Ours split that into a standing statement plus a second uppercase eyebrow,
+             so the tab carried two headings the reference does not draw at all.
+
+             `RadioCardGroup`'s own `<legend>` therefore goes back to screen-reader-only, which is
+             the shipped `is-config-cards` contract: the group keeps its accessible name and
+             paints no heading, because the sentence above it is the introduction. -->
+        <p class="manager-tool-requirements-summary" data-tool-prerequisites-summary>
           {text(
             'FABRICATE.Admin.Manager.Tools.Editor.RequiredAll',
-            'All selected prerequisites are required (AND)'
+            'All selected prerequisites are required (AND). When a character fails them:'
           )}
         </p>
-        <!-- ── AND WHAT FAILING THEM DOES ───────────────────────────────────────────────────
-             `legendVisible` un-hides the fieldset's OWN `<legend>` rather than printing a kicker
-             beside it: a visible heading that is not the group's accessible name is a heading a
-             screen reader announces twice. -->
         <RadioCardGroup
-          legendVisible
           legend={text('FABRICATE.Admin.Manager.Tools.Editor.GateMode', 'When prerequisites fail')}
           options={gateModeOptions}
           selectedValue={prerequisites.gateMode}
@@ -667,6 +748,23 @@
     display: flex;
     gap: var(--fab-space-2);
     align-items: center;
+
+    /* -- AND THE SAME TYPE AS THE CARD HEADS ABOVE IT (issue 1373, round 5) ---------------
+       `proto:2356` states this eyebrow with the SAME string `proto:2324` states the two section
+       eyebrows with — `font: 700 8.5px var(--sans); letter-spacing: .11em; text-transform:
+       uppercase; color: var(--subtle)`. Once `ToolInheritCard` narrowed its head eyebrow to the
+       reference, leaving this one on the shared `.manager-kicker`'s 0.72rem put two uppercase
+       micro-labels at two sizes inside one card — a worse reading than the one before it, and
+       one the reference does not draw at all.
+
+       Narrowed HERE rather than on `.manager-kicker`, which is the same rule the card's own
+       block records: the shared class has callers on every other manager screen. `margin: 0`
+       because the section is a flex column whose gap is already the reference's own step, and
+       the shared class adds 2px on top of it. */
+    margin: 0;
+    color: var(--fab-text-subtle);
+    font-size: 8.5px;
+    letter-spacing: 0.11em;
   }
 
   .manager-tool-bonus-kicker::after {
@@ -693,9 +791,16 @@
 
   /* The per-section trailing line. It is the last thing in the card and a claim about the
      section rather than a control, so it takes the muted micro size the world entry's other
-     reach sentences already use. `--fab-space-1` is the design's own 4px rule gap. */
+     reach sentences already use.
+
+     ITS OWN 4px TOP MARGIN IS GONE (issue 1373, round 5). The reference has no counterpart for
+     this line at all — how many crafting systems inherit a world default is a fact about world
+     scope the prototype has no concept of — so what it has to do is sit on the section's rhythm
+     rather than invent a step. The section column is `--fab-space-2`, which is where the
+     reference's own 8px and 9px gaps round to; a 4px margin on top of that made this one line
+     half again as far from its section as every other line in it. */
   .manager-tool-requirements-note {
-    margin: var(--fab-space-1) 0 0;
+    margin: 0;
     font-size: 0.62rem;
   }
 </style>

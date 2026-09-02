@@ -75,7 +75,9 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/ChecklistCardRow.svelte',
+    // The world modifier library's row. Since issue 1373's round 5 the prerequisite list
+    // and the bonus list are both this one component, so omitting it HANGS the suite.
+    'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
@@ -924,9 +926,26 @@ describe('the world Tool entry (issue 1373)', () => {
   // THE REQUIREMENTS TAB (issue 1373)
   // -------------------------------------------------------------------------
   describe('the Requirements tab', () => {
+    // The world character-prerequisite library (issue 1308), in the shape
+    // `normalizeCharacterPrerequisite` publishes. It carried an `expression` key that
+    // `prerequisitePreview` does not read, so the row's second line rendered the placeholder.
     const PREREQUISITES = [
-      { id: 'trained', name: 'Trained in Smithing', expression: '@prof >= 2' },
-      { id: 'strong', name: 'Strength 13 or higher', expression: '@abilities.str.mod >= 2' },
+      {
+        id: 'trained',
+        name: 'Trained in Smithing',
+        icon: 'fas fa-hammer',
+        path: 'tools.smith.value',
+        op: 'gte',
+        value: 1,
+      },
+      {
+        id: 'strong',
+        name: 'Strength 13 or higher',
+        icon: 'fas fa-hand-fist',
+        path: 'abilities.str.value',
+        op: 'gte',
+        value: 13,
+      },
     ];
     // The WORLD modifier library, in the shape `normalizeModifierLibrary` publishes.
     const MODIFIERS = [
@@ -987,6 +1006,94 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.deepEqual(checked, ['trained']);
     });
 
+    // ── AND THE PREREQUISITE LIST IS THE SAME ROW AS THE BONUS LIST (round 5) ─────────────
+    //
+    // `proto:4741` and `proto:4752` state the reference's two Tool lists with the same row
+    // string, so it draws ONE row where this tab drew two. Asserted at the WORLD scope as well
+    // as the system one for the reason the bonus rows already are: the tab is one component, so
+    // it cannot diverge by markup — but the row's geometry is anchored on a container class this
+    // tab writes, and the two scopes are different routes.
+    it('draws the prerequisite list as the shared modifier row at world scope too', async () => {
+      const target = await mountTab({
+        scope: scopeFor({
+          prerequisites: { enabled: true, ids: ['trained'], gateMode: 'usability' },
+        }),
+        tab: 'requirements',
+        prerequisiteOptions: PREREQUISITES,
+        modifierOptions: MODIFIERS,
+      });
+
+      const rows = [...target.querySelectorAll('[data-tool-prerequisite-row]')];
+      assert.deepEqual(rows.map((row) => row.dataset.toolPrerequisiteRow), ['trained', 'strong']);
+      assert.deepEqual(
+        rows.map((row) => row.classList.contains('manager-modifier-readonly-row')),
+        [true, true],
+        'the world entry draws its prerequisites as the shared library row'
+      );
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('.manager-modifier-readonly-label').textContent.trim()),
+        ['Trained in Smithing', 'Strength 13 or higher']
+      );
+      assert.equal(
+        target.querySelectorAll('.manager-checklist-card-row').length,
+        0,
+        'and no bespoke checklist row survives at this scope either'
+      );
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('input[type="checkbox"]').checked),
+        [true, false],
+        'the trailing control is a CHECKBOX — several prerequisites may apply at once'
+      );
+      assert.deepEqual(
+        rows.map((row) => row.classList.contains('is-active')),
+        [true, false]
+      );
+
+      // NEITHER HEADING THE REFERENCE DOES NOT DRAW. `proto:2326` runs from the section header
+      // row straight into the list, and `proto:2334` states the AND rule and introduces the gate
+      // pair in ONE muted sentence.
+      const card = target.querySelector('[data-tool-rule-card="prerequisites"]');
+      assert.equal(card.textContent.includes('Which prerequisites'), false);
+      // `legendVisible` is what paints `RadioCardGroup`'s own legend, by adding
+      // `is-legend-visible` to the fieldset; the `<legend>` element is present either way and
+      // carries the group's accessible name, which is the part that must survive.
+      assert.ok(
+        !card.querySelector('.is-legend-visible'),
+        'the gate pair paints no heading'
+      );
+      assert.equal(
+        card.querySelector('.manager-resolution-mode-legend').textContent.trim(),
+        'When prerequisites fail',
+        'and keeps its accessible name'
+      );
+      assert.ok(
+        card.textContent.includes(
+          'All selected prerequisites are required (AND). When a character fails them:'
+        )
+      );
+    });
+
+    // THE EMPTY LIBRARY NAMES ITS ROUTE, exactly as the bonus section below it does (round 5).
+    // The two absences on this tab are the same absence, and the bonus sentence was written by
+    // taking this one and appending the route — leaving this one without it.
+    it('states an empty prerequisite library the way the bonus section states its own', async () => {
+      const target = await mountTab({
+        scope: scopeFor({ prerequisites: { enabled: true, ids: [], gateMode: 'usability' } }),
+        tab: 'requirements',
+        prerequisiteOptions: [],
+        modifierOptions: [],
+      });
+
+      assert.equal(
+        target.querySelector('[data-tool-prerequisite-empty]').textContent.trim(),
+        'No character prerequisites are defined in this world yet. They are defined under World, Rules and resources.'
+      );
+      assert.ok(
+        !target.querySelector('[data-tool-prerequisite-list]'),
+        'and no empty list frame around nothing, which is how the bonus section states it'
+      );
+    });
+
     // ── THE BONUS IS A WORLD-MODIFIER PICK AT THIS SCOPE TOO (issue 1373, round 3) ─────────
     //
     // `proto:2353` (world Tool entry) and `proto:2886` (system Tool rules) draw the SAME list,
@@ -1038,8 +1145,9 @@ describe('the world Tool entry (issue 1373)', () => {
         ['@prof', '@abilities.int.mod']
       );
       // SCOPED TO THE BONUS CARD, because the section ABOVE it legitimately renders option
-      // cards: `Which prerequisites` ends in the gate-mode pair, a closed two-option set of
-      // behaviours. The ruling is about library entries, not about the card primitive.
+      // cards: its list is rows since round 5, but it still ENDS in the gate-mode pair, a closed
+      // two-option set of behaviours. The ruling is about library entries, not the card
+      // primitive.
       assert.ok(
         !target.querySelector('[data-tool-rule-card="bonus"] .manager-resolution-option'),
         'and no option-card markup survives in the bonus section'

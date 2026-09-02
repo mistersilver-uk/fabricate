@@ -3636,7 +3636,7 @@
    seeds a library now (`tests/view-lab/world/labContent.js`), the marking is gone, and the
    assertion is live.
 
-   ── AND THE TOOL STUDIO'S CHECK BONUS JOINS THEM (issue 1373, maintainer round 4) ─────
+   ── AND BOTH TOOL REQUIREMENT LISTS JOIN THEM (issue 1373, maintainer rounds 4 and 5) ──
    The Tool Requirements bonus is a pick from the SAME world modifier library, and it drew that
    roster as a stack of option cards. The ruling moves it onto this row, and the markup is
    genuinely shared: both screens render `apps/manager/ModifierLibraryRow.svelte`.
@@ -3648,8 +3648,15 @@
    ANCHOR at the same (0,3,0) rather than the Tool route authoring a copy, which keeps one
    owner for the row and leaves the Checks Studio's own rendering bit-for-bit unchanged.
    `tests/components/manager-layout.test.js` asserts the join and that each cell is declared
-   exactly once. */
+   exactly once.
+
+   ── AND THE PREREQUISITE LIST DIRECTLY ABOVE IT (round 5) ──────────────────────────────
+   `proto:4741` states the reference's prerequisite row with the same string as `proto:4752`'s
+   bonus row, byte for byte. The reference draws ONE row for both of that tab's lists; ours drew
+   two, and the second was a bespoke `ChecklistCardRow` with its own metrics, fill and selected
+   treatment. A third anchor rather than a third copy, for the same reason the second was. */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-row,
+.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-row,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-row {
   display: flex;
   align-items: center;
@@ -3665,6 +3672,7 @@
    than a per-entry tone: a modifier is not a hazard, and the tile exists to make the row
    scannable by icon, not to grade it. */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph,
+.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-glyph,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-glyph {
   display: flex;
   flex: 0 0 26px;
@@ -3679,6 +3687,7 @@
 }
 
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-label,
+.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-label,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-label {
   flex: 0 0 auto;
   color: var(--fab-text);
@@ -3692,6 +3701,7 @@
    flex item's default `min-width: auto` refuses to shrink below its content, so a long
    `@`-path would push the pill out of the row instead of ellipsing. */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-expression,
+.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-expression,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-expression {
   flex: 1 1 0;
   min-width: 0;
@@ -10800,13 +10810,11 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-resolution-option:hover,
-.fabricate-manager .manager-tool-bonus-row:hover {
+.fabricate-manager .manager-resolution-option:hover {
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-resolution-option.is-active,
-.fabricate-manager .manager-tool-bonus-row.is-active {
+.fabricate-manager .manager-resolution-option.is-active {
   border-color: var(--fab-border);
   background: var(--fab-accent-soft);
   box-shadow: inset 3px 0 0 var(--fab-accent);
@@ -10886,6 +10894,7 @@
    nudges the dot down to meet a two-line option's first line. This row is one line and centres
    its items, so the same nudge sits the dot below centre. Both selectors weigh (0,3,0), so
    source order is what decides it and this block has to come second. */
+.fabricate-manager .manager-tool-prerequisite-list,
 .fabricate-manager .manager-tool-bonus-list {
   gap: var(--fab-space-chip);
   margin: 0;
@@ -10894,8 +10903,46 @@
   background: none;
 }
 
+/* ── THE TWO PICK ROWS ON THE REQUIREMENTS TAB, AS ONE FACE (issue 1373, round 5) ──────
+   `proto:4741` and `proto:4752` are the same string, so the reference's prerequisite row and its
+   bonus row are one row with one resting state and one selected state. Both are drawn by
+   `ModifierLibraryRow`, whose four cells are joined above; what is stated here is the part the
+   cells cannot carry — the row's pointer affordance and the two states.
+
+   THE SELECTED FACE LEFT THE OPTION-CARD TREATMENT, deliberately. Round 4 gave the bonus row
+   `.manager-resolution-option.is-active` — `--fab-accent-soft` behind a 3px inset accent BAR at
+   the leading edge. The reference states a fill and an edge and nothing else, and the bar is a
+   radio-card affordance that is doubly wrong once a CHECKBOX list joins the same row: several
+   prerequisites are active at once, and a leading bar on each reads as "this is the chosen one".
+   The RADIO reset below stays joined to that treatment, because it is Foundry's native-control
+   chrome rather than an appearance choice, and only the bonus row renders a radio at all. */
+.fabricate-manager .manager-tool-prerequisite-row,
 .fabricate-manager .manager-tool-bonus-row {
+  /* The prerequisite row's real `<input>` is `SelectionCheckbox`'s, which is `position: absolute`
+     at 1px and transparent. Without a positioned ancestor here its containing block would be
+     whatever is positioned further up the tree, which is how a hidden-but-clickable control ends
+     up somewhere the smoke's `.click()` cannot reach. The retired row declared this for the same
+     reason. It changes nothing else: neither row has any other absolutely positioned child. */
+  position: relative;
   cursor: pointer;
+}
+
+.fabricate-manager .manager-tool-prerequisite-row:hover,
+.fabricate-manager .manager-tool-bonus-row:hover {
+  background: var(--fab-overlay-light-04);
+}
+
+.fabricate-manager .manager-tool-prerequisite-row.is-active,
+.fabricate-manager .manager-tool-bonus-row.is-active {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
+/* The row is the label, so the ring belongs to the row rather than to the box: `SelectionCheckbox`
+   draws its own only in `label` wrapper mode, and this list uses `contents`. */
+.fabricate-manager .manager-tool-prerequisite-row:has(input:focus-visible) {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 .fabricate-manager .manager-tool-bonus-row input[type='radio'] {
@@ -18405,31 +18452,14 @@
   margin-left: auto;
 }
 
-.fabricate-manager .manager-tool-prerequisite-list {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-}
-
-.fabricate-manager .manager-tool-prerequisite-list > label {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
-  background: var(--fab-overlay-light-03);
-}
-
-.fabricate-manager .manager-tool-prerequisite-list small {
-  display: block;
-  color: var(--fab-text-muted);
-}
+/* The prerequisite list's own grid, its `> label` row and its `small` detail line are GONE
+   (issue 1373, round 5). The list is the shared modifier row's `<fieldset>` now, joined with the
+   bonus list's block further down, and the row is `ModifierLibraryRow`. That `> label` rule was
+   also a latent fault worth naming: at (0,2,1) it out-specified the retired row's own (0,2,0)
+   block and silently replaced that component's grid, padding and radius with its own — a route
+   sheet overriding the component it hosted, with nothing saying so. (The retired row's class is
+   NOT written here even as prose: `manager-layout.test.js` ratchets it by substring over this
+   whole file, which is what makes the removal provable.) */
 
 .fabricate-manager .manager-tool-validation-checks {
   display: flex;
@@ -18494,11 +18524,24 @@
 }
 
 .fabricate-manager .manager-tool-overview-source,
-.fabricate-manager .manager-tool-on-break,
-.fabricate-manager .manager-tool-requirements-section {
+.fabricate-manager .manager-tool-on-break {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* THE REQUIREMENTS SECTIONS RUN ON THE REFERENCE'S OWN STEP (issue 1373, round 5). Every gap
+   inside one of these two sections is 8px or 9px in the reference — `proto:2334`'s `margin: 9px
+   0` around the standing sentence, `proto:2355`'s `margin-bottom: 8px` under the bonus eyebrow,
+   `proto:2367`'s `margin-top: 8px` above the bonus note — and 9px rounds to the 4px scale's
+   `--fab-space-2`. This column carried `--fab-space-3`, half again as much, on every one of
+   them. Split out of the block above because the Overview and On-break stacks are different
+   surfaces with their own frames. */
+.fabricate-manager .manager-tool-requirements-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2);
   min-width: 0;
 }
 
@@ -18625,12 +18668,16 @@
   font-size: 0.72rem;
 }
 
+/* THE HEAD'S THIRD LINE, at `proto:2324`'s `font: 400 10.5px/1.5 var(--sans); color:
+   var(--muted)` (issue 1373, round 5). 0.66rem is 10.56px against the 16px root; the leading was
+   1.35. The two faces of this line are joined below the block, because a GM moving between the
+   world entry and the system editor sees the same head with a different sentence in it. */
 .fabricate-manager .manager-tool-rule-card-sub {
   grid-row: 2;
   margin: 0;
   color: var(--fab-text-muted);
-  font-size: 0.68rem;
-  line-height: 1.35;
+  font-size: 0.66rem;
+  line-height: 1.5;
 }
 
 .fabricate-manager .manager-tool-rule-card-head .manager-scoped-inherit-head {
@@ -18639,8 +18686,9 @@
 
 .fabricate-manager .manager-tool-rule-card-head .manager-scoped-inherit-label {
   color: var(--fab-text-muted);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 400;
+  line-height: 1.5;
 }
 
 .fabricate-manager .manager-tool-rule-card-head .manager-status-toggle {
@@ -18988,58 +19036,11 @@
   line-height: 1.5;
 }
 
-.fabricate-manager .manager-checklist-card-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 20px 26px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  background: var(--fab-overlay-light-03);
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-checklist-card-row.is-selected {
-  border-color: var(--fab-accent);
-  background: var(--fab-overlay-light-08);
-}
-
-.fabricate-manager .manager-checklist-card-row.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-/* The row's check box is the shared `SelectionCheckbox` (issue 772), so the hidden input,
-   its Foundry pseudo-element reset, the 18px box and its checked treatment all moved into
-   that component's scoped block and are gone from here. What stays is ROW context — the
-   grid, the selected/disabled treatment and the focus ring below — which the shared
-   primitives rule keeps global. The `sm` size renders the same 18px/radius-5 box against
-   the same resolved colours, so the Tool Studio is unchanged. */
-.fabricate-manager .manager-checklist-card-row:has(input:focus-visible) {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
-}
-
-.fabricate-manager .manager-checklist-card-icon {
-  color: var(--fab-accent);
-  text-align: center;
-}
-
-.fabricate-manager .manager-checklist-card-copy {
-  display: grid;
-  gap: var(--fab-space-1);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-checklist-card-copy small {
-  color: var(--fab-text-muted);
-  font-family: var(--fab-font-mono);
-  font-size: 0.68rem;
-  overflow-wrap: anywhere;
-}
+/* The Tool Studio's checklist row is GONE with its component (issue 1373, round 5). Its only
+   caller was the prerequisite list, which the maintainer ruled onto the SAME row the bonus list
+   below it draws — `proto:4741` and `proto:4752` state the two byte-identically — so the row,
+   its icon cell and its copy cell went with `ChecklistCardRow.svelte` rather than being left in
+   the sheet for a fourth row to be copied from. `manager-layout.test.js` ratchets the names. */
 
 .fabricate-manager .manager-tool-inspector-sections {
   display: grid;
@@ -19218,31 +19219,26 @@
   box-shadow: none;
 }
 
-.fabricate-manager .manager-tool-prerequisite-check {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-}
+/* The hand-rolled prerequisite check box that stood here is gone too, and had been dead since
+   issue 772: no markup had rendered it since the box became `SelectionCheckbox`. It is removed
+   in this change rather than separately because this change is what makes it obviously
+   unreachable. Its class is ratcheted by substring in `manager-layout.test.js`, so it is not
+   written out here either. */
 
-.fabricate-manager .manager-tool-prerequisite-check input {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-}
+/* THE SECTION'S STANDING SENTENCE. `proto:2334`: `font: 400 10.5px/1.5 var(--sans); color:
+   var(--muted)` — 0.66rem is 10.56px against the 16px root, the nearest rung.
 
-.fabricate-manager .manager-tool-prerequisite-check i {
-  color: var(--fab-on-accent);
-  font-size: 0.6rem;
-  pointer-events: none;
-}
-
-.fabricate-manager .manager-tool-requirements-summary {
+   THE EXTRA CLASS IS LOAD-BEARING, not decoration. `.manager-tool-requirements-section p` is
+   (0,2,1) and this was (0,2,0), so every declaration here was being discarded and the sentence
+   rendered at that rule's 0.68rem/1.35 with its 4px top margin — a rule nobody had read losing
+   to a rule nobody had noticed. Doubling the class puts this at (0,3,0) and makes it the one
+   that decides. The margin stays zero because the section is a flex column whose own gap is the
+   reference's `margin: 9px 0`. */
+.fabricate-manager .manager-tool-requirements-summary.manager-tool-requirements-summary {
   margin: 0;
   color: var(--fab-text-muted);
   font-size: 0.66rem;
+  line-height: 1.5;
 }
 
 .fabricate-manager [data-tool-requirements-divider] {

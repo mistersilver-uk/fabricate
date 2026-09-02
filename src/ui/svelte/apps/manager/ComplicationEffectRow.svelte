@@ -14,7 +14,10 @@
 
   Two shipped components are close and neither can carry it:
 
-  - `ChecklistCardRow` is a DELIBERATE non-reuse. Its icon colour is hard-pinned to
+  - `ChecklistCardRow` WAS a deliberate non-reuse, and is gone (issue 1373, round 5): its
+    one caller, the Tool Studio's prerequisite list, was ruled onto `ModifierLibraryRow`.
+    The argument is kept because it is the argument against reusing THAT row here too,
+    and it held for the same reasons. Its icon colour was hard-pinned to
     `--fab-accent` in the global sheet while each condition here has its own glyph
     colour; its detail line is MONO at 0.68rem while these details are proportional prose
     sentences; its root hardcodes `data-tool-prerequisite-row`; and it has no children slot
@@ -317,7 +320,7 @@
     line-height: 1.25;
   }
 
-  /* Proportional prose, NOT the mono detail line `ChecklistCardRow` pins — these details
+  /* Proportional prose, NOT the mono expression cell the shared modifier row pins — these details
      are sentences ("Rolled against the character at the moment the result is decided"),
      and a mono face at 0.68rem makes a sentence read as a value. */
   .fab-complication-effect-detail {

@@ -263,15 +263,44 @@
      Row 1 is the eyebrow, row 2 the title line, row 3 the descriptive line - the subtitle at
      world scope, `InheritRow`'s `World default:` head at system scope. The head's one control
      spans all three, which is where the design centres it (`proto:2323`). */
+  /* -- AND ITS TYPE, WHICH `.manager-kicker` GETS WRONG FOR THIS HEAD (round 5) -----------
+     `proto:2324` states every section eyebrow on this tab as `font: 700 8.5px var(--sans);
+     letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`, and `proto:2860`
+     states the system twin identically. The shared `.manager-kicker` is `0.72rem` — 11.52px,
+     35% over — with NO tracking at all and the MUTED ink, so both section heads read as small
+     headings rather than as the quiet rules they are.
+
+     NARROWED HERE, never on the shared class, which has callers on every other manager screen
+     whose own reference frames measured them. `ToolBrowserInspector.svelte` already does exactly
+     this for the Tool inspector rail and `styles/fabricate.css:3316` for the Checks rail; this is
+     the third site, stating the reference's own figures rather than borrowing another rail's.
+
+     The cascade happens to favour a scoped rule here — the sheet is imported at `layer(modules)`
+     and this block is injected unlayered, so it wins whatever the specificity — but the rule is
+     anchored on two classes this component writes anyway, which is (0,3,0) against the sheet's
+     (0,2,0). `tests/components/manager-layout.test.js` reads the COMPILED scoped CSS. */
   .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow {
     grid-column: 1;
     grid-row: 1;
     min-width: 0;
     margin: 0;
+    color: var(--fab-text-subtle);
+    font-size: 8.5px;
+    letter-spacing: 0.11em;
+  }
+
+  /* THE HEAD'S OWN RHYTHM (round 5). `proto:2323` gives the header row `gap: 11px` — the sheet's
+     `--fab-space-3` column gap already — and `proto:2324` puts `margin-top: 3px` under the
+     eyebrow and NOTHING between the title and the description. The sheet's uniform 2px row gap
+     cannot say that, so the has-eyebrow face zeroes it and the title states its own step: 3px
+     rounds to the 4px scale's `--fab-space-1`, which is the nearest rung. */
+  .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-head {
+    row-gap: 0;
   }
 
   .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-title {
     grid-row: 2;
+    margin-top: var(--fab-space-1);
   }
 
   .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-sub {
@@ -315,8 +344,11 @@
     padding: 0;
   }
 
+  /* `proto:2323` closes the header row with `margin-bottom: 9px`, which is the 4px scale's
+     `--fab-space-2`. The head has no bottom padding in this face, so the body's top padding IS
+     that gap, and it was `--fab-space-3` — a third over the reference on both sections. */
   .manager-tool-rule-card.is-flush .manager-tool-rule-card-inherited,
   .manager-tool-rule-card.is-flush .manager-tool-rule-card-body {
-    padding: var(--fab-space-3) 0 0;
+    padding: var(--fab-space-2) 0 0;
   }
 </style>

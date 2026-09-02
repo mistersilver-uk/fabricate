@@ -71,7 +71,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/Stepper.svelte',
-    // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
+    // The shared selection control (issue 772). `ModifierLibraryRow` below trails it after
     // the conversion, so it is in this tree's static graph; the harness's closure validator
     // throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -80,7 +80,9 @@ const harness = createMountedComponentHarness({
     // renders it for the tag-match Any/All control, so it is in this tree's static
     // import graph and the closure validator throws without it.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/manager/ChecklistCardRow.svelte',
+    // The world modifier library's row, which the prerequisite list and the bonus list both
+    // draw since issue 1373's round 5. Static in this tree, so omitting it HANGS the suite.
+    'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
@@ -153,12 +155,44 @@ const worldItems = [
     description: 'Still useful.',
   },
 ];
+// THE WORLD CHARACTER-PREREQUISITE LIBRARY (issue 1308), in the shape
+// `normalizeCharacterPrerequisite` publishes: `{id, name, icon, path, op, value}`. It used to
+// carry an `expression` key, which `prerequisitePreview` does not read — so every row's second
+// line rendered the placeholder `@… ≥` and the cell the row list is judged on carried nothing
+// real. The paths are ROLL-DATA paths, which is the convention the resolver reads.
 const prerequisites = [
-  { id: 'expert', name: 'Expert Crafter', expression: '@prof >= 4' },
-  { id: 'smith', name: "Proficient with Smith's Tools", expression: '@prof' },
-  { id: 'attuned', name: 'Attuned to the Weave', expression: '@abilities.int.mod >= 2' },
-  { id: 'strong', name: 'Strength 13 or higher', expression: '@abilities.str.mod >= 2' },
-  { id: 'arena', name: 'Trained in Arcana', expression: '@skills.arcana >= 1' },
+  { id: 'expert', name: 'Expert Crafter', icon: 'fas fa-star', path: 'prof', op: 'gte', value: 4 },
+  {
+    id: 'smith',
+    name: "Proficient with Smith's Tools",
+    icon: 'fas fa-hammer',
+    path: 'tools.smith.value',
+    op: 'gte',
+    value: 1,
+  },
+  {
+    id: 'attuned',
+    name: 'Attuned to the Weave',
+    icon: 'fas fa-wand-sparkles',
+    path: 'attributes.attuned',
+    op: 'isTrue',
+  },
+  {
+    id: 'strong',
+    name: 'Strength 13 or higher',
+    icon: 'fas fa-hand-fist',
+    path: 'abilities.str.value',
+    op: 'gte',
+    value: 13,
+  },
+  {
+    id: 'arena',
+    name: 'Trained in Arcana',
+    icon: 'fas fa-hat-wizard',
+    path: 'skills.arc.value',
+    op: 'gte',
+    value: 1,
+  },
 ];
 // The WORLD modifier library (`characterLibraries.modifiers[]`), in the shape
 // `normalizeModifierLibrary` publishes. It is the design's `MODS` (`proto:3797`) and the roster
@@ -1407,7 +1441,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelectorAll('[data-tool-prerequisite-row]').length, 5);
     assert.deepEqual(
-      [...root.querySelectorAll('[data-tool-prerequisite-row] strong')].map(
+      [...root.querySelectorAll('[data-tool-prerequisite-row] .manager-modifier-readonly-label')].map(
         (node) => node.textContent
       ),
       [
@@ -1648,16 +1682,20 @@ describe('Tool Studio editor (mounted)', () => {
     );
   });
 
-  // Issue 772, acceptance 11 — the ONLY proof that extracting the check box out of
-  // `ChecklistCardRow` left this tab rendering what it rendered before. There is no Tool
-  // Studio screenshot recipe that `ChecklistCardRow.svelte` matches (it routes to the
-  // broad theme-or-global-ui recipe only), so no published frame can show it either.
+  // ── THE PREREQUISITE LIST IS THE SAME ROW AS THE BONUS LIST (issue 1373, round 5) ────────
   //
-  // The three things a conversion of this shape can silently break: the box stops being a
-  // real `<input type="checkbox">` (killing the keyboard, the label association and every
-  // `input[value=…]` selector this suite already uses); the checked state stops rendering;
-  // or the change callback stops firing. Each is asserted below.
-  it('renders the prerequisite row through the shared selection control after the conversion', async () => {
+  // `proto:4741` gives the reference's prerequisite row
+  // `display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px;
+  // background: bg1|surface-active; border: 1px solid (border|accent-border)`, which is
+  // `proto:4752`'s bonus row byte for byte. The two lists are one row in the reference and were
+  // two in ours: a bespoke `ChecklistCardRow` above, `ModifierLibraryRow` below.
+  //
+  // This test replaces issue 772's conversion guard, which proved the same three things about
+  // the retired row: that the control is a real `<input type="checkbox">` (the keyboard, the
+  // label association and every `input[value=…]` selector this suite uses depend on it), that
+  // the checked state reaches the visible box, and that the change callback still fires. All
+  // three are asserted below against the row that replaced it, so nothing is dropped.
+  it('draws the prerequisite list as the shared modifier row, with a checkbox', async () => {
     const patches = [];
     const root = await harness.mount(
       props({
@@ -1670,24 +1708,87 @@ describe('Tool Studio editor (mounted)', () => {
     const rows = [...root.querySelectorAll('[data-tool-prerequisite-row]')];
     assert.equal(rows.length, 5);
 
-    // The real control survives the extraction, and the row still owns the `<label>` — the
-    // primitive is rendered in `contents` mode precisely so no second label is nested here.
     for (const row of rows) {
+      // THE SHARED ROW, not a copy of its class list: the three cells below are written by
+      // `ModifierLibraryRow` and by nothing else on this tab.
+      assert.ok(
+        row.classList.contains('manager-modifier-readonly-row'),
+        'every prerequisite row is the shared library row'
+      );
+      assert.ok(row.querySelector('.manager-modifier-readonly-glyph'));
+      assert.ok(row.querySelector('.manager-modifier-readonly-label'));
+      assert.ok(row.querySelector('.manager-modifier-readonly-expression'));
+      // A `<label>` host, so the whole row is the box's hit target and its accessible name,
+      // with the input NESTED rather than the row converted into a `role="checkbox"` wrapper.
       assert.equal(row.tagName, 'LABEL');
       assert.equal(row.querySelectorAll('label').length, 0);
       const box = row.querySelector('input[type="checkbox"]');
       assert.ok(box, 'every prerequisite row renders a real checkbox');
-      // A bare Foundry-chromed checkbox is a SECOND selection design; the custom box has
-      // to be there beside the hidden input.
+      // A bare Foundry-chromed checkbox is a SECOND selection design; the custom box has to be
+      // there beside the hidden input.
       assert.ok(row.querySelector('.fab-selection-check.is-sm'));
     }
 
-    // Checked state reaches the visible box, not just the input.
+    // AND THE ROW IS A ROW, not the retired checklist card.
+    assert.equal(
+      root.querySelectorAll('.manager-checklist-card-row').length,
+      0,
+      'the bespoke checklist row is gone from this tab'
+    );
+
+    // The expression cell carries the entry's real preview, which is the reference's own second
+    // line for this row (`proto:2333`).
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('.manager-modifier-readonly-expression').textContent),
+      [
+        '@prof ≥ 4',
+        '@tools.smith.value ≥ 1',
+        '@attributes.attuned is true',
+        '@abilities.str.value ≥ 13',
+        '@skills.arc.value ≥ 1',
+      ]
+    );
+
+    // Checked state reaches the visible box, not just the input, and the ROW carries the
+    // selected class the sheet paints `--fab-surface-active` on.
     const expertRow = rows[0];
     assert.equal(expertRow.querySelector('input[value="expert"]').checked, true);
-    assert.equal(expertRow.querySelector('.fab-selection-check').classList.contains('is-checked'), true);
+    assert.equal(
+      expertRow.querySelector('.fab-selection-check').classList.contains('is-checked'),
+      true
+    );
+    assert.ok(expertRow.classList.contains('is-active'), 'and the row reads as selected');
     assert.equal(rows[1].querySelector('input[value="smith"]').checked, false);
-    assert.equal(rows[1].querySelector('.fab-selection-check').classList.contains('is-checked'), false);
+    assert.equal(
+      rows[1].querySelector('.fab-selection-check').classList.contains('is-checked'),
+      false
+    );
+    assert.equal(rows[1].classList.contains('is-active'), false);
+
+    // ── AND NEITHER HEADING THE REFERENCE DOES NOT DRAW IS EMITTED ─────────────────────────
+    // `proto:2326` runs from the section header row straight into the list at `proto:2328`, and
+    // `proto:2334` is one muted sentence that states the AND rule AND introduces the gate pair.
+    const cardText = root.querySelector('[data-tool-rule-card="prerequisites"]').textContent;
+    assert.equal(cardText.includes('Which prerequisites'), false, 'no list eyebrow');
+    // `RadioCardGroup` hides its `is-config-cards` legend through the sheet, and `legendVisible`
+    // un-hides it by adding `is-legend-visible` to the fieldset. So the class is what says
+    // whether a heading is PAINTED; the `<legend>` element is there either way, carrying the
+    // group's accessible name, which is the part that must survive.
+    assert.ok(
+      !root.querySelector('[data-tool-rule-card="prerequisites"] .is-legend-visible'),
+      'and no visible gate-pair legend — the sentence above it is the introduction'
+    );
+    assert.equal(
+      root
+        .querySelector('[data-tool-rule-card="prerequisites"] .manager-resolution-mode-legend')
+        .textContent.trim(),
+      'When prerequisites fail',
+      'the group keeps its accessible name'
+    );
+    assert.ok(
+      cardText.includes('All selected prerequisites are required (AND). When a character fails them:'),
+      'the AND rule and the gate introduction are one sentence'
+    );
 
     // And the change callback still reaches the tab's patch handler through the primitive.
     root.querySelector('.manager-tool-prerequisite-list input[value="smith"]').click();

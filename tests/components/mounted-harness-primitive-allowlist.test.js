@@ -43,7 +43,7 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/Callout.svelte',
   // The manager's ONE selection control and ONE essence quantity card (issue 772), and the
   // shared editable-input stepper the card is built on. All three sit in two or more mounted
-  // trees already: `ChecklistCardRow` renders the checkbox for the Tool Studio while the
+  // trees already: the Tool Studio's prerequisite row trails the checkbox while the
   // component browser's multi-select renders it a second way, and the card is rendered by
   // both the component editor and the browser's bulk-edit rail. They could not be listed here
   // before the `named` detection below was narrowed — a bare substring match produced false

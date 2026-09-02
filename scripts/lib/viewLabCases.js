@@ -242,6 +242,18 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // DISABLED state. `GatheringEconomyView.svelte:498,514` renders the two bindings, and this
   // case's own steps fill one at `[data-economy-stamina-max]`.
   'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
+  // The manager's ONE selection box, whose `sm` SIZE has exactly one caller and is absent from
+  // both representative frames: `manager-components-normal` and `fabricate-app-shell` draw the
+  // browse row's `lg` box and nothing else. `sm` is the Tool Studio's prerequisite row (issue
+  // 1373, round 5), and until that round's case existed no frame in the registry drew it at all
+  // — which is how it went on inheriting the row's 14px into a 16px box, unphotographed.
+  //
+  // ADDITIVE, not a replacement: `selectRenderFileCases` adds the representative pair for any
+  // broad-signal file as well, so a change to the box still publishes the browse surfaces that
+  // draw the other two sizes.
+  'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
+    'manager-tool-prerequisites-selected-1280x720',
+  ]),
   // The manager's on/off switch (issue 1040), and the ONE entry here whose three frames are
   // chosen per HOST rather than per state. The primitive's `as` prop is a closed set of three
   // element shapes — a pressable `<button>`, a read-only `<span role="img">` reading, and a
@@ -475,10 +487,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/apps/manager/ItemDropZone.svelte': Object.freeze([
     'world-tool-catalogue-list-head',
   ]),
-  // The radio-card group (issue 1373). Two faces, and the representative pair renders neither: the
-  // WORLD face un-hides the gate-mode legend and draws its card with a kicker heading, while the
-  // SYSTEM face keeps that legend screen-reader-only. A change to the primitive is invisible in a
-  // frame that renders the other one, so both are named.
+  // The radio-card group (issue 1373). TWO frames because the primitive has two faces and the
+  // representative pair renders neither: `manager-tool-parity-03-breakage-1280x720` is the
+  // `is-config-cards` face at system scope, and `world-tool-entry-requirements` is the same face
+  // at world scope, inside a card whose heading idiom is the kicker rather than the title.
+  //
+  // The world entry was named for `legendVisible` — the un-hidden gate-mode legend — until issue
+  // 1373's round 5 removed that caller: `proto:2334` introduces the gate pair with the sentence
+  // above it and heads it with nothing, so the legend is screen-reader-only again at both scopes
+  // and no frame in the corpus draws a visible one. The pair is kept because the two SCOPES still
+  // differ around the group, which is what a change to it would show up differently in.
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte': Object.freeze([
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
@@ -2036,11 +2054,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
-      // The bonus list's ROW, shared with the Checks Studio catalogue (issue 1373, round 4).
+      // BOTH of this tab's lists' row (issue 1373, rounds 4 and 5) — the bonus list, shared
+      // with the Checks Studio catalogue, and the prerequisite list above it.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
-      // The card the tab draws each of its two sections as, and the radio pair whose legend it
-      // un-hides here (issue 1373). This frame is the only one that photographs the WORLD face
-      // of either: the card's `headingStyle="kicker"` and the gate-mode group's visible legend.
+      // The card the tab draws each of its two sections as (issue 1373). This frame is the only
+      // one that photographs the WORLD face of it: `headingStyle="kicker"`, and the section
+      // subtitle, which at system scope the inherit row spends the head on instead.
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
     ],
   }),
@@ -7064,6 +7083,74 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-tool-prerequisites-selected-1280x720',
+    label: 'Manager — Tool requirements, prerequisites with a selection 1280x720',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE STATE NO FRAME PHOTOGRAPHED (issue 1373, maintainer round 5). The prerequisite list is
+    // the tab's other library list, and until this case existed the registry contained no frame
+    // that drew it at all — let alone one with a row selected.
+    // `manager-tool-parity-04-requirements-1280x720` opens the Anvil, whose two sections are the
+    // canonical empty, so it photographs two off-switches and no decision;
+    // `manager-tool-bonus-hand-typed-1280x720` opens the stylus, whose prerequisites are off by
+    // design so its bonus card fits one 720px frame; and `world-tool-entry-requirements` opens
+    // the hammer, which carries a world-default bonus and no prerequisites. So the list's rows,
+    // its checkbox and its selected fill were unphotographable, which is how a bespoke row with
+    // its own metrics, its own fill and its own selected treatment survived beside the shared
+    // one the section below it draws.
+    //
+    // WHAT IT CATCHES that nothing else can: the row losing its geometry (the sheet's joined
+    // cell blocks are anchored on the LIST class, so a rename silently draws a row with no box
+    // at all), the checked box painting the wrong ink or overflowing its square, the selected
+    // ROW painting the option-card treatment's leading accent bar, and either of the two retired
+    // headings coming back. `rw-tool-caliper` carries one of the world's five prerequisites, so
+    // the frame shows a checked row against four unchecked ones in the same picture — which is
+    // the only way a selected-state regression is visible rather than merely absent.
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] [data-tool-edit-rules]',
+      },
+      { selector: '#tool-tab-requirements' },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-prerequisite-list]',
+    // THE CHECKED ROW AND AN UNCHECKED ONE. A frame proving the list renders but not that a
+    // selection reads differently from a non-selection would be evidence for half the control.
+    expectContained: [
+      {
+        container: '[data-tool-rule-card="prerequisites"]',
+        target: '[data-tool-prerequisite-row="rw-prereq-arcana"].is-active input:checked',
+      },
+      {
+        container: '[data-tool-rule-card="prerequisites"]',
+        target:
+          '[data-tool-prerequisite-row="rw-prereq-int"] .manager-modifier-readonly-expression',
+      },
+      {
+        container: '[data-tool-rule-card="prerequisites"]',
+        target: '[data-tool-prerequisites-summary]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // The row both of this tab's lists draw (issue 1373, round 5), and the checkbox the
+      // prerequisite list trails on it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+      // Deliberately NO pattern for `components/SelectionCheckbox.svelte`, for the reason
+      // `manager-setup-first-run` records: it is a broad signal, `selectRenderFileCases`
+      // `continue`s on one BEFORE consulting any case's `sourceMatches`, and such an entry would
+      // be unreachable. This case is reached through `BROAD_SIGNAL_CASE_OVERRIDES` instead.
+      //
+      // The card whose eyebrow, title and description line this frame heads both sections with.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-tool-bonus-hand-typed-1280x720',
     label: 'Manager — Tool requirements, hand-typed bonus 1280x720',
     smokeLabels: [],
@@ -7150,7 +7237,10 @@ export const VIEW_LAB_CASES = Object.freeze([
           '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-requirements' },
-      { selector: '.manager-checklist-card-row:has(input[value="rw-prereq-arcana"])' },
+      // ADDRESSED BY THE ROW'S OWN HOOK since issue 1373's round 5: the prerequisite list is
+      // `ModifierLibraryRow` now, and `data-tool-prerequisite-row` carries the entry id, so this
+      // step no longer reaches through a class the list does not write.
+      { selector: '[data-tool-prerequisite-row="rw-prereq-arcana"]' },
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',

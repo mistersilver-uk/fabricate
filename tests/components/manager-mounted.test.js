@@ -70,7 +70,7 @@ const sharedComponentNames = [
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',
-  // The manager's ONE selection control (issue 772). `ChecklistCardRow` renders it after
+  // The manager's ONE selection control (issue 772). `ModifierLibraryRow` trails it after
   // the conversion, which puts it in this root's static graph through the Tool Studio; the
   // component browser's multi-select puts it there a second way.
   'SelectionCheckbox',
@@ -253,7 +253,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ChecklistCardRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EditorValidationSurface.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemDropZone.svelte');
   // THE right-inspector action button (issue 1036, maintainer round 2). The essence browser
