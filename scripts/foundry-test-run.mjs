@@ -6206,19 +6206,35 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       'Tool breakage inherit switch',
     );
   }
+  // GATED ON THE SAME FACT AS THE SWITCH ABOVE, and for the same reason. `ToolBreakageTab.svelte`
+  // renders this callout under `{#if member}`: removing a Tool from a system means deleting its
+  // MEMBERSHIP record, and a pre-migration in-system Tool has none, so offering the action would
+  // be a button with nothing behind it. This fixture's Tools are made with `csm.upsertTool` and
+  // never enter the world catalogue, so `local` is the state it actually reaches.
+  //
+  // Both branches assert. Absent-when-local is the claim the component's own guard makes, so it
+  // is worth holding; present-and-hit-testable is what only a real browser can answer.
   const removeCallout = editor.locator('[data-tool-remove-from-system]');
-  await scrollToolEditorPanelToReveal(
-    page,
-    editor,
-    '[data-tool-remove-from-system]',
-    'Remove from system',
-  );
-  await assertPointerTarget(
-    page,
-    removeCallout.locator('button'),
-    '[data-tool-remove-from-system] button',
-    'Tool remove from system',
-  );
+  if (breakageRuleState === 'local') {
+    if (await removeCallout.count() !== 0) {
+      throw new Error(
+        'a Tool with no membership record offered to remove one',
+      );
+    }
+  } else {
+    await scrollToolEditorPanelToReveal(
+      page,
+      editor,
+      '[data-tool-remove-from-system]',
+      'Remove from system',
+    );
+    await assertPointerTarget(
+      page,
+      removeCallout.locator('button'),
+      '[data-tool-remove-from-system] button',
+      'Tool remove from system',
+    );
+  }
   await assertNoScreenshotOverlays(page);
   await captureToolStudioProduct(page, 'manager-tool-parity-02-remove-1280x720', wideGeometry);
   await resetToolStudioScroll(page);
