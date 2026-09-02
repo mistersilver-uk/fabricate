@@ -700,6 +700,36 @@ const REVIEWED = [
   },
 
   {
+    id: scopedRule(
+      'tools/ToolReplacementTarget.svelte',
+      '.manager-tool-replacement .manager-tool-replacement-tile:where() ' +
+        '.manager-tool-replacement-component-trigger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE - issue 1373`s round-2 parity pass wrote it. The ' +
+      'replacement Component control is a `SearchablePopover` trigger rendered from this ' +
+      'card`s own `triggerClass` string, so it never gains `fab-manager-button` and this rule ' +
+      'cannot be re-chained onto the primitive. What it states is that the FILLED face is the ' +
+      'design`s tile (`proto:2205`) rather than a select: the box moves to the row that holds ' +
+      'the trigger and the unlink, and the trigger itself is neutralised to a chromeless ' +
+      'region inside it.',
+  },
+  {
+    id: scopedRule(
+      'tools/ToolReplacementTarget.svelte',
+      '.manager-tool-replacement .manager-tool-replacement-drop:where() ' +
+        '.manager-tool-replacement-component-trigger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'The EMPTY face`s half of the entry above, and the same population: one ' +
+      '`SearchablePopover` trigger, from the same `triggerClass` string. It states the 28px ' +
+      'inline search pill the design draws inside the drop zone (`proto:2216`) against the ' +
+      'sheet`s `width: 100%`, which had made the affordance a second full-width select.',
+  },
+
+  {
     id: globalRule('.fabricate-manager .manager-button.is-dashed'),
     disposition: 'EXCLUDE',
     why:
@@ -1343,10 +1373,17 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // could not have named because the file did not exist yet when it was written. It is left
   // unconverted, exactly like the other 16, for the same reason: converting a `triggerClass`
   // site changes `SearchablePopover`'s own trigger contract rather than this call site's.
+  //
+  // AN 18TH LANDED WITH `tools/ToolReplacementTarget.svelte` (issue 1373, maintainer round 2).
+  // That component is where the system Tool editor's one-line replacement picker went when the
+  // design's full card — a drop zone with `Click to search`, or a filled tile with an unlink —
+  // shipped at both scopes, and the two faces are two `triggerClass` sites where the block it
+  // replaced had one. The count moves by one rather than by two for that reason. Both stay
+  // unconverted on the standing argument above.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    17,
-    'plus the 17 SearchablePopover triggerClass sites named as debt'
+    18,
+    'plus the 18 SearchablePopover triggerClass sites named as debt'
   );
   // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
   // converted it, so a bare `=== 0` would be satisfied just as well by the site having been

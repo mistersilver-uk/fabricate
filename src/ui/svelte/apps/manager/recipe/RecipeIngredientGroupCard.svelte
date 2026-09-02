@@ -48,6 +48,13 @@
     // alternative (an essence match option appended to THIS requirement). Empty means
     // the system has no essences, so the choice is not offered at all.
     essenceOptions = [],
+    // WHAT THE `Any one of` PILL'S NOTE SAYS (issue 1373, maintainer round 2, E4). The recipe
+    // editor's own sentence enumerates the four kinds a crafter may pick between, which is what
+    // a recipe author needs; a Tool's REPAIR set is a different sentence about the same shape -
+    // the design says "any one of these mends it" (`proto:2242`) - and the note is the only
+    // place the two differ. Empty falls through to the shipped copy, so every recipe and
+    // downtime call site is byte-identical.
+    anyOneOfHint = '',
     onChange = () => {},
     onRemove = () => {},
   } = $props();
@@ -224,10 +231,11 @@
         <span>{text('FABRICATE.Admin.Manager.Recipe.AnyOneOf', 'Any one of')}</span>
       </span>
       <span class="manager-recipe-any-one-of-hint manager-muted"
-        >{text(
-          'FABRICATE.Admin.Manager.Recipe.AnyOneOfHint',
-          'crafter picks a component or a tagged item'
-        )}</span
+        >{anyOneOfHint ||
+          text(
+            'FABRICATE.Admin.Manager.Recipe.AnyOneOfHint',
+            'crafter picks a component or a tagged item'
+          )}</span
       >
     </div>
     <div class="manager-recipe-ingredient-requirement-options">

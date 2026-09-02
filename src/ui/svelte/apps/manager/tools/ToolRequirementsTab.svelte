@@ -64,6 +64,41 @@
   what ITS frame draws. Mounting this tab unchanged put two heading idioms on the world screen.
   `headingStyle` carries the caller's, defaults to the system editor's, and is threaded to
   `ToolInheritCard` rather than tested against a scope in here.
+
+  IT IS OVERRIDDEN WHENEVER AN EYEBROW IS SET, which since the round below is always here: the
+  eyebrow takes the uppercase treatment and the title takes the design's sentence-case sans, so
+  a caller asking for `kicker` would otherwise stack two uppercase micro-labels. `headingStyle`
+  is kept on the prop list because the Breakage tab's cards still answer it and because the
+  two scopes are still free to disagree; it simply has one answer on THIS tab.
+
+  == ONE CARD, ONE HEADING PER SECTION, THE TOGGLE ON THE HEADER ROW ==========================
+  (Issue 1373, maintainer round 2, E3.) `proto:2322`-`2352` draws this whole tab as a SINGLE
+  card at `padding: 15px; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px`, holding two sections separated by `margin-top: 15px; padding-top: 14px;
+  border-top: 1px solid var(--border)`. Each section is a header ROW - `display: flex;
+  align-items: center; gap: 11px; margin-bottom: 9px` - whose text block is the eyebrow
+  (`Prerequisites`), then the title (`Character prerequisites`), then the description, with the
+  section's own switch on that same row. The system editor draws the identical anatomy
+  (`proto:2860`, `proto:2886`).
+
+  WHAT SHIPPED WAS TWO CARDS, EACH STATING ITS HEADING TWICE. An uppercase
+  `CHARACTER PREREQUISITES` with a description, and then a bold `Require prerequisites` row with
+  its OWN subtitle and its OWN switch, restating the same section one inch lower. Two headings
+  for one section, in two boxes, with a lot of vertical air between them.
+
+  AND THE EYEBROW AND THE TITLE WERE INVERTED. The design's eyebrow is the short WORD and its
+  title is the SENTENCE; ours had the sentence, uppercased, as the only heading.
+
+  THE ENABLE SWITCH MOVES TO THE HEADER ROW WHEN, AND ONLY WHEN, THE CARD CANNOT INHERIT.
+  At WORLD scope there is exactly one switch per section - the section's own enable - so it
+  takes the header row and the design's anatomy is reproduced exactly. At SYSTEM scope the
+  header row's control is already the INHERIT switch, which is a different question with the
+  same appearance; putting the enable switch beside it would put two identical tracks one line
+  apart with nothing to tell them apart, which is precisely the confusion this tab's docblock
+  above records having fixed once already. So the system editor keeps its enable switch as the
+  first row of the body, and gains the eyebrow, the title face, the one card and the rule
+  between the sections. That divergence is the model's, not the design's: the prototype has no
+  inheritance concept for these sections at all.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -85,6 +120,18 @@
     worldDefaults = null,
     // `'title'` — the system editor's sentence-case bold — or `'kicker'`. See the file header.
     headingStyle = 'title',
+    // ── ONE TRAILING LINE PER SECTION (issue 1373, maintainer round 2) ────────────────────
+    // `{prerequisites?: string, bonus?: string}`, rendered at the foot of each section's own
+    // card. It exists because the WORLD entry states how many crafting systems inherit each
+    // default, and it was stating both OUTSIDE this component, stacked at the bottom of a
+    // wrapper card: two identical sentences under two cards, neither beside the section it
+    // counted, reading as a duplication fault rather than as two facts.
+    //
+    // A MAP RATHER THAN A SNIPPET, deliberately: the note is one sentence the caller has
+    // already resolved, and a snippet would let a caller put arbitrary markup inside a card
+    // whose whole point is that both scopes draw it the same way. An absent key renders
+    // nothing, so the system editor is untouched.
+    sectionNotes = {},
     onPatch = () => {},
     onToggleInherited = () => {},
   } = $props();
@@ -157,10 +204,39 @@
   ]);
 </script>
 
-<div class="manager-tool-tab-stack" data-tool-requirements-tab>
+<!-- ONE CARD. The two sections are `flush` inside it and the rule between them is drawn on the
+     second one; see the file header for the design's own values. -->
+<div class="manager-tool-requirements-card" data-tool-requirements-tab>
+  {#snippet prerequisitesSwitch()}
+    <StatusToggle
+      as="checkbox"
+      on={prerequisites.enabled}
+      ariaLabel={text(
+        'FABRICATE.Admin.Manager.Tools.Editor.TogglePrerequisites',
+        'Enable character prerequisites'
+      )}
+      data-tool-prerequisites-enabled=""
+      onChange={(checked) => patchPrerequisites({ enabled: checked })}
+    />
+  {/snippet}
+  {#snippet bonusSwitch()}
+    <StatusToggle
+      as="checkbox"
+      on={bonus.enabled}
+      ariaLabel={text(
+        'FABRICATE.Admin.Manager.Tools.Editor.ToggleBonus',
+        'Enable Tool check bonus'
+      )}
+      data-tool-bonus-enabled=""
+      onChange={(checked) => patchBonus({ enabled: checked })}
+    />
+  {/snippet}
+
   <ToolInheritCard
     section="prerequisites"
+    flush
     {headingStyle}
+    eyebrow={text('FABRICATE.Admin.Manager.Tools.Editor.PrerequisitesEyebrow', 'Prerequisites')}
     title={text(
       'FABRICATE.Admin.Manager.Tools.Editor.CharacterPrerequisites',
       'Character prerequisites'
@@ -169,6 +245,7 @@
       'FABRICATE.Admin.Manager.Tools.Editor.CharacterPrerequisitesHint',
       'Gate who may wield this Tool. Pick from the character prerequisites defined under World, Rules and resources.'
     )}
+    control={member ? undefined : prerequisitesSwitch}
     inheritable={member}
     {inherited}
     fact={inheritedFact('prerequisites')}
@@ -177,35 +254,27 @@
     onToggle={onToggleInherited}
   >
     <section class="manager-tool-requirements-section">
-      <!-- THE ROW STATES WHAT THE SWITCH BESIDE IT DOES. It used to be a second card head
-           reprinting the card's own subtitle, from the SAME key, one inch below it: the head is
-           gone and the copy is the switch's own. -->
-      <div class="manager-tool-setting-row">
-        <div data-tool-prerequisites-copy>
-          <strong
-            >{text(
-              'FABRICATE.Admin.Manager.Tools.Editor.RequirePrerequisites',
-              'Require prerequisites'
-            )}</strong
-          >
-          <small
-            >{text(
-              'FABRICATE.Admin.Manager.Tools.Editor.RequirePrerequisitesHint',
-              'While this is off the Tool has no character gate and anyone may wield it.'
-            )}</small
-          >
+      <!-- THE SUBORDINATE ROW SURVIVES AT SYSTEM SCOPE ONLY, because that is the only scope
+           whose header row is already spent on a different question. See the file header. -->
+      {#if member}
+        <div class="manager-tool-setting-row">
+          <div data-tool-prerequisites-copy>
+            <strong
+              >{text(
+                'FABRICATE.Admin.Manager.Tools.Editor.RequirePrerequisites',
+                'Require prerequisites'
+              )}</strong
+            >
+            <small
+              >{text(
+                'FABRICATE.Admin.Manager.Tools.Editor.RequirePrerequisitesHint',
+                'While this is off the Tool has no character gate and anyone may wield it.'
+              )}</small
+            >
+          </div>
+          {@render prerequisitesSwitch()}
         </div>
-        <StatusToggle
-          as="checkbox"
-          on={prerequisites.enabled}
-          ariaLabel={text(
-            'FABRICATE.Admin.Manager.Tools.Editor.TogglePrerequisites',
-            'Enable character prerequisites'
-          )}
-          data-tool-prerequisites-enabled=""
-          onChange={(checked) => patchPrerequisites({ enabled: checked })}
-        />
-      </div>
+      {/if}
       <!-- ── WHICH PREREQUISITES APPLY ────────────────────────────────────────────────────
            A HEADING OF ITS OWN, because it is a different question from the switch above it and
            from the failure mode below it; the three ran together in one unbroken slab. It sits
@@ -260,17 +329,28 @@
           )}
         </p>
       {/if}
+      {#if sectionNotes.prerequisites}
+        <p
+          class="manager-muted manager-tool-requirements-note"
+          data-tool-section-note="prerequisites"
+        >
+          {sectionNotes.prerequisites}
+        </p>
+      {/if}
     </section>
   </ToolInheritCard>
 
   <ToolInheritCard
     section="bonus"
+    flush
     {headingStyle}
+    eyebrow={text('FABRICATE.Admin.Manager.Tools.Editor.BonusEyebrow', 'Bonus')}
     title={text('FABRICATE.Admin.Manager.Tools.Editor.BonusToCheck', 'Bonus to the check')}
     subtitle={text(
       'FABRICATE.Admin.Manager.Tools.Editor.BonusToCheckHint',
       'What using this Tool adds to the crafting check, if anything.'
     )}
+    control={member ? undefined : bonusSwitch}
     inheritable={member}
     {inherited}
     fact={inheritedFact('bonus')}
@@ -278,35 +358,26 @@
     onToggle={onToggleInherited}
   >
     <section class="manager-tool-requirements-section">
-      <!-- SAME REPAIR AS THE CARD ABOVE: the second head is gone, and the row that replaced it
-           states what its switch does rather than reprinting the card's subtitle from the same
-           key. -->
-      <div class="manager-tool-setting-row">
-        <div data-tool-bonus-copy>
-          <strong
-            >{text(
-              'FABRICATE.Admin.Manager.Tools.Editor.AddCheckBonus',
-              'Add a check bonus'
-            )}</strong
-          >
-          <small
-            >{text(
-              'FABRICATE.Admin.Manager.Tools.Editor.AddCheckBonusHint',
-              'While this is off the Tool contributes nothing to the roll.'
-            )}</small
-          >
+      <!-- SAME SPLIT AS THE SECTION ABOVE, for the same reason. -->
+      {#if member}
+        <div class="manager-tool-setting-row">
+          <div data-tool-bonus-copy>
+            <strong
+              >{text(
+                'FABRICATE.Admin.Manager.Tools.Editor.AddCheckBonus',
+                'Add a check bonus'
+              )}</strong
+            >
+            <small
+              >{text(
+                'FABRICATE.Admin.Manager.Tools.Editor.AddCheckBonusHint',
+                'While this is off the Tool contributes nothing to the roll.'
+              )}</small
+            >
+          </div>
+          {@render bonusSwitch()}
         </div>
-        <StatusToggle
-          as="checkbox"
-          on={bonus.enabled}
-          ariaLabel={text(
-            'FABRICATE.Admin.Manager.Tools.Editor.ToggleBonus',
-            'Enable Tool check bonus'
-          )}
-          data-tool-bonus-enabled=""
-          onChange={(checked) => patchBonus({ enabled: checked })}
-        />
-      </div>
+      {/if}
       {#if bonus.enabled}
         <label class="manager-tool-bonus-field">
           <span
@@ -336,6 +407,51 @@
           )}
         </p>
       {/if}
+      {#if sectionNotes.bonus}
+        <p class="manager-muted manager-tool-requirements-note" data-tool-section-note="bonus">
+          {sectionNotes.bonus}
+        </p>
+      {/if}
     </section>
   </ToolInheritCard>
 </div>
+
+<style>
+  /* THE TAB IS THE CARD (issue 1373, maintainer round 2, E3). `proto:2322`: `padding: 15px;
+     background: var(--bg2); border: 1px solid var(--border); border-radius: 12px`. 15 rounds to
+     `--fab-space-4` on the 4px scale and the 12px radius is the design's exactly. The rung is
+     `--fab-bg-1`: this repository's ramp is shifted one step against the design's, whose
+     `--bg2` is our `--fab-bg-1` - the same mapping every other card on the world entry uses. */
+  .manager-tool-requirements-card {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    min-width: 0;
+    padding: var(--fab-space-4);
+    border: 1px solid var(--fab-border);
+    border-radius: 12px;
+    background: var(--fab-bg-1);
+  }
+
+  /* THE HAIRLINE BETWEEN THE TWO SECTIONS, and NOT a gap: `proto:2349` states
+     `margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--border)` on the second
+     header row, both of which round to `--fab-space-4`. It is written on the SECOND section
+     rather than as a separate `<hr>` so a tab that ever renders one section draws no rule.
+
+     `:global()` because `ToolInheritCard` writes the `<section>`, not this template - the
+     scoped form would compile to a selector matching nothing. It is anchored on the card this
+     file DOES write, so its reach is this tab and no other stack of rule cards. */
+  .manager-tool-requirements-card > :global(.manager-tool-rule-card ~ .manager-tool-rule-card) {
+    margin-top: var(--fab-space-4);
+    padding-top: var(--fab-space-4);
+    border-top: 1px solid var(--fab-border);
+  }
+
+  /* The per-section trailing line. It is the last thing in the card and a claim about the
+     section rather than a control, so it takes the muted micro size the world entry's other
+     reach sentences already use. `--fab-space-1` is the design's own 4px rule gap. */
+  .manager-tool-requirements-note {
+    margin: var(--fab-space-1) 0 0;
+    font-size: 0.62rem;
+  }
+</style>

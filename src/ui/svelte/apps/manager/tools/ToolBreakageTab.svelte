@@ -25,12 +25,17 @@
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import Chip from '../Chip.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
   import ToolRepairRequirements from './ToolRepairRequirements.svelte';
+  import ToolReplacementTarget from './ToolReplacementTarget.svelte';
   import ToolSystemScopeCards from './ToolSystemScopeCards.svelte';
-  import { toolBreakageChoice, toolWorldDefaultFact } from './toolStudio.js';
+  import {
+    toolBreakageChanceBand,
+    toolBreakageChoice,
+    toolWorldDefaultFact,
+  } from './toolStudio.js';
 
   let {
     tool = null,
@@ -218,16 +223,11 @@
       icon: onBreakModeIcon(mode),
     }))
   );
-  const componentPickerOptions = $derived(
-    componentOptions.map((option) => ({
-      id: option.id,
-      label: option.name,
-      img: option.img,
-    }))
-  );
-  const selectedComponent = $derived(
-    componentOptions.find((option) => option.id === onBreak.replacementTarget?.componentId)
-  );
+  const replacementComponentId = $derived(String(onBreak.replacementTarget?.componentId || ''));
+  // THE BAND BESIDE THE SLIDER (issue 1373, maintainer round 2). The design states what the
+  // percentage MEANS next to the number, and the ramp the chip is tinted from is the one the
+  // track already runs through, so the two never disagree.
+  const chanceBand = $derived(toolBreakageChanceBand(tool?.breakage?.breakageChance ?? 0, text));
   function breakageModeLabel(mode) {
     return {
       unlimited: text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses'),
@@ -415,16 +415,24 @@
         </div>
       {:else if breakageChoice === 'breakageChance'}
         <section class="manager-tool-breakage-chance-card" data-tool-breakage-chance>
-          <div>
-            <p class="manager-kicker">
-              {text('FABRICATE.Admin.Manager.Tools.BreakageChancePerUse', 'Break chance per use')}
-            </p>
-            <p>
-              {text(
-                'FABRICATE.Admin.Manager.Tools.BreakageChanceControlHint',
-                'Each time the Tool is used, this percentage is its chance to break.'
-              )}
-            </p>
+          <div class="manager-tool-breakage-chance-head">
+            <div>
+              <p class="manager-kicker">
+                {text('FABRICATE.Admin.Manager.Tools.BreakageChancePerUse', 'Break chance per use')}
+              </p>
+              <p>
+                {text(
+                  'FABRICATE.Admin.Manager.Tools.BreakageChanceControlHint',
+                  'Each time the Tool is used, this percentage is its chance to break.'
+                )}
+              </p>
+            </div>
+            <!-- THE PLAIN-LANGUAGE BAND, on the design's own five cuts. It is a claim about the
+                 number, not a control, so it is stated beside the copy the slider labels rather
+                 than beside the slider itself. -->
+            <Chip tone={chanceBand.tone} data-tool-breakage-chance-band={chanceBand.tone}
+              >{chanceBand.label}</Chip
+            >
           </div>
           <ChanceSlider
             value={tool.breakage.breakageChance ?? 0}
@@ -525,51 +533,31 @@
       />
       <hr class="manager-tool-on-break-divider" data-tool-on-break-divider />
       {#if onBreak.mode === 'replaceWith'}
-        <section
-          class="manager-tool-repair manager-tool-replacement-card"
-          data-tool-replacement-target
-        >
-          <div>
-            <p class="manager-kicker">
-              {text(
-                'FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponent',
-                'Replacement component'
-              )}
-            </p>
-            <h3>
-              {text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
-            </h3>
-            <p>
-              {text(
-                'FABRICATE.Admin.Manager.Tools.Editor.ReplacementComponentHint',
-                'Choose the managed Component produced when this Tool breaks.'
-              )}
-            </p>
-          </div>
-          <SearchablePopover
-            options={componentPickerOptions}
-            value={selectedComponent?.id || ''}
-            triggerClass="manager-button manager-tool-replacement-component-trigger"
-            triggerIcon="fas fa-cube"
-            triggerImg={selectedComponent?.img || ''}
-            triggerLabel={selectedComponent?.name ||
-              text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
-            valueClass="manager-tool-replacement-component-name"
-            triggerAriaLabel={text(
-              'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
-              'Choose component'
-            )}
-            dialogAriaLabel={text(
-              'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
-              'Choose component'
-            )}
-            searchPlaceholder={text(
-              'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-              'Search components...'
-            )}
-            onChoose={setReplacement}
-          />
-        </section>
+        <!--
+          THE SHARED CARD (issue 1373, maintainer round 2). This was a bare picker under two
+          headings: no drop target, no source line, and no way to clear a choice. `Choose
+          component` was also a HEADING as well as the button's own label, so the card said it
+          twice. Both scopes render `ToolReplacementTarget` now, so a GM meets the same control
+          on the world default and on the system override.
+
+          `sourceText` NAMES THIS SYSTEM, which is the fact system scope has and world scope does
+          not: the Component produced here is this system's, and the same world default resolves
+          to a different Component list in the next system to inherit it.
+        -->
+        <ToolReplacementTarget
+          {componentOptions}
+          componentId={replacementComponentId}
+          disabled={immune}
+          sourceText={systemName
+            ? formattedText(
+                'FABRICATE.Admin.Manager.Tools.Editor.ReplacementSourceSystem',
+                { system: systemName },
+                'A managed Component in {system}'
+              )
+            : ''}
+          onChoose={setReplacement}
+          onClear={() => patchOnBreak({ replacementTarget: null })}
+        />
       {/if}
       {#if onBreak.mode === 'flagBroken'}
         <ToolRepairRequirements
@@ -652,3 +640,36 @@
     </section>
   {/if}
 </div>
+
+<style>
+  /* THE BREAK-CHANCE CARD'S HEAD (issue 1373, maintainer round 2).
+
+     The design puts the plain-language band on the same line as the label the slider carries
+     (`proto:2144-2146`: `display:flex; align-items:center; gap:12px; margin-bottom:11px`), so a
+     GM reads `Break chance per use / Rarely breaks` as one statement. `12` is `--fab-space-3`
+     exactly; the `11px` bottom margin is the card's own grid `gap` and is not restated.
+
+     THE HINT RULE IS RESTATED HERE because the shipped
+     `.manager-tool-breakage-chance-card > div > p:last-child` addressed the copy block as the
+     card's DIRECT child, and the head is now that child — so the shipped rule matches nothing
+     rather than conflicting, and the treatment has to be re-declared at the new depth. Written
+     in this file rather than in `styles/fabricate.css` because this template writes both
+     elements, so the scoping hash reaches them. */
+  .manager-tool-breakage-chance-head {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-3);
+    min-width: 0;
+  }
+
+  .manager-tool-breakage-chance-head > div {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .manager-tool-breakage-chance-head > div > p:last-child {
+    margin: var(--fab-space-1) 0 0;
+    color: var(--fab-text-muted);
+    font-size: 0.68rem;
+  }
+</style>

@@ -115,6 +115,10 @@ const harness = createMountedComponentHarness({
     // from the SYSTEM rules editor, because a crafting system authors no identity.
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
+    // The shared `REPLACEMENT COMPONENT` card (issue 1373, maintainer round 2). The system
+    // editor's own bespoke block became a caller of it, so it is in this tree's static graph
+    // and an omission HANGS this suite rather than failing it.
+    'src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
     'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -401,7 +405,68 @@ describe('Tool Studio editor (mounted)', () => {
       /Marked broken and renamed/
     );
     assert.equal(root.querySelector('[data-tool-player-name]').textContent, "Smith's Hammer (Broken)");
+    assert.equal(
+      root.querySelector('[data-tool-player-image]').dataset.toolPlayerImage,
+      'tool',
+      'a marked-broken copy is still the Tool, dimmed and renamed'
+    );
     assert.deepEqual(patches, [], 'the broken preview writes nothing');
+  });
+
+  // THE PREVIEW SHOWS THE CONSEQUENCE, NOT A WORD FOR IT (issue 1373, maintainer round 2).
+  //
+  // All three on-break actions used to draw the SAME picture — the Tool's own art, dimmed, under
+  // a differently-worded chip — so a GM checking what `Destroy the item` does to a copy saw the
+  // copy, and what `Replace with component` produces was a chip reading `Replaced`.
+  //
+  // ASSERTED THROUGH `data-tool-player-image`, which exists for this: an empty box, the Tool's
+  // own art and a replacement's art are three different renderings that a selector on the tile
+  // cannot tell apart, and `assert.ok(!el)` rather than `assert.equal(el, null)` because
+  // node:assert serialises a mounted happy-dom element's circular tree to build a diff.
+  it('empties the inventory tile when the Tool is DESTROYED on break', async () => {
+    const root = await harness.mount(props({ tool: tool({ onBreak: { mode: 'destroy' } }) }));
+    const broken = root.querySelector('[data-tool-player-broken]');
+    broken.checked = true;
+    broken.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    const tile = root.querySelector('[data-tool-player-image]');
+    assert.equal(tile.dataset.toolPlayerImage, 'none', 'the slot is empty');
+    assert.ok(!tile.querySelector('img'), 'no art is drawn for a copy that is gone');
+    assert.ok(
+      !root.querySelector('[data-tool-player-preview] .fab-status-pill'),
+      'and no chip names the outcome the empty box already states'
+    );
+  });
+
+  it('draws the REPLACEMENT Component when the Tool is swapped on break', async () => {
+    const root = await harness.mount(
+      props({
+        tool: tool({
+          onBreak: {
+            mode: 'replaceWith',
+            replacementTarget: { type: 'component', componentId: 'scrap' },
+          },
+        }),
+      })
+    );
+    const broken = root.querySelector('[data-tool-player-broken]');
+    broken.checked = true;
+    broken.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    const tile = root.querySelector('[data-tool-player-image]');
+    assert.equal(tile.dataset.toolPlayerImage, 'replacement');
+    assert.equal(
+      tile.querySelector('img').getAttribute('src'),
+      managedItems[1].img,
+      'the tile draws what the Tool BECOMES'
+    );
+    assert.equal(
+      root.querySelector('[data-tool-player-name]').textContent.trim(),
+      managedItems[1].name,
+      'and the caption names it, not the Tool it replaced'
+    );
   });
 
   it('evaluates the Tool against a chosen actor, and says what that character gets', async () => {
@@ -1236,6 +1301,65 @@ describe('Tool Studio editor (mounted)', () => {
       const element = root.querySelector(hook);
       assert.ok(element, `${hook} must render`);
       joinedByOneSpace(element, hook);
+    }
+  });
+
+  // ── E3 AT SYSTEM SCOPE (issue 1373, maintainer round 2) ─────────────────────────────────
+  //
+  // The tab is shared with the world entry and gains the design's heading anatomy at BOTH
+  // scopes: one card, an eyebrow over a sentence-case title, and a rule between the sections.
+  //
+  // WHAT DOES NOT MOVE HERE is the enable switch. The world entry puts it on the header row,
+  // where the design draws it; a system card's header row is already spent on the INHERIT
+  // switch, which is a different question wearing the same track, so the enable switch stays as
+  // the first row of the body. This case is the record of that divergence — without it, a later
+  // author reading the world frame would "fix" the system one into two identical switches a
+  // line apart.
+  it('heads both sections with an eyebrow inside ONE card, and keeps the system enable row', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+    const card = root.querySelector('.manager-tool-requirements-card');
+    assert.ok(Boolean(card), 'the tab is one card at system scope too');
+    assert.deepEqual(
+      [...card.querySelectorAll('[data-tool-rule-card]')].map(
+        (section) => section.dataset.toolRuleCard
+      ),
+      ['prerequisites', 'bonus']
+    );
+    assert.deepEqual(
+      [...card.querySelectorAll('[data-tool-rule-eyebrow]')].map((node) =>
+        node.textContent.trim()
+      ),
+      ['Prerequisites', 'Bonus'],
+      'the eyebrow is the short word at this scope as well'
+    );
+    assert.deepEqual(
+      [...card.querySelectorAll('.manager-tool-rule-card-title h3')].map((node) =>
+        node.textContent.trim()
+      ),
+      ['Character prerequisites', 'Bonus to the check'],
+      'and the title is the sentence'
+    );
+
+    // THE HEADER ROW'S CONTROL IS THE INHERIT SWITCH, and the enable switch is in the body.
+    for (const [section, hook] of [
+      ['prerequisites', 'data-tool-prerequisites-enabled'],
+      ['bonus', 'data-tool-bonus-enabled'],
+    ]) {
+      const rule = card.querySelector(`[data-tool-rule-card="${section}"]`);
+      assert.ok(
+        Boolean(rule.querySelector(`[data-scoped-inherit-toggle="${section}"]`)),
+        'the inheritance switch keeps the head'
+      );
+      const enable = rule.querySelector(`[${hook}]`);
+      assert.ok(Boolean(enable), 'and the section still has its own enable switch');
+      assert.ok(
+        !enable.closest('.manager-tool-rule-card-head'),
+        'which stays in the body rather than joining a second track on the head'
+      );
+      assert.ok(
+        Boolean(enable.closest('.manager-tool-setting-row')),
+        'as the first row of it'
+      );
     }
   });
 

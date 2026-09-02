@@ -2389,8 +2389,10 @@ That hazard is independent of which system authored the list, which is why no do
    A dangling repair ingredient group has no such rule and would silently change what a repair costs.
 
    **Addressability, which is where the constraint bites.**
-   `repairRequirements` cannot be a live parent because ingredient groups are named over the OWNING SYSTEM's components, which world scope cannot address.
-   `effectSource` escapes that only because THIS SECTION makes components a world entity: `sourceItemUuid` is a world document UUID and is globally addressable already, and `sourceComponentId` is world-addressable exactly when it names a WORLD component.
+   `repairRequirements` cannot be a live parent because an ingredient group names a QUANTITY OF EACH REFERENT IN A PARTICULAR SYSTEM, and a world value that resolved live would change what a repair costs in a system that never authored it.
+   The referents themselves ARE world-addressable, and this is a correction of an earlier reading that said otherwise (issue 1373, maintainer round 2): THIS SECTION makes components a world entity, so a repair group naming world component ids is exactly as addressable as `effectSource`'s `sourceComponentId`.
+   What world scope cannot promise is MEMBERSHIP — that every system inheriting the Tool has also adopted each named Component — which is the same constraint `destructive-changes-and-migrations/spec.md` already applies when it lifts a seed only where every referenced component is a world component every member system holds.
+   `effectSource` escapes the live-parent objection for a different reason: it is a SINGLE reference rather than a costed set, so a system that resolves it to nothing degrades into the already-specified dangling-source state instead of quietly repricing a repair.
 
    **The binding constraint on EVERY WRITER, not only the migration:**
    a WORLD essence default's `effectSource` may name only a WORLD-ADDRESSABLE referent — a world component id or a document UUID — and MUST NOT carry a system-local component id.
@@ -2452,14 +2454,19 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    It is the shipped `Tool.repairRequirements` — the `flagBroken` repair recipe's ingredient groups — held at world scope as a starting point only.
    It is copied out of the world defaults ONCE, when a tool is added to a system, and then diverges freely; nothing re-reads it from the world afterwards, and a later world edit never reaches a system that has already been seeded.
    Resolution answers it from the MEMBERSHIP RECORD ALONE and never reads it back out of the world defaults, because a seeded value the system has since edited is the only truth about that system's repair recipe.
-   Modelling it as an INHERITED section with a permanently-false switch would be a lie the UI would then have to hide, and it would be untrue on its own terms: a repair recipe names ingredient groups over the OWNING SYSTEM's components, which the world scope cannot address.
+   Modelling it as an INHERITED section with a permanently-false switch would be a lie the UI would then have to hide, and it would be untrue on its own terms: a repair recipe prices a set of referents FOR ONE SYSTEM, and a live world value would change what a repair costs in a system that never authored it.
+   That is a statement about COST and MEMBERSHIP, not about naming: a repair group may name world component ids, world essence ids and world tags, all of which world scope addresses (see `### Essence scope` requirement 5's addressability paragraph, which records the correction).
    The seed is a DEEP copy, so neither scope can reach into the other through a shared reference — the one exception to requirement 11's aliasing rule.
    A value structured cloning refuses degrades to a shallow copy rather than being dropped, because a seed that silently lost a repair recipe would be worse than one that shares a reference nothing structurally mutates.
    Seeding is NOT the default treatment for a section whose shipped field names an in-system reference: `### Essence scope` requirement 5 settles `effectSource` as a LIVE PARENT on the opposite side of the same question, and records what distinguishes the two.
    **The world default is AUTHORED through its own tool-family write action, never through the section writer.**
    `updateWorldDefaultSection` refuses every name outside the scope's declared sections and `repairRequirements` is deliberately not one of them, so routing the write through it returns `false` and stores nothing.
    The seed's WRITE path and its READ path are therefore deliberately asymmetric: the world holds it and a tool-family-only action writes it, while the membership record alone answers it.
-   The action's callers are import, migration and adoption; NO GM SCREEN offers it, and `### GM World Scoped Entity Routes` requirement 4 states why — a screen that cannot show a repair group's contents cannot honestly offer a write over them.
+   **THE WORLD TOOL ENTRY IS A CALLER OF IT, alongside import, migration and adoption** (issue 1373, maintainer round 2).
+   The Breakage tab renders the SAME repair editor the system Tool rules editor mounts, over the WORLD component, essence and tag rosters, and routes its change to this action rather than to the section writer.
+   It is offered only in the `flagBroken` on-break mode, which is the only mode a repair route means anything in, and it states its own reach: the seed is copied when a system ADOPTS the Tool, so an edit reaches the next system to adopt it and none that already has it.
+   Currency is deliberately withheld there — units are world-wide but whether a cost is honoured is each system's `requirements.currency.enabled`, which a world default cannot state — so the editor is mounted with currency disabled and renders an imported cost read-only rather than offering a new one.
+   An earlier round removed a `REPAIR MATERIALS` card from this screen and recorded the rule that a screen may not offer a write over data it has declared itself unable to show; that rule STANDS, and this surface satisfies it by SHOWING the groups rather than by stating a bare count and offering to clear them.
 
    **WHILE `## CraftingSystem` REQUIREMENT 36 HOLDS THE SEED IS TAKEN ONTO BOTH RECORDS, AND ONLY THE IN-SYSTEM COPY IS READ** (issue 1373).
    `Tool.repairRequirements` is a shipped in-system field, so a normalized in-system record always carries it — and requirement 15's KEYS clause answers every key the in-system record carries FROM that record.

@@ -68,6 +68,16 @@
     triggerImg   — leading portrait image src on the trigger (optional; mirrors
                    how list options render `option.img`), shown before the label
     triggerLabel — current-selection text on the trigger (omitted when empty)
+    triggerMeta  — a SECOND line under `triggerLabel`, inside the trigger button (issue
+                   1373). It is the trigger-side twin of an option's `meta`, and it
+                   exists for the same reason that one does: a trigger whose value is
+                   identified by a FACT as well as by a name — the Tool editors'
+                   replacement-Component tile states where the chosen Component lives
+                   under its name — cannot put that fact in the label without making the
+                   label read as a sentence. Both lines are inside the button, so both
+                   are in its accessible name and a screen-reader user hears the same two
+                   facts. EMPTY BY DEFAULT, and the empty case renders the label span
+                   exactly as before, so every shipped call site's markup is unchanged.
     valueClass   — extra class on the trigger value span
     showChevron  — render the open/closed chevron on the trigger (default true)
     triggerAddMarker — optional value for a `data-recipe-add` attribute on the
@@ -197,6 +207,7 @@
     triggerIcon = '',
     triggerImg = '',
     triggerLabel = '',
+    triggerMeta = '',
     valueClass = '',
     showChevron = true,
     showSearch = true,
@@ -479,7 +490,13 @@
     {#if triggerImg}<span class="manager-travel-portrait" aria-hidden="true"
         ><img src={triggerImg} alt="" /></span
       >{:else if triggerIcon}<i class={triggerIcon} aria-hidden="true"></i>{/if}
-    {#if triggerLabel}<span class={`manager-travel-picker-value ${valueClass}`}>{triggerLabel}</span
+    {#if triggerMeta}<span class="manager-travel-picker-copy"
+        ><span class={`manager-travel-picker-value ${valueClass}`}>{triggerLabel}</span><span
+          class="manager-travel-picker-meta"
+          data-popover-trigger-meta>{triggerMeta}</span
+        ></span
+      >{:else if triggerLabel}<span class={`manager-travel-picker-value ${valueClass}`}
+        >{triggerLabel}</span
       >{/if}
     {#if showChevron}<i
         class={open ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
@@ -893,5 +910,35 @@
   .manager-travel-popover.is-compact-option-rows .manager-travel-option-meta {
     font-size: 9.5px;
     font-weight: 400;
+  }
+
+  /* ── THE TWO-LINE TRIGGER (issue 1373) ─────────────────────────────────────
+     The trigger-side twin of `.manager-travel-option-meta` above, and deliberately the same
+     shape: a column that may shrink to nothing, with the second line quiet, capped and
+     ellipsised so a long address cannot widen the control past its container.
+
+     BOTH ELEMENTS ARE WRITTEN BY THIS COMPONENT, so these are ordinary scoped rules — no
+     `:global()` and no dependence on `styles/fabricate.css`, which has no rule for either
+     class. `triggerMeta` is empty at every shipped call site, so neither element exists
+     anywhere but the Tool editors' replacement tile today. */
+  .manager-travel-picker-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .manager-travel-picker-meta {
+    min-width: 0;
+    margin-top: var(--fab-space-2xs);
+    overflow: hidden;
+    color: var(--fab-text-subtle);
+    font-family: var(--fab-font-mono);
+    font-size: 0.6rem;
+    font-weight: 400;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

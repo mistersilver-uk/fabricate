@@ -2887,6 +2887,63 @@
     systemId: selectedSystemId || '',
   });
 
+  // ── THE WORLD INGREDIENT ROSTERS (issue 1373, maintainer round 2) ────────────────────────
+  //
+  // The world Tool entry's Breakage tab authors two answers that NAME OTHER RECORDS: the
+  // Component a broken Tool is replaced by, and the ingredient groups that mend a marked-broken
+  // one. Both were unauthorable at world scope, on the standing reading that a repair group
+  // "names ingredient quantities over the OWNING SYSTEM's components, which world scope cannot
+  // address" — which epic 1357 retired by giving the world its own component and essence
+  // catalogues. A world entity id IS the id a membership record carries, so a world default
+  // naming one resolves in every system that has adopted it.
+  //
+  // THEY ARE NOT IN `toolScopeProps`, and that is deliberate rather than an oversight: that
+  // bundle is ONE family's scope, actions and roster, spread at twelve call sites, and three of
+  // these four values come from a DIFFERENT family's corpus. Folding a component roster into the
+  // tool bundle would hand every tool screen a key its contract does not have.
+  const worldComponentOptions = $derived(
+    (worldScopeState.component?.entries ?? []).map((entry) => ({
+      id: entry.id,
+      name: entry.entity?.name || entry.id,
+      img: entry.entity?.img || '',
+      // CARRIED FOR THE DROP TARGET. `resolveDroppedComponentId` matches a dragged Foundry
+      // document against these two, which is the only way a leaf holding no Foundry global can
+      // answer a drop at all. (The word for that global is deliberately not written here:
+      // `manager-contract.test.js` greps this file's SOURCE for it, comments included.)
+      ...(entry.entity?.registeredItemUuid && {
+        registeredItemUuid: entry.entity.registeredItemUuid,
+      }),
+      ...(entry.entity?.originItemUuid && { originItemUuid: entry.entity.originItemUuid }),
+    }))
+  );
+
+  // WORLD-DISABLED ESSENCES ARE WITHHELD FROM THE OFFER, which is exactly what
+  // `selectableEssenceOptions` does with a system-disabled one: the projection answers `enabled`
+  // from the world master switch, and an ingredient picker must not offer a record the world has
+  // turned off everywhere.
+  const worldEssenceOptions = $derived(
+    (worldScopeState.essence?.entries ?? []).map((entry) => ({
+      ...(entry.entity ?? {}),
+      id: entry.id,
+      enabled: entry.worldEnabled !== false,
+    }))
+  );
+
+  // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT. `setWorldTags` writes each
+  // world component's own `tags`, and there is no separate world tag roster to read: the
+  // `world-vocabulary` store that will publish one is not registered yet (its projection answers
+  // `total: 0`), so the union of what is actually authored is the honest list. Sorted, so the
+  // picker's order does not follow catalogue order.
+  const worldComponentTags = $derived(
+    [
+      ...new Set(
+        (worldScopeState.component?.entries ?? []).flatMap((entry) =>
+          Array.isArray(entry.defaults?.tags) ? entry.defaults.tags : []
+        )
+      ),
+    ].sort((left, right) => String(left).localeCompare(String(right)))
+  );
+
   // ── WHAT THE ESSENCE RULES INSPECTOR NEEDS FROM THE WORLD JOIN (issue 1372, round 8) ──────
   //
   // The rail states two facts it could not reach before: which LAYER each on-craft section
@@ -11785,6 +11842,9 @@
         entityId={worldScopedEntryId}
         worldItems={worldItemOptions}
         prerequisiteOptions={selectedCharacterPrerequisites}
+        componentOptions={worldComponentOptions}
+        essenceOptions={worldEssenceOptions}
+        itemTags={worldComponentTags}
         previewActors={worldToolPreviewActors}
         getPreviewRollData={worldToolPreviewRollData}
         onBackToCatalogue={() => setView('world-tools')}

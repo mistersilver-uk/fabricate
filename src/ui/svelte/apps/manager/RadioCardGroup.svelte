@@ -1,4 +1,23 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  ── A RECORDED DEVIATION FROM THE PROTOTYPE, AND THE RULING THAT SETTLED IT ─────────────
+  The GM Component Catalogue prototype draws its own radio card at `padding: 12px 13px;
+  gap: 11px; border-radius: 11px`, with a 28px leading glyph tile and `600 11.5px` labels
+  (`proto:2120` for the Tool breakage-mode trio and `proto:4596` for the shared `radioCard`
+  helper every one of its groups is built from). This primitive does not match those numbers
+  and is NOT going to be changed to.
+
+  MAINTAINER RULING (issue 1373, round 2, plan ruling 4): control heights, radii and spacing
+  stay on Fabricate's shipped scale; TYPE and COLOUR come from the prototype. So a per-4px
+  difference in a card's padding or a 1px difference in its radius is a deliberate hold, not
+  drift — and the primitive is not to be route-scoped to give one caller the prototype's
+  geometry either, because a shipped primitive that varies by caller is the union of its
+  callers.
+
+  This note exists because the deviation is otherwise invisible: measured against the design's
+  markup it looks exactly like a defect, has been reported as one, and would be rediscovered
+  on every audit that reads the prototype rather than this file.
+-->
 <script>
   import Field from '../../components/Field.svelte';
   import { localize } from '../../util/foundryBridge.js';

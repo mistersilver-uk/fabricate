@@ -2008,6 +2008,21 @@ const SMITHING_TOOLS = [
     aliasItemUuids: [],
     breakage: { mode: 'limitedUses', maxUses: null },
   },
+  // ── THE MARKED-BROKEN TOOL, AND THE ONE WITH A REPAIR ROUTE (issue 1373, round 2) ────────
+  // `Mark as broken` is the on-break action that takes an ARGUMENT — the ingredient groups that
+  // mend a broken copy — and no lab tool selected it, so the world entry's repair picker was a
+  // state no capture case could reach. That is precisely why two automated parity passes
+  // reported the screen complete while it rendered nothing there.
+  //
+  // TWO GROUPS, NOT ONE, and the second carries two OPTIONS. A single one-option group cannot
+  // show the AND-across-groups / OR-inside-a-group rule the card's own hint states, so a frame
+  // of it would be evidence for half the control. The ids are WORLD component ids: the `1.30.0`
+  // migration mints one world Component per system definition preserving its id, which is what
+  // makes a world-scope repair group addressable at all.
+  //
+  // A HIGHER BREAK CHANCE THAN THE HAMMER'S 5%, deliberately: 22% lands in the design's third
+  // band (`Breaks now and then`) where the hammer sits in its second (`Rarely breaks`), so the
+  // two frames of this control show two different bands rather than one twice.
   {
     id: 'sm-tool-tongs',
     name: 'Forge Tongs',
@@ -2017,7 +2032,26 @@ const SMITHING_TOOLS = [
     originItemUuid: 'Item.sm-tool-tongs',
     img: `${ICON_BASE}/tools/smithing/tongs-steel-grey.webp`,
     aliasItemUuids: [],
-    breakage: { mode: 'breakageChance', breakageChance: 2 },
+    breakage: { mode: 'breakageChance', breakageChance: 22 },
+    onBreak: { mode: 'flagBroken' },
+    // THE OPTIONS CARRY A `match`, WHICH IS NOT THE RECIPE FIXTURES' SHORTHAND. `simpleSet`
+    // above writes `{componentId, quantity}` and gets away with it because a recipe passes
+    // through `Recipe` normalization on the way in; a world-defaults SECTION VALUE is stored
+    // OPAQUELY and reaches the editor exactly as written, so the shorthand renders as an unset
+    // `Pick component` row in every group. This is the normalized shape the editor reads.
+    repairRequirements: [
+      {
+        id: 'sm-tool-tongs-repair-g1',
+        options: [{ quantity: 1, match: { type: 'component', componentId: 'sm-iron-ingot' } }],
+      },
+      {
+        id: 'sm-tool-tongs-repair-g2',
+        options: [
+          { quantity: 2, match: { type: 'component', componentId: 'sm-coal' } },
+          { quantity: 1, match: { type: 'component', componentId: 'sm-whetstone' } },
+        ],
+      },
+    ],
   },
 ];
 
@@ -3943,11 +3977,15 @@ export function buildLabContent() {
             id: tool.id,
             breakage: tool.breakage ?? { mode: 'limitedUses', maxUses: null },
             onBreak: tool.onBreak ?? { mode: 'destroy' },
-            // The SEEDED third section, on ONE tool only: the entry's repair tab states a
-            // count, and a corpus where every record carried the same number could not show
-            // that the count is read per record.
-            ...(tool.id === 'sm-tool-hammer'
-              ? { repairRequirements: [{ id: 'sm-tool-hammer-repair', ingredients: [] }] }
+            // THE SEEDED THIRD SECTION, READ OFF THE TOOL THAT DECLARES ONE (issue 1373,
+            // round 2). It used to be a hard-coded one-record special case whose value was
+            // `[{id, ingredients: []}]` — a shape no reader has: an ingredient GROUP carries
+            // `options`, not `ingredients`, so the world entry's repair editor rendered a group
+            // with nothing in it and the count beside it claimed one. Reading the tool's own
+            // declaration means the fixture states the seed in the shape the editor edits, and
+            // a second tool can carry a different one.
+            ...(Array.isArray(tool.repairRequirements)
+              ? { repairRequirements: tool.repairRequirements }
               : {}),
             // THE TWO SECTIONS THAT JOINED `TOOL_SECTIONS` AT `1.31.0`, AUTHORED ON ONE TOOL
             // (issue 1373). Without a world value for either, the only frame that photographs

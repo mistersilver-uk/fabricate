@@ -41,6 +41,25 @@
    - icon / title / subtitle: the card's own heading. `subtitle` is the descriptive line shown
      when the card carries NO inherit affordance; an inheritable card states the world default
      there instead, through `InheritRow`'s head.
+   - eyebrow: an uppercase micro-label ABOVE the title (issue 1373, maintainer round 2). The
+     design heads each Requirements section with a short WORD over a sentence-case TITLE -
+     `Prerequisites` over `Character prerequisites` (`proto:2324`), `Bonus` over `Bonus to the
+     check` (`proto:2350`), and the same anatomy again at system scope (`proto:2860`,
+     `proto:2886`). Ours had the two inverted: the sentence, uppercased, as the only heading.
+     Supplying an eyebrow also puts the title into the design's `600 13px` sans rather than the
+     display face, because the uppercase kicker treatment now belongs to the line above it.
+     Empty by default, so the Breakage tab's four cards are unchanged.
+   - control: an OPTIONAL snippet rendered on the header row, at its right edge. The design puts
+     each section's own enable switch there rather than on a second heading row inside the body
+     (`proto:2325`, `proto:2351`). A card that CAN inherit already spends that slot on the
+     inherit switch - a different question, and two identical switches one line apart is the
+     confusion this card's head was built to avoid - so its caller keeps the enable switch as
+     the first row of the body and passes no `control`. See `ToolRequirementsTab`.
+   - flush: draw no border, no radius, no fill and no horizontal padding, so a caller can stack
+     several sections inside ONE card with a rule between them. The design draws the whole
+     Requirements tab as a single `padding: 15px` card whose two sections are separated by
+     `margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--border)` (`proto:2322`,
+     `proto:2349`); a card per section put three nested edges where the design draws one.
    - headingStyle: `'title'` — the system rules editor's sentence-case bold, and the default —
      or `'kicker'`, the uppercase micro-label the WORLD entry sets every card heading in.
      The two design frames genuinely differ here, and mounting this card unchanged put two
@@ -90,6 +109,9 @@
     icon = '',
     title = '',
     subtitle = '',
+    eyebrow = '',
+    flush = false,
+    control = undefined,
     inheritable = false,
     inherited = {},
     fact = null,
@@ -142,10 +164,17 @@
 <section
   class="manager-tool-rule-card"
   class:is-inheriting={isInherited}
+  class:is-flush={flush}
+  class:has-eyebrow={Boolean(eyebrow)}
   data-tool-rule-card={section}
   data-tool-rule-state={inheritable ? (isInherited ? 'inheriting' : 'overridden') : 'local'}
 >
   <div class="manager-tool-rule-card-head">
+    {#if eyebrow}
+      <p class="manager-kicker manager-tool-rule-card-eyebrow" data-tool-rule-eyebrow={section}>
+        {eyebrow}
+      </p>
+    {/if}
     <div class="manager-tool-rule-card-title">
       <!-- `manager-kicker` is the shipped uppercase micro-label class and rides the SAME `<h3>`
            rather than replacing it with a paragraph: the card's heading is a heading in both
@@ -190,6 +219,7 @@
     {:else if subtitle}
       <p class="manager-tool-rule-card-sub">{subtitle}</p>
     {/if}
+    {@render control?.()}
   </div>
 
   {#if isInherited}
@@ -220,3 +250,73 @@
     </div>
   {/if}
 </section>
+
+<style>
+  /* -- THE EYEBROW FACE (issue 1373, maintainer round 2, E3) ------------------------------
+     The head is a two-column grid in `styles/fabricate.css`, and its rows are placed there by
+     rule rather than by source order. Adding a third line therefore has to re-place all of them
+     from here, under a modifier class so the four Breakage cards - which pass no eyebrow - are
+     untouched. Every rule below is anchored on two classes this component writes, which puts it
+     at (0,4,0) against the sheet's (0,2,0) and (0,3,0), so none of it depends on injection
+     order. `:global()` marks the elements `InheritRow` and `StatusToggle` write.
+
+     Row 1 is the eyebrow, row 2 the title line, row 3 the descriptive line - the subtitle at
+     world scope, `InheritRow`'s `World default:` head at system scope. The head's one control
+     spans all three, which is where the design centres it (`proto:2323`). */
+  .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-title {
+    grid-row: 2;
+  }
+
+  .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-sub {
+    grid-row: 3;
+  }
+
+  .manager-tool-rule-card.has-eyebrow
+    .manager-tool-rule-card-head
+    :global(.manager-scoped-inherit-head) {
+    grid-row: 3;
+  }
+
+  .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-head :global(.manager-status-toggle) {
+    grid-row: 1 / -1;
+  }
+
+  /* THE TITLE IS THE SENTENCE AND THE EYEBROW IS THE WORD. `proto:2324` sets the title at
+     `600 13px var(--sans); color: var(--text)`, which is 0.82rem against the 16px root - not
+     the serif display face the sheet gives a bare rule card, and not the uppercase kicker the
+     world entry gives one, because the kicker treatment has moved to the line above. */
+  .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-title h3 {
+    color: var(--fab-text);
+    font-family: var(--fab-font-sans);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+
+  /* -- THE FLUSH FACE ---------------------------------------------------------------------
+     No box of its own, so the caller's single card is the only edge on the tab. The head and
+     body keep their VERTICAL rhythm and lose their horizontal inset, which the containing card
+     supplies once instead of once per section. */
+  .manager-tool-rule-card.is-flush {
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  .manager-tool-rule-card.is-flush .manager-tool-rule-card-head {
+    padding: 0;
+  }
+
+  .manager-tool-rule-card.is-flush .manager-tool-rule-card-inherited,
+  .manager-tool-rule-card.is-flush .manager-tool-rule-card-body {
+    padding: var(--fab-space-3) 0 0;
+  }
+</style>
