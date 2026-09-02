@@ -173,6 +173,14 @@ const SELECTORS = Object.freeze({
     trigger: 'button.manager-travel-trigger',
     panel: '.fabricate-picker-popover',
   }),
+  // `ActorSelectTopBar`, the primitive's first player-window adopter (issue 1475). `container` is
+  // the element the panel used to be positioned INSIDE — the bar — and is measured so the clipping
+  // half of the conversion can be asserted rather than assumed.
+  actorbar: Object.freeze({
+    trigger: 'button.actor-bar-trigger',
+    panel: '.actor-bar-popover',
+    container: '.fabricate-app-actor-bar',
+  }),
   icon: Object.freeze({
     trigger: '.essence-icon-picker-trigger',
     panel: '.fabricate-icon-picker-popover',
@@ -208,7 +216,11 @@ async function openOverlayIn({ host, component = 'popover' }) {
     });
     await page.waitForFunction(() => globalThis.__overlayHostFixtureReady === true);
 
-    const { trigger: triggerSelector, panel: panelSelector } = SELECTORS[component];
+    const {
+      trigger: triggerSelector,
+      panel: panelSelector,
+      container: containerSelector = '',
+    } = SELECTORS[component];
 
     await page.click(triggerSelector);
     await page.waitForSelector(panelSelector);
@@ -219,7 +231,12 @@ async function openOverlayIn({ host, component = 'popover' }) {
     );
 
     const measured = await page.evaluate(
-      ({ triggerSelector: trigger, panelSelector: panel, rootClasses }) => {
+      ({
+        triggerSelector: trigger,
+        panelSelector: panel,
+        containerSelector: container,
+        rootClasses,
+      }) => {
         const box = (node) => {
           if (!node) return null;
           const { left, top, right, bottom, width, height } = node.getBoundingClientRect();
@@ -231,16 +248,37 @@ async function openOverlayIn({ host, component = 'popover' }) {
           const node = document.querySelector(`.${cls}`);
           rootPositions[cls] = node ? getComputedStyle(node).position : null;
         }
+        // A HIT TEST rather than a rect comparison, for the clipping question. An element clipped
+        // by an ancestor's `overflow` still reports its full, unclipped box from
+        // `getBoundingClientRect`, so geometry alone cannot tell a visible panel from a hidden
+        // one; `elementFromPoint` is the browser answering which element a user's pointer would
+        // actually reach at that coordinate.
+        let panelHit = null;
+        if (panelNode) {
+          const rect = panelNode.getBoundingClientRect();
+          const hit = document.elementFromPoint(
+            Math.round(rect.left + rect.width / 2),
+            Math.round(rect.top + Math.min(rect.height / 2, rect.height - 4))
+          );
+          panelHit = hit ? { inPanel: panelNode.contains(hit), className: hit.className } : null;
+        }
         return {
           trigger: box(document.querySelector(trigger)),
           panel: box(panelNode),
+          container: container ? box(document.querySelector(container)) : null,
           frame: box(document.querySelector('.application')),
           panelParentClass: panelNode?.parentElement?.className ?? '',
           panelPosition: panelNode ? getComputedStyle(panelNode).position : null,
+          panelHit,
           rootPositions,
         };
       },
-      { triggerSelector, panelSelector, rootClasses: [...OVERLAY_HOST_ROOT_CLASSES] }
+      {
+        triggerSelector,
+        panelSelector,
+        containerSelector,
+        rootClasses: [...OVERLAY_HOST_ROOT_CLASSES],
+      }
     );
 
     return { ...measured, consoleErrors };
@@ -402,6 +440,48 @@ describe('1466 a portaled overlay is positioned against the host it was portaled
       assert.deepEqual(measured.consoleErrors, [], `${label} reported a missing host`);
     });
   }
+
+  // ── THE FIRST PLAYER-WINDOW ADOPTER (issue 1475) ───────────────────────────────────────────
+  // Everything above measures a PRIMITIVE mounted in a host. This measures a shipped SURFACE:
+  // `ActorSelectTopBar`'s actor picker, which hand-rolled an `position: absolute` panel inside the
+  // bar for its whole life and now portals `SearchablePopover`'s panel onto the player window
+  // frame. It is the first thing in the product that depends on the three changes above being
+  // real, and the acceptance question for that conversion is geometric rather than structural:
+  // the panel must land at its trigger, and must not be clipped by the bar it opens from.
+  it('the actor picker lands at its trigger in the player window', async () => {
+    const measured = await openOverlayIn({ host: 'app', component: 'actorbar' });
+    assertPanelIsAtItsTrigger(measured, 'player app (ActorSelectTopBar)');
+    assert.ok(
+      measured.panelParentClass.includes('fabricate-app'),
+      `the actor picker's panel parent is \`${measured.panelParentClass}\`, not the player window ` +
+        'frame, so the portal did not land'
+    );
+    assert.deepEqual(measured.consoleErrors, [], 'the actor picker reported a missing host');
+  });
+
+  it('the actor picker escapes the bar it opens from, and is hit-testable there', async () => {
+    // THE PART A STRUCTURAL ASSERTION CANNOT MAKE. The panel's parent being the frame says where
+    // the node HANGS; it does not say the panel is visible, and the shipped arrangement — a panel
+    // inside a 64px bar — is the one this has to be distinguished from. Two independent readings:
+    // the panel extends below the bar's own bottom edge, and the browser's own hit test at the
+    // panel's centre resolves inside the panel rather than onto whatever is painted over it.
+    const measured = await openOverlayIn({ host: 'app', component: 'actorbar' });
+    const { panel, container, panelHit } = measured;
+
+    assert.ok(container, 'the fixture rendered no actor bar to measure the panel against');
+    assert.ok(
+      panel.bottom > container.bottom + EPSILON,
+      `the panel (bottom ${panel.bottom.toFixed(1)}) does not extend past the bar (bottom ` +
+        `${container.bottom.toFixed(1)}), so it is not the full-height list this measurement is ` +
+        'about and the clipping question has not been asked'
+    );
+    assert.ok(
+      panelHit?.inPanel,
+      'the browser hit test at the panel\'s centre resolved to ' +
+        `\`${panelHit?.className ?? 'nothing'}\` rather than to the panel, so the panel is drawn ` +
+        'but not reachable — clipped or painted over by something in the window'
+    );
+  });
 
   it('the fixture can tell a host-relative arrangement from a viewport-relative one', async () => {
     // THE NON-VACUITY FLOOR FOR THE THREE CLAUSES ABOVE. They assert an alignment, and an

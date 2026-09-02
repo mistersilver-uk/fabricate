@@ -2,15 +2,39 @@
 <!--
   ActorSelectTopBar is the shared, content-width actor-selection bar above all
   unified-window tabs. Its left side is a portrait + caret trigger that opens a
-  searchable popover of the user's selectable player characters (reusing the
-  IconPicker popover pattern). Its right side carries gathering-only context
-  (current weather + time-of-day) and is empty on other tabs.
+  searchable popover of the user's selectable player characters. Its right side
+  carries gathering-only context (current weather + time-of-day) and is empty on
+  other tabs.
+
+  The picker is `SearchablePopover` (issue 1475), and this is that primitive's
+  FIRST player-window caller. It hand-rolled the same widget for its whole life —
+  `aria-haspopup="dialog"`, a search field over a `role="listbox"` of
+  `role="option"` rows, single selection, close-on-choose, dismiss-on-outside-click
+  — and could not adopt the shared one until three things landed: issue 1464
+  re-rooted the primitive's class family at `fabricate-picker` /
+  `fabricate-picker-popover` (it used to hang off `.fabricate-manager`, so the panel
+  drew entirely unstyled out here), issue 1466 replaced its hard-coded
+  `closest('.fabricate-manager')` portal host with `resolveOverlayHost`, whose root
+  set includes `fabricate-app`, and issue 1473 corrected the register that still
+  asserted both were blocking.
+
+  THE PANEL IS PORTALED NOW, not absolutely positioned inside this bar. It is
+  appended to the player window's ApplicationV2 frame (`.fabricate-app`) and placed
+  against its trigger by the primitive's own layout pass, so the popover rules that
+  used to live in this file's scoped block are gone rather than rewritten — the
+  primitive paints them. `tests/components/overlay-portal-host-position.test.js`
+  measures that landing in a real browser, because the markup is identical whether
+  the portal lands or not.
+
+  What stays here is the TRIGGER's chrome, which is this bar's own: a 40px portrait
+  in a 64px bar, not the primitive's 32px manager-row portrait. Those rules are
+  `:global()` because the button is `SearchablePopover`'s element now — see the
+  style block, which states each repair's specificity.
 
   All selection state lives in the shared `store` (services.actorBar); this
   component only renders it and calls back into it.
 -->
 <script>
-  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import {
     WEATHER_FALLBACK_ICON,
@@ -19,6 +43,7 @@
     getWeatherLabelKey,
   } from '../util/gatheringConditionIcons.js';
   import ComponentSourcesBar from '../apps/crafting/ComponentSourcesBar.svelte';
+  import SearchablePopover from '../apps/manager/SearchablePopover.svelte';
 
   let {
     store = null,
@@ -29,11 +54,6 @@
   } = $props();
 
   const FALLBACK_PORTRAIT_ICON = 'fas fa-user';
-
-  let pickerOpen = $state(false);
-  let searchTerm = $state('');
-  let pickerRoot = $state(null);
-  let searchInput = $state(null);
 
   const selectableActors = $derived(store?.selectableActors ?? []);
   const selectedActor = $derived(store?.selectedActor ?? null);
@@ -70,16 +90,6 @@
   // The bar is "ready" once its selectable list and conditions have loaded, so
   // the smoke harness can wait on a mounted, conditions-loaded bar.
   const barState = $derived(store?.loaded && store?.conditions ? 'ready' : 'loading');
-
-  const filteredActors = $derived(
-    selectableActors.filter((actor) => {
-      const term = searchTerm.trim().toLowerCase();
-      if (!term) return true;
-      return String(actor?.name ?? '')
-        .toLowerCase()
-        .includes(term);
-    })
-  );
 
   // The right-side condition icons match the GM gathering-settings UI, which
   // uses fixed category icons (fa-cloud-sun for weather, fa-clock for time of
@@ -139,119 +149,78 @@
     return typeof actor?.img === 'string' && actor.img.trim() !== '';
   }
 
-  function closePicker() {
-    pickerOpen = false;
-    searchTerm = '';
-  }
+  const triggerName = $derived(selectedActor?.name || localize('FABRICATE.App.ActorBar.Trigger'));
+  const triggerImg = $derived(selectedActor && hasImg(selectedActor) ? selectedActor.img : '');
 
-  function togglePicker() {
-    if (!hasActors) return;
-    if (pickerOpen) {
-      closePicker();
-      return;
-    }
-    pickerOpen = true;
-  }
+  // `img` OR `icon` per option, never an empty `src`: `SearchablePopover` renders the
+  // portrait tile only when `img` is set and falls through to `icon` otherwise, which is the
+  // same shape `PartyTravelActorPanel` builds for the World > Parties actor picker. An
+  // `img: ''` would render `<img src="">`, which this bar has refused since it shipped.
+  const actorOptions = $derived(
+    selectableActors.map((actor) => ({
+      id: actor?.id ?? '',
+      label: String(actor?.name ?? ''),
+      img: hasImg(actor) ? actor.img : undefined,
+      icon: hasImg(actor) ? undefined : FALLBACK_PORTRAIT_ICON,
+    }))
+  );
 
-  function chooseActor(actor) {
-    const id = actor?.id ?? '';
-    store?.selectActor(id);
-    onActorChange?.(id);
-    closePicker();
-  }
+  // TWO reasons, in precedence order, mirroring `PartyTravelActorPanel`. The zero-actor
+  // reason names a module setting the player cannot see, which is prose and belongs in the
+  // body — `SearchablePopover` feeds `emptyHint` to `EmptyState`'s TITLE slot, an `<h3>` with
+  // no width cap, so a paragraph handed to it sets as a multi-line serif heading. The
+  // search-miss reason is complete in a line and carries no body.
+  //
+  // The zero-actor branch is defensive rather than reachable today: the trigger is
+  // `disabled` with no actors, so the panel cannot be opened to read it. It is derived
+  // anyway because the shipped copy was the OTHER way round — the long
+  // "no player-character type" explanation was the only empty string the panel could render,
+  // and the state it actually renders in is the search miss.
+  const pickerEmptyHint = $derived(
+    hasActors
+      ? localize('FABRICATE.App.ActorBar.NoMatches')
+      : localize('FABRICATE.App.ActorBar.NoActorsTitle')
+  );
+  const pickerEmptyDetail = $derived(hasActors ? '' : localize('FABRICATE.App.ActorBar.NoActors'));
 
-  $effect(() => {
-    if (!pickerOpen || !searchInput) return;
-    queueMicrotask(() => searchInput?.focus());
-  });
+  function chooseActor(id) {
+    const actorId = id ?? '';
+    store?.selectActor(actorId);
+    onActorChange?.(actorId);
+  }
 </script>
 
 <div class="fabricate-app-actor-bar" data-actor-bar-state={barState}>
-  <!-- The dismiss region is the picker (trigger + popover) itself, NOT the whole
-       full-width bar — otherwise clicking the bar's empty area or its right-side
-       component-sources cluster would count as "inside" and leave the dropdown open. -->
-  <div
-    bind:this={pickerRoot}
-    class="actor-bar-left"
-    use:dismissOnOutsideClick={{
-      enabled: pickerOpen,
-      onDismiss: closePicker,
-    }}
-  >
-    <button
-      type="button"
-      class="actor-bar-trigger"
-      onclick={togglePicker}
-      disabled={!hasActors}
-      aria-haspopup="dialog"
-      aria-expanded={pickerOpen}
-      aria-label={selectedActor?.name || localize('FABRICATE.App.ActorBar.Trigger')}
-      title={selectedActor?.name || localize('FABRICATE.App.ActorBar.Trigger')}
-    >
-      <span class="actor-bar-portrait" aria-hidden="true">
-        {#if selectedActor && hasImg(selectedActor)}
-          <img src={selectedActor.img} alt="" />
-        {:else}
-          <i class={FALLBACK_PORTRAIT_ICON}></i>
-        {/if}
-      </span>
-      <span class="actor-bar-trigger-label" title={selectedActor?.name || ''}>
-        {selectedActor?.name || localize('FABRICATE.App.ActorBar.Trigger')}
-      </span>
-      <span class="actor-bar-trigger-caret" aria-hidden="true">
-        <i class={`fas ${pickerOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-      </span>
-    </button>
+  <!-- No wrapper element around the picker. The `.actor-bar-left` div this replaces existed
+       to be the dismiss region, the `position: relative` anchor for the in-place panel, and
+       the bar's left flex item. The primitive owns the first two now, and it is the flex item
+       itself — `.fabricate-picker.manager-travel-picker` already declares `position: relative;
+       min-width: 0`, and `flex: 0 1 auto` was the initial value the deleted rule restated.
 
-    {#if pickerOpen}
-      <div
-        class="actor-bar-popover"
-        role="dialog"
-        aria-label={localize('FABRICATE.App.ActorBar.DialogLabel')}
-      >
-        <div class="actor-bar-search">
-          <input
-            bind:this={searchInput}
-            bind:value={searchTerm}
-            type="text"
-            placeholder={localize('FABRICATE.App.ActorBar.SearchPlaceholder')}
-            aria-label={localize('FABRICATE.App.ActorBar.SearchLabel')}
-          />
-        </div>
-
-        <div
-          class="actor-bar-options"
-          role="listbox"
-          aria-label={localize('FABRICATE.App.ActorBar.DialogLabel')}
-        >
-          {#each filteredActors as actor (actor.id)}
-            <button
-              type="button"
-              class="actor-bar-option"
-              class:is-selected={actor.id === store?.selectedActorId}
-              role="option"
-              aria-selected={actor.id === store?.selectedActorId}
-              title={actor.name}
-              onclick={() => chooseActor(actor)}
-            >
-              <span class="actor-bar-portrait" aria-hidden="true">
-                {#if hasImg(actor)}
-                  <img src={actor.img} alt="" />
-                {:else}
-                  <i class={FALLBACK_PORTRAIT_ICON}></i>
-                {/if}
-              </span>
-              <span class="actor-bar-option-name">{actor.name}</span>
-            </button>
-          {:else}
-            <p class="hint actor-bar-empty">
-              {localize('FABRICATE.App.ActorBar.NoActors')}
-            </p>
-          {/each}
-        </div>
-      </div>
-    {/if}
-  </div>
+       `actor-bar-popover` carries NO style. It is the hook the perf scenarios and the View Lab
+       case address the portaled panel by, in the same way `.manager-travel-actor-popover` is
+       World > Parties' capture hook: once the panel is appended to `.fabricate-app` it is no
+       longer a descendant of anything this bar writes, so a hook has to travel ON it. -->
+  <SearchablePopover
+    options={actorOptions}
+    value={store?.selectedActorId ?? ''}
+    disabled={!hasActors}
+    pickerClass="actor-bar-picker"
+    popoverClass="actor-bar-popover"
+    triggerClass="actor-bar-trigger"
+    valueClass="actor-bar-trigger-label"
+    {triggerImg}
+    triggerIcon={FALLBACK_PORTRAIT_ICON}
+    triggerLabel={triggerName}
+    triggerTitle={triggerName}
+    triggerAriaLabel={triggerName}
+    dialogAriaLabel={localize('FABRICATE.App.ActorBar.DialogLabel')}
+    searchPlaceholder={localize('FABRICATE.App.ActorBar.SearchPlaceholder')}
+    searchAriaLabel={localize('FABRICATE.App.ActorBar.SearchLabel')}
+    emptyHint={pickerEmptyHint}
+    emptyDetail={pickerEmptyDetail}
+    onChoose={chooseActor}
+  />
 
   {#if hasRightContext}
     <div class="actor-bar-right">
@@ -332,18 +301,28 @@
     border-bottom: 1px solid var(--fab-border);
     background: var(--fab-surface-soft);
     color: var(--fab-text);
-    /* No overflow:hidden — the picker popover renders in-place below the trigger
-       and must be allowed to overflow the bar downward. Bar children manage
-       their own horizontal overflow via min-width:0 + ellipsis. */
+    /* No overflow:hidden. The picker panel no longer renders in place — it is portaled to
+       `.fabricate-app` (issue 1475) — but the bar's children still manage their own
+       horizontal overflow via min-width:0 + ellipsis, and a clip here would cut the
+       trigger's focus ring. */
   }
 
-  .actor-bar-left {
-    position: relative;
-    flex: 0 1 auto;
-    min-width: 0;
-  }
+  /* ── THE TRIGGER, WHICH IS `SearchablePopover`'s ELEMENT NOW ────────────────────────────
+     Every rule below selects a class this component HANDS to `<SearchablePopover>` through
+     `triggerClass` / `valueClass` / `pickerClass`, or one the primitive writes on its own
+     trigger body. The scoped spelling would compile with this component's `svelte-<hash>`
+     appended to a compound that has to match an element this component does not write, so
+     each is `:global()` around the WHOLE selector — `:global(.ancestor) .child` leaves
+     `.child` as the only scoped compound and puts the hash straight back on the element that
+     cannot carry it. `tests/components/manager-button-scoped-class-reach.test.js` is the
+     guard; it was run red-then-green over each of these.
 
-  .actor-bar-trigger {
+     SPECIFICITY IS PRESERVED EXACTLY, which is why `.actor-bar-picker` is here rather than
+     dropped: the scoped forms were `.actor-bar-trigger.svelte-<hash>` and friends, so a bare
+     `:global(.actor-bar-trigger)` would be one class light and would smuggle a cascade change
+     in as a repair. `.actor-bar-picker` is the class this component hands the primitive's own
+     root, so the anchor is local rather than borrowed. */
+  :global(.actor-bar-picker .actor-bar-trigger) {
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
@@ -362,51 +341,48 @@
     cursor: pointer;
   }
 
-  .actor-bar-trigger:disabled {
+  :global(.actor-bar-picker .actor-bar-trigger:disabled) {
     cursor: default;
     opacity: 0.6;
   }
 
-  .actor-bar-trigger:hover:not(:disabled) {
+  :global(.actor-bar-picker .actor-bar-trigger:hover:not(:disabled)) {
     background: var(--fab-surface-raised);
   }
 
-  .actor-bar-trigger:focus-visible {
+  :global(.actor-bar-picker .actor-bar-trigger:focus-visible) {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 
-  .actor-bar-portrait {
+  /* THE PORTRAIT IS THE PRIMITIVE'S NOW, AT THE PRIMITIVE'S SCALE, and that is a deliberate
+     visual change rather than an oversight. The bar drew a 40px `.actor-bar-portrait` tile;
+     `styles/fabricate.css` draws `.fabricate-picker .manager-travel-portrait` at 32px, and it is
+     the same tile the panel's option rows use — so overriding it here would have made the trigger
+     and the rows below it disagree, and would have kept a 40px control height the design system
+     retired (`control-height-known-literals.js` banked this file's last one, and this conversion
+     pays it down). `ChecksRightMenu`'s preview-actor picker is the other actor picker in the
+     corpus and already presents exactly this way.
+
+     The same reasoning settles the portrait-LESS state. The primitive frames `triggerImg` in the
+     tile and renders `triggerIcon` as a bare glyph, in the trigger and in the rows alike, so
+     leaving it bare keeps one control reading one way in both of its states.
+
+     Both of the trigger's direct glyphs — the chevron and that fallback portrait — take the muted
+     colour below. It replaces `.actor-bar-trigger-caret`, whose wrapper `<span>` the primitive
+     does not render, and carries the colour the deleted `.actor-bar-portrait` gave the glyph; both
+     were `var(--fab-text-muted)`, so one rule answers for both. */
+  :global(.actor-bar-picker .actor-bar-trigger > i) {
     flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    overflow: hidden;
-    background: var(--fab-surface-raised);
     color: var(--fab-text-muted);
   }
 
-  .actor-bar-portrait img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .actor-bar-trigger-label {
+  :global(.actor-bar-picker .actor-bar-trigger-label) {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 13px;
-  }
-
-  .actor-bar-trigger-caret {
-    flex: 0 0 auto;
-    color: var(--fab-text-muted);
   }
 
   .actor-bar-right {
@@ -497,98 +473,26 @@
     white-space: nowrap;
   }
 
-  .actor-bar-popover {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    z-index: 4000;
-    display: flex;
-    flex-direction: column;
-    width: max-content;
-    min-width: 240px;
-    max-width: 340px;
-    max-height: min(60vh, 420px);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    box-shadow: var(--fab-shadow-lg);
-    overflow: hidden;
-  }
+  /* ── THE PANEL'S OWN RULES ARE DELETED, NOT REPAIRED ──────────────────────────────────
+     Ten rules used to live here — `.actor-bar-popover`, `.actor-bar-search`, its `input`,
+     `.actor-bar-options`, the four `.actor-bar-option` states, `.actor-bar-option-name` and
+     `.actor-bar-empty` — plus the `.actor-bar-portrait` pair the option rows shared with the
+     trigger. Every one of them named markup this component no longer writes, so wrapping them
+     in `:global()` would have reached nothing at all: the primitive emits
+     `.manager-travel-popover`, `.manager-travel-popover-search`, `.manager-travel-option`,
+     `.manager-travel-option-name` and an `EmptyState` instead, and `styles/fabricate.css`
+     already paints every one of them off `.fabricate-picker-popover`.
 
-  .actor-bar-search {
-    padding: 8px;
-    border-bottom: 1px solid var(--fab-border);
-  }
+     Restating them would also be the thing `openspec/specs/design-system/spec.md` forbids in
+     as many words — "the primitive paints there without the caller restating its rules". The
+     measured consequence is that the OPEN panel adopts the primitive's presentation: 40px
+     option rows with 32px portraits over the sheet's `--fab-bg-3` panel, rather than this
+     bar's 48px rows with 40px portraits. That is the same panel `ChecksRightMenu`'s
+     preview-actor picker draws, which is the other actor picker in the corpus.
 
-  .actor-bar-search input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 8px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text);
-  }
-
-  .actor-bar-options {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 6px;
-    overflow-y: auto;
-  }
-
-  .actor-bar-option {
-    /* width:100% + justify-content:flex-start override Foundry's global button
-       (which centers content and shrinks to fit), so each row is full-width with
-       the portrait + name flush-left. height:auto frees the row to fit the 40px
-       portrait rather than Foundry's fixed button height. */
-    box-sizing: border-box;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 10px;
-    height: auto;
-    min-height: 48px;
-    padding: 4px 8px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--fab-text);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .actor-bar-option:hover {
-    background: var(--fab-surface-raised);
-  }
-
-  .actor-bar-option.is-selected {
-    background: var(--fab-accent-soft);
-    border-color: var(--fab-accent);
-    color: var(--fab-accent);
-  }
-
-  .actor-bar-option:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .actor-bar-option-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-
-  .actor-bar-empty {
-    margin: 0;
-    padding: 8px;
-    color: var(--fab-text-muted);
-    font-size: 13px;
-  }
+     Deleting a dead rule is not the same as noticing it is dead. All ten compiled with the
+     scoping hash attached and matched nothing, with ZERO compiler warnings — this file holds
+     five regular elements with an expression-valued `class`, which is the condition that
+     silences `css_unused_selector` — so `lint:svelte:warnings` reports clean over them and
+     `css.code` byte-identity does not see them either. */
 </style>

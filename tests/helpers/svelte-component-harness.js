@@ -426,9 +426,11 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
  * @param {string[]} [args.rawModules]  repo-relative `.js` modules copied verbatim
  * @param {string[]} [args.compiledModules] repo-relative `.svelte` modules to compile
  * @param {string} args.componentPath   repo-relative `.svelte` of the component under test
+ * @param {string} [args.rootClass]     application root class the mount target carries, for a
+ *   component whose production host is not the manager (see `mount()` below)
  * @returns {{ setup: () => Promise<void>, teardown: () => void, mount: (props?: object) => Promise<HTMLElement>, setProps: (props: object) => Promise<HTMLElement>, remount: () => void, readonly target: HTMLElement|null }}
  */
-export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath }) {
+export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath, rootClass = 'fabricate-manager' }) {
   let tempRoot = null;
   let mounted = null;
   let target = null;
@@ -481,12 +483,19 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       // picker is somewhere no production mount of it has ever been — outside every application —
       // and its panel lands on `<body>`, out of reach of every `target.querySelector` in the suite.
       //
-      // The class is not a convenience: every component that portals is reachable ONLY from the
-      // crafting-system manager (measured by walking the import graph from all seven application
-      // roots), so a mounted fragment of one is, in production, inside this root. Saying so makes
-      // the fixture more faithful, not less — and before this the fixtures were quietly asserting
-      // against a portal that had FAILED, which is the very defect issue 1466 removed.
-      target.className = 'fabricate-manager';
+      // The class is not a convenience: it is the root the component under test is mounted inside
+      // in production, and before this the fixtures were quietly asserting against a portal that
+      // had FAILED, which is the very defect issue 1466 removed.
+      //
+      // `fabricate-manager` is the DEFAULT rather than the only answer, and issue 1475 is why.
+      // When this was written every component that portalled was reachable only from the
+      // crafting-system manager, measured by walking the import graph from all seven application
+      // roots. `ActorSelectTopBar` converting its picker onto `SearchablePopover` ends that: it is
+      // reachable only from the PLAYER window, whose root is `fabricate-app`, and both roots are
+      // in `OVERLAY_HOST_ROOT_CLASSES`. A suite that mounted it under `fabricate-manager` would
+      // resolve a host no production mount of it can reach, which is the same class of untruth
+      // this comment was added to remove. Pass `rootClass` to state the real one.
+      target.className = rootClass;
       document.body.appendChild(target);
       mounted = createClassComponent({ component: Component, target, props });
       flushSync();

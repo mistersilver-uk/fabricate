@@ -1796,7 +1796,7 @@ test('changed files map to the windows they affect', () => {
   assert.deepEqual(ids(['src/ui/svelte/apps/SomeBrandNewRoot.svelte']), [FALLBACK_CASE_ID]);
 });
 
-test('the broad SearchablePopover signal captures ALL THREE of its deliberate picker states', () => {
+test('the broad SearchablePopover signal captures every deliberate picker state, in both apps', () => {
   const selected = mapChangedFilesToCases([
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   ]).map((viewCase) => viewCase.id);
@@ -1814,6 +1814,13 @@ test('the broad SearchablePopover signal captures ALL THREE of its deliberate pi
   // field, so neither can show what the panel looks like without one, and every other
   // gathering-task frame draws the menu CLOSED — where the whole conversion is a wrapper
   // class and a scoping hash.
+  //
+  // The FOURTH is not a mode but an APPLICATION (issue 1475). Those three are all manager
+  // frames, and until `ActorSelectTopBar` converted, the manager was the only place this
+  // primitive could paint at all. `player-actor-picker` opens it in the player window, so
+  // a regression that broke the primitive only outside the manager — a re-rooted family
+  // reverted, a portal host narrowed back to `.fabricate-manager` — no longer publishes
+  // three frames in every one of which it still works.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
@@ -1822,7 +1829,22 @@ test('the broad SearchablePopover signal captures ALL THREE of its deliberate pi
       'manager-gathering-task-availability-menu',
       'manager-world-parties-actor-picker',
       'manager-world-parties-realm-override-picker',
+      'player-actor-picker',
     ]
+  );
+});
+
+test('the player top bar routes to the frame that opens its picker, not only to the pair', () => {
+  // `src/ui/svelte/components/` is a broad signal, so before issue 1475 this file published the
+  // representative pair and nothing else — and in both of those frames the picker is CLOSED. The
+  // override is what makes a change to the bar publish the state it changed.
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/components/ActorSelectTopBar.svelte',
+  ]).map((viewCase) => viewCase.id);
+
+  assert.deepEqual(
+    selected.sort((a, b) => a.localeCompare(b)),
+    ['fabricate-app-shell', 'manager-components-normal', 'player-actor-picker']
   );
 });
 

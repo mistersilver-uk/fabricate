@@ -508,11 +508,25 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // the trigger. `manager-gathering-task-availability-menu` is the one frame in the registry that
   // OPENS one — every other gathering-task frame draws the trigger closed, where the whole
   // conversion is a wrapper class and a scoping hash.
+  //
+  // A FOURTH entry as of issue 1475, and it is the first that is not a manager frame at all. The
+  // three above photograph the primitive in the crafting-system manager, which was the only
+  // application it could paint in until #1464 re-rooted its family and #1466 taught it to resolve
+  // a portal host; `player-actor-picker` is the frame that shows it doing so. A change to this
+  // primitive that broke only outside the manager would otherwise publish three frames in which it
+  // still works.
   'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
     'manager-world-parties-realm-override-picker',
     'manager-gathering-task-availability-menu',
+    'player-actor-picker',
   ]),
+  // The player window's shared top bar (issue 1475). It sits under `components/`, so the directory
+  // leg of `BROAD_SIGNAL_PATTERN` claims it and it published only the representative pair — in
+  // which its actor picker appears exclusively CLOSED. `fabricate-app-shell` IS one of that pair
+  // and draws the bar, so the closed trigger is already covered; what it cannot show is the panel,
+  // which is where the whole of the conversion lives.
+  'src/ui/svelte/components/ActorSelectTopBar.svelte': Object.freeze(['player-actor-picker']),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same
   // change. It sits under `components/`, so the directory leg of `BROAD_SIGNAL_PATTERN` claims it
   // whatever anyone thinks of it — and until now it published only the representative pair, in
@@ -7803,6 +7817,41 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/craftingStore/,
       /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
     ],
+  }),
+  // THE PRIMITIVE'S FIRST PLAYER-WINDOW FRAME (issue 1475). Every other player case draws the
+  // actor picker CLOSED, where the conversion is a class list; the whole of what changed is in the
+  // OPEN panel, and until this case there was no frame anywhere in the registry that photographed
+  // `SearchablePopover` outside the manager at all.
+  //
+  // `reaches: 'beyond'` + `smokeLabels: []`: the live smoke opens no actor picker, so there is no
+  // counterpart to fall short of, and a `beyond` case must claim zero labels.
+  //
+  // `sourceMatches` names `FabricateAppRoot` rather than `ActorSelectTopBar`, and the difference is
+  // mechanical rather than editorial: the bar lives under `src/ui/svelte/components/`, which
+  // `BROAD_SIGNAL_PATTERN` claims, so `selectRenderFileCases` never consults any case's
+  // `sourceMatches` for it — a pattern naming it would be configuration that cannot fire, which is
+  // the failure `BROAD_SIGNAL_CASE_OVERRIDES` documents at length. The bar is routed here by that
+  // table instead, alongside `SearchablePopover` itself. `FabricateAppRoot` is the surface that
+  // places the bar, and a change that moved it is a change this frame answers for.
+  //
+  // The selector asserts the three facts the conversion is: the panel is a CHILD OF THE
+  // APPLICATION FRAME (it was absolutely positioned inside the bar before, and a portal that
+  // failed to land would leave it there), it carries the primitive's own namespace root, and it
+  // holds the primitive's option rows. A frame in which the click opened nothing, or opened an
+  // unstyled panel outside the frame, fails the capture rather than publishing.
+  playerCase({
+    id: 'player-actor-picker',
+    label: 'Player app — Actor picker',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    steps: [{ selector: '.fabricate-app-actor-bar .actor-bar-trigger' }],
+    expectSelector:
+      '.fabricate-app > .fabricate-picker-popover.actor-bar-popover' +
+      ':has(.manager-travel-popover-search)' +
+      ' .manager-travel-option',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/],
   }),
   playerCase({
     id: 'player-inventory',

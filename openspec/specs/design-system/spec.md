@@ -87,6 +87,10 @@ Where two components render one class family between them, the family's roots ar
 Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, and `ManagerColorPicker` and `ManagerColorPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
 
+A re-rooted family is a CAPABILITY until a caller outside the original application uses it, and a capability nothing exercises is a claim rather than a fact.
+`SearchablePopover` has such a caller: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which makes the player window the second application the family paints in and this requirement satisfied by a shipped surface rather than by a fixture.
+The picker is therefore held to the geometry as well as the markup — its panel is portalled onto the player window's application frame and MUST land at its trigger there — because the rendered DOM is identical whether the portal lands or not, so no DOM assertion can tell a placed panel from a misplaced one.
+
 The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
 Its markup cannot appear outside that area, so the ancestor is free, and unscoping it would spend specificity and widen the rule's blast radius for no reachable benefit.
 `RecipeDurationEditor`, `EnvironmentsBrowserView` and the manager modal keep `.fabricate-manager`-rooted overlay rules on exactly that basis.
@@ -100,6 +104,7 @@ Such a primitive declares that chrome on its own rule instead.
 - **WHEN** a surface outside a primitive's original app imports that primitive
 - **THEN** the primitive paints there without the caller restating its rules
 - **AND** every rule it owns is rooted at a namespace class the primitive emits
+- **AND** a panel it portals is measured landing at its trigger inside that application
 
 #### Scenario: A component that cannot leave its area keeps that area's root
 
@@ -440,6 +445,7 @@ It toggles membership, stays open across choices and marks several options selec
 
 A picker whose class family is scoped to one application root MUST NOT be adopted by a surface outside that root until the family is unscoped.
 `SearchablePopover`'s family has been unscoped onto the primitive's own `fabricate-picker` and `fabricate-picker-popover` roots, so it satisfies this and is adoptable outside the manager.
+It has been adopted: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which is the shipped surface the unscoping and the portal-host resolver are now proved by rather than merely permitted for.
 The icon, colour, essence-source and recipe-duration pickers do NOT: their panel rules are still written under `.fabricate-manager`, so a caller outside it would render a panel with no `position: absolute` to be placed by, and unscoping each family belongs to its own change rather than to a conversion before it.
 
 #### Scenario: A converted menu renders no query field

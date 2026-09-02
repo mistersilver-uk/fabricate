@@ -63,6 +63,14 @@ const harness = createMountedComponentHarness({
     'src/ui/playerExtensions.js',
     'src/ui/playerNavModel.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // `ActorSelectTopBar`'s picker is a `<SearchablePopover>` now (issue 1475), and the
+    // primitive PORTALS its panel and measures it against the resolved application root.
+    // These three arrive through that one conversion; omitting any of them fails this
+    // suite's `before()` by name rather than hanging it, which is what the shared harness
+    // buys over the allowlist it replaced.
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js',
     'src/ui/svelte/apps/gathering/scopedSelection.js',
     'src/ui/svelte/apps/gathering/selectionDefault.js',
@@ -140,6 +148,11 @@ const harness = createMountedComponentHarness({
     // rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
+    // The searchable picker `ActorSelectTopBar` converted onto (issue 1475), and the empty
+    // panel it renders over a filtered-to-nothing list. `Chip` directly above is shared with
+    // the complication band and is already listed.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',

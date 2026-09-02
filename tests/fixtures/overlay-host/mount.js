@@ -15,13 +15,15 @@
  *   ?host=none      a positioned container inside NO application root
  *
  * `?component=` picks `popover` (SearchablePopover), `icon` (IconPicker), `source`
- * (EssenceSourceSelector) or `color` (ManagerColorPicker).
+ * (EssenceSourceSelector), `color` (ManagerColorPicker) or `actorbar` (ActorSelectTopBar — a real
+ * PRODUCT surface rather than a bare primitive, mounted only in the player host it ships in).
  * `?frameLeft=` / `?frameTop=` place the window, so the test can assert against a host whose
  * origin is far from the viewport's — which is the entire discriminating fact. With the frame at
  * the origin every arrangement looks identical.
  */
 import { mount } from 'svelte';
 
+import ActorSelectTopBar from '../../../src/ui/svelte/components/ActorSelectTopBar.svelte';
 import EssenceSourceSelector from '../../../src/ui/svelte/components/EssenceSourceSelector.svelte';
 import IconPicker from '../../../src/ui/svelte/components/IconPicker.svelte';
 import ManagerColorPicker from '../../../src/ui/svelte/components/ManagerColorPicker.svelte';
@@ -106,7 +108,37 @@ const mountPoint = element('div', 'fixture-mount');
 target.append(mountPoint);
 
 /**
- * The four overlay components this fixture can mount, by `?component=`.
+ * A stand-in for `services.actorBar`, matching the read surface `ActorSelectTopBar` uses.
+ *
+ * Plain rather than reactive: this fixture opens the picker once and measures it, so nothing here
+ * has to survive a store update. Two actors, one with an image and one without, so the trigger and
+ * the rows both draw their real shapes.
+ *
+ * @returns {object} The store shape the bar reads.
+ */
+function actorBarStore() {
+  const actors = [
+    { id: 'a1', uuid: 'Actor.a1', name: 'Aria the Bold', img: 'icons/svg/mystery-man.svg' },
+    { id: 'a2', uuid: 'Actor.a2', name: 'Borin Stonebrew', img: null },
+    { id: 'a3', uuid: 'Actor.a3', name: 'Celyn of the Vale', img: 'icons/svg/mystery-man.svg' },
+  ];
+  return {
+    selectableActors: actors,
+    selectedActorId: 'a1',
+    get selectedActor() {
+      return actors[0];
+    },
+    staminaPool: { current: 4, max: 10 },
+    conditions: { weather: 'clear', timeOfDay: 'dusk' },
+    conditionVisibility: { weather: true, timeOfDay: true },
+    realmContext: { enabled: false, realms: [] },
+    loaded: true,
+    selectActor: () => {},
+  };
+}
+
+/**
+ * The five overlay subjects this fixture can mount, by `?component=`.
  *
  * All three of the `src/ui/svelte/components/` pickers are here rather than only `IconPicker`
  * (issue 1470), because the CSS half of the defect is PER FAMILY: each carries its own class
@@ -139,6 +171,26 @@ const COMPONENTS = {
       triggerClass: 'manager-travel-trigger',
       triggerLabel: 'Alpha',
       onChoose: () => {},
+    },
+  ],
+  // THE PRIMITIVE'S FIRST PLAYER-WINDOW ADOPTER (issue 1475), and the reason it is a whole
+  // product surface rather than another bare picker: the entry above proves `SearchablePopover`
+  // CAN land in `.fabricate-app`, and nothing in the product depended on that. This one does.
+  //
+  // It is also the sharper measurement of the two, because the panel is now anchored to a trigger
+  // sitting in a full-width bar rather than to a picker in the middle of a pane — the arrangement
+  // that has to survive is "panel below the bar's own control", and the shipped alternative it
+  // replaced was an `position: absolute` panel inside the bar with no portal at all.
+  //
+  // `activeTab: 'gathering'` deliberately: it draws the bar's right-hand context cluster, so the
+  // trigger is measured in a bar of realistic width, and it is the one populated tab that renders
+  // no `ComponentSourcesBar` (which would want a `services` bag this fixture has no business
+  // faking).
+  actorbar: [
+    ActorSelectTopBar,
+    {
+      store: actorBarStore(),
+      activeTab: 'gathering',
     },
   ],
 };

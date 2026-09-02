@@ -11,10 +11,10 @@
  * a rung, and the gate fails just as loudly when a row is paid down without being banked.
  *
  * ── THE KEY IS (file, property, value), NOT file ────────────────────────────────────────
- * A per-file count absorbs a swap INSIDE a file, and `styles/fabricate.css` holds 49 of the 84:
+ * A per-file count absorbs a swap INSIDE a file, and `styles/fabricate.css` holds 49 of the 83:
  * turn a 36 into a 40 there, or move a retired value off a card and onto a control, and a
  * per-file count is unchanged and ships green. Three files hold more than one distinct
- * (property, value) pair and carry 56 of the 84 between them, so the finer key is not
+ * (property, value) pair and carry 56 of the 83 between them, so the finer key is not
  * theoretical. `tests/manager-button-source-contract.test.js` made the same choice, for the
  * reason its own docblock gives: "counted, so that deleting one of two identical probes is not
  * silently absorbed". It costs 38 rows instead of 30.
@@ -76,7 +76,7 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * which is itself retired. That is the ordinary way this number should fall: a control moved
  * onto a rung, banked here on the `styles/fabricate.css | height | 36` row.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 83;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 82;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -90,7 +90,7 @@ export const KNOWN_RETIRED_HEIGHT_TOTAL = 83;
  * would notice. Both were already stale by four and seven when a rebase grew the corpus.
  *
  * They are NOT pinned like {@link KNOWN_RETIRED_HEIGHT_TOTAL}, and the difference is what each
- * one is. The 84 is DEBT: it must not grow, so every movement is a thing to adjudicate. A
+ * one is. The 83 is DEBT: it must not grow, so every movement is a thing to adjudicate. A
  * declaration count moves whenever anyone adds a screen, so pinning it would red this gate on
  * unrelated work and teach the next author to re-baseline a number without reading it. The
  * enforced figures are the floors, which are the ones with a failure mode worth stopping.
@@ -131,7 +131,6 @@ const ROWS = Object.freeze([
   'src/ui/svelte/apps/manager/library/LibraryCard.svelte | min-height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte | min-height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte | min-height | 40 | 1 | 40px => 40px',
-  'src/ui/svelte/components/ActorSelectTopBar.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte | min-height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/components/Stepper.svelte | height | 36 | 1 | var(--fab-stepper-fill-height, 36px) => 36px',
   'styles/fabricate.css | height | 32 | 5 | 32px => 32px',
