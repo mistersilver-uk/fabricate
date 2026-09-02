@@ -99,6 +99,23 @@ const PAGED_PAGE_SIZE = 10;
 const WIDE_WINDOW_PX = 1400;
 const NARROW_WINDOW_PX = 900;
 
+/**
+ * The window the world catalogues are photographed at, and the width the toolbar case below
+ * measures (issue 1373, maintainer feedback round 3).
+ *
+ * NOT {@link WIDE_WINDOW_PX}. A 1400px window gives the list column about 120px more than the
+ * lab's, which is enough slack to hide a wrapping toolbar entirely — so a case measured only
+ * there would report a single row while the published frame showed two. This is the View Lab's
+ * own `position.width` for every `world-tool-catalogue-*` case.
+ */
+const CATALOGUE_WINDOW_PX = 1280;
+/** The world Tools Catalogue's own corpus size: eleven records over a ten-row page. */
+const SELECTION_ROW_COUNT = 11;
+/** Rows ticked, matching the maintainer's own reproduction and the `-bulk` lab case. */
+const SELECTION_TICKS = 4;
+/** The world catalogues' short select-all caption, which both of them pass. */
+const SELECT_ALL_SHORT = 'All';
+
 const laneInspectorBody = createRawSnippet(() => ({
   render: () => `<p data-lane-inspector-body>The lane's own panel.</p>`,
 }));
@@ -225,6 +242,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   let shortMarkup = '';
   let shortPagedMarkup = '';
   let leadMarkup = '';
+  let selectionMarkup = '';
 
   before(async () => {
     assert.ok(
@@ -384,6 +402,63 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     await harness.setProps({});
     shortPagedMarkup = pagedTarget.innerHTML;
 
+    // ── THE SELECTION FIXTURE (issue 1373, maintainer feedback round 3) ──────────────────────
+    // The toolbar the maintainer photographed: a world catalogue's own configuration — no
+    // membership filter and the short `All` caption — over eleven records with four ticked, at
+    // the lab's own window width. In that state the row carries four MORE controls than at rest
+    // (the divider, `4 selected`, `Select all 11 results` and `Clear`), and the shipped row wrapped
+    // `Asc` onto a second line by itself with the result count stranded beside it.
+    //
+    // Driven by ticking real boxes rather than by a prop, because selection is the frame's own
+    // state and it exposes no way in — the same reason the paged fixture drives its size select.
+    const selectionTarget = await harness.mount({
+      scope: projectWorldScopeEntity({
+        entityType: 'tool',
+        corpus: {
+          entities: Array.from({ length: SELECTION_ROW_COUNT }, (unused, index) => ({
+            id: `tool-${index}`,
+            name: `Hammer ${index}`,
+            description: 'A tool',
+            img: 'icons/tools/smithing/hammer.webp',
+          })),
+          defaults: [],
+          membership: [],
+        },
+        systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      }),
+      actions: {},
+      systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      hookValue: 'world-tools',
+      title: 'Tools Catalogue',
+      subtitle: 'One Tool per game-world Item.',
+      countUnit: 'tools',
+      membershipFilter: false,
+      selectAllLabel: SELECT_ALL_SHORT,
+      inspectorBody: laneInspectorBody,
+    });
+    const boxes = [...selectionTarget.querySelectorAll('[data-scoped-list-select]')];
+    assert.ok(
+      boxes.length >= SELECTION_TICKS,
+      `the selection fixture rendered ${boxes.length} row checkboxes, fewer than the ` +
+        `${SELECTION_TICKS} this case ticks, so the selected state below is never reached`
+    );
+    for (const box of boxes.slice(0, SELECTION_TICKS)) {
+      box.checked = true;
+      box.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    }
+    await harness.setProps({});
+    assert.ok(
+      Boolean(selectionTarget.querySelector('[data-scoped-list-selection-count]')),
+      'ticking the row boxes produced no selection count in the toolbar, so this fixture is ' +
+        'still the RESTING toolbar and the wrap it exists to measure cannot occur'
+    );
+    assert.ok(
+      Boolean(selectionTarget.querySelector('[data-scoped-list-select-all-results]')),
+      `${SELECTION_ROW_COUNT} records over a ${PAGED_PAGE_SIZE}-row page rendered no ` +
+        '`Select all N results` link, so the widest state of this row is not what is measured'
+    );
+    selectionMarkup = selectionTarget.innerHTML;
+
     harness.teardown();
     assert.ok(
       markup.includes('data-scoped-list-inspector'),
@@ -455,6 +530,67 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         rowsHeight: rowsRegion.getBoundingClientRect().height,
         listHeight: list.getBoundingClientRect().height,
         listBottom: list.getBoundingClientRect().bottom,
+      };
+    });
+    await context.close();
+    return result;
+  }
+
+  /**
+   * Measure the list toolbar's filter row as a FLEX LINE COUNT (issue 1373, round 3).
+   *
+   * ── WHY THE ROW'S HEIGHT IS THE ASSERTION AND ITEM TOPS ARE ONLY DIAGNOSTICS ──────────────
+   * The row is `align-items: center`, so every item on one line has a different `top` — a
+   * 34px search field and a 16px divider centred together share a line and differ by 9px at
+   * the top edge. Counting distinct tops therefore reports several "lines" for a row that has
+   * exactly one. A single-line flex row is as tall as its tallest item; a wrapped one is the
+   * sum of its lines plus the row gap, which on this row is a ~40px step. So the height
+   * against the tallest item is the claim, and the per-item centres are carried alongside it
+   * purely so a failure says WHICH control fell through.
+   *
+   * @param {string} productMarkup
+   * @param {number} windowWidth
+   */
+  async function measureToolbarLines(productMarkup, windowWidth) {
+    const context = await browser.newContext({
+      viewport: { width: windowWidth, height: HOST_HEIGHT_PX },
+    });
+    const tab = await context.newPage();
+    await tab.setContent(page(productMarkup, windowWidth));
+    const result = await tab.evaluate(() => {
+      const row = document.querySelector(
+        '.manager-scoped-list-column .manager-scoped-list-filter-row'
+      );
+      if (!row) return { rendered: false };
+      // `BulkSelectionToolbar` renders its own row element, which the frame flattens to
+      // `display: contents` — so the four selection controls are flex items of THIS row while
+      // their wrapper is not a box at all. Walking through any `contents` child is what makes
+      // the item list the real flex items rather than one opaque wrapper.
+      const items = [];
+      for (const child of row.children) {
+        if (getComputedStyle(child).display === 'contents') items.push(...child.children);
+        else items.push(child);
+      }
+      const described = items.map((element) => {
+        const box = element.getBoundingClientRect();
+        return {
+          label: String(element.getAttribute('class') || element.tagName),
+          centre: Math.round(box.top + box.height / 2),
+          width: Math.round(box.width),
+        };
+      });
+      const rowBox = row.getBoundingClientRect();
+      return {
+        rendered: true,
+        itemCount: items.length,
+        rowWidth: Math.round(rowBox.width),
+        rowHeight: Math.round(rowBox.height),
+        tallestItem: Math.round(
+          Math.max(...items.map((element) => element.getBoundingClientRect().height))
+        ),
+        overflowedBy: Math.round(row.scrollWidth - row.clientWidth),
+        items: described,
+        centres: [...new Set(described.map((item) => item.centre))].sort((a, b) => a - b),
       };
     });
     await context.close();
@@ -672,6 +808,43 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       box.paginationHeight < rowHeight * 1.5,
       `the pager is ${Math.round(box.paginationHeight)}px against a ${Math.round(rowHeight)}px ` +
         "row: the pagination bar took the column's slack instead of the list"
+    );
+  });
+
+  it('keeps the list toolbar on ONE line once rows are selected', async () => {
+    // FINDING 2 OF ROUND 3, MEASURED RATHER THAN LOOKED AT. Selecting four rows adds a divider,
+    // `4 selected`, `Select all 11 results` and `Clear` to a row that already carries the
+    // select-all box, the search field, `SORT BY`, the key select, the direction toggle and the
+    // result count — and the shipped row wrapped, stranding `Asc` alone on a second line with
+    // `11 of 11 tools` pushed right of it. Every UNSELECTED frame of the same screen draws that
+    // toolbar as one row, and so does the reference (`proto:1970`), so the wrap is a state the
+    // screen enters rather than a width it ran out of.
+    //
+    // The search field is the control that yields: it is the only flexible item in the row, and
+    // shrinking it changes nothing at rest — with one grow-able item the final width is the
+    // container minus everything else, whatever the basis is. The basis only decides where the
+    // row BREAKS.
+    const box = await measureToolbarLines(selectionMarkup, CATALOGUE_WINDOW_PX);
+    assert.equal(box.rendered, true, 'the selection fixture rendered no list filter row');
+    assert.ok(
+      box.itemCount >= 9,
+      `the filter row holds ${box.itemCount} flex items; the selected state of this toolbar has ` +
+        'at least nine, so this fixture is not in the state the case exists to measure'
+    );
+    assert.ok(
+      box.rowHeight <= box.tallestItem + EPSILON_PX,
+      `the filter row is ${box.rowHeight}px against a tallest control of ${box.tallestItem}px, ` +
+        'so it WRAPPED. Item centres: ' +
+        `${box.centres.join(', ')}. Items: ` +
+        `${box.items.map((item) => `${item.label}@${item.centre}=${item.width}px`).join(' | ')}`
+    );
+    // AND IT FITS RATHER THAN OVERFLOWING. A basis tight enough to stop the wrap but a
+    // `min-width` too wide to honour it produces a one-line row that runs out past its own edge,
+    // which measures identically to a fix on the assertion above and reads far worse on screen.
+    assert.ok(
+      box.overflowedBy <= EPSILON_PX,
+      `the filter row overflows its own ${box.rowWidth}px by ${box.overflowedBy}px: the controls ` +
+        'stopped wrapping because they stopped fitting'
     );
   });
 

@@ -1737,8 +1737,10 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-scoped-list-state="empty"]',
       },
       // AND THE INSPECTOR'S OWN NO-STATE, inside the column that owns it. On an empty catalogue
-      // the whole right-hand track is this one box, so a short dashed panel floating at the top
-      // of it was the only thing the column said.
+      // the whole right-hand track is this one box, and this frame is what says which SHAPE it
+      // takes: a content-height panel at the top of a full-height aside, the same treatment
+      // `.manager-tool-browser-inspector-empty` records for the system Tool Rules rail, rather
+      // than a ~700px dashed box stretched down the whole column.
       {
         container: '[data-scoped-list-inspector]',
         target: '[data-scoped-list-inspector-state="resting"]',

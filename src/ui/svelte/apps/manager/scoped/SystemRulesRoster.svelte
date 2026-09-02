@@ -207,11 +207,14 @@
     surface, no fill. That is the shipped ruling for this region and this does not reopen it.
   -->
   <div class="manager-scoped-roster-card">
+    <!-- NO ELLIPSIS ON THE PLACEHOLDER. The design's field reads `Search systems` (`proto:2025`),
+         on all six screens that draw this card; the trailing `…` was this panel's own addition
+         and was the one string in the card that differed from the reference. -->
     <ManagerSearchField
       class="manager-scoped-roster-search"
       value={systemQuery}
       onInput={(next) => changeSystemQuery(next)}
-      placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems…')}
+      placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems')}
       ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystemsLabel', 'Search systems')}
       inputAttrs={{ 'data-scoped-list-system-search': '' }}
     />
@@ -506,12 +509,35 @@
      column — the exact defect the three rules here exist to prevent.
 
      The trailing step above it is the design's (`proto:2037`), and it is wider than the row gap
-     so the walk control reads as the card's foot rather than as a sixth system. */
+     so the walk control reads as the card's foot rather than as a sixth system.
+
+     ── THE PAGER IS A BORDERED ROW, NOT A BARE STRIP UNDER A HAIRLINE (issue 1373, maintainer
+     feedback round 3) ─────────────────────────────────────────────────────────────────────────
+     `proto:2037` draws it as `padding:6px 8px; border:1px solid var(--border); border-radius:8px`
+     — the same construction, the same border colour and the same horizontal inset as a roster
+     row three lines above it (`proto:2029`), separated from the last row by `margin-top:11px`.
+     The design has NO separator rule anywhere inside this card.
+
+     What shipped was the shared bar's `border-top: 1px solid` running the full width of the card
+     with the pager loose beneath it — the one part of the card not brought across, and the only
+     hairline on a screen whose every other boundary is a card edge. The `border` SHORTHAND is
+     what removes it: a `border-top: 0` beside a `border` declaration is two rules stating one
+     edge, and the next reader has to work out which wins.
+
+     `margin-top` rather than the old `padding-top`, because the step is now OUTSIDE a box that
+     has an edge of its own; padding would have put the 12px inside the border. */
   .manager-scoped-roster-card > :global(.manager-pagination) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-3) 0 0;
+    margin-top: var(--fab-space-3);
+    padding: var(--fab-space-chip) var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    /* NO FILL, for the reason the row rule above gives: the reference recesses this card one
+       rung and lifts its parts one rung above it, and this route's pane is on the bottom rung
+       already — so every part of the card is drawn by its border alone. */
+    background: transparent;
     font-size: 0.62rem;
   }
 

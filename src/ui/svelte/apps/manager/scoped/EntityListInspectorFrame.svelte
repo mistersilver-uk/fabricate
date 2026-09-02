@@ -1467,6 +1467,47 @@
     display: contents;
   }
 
+  /* ── AND THE SEARCH FIELD IS WHAT YIELDS TO IT (issue 1373, maintainer feedback round 3) ────
+     Flattening the register into the row is only half a single-row toolbar. A selection adds
+     four items to a row that already carries seven, and at the world catalogues' own 1280px
+     window the eleven no longer fit: the row wrapped, stranding the direction toggle alone on a
+     second line with the result count pushed right of it. Every UNSELECTED frame of the same
+     screen draws one row, and so does the reference (`proto:1970` for the tool catalogue,
+     `proto:3162` for the essence one), so this was a state the screen entered rather than a
+     width it ran out of.
+
+     THE SEARCH FIELD IS THE ONLY THING IN THE ROW THAT CAN GIVE. Everything else is `flex: 0 0
+     auto` — a control, a label or a count, each already at its content width — and the count and
+     the direction toggle are precisely the two the wrap stranded. So the selection cluster takes
+     the row, the sort cluster holds its place, and the field shrinks.
+
+     IT CHANGES NOTHING AT REST, which is why the basis is safe to move: the field is the row's
+     only `flex-grow` item, so on a single line its final width is the container minus everything
+     else WHATEVER the basis is. The basis and the floor only decide where the row BREAKS.
+     `:has()` keeps even that much off the resting toolbar: no selection, no count element, no
+     rule. On an engine without `:has()` the rule is discarded whole and the row wraps as it did
+     — the pre-existing behaviour, not a worse one.
+
+     `.manager-search`'s shipped `min-width: 180px` is the floor being lifted, and it has to go
+     with the basis: line breaking uses the hypothetical main size, which is the basis CLAMPED by
+     the floor, so a low basis under a 180px floor breaks the line at 180 exactly as before. The
+     value below leaves the field its 34px icon gutter and its trailing gutter with room for a
+     short query between them, and it is a floor rather than the rendered width — at the width
+     this was photographed at the field resolves to about 150px.
+
+     WRAPPED WHOLE in one `:global()`, for the reason the `select` rule above states at length:
+     leaving any compound scoped changes what Svelte emits for the hash and silently moves the
+     specificity. This is (0,5,0) — three classes, the `:has()` argument's attribute, and
+     `.manager-search` — against the shipped `.fabricate-manager .manager-search` at (0,2,0). */
+  :global(
+    .manager-toolbar.manager-scoped-list-toolbar
+      .manager-scoped-list-filter-row:has([data-scoped-list-selection-count])
+      > .manager-search
+  ) {
+    flex: 1 1 96px;
+    min-width: 96px;
+  }
+
   /* `SORT BY`, the prototype's tracked micro-label before the key select. It is a `<span>` rather
      than a `<label>` because it names TWO controls — the key and the direction toggle — and a
      `<label>` may point at only one; the select carries `aria-labelledby` back to it instead. */
@@ -1617,17 +1658,24 @@
     overflow-y: auto;
   }
 
-  /* THE RESTING PANEL FILLS ITS COLUMN rather than floating at the top of it (issue 1373,
-     maintainer feedback round 2). On an EMPTY catalogue the whole right-hand track is this one
-     box, and a short dashed panel pinned to the top of a full-height column reads as a stray
-     card beside a list rather than as the column's own no-state — which is exactly how the
-     system Tool Rules rail draws it, and what the maintainer asked this to match.
+  /* THE RESTING PANEL IS CONTENT-HEIGHT AT THE TOP OF THE COLUMN (issue 1373, maintainer
+     feedback round 3). The ASIDE runs the full height of the app — that is finding 6 and it
+     stays — but the panel inside it does not stretch to fill it.
+
+     THIS REVERSES THE `flex: 1 1 auto` THE PREVIOUS ROUND SHIPPED, and the argument is already
+     settled in this repository rather than re-opened here. `styles/fabricate.css` records the
+     identical correction for the identical control on the screen the finding names as the
+     model: `.manager-tool-browser-inspector-empty` went from `flex: 1 1 auto` to `flex: 0 0
+     auto` for issue 1373 because stretching it "introduced a container the POPULATED panel does
+     not have" — a ~700px dashed box answering a ~220px list card, the two halves of one screen
+     stating the same absence at three times the size. The system Tool Rules rail draws it
+     content-height and top-aligned, and this is the shared frame's half of the same treatment.
 
      `:global()` and a DIRECT-CHILD combinator: the element is `EmptyState`'s, so it can never
      carry this component's scope hash, and the `>` keeps the rule off any empty state a lane's
      own inspector body renders further down the same scroller. */
   .manager-scoped-list-inspector-scroll > :global(.manager-empty) {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-height: 0;
   }
 
