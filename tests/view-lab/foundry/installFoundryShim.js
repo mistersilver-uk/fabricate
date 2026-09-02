@@ -17,10 +17,47 @@
  *   enough, and using the real seam builder is what removes any chance of the lab's service bag
  *   drifting from production's.
  */
+import CHROME_PROVENANCE from '../chrome-provenance.json' with { type: 'json' };
 import { createLabRoll } from './labRoll.js';
 import { installLabRandom } from './labRandom.js';
 import { createLabDialogV2 } from '../foundryDialog.js';
 import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFlags.js';
+
+/**
+ * The client this lab DECLARES itself to be, taken from the build whose CSS it renders against.
+ *
+ * ── WHY THE SHIM HAS TO ANSWER THIS AT ALL ────────────────────────────────────────────────────
+ *
+ * `src/ui/svelte/util/essenceIcons.js` reads `game.release.generation` to choose between a
+ * committed Font Awesome catalogue and a live MEASUREMENT of the client's own stylesheet, and its
+ * header states the rule: when in doubt, measure. With `release` unset the lab was permanently in
+ * doubt, so `IconPicker` took the measuring branch — a branch a v14 client never takes, and one
+ * whose result depends on which stylesheets have finished loading. The lab was therefore rendering
+ * a picker that was both non-deterministic across loads and never on production's code path, and
+ * `IconPicker` is a manifest row.
+ *
+ * ── WHY IT IS SOURCED RATHER THAN TYPED ───────────────────────────────────────────────────────
+ *
+ * A literal `14` here could disagree with the chrome the page is painted by, and that disagreement
+ * is exactly the class of error this lab exists to remove: real CSS from one build, a declared
+ * client from another, and a frame that cannot tell you which of the two it is showing. The
+ * committed provenance record names the harvested build and `tests/view-lab-chrome-version-lock.js`
+ * already fails when it stops matching the pinned smoke image, so reading it makes the declared
+ * client structurally unable to drift from the rendered one.
+ *
+ * ── THE SHAPE IS FOUNDRY'S ────────────────────────────────────────────────────────────────────
+ *
+ * `common/config.mjs`: `ReleaseData#generation` is a required, non-nullable integer with `min: 1`,
+ * and `ReleaseData#version` is the getter `${generation}.${build}`. `client/game.mjs:293`:
+ * `Game#version` is the getter returning `this.release.version`. Both are reproduced as plain
+ * fields, which is all a reader needs.
+ */
+const [LAB_GENERATION, LAB_BUILD] = CHROME_PROVENANCE.foundryVersion.split('.').map(Number);
+const LAB_RELEASE = Object.freeze({
+  generation: LAB_GENERATION,
+  build: LAB_BUILD,
+  version: `${LAB_GENERATION}.${LAB_BUILD}`,
+});
 
 /**
  * Compose the Map key for one setting.
@@ -205,15 +242,55 @@ function createHooks() {
  *
  * @param {Map<string, object>} documents The uuid index, for resolving content links to names.
  */
+/**
+ * `TextEditor.getDragEventData`, transcribed from `client/applications/ux/text-editor.mjs` of the
+ * harvested build. Same rule as the `applyMode` / `applyRollMode` pair below: a documented static
+ * Fabricate calls is modelled here, not approximated at the call site.
+ *
+ * WHY IT MATTERS THAT THE STATIC IS PRESENT AT ALL. `foundryBridge.getDragEventData` tries this
+ * first and falls back to parsing `text/plain` itself. The two DISAGREE on failure: core returns
+ * `{}`, the fallback returns `null`. `dragDrop.js` guards on null, so with the static absent a
+ * malformed drop fires NOTHING in the lab where production fires `onDrop({})`. For a page whose
+ * value is an event log recording every callback a component makes, that is a wrong answer at the
+ * exact surface the lab exists to document — and it is wrong silently, because a callback that does
+ * not fire leaves no trace anywhere.
+ *
+ * Core's own guard is `!("dataTransfer" in event)`, with its comment recording why it is written
+ * that clumsily (`event instanceof DragEvent` does not work). Reproduced as written, warning
+ * included, rather than tightened: a stricter guard would reject a synthesized event the product
+ * accepts.
+ *
+ * @param {DragEvent} event A drag event.
+ * @returns {object} The parsed payload, or `{}` when there is none to parse.
+ */
+function getDragEventData(event) {
+  if (!('dataTransfer' in event)) {
+    console.warn(
+      'Incorrectly attempted to process drag event data for an event which was not a DragEvent.'
+    );
+    return {};
+  }
+  try {
+    return JSON.parse(event.dataTransfer.getData('text/plain'));
+  } catch {
+    return {};
+  }
+}
+
 function createTextEditor(documents) {
   const enrich = (raw) =>
     String(raw ?? '').replace(/@UUID\[([^\]]+)\](?:\{([^}]*)\})?/g, (whole, uuid, label) => {
       const name = label || documents.get(uuid)?.name;
       return name ? `<a class="content-link" data-uuid="${uuid}">${name}</a>` : whole;
     });
+  // On BOTH the base object and `.implementation`, because the two are reached by different
+  // callers: `foundryBridge` and `foundryCompat` read `TextEditor.implementation`, while core's own
+  // V13 call sites reach the class directly. A static present on one and absent on the other is the
+  // shape that made this gap invisible in the first place.
   return {
-    implementation: { enrichHTML: async (raw) => enrich(raw) },
+    implementation: { enrichHTML: async (raw) => enrich(raw), getDragEventData },
     enrichHTML: async (raw) => enrich(raw),
+    getDragEventData,
   };
 }
 
@@ -369,6 +446,9 @@ export function installFoundryShim(world) {
 
   const game = {
     ready: true,
+    // See LAB_RELEASE: the declared client, taken from the build whose chrome is being rendered.
+    release: LAB_RELEASE,
+    version: LAB_RELEASE.version,
     user: gmUser,
     users: Object.assign(createCollection([gmUser, playerUser]), {
       activeGM: gmUser,
