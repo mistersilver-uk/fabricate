@@ -7450,8 +7450,18 @@ test('every manager select paints an opaque background, so its popup opens dark'
   const offenders = [];
 
   // 1. The global sheet: rules whose selector ends at a bare `select` under the manager.
+  //
+  // THE `\b` BELOW WAS A LITERAL BACKSPACE (issue 1373, round 8, found while editing this file).
+  // U+0008 is what an editor writes when a `\b` is passed through a shell heredoc or a non-raw
+  // Python string, and it is invisible in every diff, every review and every editor. The pattern
+  // therefore required a control character between the selector and `select`, matched NOTHING,
+  // and half of this gate had been scanning an empty set: 0 rules against the 27 the repaired
+  // pattern finds. Only branch 2, the scoped-block correlation, was ever doing any work.
+  //
+  // Repaired rather than reported, because the repair is provably safe: neither branch reports an
+  // offender on this tree, so the gate goes from vacuous to real without moving.
   for (const [, selector, body] of css.matchAll(
-    /(\.fabricate-manager[^{},]*select)\s*\{([^}]*)\}/g
+    /(\.fabricate-manager[^{},]*\bselect)\s*\{([^}]*)\}/g
   )) {
     const declared = backgroundOf(body);
     if (declared && TRANSLUCENT.test(resolveToken(declared))) {
