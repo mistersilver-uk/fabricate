@@ -147,6 +147,8 @@ const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/comp
  */
 const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/IconButton.svelte',
@@ -230,9 +232,7 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',

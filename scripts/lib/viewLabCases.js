@@ -433,6 +433,22 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // realm-override picker keeps its value-bearing trigger and renders that row. A change
   // to the search row, the header ordering or the compact field is invisible in the first
   // frame and a change to the inline trigger is invisible in the second.
+  // The drop target (issue 1373). Its representative pair are browse surfaces that render no drop
+  // zone at all, so every PR that restyled it published two frames in which the changed control is
+  // absent. `world-tool-catalogue-list-head` exists precisely because the resting catalogue case
+  // auto-scrolls to a selected row and carries the list head off the top: this is the one frame
+  // that photographs the zone as the list's FIRST element, which is where the design puts it.
+  'src/ui/svelte/apps/manager/ItemDropZone.svelte': Object.freeze([
+    'world-tool-catalogue-list-head',
+  ]),
+  // The radio-card group (issue 1373). Two faces, and the representative pair renders neither: the
+  // WORLD face un-hides the gate-mode legend and draws its card with a kicker heading, while the
+  // SYSTEM face keeps that legend screen-reader-only. A change to the primitive is invisible in a
+  // frame that renders the other one, so both are named.
+  'src/ui/svelte/apps/manager/RadioCardGroup.svelte': Object.freeze([
+    'world-tool-entry-requirements',
+    'manager-tool-parity-03-breakage-1280x720',
+  ]),
   'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
     'manager-world-parties-realm-override-picker',
@@ -1431,7 +1447,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       // The frame that owns the `listLead` slot and the list scroller the zone sits in.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
     ],
   }),
   managerCase({
@@ -1697,7 +1712,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       // un-hides here (issue 1373). This frame is the only one that photographs the WORLD face
       // of either: the card's `headingStyle="kicker"` and the gate-mode group's visible legend.
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/RadioCardGroup\.svelte$/,
     ],
   }),
   managerCase({
