@@ -701,6 +701,25 @@
         })
       : ''
   );
+
+  /**
+   * The selection band's standing sentence, and the condition on it is the honest half.
+   *
+   * `proto:594` reads `Bulk actions are in the inspector →`, and that is only TRUE when the bulk
+   * body actually lands in the inspector — which is `bulk && inspectorBody`, exactly the pair the
+   * inspector's own `{#if}` requires. `EntityRulesListShell` supplies a `bulk` snippet and NO
+   * `inspectorBody`, so its bulk body renders in `.manager-scoped-list-bulk` directly under this
+   * toolbar; pointing a GM at an inspector that is not on the screen would be a sentence about
+   * another screen. There it says nothing, and the band is the count and its two actions.
+   */
+  const selectionHint = $derived(
+    bulk && inspectorBody
+      ? text(
+          'FABRICATE.Admin.Manager.Scoped.List.SelectionInspectorHint',
+          'Bulk actions are in the inspector →'
+        )
+      : ''
+  );
 </script>
 
 <!--
@@ -752,41 +771,26 @@
           ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.Filters', 'List filters')}
         >
           <!--
-            ONE ROW, AND THE SELECTION CONTROL IS IN IT.
+            THE FILTER ROW HOLDS FILTERS, AND NOTHING THE SELECTION STATE CHANGES.
 
-            The prototype's catalogue toolbar is a single line — `[☐ All] [🔍 Search essences…]
-            SORT BY [Name ▾] [⇅ Asc]  6 of 6 essences` (`essences.png`) — where this frame shipped
-            two bands, the second holding nothing but a select-all box. The band cost about 40px
-            above the first row and read as a mode the GM had entered rather than as a control.
+            `proto:1970` is this row for the tool catalogue and `proto:3162` is it for the essence
+            one, and both are the same five things: the search field, `Sort by`, the sort select,
+            the direction toggle, and the count pushed right by `margin-left: auto`. NO selection
+            affordance appears in either, in any state — the design's own select-all is a text
+            action inside the band below, which renders only while a selection is active
+            (`proto:591`-`597`).
 
-            `BulkSelectionToolbar` renders its own `<div class="{rowClass} is-selection">` and
-            cannot be told not to, so it is NESTED INSIDE the filter row and flattened to
-            `display: contents` by the scoped rule below. Its children — the box, and the count,
-            select-all-results and Clear controls that appear only at a non-zero count — then join
-            this row directly, which is exactly the register the prototype draws.
-
-            Its `rowClass` is UNCHANGED. `scoped-entity-list-shells-mounted.test.js` asserts this
-            root wears `manager-scoped-list-filter-row` and no studio default, and the flattening
-            is a layout fact rather than a naming one.
+            THIS ROW HAS NOW BEEN THREE THINGS AND THIS IS THE REFERENCE'S. It shipped as two
+            bands, the second holding nothing but a select-all box; round 3 flattened the register
+            INTO this row with `display: contents` and then had to shrink the search field to
+            about 150px under a selection to stop the eleven resulting items wrapping. Both were
+            the same mistake at different sizes: a row whose composition depends on whether rows
+            are ticked. With the register gone the row is the same five items ticked or not, and
+            the field keeps its full ~400px in both states — which is what
+            `scoped-list-inspector-geometry.test.js` now measures, at rest and selected, off one
+            mount.
           -->
           <div class={TOOLBAR_ROW_CLASS}>
-            <BulkSelectionToolbar
-              rowClass={TOOLBAR_ROW_CLASS}
-              toolbarAttr={TOOLBAR_ATTR}
-              pageBoxAttr={PAGE_BOX_ATTR}
-              countAttr={COUNT_ATTR}
-              resultsAttr={RESULTS_ATTR}
-              clearAttr={CLEAR_ATTR}
-              pageSelectionState={selection.pageSelectionState}
-              count={selection.count}
-              showSelectAllResults={selection.showSelectAllResults}
-              selectAllResultsCount={selection.selectAllResultsCount}
-              {selectAllLabel}
-              onTogglePage={togglePage}
-              onSelectAllResults={selectAllResults}
-              onClear={clearSelection}
-            />
-
             <ManagerSearchField
               value={query}
               onInput={(next) => changeQuery(next)}
@@ -874,6 +878,52 @@
               <span class="manager-scoped-list-count" data-scoped-list-count>{resultCount}</span>
             {/if}
           </div>
+
+          <!--
+            ── THE SELECTION STATE IS ITS OWN BAND (issue 1373, maintainer feedback round 4) ────
+
+            `proto:591`-`597`: a tinted row directly beneath the filter row, rendered ONLY while a
+            selection is active, holding the count, a sentence pointing at the inspector, and the
+            two text actions at its trailing edge. `{#if selection.count > 0}` is the whole of
+            `sc-if value="{{ d.cl.selActive }}"` — the register is a STATE the screen enters, so
+            it has no resting appearance to design.
+
+            WHAT THIS COSTS, STATED RATHER THAN HIDDEN. `BulkSelectionToolbar` renders the
+            tri-state page box unconditionally and takes no prop to suppress it, so gating the
+            band on a non-empty selection takes the `All` box off the resting toolbar with it.
+            That is the right half of the trade: the design draws NOTHING selection-shaped in the
+            filter row, and it opens a selection from the row's own checkbox (`proto:603`, whose
+            `title` on the essence and system lists is literally `Select for bulk edit`). So the
+            row box is the entry point, the band's `All` completes the page once a selection
+            exists, and `Select all N results` completes the corpus. The alternative — leaving
+            `All` in the filter row — keeps a control the reference does not have on every frame
+            of every state, which is the finding this round exists to close.
+
+            IT STAYS INSIDE `<ManagerToolbar>`, as the register's last row. The toolbar is the
+            labelled landmark the manager's "emptying a bulk selection" contract hops focus to
+            (`design-system/spec.md`), and moving the band out of it would leave that hop landing
+            on a row that no longer holds the selection register.
+          -->
+          {#if selection.count > 0}
+            <BulkSelectionToolbar
+              rowClass={TOOLBAR_ROW_CLASS}
+              toolbarAttr={TOOLBAR_ATTR}
+              pageBoxAttr={PAGE_BOX_ATTR}
+              countAttr={COUNT_ATTR}
+              resultsAttr={RESULTS_ATTR}
+              clearAttr={CLEAR_ATTR}
+              pageSelectionState={selection.pageSelectionState}
+              count={selection.count}
+              showSelectAllResults={selection.showSelectAllResults}
+              selectAllResultsCount={selection.selectAllResultsCount}
+              {selectAllLabel}
+              hint={selectionHint}
+              trailingActions
+              onTogglePage={togglePage}
+              onSelectAllResults={selectAllResults}
+              onClear={clearSelection}
+            />
+          {/if}
         </ManagerToolbar>
 
         {#if bulk && !inspectorBody && selection.count > 0}
@@ -1446,67 +1496,20 @@
     min-width: 0;
   }
 
-  /* THE SELECTION REGISTER IS FLATTENED INTO THE FILTER ROW. `BulkSelectionToolbar` renders its
-     own row element and takes no "render inline" prop, so the box is nested and its wrapper is
-     removed from the box tree — which also drops the global `.is-selection` hairline and its
-     `padding-top`, since neither paints on a `display: contents` box.
+  /* ── TWO RULES USED TO LIVE HERE, AND BOTH WENT WITH THE FLATTENING (issue 1373, round 4) ───
+     `.manager-scoped-list-filter-row.is-selection { display: contents }` removed the register's
+     own wrapper from the box tree so its controls joined the filter row; the `:has()` rule under
+     it then shrank the search field to about 150px whenever that row carried a selection count,
+     because eleven items no longer fitted 1280px. The register is its own band now
+     (`proto:591`-`597`), so the filter row never carries those items, never overflows, and the
+     field never yields. A flattening rule against a band that is no longer nested, and a
+     `:has()` guard against a count that is no longer in this row, would both compile to
+     selectors matching nothing — silently, since neither compound could carry this component's
+     hash. They are deleted rather than left as inert text.
 
-     `:global()` because the element is the PRIMITIVE'S, not this template's: Svelte's
-     unused-selector analysis cannot see across a component boundary and would emit this whole
-     block as a dead comment. The local half of the selector keeps it out of every other screen,
-     exactly as the `.manager-pagination` rule above does. */
-  /* BOTH compounds are `:global` now (issue 1039), and it has to be both. The ancestor is a
-     `<ManagerToolbar>` tag and the child is `BulkSelectionToolbar`'s own element, so NEITHER can
-     carry this component's scope hash — leaving the ancestor scoped emitted
-     `.manager-scoped-list-toolbar.svelte-… .manager-scoped-list-filter-row.is-selection`, which
-     matched nothing while looking exactly like the working rule. Specificity is unchanged at
-     (0,4,0): two classes on the ancestor, two on the child, and a `:global()` contributes none of
-     its own. The pair still keeps this off every other screen, exactly as the note below says. */
-  :global(.manager-toolbar.manager-scoped-list-toolbar)
-    :global(.manager-scoped-list-filter-row.is-selection) {
-    display: contents;
-  }
-
-  /* ── AND THE SEARCH FIELD IS WHAT YIELDS TO IT (issue 1373, maintainer feedback round 3) ────
-     Flattening the register into the row is only half a single-row toolbar. A selection adds
-     four items to a row that already carries seven, and at the world catalogues' own 1280px
-     window the eleven no longer fit: the row wrapped, stranding the direction toggle alone on a
-     second line with the result count pushed right of it. Every UNSELECTED frame of the same
-     screen draws one row, and so does the reference (`proto:1970` for the tool catalogue,
-     `proto:3162` for the essence one), so this was a state the screen entered rather than a
-     width it ran out of.
-
-     THE SEARCH FIELD IS THE ONLY THING IN THE ROW THAT CAN GIVE. Everything else is `flex: 0 0
-     auto` — a control, a label or a count, each already at its content width — and the count and
-     the direction toggle are precisely the two the wrap stranded. So the selection cluster takes
-     the row, the sort cluster holds its place, and the field shrinks.
-
-     IT CHANGES NOTHING AT REST, which is why the basis is safe to move: the field is the row's
-     only `flex-grow` item, so on a single line its final width is the container minus everything
-     else WHATEVER the basis is. The basis and the floor only decide where the row BREAKS.
-     `:has()` keeps even that much off the resting toolbar: no selection, no count element, no
-     rule. On an engine without `:has()` the rule is discarded whole and the row wraps as it did
-     — the pre-existing behaviour, not a worse one.
-
-     `.manager-search`'s shipped `min-width: 180px` is the floor being lifted, and it has to go
-     with the basis: line breaking uses the hypothetical main size, which is the basis CLAMPED by
-     the floor, so a low basis under a 180px floor breaks the line at 180 exactly as before. The
-     value below leaves the field its 34px icon gutter and its trailing gutter with room for a
-     short query between them, and it is a floor rather than the rendered width — at the width
-     this was photographed at the field resolves to about 150px.
-
-     WRAPPED WHOLE in one `:global()`, for the reason the `select` rule above states at length:
-     leaving any compound scoped changes what Svelte emits for the hash and silently moves the
-     specificity. This is (0,5,0) — three classes, the `:has()` argument's attribute, and
-     `.manager-search` — against the shipped `.fabricate-manager .manager-search` at (0,2,0). */
-  :global(
-    .manager-toolbar.manager-scoped-list-toolbar
-      .manager-scoped-list-filter-row:has([data-scoped-list-selection-count])
-      > .manager-search
-  ) {
-    flex: 1 1 96px;
-    min-width: 96px;
-  }
+     The band's own appearance is `.manager-scoped-list-filter-row.is-selection` in
+     `styles/fabricate.css`, and it has to be: `BulkSelectionToolbar` writes that element in ITS
+     template, so no rule in this block can reach it at all. */
 
   /* `SORT BY`, the prototype's tracked micro-label before the key select. It is a `<span>` rather
      than a `<label>` because it names TWO controls — the key and the direction toggle — and a

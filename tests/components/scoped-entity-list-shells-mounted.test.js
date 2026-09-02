@@ -462,8 +462,33 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
 
   it('passes the row class and all five hook names, and inherits no studio default', async () => {
     const root = await catalogueHarness.mount(catalogueProps('component'));
+
+    // ── AT REST THE REGISTER IS NOT ON THE SCREEN AT ALL (issue 1373, round 4) ────────────────
+    // It used to render unconditionally, so a resting catalogue carried a select-all box in its
+    // filter row. `proto:1970` draws no selection affordance in that row in any state and
+    // `proto:591` gates the whole band on `selActive`, so the register is a state the screen
+    // enters. A GM opens it from a ROW's own box, which is the design's entry point too
+    // (`proto:603`) and is asserted below rather than assumed.
+    assert.ok(
+      !root.querySelector('[data-scoped-list-selection-toolbar]'),
+      'the selection band renders before anything is selected, so the resting filter row still ' +
+        'carries a control the reference does not have'
+    );
+    assert.ok(
+      !root.querySelector('[data-scoped-list-select-all-page]'),
+      'the `All` box survives at a count of zero'
+    );
+    const rowBox = root.querySelector('[data-scoped-list-select="component-0"]');
+    assert.ok(
+      Boolean(rowBox),
+      'no row checkbox, so a selection cannot be started from scratch at all'
+    );
+
+    rowBox.click();
+    await catalogueHarness.setProps({});
+
     const toolbar = root.querySelector('[data-scoped-list-selection-toolbar]');
-    assert.ok(Boolean(toolbar), 'the toolbar renders unconditionally, at a count of zero');
+    assert.ok(Boolean(toolbar), 'ticking a row produced no selection band');
     // TOKENS, not the whole string: Svelte appends its own scoping hash to the class attribute
     // of every element the primitive renders. The contract is which of the four candidate row
     // classes this root wears, and that no studio's leaked in.
@@ -476,7 +501,6 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
     ]) {
       assert.equal(toolbar.classList.contains(studio), false, `${studio} leaked in`);
     }
-    assert.ok(Boolean(root.querySelector('[data-scoped-list-select-all-page]')));
 
     // The Component Studio's five defaults must be nowhere in this tree: inheriting them would
     // retune six scoped screens silently the next time that studio moves.
@@ -490,11 +514,66 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
       assert.equal(root.querySelectorAll(`[${inherited}]`).length, 0, `${inherited} leaked in`);
     }
 
-    // The remaining three hooks render only once something is selected, so tick a row.
+    // THE REGISTER IS INSIDE THE BAND, ALL OF IT. A construction that moved the band but left any
+    // one control in the filter row would satisfy a bare presence query on `root`, so each hook
+    // is counted on the whole tree and inside the band and the two totals must agree.
+    //
+    // `select-all-results` renders only when the filtered set is bigger than the rendered one, so
+    // it is counted rather than required: this fixture is one page and draws none. The equality
+    // still bites — it is `0 === 0` here and `1 === 0` the moment the link is rendered outside
+    // the band.
+    for (const hook of [
+      'data-scoped-list-select-all-page',
+      'data-scoped-list-selection-count',
+      'data-scoped-list-select-all-results',
+      'data-scoped-list-clear-selection',
+    ]) {
+      assert.equal(
+        toolbar.querySelectorAll(`[${hook}]`).length,
+        root.querySelectorAll(`[${hook}]`).length,
+        `${hook} renders outside the selection band`
+      );
+    }
+    for (const required of [
+      'data-scoped-list-select-all-page',
+      'data-scoped-list-selection-count',
+      'data-scoped-list-clear-selection',
+    ]) {
+      assert.ok(Boolean(toolbar.querySelector(`[${required}]`)), `${required} never rendered`);
+    }
+  });
+
+  it('points at the inspector rather than restating what the panel there offers', async () => {
+    // `proto:594`. The band and the bulk panel BOTH state the count — the design does that too
+    // (`proto:629` is the panel's own accent hero) — and the difference is what each does next:
+    // the band names where the verbs are, the panel holds them. Without the sentence the band's
+    // `Select all` and `Clear` read as the bulk actions, which is the competition this avoids.
+    //
+    // A `bulk` SNIPPET IS SUPPLIED HERE and the base fixture has none, which is the other half of
+    // the contract: the sentence is true only when the bulk body lands in the inspector, so the
+    // frame says it only for `bulk && inspectorBody`. The second mount below is that negative.
+    const root = await catalogueHarness.mount(
+      catalogueProps('component', { bulk: markerSnippet('data-lane-bulk-body') })
+    );
     root.querySelector('[data-scoped-list-select="component-0"]').click();
     await catalogueHarness.setProps({});
-    assert.ok(Boolean(root.querySelector('[data-scoped-list-selection-count]')));
-    assert.ok(Boolean(root.querySelector('[data-scoped-list-clear-selection]')));
+    const band = root.querySelector('[data-scoped-list-selection-toolbar]');
+    assert.ok(Boolean(band), 'no band, so there is nothing to carry the sentence');
+    assert.match(
+      band.textContent,
+      /Bulk actions are in the inspector/,
+      'the band states a count and two actions and never says where the bulk verbs live'
+    );
+
+    const noBulk = await catalogueHarness.mount(catalogueProps('component'));
+    noBulk.querySelector('[data-scoped-list-select="component-0"]').click();
+    await catalogueHarness.setProps({});
+    const bareBand = noBulk.querySelector('[data-scoped-list-selection-toolbar]');
+    assert.ok(Boolean(bareBand), 'the band is gated on the bulk snippet rather than on a count');
+    assert.ok(
+      !/Bulk actions are in the inspector/.test(bareBand.textContent),
+      'a catalogue with no bulk panel still points a GM at one'
+    );
   });
 });
 
@@ -777,14 +856,22 @@ describe('a list has three no-content states, each its own treatment', () => {
       false,
       'an empty world is an absence of content, not a query that matched nothing'
     );
+    // THE SELECTION BAND IS NOT ON THIS LIST, and its absence is the point rather than a gap
+    // (issue 1373, round 4). The register is a STATE now — `proto:591` gates the whole band on
+    // an active selection — and an empty corpus has no row to tick, so a band here would be a
+    // control acting on nothing. What "the surface stays live" means is the FILTERS, which is
+    // what an unreadable corpus suspends and a readable-but-empty one does not.
     for (const live of [
       '[data-scoped-list-search]',
       '[data-scoped-list-membership]',
       '[data-scoped-list-sort]',
-      '[data-scoped-list-selection-toolbar]',
     ]) {
       assert.ok(Boolean(root.querySelector(live)), `${live} was suppressed on a readable corpus`);
     }
+    assert.ok(
+      !root.querySelector('[data-scoped-list-selection-toolbar]'),
+      'an empty catalogue draws a selection band, which can only act on rows it does not have'
+    );
   });
 
   it('states a query that matched NOTHING with the filtered treatment and a way out', async () => {
@@ -883,6 +970,18 @@ describe('the shells own the list state machine', () => {
     const root = await catalogueHarness.mount(
       catalogueProps('component', { scope: scopeOf('component', { count: 60 }) })
     );
+    // THE PAGE BOX IS INSIDE THE BAND NOW, so it has to be opened before it can be used (issue
+    // 1373, round 4). One row's own box is what a GM clicks first, exactly as `proto:603` draws
+    // it; the band then appears carrying `All`, and clicking that completes the page. The
+    // intermediate count is asserted so a box that silently stopped selecting anything cannot
+    // read as this step working.
+    root.querySelector('[data-scoped-list-select="component-0"]').click();
+    await catalogueHarness.setProps({});
+    assert.match(
+      root.querySelector('[data-scoped-list-selection-count]').textContent,
+      /1 selected/,
+      'ticking a row selected nothing, so the band below is not the state this case measures'
+    );
     // Page one only: the tri-state box acts on the RENDERED rows.
     root.querySelector('[data-scoped-list-select-all-page]').click();
     await catalogueHarness.setProps({});
@@ -917,6 +1016,10 @@ describe('the shells own the list state machine', () => {
     const root = await catalogueHarness.mount(
       catalogueProps('component', { scope: scopeOf('component', { count: 5 }) })
     );
+    // A row's own box first, because the band that carries `All` renders only under a selection
+    // (issue 1373, round 4). See the case above.
+    root.querySelector('[data-scoped-list-select="component-0"]').click();
+    await catalogueHarness.setProps({});
     root.querySelector('[data-scoped-list-select-all-page]').click();
     await catalogueHarness.setProps({});
     assert.match(

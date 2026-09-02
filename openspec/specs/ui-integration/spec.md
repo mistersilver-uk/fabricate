@@ -318,7 +318,10 @@ A surface that paints its permanent hint in `warning` alongside a conditional `w
 Every multi-select affordance in the manager renders through one shared selection-control primitive: a square custom control with a checked, unchecked and indeterminate state, at the sizes its host row needs.
 A host-supplied `<input type="checkbox">` rendered with Foundry's default control chrome is a second selection design and is not an acceptable rendering.
 A multi-select surface's SELECTION TOOLBAR — the tri-state control over the rendered rows, the selected-count readout, the select-all-results action and Clear — likewise renders through one shared toolbar primitive that every browser imports.
-Its test and screenshot hook names, its host row class and its labels are parameters of that primitive, not a reason to fork it.
+Its test and screenshot hook names, its host row class, its labels and its standing hint are parameters of that primitive, not a reason to fork it.
+Where a surface gates that toolbar on an active selection, the toolbar carries the WHOLE register — the tri-state control included — so no part of it is left standing in the filter row it was lifted out of.
+The hint is the sentence that keeps the band and the bulk edit panel from competing: the band states the count and names where the bulk actions are, and the panel holds them.
+A surface whose bulk body does not render in an inspector states nothing there rather than pointing at a rail it has not got.
 
 #### Bulk edit panels
 

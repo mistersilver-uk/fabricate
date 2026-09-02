@@ -196,9 +196,24 @@ describe('world Tools Catalogue (issue 1373)', () => {
     );
     assert.ok(!target.querySelector('select[data-scoped-list-membership]'));
     // AND THE BULK SELECTION SURVIVES IT, which is the distinction that makes this safe: the
-    // ruled-in `All` box and the per-row checkboxes are a different control from the filter.
-    assert.ok(Boolean(target.querySelector('[data-scoped-list-select-all-page]')), 'select-all');
+    // per-row checkboxes are a different control from the filter.
+    //
+    // THE ENTRY POINT IS THE ROW BOX, and at rest it is the ONLY one (issue 1373, round 4). The
+    // `All` box used to stand in this filter row; it is inside the selection band now, which
+    // renders only under an active selection, because `proto:1970` draws no selection affordance
+    // in this row in any state. Both halves are asserted, since "the row box is there" alone
+    // would also pass on a screen that kept `All` beside it.
     assert.ok(Boolean(target.querySelector('[data-scoped-list-select="hammer"]')), 'row box');
+    assert.ok(
+      !target.querySelector('[data-scoped-list-select-all-page]'),
+      'the `All` box still stands in the resting filter row'
+    );
+    target.querySelector('[data-scoped-list-select="hammer"]').click();
+    await harness.setProps({});
+    assert.ok(
+      Boolean(target.querySelector('[data-scoped-list-select-all-page]')),
+      'ticking a row produced no band, so the page control is unreachable from this screen'
+    );
   });
 
   it('opens the LIST with the creation zone, not a band beside the breakage card', async () => {

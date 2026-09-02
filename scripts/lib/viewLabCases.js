@@ -1758,11 +1758,16 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      // The no-state primitive both halves of this frame render, and the drop zone above the
-      // hero. Claimed here because this is the only case in the registry that renders the
-      // catalogue's empty face at all.
-      /^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
+      // `EmptyState.svelte` AND `ItemDropZone.svelte` WERE CLAIMED HERE AND ARE NOT ANYMORE.
+      // Both are BROAD SIGNALS (`BROAD_SIGNAL_PATTERN`, via the named manager-primitive leg), and
+      // `selectRenderFileCases` `continue`s on a broad-signal file BEFORE it reads any case's
+      // `sourceMatches` — so the two patterns declared an interest the router could never act on,
+      // and `tests/design-system-primitives.test.js` property (b) failed on them from the commit
+      // that added them. Removing them changes no routing whatsoever: a change to either file
+      // publishes the representative pair exactly as it did with the claim present. The seam for
+      // "this frame is the one that draws the primitive's deliberate state" is
+      // `BROAD_SIGNAL_CASE_OVERRIDES`, and giving either file one is a routing decision about
+      // every screen that renders it rather than about this case.
     ],
   }),
   managerCase({

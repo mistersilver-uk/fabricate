@@ -46,6 +46,16 @@ const FRAME = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const frameCss = scopedComponentCss(resolve(repoRoot, FRAME));
 const shellCss = scopedComponentCss(resolve(repoRoot, SHELL));
+/**
+ * The selection band's own children (issue 1373, maintainer feedback round 4).
+ *
+ * `BulkSelectionToolbar` paints the count, the standing hint and the two text actions in its OWN
+ * scoped block, and the band case below measures where those actions sit. Without this sheet the
+ * band renders as unstyled text runs and the case would measure a layout no build produces.
+ */
+const selectionToolbarCss = scopedComponentCss(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte')
+);
 
 /** The threshold the frame declares. Read from its source so the two cannot drift apart. */
 const THRESHOLD_PX = Number(
@@ -121,6 +131,18 @@ const laneInspectorBody = createRawSnippet(() => ({
 }));
 
 /**
+ * A lane's `bulk` panel, standing in for `ToolCatalogueBulkPanel` (issue 1373, round 4).
+ *
+ * The selection fixture needs one because the band's standing hint — `Bulk actions are in the
+ * inspector →` — is rendered only for `bulk && inspectorBody`, which is the frame refusing to
+ * point at a rail that is not carrying a bulk panel. Without it the band draws its count and its
+ * two actions and the case measures a narrower register than the screen ships.
+ */
+const laneBulkBody = createRawSnippet(() => ({
+  render: () => `<p data-lane-bulk-body>The lane's own bulk panel.</p>`,
+}));
+
+/**
  * A lane's `listLead`, standing in for the world Tool catalogue's create-from-drop zone.
  *
  * Deliberately a plain block with a stated height rather than the real `ItemDropZone`: what the
@@ -178,10 +200,24 @@ const harness = createMountedComponentHarness({
 });
 
 function page(productMarkup, windowWidth, hostHeight = HOST_HEIGHT_PX) {
+  // ── THE MODULE SHEET IS LAYERED AND THE COMPONENT SHEETS ARE NOT ─────────────────────────────
+  // `module.json` registers `styles/fabricate.css` with no explicit `layer`, and Foundry imports
+  // an unlayered module stylesheet at `layer(modules)` — `tests/view-lab/cascade.css` reproduces
+  // that verbatim and is the reference for it. A Svelte scoped block is injected as an ordinary
+  // unlayered `<style>` at runtime, and an unlayered declaration beats a layered one WHATEVER the
+  // specificity.
+  //
+  // This harness used to load all four sheets flat, which inverts that for every pair where the
+  // two files touch the same property: a rule in the global sheet that production never applies
+  // measured here as if it did. That is not hypothetical — it is exactly how a `margin-left` moved
+  // in this sheet passed a browser measurement and then did nothing in the lab (issue 1373,
+  // maintainer feedback round 4). The wrapper is one line and it makes this page's cascade the
+  // shipped one.
   return `<!doctype html><html><head><meta charset="utf-8">
-    <style>${fabricateCss}</style>
+    <style>@layer modules { ${fabricateCss} }</style>
     <style>${frameCss.css}</style>
     <style>${shellCss.css}</style>
+    <style>${selectionToolbarCss.css}</style>
     <style>
       :root { --font-primary: Arial, sans-serif; }
       html, body { margin: 0; padding: 0; }
@@ -243,6 +279,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   let shortPagedMarkup = '';
   let leadMarkup = '';
   let selectionMarkup = '';
+  let selectionRestingMarkup = '';
 
   before(async () => {
     assert.ok(
@@ -435,7 +472,19 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       membershipFilter: false,
       selectAllLabel: SELECT_ALL_SHORT,
       inspectorBody: laneInspectorBody,
+      bulk: laneBulkBody,
     });
+    // THE SAME TOOLBAR AT REST, CAPTURED BEFORE THE FIRST TICK (issue 1373, round 4). The claim
+    // the band exists to make is that the filter row's composition does not depend on selection
+    // state, and that is a COMPARISON — a selected row measured on its own cannot state it. One
+    // mount produces both halves, so the two markups differ in nothing but the ticks.
+    selectionRestingMarkup = selectionTarget.innerHTML;
+    assert.ok(
+      !selectionRestingMarkup.includes('data-scoped-list-selection-count'),
+      'the resting capture already carries a selection count, so the two markups below are the ' +
+        'same state and every comparison between them is vacuous'
+    );
+
     const boxes = [...selectionTarget.querySelectorAll('[data-scoped-list-select]')];
     assert.ok(
       boxes.length >= SELECTION_TICKS,
@@ -558,14 +607,20 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     const tab = await context.newPage();
     await tab.setContent(page(productMarkup, windowWidth));
     const result = await tab.evaluate(() => {
+      // NOT `.manager-scoped-list-filter-row` on its own. `BulkSelectionToolbar` renders
+      // `<div class="{rowClass} is-selection">` in its own template, so BOTH the filter row and
+      // the selection register carry that class and a bare query answers whichever comes first
+      // in the DOM — which is the filter row today and would silently become the band the moment
+      // the band moved above it. `:not(.is-selection)` names the filter row itself.
       const row = document.querySelector(
-        '.manager-scoped-list-column .manager-scoped-list-filter-row'
+        '.manager-scoped-list-column .manager-scoped-list-filter-row:not(.is-selection)'
       );
       if (!row) return { rendered: false };
-      // `BulkSelectionToolbar` renders its own row element, which the frame flattens to
-      // `display: contents` — so the four selection controls are flex items of THIS row while
-      // their wrapper is not a box at all. Walking through any `contents` child is what makes
-      // the item list the real flex items rather than one opaque wrapper.
+      // WALK THROUGH ANY `display: contents` CHILD. The register was flattened into this row
+      // with `display: contents` before it became its own band, and under that construction the
+      // four selection controls are flex items of THIS row while their wrapper is not a box at
+      // all. Keeping the walk is what lets this measurement describe both constructions, so the
+      // pre-fix run reports the real item list rather than one opaque wrapper.
       const items = [];
       for (const child of row.children) {
         if (getComputedStyle(child).display === 'contents') items.push(...child.children);
@@ -580,17 +635,71 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
         };
       });
       const rowBox = row.getBoundingClientRect();
+      const search = row.querySelector('.manager-search');
+      const band = document.querySelector('[data-scoped-list-selection-toolbar]');
+      const bandBox = band ? band.getBoundingClientRect() : null;
+      const bandStyle = band ? getComputedStyle(band) : null;
+      const holds = (scope) =>
+        scope
+          ? {
+              pageBox: Boolean(scope.querySelector('[data-scoped-list-select-all-page]')),
+              count: Boolean(scope.querySelector('[data-scoped-list-selection-count]')),
+              results: Boolean(scope.querySelector('[data-scoped-list-select-all-results]')),
+              clear: Boolean(scope.querySelector('[data-scoped-list-clear-selection]')),
+            }
+          : { pageBox: false, count: false, results: false, clear: false };
       return {
         rendered: true,
         itemCount: items.length,
         rowWidth: Math.round(rowBox.width),
         rowHeight: Math.round(rowBox.height),
+        rowBottom: Math.round(rowBox.bottom),
         tallestItem: Math.round(
           Math.max(...items.map((element) => element.getBoundingClientRect().height))
         ),
         overflowedBy: Math.round(row.scrollWidth - row.clientWidth),
         items: described,
         centres: [...new Set(described.map((item) => item.centre))].sort((a, b) => a - b),
+        searchWidth: search ? Math.round(search.getBoundingClientRect().width) : 0,
+        // The register's four controls, asked for on BOTH sides of the boundary: "the band holds
+        // them" and "the filter row does not" are two different claims and a construction that
+        // renders them in both places satisfies only the first.
+        rowHolds: holds(row),
+        band: {
+          rendered: Boolean(band),
+          display: bandStyle ? bandStyle.display : '',
+          // A `display: contents` box has no geometry at all, so every number below is zero for
+          // the flattened construction — which is what makes "the band is a box under the row"
+          // fail loudly rather than measure a phantom.
+          top: bandBox ? Math.round(bandBox.top) : 0,
+          height: bandBox ? Math.round(bandBox.height) : 0,
+          width: bandBox ? Math.round(bandBox.width) : 0,
+          background: bandStyle ? bandStyle.backgroundColor : '',
+          borderTopColor: bandStyle ? bandStyle.borderTopColor : '',
+          borderTopWidth: bandStyle ? bandStyle.borderTopWidth : '',
+          borderBottomWidth: bandStyle ? bandStyle.borderBottomWidth : '',
+          holds: holds(band),
+          // The trailing pair, as EDGES rather than as a `margin-left` string. `getComputedStyle`
+          // reports the USED value of an `auto` margin on a flex item, so "the auto margin is on
+          // the right control" and "the auto margin is on both, splitting the gap" both read as a
+          // plausible pixel number and only the geometry tells them apart.
+          edges: (() => {
+            const at = (selector) => {
+              const found = band ? band.querySelector(selector) : null;
+              if (!found) return null;
+              const rect = found.getBoundingClientRect();
+              return { left: Math.round(rect.left), right: Math.round(rect.right) };
+            };
+            return {
+              band: bandBox
+                ? { left: Math.round(bandBox.left), right: Math.round(bandBox.right) }
+                : null,
+              hint: at('.fab-bulk-selection-hint'),
+              results: at('[data-scoped-list-select-all-results]'),
+              clear: at('[data-scoped-list-clear-selection]'),
+            };
+          })(),
+        },
       };
     });
     await context.close();
@@ -826,10 +935,17 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     // row BREAKS.
     const box = await measureToolbarLines(selectionMarkup, CATALOGUE_WINDOW_PX);
     assert.equal(box.rendered, true, 'the selection fixture rendered no list filter row');
-    assert.ok(
-      box.itemCount >= 9,
-      `the filter row holds ${box.itemCount} flex items; the selected state of this toolbar has ` +
-        'at least nine, so this fixture is not in the state the case exists to measure'
+    // THE PRECONDITION IS NOW THE SELECTION ITSELF, not a count of items in this row (issue
+    // 1373, round 4). Round 3 kept the register flattened into the filter row and asserted at
+    // least nine flex items here; the register is its own band now, so the row is back to its
+    // resting five and a nine-item floor would fail on the fix rather than on the defect. What
+    // still has to be true for this case to mean anything is that a selection is ACTIVE — which
+    // the band renders, and the sibling case below measures.
+    assert.equal(
+      box.band.rendered,
+      true,
+      'no selection register rendered at all, so this fixture is the RESTING toolbar and the ' +
+        'wrap this case exists to measure cannot occur'
     );
     assert.ok(
       box.rowHeight <= box.tallestItem + EPSILON_PX,
@@ -845,6 +961,133 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       box.overflowedBy <= EPSILON_PX,
       `the filter row overflows its own ${box.rowWidth}px by ${box.overflowedBy}px: the controls ` +
         'stopped wrapping because they stopped fitting'
+    );
+  });
+
+  it('gives the selection its own BAND under an unchanged filter row', async () => {
+    // ── THE DESIGN'S OWN CONSTRUCTION (issue 1373, maintainer feedback round 4) ───────────────
+    // Round 3 stopped the wrap by shrinking the search field to about 150px whenever rows were
+    // selected. It worked and it is not what the reference does. `proto:1970` is the tool
+    // catalogue's filter row — search, `Sort by`, the sort select, the direction toggle and the
+    // count, with NO selection affordance in it at all — and `proto:591`-`597` puts the selection
+    // state in a SEPARATE band directly beneath that row, rendered only while a selection is
+    // active and painted `--accent-soft` inside an `--accent-border` edge.
+    //
+    // So the row never changes composition and never needs to yield anything. That is two
+    // claims, and both are measured against the SAME MOUNT at rest and selected: a selected-only
+    // measurement can say the row fits and still be describing a row that grew and shrank.
+    const resting = await measureToolbarLines(selectionRestingMarkup, CATALOGUE_WINDOW_PX);
+    const selected = await measureToolbarLines(selectionMarkup, CATALOGUE_WINDOW_PX);
+    assert.equal(resting.rendered, true, 'the resting fixture rendered no list filter row');
+    assert.equal(selected.rendered, true, 'the selection fixture rendered no list filter row');
+
+    // 1 · THE BAND IS A BOX, AND IT IS UNDER THE ROW. `display: contents` removes an element
+    // from the box tree entirely, so the flattened construction answers this with zeros.
+    assert.equal(selected.band.rendered, true, 'no selection register rendered');
+    assert.notEqual(
+      selected.band.display,
+      'contents',
+      'the selection register is still flattened into the filter row with `display: contents`, ' +
+        'so it is a set of loose controls in that row rather than the band `proto:592` draws'
+    );
+    assert.ok(
+      selected.band.height > 0 && selected.band.width > 0,
+      `the band measured ${selected.band.width}x${selected.band.height}px, so it is not a box`
+    );
+    assert.ok(
+      selected.band.top >= selected.rowBottom - EPSILON_PX,
+      `the band's top is ${selected.band.top}px against a filter row ending at ` +
+        `${selected.rowBottom}px: it is not BENEATH the row`
+    );
+
+    // 2 · AND IT IS PAINTED. `proto:592` fills it `--accent-soft` and edges it
+    // `--accent-border` on all four sides — a tinted card, not the hairline-topped continuation
+    // of the filter row that shipped. Both are read from the resolved cascade rather than from
+    // the source text, because a rule that compiles to a selector matching nothing reads exactly
+    // like the rule that works.
+    assert.notEqual(
+      selected.band.background,
+      'rgba(0, 0, 0, 0)',
+      'the band has no fill, so it is not the tinted card `proto:592` draws'
+    );
+    assert.notEqual(
+      selected.band.borderBottomWidth,
+      '0px',
+      `the band is edged only on top (${selected.band.borderTopWidth} / ` +
+        `${selected.band.borderBottomWidth}), which is the shipped separator rule rather than ` +
+        'the enclosed band'
+    );
+
+    // 3 · THE REGISTER MOVED, rather than being drawn twice. Both halves are asserted: a
+    // construction that renders the count in the band AND leaves it in the row satisfies the
+    // first clause alone.
+    assert.deepEqual(
+      selected.band.holds,
+      { pageBox: true, count: true, results: true, clear: true },
+      'the band does not carry the whole selection register'
+    );
+    assert.deepEqual(
+      selected.rowHolds,
+      { pageBox: false, count: false, results: false, clear: false },
+      'the filter row still carries selection controls, so its composition still depends on ' +
+        'selection state — which is exactly what `proto:1970` does not do'
+    );
+
+    // 4 · THE TWO TEXT ACTIONS ARE AT THE TRAILING EDGE, TOGETHER. `proto:595`-`596` puts the
+    // auto margin on `Select all N results` with `Clear` directly after it; the shipped primitive
+    // puts it on `Clear` alone, which in a band carrying the standing hint leaves the link jammed
+    // against that sentence with the whole gap after it.
+    //
+    // MEASURED AS THREE EDGES, because the pixel number a `margin-left: auto` reports is
+    // plausible under every wrong arrangement: put the auto margin on BOTH and the gap splits in
+    // half, which is a real number in the right units that looks like nothing is wrong. The claim
+    // is the ORDER of the gaps — a wide one before the link, a hairline one between the link and
+    // `Clear` — checked against the band's own width so a narrow band cannot satisfy it by having
+    // no gap anywhere.
+    //
+    // IT IS ALSO THE CLAUSE THAT ANSWERS FOR THE CASCADE. This grouping lives in
+    // `BulkSelectionToolbar`'s scoped block rather than in `styles/fabricate.css`, because that
+    // sheet ships at `layer(modules)` and loses to an unlayered component rule whatever its
+    // specificity. `page()` above layers the sheet for exactly that reason, so an attempt to move
+    // this back into the global sheet fails here instead of passing and doing nothing.
+    const edges = selected.band.edges;
+    assert.ok(
+      Boolean(edges.hint && edges.results && edges.clear && edges.band),
+      'the band is missing the hint, the results link or Clear, so the arrangement below is not ' +
+        'the state this clause measures'
+    );
+    const bandWidth = edges.band.right - edges.band.left;
+    const leadingGap = edges.results.left - edges.hint.right;
+    const pairGap = edges.clear.left - edges.results.right;
+    assert.ok(
+      leadingGap > bandWidth / 4,
+      `the gap between the hint and \`Select all\` is ${leadingGap}px of a ${bandWidth}px band: ` +
+        'the link is still sitting against the hint rather than at the trailing edge'
+    );
+    assert.ok(
+      pairGap < leadingGap,
+      `\`Select all\` and \`Clear\` are ${pairGap}px apart against a ${leadingGap}px leading gap, ` +
+        'so the free space is SPLIT between two auto margins rather than sitting ahead of the pair'
+    );
+
+    // 5 · AND THE ROW IS THE SAME ROW. The item count and the search field's rendered width are
+    // the two things round 3 moved, so they are the two things pinned: a 150px field under a
+    // selection and a full-width one at rest is the state this replaces.
+    assert.equal(
+      selected.itemCount,
+      resting.itemCount,
+      `the filter row holds ${selected.itemCount} items selected against ${resting.itemCount} ` +
+        'at rest, so selecting rows still changes what is in it'
+    );
+    assert.ok(
+      resting.searchWidth > 0,
+      'the resting search field measured no width, so the comparison below asserts nothing'
+    );
+    assert.ok(
+      Math.abs(selected.searchWidth - resting.searchWidth) <= EPSILON_PX,
+      `the search field is ${selected.searchWidth}px under a selection against ` +
+        `${resting.searchWidth}px at rest: the row still yields its only flexible item to a ` +
+        'state change'
     );
   });
 

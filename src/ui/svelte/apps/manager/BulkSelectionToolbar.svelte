@@ -68,6 +68,29 @@
     // phrase. `''` — the default — keeps the shipped words, so the three studios are untouched.
     // See `selectAllCaption` below for why the accessible name does not follow it.
     selectAllLabel: selectAllLabelOverride = '',
+    // ── WHERE THE ACTIONS THIS COUNT FEEDS ACTUALLY ARE ─────────────────────────────────────
+    // An ALREADY-LOCALIZED standing sentence, rendered beside the count and only while there is
+    // a count to stand beside. `proto:594` draws it — `Bulk actions are in the inspector →` — and
+    // it is what keeps this register from competing with the panel it points at: the band states
+    // the fact, the panel owns the verbs.
+    //
+    // A PARAMETER rather than a shipped default, for the reason the five hook names are: `''`
+    // renders nothing, so the Component, Recipe and Essence Studios are byte-identical across
+    // this. It is the CALLER's string because only the caller knows whether its bulk body lands
+    // in an inspector rail at all — `EntityRulesListShell` renders one directly under this row.
+    hint = '',
+    // ── THE TWO TEXT ACTIONS AT THE TRAILING EDGE, TOGETHER ─────────────────────────────────
+    // `proto:595`-`596` puts the auto margin on the SELECT-ALL action and lets `Clear` follow it
+    // directly; this component's shipped rule puts it on `Clear` alone, so a register carrying a
+    // `hint` strands `Select all N results` against that sentence with no space between two
+    // differently-coloured runs of text. `false` keeps the shipped arrangement, so the Component,
+    // Recipe and Essence Studios render byte-identically.
+    //
+    // A PROP RATHER THAN A RULE IN `styles/fabricate.css`, and that is mechanical rather than a
+    // preference: that sheet is imported at `layer(modules)` and this scoped block is injected
+    // unlayered, so a rule there loses to the one below WHATEVER its specificity — silently, with
+    // the selector matching and the declaration unused. The sheet records the measurement.
+    trailingActions = false,
     rowClass = 'manager-component-filter-row',
     toolbarAttr = 'data-component-selection-toolbar',
     pageBoxAttr = 'data-component-select-all-page',
@@ -153,10 +176,14 @@
       <i class="fas fa-layer-group" aria-hidden="true"></i>
       <span>{countLabel}</span>
     </span>
+    {#if hint}
+      <span class="fab-bulk-selection-hint">{hint}</span>
+    {/if}
     {#if showSelectAllResults}
       <button
         type="button"
         class="fab-bulk-selection-link"
+        class:is-trailing={trailingActions}
         {...resultsHook}
         onclick={() => onSelectAllResults()}>{resultsLabel}</button
       >
@@ -248,6 +275,22 @@
     font-size: 0.62rem;
   }
 
+  /* The standing sentence beside the count, MUTED and one rung lighter than it: it is context
+     for the accent fact rather than a second fact. `proto:594` sets `500 10.5px var(--sans)` in
+     `--muted`, and 10.5px is 0.66rem against the 16px root this product uses.
+
+     `flex: 0 1 auto` with `min-width: 0`, not `0 0 auto`: it is the one item in this register
+     that is a sentence rather than a control, so it is also the only one that can honestly give
+     width back before the row wraps. */
+  .fab-bulk-selection-hint {
+    flex: 0 1 auto;
+    min-width: 0;
+    color: var(--fab-text-muted);
+    font-size: 0.66rem;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
   /* A real `<button>` wearing link chrome, not an `<a>` with no href: it performs an
      action on this screen and must be reachable by keyboard as the action it is. Foundry's
      host button geometry is reset explicitly (fixed height, its own font family), the same
@@ -284,6 +327,24 @@
   .fab-bulk-selection-clear {
     margin-left: auto;
     color: var(--fab-text-subtle);
+  }
+
+  /* ── `trailingActions`: THE PAIR MOVES TO THE END TOGETHER (issue 1373, round 4) ───────────
+     `proto:595` puts the auto margin here rather than on `Clear`, so `Select all N results` and
+     `Clear` sit together at the trailing edge with the count and the standing hint at the
+     leading one. BOTH declarations are required and the second is the non-obvious half: two flex
+     items each carrying `margin-left: auto` SPLIT the free space between them rather than both
+     moving right, so `Clear` has to give its own back. It keeps it whenever the link is absent,
+     which is the single-page case.
+
+     Scoped, not `:global()`, and deliberately so: both elements are written by THIS template, so
+     Svelte can see the selector and would warn if either class stopped being emitted. */
+  .fab-bulk-selection-link.is-trailing {
+    margin-left: auto;
+  }
+
+  .fab-bulk-selection-link.is-trailing + .fab-bulk-selection-clear {
+    margin-left: 0;
   }
 
   .fab-bulk-selection-clear:hover,

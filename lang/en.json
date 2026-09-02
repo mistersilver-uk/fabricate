@@ -6163,6 +6163,7 @@
             "SearchSystems": "Search systems",
             "SearchSystemsLabel": "Search systems",
             "SelectRow": "Select {name}",
+            "SelectionInspectorHint": "Bulk actions are in the inspector →",
             "SortAsc": "Asc",
             "SortByLabel": "Sort by",
             "SortDesc": "Desc",

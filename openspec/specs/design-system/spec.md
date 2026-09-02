@@ -676,7 +676,9 @@ A settings screen is an EDITOR without a breadcrumb or a back-and-save pair, bec
 
 A BROWSE screen orders the app title bar, the navigation sidebar, a page header carrying at most one primary action, the filter bar, the list, and the pagination bar.
 A blocking notice, when present, sits between the page header and the filter bar.
-The selection bar replaces the filter bar in place when anything is selected.
+The selection bar is a BAND OF ITS OWN directly beneath the filter bar, never a set of controls mixed into it.
+The filter bar's composition MUST NOT change with selection state: a surface that adds selection controls to that row when rows are ticked, or narrows one of the row's own controls to make room for them, has made one bar mean two things and reads as a different screen in each.
+Whether the band renders at rest is per surface, and a surface that renders it only while a selection is active MUST keep a per-row selection control as the way to open one, because otherwise the mode has no entry point.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
 A browse surface MAY suppress the bar entirely while the whole filtered list fits ONE page, and MUST restore it the moment a second page exists; suppression is per surface and opt-in, so a surface that says nothing keeps the bar.
 The permission is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.

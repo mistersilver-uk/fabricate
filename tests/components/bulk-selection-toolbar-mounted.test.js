@@ -240,4 +240,80 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       assert.ok(!root.querySelector(`[${hook}]`), `${hook} belongs to a non-empty selection`);
     }
   });
+
+  // ── THE TWO PARAMETERS ISSUE 1373 ADDED, AND WHERE THEIR CSS HAS TO LIVE ───────────────────
+  it('renders the standing hint only when one is given', async () => {
+    const bare = await toolbar.mount({ count: 3 });
+    assert.ok(
+      !bare.querySelector('.fab-bulk-selection-hint'),
+      'the default renders a hint element, so the three studios are no longer byte-identical'
+    );
+
+    const hinted = await toolbar.mount({ count: 3, hint: 'Bulk actions are in the inspector' });
+    const hint = hinted.querySelector('.fab-bulk-selection-hint');
+    assert.ok(Boolean(hint), 'the hint prop rendered nothing');
+    assert.equal(hint.textContent.trim(), 'Bulk actions are in the inspector');
+  });
+
+  it('groups the two text actions at the trailing edge only when asked, and pays for the pair', () => {
+    // ── WHY THIS IS A SOURCE ASSERTION AND NOT A MOUNTED ONE ─────────────────────────────────
+    // happy-dom computes no cascade, so the mounted tree can state that `is-trailing` is on the
+    // element and never that the margin moved. The real geometry is measured in a browser by
+    // `scoped-list-inspector-geometry.test.js`. What is pinned HERE is the thing that measurement
+    // cannot see: WHICH FILE the two declarations are written in.
+    //
+    // `styles/fabricate.css` ships at `layer(modules)` — `module.json` gives it no explicit layer
+    // and Foundry imports an unlayered module sheet there, which `tests/view-lab/cascade.css`
+    // reproduces. This component's scoped block is injected unlayered at runtime, and an
+    // unlayered declaration beats a layered one whatever the specificity. So the obvious
+    // authoring of this rule — a higher-specificity selector in the global sheet — is emitted,
+    // matches, and has its declaration silently discarded. It was written that way first and the
+    // View Lab is what caught it.
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte'),
+      'utf8'
+    );
+    assert.match(
+      source,
+      /\.fab-bulk-selection-link\.is-trailing\s*\{[^}]*margin-left:\s*auto/,
+      'the trailing-group margin is not in this component’s scoped block'
+    );
+    // AND THE SECOND HALF, which is the one an eye skips: two flex items each carrying
+    // `margin-left: auto` SPLIT the free space rather than both moving right, so `Clear` has to
+    // give its own back or the pair sits half a band apart.
+    assert.match(
+      source,
+      /\.fab-bulk-selection-link\.is-trailing\s*\+\s*\.fab-bulk-selection-clear\s*\{[^}]*margin-left:\s*0/,
+      '`Clear` keeps its own auto margin beside a trailing link, so the free space splits'
+    );
+
+    // COMMENTS STRIPPED FIRST, and that is not tidiness: the sheet's own note about this rule
+    // NAMES both selectors, so a comment-blind scan reports the explanation as the violation and
+    // the guard can never go green. It also has to still bite, so `fails on a real rule` below is
+    // the negative half.
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      ''
+    );
+    const declarations = sheet
+      .split('}')
+      .filter((block) => /\.fab-bulk-selection-(link|clear)[^{]*\{/.test(block));
+    assert.deepEqual(
+      declarations,
+      [],
+      'a rule in `styles/fabricate.css` targets this primitive’s own elements. That sheet is ' +
+        'layered and this block is not, so the rule is discarded silently — author it here.'
+    );
+
+    // THE SCAN IS PROVED TO BITE, on the sheet's own text plus one synthetic rule. A
+    // comment-stripping filter that stripped too much would report zero on every input, which is
+    // indistinguishable from a clean sheet.
+    const seeded = `${sheet}\n.fabricate-manager .x .fab-bulk-selection-clear { margin-left: 0; }`;
+    assert.equal(
+      seeded.split('}').filter((block) => /\.fab-bulk-selection-(link|clear)[^{]*\{/.test(block))
+        .length,
+      1,
+      'the scan cannot see a rule in the global sheet at all, so its green above means nothing'
+    );
+  });
 });
