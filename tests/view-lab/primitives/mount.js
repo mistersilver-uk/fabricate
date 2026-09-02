@@ -17,7 +17,15 @@
  *                                being rendered fails rather than passing more quickly.
  *   data-primitive-lab-ready     ABSENT until every specimen instance has settled. Present with no
  *                                value once they all have, success or failure.
- *   data-primitive-lab-error     how many failed, and — when any did — which.
+ *   data-primitive-lab-error     ABSENT while nothing has failed. Present, naming how many failed
+ *                                and which, as soon as one has. Presence IS the failure signal —
+ *                                it never reads `0`, because `'0'` is a truthy string and a
+ *                                consumer testing the attribute would reject a healthy page. That
+ *                                is not hypothetical: it is what this attribute did on the first
+ *                                integrated run, and `scripts/primitive-lab-smoke.mjs` rejected a
+ *                                page that had mounted every specimen correctly. Absence-means-well
+ *                                is also the convention `tests/view-lab/mount.js` already uses for
+ *                                `data-view-lab-error`.
  *
  * ── AND IT FAILS CLOSED ON A MISSING CHROME HARVEST ───────────────────────────────────────────
  *
@@ -113,14 +121,15 @@ function renderMissingChrome(message) {
  */
 function publishProgress({ mounted, failed, settled, expected }) {
   document.body.setAttribute(MOUNTED_ATTRIBUTE, String(mounted.length));
-  document.body.setAttribute(
-    ERROR_ATTRIBUTE,
-    failed.length === 0
-      ? '0'
-      : `${failed.length}: ${failed
-          .map((entry) => `${entry.instanceId} — ${entry.message}`)
-          .join(' | ')}`
-  );
+  if (failed.length === 0) document.body.removeAttribute(ERROR_ATTRIBUTE);
+  else {
+    document.body.setAttribute(
+      ERROR_ATTRIBUTE,
+      `${failed.length}: ${failed
+        .map((entry) => `${entry.instanceId} — ${entry.message}`)
+        .join(' | ')}`
+    );
+  }
   if (settled >= expected && expected > 0) document.body.setAttribute(READY_ATTRIBUTE, '');
   else document.body.removeAttribute(READY_ATTRIBUTE);
 }
