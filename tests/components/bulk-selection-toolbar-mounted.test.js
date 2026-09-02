@@ -299,6 +299,55 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
     );
   });
 
+  it('draws the count glyph the caller names, and defaults to the studios’ own', async () => {
+    // ── THE COUNT IS A THIRD OBJECT, NOT A THIRD ACTION ──────────────────────────────────────
+    // `proto:593` draws the band's count as `700 11px var(--sans)` in `--accent` behind a
+    // `fa-solid fa-check-double` at `font-size:10px; margin-right:6px`. Measured in Chromium
+    // against the production layering, everything but the glyph already matches: 10.88px / 700 /
+    // `#E8C6A7`, and a 6px optical gap from `--fab-space-chip`. The one real divergence is WHICH
+    // GLYPH, and that is markup — no stylesheet can swap an element the template renders, which
+    // is why this is a prop and not a rule.
+    //
+    // A PROP OF ITS OWN rather than a third clause on `bareActions`: see the note beside
+    // `countIcon`'s declaration. Both directions are asserted, because a component that ignored
+    // the prop and one that hard-coded the design's glyph for everybody each satisfy one clause.
+    const shipped = await toolbar.mount({ count: 2 });
+    const shippedGlyph = shipped.querySelector('.fab-bulk-selection-count > i');
+    assert.ok(Boolean(shippedGlyph), 'the count lost its leading glyph outright');
+    assert.deepEqual(
+      authoredClasses(shippedGlyph),
+      ['fa-layer-group', 'fas'],
+      'the default moved off the stack glyph, so the Component, Recipe and Essence Studios — and ' +
+        'the two font-size fixtures that hand-copy this markup — no longer render what ships'
+    );
+
+    const band = await toolbar.mount({ count: 2, countIcon: 'fa-solid fa-check-double' });
+    const bandGlyph = band.querySelector('.fab-bulk-selection-count > i');
+    assert.ok(Boolean(bandGlyph), 'the named glyph rendered no element at all');
+    assert.deepEqual(
+      authoredClasses(bandGlyph),
+      ['fa-check-double', 'fa-solid'],
+      'the caller names a glyph and the count draws the shipped one anyway'
+    );
+    // STILL DECORATIVE. The count's accessible name is the `N selected` text beside it; a glyph
+    // that lost `aria-hidden` would be announced as an unnamed image in the middle of it.
+    assert.equal(bandGlyph.getAttribute('aria-hidden'), 'true', 'the glyph is decoration');
+    // AND THE LABEL SURVIVES THE SWAP, which is the edit next to it in any future diff.
+    assert.match(band.querySelector('.fab-bulk-selection-count').textContent, /2 selected/);
+
+    // AND THE CATALOGUE ACTUALLY ASKS FOR IT. A prop nobody passes renders the shipped glyph on
+    // every screen while both mounted directions above stay green.
+    const frame = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte'),
+      'utf8'
+    );
+    assert.match(
+      frame,
+      /countIcon="fa-solid fa-check-double"/,
+      'the scoped catalogue band never opts in, so `proto:593`’s glyph ships nowhere'
+    );
+  });
+
   it('groups the two text actions at the trailing edge only when asked, and pays for the pair', () => {
     // ── WHY THIS IS A SOURCE ASSERTION AND NOT A MOUNTED ONE ─────────────────────────────────
     // happy-dom computes no cascade, so the mounted tree can state that `is-trailing` is on the

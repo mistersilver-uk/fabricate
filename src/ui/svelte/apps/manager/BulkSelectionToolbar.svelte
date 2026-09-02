@@ -114,6 +114,32 @@
     // specificity. The glyph is not a cascade question at all — no stylesheet can remove an
     // element the template renders.
     bareActions = false,
+    // ── WHICH GLYPH THE COUNT DRAWS, WHICH IS A THIRD OBJECT AND NOT A THIRD ACTION ─────────
+    // `proto:593` is the band's count — `font:700 11px var(--sans); color:var(--accent)` behind a
+    // `fa-solid fa-check-double` at `font-size:10px; margin-right:6px`. Measured in Chromium at
+    // the production layering, everything but the glyph already matches: the count renders
+    // 10.88px at weight 700 in the accent token itself, and the glyph sits 6px from the label,
+    // because `--fab-space-chip` IS 6px. The sub-pixel gaps — 10.88px against 11px, and 9.92px
+    // against 10px — are the shipped rem scale this block is written in and are left alone; buying
+    // 0.12px would cost the three studios their identical rendering.
+    //
+    // NOT A THIRD CLAUSE ON `bareActions`, deliberately. That prop is one ruling about the band's
+    // two ACTIONS — `proto:595`-`596` — and it is a REMOVAL: no underline, no glyph. The count is
+    // the fact those actions operate on, not an action, and its ruling is a SUBSTITUTION. Folding
+    // it in would make one prop mean two unrelated things and hand a caller that asked about the
+    // actions a change to something else, which is the failure `bareActions`'s own note names when
+    // it argues against splitting a single ruling.
+    //
+    // A STRING, following the shipped idiom rather than inventing one: `Chip`, `Callout`,
+    // `ChecklistCardRow`, `ComplicationEffectRow` and `ArmedDangerButton` all take "which Font
+    // Awesome classes does this leading glyph draw" as a string prop. The default is today's
+    // markup EXACTLY, so the Component, Recipe and Essence Studios are byte-identical — including
+    // the hand-copied `<i class="fas fa-layer-group">` in their two font-size fixtures.
+    //
+    // AND IT CANNOT BE A RULE. `bareActions` records why the sheet cannot win a cascade against
+    // this block; the glyph does not even get that far, because no stylesheet can swap the element
+    // a template renders. It is markup or it is nothing.
+    countIcon = 'fas fa-layer-group',
     rowClass = 'manager-component-filter-row',
     toolbarAttr = 'data-component-selection-toolbar',
     pageBoxAttr = 'data-component-select-all-page',
@@ -196,7 +222,7 @@
   {#if count > 0}
     <span class="fab-bulk-selection-divider" aria-hidden="true"></span>
     <span class="fab-bulk-selection-count" {...countHook}>
-      <i class="fas fa-layer-group" aria-hidden="true"></i>
+      <i class={countIcon} aria-hidden="true"></i>
       <span>{countLabel}</span>
     </span>
     {#if hint}
