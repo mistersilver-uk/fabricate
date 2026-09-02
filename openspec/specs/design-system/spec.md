@@ -335,6 +335,41 @@ The commit action names the number of records it writes to.
 - **THEN** each entry offers add, remove and leave unchanged
 - **AND** entries left unchanged are not written to any selected record
 
+### Requirement: A picker announces the panel it opens, and a look-alike is adjudicated rather than converted
+
+A trigger that opens a catalogue picker MUST state what will open, and the shared picker MUST take that value as a declared capability rather than hard-coding one.
+`aria-haspopup` is `dialog` when the panel renders a query field and `listbox` when it renders a bare option list, and a caller asking for `listbox` MUST suppress the search field, because a trigger promising a listbox over a panel that contains one inside a dialog promises a control the GM never gets.
+The difference between the two is INFORMATIONAL — it tells assistive technology what is about to appear — so it is absorbed as a prop on the shared picker and is never a reason to hand-roll a second one.
+
+The picker MUST name both surfaces it renders.
+The portaled panel and the option list inside it take one accessible name from the caller, so a caller that omits it produces a dialog with no name wrapping a list with no name.
+Neither is visible in a frame, neither is a compiler error and no lint rule covers it, so the naming obligation is enforced at the source.
+
+A control that resembles the picker MUST be adjudicated against it by its WIDGET rather than by its markup, and the verdict MUST be recorded with the measurement that produced it.
+Three families are adjudicated NON-MEMBERS and are recorded in `scripts/lib/designSystemPrimitives.json`:
+
+- A TYPEAHEAD COMBOBOX is not a picker.
+It has no trigger, its suggestion list hangs off an input whose expanded state is driven by the query rather than by a control, and it therefore has no closed state to open from.
+- An ACTION MENU is not a picker.
+`role="menu"` with `role="menuitem"` children announces a list of things to DO, while the picker announces `role="listbox"` with `role="option"` children, a list of things to BE — converting one to the other changes what a screen reader says about the widget, not how it looks.
+- A MULTI-SELECT CHECKLIST is not a picker.
+It toggles membership, stays open across choices and marks several options selected at once, while the picker carries a single value and closes on choose.
+
+A picker whose class family is scoped to one application root MUST NOT be adopted by a surface outside that root until the family is unscoped.
+The shared picker's rules are area-scoped today, so a player-window caller would portal to a host that is not present and render the panel unstyled; that adoption belongs to the change that renames and unscopes the family, not to a conversion before it.
+
+#### Scenario: A converted menu renders no query field
+
+- **WHEN** a caller opens the shared picker with its search field suppressed
+- **THEN** the trigger announces `aria-haspopup="listbox"`
+- **AND** the panel renders an option list with no query field
+
+#### Scenario: An action menu is proposed as a picker conversion
+
+- **WHEN** a `role="menu"` control is proposed for conversion onto the shared picker
+- **THEN** it is recorded as an adjudicated non-member with its role and child roles measured
+- **AND** it keeps its menu semantics rather than being announced as a listbox
+
 ### Requirement: One requirement row serves both sides of a recipe
 
 The row that authors what a craft CONSUMES and the row that authors what it PRODUCES are one primitive, and the choice group built from them is one component.

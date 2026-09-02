@@ -95,16 +95,30 @@ export function openingTagsNamed(source, name) {
  * callers state their own non-vacuity floor over the result, so a corpus in which the scan
  * silently stopped finding tokens fails rather than passing over nothing.
  *
+ * `classProps` exists because `class` is not the only prop that carries one (issue 1458).
+ * `SearchablePopover` renders THREE elements a caller may class — the trigger, the portaled
+ * panel and the value span — so it takes `triggerClass`, `popoverClass`, `valueClass` and
+ * `pickerClass` rather than one `class`, and a scan hard-coded to `class` finds zero tokens
+ * across all sixteen of its call sites and reports clean. Measured before the option existed:
+ * 69 tokens in 16 files, none of them visible to the single-prop form.
+ *
+ * The pattern is anchored `(?<![\w-])`, not `\b`: `class` is a SUFFIX of `triggerClass` and
+ * `valueClass`, so a `\b`-anchored `class="…"` pattern would read a `triggerClass="…"` as the
+ * `class` prop — which is wrong in the direction that quietly widens a guard's token set.
+ *
  * @param {string} source component source text
  * @param {string} name the tag name to find
- * @returns {Set<string>} every literal class token passed through the `class` prop
+ * @param {ReadonlyArray<string>} [classProps] attribute names carrying class tokens
+ * @returns {Set<string>} every literal class token passed through those props
  */
-export function classTokensPassedTo(source, name) {
+export function classTokensPassedTo(source, name, classProps = ['class']) {
   const tokens = new Set();
   for (const tag of openingTagsNamed(source, name)) {
-    const literal = /\bclass="([^"]*)"/.exec(tag);
-    if (!literal) continue;
-    for (const token of literal[1].split(/\s+/)) if (token) tokens.add(token);
+    for (const prop of classProps) {
+      const literal = new RegExp(String.raw`(?<![\w-])${prop}="([^"]*)"`).exec(tag);
+      if (!literal) continue;
+      for (const token of literal[1].split(/\s+/)) if (token) tokens.add(token);
+    }
   }
   return tokens;
 }

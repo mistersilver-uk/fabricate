@@ -6081,6 +6081,7 @@
             "Heading": "Recipes inside",
             "Hint": "The recipes a reader can learn from this item. Remove any that shouldn’t be taught here.",
             "LinkRecipe": "Link recipe",
+            "NoneLinkable": "Every recipe is already linked",
             "Remove": "Remove recipe",
             "Title": "Recipes inside",
             "Uncategorized": "General"

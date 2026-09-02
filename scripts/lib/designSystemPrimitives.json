@@ -124,7 +124,7 @@
       "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
       "library": "<SearchPopover>",
       "evidence": "broad",
-      "why": "`library.html:764` — \"One panel for picking anything from a catalogue\". 16 callers. Carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because its two modes render different chrome and neither representative frame opens a popover at all."
+      "why": "`library.html:764` — \"One panel for picking anything from a catalogue\". 20 callers over 24 call sites as issue 1458 lands, up from 16: three hand-rolled trigger-plus-listbox add menus (`GatheringEventEditView`, `GatheringTaskEditView`, `ModifierPillSelect`) and the recipe item editor’s Link-recipe menu converted onto it. That change also gave it the `triggerHasPopup` capability, which absorbs the one axis the ten hand-rolled popovers disagreed on — four announced `aria-haspopup=\"dialog\"` and four `listbox`, and the split tracked whether the panel rendered a query field. Carries a THREE-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because it now has three deliberate presentations (inline-search trigger, value-bearing trigger with the search row, and the search-less option list) and neither representative frame opens a popover at all. Its class family is `.manager-travel-*`, 113 rules in `styles/fabricate.css` and every one scoped under `.fabricate-manager` — a legacy World › Travel name this conversion knowingly concentrates rather than renames, so the rename that follows is a one-file edit plus the sheet. That scoping is also why the two PLAYER-app popovers did not convert; see their rows in {@link NOT_A_PRIMITIVE}."
     },
     {
       "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
@@ -160,7 +160,7 @@
       "path": "src/ui/svelte/components/EssenceSourceSelector.svelte",
       "library": null,
       "evidence": "broad",
-      "why": "The essence source picker (2 callers). `library.html:764` names essences among the catalogues its four existing pickers COLLAPSE INTO `<SearchPopover>`; this file is one of those pickers and is not that panel today, so recording the name would fill the conformant quadrant with work not done."
+      "why": "The essence source picker (2 callers). `library.html:764` names essences among the catalogues its four existing pickers COLLAPSE INTO `<SearchPopover>`; this file is one of those pickers and is not that panel today, so recording the name would fill the conformant quadrant with work not done. Issue 1458 measured what the collapse costs and left it: the TRIGGER is a drop-target image tile with an empty state and a corner glyph, sitting beside a clear button inside a `dragDrop` shell, and `SearchablePopover` owns its trigger button outright — so the conversion needs a caller-owned trigger SNIPPET the primitive does not have. Its option list is a GRID of image tiles rather than a row list, its popover is bounded 280-420px against the primitive’s 240-340, and its empty message varies by whether the catalogue is empty or the query matched nothing. Four capabilities for one caller is a redesign, not a conversion."
     },
     {
       "path": "src/ui/svelte/components/Field.svelte",
@@ -184,7 +184,7 @@
       "path": "src/ui/svelte/components/IconPicker.svelte",
       "library": null,
       "evidence": "broad",
-      "why": "The shared icon picker (8 callers, issue 1269). `library.html:764` names icons FIRST among the catalogues collapsing into `<SearchPopover>`; same reasoning as `EssenceSourceSelector`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because everything it presents exists only in the open popover and neither representative frame opens one."
+      "why": "The shared icon picker (8 callers, issue 1269). `library.html:764` names icons FIRST among the catalogues collapsing into `<SearchPopover>`; same reasoning as `EssenceSourceSelector`. Carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry because everything it presents exists only in the open popover and neither representative frame opens one. Issue 1458 measured the collapse and left it: this picker needs FIVE capabilities the primitive lacks — a PINNED resolved row above an alphabetical list of ~1000 (without it the picker always opens on `abacus`), `horizontalAlign: iconOnly ? 'left' : 'right'` against the primitive’s hard-coded `left`, a measured `listMaxHeight` fed back into the layout, a `style` on the trigger for the colour swatch, and `oncontextmenu`/`onkeydown` pass-throughs the trigger’s own attribute set would override. Its rows also wrap the glyph in a `.essence-icon-picker-preview` tile the primitive renders bare, so the conversion changes what eight callers draw."
     },
     {
       "path": "src/ui/svelte/components/InspectorCard.svelte",
@@ -226,7 +226,7 @@
       "path": "src/ui/svelte/components/ModifierPillSelect.svelte",
       "library": null,
       "evidence": "broad",
-      "why": "A dropdown-plus-removable-pills multi-select (2 callers, issue 770). `<SetPicker>` (`library.html:1333`) specifies editing membership of a set too large to render inline, and states it never dumps the whole set into its panel — this control renders every unselected option in a listbox, so it is not that primitive."
+      "why": "A dropdown-plus-removable-pills multi-select (2 callers, issue 770). `<SetPicker>` (`library.html:1333`) specifies editing membership of a set too large to render inline, and states it never dumps the whole set into its panel — this control renders every unselected option in a listbox, so it is not that primitive. Its ADD MENU is `SearchablePopover` since issue 1458, which is why the pill row and the menu are now two different things rather than one hand-rolled widget; the conversion needed the primitive to absorb `triggerAriaDisabled`, the at-cap state that must refuse to open while staying focusable, because the post-removal focus fallback lands on that very button and `focus()` on a `disabled` one silently no-ops. It carries a `BROAD_SIGNAL_CASE_OVERRIDES` entry as of that change: `manager-recipe-edit-crafting-modifier-cap-reached` is the one frame that draws its single remaining painted rule, the at-cap trigger treatment."
     },
     {
       "path": "src/ui/svelte/components/Pagination.svelte",
@@ -294,7 +294,7 @@
       "path": "src/ui/svelte/components/ActorSelectTopBar.svelte",
       "library": null,
       "evidence": "broad",
-      "why": "ONE caller, `src/ui/svelte/apps/FabricateAppRoot.svelte`. At 594 lines it is a screen region rather than a primitive; `<AppTitleBar>` (`library.html:960`) specifies the strip above the page header and nav rail, and whether this is an implementation of it has not been adjudicated."
+      "why": "ONE caller, `src/ui/svelte/apps/FabricateAppRoot.svelte`. At 594 lines it is a screen region rather than a primitive; `<AppTitleBar>` (`library.html:960`) specifies the strip above the page header and nav rail, and whether this is an implementation of it has not been adjudicated. Its actor picker is ALSO an adjudicated non-conversion as of issue 1458, and the reason is structural rather than editorial: it is a genuine single-select searchable popover, but it renders in the PLAYER window under `.fabricate-app-shell`, and all 113 `.manager-travel-*` rules in `styles/fabricate.css` are scoped under `.fabricate-manager`. Converting it would portal to a host that is not there and render the panel entirely unstyled. Unscoping that family IS the deferred rename, and doing it here is what the \"convert first, rename later\" ordering exists to avoid; the picker converts with the rename, not before it."
     },
     {
       "path": "src/ui/svelte/components/DropZone.svelte",
@@ -319,6 +319,24 @@
       "library": "<RowDisclosure>",
       "evidence": "broad",
       "why": "ONE caller, `src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte`. Named at `library.html:941`, so it is specified and shipped and still below the entry bar. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js:83` for a reason the caller count cannot express — omitting it there HANGS a mounted tree — which is why that list is not derived from this manifest."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "why": "ONE caller, `src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte`, and it is a route tab rather than a candidate primitive. It is recorded because issue 1458 adjudicated the two `role=\"listbox\"` SITES inside it (`:531`, `:631`) against `SearchablePopover` and ruled them a DIFFERENT WIDGET, which is a decision a later audit would otherwise re-propose from the same grep. They are typeahead COMBOBOXES: neither has a trigger button at all, the suggestion list hangs off an `<input>` whose `aria-expanded={suggestions.length > 0}` (`:537`, `:637`) is driven by the query rather than by a control, and the input IS the field rather than a filter over a panel. `SearchablePopover` opens a panel FROM a trigger; a combobox has no closed state to open from. `manager-filter-bar-source-contract.test.js` already records the same verdict for the three `.manager-search` comboboxes, from the other side. The file carries 30 scoped rules and a silent-mode trigger (`<i class={expr}>`), so a conversion would have been the highest-risk one in the candidate set as well as the wrongest."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/environment/CompositionList.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "why": "ONE caller, `src/ui/svelte/apps/manager/environment/EnvironmentCompositionTab.svelte`. Recorded because issue 1458 adjudicated its four popovers (`:373`, `:553`, `:688`, `:827`) against `SearchablePopover` and ruled them a different widget: each is `aria-haspopup=\"menu\"` opening a `role=\"menu\"` of `role=\"menuitem\"` children — an ACTION menu — while the primitive renders `role=\"listbox\"`/`role=\"option\"`, a SELECTION control. Converting them would change what a screen reader announces from \"menu, four items\" to \"listbox, four options, none selected\", which is a claim about the widget rather than about its styling. It carries no `<style>` block at all, so its exposure to the scoped-rule failure was nil and the exclusion is about meaning alone. The group is a legitimate candidate for a shared ACTION-menu primitive of its own — four sites in one file, and `ComponentIdentityStrip`’s source-actions overflow is a fifth site that went the other way and is a `SearchablePopover` today — but that is a different primitive from this one."
+    },
+    {
+      "path": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "why": "ONE caller, `src/ui/svelte/components/ActorSelectTopBar.svelte`. Recorded because issue 1458 adjudicated its editor popover (`:134`, `:138`) against `SearchablePopover` and found TWO independent disqualifiers, either of which is sufficient. (1) It renders in the PLAYER window under `.fabricate-app-shell`, and all 113 `.manager-travel-*` rules in `styles/fabricate.css` are scoped under `.fabricate-manager` — the panel would portal to a host that is not there and draw completely unstyled. (2) It is a MULTI-SELECT checklist rather than a picker: `toggleAvailable` toggles membership, the popover stays open across choices, and `aria-selected` is true on every chosen actor at once, while `SearchablePopover` has a single `value` and closes on `choose`. Converting it would take four clicks to add four source actors and would tell assistive technology that one option is selected when four are. Its 28 scoped rules carry NO silent-mode trigger — measured, against the file’s own AST — so they would have pruned and warned rather than dying quietly; that is the one at-risk file in the candidate set where the recorded silencing condition does not hold."
     }
   ],
   "ruledOut": [

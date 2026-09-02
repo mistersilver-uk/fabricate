@@ -9,7 +9,7 @@
 
   Props:
     options      — [{ id, label, icon?, img?, meta?, trailing?, trailingIcon?,
-                   addMarker?, dataId?,
+                   addMarker?, dataId?, data?,
                    group? }] (consumer builds the full list, including any leading
                    "special" option such as Auto).
                    `addMarker` stamps `data-recipe-add` on that OPTION (the recipe
@@ -28,6 +28,19 @@
                    Capture walks and mounted tests address an option by identity through
                    it; without one the only handle is the display label, which is
                    localized and therefore not a selector.
+                   `data` is `dataId`'s general form — an OPTIONAL `{ 'data-x': 'value' }`
+                   map stamped verbatim on that option's button, standing to `dataId`
+                   exactly as `triggerData` stands to `triggerAddMarker` below. It exists
+                   because a converted hand-rolled menu usually carries TWO hooks per row
+                   rather than one, and they are its own rather than this component's: the
+                   gathering availability menus stamp both
+                   `data-gathering-task-availability-option="<kind>"` — which of the three
+                   menus this row belongs to — and `data-condition-id="<id>"`, the same
+                   attribute their selected PILLS carry, so one selector reads a row and
+                   its pill. Folding either into `dataId` would rename a hook that a
+                   mounted suite, a source-contract pin and a sibling element all share.
+                   Spread FIRST, so it can never override this component's own `type`,
+                   `role`, `aria-selected` or `onclick`.
                    `trailingIcon` marks an option that IS the current value with a
                    glyph rather than a word — the travel-actor picker checks the
                    linked actor, and `trailing` renders a Chip, which is a label.
@@ -71,6 +84,38 @@
                    `type`, `onclick` or ARIA contract.
     triggerTitle — optional native `title` tooltip on the trigger button
                    (backward-compatible; omitted when empty)
+    triggerHasPopup — `'dialog'` (default) or `'listbox'`, the trigger's `aria-haspopup`
+                   (issue 1458). This is INFORMATIONAL rather than structural: it tells
+                   assistive technology what activating the trigger will open, and it is
+                   the one axis on which the ten hand-rolled popovers this primitive
+                   absorbs did not agree. Four announced `dialog` and four `listbox`, and
+                   the difference tracks the panel each of them actually opened — a
+                   searchable panel with a query field is a dialog, while a bare list of
+                   choices with no field is a listbox. This primitive renders BOTH shapes
+                   (`showSearch={false}` is the second one), so a single hard-coded value
+                   made one of them announce a control the GM never gets. It is a
+                   capability rather than a recorded divergence for exactly that reason:
+                   the difference is real, and absorbing it is what lets the four listbox
+                   sites convert without their screen-reader announcement changing.
+
+                   Pass `'listbox'` only with `showSearch={false}`. With the search field
+                   rendered, the panel genuinely IS a dialog containing a listbox, and
+                   announcing a bare listbox would promise a control the panel does not
+                   present. `tests/components/searchable-popover-trigger-contract.test.js`
+                   refuses that combination at the source rather than trusting this note.
+    triggerAriaDisabled — render the trigger with `aria-disabled="true"` and refuse to
+                   open, while leaving it ENABLED and focusable (default false, issue
+                   1458). Not a synonym for `disabled`, and the difference is a defect
+                   rather than a preference. `ModifierPillSelect` reached its pick cap
+                   with a control that must stay reachable in the one direction that can
+                   un-hit the cap: several screen readers drop a `disabled` button from
+                   the tab order, so a capped GM would tab straight past the only control
+                   whose `aria-describedby` explains the cap, and that component's
+                   post-removal focus fallback targets this very button — `focus()` on a
+                   `disabled` button silently no-ops and drops the keyboard user to
+                   `<body>`. The trade is that `aria-disabled` does not suppress the
+                   click, so `toggle()` has to, which is why this is a prop here and not
+                   a `triggerData` entry the caller could pass today.
     showSearch   — render the search input (default true). A caller with only a
                    handful of fixed options (the recipe row-level "or…" menu) drops
                    it: `search` stays '' so `filteredOptions` and the autofocus
@@ -168,6 +213,8 @@
     triggerAddMarker = '',
     triggerData = {},
     triggerTitle = '',
+    triggerHasPopup = 'dialog',
+    triggerAriaDisabled = false,
     triggerAriaLabel = '',
     dialogAriaLabel = '',
     searchPlaceholder = '',
@@ -268,7 +315,11 @@
 
   function toggle(event) {
     event.stopPropagation();
-    if (disabled) return;
+    // `aria-disabled` is advisory to the browser — it neither blocks the click nor removes
+    // the tab stop — so the refusal has to be stated here. See `triggerAriaDisabled` above
+    // for why the caller wants a focusable, clickable, refusing button rather than a
+    // `disabled` one.
+    if (disabled || triggerAriaDisabled) return;
     if (open) {
       close({ restoreFocus: false });
       return;
@@ -375,8 +426,9 @@
   const triggerAttributes = $derived({
     ...triggerData,
     type: 'button',
-    'aria-haspopup': 'dialog',
+    'aria-haspopup': triggerHasPopup,
     'aria-expanded': open,
+    'aria-disabled': triggerAriaDisabled ? 'true' : undefined,
     disabled,
     'data-recipe-add': triggerAddMarker || undefined,
     title: triggerTitle || undefined,
@@ -488,6 +540,7 @@
     >
       {#snippet optionRow(option)}
         <button
+          {...option.data}
           type="button"
           class="manager-travel-option"
           role="option"

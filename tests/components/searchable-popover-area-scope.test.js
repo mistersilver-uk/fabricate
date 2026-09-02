@@ -239,7 +239,27 @@ test('every rule the primitive owns is rooted at the primitive, not at an applic
  * measured a 14px option meta against the 9.92px the real one renders. A fixture that copies the
  * primitive's markup is a hand-maintained mirror, and a mirror missing the root MEASURES SOMETHING
  * ELSE while still reporting on the primitive by name.
+ *
+ * ── THE ONE EXEMPTION, AND WHY IT IS NOT A LOOPHOLE ─────────────────────────────────────────────
+ * The premise above is about a mirror that gets RENDERED and MEASURED. A source-contract detector
+ * fixture is the opposite: it is a string handed to a regex to prove the detector finds a RAW,
+ * unconverted site, and it is deliberately non-conforming because depicting the defect is its
+ * entire job. Namespacing one would make it depict a CONVERTED site, and the clause it feeds would
+ * stop discriminating — a guard weakened to satisfy another guard.
+ *
+ * So the exemption is by FILE and pinned by EXACT COUNT: it cannot grow silently, and a file that
+ * starts rendering its fixtures rather than pattern-matching them fails here until someone says so.
  */
+const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
+  Object.freeze({
+    file: 'tests/components/searchable-popover-source-contract.test.js',
+    count: 3,
+    why:
+      'the `DETECTOR_FIXTURE` source string, which exists to prove the raw-site detector fires. ' +
+      'Its three attributes depict UNCONVERTED markup on purpose; namespacing them would make the ' +
+      'fixture depict a converted site and the discrimination clause would pass vacuously.',
+  }),
+]);
 test('hand-built fixture markup carries the namespace roots the primitive writes', () => {
   const mirrored = [
     { anchor: 'manager-travel-picker', root: 'fabricate-picker' },
@@ -247,6 +267,8 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   ];
 
   const offenders = [];
+  const exempt = new Set(DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => entry.file));
+  const exemptHits = new Map();
   let attributes = 0;
   for (const [file, text] of Object.entries(collectWorkingTreeSources(['tests'], ['.js']))) {
     for (const match of text.matchAll(/class="([^"]*)"/g)) {
@@ -254,7 +276,12 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
       for (const { anchor, root } of mirrored) {
         if (!classes.includes(anchor)) continue;
         attributes += 1;
-        if (!classes.includes(root)) offenders.push(`${file}: class="${match[1]}"`);
+        if (classes.includes(root)) continue;
+        if (exempt.has(file)) {
+          exemptHits.set(file, (exemptHits.get(file) ?? 0) + 1);
+          continue;
+        }
+        offenders.push(`${file}: class="${match[1]}"`);
       }
     }
   }
@@ -273,6 +300,19 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
       'they render a copy no rule in the sheet reaches and measure a default rather than the ' +
       'product:\n  ' + offenders.join('\n  ')
   );
+
+  // The exemption is only earned while it is still USED, and at the count it was recorded with.
+  // A detector fixture that gains an attribute, loses one, or gets namespaced silently is a
+  // permission nobody is exercising — which is how an allowlist entry outlives its reason.
+  for (const entry of DETECTOR_FIXTURE_EXEMPTIONS) {
+    const hits = exemptHits.get(entry.file) ?? 0;
+    assert.equal(
+      hits,
+      entry.count,
+      `${entry.file} is exempted for ${entry.count} non-namespaced fixture attribute(s) and has ` +
+        `${hits}. Reason on record: ${entry.why}`
+    );
+  }
 });
 
 test('the primitive’s own scoped styles name no application root either', () => {

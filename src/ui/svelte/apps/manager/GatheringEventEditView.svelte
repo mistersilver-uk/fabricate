@@ -5,13 +5,13 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize, viewScene } from '../../util/foundryBridge.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
   import IconButton from '../../components/IconButton.svelte';
+  import SearchablePopover from './SearchablePopover.svelte';
 
   let {
     event = null,
@@ -23,8 +23,6 @@
   } = $props();
 
   const DEFAULT_DANGER_TAGS = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
-
-  let openAvailabilityMenu = $state('');
 
   const rawDangerTags = $derived(Array.isArray(event?.dangerTags) ? event.dangerTags : []);
   const dangerTags = $derived(
@@ -148,6 +146,32 @@
     });
   }
 
+  /**
+   * The still-unselected conditions, shaped for `SearchablePopover` (issue 1458).
+   *
+   * Both `data` entries are hooks this VIEW owns rather than the primitive's own
+   * `data-popover-option`, and both are load-bearing. `data-gathering-event-availability-option`
+   * says which of the three menus a row belongs to — the three are rendered by one `{#each}`
+   * and the popover is portaled out of the field that anchors it, so without it a row cannot
+   * be told from its sibling menu's row. `data-condition-id` is the same attribute the
+   * SELECTED pills below carry, which is what lets one selector read a choice and its
+   * resulting pill.
+   *
+   * @param {string} kind `biomes`, `timeOfDay` or `weather`
+   * @returns {Array<object>} popover options in menu order
+   */
+  function availabilityMenuOptions(kind) {
+    return availableConditionOptions(kind).map((option) => ({
+      id: conditionId(option),
+      label: conditionLabel(option),
+      icon: conditionIcon(option),
+      data: {
+        'data-gathering-event-availability-option': kind,
+        'data-condition-id': conditionId(option),
+      },
+    }));
+  }
+
   function availabilityFieldLabel(kind) {
     if (kind === 'weather')
       return text('FABRICATE.Admin.Manager.Environment.Events.Weather', 'Weather');
@@ -204,7 +228,6 @@
     const selectedIds = selectedConditionIds(kind);
     if (selectedIds.includes(normalizedId)) return;
     onUpdateEvent({ [kind]: [...selectedIds, normalizedId] });
-    openAvailabilityMenu = '';
   }
 
   function removeAvailability(kind, id) {
@@ -353,52 +376,25 @@
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
           <Field as="div" class="manager-availability-multi" data-gathering-event-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
-            <div
-              class="manager-availability-picker"
-              use:dismissOnOutsideClick={{
-                enabled: openAvailabilityMenu === kind,
-                onDismiss: () => {
-                  if (openAvailabilityMenu === kind) openAvailabilityMenu = '';
-                },
-              }}
-            >
-              <button
-                type="button"
-                class="manager-availability-menu-button"
-                aria-haspopup="listbox"
-                aria-expanded={openAvailabilityMenu === kind}
-                onclick={() => (openAvailabilityMenu = openAvailabilityMenu === kind ? '' : kind)}
-              >
-                <span>{availabilityMenuLabel(kind)}</span>
-                <i class="fas fa-chevron-down" aria-hidden="true"></i>
-              </button>
-              {#if openAvailabilityMenu === kind}
-                <div
-                  class="manager-availability-menu"
-                  role="listbox"
-                  aria-label={availabilityFieldLabel(kind)}
-                >
-                  {#if availableConditionOptions(kind).length > 0}
-                    {#each availableConditionOptions(kind) as option (conditionId(option))}
-                      <button
-                        type="button"
-                        class="manager-availability-option"
-                        role="option"
-                        aria-selected="false"
-                        data-gathering-event-availability-option={kind}
-                        data-condition-id={conditionId(option)}
-                        onclick={() => addAvailability(kind, conditionId(option))}
-                      >
-                        <i class={conditionIcon(option)} aria-hidden="true"></i>
-                        <span>{conditionLabel(option)}</span>
-                      </button>
-                    {/each}
-                  {:else}
-                    <span class="manager-availability-empty">{availabilityMenuLabel(kind)}</span>
-                  {/if}
-                </div>
-              {/if}
-            </div>
+            <!-- The add-condition menu is `SearchablePopover` (issue 1458), not a
+                 hand-rolled trigger-plus-listbox. `showSearch={false}` because a menu of
+                 at most a handful of biomes needs no query field, and because it is what
+                 keeps `triggerHasPopup="listbox"` truthful: with a field, the panel is a
+                 dialog CONTAINING a listbox and the trigger would promise a control the
+                 GM never gets. The `.manager-availability-picker` wrapper is GONE rather
+                 than passed as `pickerClass`: it carried `position: relative; min-width:
+                 0`, which is `.manager-travel-picker`'s own declaration verbatim, so
+                 keeping it would state the primitive's layout twice. -->
+            <SearchablePopover
+              options={availabilityMenuOptions(kind)}
+              showSearch={false}
+              triggerHasPopup="listbox"
+              triggerClass="manager-availability-menu-button"
+              triggerLabel={availabilityMenuLabel(kind)}
+              dialogAriaLabel={availabilityFieldLabel(kind)}
+              emptyHint={availabilityMenuLabel(kind)}
+              onChoose={(id) => addAvailability(kind, id)}
+            />
             <div
               class="manager-availability-pill-row"
               data-gathering-event-availability-pills={kind}

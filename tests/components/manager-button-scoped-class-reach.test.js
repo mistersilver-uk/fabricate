@@ -272,6 +272,47 @@ const PRIMITIVES = Object.freeze([
     ],
     minimumTokens: 1,
   }),
+  // The manager's searchable picker (issue 1458), and the first entry that does NOT take its
+  // classes through a `class` prop. It renders three elements a caller may want to reach — the
+  // trigger, the portaled panel and the value span — so it takes `triggerClass`,
+  // `popoverClass`, `valueClass` and `pickerClass` instead, which is what `classProps` below is
+  // for. Without it the scan reads `class` on sixteen call sites, finds nothing, and every
+  // clause here goes vacuous over this primitive while reporting clean; with it, 69 tokens.
+  //
+  // It also CORRECTS what this file records about the silent mode, and the correction is the
+  // reason the entry earns its place rather than restating the ones above. The silent,
+  // warning-free variant needs the class LITERAL to sit in a `class` attribute on the component
+  // tag — that is the analysis Svelte's `css_unused_selector` pass consults. A token travelling
+  // as `triggerClass` is invisible to it, so a rule that names one is PRUNED and warned about
+  // instead. Measured on this change's own conversion: `ModifierPillSelect`'s
+  // `.manager-availability-menu-button[aria-disabled='true']` pair was emitted-and-scoped
+  // before, and the moment the trigger became a `<SearchablePopover>` both were pruned with an
+  // `Unused CSS selector` warning — even though that file holds
+  // `<i class={option.icon || 'fa-solid fa-dice-d20'}>`, the exact silencing condition recorded
+  // above. So for THIS primitive `lint:svelte:warnings` does see the defect, and the pruned
+  // half of this guard is the half that fires. Both halves stay wired, because that behaviour
+  // is a property of a PROP NAME and not of the boundary: the day a caller writes
+  // `class="…"` on a `<SearchablePopover>` — the `class` prop it does not declare — the
+  // emitted half is what would catch it.
+  //
+  // The portaled panel is why the contract set is not just the picker root: `.manager-travel-
+  // popover` and `.manager-travel-option` are appended to the `.fabricate-manager` host, so a
+  // caller's `.its-cell .manager-travel-option` rule is dead on ARRIVAL as well as unscoped.
+  // The floor is 40 against a measured 69, which reds if two fifths of the call sites stop
+  // resolving without failing on a single conversion that drops a bespoke token.
+  Object.freeze({
+    tag: 'SearchablePopover',
+    classProps: ['triggerClass', 'popoverClass', 'valueClass', 'pickerClass'],
+    contractClasses: [
+      'manager-travel-picker',
+      'manager-travel-popover',
+      'manager-travel-popover-options',
+      'manager-travel-option',
+      'manager-travel-option-name',
+      'manager-travel-portrait',
+    ],
+    minimumTokens: 40,
+  }),
 ]);
 
 test('no component scopes a rule onto a class it hands to a shared primitive', () => {
@@ -284,7 +325,7 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
     const source = readFileSync(join(repoRoot, file), 'utf8');
     const active = PRIMITIVES.map((primitive) => ({
       primitive,
-      tokens: classTokensPassedTo(source, primitive.tag),
+      tokens: classTokensPassedTo(source, primitive.tag, primitive.classProps),
       // `String.raw` is load-bearing and is NOT a style choice. A plain template literal
       // resolves \s to a bare `s` before `RegExp` ever sees it, so this character
       // class silently becomes `[s/>]` — which breaks the predicate in BOTH directions at once.
@@ -417,8 +458,9 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
     violations.sort((left, right) => (left === right ? 0 : left < right ? -1 : 1)),
     [],
     'these rules select a class that only a `<ManagerButton>`, `<IconButton>`, ' +
-      '`<InspectorCard>`, `<ManagerToolbar>`, `<ManagerSearchField>` or ' +
-      '`<EditorValidationSurface>` carries, so they match NOTHING ' +
+      '`<InspectorCard>`, `<ManagerToolbar>`, `<ManagerSearchField>`, ' +
+      '`<EditorValidationSurface>` or `<SearchablePopover>` carries, so they match ' +
+      'NOTHING ' +
       'and the control is silently unstyled — either emitted with this component`s scoping ' +
       'class attached, or pruned by the compiler before they were emitted at all. Wrap each ' +
       'in `:global(...)` — and chain the primitive`s classes while you are there, because a ' +

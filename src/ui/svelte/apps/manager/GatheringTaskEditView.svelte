@@ -6,7 +6,6 @@
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -17,6 +16,7 @@
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchablePopover from './SearchablePopover.svelte';
 
   let {
     task = null,
@@ -63,7 +63,12 @@
   let selectedComponentTags = $state([]);
   let componentPageIndex = $state(0);
   let lastTaskId = $state('');
-  let openAvailabilityMenu = $state('');
+  // One open flag per availability menu, rather than the single "which kind is open"
+  // string the hand-rolled menus shared (issue 1458). Each menu is its own
+  // `SearchablePopover` and owns its own open state; this map exists so the task-switch
+  // reset below can still force all three shut, and mutual exclusion now comes from the
+  // primitive's outside-click dismissal — clicking one trigger is outside the other two.
+  let availabilityMenuOpen = $state({ biomes: false, timeOfDay: false, weather: false });
   let componentPageSize = $state(6);
   let toolSearchTerm = $state('');
   let toolPageIndex = $state(0);
@@ -189,7 +194,7 @@
     componentTagSearchTerm = '';
     selectedComponentTags = [];
     componentPageIndex = 0;
-    openAvailabilityMenu = '';
+    availabilityMenuOpen = { biomes: false, timeOfDay: false, weather: false };
     toolSearchTerm = '';
     toolPageIndex = 0;
     lastTaskId = task?.id || '';
@@ -367,6 +372,32 @@
     });
   }
 
+  /**
+   * The still-unselected conditions, shaped for `SearchablePopover` (issue 1458).
+   *
+   * Both `data` entries are hooks this VIEW owns rather than the primitive's own
+   * `data-popover-option`, and both are load-bearing. `data-gathering-task-availability-option`
+   * says which of the three menus a row belongs to — the three are rendered by one `{#each}`
+   * and the popover is portaled out of the field that anchors it, so without it a row cannot
+   * be told from its sibling menu's row. `data-condition-id` is the same attribute the
+   * SELECTED pills below carry, which is what lets one selector read a choice and its
+   * resulting pill.
+   *
+   * @param {string} kind `biomes`, `timeOfDay` or `weather`
+   * @returns {Array<object>} popover options in menu order
+   */
+  function availabilityMenuOptions(kind) {
+    return availableConditionOptions(kind).map((option) => ({
+      id: conditionId(option),
+      label: conditionLabel(option),
+      icon: conditionIcon(option),
+      data: {
+        'data-gathering-task-availability-option': kind,
+        'data-condition-id': conditionId(option),
+      },
+    }));
+  }
+
   function availabilityMenuLabel(kind) {
     const available = availableConditionOptions(kind);
     if (available.length === 0) {
@@ -432,7 +463,6 @@
     const selectedIds = selectedConditionIds(kind);
     if (selectedIds.includes(normalizedId)) return;
     onUpdateTask({ [kind]: [...selectedIds, normalizedId] });
-    openAvailabilityMenu = '';
   }
 
   function removeAvailability(kind, id) {
@@ -985,52 +1015,27 @@
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
           <Field as="div" class="manager-availability-multi" data-gathering-task-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
-            <div
-              class="manager-availability-picker"
-              use:dismissOnOutsideClick={{
-                enabled: openAvailabilityMenu === kind,
-                onDismiss: () => {
-                  if (openAvailabilityMenu === kind) openAvailabilityMenu = '';
-                },
-              }}
-            >
-              <button
-                type="button"
-                class="manager-availability-menu-button"
-                aria-haspopup="listbox"
-                aria-expanded={openAvailabilityMenu === kind}
-                onclick={() => (openAvailabilityMenu = openAvailabilityMenu === kind ? '' : kind)}
-              >
-                <span>{availabilityMenuLabel(kind)}</span>
-                <i class="fas fa-chevron-down" aria-hidden="true"></i>
-              </button>
-              {#if openAvailabilityMenu === kind}
-                <div
-                  class="manager-availability-menu"
-                  role="listbox"
-                  aria-label={availabilityFieldLabel(kind)}
-                >
-                  {#if availableConditionOptions(kind).length > 0}
-                    {#each availableConditionOptions(kind) as option (conditionId(option))}
-                      <button
-                        type="button"
-                        class="manager-availability-option"
-                        role="option"
-                        aria-selected="false"
-                        data-gathering-task-availability-option={kind}
-                        data-condition-id={conditionId(option)}
-                        onclick={() => addAvailability(kind, conditionId(option))}
-                      >
-                        <i class={conditionIcon(option)} aria-hidden="true"></i>
-                        <span>{conditionLabel(option)}</span>
-                      </button>
-                    {/each}
-                  {:else}
-                    <span class="manager-availability-empty">{availabilityMenuLabel(kind)}</span>
-                  {/if}
-                </div>
-              {/if}
-            </div>
+            <!-- `SearchablePopover`, not a hand-rolled trigger-plus-listbox (issue 1458).
+                 The same conversion as `GatheringEventEditView`'s, which this menu was a
+                 near-verbatim copy of. `showSearch={false}` keeps
+                 `triggerHasPopup="listbox"` truthful and keeps the empty branch reading
+                 "All biomes selected" rather than a no-search-results hint, and the
+                 `.manager-availability-picker` wrapper is gone because
+                 `.manager-travel-picker` declares the same `position: relative;
+                 min-width: 0`. `bind:open` exists for ONE reason: the task-switch effect
+                 above closes every open menu, and a portaled panel that outlived its task
+                 would hang over a form whose contents had changed underneath it. -->
+            <SearchablePopover
+              bind:open={availabilityMenuOpen[kind]}
+              options={availabilityMenuOptions(kind)}
+              showSearch={false}
+              triggerHasPopup="listbox"
+              triggerClass="manager-availability-menu-button"
+              triggerLabel={availabilityMenuLabel(kind)}
+              dialogAriaLabel={availabilityFieldLabel(kind)}
+              emptyHint={availabilityMenuLabel(kind)}
+              onChoose={(id) => addAvailability(kind, id)}
+            />
             <div
               class="manager-availability-pill-row"
               data-gathering-task-availability-pills={kind}

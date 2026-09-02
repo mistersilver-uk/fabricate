@@ -14,7 +14,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import SearchablePopover from '../SearchablePopover.svelte';
   // Shared pure resolver: an empty OR generic item-bag image falls back to the
   // alchemical blueprint — matching the player builder + browser exactly (no drift).
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
@@ -26,8 +26,6 @@
     onLinkRecipe = () => {},
     onRemoveRecipe = () => {},
   } = $props();
-
-  let linkOpen = $state(false);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -47,10 +45,32 @@
     );
   }
 
+  /**
+   * The linkable recipes, shaped for `SearchablePopover` (issue 1458).
+   *
+   * The category travels as `meta` — the option's SECOND LINE — rather than as a third inline
+   * span. That is a deliberate change and it converges on the rows directly beneath it: a
+   * LINKED recipe already renders its name over its category in a two-line copy block, so the
+   * menu now offers a choice in the shape the choice will take. It is also the case `meta` is
+   * documented for, a picker whose entries differ by a fact rather than by a name.
+   *
+   * `data` reproduces `data-recipe-item-link-recipe-option` verbatim instead of folding it into
+   * the primitive's `dataId`/`data-popover-option`, so the mounted suite that reads a row's
+   * recipe id out of that attribute keeps working against the same hook.
+   */
+  const linkOptions = $derived(
+    linkable.map((recipe) => ({
+      id: recipe.id,
+      label: recipe.name,
+      meta: categoryLabel(recipe),
+      img: resolveRecipeImage(recipe),
+      data: { 'data-recipe-item-link-recipe-option': recipe.id },
+    }))
+  );
+
   function linkRecipe(recipeId) {
     if (!recipeId) return;
     onLinkRecipe(recipeId);
-    linkOpen = false;
   }
 </script>
 
@@ -66,48 +86,38 @@
         {text('FABRICATE.Admin.Manager.RecipeItem.Contents.Heading', 'Recipes inside')}
       </h3>
     </div>
+    <!-- `SearchablePopover` with its CHIP trigger (issue 1458), not a hand-rolled
+         trigger-plus-listbox. The wrapper `<div>` STAYS: it is this head row's second flex
+         item, and it is also the element that carries this component's scoping hash for the
+         `:global(...)` disabled rule below, which would otherwise stop reaching the chip.
+
+         `is-neutral` rides `triggerClass` because the primitive renders the chip without a
+         `tone`, and that class is exactly what `tone="neutral"` emitted. `showSearch={false}`
+         keeps `triggerHasPopup="listbox"` truthful, and `showChevron={false}` keeps the trigger
+         an ADD control — its leading `fa-plus` says what it does, and a value chevron beside it
+         would imply it shows a current selection. -->
     <div class="manager-recipe-item-link-recipe">
-      <Chip
-        tag="button"
-        tone="neutral"
-        icon="fas fa-plus"
-        class="manager-recipe-item-link-recipe-toggle"
-        type="button"
-        data-recipe-item-link-recipe-toggle
-        aria-haspopup="listbox"
-        aria-expanded={linkOpen}
+      <SearchablePopover
+        options={linkOptions}
+        triggerChip
+        showSearch={false}
+        showChevron={false}
+        triggerHasPopup="listbox"
+        triggerClass="manager-recipe-item-link-recipe-toggle is-neutral"
+        triggerIcon="fas fa-plus"
+        triggerLabel={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}
+        dialogAriaLabel={text(
+          'FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe',
+          'Link recipe'
+        )}
+        triggerData={{ 'data-recipe-item-link-recipe-toggle': '' }}
         disabled={linkable.length === 0}
-        onclick={() => {
-          linkOpen = !linkOpen;
-        }}
-      >
-        <span>{text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}</span>
-      </Chip>
-      {#if linkOpen && linkable.length > 0}
-        <div
-          class="manager-recipe-item-link-recipe-list"
-          role="listbox"
-          data-recipe-item-link-recipe-list
-          aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}
-        >
-          {#each linkable as recipe (recipe.id)}
-            <button
-              type="button"
-              class="manager-recipe-item-link-recipe-option"
-              role="option"
-              aria-selected="false"
-              data-recipe-item-link-recipe-option={recipe.id}
-              onclick={() => linkRecipe(recipe.id)}
-            >
-              <span class="manager-recipe-item-recipe-icon" aria-hidden="true"
-                ><img src={resolveRecipeImage(recipe)} alt="" /></span
-              >
-              <span class="manager-recipe-item-recipe-name">{recipe.name}</span>
-              <span class="manager-recipe-item-recipe-cat">{categoryLabel(recipe)}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
+        emptyHint={text(
+          'FABRICATE.Admin.Manager.RecipeItem.Contents.NoneLinkable',
+          'Every recipe is already linked'
+        )}
+        onChoose={linkRecipe}
+      />
     </div>
   </div>
 
@@ -190,42 +200,11 @@
     cursor: not-allowed;
   }
 
-  .manager-recipe-item-link-recipe-list {
-    position: absolute;
-    right: 0;
-    top: calc(100% + var(--fab-space-1));
-    z-index: 20;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-1);
-    min-width: 220px;
-    max-height: 260px;
-    overflow-y: auto;
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 10px;
-    background: var(--fab-bg-1);
-    box-shadow: var(--fab-shadow-lg);
-  }
-
-  .manager-recipe-item-link-recipe-option {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2);
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .manager-recipe-item-link-recipe-option:hover,
-  .manager-recipe-item-link-recipe-option:focus-visible {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-surface-soft);
-    outline: none;
-  }
+  /* The popover panel and its rows were `.manager-recipe-item-link-recipe-list` and
+     `.manager-recipe-item-link-recipe-option`, and both blocks are GONE rather than repaired
+     (issue 1458): `.manager-travel-popover` and `.manager-travel-option` in
+     `styles/fabricate.css` state the same panel and the same row, and repairing a rule that
+     restates the primitive's own would have kept the duplication with a `:global()` on it. */
 
   .manager-recipe-item-contents-hint {
     margin: 0 0 var(--fab-space-2);
