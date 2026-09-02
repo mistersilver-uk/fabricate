@@ -8572,7 +8572,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
                     <div class="manager-environment-tab-panel"></div>
                     <aside class="manager-inspector manager-environment-inspector manager-checks-rail" data-checks-rail="crafting">
                       <section class="manager-inspector-card" data-checks-preview-as>
-                        <div class="manager-travel-picker manager-checks-preview-actor">
+                        <div class="fabricate-picker manager-travel-picker manager-checks-preview-actor">
                           <button type="button" data-probe="preview-actor" data-checks-preview-actor
                             class="manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
                             <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>

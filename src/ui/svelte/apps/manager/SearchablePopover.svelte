@@ -407,8 +407,15 @@
   });
 </script>
 
+<!-- `fabricate-picker` is the primitive's own NAMESPACE root, and it is what lets this component
+     paint outside the manager (issue 1464). `styles/fabricate.css` is loaded page-wide into the
+     Foundry document, so every selector in it must begin with `.fabricate` or it bleeds into
+     other modules' sheets; the family used to satisfy that by hanging off `.fabricate-manager`,
+     which is why a player-window caller drew nothing at all. A root the COMPONENT writes
+     satisfies the same rule and travels with it. Do not swap it back for an app root, and do not
+     delete it: `tests/components/searchable-popover-area-scope.test.js` fails on either. -->
 <div
-  class={`manager-travel-picker ${pickerClass}`}
+  class={`fabricate-picker manager-travel-picker ${pickerClass}`}
   bind:this={pickerRoot}
   use:dismissOnOutsideClick={{
     enabled: open,
@@ -459,9 +466,12 @@
   {/if}
 
   {#if open}
+    <!-- `fabricate-picker-popover` is the panel's own half of the primitive's namespace root. It
+         is a SECOND class rather than the one on the picker root because `use:portal` moves this
+         node out of that root, taking its classes and losing its ancestors. -->
     <div
       bind:this={popoverRoot}
-      class={`manager-travel-popover ${popoverClass} ${compactOptionRows ? 'is-compact-option-rows' : ''}`}
+      class={`fabricate-picker-popover manager-travel-popover ${popoverClass} ${compactOptionRows ? 'is-compact-option-rows' : ''}`}
       style={popoverStyle}
       role="dialog"
       tabindex="-1"
@@ -657,8 +667,10 @@
 
   /* Pointer feedback, restated for this mode. The compact row's resting
      `background: var(--fab-bg-3)` below computes to (0,4,0) and so OUTRANKS the
-     global `.fabricate-manager .manager-travel-option:hover` at (0,2,0) — meaning the
-     shared hover silently stopped landing the moment a caller opted in. The actor picker
+     global `.manager-travel-option:hover` — meaning the shared hover silently stopped
+     landing the moment a caller opted in. Issue 1464 took `.fabricate-manager` off that
+     global rule so the primitive paints outside the manager, which widens the gap rather
+     than closing it: the mode's own rules still win, by two classes now instead of one. The actor picker
      had already lost it; opting the realm-override picker in would have taken pointer
      feedback off ten clickable realms as well. */
   .manager-travel-popover.is-compact-option-rows .manager-travel-option:hover {

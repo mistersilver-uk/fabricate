@@ -748,11 +748,13 @@ const REVIEWED = [
     why: 'Travel parties override popover trigger, population B.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-travel-picker-trigger'),
+    id: globalRule('.fabricate-picker .manager-travel-picker-trigger'),
     disposition: 'EXCLUDE',
     why:
       'NOT IN THE SEEDED LIST. The (0,2,0) shared treatment behind four population-B ' +
-      'triggers; re-chaining it would repaint controls the sweep is not converting.',
+      'triggers; re-chaining it would repaint controls the sweep is not converting. Its ' +
+      'root is the picker primitive`s own namespace class rather than the manager`s since ' +
+      'issue 1464 unscoped the family, which is the same (0,2,0) at the same position.',
   },
   // REMOVED at issue 1427, and the removal is recorded rather than performed silently.
   //
