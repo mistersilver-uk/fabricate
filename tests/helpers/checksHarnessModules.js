@@ -199,4 +199,8 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte',
+  // The catalogue's entry row, extracted so the Tool Studio's check-bonus picker draws the
+  // same one (issue 1373, maintainer round 4). Static in that card's graph, so omitting it
+  // HANGS every checks suite rather than failing one.
+  'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
 ]);

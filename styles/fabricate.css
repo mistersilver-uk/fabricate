@@ -3636,8 +3636,21 @@
    seeds a library now (`tests/view-lab/world/labContent.js`), the marking is gone, and the
    assertion is live.
 
-   Scoped to the studio's catalogue card so the same markup elsewhere is untouched. */
-.fabricate-manager .manager-checks-card .manager-modifier-readonly-row {
+   ── AND THE TOOL STUDIO'S CHECK BONUS JOINS THEM (issue 1373, maintainer round 4) ─────
+   The Tool Requirements bonus is a pick from the SAME world modifier library, and it drew that
+   roster as a stack of option cards. The ruling moves it onto this row, and the markup is
+   genuinely shared: both screens render `apps/manager/ModifierLibraryRow.svelte`.
+
+   The GEOMETRY cannot be shared that way, because it is here rather than in that component,
+   and these four blocks were anchored on `.manager-checks-card` — so the row rendered on any
+   other route matched nothing and drew with NO metrics at all. That failure is silent: every
+   class selector still resolves and the row simply loses its box. So each block takes a SECOND
+   ANCHOR at the same (0,3,0) rather than the Tool route authoring a copy, which keeps one
+   owner for the row and leaves the Checks Studio's own rendering bit-for-bit unchanged.
+   `tests/components/manager-layout.test.js` asserts the join and that each cell is declared
+   exactly once. */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-row,
+.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-row {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3651,7 +3664,8 @@
 /* The entry's GLYPH TILE, the row's own leading square. Its family is the accent rather
    than a per-entry tone: a modifier is not a hazard, and the tile exists to make the row
    scannable by icon, not to grade it. */
-.fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph {
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph,
+.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-glyph {
   display: flex;
   flex: 0 0 26px;
   align-items: center;
@@ -3664,7 +3678,8 @@
   font-size: 11px;
 }
 
-.fabricate-manager .manager-checks-card .manager-modifier-readonly-label {
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-label,
+.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-label {
   flex: 0 0 auto;
   color: var(--fab-text);
   font-size: 12.5px;
@@ -3676,7 +3691,8 @@
    anywhere — exactly how the prototype lays the row out. `min-width: 0` is load-bearing: a
    flex item's default `min-width: auto` refuses to shrink below its content, so a long
    `@`-path would push the pill out of the row instead of ellipsing. */
-.fabricate-manager .manager-checks-card .manager-modifier-readonly-expression {
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-expression,
+.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-expression {
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
@@ -10784,11 +10800,13 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-resolution-option:hover {
+.fabricate-manager .manager-resolution-option:hover,
+.fabricate-manager .manager-tool-bonus-row:hover {
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-resolution-option.is-active {
+.fabricate-manager .manager-resolution-option.is-active,
+.fabricate-manager .manager-tool-bonus-row.is-active {
   border-color: var(--fab-border);
   background: var(--fab-accent-soft);
   box-shadow: inset 3px 0 0 var(--fab-accent);
@@ -10798,7 +10816,8 @@
    unchecked state is a hollow ring on the border token; the checked state paints a green accent
    ring plus a filled centre dot via an inset box-shadow (no gradients, no orange anywhere). The
    inset spread fills the inner circle to the accent colour while the border stays the ring. */
-.fabricate-manager .manager-resolution-option input[type='radio'] {
+.fabricate-manager .manager-resolution-option input[type='radio'],
+.fabricate-manager .manager-tool-bonus-row input[type='radio'] {
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
@@ -10819,16 +10838,20 @@
    pseudo-elements here so only the themed ring + inset-box-shadow dot shows. Load-bearing: do not
    "clean up" this rule. Scoped to the resolution-mode radios only, never radios globally. */
 .fabricate-manager .manager-resolution-option input[type='radio']::before,
-.fabricate-manager .manager-resolution-option input[type='radio']::after {
+.fabricate-manager .manager-resolution-option input[type='radio']::after,
+.fabricate-manager .manager-tool-bonus-row input[type='radio']::before,
+.fabricate-manager .manager-tool-bonus-row input[type='radio']::after {
   display: none;
 }
 
-.fabricate-manager .manager-resolution-option input[type='radio']:checked {
+.fabricate-manager .manager-resolution-option input[type='radio']:checked,
+.fabricate-manager .manager-tool-bonus-row input[type='radio']:checked {
   border-color: var(--fab-accent);
   box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
-.fabricate-manager .manager-resolution-option input[type='radio']:focus {
+.fabricate-manager .manager-resolution-option input[type='radio']:focus,
+.fabricate-manager .manager-tool-bonus-row input[type='radio']:focus {
   outline: none;
   box-shadow: none;
 }
@@ -10836,13 +10859,47 @@
 /* Keep the checked centre dot while the radio is focused — the bare :focus rule
    above zeroes box-shadow, which is also what paints the dot, so a checked radio
    loses its dot the moment it is clicked/focused without this restore. */
-.fabricate-manager .manager-resolution-option input[type='radio']:checked:focus {
+.fabricate-manager .manager-resolution-option input[type='radio']:checked:focus,
+.fabricate-manager .manager-tool-bonus-row input[type='radio']:checked:focus {
   box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
-.fabricate-manager .manager-resolution-option input[type='radio']:focus-visible {
+.fabricate-manager .manager-resolution-option input[type='radio']:focus-visible,
+.fabricate-manager .manager-tool-bonus-row input[type='radio']:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* ── The Tool check-bonus list: the manager's option treatment, on the modifier ROW ────
+   The bonus picks one entry from the world modifier library, and the library is drawn as the
+   Checks Studio's row (four blocks above, joined). What is only true HERE is that the group is
+   a `<fieldset>` and each row is a `<label>` around a real radio, so this is the fieldset reset,
+   the row's pointer affordance, and the one alignment fact the joined radio rule cannot carry.
+
+   The reset is not cosmetic: `<Field as="fieldset">` supplies `.manager-field`'s column box and
+   Foundry's core sheet still draws a fieldset's own border, padding and margin around it.
+   `RadioCardGroup`'s `is-config-cards` face carries the identical three declarations for the
+   identical reason. The gap is `--fab-space-chip`, which is the 6px rhythm the Checks Studio's
+   own rows list already uses — the same rows at the same spacing on both screens.
+
+   PLACED AFTER THE JOINED RULES ABOVE, DELIBERATELY. `margin-top` there is a CARD fact: it
+   nudges the dot down to meet a two-line option's first line. This row is one line and centres
+   its items, so the same nudge sits the dot below centre. Both selectors weigh (0,3,0), so
+   source order is what decides it and this block has to come second. */
+.fabricate-manager .manager-tool-bonus-list {
+  gap: var(--fab-space-chip);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.fabricate-manager .manager-tool-bonus-row {
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-tool-bonus-row input[type='radio'] {
+  margin-top: 0;
 }
 
 /* Config-card variant (Crafting settings — recipe resolution, recipe visibility,

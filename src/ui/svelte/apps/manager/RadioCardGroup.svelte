@@ -31,6 +31,17 @@
   while a Svelte scoped block is injected unlayered, so a property this component declares in
   its own block cannot be overridden from that sheet at all. The rest of the row's appearance
   stays in the sheet, where it already lives, because none of it moves.
+
+  ── AND `option.meta` NOW HAS NO CALLER (issue 1373, maintainer round 4) ────────────────
+  Round 4 ruled the Tool bonus list off this primitive entirely — the world modifier library is
+  presented as the Checks Studio's compact ROWS (`ModifierLibraryRow.svelte`), and this group is
+  reserved for closed mode sets, which is what its nine remaining callers all are. `meta` was
+  added for that one caller and is now unused.
+
+  IT IS LEFT IN PLACE DELIBERATELY, not overlooked. Deleting a shipped primitive's prop is a
+  change to a shared surface with its own reviewers, and it does not belong inside the diff that
+  orphaned it; it is recorded here so the next reader finds a decision rather than dead code, and
+  it is owed a follow-up that removes the prop, its markup branch and its rule together.
 -->
 <script>
   import Field from '../../components/Field.svelte';

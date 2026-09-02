@@ -7426,6 +7426,64 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
   );
 });
 
+// ── ONE MODIFIER ROW, REACHING BOTH SCREENS THAT DRAW THE LIBRARY (issue 1373, round 4) ────
+//
+// The Tool Requirements bonus list drew the world modifier library as a stack of option cards.
+// The Checks Studio draws the SAME roster — `characterLibraries.modifiers[]` — as compact rows
+// one screen away, and reserves the card group for `How they combine`, a closed set of
+// behaviours. The maintainer's ruling moves the bonus list onto that row.
+//
+// The markup is shared as a component (`ModifierLibraryRow.svelte`, asserted in
+// `manager-contract.test.js`). What CANNOT be shared that way is the geometry: it lives in this
+// sheet, anchored on `.manager-checks-card`, so the row rendered on any other route would have
+// had NO metrics at all — a silent failure, since every class selector would still resolve. So
+// the two anchors JOIN one block per cell rather than the Tool route authoring a second copy.
+test('the modifier library row is one block per cell, reaching both screens that draw it', () => {
+  const CELLS = [
+    'manager-modifier-readonly-row',
+    'manager-modifier-readonly-glyph',
+    'manager-modifier-readonly-label',
+    'manager-modifier-readonly-expression',
+  ];
+  for (const cell of CELLS) {
+    assert.ok(
+      css.includes(
+        `.fabricate-manager .manager-checks-card .${cell},\n` +
+          `.fabricate-manager .manager-tool-bonus-list .${cell} {`
+      ),
+      `${cell} must be ONE joined block naming both routes, not a second copy for the Tool tab`
+    );
+    // The non-vacuity half: a second declaring block would satisfy the join above and still
+    // let the two screens drift, so each cell is declared exactly twice in the file — once in
+    // the joined selector, once nowhere else.
+    assert.equal(
+      (css.match(new RegExp(`\\.${cell} \\{`, 'g')) || []).length,
+      1,
+      `${cell} must be declared exactly once`
+    );
+  }
+  // AND THE PICK CONTROL IS THE MANAGER'S SHIPPED RADIO, joined the same way. Foundry's core
+  // sheet draws a native radio's inner chrome through ::before/::after that `appearance: none`
+  // does not remove, so a hand-rolled themed radio is not a few lines — it is the whole block
+  // `.manager-resolution-option` already carries, and a copy of it is a second owner.
+  for (const rule of [
+    "input[type='radio'] {",
+    "input[type='radio']::before,",
+    "input[type='radio']:checked {",
+  ]) {
+    assert.ok(
+      css.includes(`.fabricate-manager .manager-tool-bonus-row ${rule}`),
+      `the Tool bonus row must join the shipped radio treatment (${rule})`
+    );
+  }
+  // The negative control on the widening: joining must not have reached radios generally.
+  assert.equal(
+    /\n\.fabricate-manager input\[type='radio'\]/.test(css),
+    false,
+    'the themed radio stays scoped to the surfaces that opt into it, never radios globally'
+  );
+});
+
 test('the locked activation indicator offers no hover affordance', async () => {
   // `.manager-status-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
   // The hover rule excluded `:disabled` and `.is-disabled`, and a span can be neither, so the

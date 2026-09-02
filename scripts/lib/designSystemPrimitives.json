@@ -103,6 +103,12 @@
       "why": "`library.html:1104` and `:1137` name it and its two callers — the import folder-mapping step and the import report — and `:1137` records that ruling it out as single-caller was wrong."
     },
     {
+      "path": "src/ui/svelte/apps/manager/ModifierLibraryRow.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "why": "The world modifier library's entry row — glyph tile, name, expression, and the caller's own trailing control (2 callers, issue 1373). It was inline markup in `checks/CraftingModifierCatalogueCard.svelte` and moved out when the Tool Studio's check-bonus picker was ruled onto the same row rather than a stack of option cards, so the two screens that draw `characterLibraries.modifiers[]` cannot present it from two copies. `library` is null because `library.html` specifies no modifier row: `:626`'s `<OptionCards>` is the CARD group this row replaced at one of the two call sites and is emphatically not it, and no row primitive there covers a library entry. Targeted rather than broad because both consumers are named and the frames that photograph each claim it by `sourceMatches` — `manager-checks-crafting-modifiers` for the catalogue, and the three `*-tool-*bonus*` and `world-tool-entry-requirements` cases for the picker."
+    },
+    {
       "path": "src/ui/svelte/apps/manager/RadioCardGroup.svelte",
       "library": "<OptionCards>",
       "evidence": "broad",

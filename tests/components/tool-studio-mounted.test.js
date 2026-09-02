@@ -119,6 +119,10 @@ const harness = createMountedComponentHarness({
     // editor's own bespoke block became a caller of it, so it is in this tree's static graph
     // and an omission HANGS this suite rather than failing it.
     'src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte',
+    // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus
+    // list and the Checks Studio catalogue render it, so it is static in this tree's graph
+    // and an omission HANGS this suite rather than failing it.
+    'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
     'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -1466,7 +1470,16 @@ describe('Tool Studio editor (mounted)', () => {
   // `r.bonus === m.expr`, so the selection is resolved by EXPRESSION even though the radio's own
   // value is the entry id: two entries may share an expression and a duplicate `{#each}` key
   // throws, while `normalizeModifierLibrary` guarantees the ids are unique.
-  it('draws the world modifier library as a single-select list, one row per entry', async () => {
+  //
+  // ── AND IT IS A ROW LIST, NOT A CARD STACK (issue 1373, maintainer round 4) ───────────────
+  //
+  // The first pass drew the roster as a `RadioCardGroup`. This app already draws the
+  // distinction the other way, one screen from here: `checks/CraftingModifierCatalogueCard`
+  // presents THIS SAME roster as compact rows, and `How they combine` — a closed four-option
+  // set of behaviours, each needing a sentence — is the `RadioCardGroup` beneath it. So the
+  // classes below are the assertion, not decoration: they are the CHECKS row's own cells, and
+  // a card stack cannot emit them.
+  it('draws the world modifier library as a single-select ROW list, one row per entry', async () => {
     const root = await harness.mount(props({ activeTab: 'requirements' }));
 
     const rows = [...root.querySelectorAll('[data-tool-bonus-modifier]')];
@@ -1476,25 +1489,48 @@ describe('Tool Studio editor (mounted)', () => {
       'one row per library entry, in library order'
     );
     assert.deepEqual(
-      rows.map((row) => row.querySelector('[data-tool-choice-title]').textContent.trim()),
-      ['Proficiency @prof', 'Intelligence modifier @abilities.int.mod', 'Guidance 1d4'],
-      'each row carries the label and, beside it, the entry’s own expression (`proto:2363`)'
+      rows.map((row) => row.classList.contains('manager-modifier-readonly-row')),
+      [true, true, true],
+      'each entry is the Checks Studio modifier ROW'
+    );
+    const bonusCard = root.querySelector('[data-tool-rule-card="bonus"]');
+    assert.ok(
+      !bonusCard.querySelector('.manager-resolution-option'),
+      'and no option-card markup survives in the bonus section'
+    );
+    assert.ok(
+      !bonusCard.querySelector('[data-radio-card-group]'),
+      'nor the option-card group that wrapped them'
     );
     assert.deepEqual(
-      rows.map((row) => row.querySelector('[data-radio-card-meta]').textContent.trim()),
+      rows.map((row) => row.querySelector('.manager-modifier-readonly-label').textContent.trim()),
+      ['Proficiency', 'Intelligence modifier', 'Guidance'],
+      'the row carries the entry’s name'
+    );
+    assert.deepEqual(
+      rows.map((row) =>
+        row.querySelector('.manager-modifier-readonly-expression').textContent.trim()
+      ),
       ['@prof', '@abilities.int.mod', '1d4'],
-      'and the expression is its own element, so the two can be typed differently'
+      'and its expression, in the row’s own mono cell (`proto:2363`)'
     );
     assert.deepEqual(
       rows.map((row) => row.querySelector('input[type="radio"]').checked),
       [true, false, false],
       '`@prof` selects the entry whose expression it is'
     );
+    assert.deepEqual(
+      [...new Set(rows.map((row) => row.querySelector('input[type="radio"]').name))],
+      ['tool-bonus-modifier'],
+      'one radio group name across the rows, so arrow keys traverse it as one control'
+    );
     // NO THIRD LINE. The design's rows carry an authored `note`; ours have no such field and
-    // one is NOT invented on the persisted shape. See the tab's own docblock.
-    assert.ok(
-      !rows[0].querySelector('[data-tool-choice-description]'),
-      'a library row is icon + label + expression and nothing else'
+    // one is NOT invented on the persisted shape. See the tab's own docblock. A row is icon +
+    // label + expression + the pick control, which is exactly the Checks row's anatomy.
+    assert.equal(
+      rows[0].querySelector('.manager-modifier-readonly-label').nextElementSibling.tagName,
+      'CODE',
+      'the expression follows the name directly, with no description between them'
     );
     assert.equal(
       root.querySelector('[data-tool-bonus-note]').textContent.trim(),
@@ -1545,12 +1581,29 @@ describe('Tool Studio editor (mounted)', () => {
       'fabricate:tool-bonus-custom',
       'and it is FIRST, because it is the answer the record currently holds'
     );
-    assert.equal(custom.querySelector('[data-radio-card-meta]').textContent.trim(), '@abilities.str.mod + 2');
+    assert.equal(
+      custom.querySelector('.manager-modifier-readonly-label').textContent.trim(),
+      'Set by hand'
+    );
+    assert.equal(
+      custom.querySelector('.manager-modifier-readonly-expression').textContent.trim(),
+      '@abilities.str.mod + 2'
+    );
     assert.equal(custom.querySelector('input[type="radio"]').checked, true);
+    // THE SENTENCE IS A SIBLING OF THE ROW, NOT A THIRD LINE INSIDE IT. The Checks row is one
+    // line and stays one line; its own bounds fault is stated the same way, as a paragraph
+    // after the row it qualifies. The radio names it through `aria-describedby`, so the
+    // explanation is announced with the option rather than orphaned beside it.
+    const hint = root.querySelector('[data-tool-bonus-custom-hint]');
     assert.match(
-      custom.querySelector('[data-tool-choice-description]').textContent,
+      hint.textContent,
       /not one of the world modifiers/i,
       'the row says why it is not in the library'
+    );
+    assert.equal(
+      custom.querySelector('input[type="radio"]').getAttribute('aria-describedby'),
+      hint.id,
+      'and the sentence is announced with the option it explains'
     );
     assert.deepEqual(
       rows.slice(1).map((row) => row.querySelector('input[type="radio"]').checked),
@@ -1585,7 +1638,7 @@ describe('Tool Studio editor (mounted)', () => {
       'No modifiers are defined in this world yet. They are defined under World, Rules and resources.'
     );
     assert.ok(
-      !root.querySelector('[data-radio-card-group="tool-bonus-modifier"]'),
+      !root.querySelector('[data-tool-bonus-list]'),
       'and no empty list frame around nothing'
     );
     assert.equal(

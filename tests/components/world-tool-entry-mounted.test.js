@@ -85,6 +85,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus
+    // list and the Checks Studio catalogue render it, so it is static in this tree's graph
+    // and an omission HANGS this suite rather than failing it.
+    'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     // `ToolRequirementsTab` draws each of its two sections as a `ToolInheritCard` now (issue
     // 1373), so the card and the shared inherit row it wraps are in this tree's static graph.
@@ -1012,6 +1016,33 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.deepEqual(
         rows.map((row) => row.dataset.toolBonusModifier),
         ['mod-prof', 'mod-int']
+      );
+      // ── AND IT IS THE CHECKS STUDIO'S ROW AT THIS SCOPE TOO (round 4) ──────────────────
+      // The tab is one component, so this cannot diverge from the system editor by markup —
+      // what it CAN diverge on is the sheet, because the row's geometry is anchored on a
+      // container class this tab writes, and the world entry is a different route. The
+      // classes are asserted at both scopes for that reason.
+      assert.deepEqual(
+        rows.map((row) => row.classList.contains('manager-modifier-readonly-row')),
+        [true, true],
+        'the world entry draws the library as rows, not as option cards'
+      );
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('.manager-modifier-readonly-label').textContent.trim()),
+        ['Proficiency', 'Intelligence modifier']
+      );
+      assert.deepEqual(
+        rows.map((row) =>
+          row.querySelector('.manager-modifier-readonly-expression').textContent.trim()
+        ),
+        ['@prof', '@abilities.int.mod']
+      );
+      // SCOPED TO THE BONUS CARD, because the section ABOVE it legitimately renders option
+      // cards: `Which prerequisites` ends in the gate-mode pair, a closed two-option set of
+      // behaviours. The ruling is about library entries, not about the card primitive.
+      assert.ok(
+        !target.querySelector('[data-tool-rule-card="bonus"] .manager-resolution-option'),
+        'and no option-card markup survives in the bonus section'
       );
       assert.deepEqual(
         rows.map((row) => row.querySelector('input[type="radio"]').checked),

@@ -274,7 +274,7 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 44, 'the shipped primitive set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 45, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(

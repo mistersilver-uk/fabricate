@@ -527,6 +527,10 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingModifierCatalogueCard\.svelte$/,
+      // The catalogue's ENTRY ROW, extracted out of that card at issue 1373's round 4 so the
+      // Tool Studio's check-bonus picker draws the same one. It is the part of this frame a
+      // reader looks at, and the exact-path pattern above cannot reach a file that moved.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
       /^src\/ui\/svelte\/components\/ModifierPillSelect\.svelte$/,
     ],
   },

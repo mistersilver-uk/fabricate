@@ -210,6 +210,9 @@ function compileManagerRoot() {
   // Per-recipe check-modifier catalogue card (issue 770), rendered inside the crafting
   // checks stack; omitting it HANGS the mounted suite (# cancelled).
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte');
+  // Its entry row, shared with the Tool Studio's check-bonus picker (issue 1373, maintainer
+  // round 4). Static in BOTH graphs, so omitting it HANGS the mounted suite (# cancelled).
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ModifierLibraryRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');

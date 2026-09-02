@@ -118,8 +118,8 @@
      this screen, and the two facts we DO hold that read like prose — `min`/`max` bounds and
      `isRollExpression` — are not notes and, worse, would be untrue here: picking a modifier
      copies its EXPRESSION and nothing else, so its bounds do not travel to the Tool bonus. A
-     library row is therefore icon + label + expression, and the description slot is left for
-     the one row that has a real sentence to say (below).
+     library row is therefore icon + label + expression and nothing else — which is also, and
+     not by coincidence, why the list is drawn as rows (see the ruling below).
   2. AN EXPRESSION THE LIBRARY DOES NOT CONTAIN IS PRESERVED. A GM may have typed one under the
      old control. The design's own model simply highlights nothing in that case, which for us
      would read as "no bonus" over a record that has one, and the next save would drop it. It
@@ -129,6 +129,32 @@
      list's own, one section up, with the route appended: `ToolInheritCard` renders a card's
      `subtitle` at WORLD scope only (at system scope the head is spent on the inherit row), so
      the empty line is the one place both scopes can be told where modifiers are authored.
+
+  == A DELIBERATE DEVIATION: THE LIBRARY IS ROWS, NOT CARDS (round 4 ruling) ==================
+  `proto:2361` draws each of these entries as an option CARD, and this list does not. That is a
+  recorded deviation rather than drift, and it is recorded HERE because this is where a reader
+  meets the divergence — an audit that reads the prototype would otherwise report it as a defect
+  on every pass, which is exactly what happened to the first version of this section.
+
+  THE PRECEDENT IS ONE SCREEN AWAY, IN THIS APP. The Checks Studio renders THIS SAME roster —
+  `characterLibraries.modifiers[]` — as compact rows: icon, name, expression in mono, a bounds
+  chip and a state control at the right end, in `checks/CraftingModifierCatalogueCard.svelte`.
+  Directly beneath it on that same screen, `How they combine` IS a `RadioCardGroup`, because it
+  is a closed four-option set of behaviours each of which needs a sentence to distinguish it.
+  The app therefore already draws the distinction: LIBRARY ENTRIES GET ROWS, CLOSED MODE SETS
+  GET CARDS. The Tool bonus is library entries, so it takes the row — literally the same
+  component, `ModifierLibraryRow`, so a third modifier row cannot come into existence by copy.
+
+  WHAT JUSTIFIES THE DESIGN'S CARD DOES NOT HOLD FOR OURS. A card earns its height with the
+  description line under the name; the prototype's `MODS` carry an authored `note` and ours
+  carry no such field, and the maintainer has declined to add one (see point 1 above). A card
+  with nothing on its second line is a row with padding.
+
+  TWO SUPPORTING FACTS, stated once. The library is UNBOUNDED and GM-authored — the design's own
+  rail shows twelve — and a card stack costs about 50px an entry with no search above it, so the
+  list is the tallest thing on the tab in any world that uses modifiers seriously. And issue 1458
+  converged four selection popovers onto one shared picker for exactly this class of choice, so
+  a bespoke presentation for a fifth would be reopening a question this repository has settled.
 
   WHAT IS NOT REPRODUCED is `proto:4754`'s click-the-selected-row-to-clear. A radio group cannot
   be un-checked by re-clicking it, and faking that on a `<label>` wrapping a real `<input>` is
@@ -149,9 +175,11 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
+  import Field from '../../../components/Field.svelte';
   import ChecklistCardRow from '../ChecklistCardRow.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
+  import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
   import { toolWorldDefaultFact } from './toolStudio.js';
 
@@ -159,8 +187,10 @@
   // RADIO VALUE, never a persisted id, and it is spelled so that no library entry can collide
   // with it: `normalizeModifierLibrary` trims an id but does not otherwise constrain it.
   const CUSTOM_BONUS_VALUE = 'fabricate:tool-bonus-custom';
-  /** What a modifier row shows when the library entry has no expression yet. */
-  const NO_EXPRESSION = '—';
+  // The hand-typed row's sentence is a SIBLING of the row rather than a third line inside it,
+  // so the radio has to name it explicitly or the explanation is announced by nothing. One
+  // constant id is enough because at most one row can ever carry it.
+  const CUSTOM_BONUS_HINT_ID = 'manager-tool-bonus-hand-typed-hint';
 
   let {
     tool = null,
@@ -241,8 +271,9 @@
     modifierLibrary.map((entry) => ({
       value: entry.id,
       label: entry.label || entry.id,
-      icon: entry.icon || 'fa-solid fa-dice-d20',
-      meta: entry.expression || NO_EXPRESSION,
+      icon: entry.icon || '',
+      expression: entry.expression,
+      hint: '',
     }))
   );
   // FIRST, because it is the answer the record currently holds; below eight library rows it
@@ -254,8 +285,8 @@
             value: CUSTOM_BONUS_VALUE,
             label: text('FABRICATE.Admin.Manager.Tools.Editor.BonusCustom', 'Set by hand'),
             icon: 'fas fa-pen',
-            meta: bonus.expression,
-            description: text(
+            expression: bonus.expression,
+            hint: text(
               'FABRICATE.Admin.Manager.Tools.Editor.BonusCustomHint',
               'This expression is not one of the world modifiers. Pick one below to replace it.'
             ),
@@ -508,10 +539,13 @@
              of the rows rather than sub-heading a question, and it is also what separates the
              library from the enable row above it at system scope.
 
-             `RadioCardGroup`'s own `<legend>` stays visually hidden, which is the shipped
-             `is-config-cards` contract — the host renders the heading, the fieldset keeps the
-             accessible name. Its geometry is taken AS GIVEN by maintainer ruling (see that
-             component's header); the only thing this caller adds is the inline expression. -->
+             THE LIST IS ROWS, NOT CARDS (maintainer round 4). See this file's header for the
+             ruling and the precedent; the mechanics are here. `<Field as="fieldset">` is the
+             group: a `<legend>` is only valid as a fieldset's first child and is what names a
+             radio group, and `disabled` on a fieldset disables every descendant control, which
+             is how `saving` reaches every row without a per-row prop. The legend is visually
+             hidden because the eyebrow above already renders the heading — un-hiding it would
+             have a screen reader announce `World modifiers` twice. -->
         <p class="manager-kicker manager-tool-bonus-kicker">
           {text('FABRICATE.Admin.Manager.Tools.Editor.WorldModifiers', 'World modifiers')}
         </p>
@@ -524,17 +558,54 @@
           </p>
         {/if}
         {#if bonusChoices.length > 0}
-          <RadioCardGroup
-            legend={text('FABRICATE.Admin.Manager.Tools.Editor.WorldModifiers', 'World modifiers')}
-            options={bonusChoices}
-            selectedValue={selectedBonusValue}
-            groupName="tool-bonus-modifier"
-            columns={1}
-            dataGroup="tool-bonus-modifier"
-            optionDataAttr="data-tool-bonus-modifier"
+          <Field
+            as="fieldset"
+            class="manager-tool-bonus-list"
             disabled={saving}
-            onChange={chooseBonusModifier}
-          />
+            data-tool-bonus-list=""
+          >
+            <legend class="visually-hidden"
+              >{text(
+                'FABRICATE.Admin.Manager.Tools.Editor.WorldModifiers',
+                'World modifiers'
+              )}</legend
+            >
+            {#each bonusChoices as choice (choice.value)}
+              <!-- THE CHECKS STUDIO'S MODIFIER ROW, with a radio where that screen puts its
+                   eligibility toggle. A `<label>` host, so the whole row is the radio's hit
+                   target and its accessible name; the input is NESTED in it rather than the
+                   row being converted into one, which is the trap a `role="radio"` wrapper
+                   would land. -->
+              <ModifierLibraryRow
+                as="label"
+                icon={choice.icon}
+                label={choice.label}
+                expression={choice.expression}
+                class={choice.value === selectedBonusValue
+                  ? 'manager-tool-bonus-row is-active'
+                  : 'manager-tool-bonus-row'}
+                rowAttributes={{ 'data-tool-bonus-modifier': choice.value }}
+              >
+                <input
+                  type="radio"
+                  name="tool-bonus-modifier"
+                  value={choice.value}
+                  checked={choice.value === selectedBonusValue}
+                  aria-describedby={choice.hint ? CUSTOM_BONUS_HINT_ID : undefined}
+                  onchange={(event) => chooseBonusModifier(event.currentTarget.value)}
+                />
+              </ModifierLibraryRow>
+              {#if choice.hint}
+                <p
+                  class="manager-muted manager-tool-bonus-hand-typed"
+                  id={CUSTOM_BONUS_HINT_ID}
+                  data-tool-bonus-custom-hint
+                >
+                  {choice.hint}
+                </p>
+              {/if}
+            {/each}
+          </Field>
         {/if}
         <p class="manager-tool-requirements-summary" data-tool-bonus-note>{bonusNote}</p>
       {:else}
@@ -603,6 +674,21 @@
     height: 1px;
     background: var(--fab-border);
     content: '';
+  }
+
+  /* THE HAND-TYPED ROW'S SENTENCE, and it is a SIBLING of that row rather than a third line
+     inside it. The modifier row is one line on both screens that draw it, and the Checks Studio
+     states its own per-entry fault the same way — a paragraph after the row it qualifies. The
+     radio names this paragraph through `aria-describedby`, so nothing is lost by it sitting
+     outside the row.
+
+     Only the WEIGHT is stated here: `manager-muted` already owns the colour, the size and the
+     leading, and the 700 this resets is inherited from `.manager-field`, which the group's
+     `<fieldset>` carries because a field's caption is a label. This is the field's VALUE, not
+     its caption — the same distinction the sheet records for the world Tool entry's inputs. */
+  .manager-tool-bonus-hand-typed {
+    margin: 0;
+    font-weight: 500;
   }
 
   /* The per-section trailing line. It is the last thing in the card and a claim about the

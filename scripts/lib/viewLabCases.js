@@ -2021,6 +2021,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // The bonus list's ROW, shared with the Checks Studio catalogue (issue 1373, round 4).
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
       // The card the tab draws each of its two sections as, and the radio pair whose legend it
       // un-hides here (issue 1373). This frame is the only one that photographs the WORLD face
       // of either: the card's `headingStyle="kicker"` and the gate-mode group's visible legend.
@@ -2079,6 +2081,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // The bonus list's ROW, shared with the Checks Studio catalogue (issue 1373, round 4).
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
     ],
   }),
@@ -4387,6 +4391,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
+      // it into a shared component the Tool Studio's check-bonus picker also calls. The
+      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
   // ── the OTHER TWO activities' modifier cards (issues 1095, 1117) ────────────────────────────
@@ -4427,6 +4435,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
+      // it into a shared component the Tool Studio's check-bonus picker also calls. The
+      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
   managerCase({
@@ -4457,6 +4469,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
+      // it into a shared component the Tool Studio's check-bonus picker also calls. The
+      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
   // ── the SHARED subject picker, one case per host (issue 1095) ───────────────────────────────
@@ -7076,7 +7092,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      // The bonus list's ROW, shared with the Checks Studio catalogue (issue 1373, round 4).
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-tool-parity-05-validation-1280x720',

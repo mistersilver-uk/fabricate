@@ -112,6 +112,12 @@ const toolValidationPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte'
 );
+// The Checks Studio's own modifier catalogue, read here for ONE reason: it is the other caller
+// of the shared modifier row, and the claim below is that there is one row and not two.
+const craftingModifierCataloguePath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
+);
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js');
 const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
@@ -168,6 +174,7 @@ const toolEditorTabsSource = readFileSync(
 );
 const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
 const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
+const craftingModifierCatalogueSource = readFileSync(craftingModifierCataloguePath, 'utf8');
 // The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
 const worldToolEntrySource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte'),
@@ -3322,6 +3329,30 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(
       toolRequirementsSource.includes('data-tool-bonus-modifier'),
       'Tool requirements should select the bonus from the world modifier library'
+    );
+    // ── AND THE LIBRARY IS DRAWN AS ROWS, THROUGH THE CHECKS STUDIO'S OWN ROW ─────────────
+    // (issue 1373, maintainer round 4). The first pass drew it as a `RadioCardGroup` — a stack
+    // of option cards — and this app already draws the distinction the other way: the Checks
+    // Studio presents THIS SAME roster (`characterLibraries.modifiers[]`) as compact rows in
+    // `checks/CraftingModifierCatalogueCard.svelte`, and reserves `RadioCardGroup` for the
+    // closed four-option mode set (`How they combine`) directly beneath it. Library entries get
+    // rows; closed mode sets get cards.
+    //
+    // ASSERTED AS ONE COMPONENT WITH TWO CALLERS, not as "the tab emits the row's classes". A
+    // class-only assertion is satisfied by a second copy of the markup, which is exactly the
+    // third modifier row the maintainer's ruling forbids.
+    assert.ok(
+      toolRequirementsSource.includes('<ModifierLibraryRow'),
+      'the bonus list should render the shared modifier row, not option cards'
+    );
+    assert.ok(
+      craftingModifierCatalogueSource.includes('<ModifierLibraryRow'),
+      'the Checks Studio catalogue should render the SAME shared row, so there is one row and ' +
+        'not two'
+    );
+    assert.ok(
+      !/<RadioCardGroup[^>]*?tool-bonus-modifier/s.test(toolRequirementsSource),
+      'the bonus list should render no option-card group'
     );
     // AND BOTH CALLERS MUST PASS THE ROSTER. A prop declared and not passed renders an empty
     // library that reads as "this world has none" — and it also subscribes the whole spread
