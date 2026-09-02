@@ -65,7 +65,13 @@ export const PERF_SELECTORS = Object.freeze({
   playerNavItem: '.fabricate-app-nav-item',
   actorBarReady: '[data-actor-bar-state="ready"]',
   actorBarTrigger: '.fabricate-app-actor-bar button[aria-haspopup]',
-  actorBarOption: '.actor-bar-option',
+  // The picker is `SearchablePopover` now (issue 1475), so its rows are the primitive's
+  // `.manager-travel-option` and the panel is PORTALED out of the bar onto the player window's
+  // frame. `.actor-bar-popover` is the hook the bar hands the primitive through `popoverClass`
+  // and is what keeps this scoped to this picker rather than to any popover in the window; the
+  // frame is still `#fabricate-app`, which is what `playerRoot` locates, so the panel remains
+  // inside the `shell` this scenario searches.
+  actorBarOption: '.actor-bar-popover .manager-travel-option',
   craftingBrowser: '[data-crafting-browser]',
   craftingSearch: '[data-crafting-browser] input[type="search"], [data-crafting-browser] input',
   craftingRow: '[data-crafting-browser] [data-recipe-id]',

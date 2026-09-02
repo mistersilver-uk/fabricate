@@ -1,39 +1,78 @@
+/**
+ * The shared player top bar, mounted (issue 1475 converted its picker onto `SearchablePopover`).
+ *
+ * TWO THINGS ABOUT THIS SUITE'S SETUP ARE LOAD-BEARING RATHER THAN TIDYING.
+ *
+ * It runs on `createMountedComponentHarness` instead of the inlined compile/mount boilerplate it
+ * used to carry, because the conversion put five more components and six more modules into this
+ * component's static graph. A `.svelte` missing from a hand-rolled allowlist does not fail a
+ * mounted suite — it HANGS it, reported as `# cancelled N` and never as `# fail` — whereas the
+ * shared harness walks the import closure in `before()` and throws by name.
+ *
+ * And it mounts into `fabricate-app`, not the harness default of `fabricate-manager`. The picker
+ * PORTALS its panel to the nearest application root (`util/overlayHost.js`), so the root the
+ * fixture wears decides where the panel actually lands; this component is reachable only from the
+ * player window, and it is the first mounted suite in the corpus for which that is true.
+ *
+ * Every assertion that reads the OPEN panel therefore queries `document`, not `target`: the panel
+ * is no longer a descendant of the bar. `.actor-bar-popover` is the hook the bar hands the
+ * primitive through `popoverClass`, and is what keeps these queries pointed at THIS picker.
+ */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { compile } from 'svelte/compiler';
-import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
-import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import { resolve } from 'node:path';
+import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-let tempRoot;
-let ActorSelectTopBar;
-let mounted;
+const harness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-actorbar-bar-',
+  rawModules: [
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    'src/ui/svelte/util/gatheringConditionIcons.js'
+  ],
+  compiledModules: [
+    // `SearchablePopover` and the two leaves it renders (issue 1475). The Crafting tab renders
+    // `ComponentSourcesBar` in the bar's right slot, so that is in the static graph too — on
+    // every tab, not just Crafting.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+    'src/ui/svelte/components/ActorSelectTopBar.svelte'
+  ],
+  componentPath: 'src/ui/svelte/components/ActorSelectTopBar.svelte',
+  rootClass: 'fabricate-app'
+});
+
 let target;
 
-
-function writeCompiledSvelte(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, {
-    filename: sourcePath,
-    generate: 'client',
-    dev: true,
-    css: 'injected'
-  });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
+/** The picker's trigger, which is `SearchablePopover`'s button wearing this bar's class. */
+function barTrigger() {
+  return target.querySelector('.actor-bar-trigger');
 }
 
-function copyModule(sourcePath) {
-  const destination = join(tempRoot, sourcePath);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, readFileSync(resolve(repoRoot, sourcePath), 'utf8'));
+/** The PORTALED panel. Not under `target` — see this file's header. */
+function panel() {
+  return document.querySelector('.actor-bar-popover');
+}
+
+/** The panel's option rows, which are the primitive's. */
+function panelOptions() {
+  return document.querySelectorAll('.actor-bar-popover [role="option"]');
+}
+
+async function openPicker() {
+  barTrigger().click();
+  flushSync();
+  await tick();
+  flushSync();
 }
 
 // A plain (non-reactive) fake store mirroring the actorBarStore read surface.
@@ -64,13 +103,7 @@ function fakeStore(overrides = {}) {
 }
 
 async function mountBar(props) {
-  target = document.createElement('div');
-  target.className = 'fabricate-app';
-  document.body.appendChild(target);
-  mounted = mount(ActorSelectTopBar, { target, props });
-  flushSync();
-  await tick();
-  flushSync();
+  target = await harness.mount(props);
 }
 
 const ACTORS = [
@@ -80,47 +113,16 @@ const ACTORS = [
 
 describe('ActorSelectTopBar mounted behavior', () => {
   before(async () => {
-    setupDOM();
-    globalThis.Text = document.createTextNode('').constructor;
-    globalThis.Comment = document.createComment('').constructor;
-    globalThis.game = {
-      i18n: {
-        localize: (key) => key,
-        format: (key, data) => `${key}:${JSON.stringify(data)}`
-      }
-    };
-    tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-actorbar-bar-'));
-    symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
-
-    copyModule('src/ui/svelte/util/foundryBridge.js');
-    copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
-    copyModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
-
-    // The Crafting tab renders ComponentSourcesBar in the bar's right slot, so the
-    // bar's compiled tree imports it — compile it too or the mounted suite hangs
-    // (reported as `# cancelled`, never `# fail`).
-    writeCompiledSvelte('src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/ActorSelectTopBar.svelte');
-
-    ActorSelectTopBar = (await import(pathToFileURL(join(
-      tempRoot,
-      'src/ui/svelte/components/ActorSelectTopBar.svelte.js'
-    )))).default;
+    await harness.setup();
   });
 
   afterEach(() => {
-    if (mounted) {
-      unmount(mounted);
-      mounted = null;
-    }
-    target?.remove();
+    harness.remount();
     target = null;
   });
 
   after(() => {
-    rmSync(tempRoot, { recursive: true, force: true });
-    teardownDOM();
-    delete globalThis.game;
+    harness.teardown();
   });
 
   it('renders a contextual stamina bar on the gathering tab when a pool is set', async () => {
@@ -137,70 +139,210 @@ describe('ActorSelectTopBar mounted behavior', () => {
   it('hides the stamina bar when there is no pool or off the gathering tab', async () => {
     const noPool = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', staminaPool: null });
     await mountBar({ store: noPool.store, activeTab: 'gathering' });
-    assert.equal(target.querySelector('[data-actor-bar-stamina]'), null, 'no bar without a pool');
-    unmount(mounted); mounted = null; target.remove();
+    assert.ok(!target.querySelector('[data-actor-bar-stamina]'), 'no bar without a pool');
+    harness.remount();
 
     const withPool = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', staminaPool: { current: 4, max: 10 } });
     await mountBar({ store: withPool.store, activeTab: 'crafting' });
-    assert.equal(target.querySelector('[data-actor-bar-stamina]'), null, 'no bar off the gathering tab');
+    assert.ok(!target.querySelector('[data-actor-bar-stamina]'), 'no bar off the gathering tab');
   });
 
   it('renders the selected actor portrait image in the trigger', async () => {
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
 
-    const trigger = target.querySelector('.actor-bar-trigger');
-    assert.ok(trigger, 'trigger renders');
-    assert.equal(trigger.disabled, false, 'trigger enabled with actors');
-    const img = trigger.querySelector('.actor-bar-portrait img');
+    const button = barTrigger();
+    assert.ok(button, 'trigger renders');
+    assert.equal(button.disabled, false, 'trigger enabled with actors');
+    // `manager-travel-portrait` is `SearchablePopover`'s tile, not this bar's — the bar hands the
+    // image through `triggerImg` and keeps only its own 40px sizing rule.
+    const img = button.querySelector('.manager-travel-portrait img');
     assert.ok(img, 'portrait image renders for an actor with img');
     assert.equal(img.getAttribute('src'), 'icons/a.webp');
-    assert.ok(trigger.textContent.includes('Aria the Bold'), 'trigger shows the actor name');
+    assert.ok(button.textContent.includes('Aria the Bold'), 'trigger shows the actor name');
   });
 
   it('renders a neutral fallback icon (no empty <img>) for a null-img actor', async () => {
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a2' });
     await mountBar({ store, activeTab: 'crafting' });
 
-    const trigger = target.querySelector('.actor-bar-trigger');
-    assert.equal(trigger.querySelector('.actor-bar-portrait img'), null, 'no <img> for a null-img actor');
-    assert.ok(trigger.querySelector('.actor-bar-portrait i.fa-user'), 'neutral fallback icon renders');
-    // Hard guard: never emit an <img src="">.
-    const emptyImgs = Array.from(target.querySelectorAll('img')).filter((img) => !img.getAttribute('src'));
+    const button = barTrigger();
+    assert.ok(!button.querySelector('.manager-travel-portrait'), 'no portrait tile for a null-img actor');
+    assert.ok(button.querySelector('i.fa-user'), 'neutral fallback icon renders');
+    // Hard guard: never emit an <img src="">. The primitive renders `triggerImg` unconditionally
+    // once it is truthy, so passing '' rather than omitting it would reintroduce exactly that.
+    const emptyImgs = Array.from(document.querySelectorAll('img')).filter((img) => !img.getAttribute('src'));
+    assert.equal(emptyImgs.length, 0, 'no <img src=""> anywhere');
+  });
+
+  it('every option carries an image or a fallback glyph, never an empty <img>', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+
+    const rows = panelOptions();
+    assert.equal(rows.length, 2, 'one option per actor');
+    assert.ok(rows[0].querySelector('.manager-travel-portrait img'), 'the img actor gets a portrait');
+    assert.ok(!rows[1].querySelector('.manager-travel-portrait'), 'the null-img actor gets no tile');
+    assert.ok(rows[1].querySelector('i.fa-user'), 'the null-img actor gets the fallback glyph');
+    const emptyImgs = Array.from(document.querySelectorAll('img')).filter((img) => !img.getAttribute('src'));
     assert.equal(emptyImgs.length, 0, 'no <img src=""> anywhere');
   });
 
   it('opens a popover with a search input over a listbox of options', async () => {
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
 
-    target.querySelector('.actor-bar-trigger').click();
+    const dialog = panel();
+    assert.ok(dialog, 'popover dialog opens');
+    assert.equal(dialog.getAttribute('role'), 'dialog', 'the panel is a dialog');
+    assert.ok(dialog.querySelector('input[type="text"]'), 'search input present');
+    const listbox = dialog.querySelector('[role="listbox"]');
+    assert.ok(listbox, 'listbox present');
+    assert.equal(listbox.querySelectorAll('[role="option"]').length, 2, 'one option per actor');
+    assert.equal(barTrigger().getAttribute('aria-expanded'), 'true', 'trigger reports expanded');
+  });
+
+  // THE PANEL IS PORTALED NOW (issue 1475), and this is the assertion that says so. The markup is
+  // identical whether the portal lands or not, so a query that walked down from `document` would
+  // pass either way; what changed is its PARENT. `overlay-portal-host-position.test.js` measures
+  // the geometry in a real browser — happy-dom computes no layout — and this pins the structural
+  // half in the suite that can see it cheaply.
+  it('portals the panel onto the player window frame, out of the bar', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+
+    const dialog = panel();
+    assert.ok(dialog, 'panel opens');
+    // `target` IS the application root here (the harness mounts into `.fabricate-app`), so the
+    // discriminating fact is that the panel left the BAR and became a child of that root.
+    assert.ok(
+      !target.querySelector('.fabricate-app-actor-bar').contains(dialog),
+      'the panel is still inside the bar, so the portal did not land and it would be clipped and ' +
+        'positioned by the bar rather than by the player window'
+    );
+    assert.ok(
+      dialog.parentElement?.classList.contains('fabricate-app'),
+      `the panel hangs off \`${dialog.parentElement?.className}\` rather than the application root`
+    );
+  });
+
+  // ── THE ARIA CONTRACT, WHICH IS THE BAR THIS CONVERSION IS HELD TO ────────────────────────
+  // A DOM comparison cannot stand in for these. A control that keeps its markup and loses a key
+  // handler renders byte-identically, so each clause below names a behaviour rather than a node.
+  it('announces the widget it opens, and its expanded state, on the trigger', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+
+    const button = barTrigger();
+    // `dialog`, not `listbox`: the panel renders a query field, so it IS a dialog containing a
+    // listbox. `SearchablePopover` takes this as a prop and defaults to `dialog`, which is what
+    // this bar hand-rolled before the conversion.
+    assert.equal(button.getAttribute('aria-haspopup'), 'dialog', 'the trigger says a dialog opens');
+    assert.equal(button.getAttribute('aria-expanded'), 'false', 'collapsed before opening');
+    assert.equal(button.getAttribute('aria-label'), 'Aria the Bold', 'the trigger is named by the selection');
+    assert.equal(button.getAttribute('title'), 'Aria the Bold', 'and exposes it as a tooltip');
+
+    await openPicker();
+    assert.equal(barTrigger().getAttribute('aria-expanded'), 'true', 'expanded once open');
+  });
+
+  it('names both the dialog and the listbox inside it', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+
+    const dialog = panel();
+    assert.equal(
+      dialog.getAttribute('aria-label'),
+      'FABRICATE.App.ActorBar.DialogLabel',
+      'the dialog carries an accessible name'
+    );
+    assert.equal(
+      dialog.querySelector('[role="listbox"]').getAttribute('aria-label'),
+      'FABRICATE.App.ActorBar.DialogLabel',
+      'and so does the list inside it — a caller that omits either leaves an unnamed widget'
+    );
+    assert.equal(
+      dialog.querySelector('input[type="text"]').getAttribute('aria-label'),
+      'FABRICATE.App.ActorBar.SearchLabel',
+      'the query field is named separately from the list it filters'
+    );
+  });
+
+  it('marks exactly the current selection with aria-selected', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a2' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+
+    const selected = Array.from(panelOptions()).map((row) => row.getAttribute('aria-selected'));
+    assert.deepEqual(selected, ['false', 'true'], 'single selection, on the row that is the value');
+  });
+
+  it('moves keyboard focus into the query field when the panel opens', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+    // The focus call is queued as a microtask by the primitive, so drain the queue before reading.
+    await new Promise((done) => setTimeout(done, 0));
+
+    assert.ok(
+      document.activeElement === panel().querySelector('input[type="text"]'),
+      'focus lands in the search field, so a keyboard user can type straight away; it is on ' +
+        `\`${document.activeElement?.className || document.activeElement?.tagName}\``
+    );
+  });
+
+  it('closes on Escape and returns focus to the trigger', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+    assert.ok(panel(), 'panel open before Escape');
+
+    // Dispatched on the DOCUMENT, because that is where the dismiss action listens — a handler
+    // bound to the portaled panel alone would never see a key pressed with focus elsewhere.
+    document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     flushSync();
     await tick();
     flushSync();
 
-    const popover = document.querySelector('.actor-bar-popover[role="dialog"]');
-    assert.ok(popover, 'popover dialog opens');
-    assert.ok(popover.querySelector('.actor-bar-search input'), 'search input present');
-    const listbox = popover.querySelector('[role="listbox"]');
-    assert.ok(listbox, 'listbox present');
-    assert.equal(listbox.querySelectorAll('[role="option"]').length, 2, 'one option per actor');
-    assert.equal(
-      target.querySelector('.actor-bar-trigger').getAttribute('aria-expanded'),
-      'true',
-      'trigger reports expanded'
+    assert.ok(!panel(), 'Escape closes the panel');
+    assert.equal(barTrigger().getAttribute('aria-expanded'), 'false', 'and the trigger reports collapsed');
+
+    // Focus restoration waits on `tick()` inside the primitive, so let its promise settle.
+    await new Promise((done) => setTimeout(done, 0));
+    assert.ok(
+      document.activeElement === barTrigger(),
+      'focus returns to the trigger — without this a keyboard user is dropped to <body> and has to ' +
+        `tab back through the whole window. It is on \`${document.activeElement?.tagName}\``
+    );
+  });
+
+  it('returns focus to the trigger after choosing an actor', async () => {
+    const { store, calls } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+
+    panelOptions()[1].click();
+    flushSync();
+    await tick();
+    flushSync();
+    await new Promise((done) => setTimeout(done, 0));
+
+    assert.deepEqual(calls.selectActor, ['a2'], 'the choice reached the store');
+    assert.ok(
+      document.activeElement === barTrigger(),
+      `focus returns to the trigger after a choice; it is on \`${document.activeElement?.tagName}\``
     );
   });
 
   it('closes the popover on an outside mousedown', async () => {
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
-
-    target.querySelector('.actor-bar-trigger').click();
-    flushSync();
-    await tick();
-    flushSync();
-    assert.ok(document.querySelector('.actor-bar-popover'), 'popover open before outside click');
+    await openPicker();
+    assert.ok(panel(), 'popover open before outside click');
 
     const outside = document.createElement('button');
     document.body.appendChild(outside);
@@ -209,87 +351,135 @@ describe('ActorSelectTopBar mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(document.querySelector('.actor-bar-popover'), null, 'popover closes on outside mousedown');
-    assert.equal(
-      target.querySelector('.actor-bar-trigger').getAttribute('aria-expanded'),
-      'false',
-      'trigger reports collapsed after dismiss'
-    );
+    assert.ok(!panel(), 'popover closes on outside mousedown');
+    assert.equal(barTrigger().getAttribute('aria-expanded'), 'false', 'trigger reports collapsed after dismiss');
     outside.remove();
+  });
+
+  it('keeps the popover open when clicking inside the portaled panel', async () => {
+    // The panel is no longer a descendant of the picker root, so "inside" has to be registered
+    // with the dismiss action explicitly. The primitive does that; without it every click on a
+    // search field or an option would first dismiss the panel that contains it.
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+
+    panel()
+      .querySelector('input[type="text"]')
+      .dispatchEvent(new globalThis.MouseEvent('mousedown', { bubbles: true }));
+    flushSync();
+    await tick();
+    flushSync();
+
+    assert.ok(panel(), 'clicking the panel does not dismiss it');
   });
 
   it('closes the popover when clicking elsewhere in the bar (outside the picker)', async () => {
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+    assert.ok(panel(), 'popover open');
 
-    target.querySelector('.actor-bar-trigger').click();
-    flushSync();
-    await tick();
-    flushSync();
-    assert.ok(document.querySelector('.actor-bar-popover'), 'popover open');
-
-    // The full-width bar is outside the picker region (.actor-bar-left); a click on
-    // it (its empty area / right-side cluster) must dismiss the dropdown.
+    // The full-width bar is outside the picker region; a click on it (its empty area /
+    // right-side cluster) must dismiss the dropdown.
     const bar = target.querySelector('.fabricate-app-actor-bar');
     bar.dispatchEvent(new globalThis.MouseEvent('mousedown', { bubbles: true }));
     flushSync();
     await tick();
     flushSync();
 
-    assert.equal(
-      document.querySelector('.actor-bar-popover'),
-      null,
-      'clicking the bar outside the picker closes the dropdown'
-    );
+    assert.ok(!panel(), 'clicking the bar outside the picker closes the dropdown');
   });
 
   it('filters options case-insensitively by name', async () => {
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
 
-    target.querySelector('.actor-bar-trigger').click();
-    flushSync();
-    await tick();
-    flushSync();
-
-    const input = document.querySelector('.actor-bar-search input');
+    const input = panel().querySelector('input[type="text"]');
     input.value = 'BORIN';
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
 
-    const options = document.querySelectorAll('.actor-bar-popover [role="option"]');
-    assert.equal(options.length, 1, 'only the case-insensitive name match remains');
-    assert.ok(options[0].textContent.includes('Borin'));
+    const rows = panelOptions();
+    assert.equal(rows.length, 1, 'only the case-insensitive name match remains');
+    assert.ok(rows[0].textContent.includes('Borin'));
+  });
+
+  it('states the search-miss reason, not the no-player-character-type explanation', async () => {
+    // The shipped panel had one empty string and it was the wrong one: the long
+    // "ask your GM to add its actor type" copy was the ONLY thing a filtered-to-nothing list
+    // could say, while the state it names — zero selectable actors — cannot open the panel at
+    // all, because the trigger is disabled there.
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+
+    const input = panel().querySelector('input[type="text"]');
+    input.value = 'nobody by that name';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+
+    assert.equal(panelOptions().length, 0, 'nothing matches');
+    const text = panel().textContent;
+    assert.ok(text.includes('FABRICATE.App.ActorBar.NoMatches'), 'the search-miss reason is shown');
+    assert.ok(
+      !text.includes('FABRICATE.App.ActorBar.NoActors'),
+      'and the zero-actor explanation is not, because that is not the state the panel is in'
+    );
+  });
+
+  it('keeps the no-matches state out of the listbox', async () => {
+    // A listbox's only valid children are its options, so the empty panel must be a SIBLING of
+    // the list rather than a row inside it.
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
+
+    const input = panel().querySelector('input[type="text"]');
+    input.value = 'zzz';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+
+    assert.ok(!panel().querySelector('[role="listbox"]'), 'no listbox is rendered over an empty list');
+    assert.ok(panel().querySelector('[role="status"]'), 'the empty reason is announced as a status');
   });
 
   it('clicking an option calls store.selectActor and closes the popover', async () => {
     const { store, calls } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
+    await openPicker();
 
-    target.querySelector('.actor-bar-trigger').click();
-    flushSync();
-    await tick();
-    flushSync();
-
-    const options = document.querySelectorAll('.actor-bar-popover [role="option"]');
-    options[1].click();
+    panelOptions()[1].click();
     flushSync();
 
     assert.deepEqual(calls.selectActor, ['a2'], 'selectActor called with the chosen id');
-    assert.equal(document.querySelector('.actor-bar-popover'), null, 'popover closes after selection');
+    assert.ok(!panel(), 'popover closes after selection');
+  });
+
+  it('notifies the host of the chosen actor id', async () => {
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
+    const changed = [];
+    await mountBar({ store, activeTab: 'crafting', onActorChange: (id) => changed.push(id) });
+    await openPicker();
+
+    panelOptions()[1].click();
+    flushSync();
+
+    assert.deepEqual(changed, ['a2'], 'onActorChange receives the id, not the option object');
   });
 
   it('disables the trigger and shows the empty state when there are zero selectable actors', async () => {
     const { store } = fakeStore({ selectableActors: [], selectedActorId: '' });
     await mountBar({ store, activeTab: 'crafting' });
 
-    const trigger = target.querySelector('.actor-bar-trigger');
-    assert.equal(trigger.disabled, true, 'trigger disabled with no actors');
-    assert.ok(trigger.textContent.includes('FABRICATE.App.ActorBar.Trigger'), 'placeholder label shown');
+    const button = barTrigger();
+    assert.equal(button.disabled, true, 'trigger disabled with no actors');
+    assert.ok(button.textContent.includes('FABRICATE.App.ActorBar.Trigger'), 'placeholder label shown');
     // A disabled trigger does not open; assert no popover after a click attempt.
-    trigger.click();
+    button.click();
     flushSync();
-    assert.equal(document.querySelector('.actor-bar-popover'), null, 'disabled trigger does not open');
+    assert.ok(!panel(), 'disabled trigger does not open');
   });
 
   it('truncates long names with title on both trigger and options', async () => {
@@ -298,15 +488,20 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const { store } = fakeStore({ selectableActors: actors, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
 
-    const triggerLabel = target.querySelector('.actor-bar-trigger-label');
-    assert.equal(triggerLabel.getAttribute('title'), longName, 'trigger label exposes the full name via title');
+    // The full name rides on the BUTTON's own `title` now rather than on a nested span's. The
+    // bar used to set both, which put a tooltip inside a tooltip; the primitive takes one.
+    assert.equal(barTrigger().getAttribute('title'), longName, 'the trigger exposes the full name via title');
+    assert.ok(
+      target.querySelector('.actor-bar-trigger-label').textContent.includes(longName),
+      'and the ellipsised label still carries the text it truncates'
+    );
 
-    target.querySelector('.actor-bar-trigger').click();
-    flushSync();
-    await tick();
-    flushSync();
-    const option = document.querySelector('.actor-bar-popover [role="option"]');
-    assert.equal(option.getAttribute('title'), longName, 'option exposes the full name via title');
+    await openPicker();
+    assert.equal(
+      panelOptions()[0].getAttribute('title'),
+      longName,
+      'option exposes the full name via title'
+    );
   });
 
   it('shows weather and time-of-day on the gathering tab', async () => {
@@ -326,7 +521,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.dusk'), 'time-of-day value label');
     // The realm chip only appears when the region/travel subsystem is enabled
     // (realmContext.enabled); it stays hidden for a plain conditions-only store.
-    assert.equal(right.querySelector('.actor-bar-realm'), null, 'realm chip hidden when realms disabled');
+    assert.ok(!right.querySelector('.actor-bar-realm'), 'realm chip hidden when realms disabled');
   });
 
   it('shows the current region on the gathering tab when regions/travel is enabled', async () => {
@@ -398,7 +593,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const slot = target.querySelector('.actor-bar-realm-slot');
     assert.ok(slot, 'realm slot persists even when the chip is hidden');
     assert.equal(slot.getAttribute('aria-live'), 'polite');
-    assert.equal(slot.querySelector('.actor-bar-realm'), null, 'no chip child when the subsystem is off');
+    assert.ok(!slot.querySelector('.actor-bar-realm'), 'no chip child when the subsystem is off');
   });
 
   it('redacts a secret undiscovered current region to the placeholder label', async () => {
@@ -426,7 +621,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     });
     await mountBar({ store, activeTab: 'gathering' });
 
-    assert.equal(target.querySelector('.actor-bar-realm'), null, 'no realm chip when the subsystem is off');
+    assert.ok(!target.querySelector('.actor-bar-realm'), 'no realm chip when the subsystem is off');
   });
 
   it('hides the weather chip when weather is disabled for the active system', async () => {
@@ -439,7 +634,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     await mountBar({ store, activeTab: 'gathering' });
 
     const right = target.querySelector('.actor-bar-right');
-    assert.equal(right.querySelector('.actor-bar-weather'), null, 'weather chip hidden when disabled');
+    assert.ok(!right.querySelector('.actor-bar-weather'), 'weather chip hidden when disabled');
     assert.ok(right.querySelector('.actor-bar-time'), 'time-of-day chip still shown');
   });
 
@@ -453,7 +648,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     await mountBar({ store, activeTab: 'gathering' });
 
     const right = target.querySelector('.actor-bar-right');
-    assert.equal(right.querySelector('.actor-bar-time'), null, 'time-of-day chip hidden when disabled');
+    assert.ok(!right.querySelector('.actor-bar-time'), 'time-of-day chip hidden when disabled');
     assert.ok(right.querySelector('.actor-bar-weather'), 'weather chip still shown');
   });
 
@@ -489,7 +684,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     // the component-sources bar, so it is no longer an "empty right" tab).
     await mountBar({ store, activeTab: 'journal' });
 
-    assert.equal(target.querySelector('.actor-bar-right'), null, 'no right-side context on a tab without it');
+    assert.ok(!target.querySelector('.actor-bar-right'), 'no right-side context on a tab without it');
   });
 
   it('exposes data-actor-bar-state=ready once loaded with conditions', async () => {
@@ -569,7 +764,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     });
     await mountBar({ store, activeTab: 'gathering', activeCanvasTool: null });
 
-    assert.equal(target.querySelector('.actor-bar-tool-chip'), null, 'no chip without an active tool');
+    assert.ok(!target.querySelector('.actor-bar-tool-chip'), 'no chip without an active tool');
     // The gathering conditions remain untouched.
     assert.ok(target.querySelector('.actor-bar-weather'), 'gathering conditions still render');
   });
@@ -586,6 +781,6 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.ok(right, 'right cluster renders on crafting when a tool is active');
     assert.ok(right.querySelector('.actor-bar-tool-chip'), 'chip renders on the non-gathering tab');
     // No gathering conditions on a non-gathering tab.
-    assert.equal(right.querySelector('.actor-bar-weather'), null, 'no gathering conditions off the gathering tab');
+    assert.ok(!right.querySelector('.actor-bar-weather'), 'no gathering conditions off the gathering tab');
   });
 });
