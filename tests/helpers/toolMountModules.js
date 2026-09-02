@@ -39,6 +39,12 @@
  * in `reconstructibleDefaults.js`. `foundryBridge.js` is the localization and dialog seam; all
  * three page components import it directly.
  *
+ * `overlayHost.js` arrives TRANSITIVELY and through no tool file: both Tool editors render
+ * `ToolReplacementTarget.svelte` (issue 1373), which renders `SearchablePopover.svelte`, which
+ * issue 1466 made import the shared portal-host resolver. Neither change is wrong on its own and
+ * neither branch's suites failed; the closure only became incomplete once both landed, which is
+ * why it is stated here rather than in one suite - every mounted tool tree reaches it.
+ *
  * @type {ReadonlyArray<string>}
  */
 export const TOOL_TREE_RAW_MODULES = Object.freeze([
@@ -51,6 +57,7 @@ export const TOOL_TREE_RAW_MODULES = Object.freeze([
   'src/models/toolDisplay.js',
   'src/ui/svelte/apps/manager/tools/toolStudio.js',
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/overlayHost.js',
 ]);
 
 /**
