@@ -234,6 +234,18 @@ function hasAnyStateSelector(selectorText) {
  * threw would take the whole section out, so the read is guarded per sheet and a sheet that cannot
  * be read is skipped rather than fatal — this is a reference panel, not a gate.
  *
+ * ── A STYLE RULE IS ALSO A GROUPING RULE, AND WRITING THIS AS AN `else if` CHAIN RETURNED ZERO ──
+ *
+ * CSS nesting made `CSSStyleRule` extend `CSSGroupingRule`, so EVERY style rule now carries a
+ * `cssRules` list — usually empty, and an empty `CSSRuleList` is truthy. An
+ * `if (rule.cssRules) … else if (rule.selectorText) …` therefore descended into each style rule's
+ * empty child list and collected nothing at all, from anywhere. The section rendered eight states,
+ * each reading "0 rules · 0 tokens", which looks like a finding about the stylesheet rather than a
+ * bug in the reader — the exact failure this project has recorded as a vacuous mechanical check.
+ *
+ * So a rule is COLLECTED when it has a selector and DESCENDED INTO when it has children, and those
+ * are not alternatives.
+ *
  * @param {Document} document_ The document to read.
  * @returns {{selectorText: string, cssText: string}[]}
  */
@@ -247,11 +259,14 @@ function collectFabricateStyleRules(document_) {
       return;
     }
     for (const rule of rules ?? []) {
-      if (rule.styleSheet) visit(rule.styleSheet);
-      else if (rule.cssRules) visit(rule);
-      else if (rule.selectorText) {
+      if (rule.styleSheet) {
+        visit(rule.styleSheet);
+        continue;
+      }
+      if (rule.selectorText) {
         collected.push({ selectorText: rule.selectorText, cssText: rule.cssText });
       }
+      if (rule.cssRules) visit(rule);
     }
   };
   for (const sheet of document_.styleSheets) {
