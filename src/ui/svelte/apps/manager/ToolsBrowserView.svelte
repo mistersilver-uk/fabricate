@@ -608,9 +608,24 @@
             </div>
           </EmptyState>
         {:else if filteredTools.length === 0}
+          <!--
+            FILTERED TO NOTHING IS NOT AN ABSENCE (issue 1373), and the primitive has said so
+            since it was extracted. This call site passed an `icon` and a `title` and no
+            `filtered`, so a list that simply matched no rows drew the full hero panel — a 44px
+            inset, a 46px glyph tile and a 13px serif heading — where `proto:2545` draws one
+            dashed box, 26px around a single 11.5px sentence, with no icon and no title at all.
+
+            THE SENTENCE NAMES THE FILTER, not the search. Three controls narrow this list and
+            only one of them is the query: a GM who has switched the membership segment to
+            `Overriding` on a system that overrides nothing was told `No Tools match your
+            search` over an empty search box.
+          -->
           <EmptyState
-            icon="fas fa-search"
-            title={text('FABRICATE.Admin.Manager.Tools.EmptySearch', 'No Tools match your search')}
+            filtered
+            hint={text(
+              'FABRICATE.Admin.Manager.Tools.EmptyFiltered',
+              'Nothing matches that filter.'
+            )}
             dataAttr="data-tool-library-filtered-empty"
           />
         {:else}
@@ -646,6 +661,7 @@
                       {#if entry.member}
                         <Chip
                           tone={row.validation.valid ? 'positive' : 'danger'}
+                          density="list"
                           class={`manager-tools-validation-chip ${row.validation.valid ? 'is-ready' : ''}`}
                           icon={row.validation.valid
                             ? 'fas fa-circle-check'
@@ -667,7 +683,7 @@
                              here says nothing this screen decides. The enabled half of that
                              pair is the toggle in the action cluster rather than a second
                              chip beside it - see the note there. -->
-                        <Chip tone="neutral" class="manager-tools-breakage-chip"
+                        <Chip tone="neutral" density="list" class="manager-tools-breakage-chip"
                           >{breakageLabel(entry.tool, row.breakage)}</Chip
                         >
                       {/if}
@@ -699,6 +715,15 @@
                          `0` is not a count that came out low - there is nothing to count, and
                          the reference draws the em dash for exactly that (issue 1373). -->
                     <strong>{entry.member ? recipeCount(entry.id) : '\u2014'}</strong>
+                    <!-- THE PLURAL IS OURS AND IT STAYS (issue 1373 parity round). `proto:2536`
+                         writes an invariant `Recipes` under the figure, and the audit asked for
+                         a decision either way. Kept: the reference is a single-locale artefact
+                         and English is the one language where an invariant unit caption happens
+                         to read acceptably at 1. `RowRecipeOne` is a real localization seam - a
+                         language with a dual or a paucal needs it - and deleting it to match a
+                         mock would be trading a translator's affordance for a character. The
+                         two labels are the same size, weight and tracking, so nothing about the
+                         column's geometry turns on which one renders. -->
                     <small
                       >{recipeCount(entry.id) === 1 && entry.member
                         ? text('FABRICATE.Admin.Manager.Tools.RowRecipeOne', 'Recipe')
@@ -868,11 +893,16 @@
   /* THE PER-ROW RECIPE COUNT, stacked as a figure over its unit exactly as the design draws
      it: the number is what a GM scans down the column, and the word beneath it is what tells
      them what the number counts. Right-aligned so the figures line up row to row. */
+  /* `proto:2536` states `text-align: right; min-width: 50px; flex: 0 0 auto` — and the
+     `min-width` is the one that does the work. Without it a `1` and a `12` give two different
+     column widths, so the `Edit rules` buttons beside them do not line up down the list and
+     the eye has nothing to run along. */
   .manager-tools-row-recipes {
     display: inline-flex;
     flex: 0 0 auto;
     flex-direction: column;
     align-items: flex-end;
+    min-width: 50px;
     line-height: 1.1;
     text-align: right;
   }
@@ -889,11 +919,14 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* `proto:2536`: `font: 600 8px var(--sans); letter-spacing: .07em`. 0.52rem is 8.32px, so
+     only the tracking was short — and tracking is most of what makes an 8px uppercase caption
+     legible at all. */
   .manager-tools-row-recipes small {
     color: var(--fab-text-subtle);
     font-size: 0.52rem;
     font-weight: 600;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
   }
 
@@ -944,9 +977,13 @@
     min-width: 0;
   }
 
+  /* `proto:2519`: `font: 700 8.5px var(--sans); letter-spacing: .09em; text-transform:
+     uppercase; color: var(--subtle)`. The tracking and the transform were already right; the
+     ink was a rung bright, which put a control's LABEL at the same weight of attention as the
+     controls it labels. */
   .manager-tools-sort-label {
-    color: var(--fab-text-muted);
-    font-size: 0.54rem;
+    color: var(--fab-text-subtle);
+    font-size: 8.5px;
     font-weight: 700;
     letter-spacing: 0.09em;
     text-transform: uppercase;
@@ -963,66 +1000,92 @@
      shipped `.fabricate-manager select` rule already paints `--fab-bg-1`, one opaque rung
      that lands within a few units of the design's composited value, so this block states
      geometry only and inherits the fill every other manager select wears. */
+  /* `proto:2520`: `height: 32px; padding: 0 10px; color: var(--text2); font: 500 11.5px
+     var(--sans)`. 32 is a retired control height, so this takes the ladder's nearest surviving
+     rung, 30 — the same substitution every 32px control on this screen makes, stated once in
+     the segment block of `styles/fabricate.css`. 10px has no step on the 4px spacing scale and
+     takes 12. */
   .manager-tools-sort-select {
     flex: 0 0 auto;
     width: auto;
-    height: 28px;
+    height: 30px;
     min-width: 92px;
     max-width: 180px;
-    padding: 0 var(--fab-space-2);
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
-    color: var(--fab-text-muted);
-    font-size: 0.68rem;
+    color: var(--fab-text-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
   }
 
   /* `height: auto` and `min-height` rather than a bare `height`, and `justify-content:
      flex-start` — Foundry's global button rule centres content and pins a fixed height, which
      crops a two-child button like this one. See the CSS section of `CONTRIBUTING.md`. */
+  /* `proto:2521` (the direction toggle) and `proto:2538` (the row's route) both state
+     `gap: 6px` and an 8px corner over the soft surface. The gap was 4. The direction toggle is
+     a 32px control and takes the ladder's 30; the row button is 30 in the design itself, so
+     its own block below leaves the floor alone. */
   .manager-tools-sort-direction,
   .manager-tools-edit-rules {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--fab-space-1);
+    gap: var(--fab-space-chip);
     width: auto;
     height: auto;
-    min-height: 28px;
-    padding: 0 var(--fab-space-2);
+    min-height: 30px;
+    padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-    font-size: 0.68rem;
+    color: var(--fab-text-secondary);
+    font-size: 11.5px;
     font-weight: 600;
     line-height: 1.2;
     white-space: nowrap;
     cursor: pointer;
   }
 
+  /* `proto:2538`: `height: 30px; padding: 0 12px; border: 1px solid var(--border-strong);
+     font: 600 10.5px var(--sans); color: var(--text)`. Everything but the label size and the
+     glyph was already exact. */
   .manager-tools-edit-rules {
     flex: 0 0 auto;
     min-height: 30px;
     padding: 0 var(--fab-space-3);
     border-color: var(--fab-border-strong);
     color: var(--fab-text);
-    font-size: 0.66rem;
+    font-size: 10.5px;
   }
 
+  /* `proto:2541`: the same control, dashed, in the SECONDARY ink rather than the muted one.
+     Nothing else on it differs, which is why only the colour is restated here. */
   .manager-tools-edit-rules.is-add {
     border-style: dashed;
     background: transparent;
-    color: var(--fab-text-muted);
+    color: var(--fab-text-secondary);
   }
 
+  /* `proto:2538` sets the launch arrow at 8px; `proto:2541` sets the plus at 9px. They are
+     different glyphs doing different jobs — one is a destination mark after a label, the other
+     is the verb in front of one — so the design sizes them apart and so does this. */
   .manager-tools-edit-rules i {
-    font-size: 0.6rem;
+    font-size: 8px;
   }
 
+  .manager-tools-edit-rules.is-add i {
+    font-size: 9px;
+  }
+
+  /* `proto:2522`: `font: 500 11px var(--sans); color: var(--subtle)`. It read at 10.56px in
+     the muted ink, which put a running total at almost the same emphasis as the controls that
+     produce it. */
   .manager-tools-sort-row .manager-tools-result-summary {
     margin: 0 0 0 auto;
-    color: var(--fab-text-muted);
-    font-size: 0.66rem;
+    color: var(--fab-text-subtle);
+    font-size: 11px;
+    font-weight: 500;
     text-align: right;
   }
 

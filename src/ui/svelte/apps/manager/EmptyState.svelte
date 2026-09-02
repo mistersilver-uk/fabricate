@@ -251,11 +251,31 @@
     (a 46px icon, an <h3>, a paragraph). One dashed panel says it in a sentence, and the
     Clear-filters button — which the prototype has no equivalent of, and which is kept —
     is the way out of it.
+
+    ── THE FIGURES ARE THE REFERENCE'S NOW (issue 1373) ────────────────────────────────
+    `proto:2545` states this state exactly, and it is the only design source there is for
+    it: `padding: 26px; text-align: center; border: 1px dashed var(--border);
+    border-radius: 10px; font: 400 11.5px var(--sans); color: var(--disabled)`.
+
+    What this variant shipped agreed with none of it — a 40px inset, the STRONGER border
+    colour, the base panel's 12px corner and 1.5px edge, and a 12.8px sentence — so the
+    "quieter" panel was in fact both larger and higher-contrast than the reference's, and
+    on the one screen whose reference frame we hold it was drawn at nearly twice the
+    height. The values are corrected on the VARIANT rather than route-scoped for the
+    reason `contextClass` gives two blocks up: appearance belongs to this file, and a
+    layered global rule could not reach an unlayered scoped block in any case. Every
+    caller of `filtered` gets the reference's own treatment, which is the point of a
+    shared variant.
+
+    26px has no step on the 4px spacing scale and takes the nearest, 24.
   */
   .manager-empty.is-filtered {
     align-content: center;
-    padding: 40px;
-    border-color: var(--fab-border-strong);
+    padding: var(--fab-space-6);
+    border-width: 1px;
+    border-color: var(--fab-border);
+    border-radius: 10px;
+    color: var(--fab-text-disabled);
   }
 
   .manager-empty.is-filtered > div {
@@ -263,6 +283,8 @@
   }
 
   .manager-empty.is-filtered p {
-    font-size: 0.8rem;
+    color: var(--fab-text-disabled);
+    font-size: 11.5px;
+    font-weight: 400;
   }
 </style>

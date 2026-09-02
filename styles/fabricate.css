@@ -23984,6 +23984,13 @@
  * Manager — Tool Studio library
  * ========================================================================== */
 
+/* THE INSPECTOR TRACK STAYS AT 340px (issue 1373 parity round). `proto:2496` states 326, and
+   the difference is adjudicated rather than closed: 14px is under a rung of this screen's own
+   spacing scale, the track is a shared grid figure the rail-collapsed variant below restates
+   and the Tool EDITOR route holds at 320, and moving one of the three would make the inspector
+   column change width on a trip into the editor and back — which the design does not do and
+   which no frame would explain. The panel's own inset moves to the scale instead; see the
+   `.manager-inspector` block below. */
 .fabricate-manager[data-manager-view="tools"] .manager-body {
   grid-template-columns: 210px minmax(0, 1fr) 340px;
 }
@@ -24001,24 +24008,38 @@
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
+/* ── THE HEADER BAND, ON THE DESIGN'S OWN FIGURES (issue 1373) ───────────────────────────────
+   `proto:2486` states `padding: 15px 22px 13px`. Neither 15 nor 13 has a step on the 4px
+   spacing scale, so each takes its nearest — 16 and 12 — and the horizontal inset keeps the
+   scale's 20px it already had, 22 sitting exactly between two steps. */
 .fabricate-manager .manager-tools-context-header {
   align-items: flex-start;
-  padding: 14px var(--fab-space-6) var(--fab-space-4);
+  padding: var(--fab-space-4) var(--fab-space-6) var(--fab-space-3);
   background: var(--fab-bg-1);
 }
 
+/* `proto:2487`: `font: 600 11px var(--sans); gap: 8px; margin-bottom: 6px`. The shared
+   `.manager-breadcrumbs` rule states 0.76rem at weight 700 with a 6px gap and an 8px bottom
+   margin — the gap and the margin the wrong way round from the design's, which is why the
+   crumb row read tight and sat too far from the title it introduces. Scoped to this route
+   rather than corrected on the shared rule: eight other manager headers draw the same
+   element and none of them was measured in this pass. */
 .fabricate-manager .manager-tools-context-header .manager-breadcrumbs {
-  margin-bottom: var(--fab-space-2);
-  font-size: 0.68rem;
+  gap: var(--fab-space-2);
+  margin-bottom: var(--fab-space-chip);
+  font-size: 11px;
+  font-weight: 600;
 }
 
+/* `proto:2493`: `600 19px var(--serif)`. 1.24rem is 19.84px. */
 .fabricate-manager .manager-tools-context-header .manager-title {
-  font-size: 1.24rem;
+  font-size: 19px;
 }
 
+/* `proto:2494`: `margin-top: 3px`, which takes the scale's nearest step. */
 .fabricate-manager .manager-tools-context-header .manager-subtitle {
   max-width: 920px;
-  margin-top: var(--fab-space-chip);
+  margin-top: var(--fab-space-1);
   font-size: 0.72rem;
   line-height: 1.4;
 }
@@ -24030,19 +24051,38 @@
   overflow: hidden;
 }
 
+/* ── THE TOOLBAR RHYTHM (issue 1373) ────────────────────────────────────────────────────────
+   The design does not run one uniform gap down this column. `proto:2498` insets the toolbar
+   block `14px 22px 0`, then each row states its own separation: the authority card
+   `margin-bottom: 11px` (`proto:2499`), the search row `10px` (`proto:2509`), the sort row
+   `10px` (`proto:2518`). Three values within a pixel of each other, against the uniform 14px
+   this column shipped — so the whole toolbar ran 30-40% loose.
+
+   ONE GAP IS STILL THE RIGHT SHAPE, because the three design values differ by a pixel and the
+   spacing scale has no step between them; what was wrong was the value. 12px is the scale's
+   step nearest all three. The block inset takes 16px vertically for the same reason (the
+   design's 14) and keeps the 20px it had horizontally, 22 sitting exactly between two
+   steps. */
 .fabricate-manager .manager-tools-main-content {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--fab-space-3);
   min-height: 0;
-  padding: 18px var(--fab-space-5) 0;
+  padding: var(--fab-space-4) var(--fab-space-5) 0;
   overflow: hidden;
 }
 
+/* `proto:2549` insets the inspector column 17px, which has no step on the 4px scale and takes
+   the nearest. Stating it as the scale's own token is what lets the pinned footer band below
+   express its full-bleed offset as the same token rather than as a second raw number.
+
+   THE FILL IS NOT STATED HERE ANY MORE. Two rules painted this aside — this one, at
+   `--fab-bg-2`, and the surface-ladder block near the foot of this sheet — and the ladder
+   block won on source order, which is how the aside came to be byte-identical to the pane
+   beside it. One declaration now, in the ladder block, with this route's other surfaces. */
 .fabricate-manager[data-manager-view="tools"] .manager-inspector {
-  padding: 18px;
-  background: var(--fab-bg-2);
+  padding: var(--fab-space-4);
 }
 
 .fabricate-manager .manager-tools-authority-card,
@@ -24093,11 +24133,23 @@
   line-height: 1.3;
 }
 
+/* ── THE BREAKAGE-MODE CARD (issue 1373) ────────────────────────────────────────────────────
+   `proto:2499`: `padding: 12px 14px; background: var(--bg2); border: 1px solid var(--border);
+   border-radius: 11px`. The design's `--bg2` is our `--fab-bg-1` — the background ramp is the
+   one family shifted a rung between the two token sets — over a `--bg1` pane, which is our
+   `--fab-bg-0`.
+
+   WHAT SHIPPED WAS A 4% LIGHT OVERLAY, which composites to within a couple of levels of the
+   pane itself, so the card read as a faintly dirty patch of background rather than as the
+   raised surface the design draws. The inset was 8/12 against 12/14 and the corner 8 against
+   11. 14px has no step on the 4px spacing scale, so the horizontal inset takes 12. */
 .fabricate-manager .manager-tools-authority-card {
   flex-flow: column nowrap;
   align-items: stretch;
   gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-3);
+  padding: var(--fab-space-3);
+  border-radius: 11px;
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-tools-authority-heading {
@@ -24107,6 +24159,13 @@
   gap: var(--fab-space-2);
   color: var(--fab-text);
   font-size: 0.72rem;
+}
+
+/* `proto:2502`: `font: 600 12px var(--sans)`. The word inherited the heading row's 0.72rem
+   (11.52px) at the UA's own `strong` weight, so it was both a shade small and a weight heavy. */
+.fabricate-manager .manager-tools-authority-title > strong {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .fabricate-manager .manager-tools-authority-heading > span:first-child {
@@ -24124,15 +24183,20 @@
   font-size: 0.56rem;
 }
 
+/* `proto:2505`: `gap: 4px; padding: 3px; background: var(--bg1); border: 1px solid
+   var(--border); border-radius: 9px`. The design's `--bg1` is our `--fab-bg-0`, a rung BELOW
+   the card it sits in — that is what makes the track read as a recessed well for the accent
+   pill to sit in. An 8% dark overlay over a 4% light card was two near-transparent layers
+   composited over one another, so there was no well to see. */
 .fabricate-manager .manager-tools-authority-segments {
   display: flex;
   flex: 1 1 auto;
-  gap: var(--fab-space-2xs);
+  gap: var(--fab-space-1);
   max-width: none;
   padding: 3px;
   border: 1px solid var(--fab-border);
   border-radius: 9px;
-  background: var(--fab-overlay-dark-08);
+  background: var(--fab-bg-0);
 }
 
 .fabricate-manager .manager-tools-authority-caption {
@@ -24145,15 +24209,31 @@
    inherited the card's `--fab-text` and the strip read as though all three were selected -
    the selected one is distinguished by its ACCENT FILL alone, which is a fill a GM has to
    look for rather than a contrast they see. The reference gives the unselected segments the
-   muted ink, which is the same relationship the membership filter beside them already has. */
+   muted ink, which is the same relationship the membership filter beside them already has.
+
+   `proto:4864`: `height: 32px; padding: 0 10px; border-radius: 8px; font: 600 10.5px
+   var(--sans)`, with a 1px TRANSPARENT edge unselected and a 1px accent edge selected. Ours
+   stated no height at all (a content box of about 25.8px), a 7px corner, no border in either
+   state, and an 11.52px label.
+
+   THE EDGE IS DECLARED IN BOTH STATES ON PURPOSE. A border that appears only on selection
+   moves the strip two pixels the moment a GM clicks it; the design states the transparent
+   one for exactly that reason.
+
+   32 IS A RETIRED CONTROL HEIGHT. `openspec/specs/design-system/spec.md` closes the ladder at
+   26/28/30/34/38/44 and retires 32/36/40, so every control on this screen that the design
+   states at 32 takes the nearest surviving rung, 30, and the one it states at 36 takes 34 —
+   which preserves the design's own 4px relationship between the two. */
 .fabricate-manager .manager-tools-authority-segments label {
   display: flex;
   flex: 1 1 0;
   align-items: center;
   justify-content: center;
   min-width: 0;
-  padding: 6px var(--fab-space-2);
-  border-radius: 7px;
+  height: 30px;
+  padding: 0 var(--fab-space-3);
+  border: 1px solid transparent;
+  border-radius: 8px;
   color: var(--fab-text-muted);
   cursor: pointer;
 }
@@ -24162,12 +24242,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-1);
-  font-size: 0.72rem;
+  font-size: 10.5px;
   font-weight: 600;
   line-height: 1.2;
 }
 
 .fabricate-manager .manager-tools-authority-segments label.is-selected {
+  border-color: var(--fab-accent-border);
   background: var(--fab-accent);
   color: var(--fab-on-accent);
 }
@@ -24292,11 +24373,19 @@
    button conversion. `.manager-tools-library-actions` is live — `ToolsBrowserView` renders
    it — which is why this group survives at all. */
 .fabricate-manager .manager-tools-item-shortcuts,
-.fabricate-manager .manager-tools-library-toolbar,
-.fabricate-manager .manager-tools-library-actions {
+.fabricate-manager .manager-tools-library-toolbar {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
+}
+
+/* `proto:2527` runs the row's own children at an 11px gap, which takes the scale's 12px. The
+   right inset keeps the action cluster off the row's own edge. */
+.fabricate-manager .manager-tools-library-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  padding-right: var(--fab-space-3);
 }
 
 .fabricate-manager .manager-tools-item-shortcuts {
@@ -24335,8 +24424,33 @@
   min-width: 0;
 }
 
+/* ── THE SEARCH FIELD STATES ITS OWN TYPE (issue 1373) ───────────────────────────────────────
+   `proto:2510` gives the box `height: 32px; padding: 0 11px; background: var(--surface-soft);
+   border: 1px solid var(--border); border-radius: 8px`, and `proto:2512` gives the input
+   `font: 500 11.5px var(--sans)`.
+
+   THE FONT IS THE DEFECT THAT MATTERED. `.manager-search input` carries no `font-size` at
+   all, so this field inherited Foundry's 14px `.application` base — the exact bleed the block
+   at the Component Studio's own repair names, which scopes its fix to
+   `[data-manager-view="components"]` and therefore never reached this route. The field was
+   rendering two and a half pixels over the design on a screen whose every other control is
+   under twelve.
+
+   The FILL is the design's translucent surface token rather than the opaque `--fab-bg-1` the
+   shared rule paints; the `<select>` beside it keeps the opaque one, and its own block says
+   why. 32 takes the nearest surviving ladder rung — see the segment block above. */
 .fabricate-manager [data-manager-tools-search] .manager-search input {
-  height: 36px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--fab-surface-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* `proto:2511`: `font-size: 10px; color: var(--subtle)`. */
+.fabricate-manager [data-manager-tools-search] .manager-search > i {
+  color: var(--fab-text-subtle);
+  font-size: 10px;
 }
 
 .fabricate-manager .manager-tools-result-summary {
@@ -24371,13 +24485,16 @@
   box-sizing: border-box;
 }
 
+/* `proto:4870`: `gap: 11px; border-radius: 9px`. The row gap takes the scale's 12px, which is
+   the step nearest the design's 11 — it was 8, one step short, which is where a third of
+   finding 13's 30-40% looseness reversed into tightness. */
 .fabricate-manager .manager-tools-library-list > article {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--fab-overlay-light-03);
   min-height: 68px;
 }
@@ -24407,7 +24524,7 @@
   grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
   justify-content: flex-start;
-  gap: var(--fab-space-2);
+  gap: var(--fab-space-3);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 0;
@@ -24422,11 +24539,14 @@
   outline-offset: 2px;
 }
 
+/* `proto:4763`: a 40px tile at `border-radius: 9px` and NO border. The design draws the
+   thumbnail as an image, not as a framed one — the 1px edge here made every row carry two
+   concentric outlines, its own and the tile's. */
 .fabricate-manager .manager-tools-select-target > img {
   width: 40px;
   height: 40px;
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border: 0;
+  border-radius: 9px;
   object-fit: cover;
 }
 
@@ -24437,11 +24557,13 @@
   min-width: 0;
 }
 
+/* `proto:2530`: `font: 600 13.5px var(--serif)`. 0.84rem is 13.44px — exact to within a
+   rounding step — where 0.82rem was 13.12px. */
 .fabricate-manager .manager-tools-library-copy > strong {
   min-width: 0;
   color: var(--fab-text);
   font-family: var(--fab-font-serif);
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 600;
   line-height: 1.2;
   overflow: hidden;
@@ -24453,10 +24575,12 @@
   display: none;
 }
 
+/* `proto:2531`: `gap: 6px` between a row's pills. */
 .fabricate-manager .manager-tools-library-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--fab-space-1);
+  align-items: center;
+  gap: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-tools-library-chips .manager-tools-validation-chip.is-ready {
@@ -24470,11 +24594,10 @@
 /* The compact chip scale used to be an OPT-IN join here, listing the Tools library rows
    and the two GM Knowledge row containers (issue 785). It is gone: the compact scale is
    what a chip IS now, declared once in `Chip.svelte` (issue 883), so there is no longer
-   a size to opt into and no list for the next screen to be added to. */
+   a size to opt into and no list for the next screen to be added to.
 
-.fabricate-manager .manager-tools-library-actions {
-  padding-right: var(--fab-space-3);
-}
+   `.manager-tools-library-actions` had a second block here stating only `padding-right`. It
+   is merged into the one above, which is where the cluster's own geometry now lives. */
 
 .fabricate-manager .manager-tools-enabled-toggle {
   display: inline-flex;
@@ -24532,6 +24655,64 @@
   background: transparent;
   font-size: 0.76rem;
   line-height: 1.35;
+}
+
+/* ── THE PANEL'S TWO BUTTONS, ON THE DESIGN'S OWN FIGURES (issue 1373) ───────────────────────
+   Both are `ManagerButton`s, so their geometry is stated here rather than in the panel's own
+   scoped block: the primitive writes the `<button>`, so a rule in the panel's block would need
+   `:global()` to reach it and would then be a second implementation of a control's geometry.
+   The global sheet is where a manager button's geometry already lives, and route-scoping keeps
+   it off the other forty-odd screens that render the same primitive.
+
+   `proto:2576` — the secondary, `Edit the world Tool`: `height: 32px; border-radius: 8px;
+   background: var(--bg1); border: 1px solid var(--border-strong); color: var(--text2);
+   font: 600 10.5px var(--sans)`, with a 9px globe. It missed all seven, rendering as the
+   primitive's default 34px/6px/`--fab-border`/6% overlay/`--fab-text`/11.52px at weight 700.
+
+   `proto:4897` — the primary: `height: 36px; border-radius: 9px; font: 700 12px var(--sans)`.
+   Its COLOUR is not changed: a standing maintainer ruling keeps our primaries on the success
+   tone rather than the design's accent, and that ruling is about paint, not geometry.
+
+   32 and 36 are both retired control heights (`openspec/specs/design-system/spec.md` closes
+   the ladder at 26/28/30/34/38/44), so each takes its nearest surviving rung — 30 and 34 —
+   which keeps the design's own 4px step between the two. */
+.fabricate-manager[data-manager-view="tools"]
+  .manager-tool-browser-inspector
+  [data-tool-inspector-edit-world] {
+  min-height: 30px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* `:not(:disabled)` because this states the role's RESTING PAINT, and the invariant the
+   `.manager-button:disabled` block records is that a switched-off manager button paints from
+   that rule whatever role or container it carries. */
+.fabricate-manager[data-manager-view="tools"]
+  .manager-tool-browser-inspector
+  [data-tool-inspector-edit-world]:not(:disabled) {
+  border-color: var(--fab-border-strong);
+  color: var(--fab-text-secondary);
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager[data-manager-view="tools"]
+  .manager-tool-browser-inspector
+  [data-tool-inspector-edit-world]
+  i {
+  font-size: 9px;
+}
+
+/* Double-quoted, deliberately. `manager-layout.test.js` DERIVES the container list for its
+   disabled-paint probe from this sheet, and its attribute matcher reads double quotes only, so
+   a single-quoted route attribute here takes this container out of that gate silently — the
+   test reports it as unmaterializable rather than letting it go unprobed, which is how this
+   was found. The tools block earlier in the sheet is double-quoted throughout for the same
+   reason. */
+.fabricate-manager[data-manager-view="tools"] .manager-tool-inspector-foot .manager-button {
+  min-height: 34px;
+  border-radius: 9px;
+  font-size: 12px;
 }
 
 /* LAYOUT CONTEXT ONLY for the shared `EmptyState` primitive. The appearance (dashed panel,
@@ -24624,9 +24805,10 @@
   line-height: 1.25;
 }
 
-.fabricate-manager .manager-tool-inspector-section-kicker {
-  margin: var(--fab-space-1) 0 0;
-}
+/* The Tool inspector's section kickers state their own margin AND their own type in
+   `ToolBrowserInspector.svelte`'s scoped block (issue 1373), which is unlayered and therefore
+   beats this sheet at any specificity. A margin declared here would be dead, so it is not
+   declared here. */
 
 .fabricate-manager .manager-tool-inspector-sections > section {
   display: grid;
@@ -25309,12 +25491,28 @@
 /* HOVER STILL HAS TO READ with the resting fill gone, so it is restated one rung up from the
    pane rather than left pointing at a ladder that no longer starts where it assumed.
 
-   SELECTION IS RESTATED ONLY FOR THE WORLD CATALOGUE. The system rules row already marks its
-   selection on its own body — `.manager-tools-row.is-selected > .manager-tools-row-body` paints
-   `--fab-success-soft` — so a second fill on the row behind it would be one state stated twice
-   in two colours. */
+   ── HOVER MUST NOT SPEAK OVER SELECTION (issue 1373) ─────────────────────────────────────────
+   This rule was `.manager-tools-row:hover` unqualified, which is (0,4,0), and the rule that
+   paints a CHOSEN row — `.manager-tools-library-list > article.is-selected` — is (0,3,1). So
+   hover won outright: moving the pointer across the row a GM had just selected repainted it
+   from the accent fill to the pane's next rung and took the selection marking away for as long
+   as the pointer stayed there. No frame can photograph a hover, and no mounted test computes a
+   cascade, so nothing in this repository could report it;
+   `tests/components/tool-rules-list-parity.test.js` measures it in a real browser now, and
+   measures the unselected row too so that deleting this rule cannot pass for a fix.
+
+   `:not(.is-selected)` rather than re-chaining the selected rule higher: hover and selection
+   are different questions about the same row, and the honest statement is that a selected row
+   has no hover paint of its own, not that its paint happens to be written more specifically.
+
+   The world catalogue's half is deliberately untouched. Its selected rule paints
+   `--fab-bg-1` — the same value this one does — so the arbitration there is zero-pixel, and
+   that route belongs to another lane.
+
+   SELECTION IS RESTATED ONLY FOR THE WORLD CATALOGUE, because the system rules row is painted
+   by the `.manager-tools-library-list > article.is-selected` rule above. */
 .fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row:hover,
-.fabricate-manager[data-manager-view='tools'] .manager-tools-row:hover {
+.fabricate-manager[data-manager-view='tools'] .manager-tools-row:not(.is-selected):hover {
   background: var(--fab-bg-1);
 }
 
@@ -25324,10 +25522,19 @@
 
 /* THE SYSTEM RULES LIST SHARES THE MANAGER’S OWN INSPECTOR ASIDE, exactly as the system essence
    rules list does, so its surfaces are brought onto the ladder here rather than in a scoped
-   block. The `tools` route already declares its own `--fab-bg-2` fill on that aside above; this
-   is the later declaration of the two, which is what carries it. */
+   block. The route's own block above no longer states a fill at all, so this is the single
+   declaration rather than the later of two.
+
+   ── THE ASIDE IS A RUNG ABOVE THE PANE, NOT LEVEL WITH IT (issue 1373) ──────────────────────
+   `proto:2548` paints this column `--bg2` over a `--bg1` pane. The background ramp is the one
+   token family that is shifted a rung between the design's set and ours, so the design's
+   `--bg1` is our `--fab-bg-0` and its `--bg2` is our `--fab-bg-1`. Flattening the aside onto
+   `--fab-bg-0` made it byte-identical to the pane beside it: the inspector had no surface of
+   its own, only the hairline the shared rule draws, and every inset inside it read LIGHTER
+   than its own container. `IconFactRow`'s `rule` density and the inheritance rows take
+   `--fab-bg-0` for the same reason — with the aside back on its rung they recess again. */
 .fabricate-manager[data-manager-view='tools'] .manager-inspector {
-  background: var(--fab-bg-0);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager[data-manager-view='tools'] .manager-inspector .manager-inspector-card {
