@@ -13168,16 +13168,44 @@
   flex: 0 0 auto;
 }
 
-/* `+ Tag` (`proto:2256`): a dashed pill in the tag tint, not a filled button — it is an
-   affordance for adding, standing in a row of chips that are values. */
-.fabricate-manager .manager-chip.manager-recipe-tag-trigger {
+/* `+ Tag` (`proto:2256`): `inline-flex; gap:5px; padding:3px 9px; border-radius:999px;
+   border:1px dashed var(--tag); font:600 10px var(--sans); color:var(--tag)` — a dashed pill in
+   the tag tint, not a filled button, because it is an affordance for adding standing in a row of
+   chips that are VALUES. Its edge and ink used to be written against the shared chip class and
+   were discarded whole; see the layer note at `.manager-recipe-or-trigger` below, which is the
+   same defect on the other affordance in this row. It renders as a bare `<button>` now, so this
+   rule is the whole of the control. */
+.fabricate-manager .manager-recipe-tag-trigger {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-1);
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
   border: 1px dashed color-mix(in srgb, var(--fab-purple) 60%, transparent);
+  border-radius: 999px;
   color: var(--fab-purple);
   background: transparent;
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.fabricate-manager .manager-chip.manager-recipe-tag-trigger:hover {
+.fabricate-manager .manager-recipe-tag-trigger > i {
+  flex: 0 0 auto;
+  font-size: 8px;
+}
+
+.fabricate-manager .manager-recipe-tag-trigger:hover {
   background: var(--fab-purple-soft);
 }
 
@@ -13274,8 +13302,7 @@
 
 /* The requirement's single "or..." control (issue 643): one popover per requirement
    offering the ingredient kinds this system can honour, replacing the loose per-row
-   and footer add-buttons. It reads as an affordance, not a filled button, so it is a
-   dashed accent chip. */
+   and footer add-buttons. */
 .fabricate-manager .manager-recipe-requirement-adds {
   display: flex;
   flex-wrap: wrap;
@@ -13284,15 +13311,75 @@
   padding-top: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-chip.manager-recipe-or-trigger {
-  border: 1px dashed var(--fab-accent-border);
-  color: var(--fab-accent);
+/* ── THE ROW'S TWO IN-ROW AFFORDANCES, AND THE RULES THAT WERE NEVER PAINTING ─────────────
+   `or…` (`proto:2290`) and `+ Tag` (`proto:2256`) are the two dashed affordances a requirement
+   row carries. Both were rendered through `Chip` with their treatment written HERE, as
+   `.fabricate-manager .manager-chip.manager-recipe-<x>-trigger { border… color… background… }`,
+   and NEITHER was painting.
+
+   Every property in those rules is also declared in `Chip.svelte`'s own scoped block, which
+   `svelte.config.js` injects UNLAYERED while `module.json` imports this sheet at
+   `layer(modules)`. An unlayered author declaration beats a layered one at ANY specificity, so
+   both rules matched and both were discarded: measured in a real cascade, the two shipped as the
+   default filled neutral chip — 20px tall, a SOLID `--fab-border` edge, `--fab-text` ink, a 10px
+   corner and a fill — with no dash and no tint anywhere on either. Nothing objected. Stylelint
+   does not read `.svelte`, Svelte's unused-selector pass never sees this file, and a harness that
+   loads both sheets flat reports these rules winning, because in that page they do. Issue 1373,
+   round 8; `manager-layout.test.js` now measures both in the layer order that ships.
+
+   THE FIX IS TO STOP MAKING THEM CHIPS. `SearchablePopover` renders a bare `<button>` carrying
+   only the caller's `triggerClass` unless `triggerChip` is passed, and nothing declares anything
+   for these two classes anywhere else, so the treatment below is the whole of each control and
+   this sheet can state it.
+
+   THE ALTERNATIVE, AND WHY IT IS NOT TAKEN HERE. `ManagerButton`'s `dashed` role is this same
+   affordance — dashed `--fab-border-strong` edge, muted ink, no fill, accent on hover — and it
+   carries no scoped block, so a route rule CAN size it. Routing these two through it would mean
+   `SearchablePopover` importing `ManagerButton`, which pulls the button primitive into the
+   compiled graph of fourteen mounted picker suites that never render one, and it would still
+   need a per-caller rule for the scale, because the role is sized for an add-a-row button under
+   a list (34px) and these two stand inside a 30px row. The two scales below are also not one
+   scale: `proto:2290` draws `or…` as a 26px 7px-cornered control and `proto:2256` draws `+ Tag`
+   as a ~20px stadium, because one is a control among controls and the other is a chip among
+   chips. */
+
+/* `proto:2290`: `inline-flex; gap:4px; height:26px; padding:0 9px; border-radius:7px;
+   border:1px dashed var(--border-strong); font:600 9.5px var(--sans); color:var(--subtle)`,
+   going `color:var(--accent); border-color:var(--accent-border)` on hover. 26px is a rung on the
+   control-height ladder and is the height of the stepper it stands beside. */
+.fabricate-manager .manager-recipe-or-trigger {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fab-space-1);
+  box-sizing: border-box;
+  width: auto;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 var(--fab-space-2);
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 7px;
+  color: var(--fab-text-subtle);
   background: transparent;
+  font-family: var(--font-primary);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.fabricate-manager .manager-chip.manager-recipe-or-trigger:hover {
-  background: var(--fab-accent-soft);
+.fabricate-manager .manager-recipe-or-trigger > i {
+  flex: 0 0 auto;
+  font-size: 8px;
+}
+
+.fabricate-manager .manager-recipe-or-trigger:hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
 }
 
 /* Progressive result rows: keyboard move controls beside the drag grip. Reorder was
@@ -23777,13 +23864,10 @@
   white-space: nowrap;
 }
 
-/* The recipe row-level "or…" popover carries longer, full-sentence option labels
-   ("Add alternative tag requirement"). With no search box squeezing it, let those
-   labels wrap in full rather than truncate (issue 643). */
-.fabricate-manager .manager-recipe-or-popover .manager-travel-option-name {
-  overflow: visible;
-  white-space: normal;
-}
+/* (The recipe row-level "or…" popover used to let its option labels WRAP here, because they
+   were full sentences — "Add alternative tag requirement". `proto:4682` gives each entry the
+   bare kind name, one word, in a 150px panel, so there is nothing left to wrap and the shared
+   single-line ellipsis above is the right treatment for all of them. Issue 1373, round 8.) */
 
 /* The TWO-LINE option (issue 1010). A picker whose choices differ by a fact rather than
    by a name states that fact on a second line; the wrapper takes over the flex sizing the
@@ -24013,6 +24097,73 @@
 
 .fabricate-picker-popover .manager-travel-option:hover {
   background: var(--fab-surface-raised);
+}
+
+/* ── THE "or…" MENU (`proto:2292`-`2293`, `proto:4683`) ────────────────────────────
+   A COMPACT MENU OF KINDS, not a picker of records — which is what the shared popover above is
+   sized for, and why this one needs its own scale. `proto:2292` draws a 150px panel with a 5px
+   inset and a 9px corner on `--bg0`; the shared box is a 240-340px `--fab-bg-3` panel with an
+   8px corner and a 7px list inset, because the lists it usually holds are world components and
+   actors whose names are as long as they are.
+
+   The WIDTH is not written here. `SearchablePopover` computes it from `minWidth`/`maxWidth` and
+   writes it onto the node as an inline style, so the caller states 150 twice and this sheet
+   states the rest of the frame.
+
+   Written at (0,3,0) so it out-specifies `.fabricate-picker-popover.manager-travel-popover` and
+   `.fabricate-picker-popover .manager-travel-option` inside the same layer — both of which this
+   panel matches, and both of which sit in THIS file, so the contest is an ordinary one. That is
+   NOT true of the trigger this panel hangs from; see the note at
+   `.manager-recipe-or-trigger` above for the layer boundary that discarded its rules whole. */
+.fabricate-picker-popover.manager-recipe-or-popover {
+  /* THE 240px FLOOR IS RELEASED, and that is not tidiness. `SearchablePopover` writes its
+     computed `width` inline, but the shared box declares `min-width: 240px`, and a floor beats a
+     used width — so a caller asking for 150 rendered at 240 with the inline declaration sitting
+     there looking honoured. Measured, not reasoned: the guard's first run reported 240 against a
+     fixture carrying `style="width: 150px"`. Both bounds are restated at the design's figure so
+     the panel is 150px whether or not the positioning pass has run yet. */
+  min-width: 150px;
+  max-width: 150px;
+  padding: var(--fab-space-1);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+}
+
+/* The panel IS the inset, so the list adds none of its own, and the entries stack without a gap
+   exactly as `proto:2292` draws them. */
+.fabricate-picker-popover.manager-recipe-or-popover .manager-travel-popover-options {
+  gap: 0;
+  padding: 0;
+}
+
+/* `proto:4683`: `display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:6px;
+   font:600 11px var(--sans); color:var(--text2)`. The 40px `min-height` the shared row carries is
+   released — that floor is sized to a 24px portrait tile, and these entries carry a 10px glyph.
+   The type scale is stated rather than inherited for the reason the compact picker states its
+   own: this is a `<button>` under `.fabricate-manager button { font: inherit }`, so an unstated
+   size renders at whatever the manager root happens to inherit from Foundry. */
+.fabricate-picker-popover.manager-recipe-or-popover .manager-travel-option {
+  gap: var(--fab-space-2);
+  min-height: 0;
+  padding: var(--fab-space-chip) var(--fab-space-2);
+  border-radius: 6px;
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* THE KIND'S GLYPH (`proto:4683`: `font-size:10px; width:14px`). A fixed column so the four
+   labels start on one left edge whatever glyph precedes them.
+
+   Its COLOUR is deliberately absent from this rule. The glyph wears
+   `manager-recipe-option-mark is-<kind>`, so it is inked by the same four declarations the
+   requirement row's plate and chosen chip are — one table of tints for both surfaces, which is
+   what stops the menu drifting from the rows it authors. */
+.fabricate-picker-popover.manager-recipe-or-popover .manager-travel-option > i {
+  flex: 0 0 auto;
+  width: 14px;
+  font-size: 10px;
+  text-align: center;
 }
 
 /* ==========================================

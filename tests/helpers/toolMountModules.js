@@ -60,6 +60,10 @@ export const TOOL_TREE_RAW_MODULES = Object.freeze([
   // module rather than four lines in the component precisely so it can be one copy across the
   // two scopes that render the block, which is what puts it in EVERY mounted tool tree.
   'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
+  // The ONE ingredient-kind table (issue 1373, round 8). Every tool tree renders the repair
+  // block, which renders `RecipeIngredientGroupCard` -> `RecipeIngredientOption`, and both read
+  // their kind glyph, tint class and one-word name from it.
+  'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/overlayHost.js',
 ]);

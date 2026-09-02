@@ -67,7 +67,7 @@ const FIXTURE = `
              app base; the flat-picker vs bleed-baseline assertions below prove it no
              longer does. -->
         <div class="manager-recipe-ingredient-option-row">
-          <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fas fa-cubes"></i></span>
+          <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fa-solid fa-cube"></i></span>
           <div class="manager-recipe-option-target">
             <div class="manager-recipe-option-component">
               <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">

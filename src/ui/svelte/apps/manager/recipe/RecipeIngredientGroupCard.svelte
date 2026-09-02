@@ -36,6 +36,10 @@
   import RecipeIngredientOption from './RecipeIngredientOption.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  // The ONE kind table (`proto:4624`), shared with the row's own plate and kind select. The
+  // `or…` menu's four entries and the choice group's four adders both read their glyph, their
+  // tint class and their one-word name from it.
+  import { ingredientKindMarkClass, ingredientKindMeta } from './ingredientKindMeta.js';
 
   let {
     group = {},
@@ -78,52 +82,36 @@
     text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
   );
 
-  // The flat "Accept instead" choices, each carrying its own `data-recipe-add` token.
+  // ── THE FOUR CHOICES (`proto:4682`) ───────────────────────────────────────────────────────
+  // Each entry is ONE WORD — the kind it appends, taken from the same table the row's own kind
+  // select reads. The verb lives once, in the panel's `Accept instead` header (`proto:2293`),
+  // so no entry has to carry it.
+  //
+  // WHAT THIS REPLACES (issue 1373, maintainer round 8): four full sentences, `Add alternative
+  // component` / `Add alternative tag requirement` / `Add essence` / `Add alternative cost`.
+  // They disagreed with each other as much as with the design — three said `alternative` and
+  // one did not; one said `cost` where the row it authors says `currency` — and the four keys
+  // behind them are retired from `lang/en.json` with this change.
+  //
+  // The glyph carries `manager-recipe-option-mark is-<kind>`, which is the SAME class the row's
+  // plate and chosen chip wear, so the menu's tints are the row's tints by construction rather
+  // than by a second table of tokens. `SearchablePopover` renders an option's `icon` as the
+  // whole `class` attribute of its `<i>`, which is what makes that reuse possible.
+  //
   // No option groups — a single ungrouped bucket (optionGroups: []) so SearchablePopover
   // renders no lone heading. Currency appears only when the system configures units;
   // essence only when the system enables essences.
+  const orMenuChoice = (kind, addMarker) => ({
+    id: kind,
+    addMarker,
+    icon: ingredientKindMarkClass(kind),
+    label: text(ingredientKindMeta(kind).labelKey, ingredientKindMeta(kind).label),
+  });
   const orMenuOptions = $derived([
-    {
-      id: 'component',
-      addMarker: 'alternative-component',
-      icon: 'fas fa-cube',
-      label: text(
-        'FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent',
-        'Add alternative component'
-      ),
-    },
-    {
-      id: 'tags',
-      addMarker: 'alternative-tag',
-      icon: 'fas fa-tags',
-      label: text(
-        'FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement',
-        'Add alternative tag requirement'
-      ),
-    },
-    ...(hasEssences
-      ? [
-          {
-            id: 'essence',
-            addMarker: 'alternative-essence',
-            icon: 'fas fa-flask-vial',
-            label: text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence'),
-          },
-        ]
-      : []),
-    ...(canAddCost
-      ? [
-          {
-            id: 'currency',
-            addMarker: 'alternative-currency',
-            icon: 'fa-solid fa-coins',
-            label: text(
-              'FABRICATE.Admin.Manager.Recipe.AddAlternativeCost',
-              'Add alternative cost'
-            ),
-          },
-        ]
-      : []),
+    orMenuChoice('component', 'alternative-component'),
+    orMenuChoice('tags', 'alternative-tag'),
+    ...(hasEssences ? [orMenuChoice('essence', 'alternative-essence')] : []),
+    ...(canAddCost ? [orMenuChoice('currency', 'alternative-currency')] : []),
   ]);
 
   function updateOption(index, nextOption) {
@@ -192,9 +180,8 @@
     options={orMenuOptions}
     optionGroups={[]}
     pickerClass="manager-recipe-or-picker"
-    triggerChip
     triggerClass="manager-recipe-or-trigger"
-    triggerIcon="fas fa-code-branch"
+    triggerIcon="fa-solid fa-code-branch"
     triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
     triggerAriaLabel={orMenuLabel}
     triggerTitle={text(
@@ -210,9 +197,10 @@
     emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
     showChevron={false}
     showSearch={false}
+    popoverTitle={orMenuLabel}
     popoverClass="manager-recipe-or-popover"
-    minWidth={220}
-    maxWidth={340}
+    minWidth={150}
+    maxWidth={150}
     onChoose={(type) => appendAlternative(type)}
   />
 {/snippet}
@@ -274,7 +262,7 @@
         data-recipe-add="alternative-component"
         onclick={() => appendAlternative('component')}
       >
-        <i class="fas fa-cube" aria-hidden="true"></i>
+        <i class={ingredientKindMeta('component').icon} aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AltComponent', 'alt component')}</span>
       </ManagerButton>
       <ManagerButton
@@ -282,7 +270,7 @@
         data-recipe-add="alternative-tag"
         onclick={() => appendAlternative('tags')}
       >
-        <i class="fas fa-tags" aria-hidden="true"></i>
+        <i class={ingredientKindMeta('tags').icon} aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AltTag', 'alt tag')}</span>
       </ManagerButton>
       {#if hasEssences}
@@ -291,7 +279,7 @@
           data-recipe-add="alternative-essence"
           onclick={() => appendAlternative('essence')}
         >
-          <i class="fas fa-flask-vial" aria-hidden="true"></i>
+          <i class={ingredientKindMeta('essence').icon} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AltEssence', 'alt essence')}</span>
         </ManagerButton>
       {/if}
@@ -301,7 +289,7 @@
           data-recipe-add="alternative-cost"
           onclick={() => appendAlternative('currency')}
         >
-          <i class="fa-solid fa-coins" aria-hidden="true"></i>
+          <i class={ingredientKindMeta('currency').icon} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AltCurrency', 'alt currency')}</span>
         </ManagerButton>
       {/if}

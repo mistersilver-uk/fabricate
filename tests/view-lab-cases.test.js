@@ -1815,6 +1815,13 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   // gathering-task frame draws the menu CLOSED — where the whole conversion is a wrapper
   // class and a scoping hash.
   //
+  // The FIFTH is a fifth CONFIGURATION rather than a fifth mode (issue 1373, round 8): the
+  // recipe row's `or…` menu is the only frame that renders the `popoverTitle` header on a panel
+  // with NO search field, at a caller-fixed 150px. The parties frames draw the header over a
+  // search row, the availability menu draws the search-less list with no header, and neither can
+  // show what happens where the two meet — which is where the shared box's `min-width: 240px`
+  // floor silently overrode a caller asking for 150.
+  //
   // The FOURTH is not a mode but an APPLICATION (issue 1475). Those three are all manager
   // frames, and until `ActorSelectTopBar` converted, the manager was the only place this
   // primitive could paint at all. `player-actor-picker` opens it in the player window, so

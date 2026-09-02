@@ -534,6 +534,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // control at WORLD scope, where the vocabulary is the union of every world component's own
   // `defaults.tags` and only `setWorldTags` ever writes one — so it is empty in the lab world
   // and in a freshly installed one alike, which is the state a GM meets on day one.
+  //
+  // A FIFTH entry as of issue 1373 round 8, and it is a fifth CONFIGURATION: the recipe row's
+  // `or…` menu is the only frame that renders this primitive's `popoverTitle` header on a panel
+  // that has NO search field, at a caller-fixed 150px. The parties pickers draw the header over a
+  // search row and the availability menu draws the search-less list with no header, so between
+  // them the two halves are covered and their COMBINATION is not — which is exactly where the
+  // width floor bit: the shared box declares `min-width: 240px`, so a caller asking for 150 got
+  // 240 with its own inline width sitting there looking honoured.
   'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
     'manager-world-parties-realm-override-picker',
@@ -541,6 +549,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-actor-picker',
     'manager-recipe-edit-tag-picker',
     'world-tool-entry-on-break-repair-tag-picker-empty',
+    'manager-recipe-edit-ingredients-or-menu',
   ]),
   // The player window's shared top bar (issue 1475). It sits under `components/`, so the directory
   // leg of `BROAD_SIGNAL_PATTERN` claims it and it published only the representative pair — in
@@ -3598,6 +3607,53 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '.fabricate-picker-popover .manager-travel-popover-search input',
       },
     ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-or-menu',
+    label: 'Manager — Recipe edit ingredients, the "or…" menu open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // NO CASE IN THE REGISTRY HAD EVER OPENED THIS MENU (issue 1373, maintainer round 8), and that
+    // is the whole reason it shipped as a wide list of four full sentences with no header and no
+    // colour while three surfaces around it were being brought onto the design. The registry held
+    // frames of the requirement row, of its suggestion list and of its empty tag arm; the one
+    // overlay the row can open was evidence-free, so the only thing anyone could check it against
+    // was its own source, and its source read as though it were fine.
+    //
+    // `lab-herbalism` rather than the default system because the menu's LENGTH is configuration-
+    // dependent: Currency appears only when the system enables currency and has authored units,
+    // and Essence only when it has essences. Herbalism is the one system with both, so this is the
+    // frame that shows all four kinds — and therefore the only one that can show four tints.
+    //
+    // The FIRST requirement is the one opened. It is a bare single-alternative component row
+    // (`hb-moonleaf`), which is the shape that carries the inline `or…` control at all — a
+    // two-alternative requirement drops it for the dashed adders at its foot — and it sits at the
+    // top of the list, so the panel is fully on screen without a scroll step to keep in sync.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '.manager-recipe-or-trigger' },
+    ],
+    expectView: 'recipe-edit',
+    // NAMED ON THE LAST KIND, not on the panel. The panel exists the moment the trigger is
+    // pressed; `alternative-currency` is the choice that is only offered when the system really
+    // does configure currency, so a fixture drift that quietly turned it off would publish a
+    // three-entry menu under a case whose whole subject is four.
+    expectSelector: '.manager-recipe-or-popover [data-recipe-add="alternative-currency"]',
+    // The panel is PORTALED to the manager root (`util/overlayHost.js`), so the container is that
+    // root and not the recipe view: it is deliberately outside the scrolling editor pane, and
+    // containment against the pane would be a claim about a box it does not sit in.
+    expectContained: [{ container: '.fabricate-manager', target: '.manager-recipe-or-popover' }],
+    // …and it is actually on top. A menu drawn under the row it hangs from is contained, visible
+    // and useless, which is a failure no bounding box can see.
+    expectCenterHit: '.manager-recipe-or-popover [data-recipe-add="alternative-component"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,

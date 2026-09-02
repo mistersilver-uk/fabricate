@@ -59,6 +59,10 @@ const RAW_MODULES = [
   'src/config/flags.js',
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',
+  // The ONE ingredient-kind table (issue 1373, round 8): the requirement row's plate glyph and
+  // tint, its kind select's four words, and the `or...` menu's four entries all read it, so both
+  // ingredient components import it and the closure validator throws without it.
+  'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
   // The validation tab localizes a signature-collision blocker row via this pure
@@ -3751,6 +3755,75 @@ describe('RecipeEditView (mounted)', () => {
       dialog.querySelector('input[type="text"]'),
       null,
       'the search-less row popover renders no search input'
+    );
+    editHarness.remount();
+  });
+
+  it('draws the "or..." menu the way the design does: a header, four one-word entries, four tints', async () => {
+    // WHAT SHIPPED, AND WHY IT WAS NEVER SEEN (issue 1373, maintainer round 8). No case in the
+    // View Lab registry opened this menu, so the only evidence for it was its own source. It
+    // rendered as a wide list of four full sentences - `Add alternative component`, `Add
+    // alternative tag requirement`, `Add essence`, `Add alternative cost` - with no header and
+    // no colour. Three of those four say `alternative`, one says `cost` where the row it
+    // authors says `currency`, and a fourth says neither.
+    //
+    // `proto:4682` takes the four labels STRAIGHT FROM `KINDMETA` (`proto:4624`), which is the
+    // same table the row's own kind select reads: `Component`, `Tag`, `Essence`, `Currency`.
+    // The verb lives once, in the header `proto:2293` draws above them (`Accept instead`), so
+    // no entry has to carry it - and the entries then read as the four KINDS they append,
+    // which is what the GM is choosing between.
+    //
+    // ASSERTED AGAINST THE ROW'S OWN SELECT rather than against a copied literal list. The
+    // menu and the select answer the same question about the same four kinds, and a guard that
+    // pinned four strings here would go green while the two surfaces drifted apart in wording.
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
+      {
+        props: {
+          componentOptions: COMPONENT_OPTIONS,
+          itemTags: ITEM_TAGS,
+          currencyUnits: CURRENCY_UNITS,
+          essenceOptions: ESSENCE_OPTIONS,
+        },
+      }
+    );
+    const kindWords = [...target.querySelectorAll('[data-recipe-option-kind] option')].map(
+      (option) => option.textContent.trim()
+    );
+
+    await openOrMenu(target, 'grp-1');
+    const popover = document.querySelector('.manager-recipe-or-popover');
+    assert.ok(Boolean(popover), 'the "or..." menu is open');
+
+    // THE HEADER (`proto:2293`). It is what makes a one-word entry legible: without it the
+    // panel is four nouns with no verb anywhere on it.
+    const heading = popover.querySelector('[data-popover-header] .manager-travel-popover-title');
+    assert.ok(Boolean(heading), 'the panel carries the eyebrow that names what choosing does');
+    assert.equal(heading.textContent.trim(), 'Accept instead');
+
+    const entries = [...popover.querySelectorAll('[role="listbox"] [data-recipe-add]')];
+    assert.deepEqual(
+      entries.map((entry) => entry.querySelector('.manager-travel-option-name').textContent.trim()),
+      kindWords,
+      'every entry is the bare kind name the row select uses, in the same order'
+    );
+
+    // THE TINT, TAKEN FROM THE ROW'S OWN MARK rather than from a second table. The class the
+    // glyph carries IS `styles/fabricate.css`'s per-kind ink rule, so the menu cannot drift
+    // from the plate and the chosen chip beside it; `manager-layout.test.js` measures the four
+    // colours it resolves to in a real cascade.
+    const marks = entries.map((entry) => entry.querySelector('i').className);
+    for (const mark of marks) {
+      assert.ok(
+        mark.includes('manager-recipe-option-mark'),
+        `an entry glyph carries the row's own tinted-mark class (got \`${mark}\`)`
+      );
+    }
+    const tones = marks.map((mark) => mark.match(/\bis-[a-z]+\b/)?.[0] || '');
+    assert.deepEqual(
+      tones,
+      ['is-component', 'is-tag', 'is-essence', 'is-currency'],
+      'each entry is inked as its own kind, and the four are four different kinds'
     );
     editHarness.remount();
   });

@@ -84,6 +84,10 @@
   import SearchablePopover from '../SearchablePopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  // The ONE kind table (`proto:4624`). The plate's glyph and tint, and the kind select's four
+  // words, are read from it rather than restated here — see `ingredientKindMeta.js` for the
+  // two drifts that motivated collecting them.
+  import { INGREDIENT_KIND_ORDER, ingredientKindMeta } from './ingredientKindMeta.js';
 
   tagMatchGroupSeq += 1;
   const tagMatchGroupId = tagMatchGroupSeq;
@@ -223,29 +227,21 @@
   // available to a system whose essences are all disabled. What the disabled ones are withheld
   // from is the SUGGESTION list below, which is where an essence is actually chosen.
   const canAddEssence = $derived((essenceOptions || []).length > 0);
+  // The four words come from the shared kind table, which is also where the `or…` menu's four
+  // entries come from — so the select and the menu name the same kinds with the same nouns.
+  // What stays HERE is the offer rule, which is about this system's configuration and not about
+  // what a kind is called.
+  const kindOffered = $derived({
+    component: true,
+    tags: true,
+    essence: canAddEssence,
+    currency: canAddCost,
+  });
   const kindOptions = $derived(
-    [
-      {
-        value: 'component',
-        label: text('FABRICATE.Admin.Manager.Recipe.ComponentTypeLabel', 'Component'),
-        offered: true,
-      },
-      {
-        value: 'tags',
-        label: text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag'),
-        offered: true,
-      },
-      {
-        value: 'essence',
-        label: text('FABRICATE.Admin.Manager.Recipe.EssenceTypeLabel', 'Essence'),
-        offered: canAddEssence,
-      },
-      {
-        value: 'currency',
-        label: text('FABRICATE.Admin.Manager.Recipe.CurrencyTypeLabel', 'Currency'),
-        offered: canAddCost,
-      },
-    ].filter((kind) => kind.offered || kind.value === matchType)
+    INGREDIENT_KIND_ORDER.filter((kind) => kindOffered[kind] || kind === matchType).map((kind) => ({
+      value: kind,
+      label: text(ingredientKindMeta(kind).labelKey, ingredientKindMeta(kind).label),
+    }))
   );
 
   // ── THE NAME FIELD'S SUBJECT, PER KIND ──────────────────────────────────────────────────
@@ -428,24 +424,13 @@
   // and each suggestion's, exactly as premium's `RewardRow` tints all three from one
   // `presentation.tint` (`:62`, `:80`, `:129`). It shipped on the plate ALONE, so a named row's
   // mark was one inherited ink whatever kind the row was.
-  const leadTone = $derived(
-    matchType === 'tags'
-      ? 'tag'
-      : matchType === 'currency'
-        ? 'currency'
-        : matchType === 'essence'
-          ? 'essence'
-          : 'component'
-  );
-  const leadIcon = $derived(
-    matchType === 'tags'
-      ? 'fas fa-tag'
-      : matchType === 'currency'
-        ? 'fa-solid fa-coins'
-        : matchType === 'essence'
-          ? 'fas fa-flask-vial'
-          : 'fas fa-cubes'
-  );
+  //
+  // BOTH HALVES NOW COME FROM ONE TABLE (issue 1373, round 8). They were a pair of ternaries
+  // here and a second, DIFFERENTLY-SPELLED pair in `RecipeIngredientGroupCard`'s `or…` menu, so
+  // the glyph a GM pressed to add a component was `fa-cube` while the row it produced drew
+  // `fa-cubes`. `proto:4624` has one entry per kind and every surface reads it.
+  const leadTone = $derived(ingredientKindMeta(matchType).tone);
+  const leadIcon = $derived(ingredientKindMeta(matchType).icon);
 
   const removeLabel = $derived(
     matchType === 'component'
@@ -513,9 +498,8 @@
       <SearchablePopover
         options={tagPickerOptions}
         pickerClass="manager-recipe-tag-picker"
-        triggerChip
         triggerClass="manager-recipe-tag-trigger"
-        triggerIcon="fas fa-plus"
+        triggerIcon="fa-solid fa-plus"
         triggerLabel={text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}
         triggerData={{ 'data-recipe-add-tag': '' }}
         triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}

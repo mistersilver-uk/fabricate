@@ -6116,7 +6116,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
           <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
         </div>
         <span class="manager-recipe-option-divider"></span>
-        <span class="manager-chip manager-recipe-or-trigger"><i class="fas fa-code-branch"></i><span>or</span></span>
+        <div class="fabricate-picker manager-travel-picker manager-recipe-or-picker"><button type="button" class="manager-recipe-or-trigger"><i class="fa-solid fa-code-branch"></i><span class="manager-travel-picker-value">or…</span></button></div>
         <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
       </div>`;
 
@@ -6136,7 +6136,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
       <span class="manager-recipe-option-tags" data-recipe-option-tags>
         <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>${chips}
         <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
-          <button type="button" class="manager-chip manager-recipe-tag-trigger" data-recipe-add-tag><i class="fas fa-plus"></i><span class="manager-travel-picker-value">Tag</span></button>
+          <button type="button" class="manager-recipe-tag-trigger" data-recipe-add-tag><i class="fa-solid fa-plus"></i><span class="manager-travel-picker-value">Tag</span></button>
         </div>
       </span>
       <div class="manager-segmented is-tag" role="radiogroup" aria-label="Tag match">
@@ -6774,9 +6774,9 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
         </head>
         <body>
           <main class="fabricate-manager">
-            ${rowFor('component', 'fas fa-cubes')}
-            ${rowFor('tag', 'fas fa-tag')}
-            ${rowFor('essence', 'fas fa-flask-vial')}
+            ${rowFor('component', 'fa-solid fa-cube')}
+            ${rowFor('tag', 'fa-solid fa-tag')}
+            ${rowFor('essence', 'fa-solid fa-flask-vial')}
             ${rowFor('currency', 'fa-solid fa-coins')}
             <span data-token="component" style="color: var(--fab-success)"></span>
             <span data-token="tag" style="color: var(--fab-purple)"></span>
@@ -11119,4 +11119,387 @@ test('the manager root clips rather than hides, so focus cannot scroll the app a
     'the manager root must not use `overflow: hidden`: it still creates a scroll container that ' +
       'focus can drive, which is the issue-1286 blank-window defect'
   );
+});
+
+// ── THE "or…" MENU (issue 1373, maintainer round 8) ──────────────────────────────────────
+// The panel a requirement row opens to accept a different KIND of ingredient in its place.
+// `proto:2292` is the panel, `proto:2293` its header and `proto:4682`-`4683` its entries.
+const orMenuGroupCardPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte'
+);
+const orMenuGroupCardSource = readFileSync(orMenuGroupCardPath, 'utf8');
+
+const OR_MENU_KINDS = ['component', 'tag', 'essence', 'currency'];
+const OR_MENU_LABELS = {
+  component: 'Component',
+  tag: 'Tag',
+  essence: 'Essence',
+  currency: 'Currency',
+};
+const OR_MENU_GLYPHS = {
+  component: 'fa-solid fa-cube',
+  tag: 'fa-solid fa-tag',
+  essence: 'fa-solid fa-flask-vial',
+  currency: 'fa-solid fa-coins',
+};
+
+test('the "or…" menu is a 150px panel of four tinted, one-word entries under its own header', async () => {
+  // WHY IT IS MEASURED AND NOT READ. Three of this panel's claims are cascade questions that a
+  // sheet cannot answer on its own:
+  //
+  //   1. the ENTRY is a `<button>`, so Foundry's `a.button, button { justify-content: center }`
+  //      in `@layer elements.forms` reaches it — the same host rule that centred the suggestion
+  //      row one round ago. `styles/fabricate.css` imports at `layer(modules)`, which sorts
+  //      after `elements`, so one declaration displaces it; whether one is WRITTEN is the
+  //      question, and only a rendered cascade answers it.
+  //   2. the panel's frame is stated twice — `.fabricate-picker-popover.manager-travel-popover`
+  //      gives every picker an 8px corner on `--fab-bg-3`, and this menu's own rule has to
+  //      out-specify it inside the same layer.
+  //   3. the entry TINT is not written for this panel at all. The glyph carries the ROW's own
+  //      `.manager-recipe-option-mark.is-<kind>` class, so the menu is inked by the same four
+  //      rules the plate and the chosen chip are and cannot drift from them. That claim holds
+  //      only if those rules still reach a glyph inside a PORTALED panel, which is a different
+  //      DOM position from the row's.
+  //
+  // So the fixture renders the four reference marks a ROW draws beside the panel and compares
+  // colour for colour, rather than pinning four token names a rename would walk away from.
+  const popoverScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/SearchablePopover.svelte')
+  );
+  const stamp = (markup) =>
+    [
+      'manager-travel-popover',
+      'manager-travel-popover-header',
+      'manager-travel-popover-title',
+      'manager-travel-popover-options',
+      'manager-travel-option',
+      'manager-travel-option-name',
+    ].reduce((html, className) => withScopeHash(html, className, popoverScoped.hashClass), markup);
+
+  // The panel exactly as `SearchablePopover` portals it: the primitive's own two classes, the
+  // caller's `popoverClass`, the header the `popoverTitle` prop renders, and one option button
+  // per kind carrying the row's tinted-mark glyph. `width: 150px` is written inline because
+  // that is where it comes from in the product — the primitive computes its width from
+  // `minWidth`/`maxWidth` and writes it onto the node, so no rule in the sheet states it and
+  // the source assertion at the foot of this test is what pins the number.
+  const panel = stamp(
+    '<div class="fabricate-picker-popover manager-travel-popover manager-recipe-or-popover" ' +
+      'role="dialog" aria-label="Accept instead" style="width: 150px;">' +
+      '<div class="manager-travel-popover-header" data-popover-header>' +
+      '<span class="manager-travel-popover-title">Accept instead</span></div>' +
+      '<div class="manager-travel-popover-options" role="listbox" aria-label="Accept instead">' +
+      OR_MENU_KINDS.map(
+        (kind) =>
+          `<button type="button" class="manager-travel-option" role="option" data-recipe-add="alternative-${kind}" data-kind="${kind}">` +
+          `<i class="${OR_MENU_GLYPHS[kind]} manager-recipe-option-mark is-${kind}"></i>` +
+          `<span class="manager-travel-option-name">${OR_MENU_LABELS[kind]}</span></button>`
+      ).join('') +
+      '</div></div>'
+  );
+
+  // The reference marks: the same four classes, on the plate a requirement ROW draws.
+  const referenceRows = OR_MENU_KINDS.map(
+    (kind) =>
+      `<span class="manager-recipe-option-lead is-${kind}">` +
+      `<i class="${OR_MENU_GLYPHS[kind]} manager-recipe-option-mark is-${kind}" data-reference-mark="${kind}"></i></span>`
+  ).join('');
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 640, height: 520 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; }
+            }
+            @layer modules { ${css} }
+            ${popoverScoped.css}
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            ${referenceRows}
+            ${panel}
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const panelNode = document.querySelector('.manager-recipe-or-popover');
+      const panelStyle = getComputedStyle(panelNode);
+      const heading = panelNode.querySelector('.manager-travel-popover-title');
+      const entries = [...panelNode.querySelectorAll('[data-recipe-add]')].map((entry) => {
+        const glyph = entry.querySelector('i');
+        const label = entry.querySelector('.manager-travel-option-name');
+        const style = getComputedStyle(entry);
+        const box = entry.getBoundingClientRect();
+        const labelStyle = getComputedStyle(label);
+        return {
+          kind: entry.dataset.kind,
+          justifyContent: style.justifyContent,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          // The offset of the glyph from the entry's own padding edge: zero means the row
+          // reads from its left edge, as `proto:4683` draws it.
+          glyphIndent: Number(
+            (
+              glyph.getBoundingClientRect().left -
+              (box.left +
+                Number.parseFloat(style.paddingLeft) +
+                Number.parseFloat(style.borderLeftWidth))
+            ).toFixed(2)
+          ),
+          glyphColor: getComputedStyle(glyph).color,
+          glyphWidth: getComputedStyle(glyph).width,
+          glyphFontSize: getComputedStyle(glyph).fontSize,
+          labelHeight: Number(label.getBoundingClientRect().height.toFixed(2)),
+          labelLineHeight:
+            Number.parseFloat(labelStyle.lineHeight) ||
+            Number.parseFloat(labelStyle.fontSize) * 1.2,
+          referenceColor: getComputedStyle(
+            document.querySelector(`[data-reference-mark="${entry.dataset.kind}"]`)
+          ).color,
+        };
+      });
+      return {
+        panel: {
+          width: Number(panelNode.getBoundingClientRect().width.toFixed(2)),
+          borderRadius: panelStyle.borderTopLeftRadius,
+        },
+        headerText: heading ? heading.textContent : '',
+        headerTransform: heading ? getComputedStyle(heading).textTransform : '',
+        entries,
+      };
+    });
+
+    assert.equal(report.panel.width, 150, '`proto:2292` draws a 150px panel');
+    assert.equal(report.panel.borderRadius, '9px', '`proto:2292`: a 9px corner');
+    assert.equal(report.headerText, 'Accept instead');
+    assert.equal(report.headerTransform, 'uppercase', '`proto:2293` sets the eyebrow in caps');
+
+    for (const entry of report.entries) {
+      assert.notEqual(
+        entry.justifyContent,
+        'center',
+        `the ${entry.kind} entry must displace the host button rule rather than inherit its centring`
+      );
+      assert.ok(
+        Math.abs(entry.glyphIndent) <= 1,
+        `the ${entry.kind} entry's glyph starts at its own left edge (indent ${entry.glyphIndent}px)`
+      );
+      assert.equal(entry.fontSize, '11px', `\`proto:4683\`: the ${entry.kind} entry is 11px`);
+      assert.equal(entry.fontWeight, '600', `\`proto:4683\`: the ${entry.kind} entry is 600`);
+      assert.equal(entry.glyphFontSize, '10px', '`proto:4683`: a 10px glyph');
+      assert.equal(entry.glyphWidth, '14px', '`proto:4683`: a 14px glyph column');
+      assert.ok(
+        entry.labelHeight <= entry.labelLineHeight * 1.5,
+        `the ${entry.kind} entry's one-word label fits a 150px panel on one line ` +
+          `(${entry.labelHeight}px over a ${entry.labelLineHeight}px line)`
+      );
+      // THE ANTI-DRIFT CLAIM, and the reason the reference marks are in this document at all.
+      assert.equal(
+        entry.glyphColor,
+        entry.referenceColor,
+        `the ${entry.kind} entry is inked by the same rule the row's own mark is`
+      );
+    }
+
+    // …and four DIFFERENT inks, so "each carries its kind's colour" is a statement about four
+    // kinds rather than about one colour applied four times.
+    assert.equal(
+      new Set(report.entries.map((entry) => entry.glyphColor)).size,
+      4,
+      `the four kinds are four colours (got ${report.entries.map((entry) => entry.glyphColor).join(', ')})`
+    );
+  } finally {
+    await context.close();
+  }
+
+  // THE WIDTH'S OWN SOURCE. The primitive writes the computed width onto the node, so the
+  // measurement above proves the geometry a 150px panel produces and this proves 150 is the
+  // number the caller asks for.
+  assert.match(
+    orMenuGroupCardSource,
+    /minWidth=\{150\}/,
+    '`proto:2292` fixes the panel at 150px, so the caller must ask for exactly that'
+  );
+  assert.match(orMenuGroupCardSource, /maxWidth=\{150\}/, 'and must not let it grow past it');
+});
+
+
+
+test("the requirement row's two dashed affordances paint at all, and at the design's two scales", async () => {
+  // MEASURED, BECAUSE THE SHEET SAID OTHERWISE AND WAS NOT PAINTING (issue 1373, round 8).
+  //
+  // `or…` and `+ Tag` are the two affordances a requirement row carries, and `styles/fabricate.css`
+  // stated a dashed edge, a tint and a transparent fill for each — bound to the shared chip class,
+  // because both rendered through `Chip`. Every one of those properties is ALSO declared in
+  // `Chip.svelte`'s own scoped block, which `svelte.config.js` injects UNLAYERED while
+  // `module.json` imports the sheet at `layer(modules)`. An unlayered declaration beats a layered
+  // one at any specificity, so both rules matched, both were discarded, and the two shipped as
+  // the default filled neutral chip: 20px tall, a SOLID `--fab-border` edge, `--fab-text` ink, a
+  // 10px corner and a fill. Two rounds of this issue believed otherwise, and no gate could
+  // disagree — stylelint does not read `.svelte`, Svelte's unused-selector pass never sees the
+  // sheet, and a fixture that loads both flat reports the sheet winning.
+  //
+  // So this test is written in the LAYER ORDER THAT SHIPS, and it measures the CHIP as a control:
+  // the same fixture renders a plain `Chip` beside the two, so "these two are not chips" is a
+  // measured difference against the real primitive rather than an assertion about a token name.
+  const chipScopedForTriggers = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/Chip.svelte')
+  );
+  const chipProbe = withScopeHash(
+    '<button type="button" class="manager-chip" data-plain-chip><i class="fa-solid fa-plus"></i><span>Chip</span></button>',
+    'manager-chip',
+    chipScopedForTriggers.hashClass
+  );
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 640, height: 240 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; height: 2rem; }
+            }
+            @layer modules { ${css} }
+            ${chipScopedForTriggers.css}
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <div class="fabricate-picker manager-travel-picker manager-recipe-or-picker">
+              <button type="button" class="manager-recipe-or-trigger" data-or-trigger>
+                <i class="fa-solid fa-code-branch"></i><span class="manager-travel-picker-value">or…</span>
+              </button>
+            </div>
+            <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
+              <button type="button" class="manager-recipe-tag-trigger" data-tag-trigger>
+                <i class="fa-solid fa-plus"></i><span class="manager-travel-picker-value">Tag</span>
+              </button>
+            </div>
+            ${chipProbe}
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const read = (selector) => {
+        const node = document.querySelector(selector);
+        const style = getComputedStyle(node);
+        return {
+          height: Number(node.getBoundingClientRect().height.toFixed(2)),
+          borderStyle: style.borderTopStyle,
+          borderRadius: style.borderTopLeftRadius,
+          color: style.color,
+          background: style.backgroundColor,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          justifyContent: style.justifyContent,
+        };
+      };
+      return {
+        or: read('[data-or-trigger]'),
+        tag: read('[data-tag-trigger]'),
+        chip: read('[data-plain-chip]'),
+      };
+    });
+
+    // THE CONTROL IN BOTH SENSES. This is what the two affordances were rendering as, so every
+    // claim below is a measured difference from it rather than a value read off the sheet.
+    assert.equal(
+      report.chip.borderStyle,
+      'solid',
+      'the plain chip is the filled solid-edged badge both affordances were shipping as'
+    );
+
+    // `proto:2290`: 26px — a rung on the control-height ladder, and the height of the stepper it
+    // stands beside — with a 7px corner, 9.5px/600 text and a dashed `--border-strong` edge.
+    assert.equal(report.or.borderStyle, 'dashed', 'the "or…" trigger is an affordance, not a fill');
+    assert.equal(report.or.height, 26, '`proto:2290`: 26px');
+    assert.equal(report.or.borderRadius, '7px', '`proto:2290`: a 7px corner');
+    assert.equal(report.or.fontSize, '9.5px', '`proto:2290`: 9.5px');
+    assert.equal(report.or.fontWeight, '600', '`proto:2290`: 600');
+    assert.equal(
+      report.or.background,
+      'rgba(0, 0, 0, 0)',
+      '`proto:2290` gives the affordance no fill of its own'
+    );
+    assert.notEqual(
+      report.or.justifyContent,
+      'center',
+      'and it displaces the host `button { justify-content: center }` rather than inheriting it'
+    );
+
+    // `proto:2256`: a ~20px stadium in the TAG tint at 10px/600, which is a different scale from
+    // `or…` on purpose — one is a control among controls, the other a chip among chips.
+    assert.equal(report.tag.borderStyle, 'dashed', 'the `+ Tag` pill is an affordance too');
+    assert.equal(report.tag.borderRadius, '999px', '`proto:2256`: a stadium');
+    assert.equal(report.tag.fontSize, '10px', '`proto:2256`: 10px');
+    assert.equal(report.tag.fontWeight, '600', '`proto:2256`: 600');
+    assert.equal(
+      report.tag.background,
+      'rgba(0, 0, 0, 0)',
+      '`proto:2256` gives it no fill either — the chips beside it are the filled things'
+    );
+    assert.ok(
+      report.tag.height <= 22,
+      `\`proto:2256\` draws a pill no taller than the chips it stands among (got ${report.tag.height}px)`
+    );
+    // The two carry DIFFERENT inks, and neither is the chip's. `+ Tag` is in the tag family
+    // because a tag is what it adds; `or…` is quiet because it offers four kinds and favours none.
+    assert.notEqual(report.tag.color, report.chip.color, 'the `+ Tag` pill carries the tag tint');
+    assert.notEqual(report.or.color, report.tag.color, 'and `or…` is not in the tag family');
+  } finally {
+    await context.close();
+  }
+
+  // THE MARKUP HALF. A fixture goes on measuring itself long after the component stops emitting
+  // it, so the claim that these ARE the two triggers is pinned at both call sites: neither may
+  // ask for the chip shape whose own scoped block is what discarded the rules above.
+  assert.doesNotMatch(
+    orMenuGroupCardSource,
+    /\n\s+triggerChip\b/,
+    'the "or…" trigger is a bare button this sheet can style, not a Chip'
+  );
+  assert.doesNotMatch(
+    readFileSync(
+      resolve(__dirname, '../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte'),
+      'utf8'
+    ),
+    /\n\s+triggerChip\b/,
+    'and so is `+ Tag`'
+  );
+  for (const retired of ['manager-recipe-or-trigger', 'manager-recipe-tag-trigger']) {
+    assert.doesNotMatch(
+      css,
+      new RegExp(`\\.manager-chip\\.${retired}`),
+      `the discarded chip-bound rules for \`${retired}\` are retired rather than left reading as live`
+    );
+  }
 });

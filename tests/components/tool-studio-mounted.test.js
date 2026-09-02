@@ -42,6 +42,9 @@ const harness = createMountedComponentHarness({
     // The repair block's plain-language readback (issue 1373, maintainer round 5): a pure
     // module so the two scopes that render the block share one copy of the sentence.
     'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
+    // The ONE ingredient-kind table (issue 1373, round 8): the requirement row's plate glyph and
+    // tint, its kind select's four words, and the `or…` menu's four entries all read it.
+    'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',

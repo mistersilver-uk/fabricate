@@ -2814,6 +2814,18 @@ It is a single flat **"Accept instead"** list of the four real ingredient match 
 A requirement that already holds two or more alternatives renders that choice as four explicit dashed adders at the foot of its box instead, worded `alt component` / `alt tag` / `alt essence` / `alt currency`: inside a choice group every one of them appends an ALTERNATIVE, and `Add component` beside `Add cost` is two verbs for one act.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
+The menu is a COMPACT PANEL OF KINDS rather than a picker of records, and its scale says so: a fixed 150px panel inset on its own frame, headed by an uppercase **"Accept instead"** eyebrow, over four entries that read from their own left edge.
+The header is what lets each entry be one word.
+The verb belongs to the panel, so an entry states only the kind it appends — `Component`, `Tag`, `Essence`, `Currency` — and never repeats "Add", "alternative" or a synonym for the row's own vocabulary.
+The width is stated by the caller and not left to the shared picker's own floor, which is sized for lists of world components and actors and is wide enough that the panel overflowed the application window.
+
+Each entry's glyph carries its KIND'S OWN TINT, and it is the same declaration that inks the row's plate and its named pill rather than a second table of colours.
+One table per kind — glyph, tint and one-word name — is what keeps the menu, the row's kind select and the row's plate from naming the same four kinds three different ways; two of them had already drifted to different glyphs for a component and for a tag.
+
+Both of the requirement row's in-row affordances — the `or…` trigger and a tag arm's `+ Tag` — are DASHED OUTLINES with no fill, because each is an affordance for adding standing among controls and chips that are values.
+They are drawn at their own two scales: `or…` is a control among controls, level with the quantity stepper beside it, while `+ Tag` is a chip among chips.
+Neither may be rendered through the shared chip primitive: that component declares its own border, ink and fill in a scoped block, which the runtime injects UNLAYERED while `styles/fabricate.css` is imported at `layer(modules)`, so a sheet rule naming any of those three properties for such a control is emitted, matches, and is discarded — leaving both affordances painted as the default filled neutral chip with nothing reporting it.
+
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
 Currency-cost affordances — the set-level "Add cost" button, the requirement-level "Add cost" button, and the "or…" popover's Currency choice — render only when the system's currency feature is **enabled** (`requirements.currency.enabled === true`) AND the world configures units, not merely when units exist.
 Unit presence alone is not authorisation, and since issue 1278 it is emphatically not: the ladder is WORLD scope, so a world with a fully authored ladder still has systems that do not charge for anything, and the participation toggle is the only thing that says which do.

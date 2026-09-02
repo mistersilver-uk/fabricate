@@ -538,7 +538,7 @@ function compileManagerRoot() {
       )
     );
   }
-  for (const recipeModule of ['recipeReadiness.js']) {
+  for (const recipeModule of ['recipeReadiness.js', 'ingredientKindMeta.js']) {
     const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`);
     mkdirSync(dirname(moduleDestination), { recursive: true });
     writeFileSync(
