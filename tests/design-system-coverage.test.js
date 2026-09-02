@@ -315,11 +315,17 @@ test('no library entry recorded as unbuilt ships as a component', () => {
  * adjudication rather than a primitive that shipped undocumented.
  */
 const UNDOCUMENTED_ROWS = [
-  // Three arrived together at issue 1458, and none of them is an undocumented PRIMITIVE: all
-  // three are adjudicated NON-MEMBERS recorded with the measurement that ruled them out of the
-  // `SearchablePopover` conversion — a multi-select checklist in the player window, two typeahead
-  // comboboxes, and four `role="menu"` action menus. That is the register doing its job, and it
-  // is the same growth-is-not-always-debt case `downtime/WorldDowntimeTabs` records below.
+  // Two of the three that arrived together at issue 1458 are adjudicated NON-MEMBERS rather than
+  // undocumented PRIMITIVES, recorded with the measurement that ruled them out of the
+  // `SearchablePopover` conversion — a multi-select checklist in the player window, and two
+  // typeahead comboboxes. That is the register doing its job, and it is the same
+  // growth-is-not-always-debt case `downtime/WorldDowntimeTabs` records below.
+  //
+  // The third, `environment/CompositionList`, is no longer one of them. Issue 1446 measured its
+  // two callers, moved it to `DESIGN_SYSTEM_PRIMITIVES`, and adjudicated its `library` column
+  // against three entries — so it stays on THIS list, and for the ordinary reason: it is a member
+  // of the set that no `library.html` specimen names. Its four `role="menu"` action menus are
+  // still a recorded non-conversion; a component can be a primitive and carry one.
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',

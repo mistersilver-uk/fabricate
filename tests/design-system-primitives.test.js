@@ -54,6 +54,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { measureImporters } from '../scripts/lib/componentImporters.js';
 import {
   DESIGN_SYSTEM_PRIMITIVES,
   NOT_A_PRIMITIVE,
@@ -274,8 +275,8 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 45, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 47, 'the shipped primitive set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 10, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -432,6 +433,210 @@ test('(c) every manifest row names a file that exists', () => {
       `${row.path} is in the manifest and not on disk. A renamed or deleted primitive leaves a ` +
         'row that can never match anything, and a derivation over it emits a name nothing has.'
     );
+  }
+});
+
+/**
+ * The import graph under `src/`, measured once for every clause below.
+ *
+ * `scripts/lib/componentImporters.js` states the two ways a matcher for this is wrong here — a
+ * line-at-a-time scan that misses 11% of the graph, and a whole-file one that spans a docblock into
+ * the next statement — and why it compares whole resolved paths and never a basename.
+ */
+const IMPORTERS = measureImporters(REPO_ROOT);
+
+/** A component this repository is known to import heavily. See the control clause below. */
+const POPULATED_CONTROL = 'src/ui/svelte/apps/manager/Chip.svelte';
+
+/** The number words a `why` may spell a caller count with, plus the digits. */
+const COUNT_WORDS = new Map([
+  ['zero', 0],
+  ['one', 1],
+  ['two', 2],
+  ['three', 3],
+  ['four', 4],
+  ['five', 5],
+  ['six', 6],
+  ['seven', 7],
+  ['eight', 8],
+  ['nine', 9],
+  ['ten', 10],
+]);
+
+/**
+ * A caller count stated in prose: a numeral or a number word immediately before `caller`/`callers`.
+ *
+ * `\s+` rather than `[\s-]+` is deliberate. `two-caller bar` names the RULE, not this row's count,
+ * and a hyphen is what distinguishes the two throughout this corpus.
+ */
+const PROSE_CALLER_COUNT = /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+callers?\b/gi;
+
+/** A backticked component path or partial path, as the `why` prose writes one. */
+const BACKTICKED_COMPONENT = /`([^`]*\.svelte)`/g;
+
+/**
+ * Whether `token` names `file`, anchored on the path separator.
+ *
+ * The anchor is the whole point and the register records why on its own `DropZone` row: a suffix
+ * test without it accepts `DropZone.svelte` for `apps/manager/ItemDropZone.svelte` and credits a
+ * dead component with seven importers. This is only ever asked against ONE row's own caller list,
+ * so the ambiguity a bare basename would carry across the tree is not reintroduced.
+ *
+ * @param {string} file repository-relative POSIX path
+ * @param {string} token what the prose wrote
+ * @returns {boolean}
+ */
+const namesFile = (file, token) => file === token || file.endsWith(`/${token}`);
+
+test('the importer scan is measuring a populated tree, not silently matching nothing', () => {
+  // THE CONTROL, SHIPPED AS A CLAUSE RATHER THAN RUN ONCE BY HAND.
+  //
+  // Every clause below is satisfied by a scan that returns nothing for everything: zero measured
+  // importers equals a `callers: []` row, and the promotion trigger cannot fire on a graph with no
+  // edges. A uniformly-empty result reads EXACTLY like a clean tree, and that is not hypothetical —
+  // the audit that opened issue 1446 returned zero importers for every row on its first pass,
+  // through broken quoting inside the scan, and it was caught only because someone thought to ask
+  // the scan about a component they knew had dozens of callers.
+  //
+  // So that question is asked here, every run. `Chip` is the one this manifest calls "the
+  // highest-traffic primitive in the codebase"; the bound is far under its measured count so that
+  // ordinary churn does not touch it, and far over anything a broken matcher produces.
+  assert.ok(
+    IMPORTERS.fileCount > 500,
+    `the walk found ${IMPORTERS.fileCount} files under src/, so it is not reaching the tree`
+  );
+  assert.ok(
+    IMPORTERS.importEdgeCount > 1000,
+    `the scan resolved ${IMPORTERS.importEdgeCount} import edges across the whole of src/, which ` +
+      'is far too few to be this repository. The matcher has stopped matching, and every caller ' +
+      'clause below is now green over an empty graph.'
+  );
+  assert.ok(
+    IMPORTERS.importersOf(POPULATED_CONTROL).length >= 20,
+    `${POPULATED_CONTROL} measured ${IMPORTERS.importersOf(POPULATED_CONTROL).length} importers. ` +
+      'It is the most-imported component in the repository, so a low count here means the scan is ' +
+      'broken rather than that the tree changed.'
+  );
+});
+
+test('(d) every recorded non-member names exactly the callers it has', () => {
+  // THE CLAUSE THE REGISTER WAS MISSING, AND THE THREE SHAPES IT CATCHES.
+  //
+  // The dead-component rows always had their zero-importer claim re-checked, by the disk clause
+  // plus PRIMITIVES_WITH_NO_FRAME. The count-justified rows had nothing, and measured at issue
+  // 1446 three of them were wrong:
+  //
+  //   * `InspectorActionButton` had TWO callers and a row that said so, in a table for components
+  //     with fewer. It said it was owed a move for two issues and nothing moved it.
+  //   * `environment/CompositionList` claimed ONE caller, named `EnvironmentCompositionTab.svelte`
+  //     as that caller, and had TWO. No file of that name has ever existed in this repository. The
+  //     row was authored the day before it was found and every gate passed on it.
+  //   * `recipe-item/RecipeItemLimitsTab` had the right COUNT beside the wrong FILE.
+  //
+  // Equality against the measurement is what closes all three at once, and it is why the field
+  // holds PATHS: a count check alone cannot see the third, and an existence check alone cannot see
+  // the third either, because `RecipeItemEditorTabs.svelte` is a real file — just not this one's
+  // caller.
+  assert.ok(NOT_A_PRIMITIVE.length > 0, 'the non-member table is empty, so this has no domain');
+  for (const row of NOT_A_PRIMITIVE) {
+    assert.ok(
+      Array.isArray(row.callers),
+      `${row.path} carries no \`callers\` array. spec.md requirement "The primitive set is a ` +
+        'closed, versioned vocabulary" has a candidate below the bar recorded WITH ITS CALLERS ' +
+        'NAMED; an absent field is not an empty one, and only one of the two can be checked.'
+    );
+    for (const caller of row.callers) {
+      assert.ok(
+        existsSync(path.join(REPO_ROOT, caller)),
+        `${row.path} names ${caller} as a caller and no such file exists. That is the phantom ` +
+          'this clause was written for: the row read like a decision, the file had never existed, ' +
+          'and nothing anywhere resolved the name.'
+      );
+    }
+    assert.deepEqual(
+      row.callers,
+      IMPORTERS.importersOf(row.path),
+      `${row.path} records callers that are not the callers it has. The recorded set is the ` +
+        'claim this register exists to let a later reader re-test; the measured set is what the ' +
+        'tree says. Correct the row — or, if it has reached two, move it to ' +
+        'DESIGN_SYSTEM_PRIMITIVES, which is what two independent callers mean.'
+    );
+  }
+});
+
+test('(d) no recorded non-member has reached the membership bar', () => {
+  // The promotion trigger, stated as its own clause rather than left implicit in the equality
+  // above. It is the one this register has now missed twice, and it fails with the sentence a
+  // reader needs rather than as a mismatched array.
+  for (const row of NOT_A_PRIMITIVE) {
+    assert.ok(
+      row.callers.length < 2,
+      `${row.path} is recorded as NOT a primitive and has ${row.callers.length} independent ` +
+        `callers: ${row.callers.join(', ')}. spec.md requirement "The primitive set is a closed, ` +
+        'versioned vocabulary" puts a candidate into the set at two or more, so this row is owed a ' +
+        'move to DESIGN_SYSTEM_PRIMITIVES — with its own `library` adjudication, its own ' +
+        '`evidence` derivation, and both table length pins recomputed.'
+    );
+  }
+});
+
+test('(d) every shipped primitive still clears the membership bar', () => {
+  // The bar from the member side, which is also the broadest non-vacuity signal in this file: 46
+  // independent rows, each measured against the tree. A row that fell to one caller is a primitive
+  // whose second adopter was deleted or renamed, and it belongs on NOT_A_PRIMITIVE with the
+  // measurement that put it there — the register moves in both directions.
+  assert.ok(DESIGN_SYSTEM_PRIMITIVES.length > 0, 'the member table is empty, so this has no domain');
+  for (const row of DESIGN_SYSTEM_PRIMITIVES) {
+    const measured = IMPORTERS.importersOf(row.path);
+    assert.ok(
+      measured.length >= 2,
+      `${row.path} is a member of the shared primitive set and ${measured.length} file(s) import ` +
+        `it: ${JSON.stringify(measured)}. The bar is two or more independent callers.`
+    );
+    assert.ok(
+      !('callers' in row),
+      `${row.path} is a member and carries a \`callers\` field. Members are held to the BAR, not ` +
+        'to an enumeration — `Chip` has 59 importers and an exact list there would be a manifest ' +
+        'edit on every unrelated PR that adds one usage. A half-filled field on some members and ' +
+        'not others is the ambiguity this asymmetry is deliberate to avoid.'
+    );
+  }
+});
+
+test('(d) no non-member prose contradicts its measured callers', () => {
+  // THE FIELD IS THE AUTHORITY AND THE SENTENCE MUST NOT DISAGREE WITH IT.
+  //
+  // Adding a structured field does not by itself stop a row being wrong; it relocates where it can
+  // be wrong. A row whose `callers` is correct and whose prose still reads "ONE caller,
+  // `SomeOtherFile.svelte`" is exactly as misleading as the rows this change repaired, and the
+  // repair would look complete. So both directions are asserted: a count spelled in the prose has
+  // to agree with the field, and every path in the field has to appear in the prose.
+  //
+  // WHAT THIS DOES NOT CLOSE, stated rather than implied: the prose may still mention an
+  // ADDITIONAL component near its caller claim, and no non-fragile rule distinguishes "and it is a
+  // route tab under `RecipeItemEditorTabs`" from a second caller claim. The field is what a reader
+  // and every clause above resolve; the prose is a pointer, and it is now a pointer that cannot
+  // name a different count or omit a caller.
+  for (const row of NOT_A_PRIMITIVE) {
+    for (const [, spelling] of row.why.matchAll(PROSE_CALLER_COUNT)) {
+      const stated = COUNT_WORDS.get(spelling.toLowerCase()) ?? Number(spelling);
+      assert.equal(
+        stated,
+        row.callers.length,
+        `${row.path} writes "${spelling} caller" in its \`why\` and records ` +
+          `${row.callers.length} in \`callers\`. One of the two is wrong, and the field is the ` +
+          'one the tree was measured against.'
+      );
+    }
+    const namedInProse = [...row.why.matchAll(BACKTICKED_COMPONENT)].map((match) => match[1]);
+    for (const caller of row.callers) {
+      assert.ok(
+        namedInProse.some((token) => namesFile(caller, token)),
+        `${row.path} records ${caller} as a caller and its \`why\` never names it. The prose is ` +
+          'what a reader acts on, so a caller present only in the data is a caller the next ' +
+          'adjudication will not see.'
+      );
+    }
   }
 });
 
