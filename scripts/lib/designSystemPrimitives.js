@@ -72,7 +72,8 @@
  *
  * ── ROW SHAPE ──────────────────────────────────────────────────────────────────────────────────
  *
- *   { path, library, evidence, why }
+ *   { path, library, evidence, why }              on {@link DESIGN_SYSTEM_PRIMITIVES}
+ *   { path, library, evidence, callers, why }     on {@link NOT_A_PRIMITIVE}
  *
  * `path`    Repository-relative POSIX path of the shipped implementation, exactly as a diff names
  *           it. Asserted to exist on disk.
@@ -81,8 +82,39 @@
  * `evidence` `'broad'` or `'targeted'`. See below — this is the field with consequences, and the
  *           integrity test asserts that EVERY row carries one of the two, so no row can be exempt
  *           from both clauses by a typo.
+ * `callers` NON-MEMBER ROWS ONLY. Every file under `src/` that imports this one, as
+ *           repository-relative POSIX paths in code-point order — the spec's "WITH ITS CALLERS
+ *           NAMED", as data. Asserted EQUAL to what `scripts/lib/componentImporters.js` measures
+ *           against the tree, so the claim cannot drift from the repository it describes.
  * `why`     The judgement, in prose. For a `null` library, why the correspondence is not made; for
- *           a non-member, its callers named, or the fact that it has none.
+ *           a non-member, why it is recorded rather than merely absent.
+ *
+ * ── WHY `callers` IS A FIELD AND NOT A SENTENCE, AND WHY MEMBERS DO NOT CARRY IT ───────────────
+ *
+ * It was a sentence, and sentences are not checked. Issue 1446 measured all ten count-justified
+ * non-member rows against the tree and found TWO wrong in the direction that hides a converged
+ * primitive and a THIRD wrong about which file its caller was. `InspectorActionButton` had said in
+ * its own text, for two issues, that it was owed a move nobody made. `environment/CompositionList`
+ * claimed one caller, named `environment/EnvironmentCompositionTab.svelte` as that caller, and had
+ * two — and no file of that name has ever existed anywhere in this repository. Its row was
+ * written and merged the day before it was found, and every gate passed. The limits tab under
+ * `recipe-item/` had the right COUNT beside the wrong FILE, naming a real sibling that does not
+ * import it — which is the half a count check on its own cannot see, and the reason the field
+ * holds PATHS rather than a number.
+ *
+ * Paths, and no line numbers. This module's own citation rule above records what happened the last
+ * time it wrote `NNN`: a line citation cannot be resolved by anything, so it rots the first time a
+ * line is inserted above it. A caller's line moves on every edit to that caller; its path moves
+ * only when it is renamed, which is a rename the equality assertion reports.
+ *
+ * MEMBERS DO NOT CARRY IT, and the asymmetry is the spec's, not a convenience. The requirement
+ * cited below obliges a candidate BELOW the bar to be recorded with its callers named; it obliges
+ * a member to nothing of the kind, and for good reason — `Chip` has 59 importers and `EmptyState`
+ * 46, so an exact list there would be a manifest edit on every unrelated PR that adds one usage,
+ * and a register that must be edited to add a `<Chip>` is a register people route around. What a
+ * member is held to is the bar itself, which the integrity test asserts by MEASURING every member
+ * at two or more importers. The two halves together mean no row's membership rests on an unchecked
+ * count in either direction.
  *
  * There is deliberately no `status` field. Membership is which TABLE holds the row —
  * {@link DESIGN_SYSTEM_PRIMITIVES} or {@link NOT_A_PRIMITIVE} — and a field restating that is
@@ -142,11 +174,13 @@
  *
  * spec.md requirement "The primitive set is a closed, versioned vocabulary" — two or more
  * INDEPENDENT callers. An importer is any other file under `src/` that imports the component by
- * path. Nine ADJUDICATED candidates are recorded in {@link NOT_A_PRIMITIVE} rather than omitted,
- * because that same requirement obliges a candidate with fewer to be "recorded as ruled out WITH
- * ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than
- * an oversight". EIGHT of those nine are below the bar as this is measured; see that docblock for
- * the ninth, which acquired a second caller and is owed a move nobody has made.
+ * path, which is the reading `scripts/lib/componentImporters.js` implements and the only one a
+ * guard can decide. Ten ADJUDICATED candidates are recorded in {@link NOT_A_PRIMITIVE} rather than
+ * omitted, because that same requirement obliges a candidate with fewer to be "recorded as ruled
+ * out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision
+ * rather than an oversight". All ten are below the bar, and that is MEASURED rather than asserted:
+ * the integrity test compares each row's `callers` against the tree and fails a non-member that has
+ * reached two, which is the promotion trigger this register missed twice before issue 1446.
  *
  * ADJUDICATED is the bound, and it is load-bearing: 48 of the 73 top-level `.svelte` files under
  * `apps/manager/` sit below the two-caller bar, and {@link NOT_A_PRIMITIVE} is emphatically not a
@@ -156,11 +190,11 @@
  *
  * `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js` is NOT
  * derived from this manifest and must not become so. It answers a different question — can
- * omitting this file HANG a mounted tree — and three of its entries are on it at one caller, or
- * from a nested directory, for recorded reasons the two-caller predicate structurally cannot
- * express (`EssenceQuantityCard`, `InspectorActionButton`, `RowDisclosure`). Deriving it here
- * would silently drop those three, and a missing entry there does not fail a suite: it hangs it
- * and reports `# cancelled`.
+ * omitting this file HANG a mounted tree — and its entries are on it for recorded reasons the
+ * two-caller predicate structurally cannot express: `RowDisclosure` is on it at ONE caller, and
+ * `EssenceQuantityCard` is on it at two from `apps/manager/components/`, a nested directory this
+ * manifest does not enumerate. Deriving it here would silently drop both, and a missing entry there
+ * does not fail a suite: it hangs it and reports `# cancelled`.
  */
 import { readFileSync } from 'node:fs';
 
@@ -187,20 +221,31 @@ const MANIFEST = JSON.parse(
 );
 
 /**
- * Freeze a table read from JSON, rows and all.
+ * Freeze a table read from JSON, rows and all, INCLUDING a row's array-valued fields.
  *
  * `JSON.parse` hands back fresh MUTABLE objects, where the literals this replaced were frozen at
  * both levels. That is not decoration: these tables are module-level singletons shared by every
  * importer in one process — `viewLabCases.js` derives routing from them at ITS import time, and a
  * test that mutated a row in place would change what a later suite in the same run routes. Freezing
- * both levels makes such a write throw in strict mode instead of silently succeeding.
+ * every level makes such a write throw in strict mode instead of silently succeeding.
+ *
+ * The array level is not a generalisation for its own sake. `callers` is the field an integrity
+ * assertion compares against the tree, and a shallow freeze leaves exactly that value writable —
+ * so a suite could push a path onto a row and green the comparison it was supposed to fail, in a
+ * process another suite then reads. The one field that must not be quietly editable was the one
+ * field two levels of freezing did not reach.
  *
  * @template {object} Row
  * @param {Row[]} rows
  * @returns {readonly Row[]}
  */
 function frozenTable(rows) {
-  return Object.freeze(rows.map((row) => Object.freeze(row)));
+  return Object.freeze(
+    rows.map((row) => {
+      for (const value of Object.values(row)) if (Array.isArray(value)) Object.freeze(value);
+      return Object.freeze(row);
+    })
+  );
 }
 
 /**
@@ -257,26 +302,32 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * broad-signal set, a `library.html` entry it does or does not implement, an entry on the
  * mounted-harness hang guard. It is NOT a census of the directory. 48 of the 73 top-level `.svelte`
  * files under `apps/manager/` sit below the two-caller bar, and `components/` holds screen regions
- * and dead code besides; listing all of them would bury the nine judgements that were actually
+ * and dead code besides; listing all of them would bury the ten judgements that were actually
  * made in dozens that were not, and the requirement cited above asks for recorded DECISIONS, not
  * for an inventory.
  *
  * So the next reader has two wrong moves available and neither is what this list wants: adding the
- * other 46 top-level manager files, and deleting `InspectorActionButton` or `SystemOverviewView` as
- * inconsistent with them. The distinguishing fact is written down beside each row.
+ * other 47 top-level manager files, and deleting `SystemOverviewView` as inconsistent with them.
+ * The distinguishing fact is written down beside each row.
  *
- * ── ONE ROW IS OWED A MOVE, AND SAYING SO IS THE POINT OF THE LIST ─────────────────────────────
+ * ── EVERY ROW HERE IS RE-MEASURED, WHICH IS WHAT MAKES IT A REGISTER RATHER THAN A CLAIM ───────
  *
- * `InspectorActionButton` predicted its own exit — "this row moves to
- * {@link DESIGN_SYSTEM_PRIMITIVES} when a second inspector adopts it" — and a second inspector
- * HAS adopted it: `scoped/WorldEssenceCataloguePage.svelte` imports it as of the world essence
- * surfaces (issue 1400), alongside `essences/EssenceBrowserInspector.svelte`. So it now meets the
- * two-caller bar and this is no longer the right table for it. Issue 1429 measured that while
- * recomputing the totals above and deliberately did NOT make the move: it needs its own
- * adjudication of the `library` column, and it shifts both {@link DESIGN_SYSTEM_PRIMITIVES} and
- * {@link NOT_A_PRIMITIVE} length pins, which is a change that should be reviewed as itself rather
- * than ride along inside a tab-strip conversion. It is recorded here so the next reader re-tests
- * the count rather than re-deriving the question, which is what this register exists for.
+ * The requirement above asks that a later reader be able to "re-test the count rather than
+ * re-derive it". Until issue 1446 nobody could: the count was a word in a sentence, and the only
+ * clause that touched the tree was the disk check on `path`. Every row now carries `callers` as
+ * data, and `tests/design-system-primitives.test.js` asserts it EQUALS what
+ * `scripts/lib/componentImporters.js` measures — so a row that has quietly reached two callers
+ * fails as a promotion it is owed, a row naming a caller that does not import it fails as a wrong
+ * file, and a row naming a caller that does not exist fails as a phantom. All three had happened.
+ *
+ * `InspectorActionButton` was the worked example and is DELIBERATELY GONE, not lost. It predicted
+ * its own exit here — "this row moves to {@link DESIGN_SYSTEM_PRIMITIVES} when a second inspector
+ * adopts it" — `scoped/WorldEssenceCataloguePage.svelte` adopted it at issue 1400, issue 1429
+ * corrected the sentence without making the move, and it then sat here for two more issues saying
+ * out loud that it was in the wrong table while every gate passed. Issue 1446 made the move and
+ * closed the gap that let it sit. `environment/CompositionList` left at the same time and was
+ * worse: its row was authored the previous day, claimed one caller, and named a file for that
+ * caller which has never existed. Do not re-add either row.
  *
  * ── THE `evidence` COLUMN HERE ─────────────────────────────────────────────────────────────────
  *
@@ -284,23 +335,26 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * `BROAD_SIGNAL_PATTERN` DOES with the path, not what anyone thinks the file deserves. The five
  * under `src/ui/svelte/components/` are `'broad'` because that directory leg matches them today
  * whatever anyone thinks of them, which is the point issue 1378 makes: a directory cannot tell a
- * primitive from a component that merely lives there. The four under `apps/manager/` —
- * `InspectorActionButton`, `SystemOverviewView`, `downtime/WorldDowntimeTabs` and
- * `environment/EnvironmentValidationTab` — are
- * `'targeted'` because membership there is by NAME and none of them is on a name list, so the
- * frames that claim each by `sourceMatches` are reached.
+ * primitive from a component that merely lives there. The other five — `SystemOverviewView`,
+ * `downtime/WorldDowntimeTabs`, `environment/EnvironmentValidationTab`,
+ * `recipe-item/RecipeItemLimitsTab` and `apps/crafting/ComponentSourcesBar` — are `'targeted'`,
+ * the four manager ones because membership in the broad set there is by NAME and none of them is
+ * on a name list, and the crafting one because the pattern does not reach that directory at all.
+ * Either way the frames that claim each by `sourceMatches` are reached.
  *
- * ── THE TWO ROWS THAT ARE NOT UNDER-CALLED CANDIDATES ──────────────────────────────────────────
+ * ── THE ROWS THAT ARE NOT UNDER-CALLED CANDIDATES ──────────────────────────────────────────────
  *
- * `SystemOverviewView` and `environment/EnvironmentValidationTab` were added at issue 1444 and are
- * a different kind of non-member from the other seven: both are plainly single-caller, but neither
- * was proposed as a primitive in its own right. They were proposed as unconverted CALL SITES of
- * `EditorValidationSurface` — the plan that change came from named four hand-rollers of the
- * validation surface and two of them render a different surface entirely — so what is recorded
- * here is the measurement that settles that, not a caller count. The distinction matters because
- * the repair the register exists to prevent is different in each case: for the other seven it is
- * "someone re-proposes promoting this", and for these two it is "someone re-proposes converting
- * this", which would be a visual redesign filed as an adoption.
+ * `SystemOverviewView` and `environment/EnvironmentValidationTab` were added at issue 1444, and
+ * `recipe-item/RecipeItemLimitsTab` and `apps/crafting/ComponentSourcesBar` at issue 1458. They are
+ * a different kind of non-member from the other six: all four are plainly single-caller, but none
+ * was proposed as a primitive in its own right. The first two were proposed as unconverted CALL
+ * SITES of `EditorValidationSurface` — the plan that change came from named four hand-rollers of
+ * the validation surface and two of them render a different surface entirely — and the second two
+ * as unconverted call sites of `SearchablePopover`. So what each records is the measurement that
+ * settles that, not a caller count. The distinction matters because the repair the register exists
+ * to prevent is different in each case: for the other six it is "someone re-proposes promoting
+ * this", and for these four it is "someone re-proposes converting this", which would be a visual
+ * redesign or a change of announced widget filed as an adoption.
  *
  * `checks/ChecksEditorTabs` was recorded here too and is DELIBERATELY GONE, not lost. It was recorded here by
  * issue 1038 on the ground that its count is a bare mono numeral rather than a chip and "the two
@@ -320,9 +374,12 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * genuinely functional capabilities `EditorTabs` still lacks.
  *
  * That is why the integrity test runs its per-row clauses over THESE rows too. The disk clause in
- * particular is live here: two of the nine name files nothing imports.
+ * particular is live here: two of the ten name files nothing imports, and their `callers` is the
+ * empty array rather than an omitted field, because "measured, and there are none" and "nobody
+ * filled this in" must not be the same value.
  *
- * @type {readonly {path: string, library: string|null, evidence: string, why: string}[]}
+ * @type {readonly {path: string, library: string|null, evidence: string,
+ *   callers: readonly string[], why: string}[]}
  */
 export const NOT_A_PRIMITIVE = frozenTable(MANIFEST.notAPrimitive);
 

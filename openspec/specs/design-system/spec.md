@@ -33,7 +33,25 @@ Adding a prop to the primitive that already owns a meaning takes precedence over
 
 A candidate that decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set; it is recorded with the composition that replaces it so it is not re-proposed.
 A candidate MUST have two or more independent callers to enter the set.
+An independent caller is any other file under `src/` that imports the component by path, which is the reading a gate can decide and the one `scripts/lib/componentImporters.js` implements.
 A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than an oversight, and so a later reader can re-test the count rather than re-derive it.
+
+Those recorded callers MUST be a structured field on the row rather than a sentence, and `tests/design-system-primitives.test.js` MUST assert the field EQUALS what the import graph measures.
+"Re-test the count" is what the clause above asks for and what nothing did: the register's caller claims were prose for as long as it existed, and prose is not resolved by anything.
+Measured when the field was introduced, two rows had reached the bar without moving — one of them saying so in its own text for two issues — a third named a real file that does not import it, and a fourth named a file that has never existed in the repository.
+Every gate passed on all four.
+So the count is asserted against the tree, the named callers are asserted to be the measured ones, a non-member that has reached two callers fails as a promotion it is owed, and a member that has fallen below two fails as a row that has stopped being true.
+The prose beside the field MUST NOT state a caller count the field contradicts, and MUST name every caller the field records, because a correct field beside a stale sentence misleads exactly as far as the stale sentence reaches.
+
+Members carry no such field, and the asymmetry is this requirement's: it obliges a candidate BELOW the bar to name its callers and obliges a member to nothing of the kind.
+A member is held to the bar itself, measured the same way.
+An exact caller list on a primitive with dozens of importers would make an unrelated new usage a manifest edit, and a register that must be edited to add a chip is a register that gets routed around.
+
+#### Scenario: A recorded non-member acquires a second caller
+
+- **WHEN** a component recorded as ruled out is imported by a second file under `src/`
+- **THEN** the caller-count gate fails against the recorded row
+- **AND** the row moves into the set with its own library adjudication, its own evidence derivation, and the manifest's table sizes recomputed
 
 #### Scenario: A new surface needs a control the set already contains
 
