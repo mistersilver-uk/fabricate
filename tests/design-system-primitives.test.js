@@ -136,7 +136,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|Chip|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|RollDataExpressionInput|SearchablePopover|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|Chip|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SearchablePopover|SegmentedControl|ToggleCard)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -242,7 +242,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
-  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
   'src/ui/svelte/components/ActorSelectTopBar.svelte',
@@ -275,8 +274,8 @@ test('the inputs every property below quantifies over are alive', () => {
     'the render-file walk reached no nested file, so it is not recursing'
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 47, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 10, 'the recorded non-member set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 46, 'the shipped primitive set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -292,7 +291,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 308);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 284);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {

@@ -127,12 +127,6 @@
       "why": "The resolution-mode chooser card (2 callers, `CraftingSettingsView.svelte` and `GatheringEconomyView.svelte`). `library.html:1606` defers the modes themselves to the resolution-modes capability and specifies no card for choosing one. Targeted: `manager-system-edit-normal` claims it."
     },
     {
-      "path": "src/ui/svelte/apps/manager/RollDataExpressionInput.svelte",
-      "library": "<ExprInput>",
-      "evidence": "broad",
-      "why": "`library.html:1510` and `:1516` — cursor insertion and an actor resolver are behaviour nothing else owns, which is why it is a primitive where `<Bounds>` and `<Currency>` are compositions."
-    },
-    {
       "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
       "library": "<SearchPopover>",
       "evidence": "broad",
@@ -285,6 +279,24 @@
   ],
   "notAPrimitive": [
     {
+      "path": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "callers": [
+        "src/ui/svelte/components/ActorSelectTopBar.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/components/ActorSelectTopBar.svelte`. Recorded because issue 1458 adjudicated its editor popover (`:134`, `:138`) against `SearchablePopover` and found TWO independent disqualifiers, either of which is sufficient. (1) It renders in the PLAYER window under `.fabricate-app-shell`, and all 113 `.manager-travel-*` rules in `styles/fabricate.css` are scoped under `.fabricate-manager` — the panel would portal to a host that is not there and draw completely unstyled. (2) It is a MULTI-SELECT checklist rather than a picker: `toggleAvailable` toggles membership, the popover stays open across choices, and `aria-selected` is true on every chosen actor at once, while `SearchablePopover` has a single `value` and closes on `choose`. Converting it would take four clicks to add four source actors and would tell assistive technology that one option is selected when four are. Its 28 scoped rules carry NO silent-mode trigger — measured, against the file’s own AST — so they would have pruned and warned rather than dying quietly; that is the one at-risk file in the candidate set where the recorded silencing condition does not hold."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/RollDataExpressionInput.svelte",
+      "library": "<ExprInput>",
+      "evidence": "targeted",
+      "callers": [
+        "src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte"
+      ],
+      "why": "DEMOTED at issue 1373, not adjudicated against anything. It cleared the two-caller bar on the Tool check bonus and `WorldModifiersTab`; the bonus stopped authoring a raw expression when the maintainer ruled that a Tool takes its modifiers FROM the world library rather than by typing one, so the picker became `ModifierLibraryRow` and this input lost that caller. The behaviour the original entry credits - cursor insertion and an actor resolver - is unchanged and still unowned elsewhere, so this is a membership fact about caller count, not a judgement that it stopped being well built. Its `sigil` branch has no caller either, since `WorldModifiersTab` passes `sigil={false}`; removing that branch is owed as its own change. One caller: `src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte`."
+    },
+    {
       "path": "src/ui/svelte/apps/manager/SystemOverviewView.svelte",
       "library": null,
       "evidence": "targeted",
@@ -310,6 +322,15 @@
         "src/ui/svelte/apps/manager/EnvironmentEditView.svelte"
       ],
       "why": "ADJUDICATED against `EditorValidationSurface` at issue 1444 and ruled a DIFFERENT SURFACE rather than an unconverted one, so the next audit does not re-propose it. Measured: it renders `.manager-environment-card`, `.manager-environment-check-list` and `.manager-environment-issue-list`, carries no status medallion, no counts rail and no grouped row stack, and expresses severity through `Chip` (`:140`) rather than a `manager-recipe-val-pill`. It writes zero `manager-recipe-val-*` and zero `manager-recipe-rail-*` tokens, and each of its three classes appears in exactly one file. Converting it would be a visual REDESIGN of the environment editor, not an adoption. One caller: `src/ui/svelte/apps/manager/EnvironmentEditView.svelte`."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "callers": [
+        "src/ui/svelte/apps/manager/RecipeItemEditor.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/apps/manager/RecipeItemEditor.svelte`, and it is a route tab rather than a candidate primitive. The caller recorded here until issue 1446 was `recipe-item/RecipeItemEditorTabs.svelte`, a real sibling that imports `EditorTabs` and does not import this tab at all: the COUNT was right and the FILE was wrong, which is the half of the drift a count check on its own cannot see. It is recorded because issue 1458 adjudicated the two `role=\"listbox\"` SITES inside it (`:531`, `:631`) against `SearchablePopover` and ruled them a DIFFERENT WIDGET, which is a decision a later audit would otherwise re-propose from the same grep. They are typeahead COMBOBOXES: neither has a trigger button at all, the suggestion list hangs off an `<input>` whose `aria-expanded={suggestions.length > 0}` (`:537`, `:637`) is driven by the query rather than by a control, and the input IS the field rather than a filter over a panel. `SearchablePopover` opens a panel FROM a trigger; a combobox has no closed state to open from. `manager-filter-bar-source-contract.test.js` already records the same verdict for the three `.manager-search` comboboxes, from the other side. The file carries 30 scoped rules and a silent-mode trigger (`<i class={expr}>`), so a conversion would have been the highest-risk one in the candidate set as well as the wrongest."
     },
     {
       "path": "src/ui/svelte/components/ActorSelectTopBar.svelte",
@@ -351,24 +372,6 @@
         "src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte"
       ],
       "why": "ONE caller, `src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte`. Named at `library.html:941`, so it is specified and shipped and still below the entry bar. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js:83` for a reason the caller count cannot express — omitting it there HANGS a mounted tree — which is why that list is not derived from this manifest."
-    },
-    {
-      "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
-      "library": null,
-      "evidence": "targeted",
-      "callers": [
-        "src/ui/svelte/apps/manager/RecipeItemEditor.svelte"
-      ],
-      "why": "ONE caller, `src/ui/svelte/apps/manager/RecipeItemEditor.svelte`, and it is a route tab rather than a candidate primitive. The caller recorded here until issue 1446 was `recipe-item/RecipeItemEditorTabs.svelte`, a real sibling that imports `EditorTabs` and does not import this tab at all: the COUNT was right and the FILE was wrong, which is the half of the drift a count check on its own cannot see. It is recorded because issue 1458 adjudicated the two `role=\"listbox\"` SITES inside it (`:531`, `:631`) against `SearchablePopover` and ruled them a DIFFERENT WIDGET, which is a decision a later audit would otherwise re-propose from the same grep. They are typeahead COMBOBOXES: neither has a trigger button at all, the suggestion list hangs off an `<input>` whose `aria-expanded={suggestions.length > 0}` (`:537`, `:637`) is driven by the query rather than by a control, and the input IS the field rather than a filter over a panel. `SearchablePopover` opens a panel FROM a trigger; a combobox has no closed state to open from. `manager-filter-bar-source-contract.test.js` already records the same verdict for the three `.manager-search` comboboxes, from the other side. The file carries 30 scoped rules and a silent-mode trigger (`<i class={expr}>`), so a conversion would have been the highest-risk one in the candidate set as well as the wrongest."
-    },
-    {
-      "path": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
-      "library": null,
-      "evidence": "targeted",
-      "callers": [
-        "src/ui/svelte/components/ActorSelectTopBar.svelte"
-      ],
-      "why": "ONE caller, `src/ui/svelte/components/ActorSelectTopBar.svelte`. Recorded because issue 1458 adjudicated its editor popover (`:134`, `:138`) against `SearchablePopover` and found TWO independent disqualifiers, either of which is sufficient. (1) It renders in the PLAYER window under `.fabricate-app-shell`, and all 113 `.manager-travel-*` rules in `styles/fabricate.css` are scoped under `.fabricate-manager` — the panel would portal to a host that is not there and draw completely unstyled. (2) It is a MULTI-SELECT checklist rather than a picker: `toggleAvailable` toggles membership, the popover stays open across choices, and `aria-selected` is true on every chosen actor at once, while `SearchablePopover` has a single `value` and closes on `choose`. Converting it would take four clicks to add four source actors and would tell assistive technology that one option is selected when four are. Its 28 scoped rules carry NO silent-mode trigger — measured, against the file’s own AST — so they would have pruned and warned rather than dying quietly; that is the one at-risk file in the candidate set where the recorded silencing condition does not hold."
     }
   ],
   "ruledOut": [

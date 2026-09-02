@@ -1061,6 +1061,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/,
+      // The expression field this screen is now the ONLY caller of (issue 1373). It was a
+      // BROAD SIGNAL until the Tool check bonus stopped authoring a raw expression and took
+      // its modifiers from the world library instead; a broad-signal file cannot be claimed
+      // by `sourceMatches` at all, so this pattern would have been unreachable configuration
+      // before that change and is load-bearing after it.
+      /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
       // The icon vocabulary the shared picker lists (issue 1269). `IconPicker.svelte`
       // itself is a BROAD SIGNAL and reaches this case through
       // `BROAD_SIGNAL_CASE_OVERRIDES`; these are not, so they are claimed here.
