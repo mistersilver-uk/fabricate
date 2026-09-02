@@ -2002,8 +2002,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     // records that a definition with no source references of its own becomes a world entity
     // flagged unlinked, and `lab-tool-unlinked` is that record in the lab corpus — already
     // seeded, already listed by the catalogue case, and until now never opened.
+    // THE PAGER STEP IS LOAD-BEARING, and it was added after a cross-lane break (issue 1373).
+    // This case reached the row directly until the catalogue's window became ten rows in the same
+    // epic: `Unclaimed Bellows` sorts last of eleven, so the record moved to page two and the row
+    // selector matched nothing — `the case cannot reach its view state`, which fails the whole
+    // capture and publishes NO frames rather than one bad one. Neither change was wrong alone and
+    // neither lane's own capture could see it, because the case and the page size were authored in
+    // different worktrees. `world-tool-catalogue-page-two` states the same fact from the other end.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-pagination-next]' },
       {
         selector:
           '[data-scoped-list-row="lab-tool-unlinked"] [data-scoped-list-action="open-entry"]',
