@@ -1911,6 +1911,34 @@
     background: var(--fab-surface-soft);
   }
 
+  /* THE LINKED ITEM'S NAME IS SET IN THE DISPLAY SERIF. `proto:2091` states
+     `font: 600 13.5px var(--serif)` for it and the screen drew it in the app sans at the UA's
+     bare-`<strong>` 700, because nothing declared a face, a size or a weight on that element -
+     not the primitive's scoped block, not the global sheet.
+
+     ROUTE-SCOPED FROM HERE RATHER THAN ADDED TO `ItemDropZone`. The primitive is shared with the
+     recipe-item, essence and check-macro drop zones and none of those screens asked for a serif
+     name, so the face belongs to THIS card rather than to the tile everywhere it is used.
+
+     AND SCOPED HERE RATHER THAN IN `styles/fabricate.css`. `module.json` gives that sheet no
+     explicit `layer`, so Foundry imports it at layer `modules` while Svelte injects scoped CSS
+     UNLAYERED - and an unlayered declaration beats a layered one at any specificity
+     (`tests/view-lab/cascade.css`). Nothing currently declares either property on this element,
+     so this is an addition rather than an override; written in the scoped block anyway so it
+     stays correct when that stops being true.
+
+     0.84rem, NOT `13.5px`: this sheet's rem basis is 16px, and the design's px values are
+     translated to the rem scale here exactly as the unlink control below translates its 11px.
+     Measured before the change at 14px/700/Signika. Keyed on `.is-linked` because the UNLINKED
+     prompt is `proto:2098`, which states `font: 500 11px var(--sans)` - a face of its own, and a
+     sans one. */
+  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
+    :global(.manager-item-drop-zone.is-linked .manager-item-drop-zone-copy strong) {
+    font-family: var(--fab-font-serif);
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+
   /* THE UNLINKED FACE KEEPS THE DASH AND GAINS THE DANGER INK. `2px` rather than the design's
      1.5: a fractional border rounds per device pixel ratio and reads as a hairline at 1x, which
      is the same call `ToolReplacementTarget`'s empty drop zone already made, so the two dashed

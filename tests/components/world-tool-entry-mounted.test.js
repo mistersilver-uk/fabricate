@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { tick } from 'svelte';
 
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
   TOOL_TREE_COMPILED_MODULES,
@@ -776,6 +777,82 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.ok(
         !unlinkedZone.classList.contains('is-linked'),
         'and an unlinked record is not, which is what the danger-dashed prompt keys on'
+      );
+    });
+
+    // ── E5 ────────────────────────────────────────────────────────────────────────────────
+    // THE LINKED ITEM'S NAME IS SET IN THE DESIGN SERIF, AND THE RULE THAT DOES IT REACHES.
+    //
+    // `proto:2091` states `font: 600 13.5px var(--serif)` for the linked Item's name. The screen
+    // drew it in the app sans at the UA's bare-`<strong>` 700, because nothing declared a face,
+    // a size or a weight on that element anywhere - not the primitive's scoped block, not the
+    // global sheet.
+    //
+    // THE RULE CANNOT LIVE IN `ItemDropZone`. That primitive is shared with the recipe-item,
+    // essence and check-macro drop zones and none of those screens asked for a serif name, so
+    // the face is route-scoped from THIS caller, which writes the card wrapper itself.
+    //
+    // A `:global()` rule addressing another component's markup can compile to a selector that
+    // matches NOTHING, silently and with no warning, so proving the declarations alone would
+    // prove nothing. This holds both halves: the three properties the design states, and the
+    // COMPILED selector run against the markup the primitive actually renders. Selector matching
+    // is what happy-dom can do; which declaration WINS is proved by the recaptured
+    // `world-tool-entry-overview` frame, because happy-dom cannot compute a cascade.
+    //
+    // The unlinked prompt is held to the OPPOSITE, because `proto:2098` gives that copy
+    // `font: 500 11px var(--sans)` - a face of its own, and it is the sans one. A rule keyed on
+    // the state rather than on the card is what keeps the two faces from drifting into each
+    // other.
+    it('sets the LINKED source name in the design serif, in a rule that reaches the primitive', async () => {
+      const { css } = scopedComponentCss(
+        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte')
+      );
+      // Comments are stripped first: a `{` inside one would split a rule at the wrong place and
+      // the gate would report a missing rule that is present.
+      const rules = [...css.replaceAll(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(
+        ([, selector, body]) => ({ selector: selector.trim().replaceAll(/\s+/g, ' '), body })
+      );
+      const serif = rules.find(
+        ({ selector, body }) =>
+          selector.includes('.manager-item-drop-zone-copy strong') &&
+          /font-family:\s*var\(--fab-font-serif\)/.test(body)
+      );
+      assert.ok(
+        Boolean(serif),
+        'no rule gives the drop zone name `var(--fab-font-serif)`; `proto:2091` states the serif'
+      );
+      // 600, NOT the UA's bare-`<strong>` 700, and 0.84rem for the design's 13.5px on this
+      // sheet's 16px rem basis. A raw pixel literal here would be the thing the scale forbids.
+      assert.match(serif.body, /font-weight:\s*600/, '`proto:2091` states weight 600');
+      assert.match(serif.body, /font-size:\s*0\.84rem/, '`proto:2091` states 13.5px = 0.84rem');
+
+      const linked = await mountTab({ scope: scopeFor(), worldItems: [LINKED_ITEM] });
+      const card = linked.querySelector('[data-world-tool-entry-card="linked-item"]');
+      const name = card.querySelector('.manager-item-drop-zone-copy strong');
+      assert.ok(Boolean(name), 'the primitive still renders the name as a `<strong>`');
+      // The scoping hash is re-stamped from the LIVE element rather than trusted to match across
+      // two compiles, so this asserts the selector's SHAPE reaches - which is the half that rots
+      // when the primitive's markup moves.
+      const hash = [...card.classList].find((token) => token.startsWith('svelte-'));
+      assert.ok(Boolean(hash), "the card wrapper carries this component's scoping hash");
+      const selector = serif.selector.replaceAll(/svelte-[\da-z]+/g, hash);
+      assert.ok(
+        [...linked.querySelectorAll(selector)].includes(name),
+        `the compiled rule matches nothing the primitive renders: ${selector}`
+      );
+
+      const scope = scopeFor();
+      scope.entries[0].originItemUuid = '';
+      scope.entries[0].registeredItemUuid = '';
+      scope.entries[0].hasSourceLink = false;
+      const unlinked = await mountTab({ scope });
+      const prompt = unlinked.querySelector(
+        '[data-world-tool-entry-card="linked-item"] .manager-item-drop-zone-copy strong'
+      );
+      assert.ok(Boolean(prompt), 'the unlinked face still draws its own copy');
+      assert.ok(
+        ![...unlinked.querySelectorAll(selector)].includes(prompt),
+        "the serif is the LINKED tile's; `proto:2098` keeps the unlinked prompt in the sans"
       );
     });
 
