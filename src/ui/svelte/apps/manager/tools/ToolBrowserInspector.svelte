@@ -366,7 +366,7 @@
     justify-content: space-between;
     gap: var(--fab-space-2);
     min-width: 0;
-    padding: 7px 11px;
+    padding: var(--fab-space-chip) var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-1);

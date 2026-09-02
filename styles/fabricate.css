@@ -18539,7 +18539,7 @@
 
 .fabricate-manager .manager-tool-setting-row > div {
   display: grid;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
   min-width: 0;
 }
 

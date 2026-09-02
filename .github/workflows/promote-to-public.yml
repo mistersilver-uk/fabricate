@@ -612,7 +612,18 @@ jobs:
           VERIFIED=$(jq -r '.compatibility.verified // ""' "$MODJSON")
           MAX=$(jq -r '.compatibility.maximum // ""' "$MODJSON")
 
-          if [ "$BUILT_VERSION" != "$VERSION" ]; then
+          # The ARTEFACT is the source of truth for the version the registry advertises, so the string
+          # Foundry offers and the string an installed module.json reports cannot drift. They must
+          # not: `isNewerVersion` is NOT semver — it compares part-wise and falls back to a string
+          # compare when either part is non-numeric, so an advertised `v1.9.3` against an installed
+          # `1.9.3` compares `v1` with `1` as strings, reads as permanently newer, and becomes a
+          # perpetual update prompt.
+          #
+          # This guard still establishes exactly what it always did — this artefact IS the version
+          # being promoted — while staying agnostic about the prefix, so the release line can start
+          # carrying one without a lockstep change here. `VERSION` is bare by contract, validated
+          # against `^[0-9]+\.[0-9]+\.[0-9]+$` in job 1, so only the built side needs normalising.
+          if [ "${BUILT_VERSION#v}" != "$VERSION" ]; then
             echo "::error::artefact version '$BUILT_VERSION' does not match the version being promoted '$VERSION'."
             exit 1
           fi
@@ -621,7 +632,10 @@ jobs:
             exit 1
           fi
 
-          # Version-pinned, CONSTRUCTED from the version — not the artefact's latest-release manifest.
+          # Version-pinned, CONSTRUCTED from the BARE version — not the artefact's latest-release
+          # manifest. These stay on `$VERSION` rather than `$BUILT_VERSION` precisely because the tag
+          # is `v` followed by the bare version: interpolating a version that already carries the
+          # prefix would produce `vv1.9.3` and a manifest URL that 404s.
           MANIFEST="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/module.json"
           NOTES="https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}"
 
@@ -637,7 +651,7 @@ jobs:
 
           jq -n \
             --arg id "$ID" \
-            --arg version "$VERSION" \
+            --arg version "$BUILT_VERSION" \
             --arg manifest "$MANIFEST" \
             --arg notes "$NOTES" \
             --argjson compatibility "$COMPAT" \

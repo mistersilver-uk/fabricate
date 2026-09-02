@@ -35,6 +35,7 @@
   import Medallion from '../../components/Medallion.svelte';
   import KnowledgeTabs from './knowledge/KnowledgeTabs.svelte';
   import KnowledgeRoster from './knowledge/KnowledgeRoster.svelte';
+  import { createKnowledgeRosterBrowserState } from '../../../../utils/managerBrowserViewState.js';
   import KnowledgeRecipeItemsTab from './knowledge/KnowledgeRecipeItemsTab.svelte';
   import KnowledgeLearnedRecipesTab from './knowledge/KnowledgeLearnedRecipesTab.svelte';
   import {
@@ -52,9 +53,19 @@
     onErase = () => {},
     onResetSystem = () => {},
     onResetAll = () => {},
+    // ── THE ROSTER SEARCH IS LIFTED (issue 1438) ─────────────────────────────────────────
+    // The roster is a controlled child and this view has always owned its term, which is the
+    // right level for every in-surface interaction: selecting a character, expending, erasing
+    // and resetting all keep this component mounted. What it does NOT survive is leaving the
+    // Knowledge route, because this whole view is one branch of the root's `currentView`
+    // chain — so the owner has to be the root, not the immediate parent.
+    browserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
+  let ownBrowserState = $state(createKnowledgeRosterBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
   let armedToken = $state('');
   // Seeded ONCE from the store's `defaultTab` (itself resolved once on surface
   // entry from the DEFINITION count). Never a live `$derived` over that count: a
@@ -107,7 +118,7 @@
   }
 
   function handleSearch(term) {
-    searchTerm = term;
+    ui.searchTerm = term;
     armedToken = '';
   }
 

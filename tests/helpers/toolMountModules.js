@@ -91,4 +91,9 @@ export const WORLD_TOOL_SCOPE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
+  // The shared list frame's LIFTED VIEW-STATE (issue 1438), reached through
+  // `EntityCatalogueShell` -> `EntityListInspectorFrame`. Declared here because omitting a
+  // module the tree imports throws in `before()`, and node reports that as `# cancelled`
+  // rather than `# fail` - a silent hang with no message.
+  'src/utils/managerBrowserViewState.js',
 ]);

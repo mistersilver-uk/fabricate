@@ -11,6 +11,10 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import {
+    DEFAULT_BROWSER_PAGE_SIZE,
+    createGatheringTasksBrowserState,
+  } from '../../../../utils/managerBrowserViewState.js';
 
   let {
     tasks = [],
@@ -26,15 +30,25 @@
     onDuplicateTask = () => {},
     onDeleteTask = () => {},
     onToggleTaskEnabled = () => {},
+    // ── THE VIEW-STATE IS LIFTED (issue 1438) ────────────────────────────────────────────
+    // Search, the filter axes, the page AND the system-switch sentinel all live on one
+    // object the manager root owns and binds here. Opening a record switches `currentView`
+    // to the editor route, which unmounts this component; held locally every control was
+    // reset by the trip out and back. The SENTINEL has to come too: a component-local one
+    // re-initialises to '' on the remount, so the reset effect below would read the return
+    // as a system switch and wipe the very state this object exists to preserve.
+    browserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
-  let statusFilter = $state('all');
-  let biomeFilter = $state('all');
-  let availabilityFilter = $state('all');
-  let lastSystemId = $state('');
-  let pageIndex = $state(0);
-  let pageSize = $state(10);
+  let ownBrowserState = $state(createGatheringTasksBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
+  const statusFilter = $derived(ui.statusFilter || 'all');
+  const biomeFilter = $derived(ui.biomeFilter || 'all');
+  const availabilityFilter = $derived(ui.availabilityFilter || 'all');
+  const pageIndex = $derived(ui.pageIndex || 0);
+  const pageSize = $derived(ui.pageSize || DEFAULT_BROWSER_PAGE_SIZE);
 
   const taskList = $derived(Array.isArray(tasks) ? tasks : []);
   const systemConfig = $derived(gatheringConfig?.systems?.[selectedSystemId] || {});
@@ -77,18 +91,18 @@
   );
 
   $effect(() => {
-    if (selectedSystemId === lastSystemId) return;
-    searchTerm = '';
-    statusFilter = 'all';
-    biomeFilter = 'all';
-    availabilityFilter = 'all';
-    pageIndex = 0;
-    lastSystemId = selectedSystemId;
+    if (selectedSystemId === ui.systemId) return;
+    ui.searchTerm = '';
+    ui.statusFilter = 'all';
+    ui.biomeFilter = 'all';
+    ui.availabilityFilter = 'all';
+    ui.pageIndex = 0;
+    ui.systemId = selectedSystemId;
   });
 
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= filteredTasks.length) {
-      pageIndex = 0;
+      ui.pageIndex = 0;
     }
   });
 
@@ -231,10 +245,10 @@
   }
 
   function clearFilters() {
-    searchTerm = '';
-    statusFilter = 'all';
-    biomeFilter = 'all';
-    availabilityFilter = 'all';
+    ui.searchTerm = '';
+    ui.statusFilter = 'all';
+    ui.biomeFilter = 'all';
+    ui.availabilityFilter = 'all';
   }
 </script>
 
@@ -250,7 +264,8 @@
     ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.Filters', 'Gathering task filters')}
   >
     <ManagerSearchField
-      bind:value={searchTerm}
+      value={searchTerm}
+      onInput={(next) => (ui.searchTerm = next)}
       placeholder={text(
         'FABRICATE.Admin.Manager.Environment.Tasks.SearchPlaceholder',
         'Search gathering tasks...'
@@ -262,7 +277,10 @@
     />
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-      <select value={statusFilter} onchange={(event) => (statusFilter = event.currentTarget.value)}>
+      <select
+        value={statusFilter}
+        onchange={(event) => (ui.statusFilter = event.currentTarget.value)}
+      >
         <option value="all"
           >{text(
             'FABRICATE.Admin.Manager.Environment.Tasks.StatusAll',
@@ -277,7 +295,10 @@
     </label>
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
-      <select value={biomeFilter} onchange={(event) => (biomeFilter = event.currentTarget.value)}>
+      <select
+        value={biomeFilter}
+        onchange={(event) => (ui.biomeFilter = event.currentTarget.value)}
+      >
         <option value="all"
           >{text('FABRICATE.Admin.Manager.Environment.BiomeAll', 'All biomes')}</option
         >
@@ -290,7 +311,7 @@
       <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Availability', 'Availability')}</span>
       <select
         value={availabilityFilter}
-        onchange={(event) => (availabilityFilter = event.currentTarget.value)}
+        onchange={(event) => (ui.availabilityFilter = event.currentTarget.value)}
       >
         <option value="all"
           >{text(
@@ -507,10 +528,10 @@
     totalCount={filteredTasks.length}
     {pageSize}
     {pageIndex}
-    onPageChange={(next) => (pageIndex = next)}
+    onPageChange={(next) => (ui.pageIndex = next)}
     onPageSizeChange={(next) => {
-      pageSize = next;
-      pageIndex = 0;
+      ui.pageSize = next;
+      ui.pageIndex = 0;
     }}
   />
 </div>

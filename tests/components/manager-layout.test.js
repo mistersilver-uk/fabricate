@@ -6206,8 +6206,31 @@ test('the Tags & Categories route names one grid track per section and grows the
   const mainStart = source.indexOf('<main');
   assert.notEqual(mainStart, -1, 'the view must render a `.manager-main` grid');
   const main = source.slice(mainStart);
-  const children = main.match(/^ {2}<(?:section|div|header|footer|nav|ManagerToolbar)\b/gm) || [];
-  assert.equal(children.length, 2, 'expected two unconditional top-level grid children');
+  // ANY two-space-indented opening tag, element or COMPONENT, rather than a hand-listed
+  // alternation. The list previously named `section|div|header|footer|nav|ManagerToolbar`, and
+  // issue 1429 turned the first grid child into `<VocabularyTabs>` — a name no list could have
+  // been holding. A hand-listed alternation does not fail on an unknown tag, it silently stops
+  // counting one, and the track assertion below then compares 1 track against 1 child and
+  // passes. An HTML comment opener is excluded by the leading-letter class, and attribute lines
+  // do not open with `<`, so this counts exactly the children of `.manager-main`.
+  //
+  // That opener is DESCRIBED rather than quoted, deliberately. This file's own `withoutComments`
+  // at the top strips `<!-- … -->` with a non-greedy regex over the RAW text, so a comment that
+  // spells the opener in prose pairs with the next closer anywhere below it and deletes
+  // everything between — here it silently blanked two switch-track fixtures 200k characters
+  // later and reddened `status-toggle-source-contract.test.js`'s non-vacuity floor instead of
+  // anything near the edit.
+  // The lookahead is not decoration. Without it the pattern ends in a `*` quantifier followed
+  // by the regex's own closing slash, and that two-character sequence IS a block-comment
+  // terminator to every raw-text comment stripper in this repository — including the one this
+  // file declares at the top. A stray terminator makes some other opener close early, which
+  // silently changes what a scanner sees hundreds of lines away.
+  const children = main.match(/^ {2}<[A-Za-z][\w-]*(?=[\s>])/gm) || [];
+  assert.equal(
+    children.length,
+    2,
+    `expected two unconditional top-level grid children, got ${children.length}: ${children.join(', ')}`
+  );
   assert.equal(
     main.includes('manager-section-header'),
     false,
@@ -6247,6 +6270,13 @@ test('the Tags & Categories route names one grid track per section and grows the
 // implicit landmark roles for the ARIA roles to override). Every governing selector below is
 // class-based, so nothing here depends on the element; the fixture is updated so it keeps
 // MIRRORING shipped markup rather than quietly describing a shape that no longer exists.
+//
+// Issue 1429 moved the strip onto `EditorTabs` and corrected its mark from the neutral chip to
+// the Rail Marker Family's RECORD COUNT, so the fixture's tab now carries
+// `<span class="manager-editor-tab-count">` rather than a `.manager-chip`. This is a hand-written
+// COPY of shipped markup, which is exactly the kind that keeps passing after the product stops
+// emitting it — the `<div role="tablist">` host and both container classes are unchanged, so the
+// copy is faithful again rather than merely still green.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
   const context = await sharedBrowser.newContext({ viewport: { width: 760, height: 600 } });
   const page = await context.newPage();
@@ -6264,7 +6294,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
     </div>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-editor-tab-count">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section><span class="manager-chip" data-default-chip-reference>Default</span></div></main></div></div>`
       )
     );
     const geometry = await page.evaluate(() => {
@@ -6283,8 +6313,14 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
         ),
         lockedChipBackground: getComputedStyle(locked.querySelector('.manager-chip'))
           .backgroundColor,
+        // A chip that exists to BE the default, named by its own hook. It used to be read off
+        // `.manager-editor-tab-button .manager-chip` — the tab badge — which made an assertion
+        // about the LOCKED ROW's fill depend on the vehicle the tab strip happened to draw.
+        // Issue 1429 corrected that badge to the bare-numeral record count, and this clause fell
+        // over with `getComputedStyle` on null rather than saying what it had lost. The
+        // comparison only ever needed a default chip on the same page.
         defaultChipBackground: getComputedStyle(
-          document.querySelector('.manager-editor-tab-button .manager-chip')
+          document.querySelector('[data-default-chip-reference]')
         ).backgroundColor,
       };
     });

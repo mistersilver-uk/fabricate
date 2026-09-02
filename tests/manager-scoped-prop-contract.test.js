@@ -128,6 +128,10 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../../utils/essenceBrowserModel.js',
   '../../../../utils/essenceBulkEditModel.js',
   '../../../../utils/failureResultPolicy.js',
+  // Issue 1438 lifted the remaining browse surfaces' filter/search state onto one
+  // root-owned record, which the root mints from this factory. It is a legitimate addition
+  // under the message below, not a drift.
+  '../../../../utils/managerBrowserViewState.js',
   '../../../../utils/recipeBrowserModel.js',
   '../../../../utils/recipeBulkEditModel.js',
   '../../../../utils/recipeCategories.js',

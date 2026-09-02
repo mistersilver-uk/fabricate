@@ -13,6 +13,10 @@
     INHERIT_BREAK_MODE,
     systemBreakModeOptions,
   } from './scoped/worldToolStudio.js';
+  import {
+    DEFAULT_BROWSER_PAGE_SIZE,
+    createToolsBrowserState,
+  } from '../../../../utils/managerBrowserViewState.js';
 
   let {
     tools = [],
@@ -60,6 +64,12 @@
     // through `actions`, which is the world Tool WRITE family: opening a route is the shell's
     // job and the write family has no navigation on it (issue 1373).
     onOpenWorldCatalogue = () => {},
+    // ── THE VIEW-STATE IS LIFTED (issue 1438) ────────────────────────────────────────────
+    // Search and page live on an object the manager root owns and binds here: opening a tool
+    // switches `currentView` to `tool-edit`, which unmounts this component, so held locally
+    // both were reset by the trip out and back. Unbound, the local fallback keeps the controls
+    // reactive in-component for the isolated mounted tests.
+    browserState = $bindable(null),
   } = $props();
 
   /**
@@ -83,12 +93,30 @@
     { id: 'bonus', key: 'FABRICATE.Admin.Manager.Scoped.Sections.Bonus', label: 'Check bonus' },
   ];
 
-  let searchTerm = $state('');
-  let membershipFilter = $state('in');
-  let sortKey = $state('name');
-  let sortDirection = $state('asc');
-  let pageIndex = $state(0);
-  let pageSize = $state(8);
+  // ── THE VIEW-STATE IS LIFTED (issue 1438), ON ALL SIX AXES ───────────────────────────
+  // Search and page live on an object the manager root owns and binds here: opening a tool
+  // switches `currentView` to `tool-edit`, which unmounts this component, so held locally
+  // both were reset by the trip out and back. Unbound, the local fallback keeps the controls
+  // reactive in-component for the isolated mounted tests.
+  //
+  // MEMBERSHIP, SORT KEY AND SORT DIRECTION ARE LIFTED WITH THEM (issue 1373). They arrived
+  // on this screen after the lift was written, and they are the same KIND of state by that
+  // change's own test: view filters over rows the store has already published, not cohort
+  // selectors the store must hold. Leaving them component-local would half-lift the toolbar —
+  // a GM who filters to `Overriding`, opens a tool and comes back would find the search term
+  // preserved beside a membership segment silently snapped back to `In this system`, which is
+  // the exact defect issue 1438 exists to remove, made harder to see by being partial.
+  let ownBrowserState = $state(createToolsBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
+  const membershipFilter = $derived(ui.membershipFilter || 'in');
+  const sortKey = $derived(ui.sortKey || 'name');
+  const sortDirection = $derived(ui.sortDirection || 'asc');
+  const pageIndex = $derived(ui.pageIndex || 0);
+  const pageSize = $derived(ui.pageSize || DEFAULT_BROWSER_PAGE_SIZE);
+  // NOT lifted: this is the "nothing is selected, pick the first row" guard, and it names one
+  // mount's worth of auto-selection rather than anything the GM chose.
   let autoSelectedToolId = $state('');
 
   function text(key, fallback) {
@@ -290,7 +318,7 @@
   );
 
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredTools.length) pageIndex = 0;
+    if (pageIndex > 0 && pageIndex * pageSize >= filteredTools.length) ui.pageIndex = 0;
   });
 
   /**
@@ -442,8 +470,8 @@
       <ManagerSearchField
         value={searchTerm}
         onInput={(next) => {
-          searchTerm = next;
-          pageIndex = 0;
+          ui.searchTerm = next;
+          ui.pageIndex = 0;
         }}
         placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
         ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
@@ -468,8 +496,8 @@
               value={option.id}
               checked={membershipFilter === option.id}
               onchange={() => {
-                membershipFilter = option.id;
-                pageIndex = 0;
+                ui.membershipFilter = option.id;
+                ui.pageIndex = 0;
               }}
             />
             <span>{option.label}</span>
@@ -493,8 +521,8 @@
         value={sortKey}
         aria-label={text('FABRICATE.Admin.Manager.Tools.SortBy', 'Sort by')}
         onchange={(event) => {
-          sortKey = event.currentTarget.value;
-          pageIndex = 0;
+          ui.sortKey = event.currentTarget.value;
+          ui.pageIndex = 0;
         }}
       >
         <option value="name">{text('FABRICATE.Admin.Manager.Tools.SortName', 'Name')}</option>
@@ -506,7 +534,7 @@
         type="button"
         class="manager-tools-sort-direction"
         data-tool-sort-direction={sortDirection}
-        onclick={() => (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')}
+        onclick={() => (ui.sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')}
       >
         <i
           class={sortDirection === 'asc' ? 'fas fa-arrow-down-a-z' : 'fas fa-arrow-up-a-z'}
@@ -555,8 +583,8 @@
                   role="primary"
                   data-tool-empty-browse-world={String(ghostRows.length)}
                   onclick={() => {
-                    membershipFilter = 'all';
-                    pageIndex = 0;
+                    ui.membershipFilter = 'all';
+                    ui.pageIndex = 0;
                   }}
                 >
                   <i class="fas fa-plus" aria-hidden="true"></i>
@@ -767,11 +795,11 @@
         pageSizeOptions={[8, 16, 24]}
         multiPageOnly
         onPageChange={(next) => {
-          pageIndex = next;
+          ui.pageIndex = next;
         }}
         onPageSizeChange={(next) => {
-          pageSize = next;
-          pageIndex = 0;
+          ui.pageSize = next;
+          ui.pageIndex = 0;
         }}
       />
     </div>
@@ -873,8 +901,8 @@
     display: flex;
     flex: 0 1 auto;
     flex-wrap: wrap;
-    gap: 3px;
-    padding: 3px;
+    gap: var(--fab-space-2xs);
+    padding: var(--fab-space-2xs);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
@@ -884,7 +912,7 @@
   .manager-tools-membership-filter label {
     display: inline-flex;
     align-items: center;
-    padding: 5px var(--fab-space-2);
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border-radius: 6px;
     color: var(--fab-text-muted);
     font-size: 0.66rem;

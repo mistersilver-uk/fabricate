@@ -28,6 +28,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/utils/recipeCategories.js',
+    // The roster's lifted search term (issue 1438).
+    'src/utils/managerBrowserViewState.js',
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
     // knowledgeStudio resolves a learned recipe's image through the shared chokepoint
     // (issue 887). It is an import-free leaf, so this one entry suffices — but omitting

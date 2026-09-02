@@ -763,6 +763,54 @@ Tabs:
 - Checks (an expandable group whose children are the Crafting / Salvage / Gathering / Validation routes)
 - Environments (only when the selected system has `features.gathering === true`)
 
+### Manager browse view-state
+
+Every manager browse surface renders inside one mutually exclusive route branch, so opening a record unmounts the list the GM was reading and returning mounts a fresh one.
+The filter bar's state MUST therefore outlive the surface: search term, filter axes, sort key and direction, page index and page size are **preserved across the trip that unmounts the surface**, and the GM returns to the list exactly as they left it.
+
+The trip differs by surface and each kind counts.
+Where an editor route exists the trip is the editor round-trip — the system library, the environment library, the gathering task and encounter libraries, the three studios, and the world scoped-entity catalogues.
+Where no editor exists the trip is leaving the route or switching a sub-tab, which unmounts the surface just as completely: the tool library, the three vocabulary panels, the Knowledge roster, the grant-access rosters, World Travel's realm list and a realm row's environment pickers.
+
+The state is owned by the **manager shell**, never by the surface and never by an intermediate component between the two.
+An intermediate is unmounted by the same trip, so state held one level up is destroyed by the very transition it would exist to survive.
+A surface reached through an intermediate has its state threaded through it; each surface receives its OWN slot and no surface can read another's, so a term typed into one vocabulary panel never appears in its sibling.
+
+Where a surface resets its filters on a genuine crafting-system change, the remembered system id MUST live beside the filters it guards.
+A sentinel held by the surface re-initialises when the surface remounts, so returning from an editor reads as a system switch and clears the state the lift exists to preserve — a lift whose sentinel stays behind is inert.
+The same rule governs a page-to-the-selection guard, which otherwise pages away from the restored page.
+
+This state MUST NOT live in the store the list renders from, for the reason `design-system/spec.md` states for row disclosure state: every persisted edit refreshes that store, and a refresh must never be able to reset the GM's filter bar.
+
+A **search term the store's own data assembly consumes is not view-state and stays in the store.**
+The component and recipe browser terms are these: setting one triggers a refresh that threads the term into the managed-item and recipe-list projections, so it selects the cohort that is fetched, hydrated and memoised rather than narrowing rows already published.
+Neither mechanism is world-scoped or replicated — both are per-session — so the boundary between them is the term's ROLE and not its persistence.
+
+State that belongs to a single session MUST still reset when its surface unmounts, and MUST NOT be lifted:
+
+- an editor's own pickers, including the gathering task editor's component, tag, drop-rule and tool searches, which name what the GM is attaching to the record in front of them;
+- a half-typed vocabulary add-form entry, which is an unfinished record rather than a filter;
+- an armed destructive confirmation, because an arm that outlives its surface is a delete nobody re-confirmed;
+- a bulk selection, which is an in-progress action over a set rather than a filter over rows;
+- the essence catalogue's membership filter, which is `in`-scoped on every mount because a list showing entities the edited system does not hold reads as data loss.
+
+#### Scenario: A GM returns from an editor to a filtered list
+
+- **WHEN** a GM narrows a browse surface with a search term or filter, opens one of its records, and returns
+- **THEN** the surface renders with that search term and filter still applied
+- **AND** the page they were on is restored, clamped to the last valid page when rows were added or removed while they were away
+
+#### Scenario: A GM returns to a surface that has no editor
+
+- **WHEN** a GM narrows a surface with no editor route, navigates away or switches sub-tab, and comes back
+- **THEN** the surface renders with that search term still applied
+- **AND** a sibling surface sharing the same component renders with its own empty term
+
+#### Scenario: A GM re-opens a record editor
+
+- **WHEN** a GM types into an editor's own picker search, leaves the editor, and opens a record again
+- **THEN** that picker search is empty
+
 ### Systems Tab
 
 Display list + detail editor for crafting systems.

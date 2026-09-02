@@ -779,7 +779,7 @@
     flex: 1 1 auto;
     flex-wrap: wrap;
     gap: var(--fab-space-2xs);
-    padding: 3px;
+    padding: var(--fab-space-2xs);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     min-width: 0;
@@ -791,7 +791,7 @@
     align-items: center;
     justify-content: center;
     min-width: 0;
-    padding: 6px var(--fab-space-2);
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border-radius: 7px;
     cursor: pointer;
   }

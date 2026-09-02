@@ -68,3 +68,47 @@ test('a paginated gh api call buffered through execSync states its own maxBuffer
     );
   }
 });
+
+// The Foundry package listing showed 1.9.0, 1.9.1 and 1.9.2 without their `v` prefix (issue #1457)
+// because ONE value served two masters: the registry payload's `version` field and the `v${...}` tag
+// URLs. Bare gave a correct URL and a bare display version; prefixing it would have produced
+// `vv1.9.3`. The artefact is now the source of truth for what is advertised, and the URLs keep using
+// the bare input.
+test('the registry advertises the ARTEFACT version, while the URLs are built from the bare input', () => {
+  const source = readFileSync(WORKFLOW, 'utf8');
+
+  assert.match(
+    source,
+    /--arg version "\$BUILT_VERSION"/,
+    'the registry payload must advertise the version the artefact itself carries, so the string Foundry offers and the string an installed module.json reports cannot drift'
+  );
+  assert.ok(
+    !/--arg version "\$VERSION"/.test(source),
+    'the payload must not advertise the dispatch input: it is bare by contract, so it would strip a prefix the artefact carries'
+  );
+
+  // The tag is `v` plus the bare version, so the URLs must interpolate the input rather than the
+  // artefact's version — otherwise a prefixed artefact yields `vv1.9.3` and a manifest URL that 404s.
+  for (const url of [
+    /releases\/download\/v\$\{VERSION\}\/module\.json/,
+    /releases\/tag\/v\$\{VERSION\}/,
+  ]) {
+    assert.match(
+      source,
+      url,
+      'the manifest and notes URLs must be built from the BARE dispatch input'
+    );
+  }
+  assert.ok(
+    !/v\$\{BUILT_VERSION\}/.test(source),
+    'no URL may interpolate the artefact version behind a literal v — that is the vv1.9.3 defect'
+  );
+
+  // The guard still establishes "this artefact is the version being promoted", but comparing the
+  // bare forms so the release line can start carrying a prefix without a lockstep change here.
+  assert.match(
+    source,
+    /if \[ "\$\{BUILT_VERSION#v\}" != "\$VERSION" \]; then/,
+    'the artefact-matches-input guard must compare the two after normalising the built side'
+  );
+});

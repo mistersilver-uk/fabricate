@@ -142,14 +142,15 @@
  *
  * spec.md requirement "The primitive set is a closed, versioned vocabulary" — two or more
  * INDEPENDENT callers. An importer is any other file under `src/` that imports the component by
- * path. Seven ADJUDICATED candidates fall below the bar and are recorded in {@link NOT_A_PRIMITIVE}
- * rather than omitted, because that same requirement obliges a candidate with fewer to be "recorded
- * as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a
- * decision rather than an oversight".
+ * path. Seven ADJUDICATED candidates are recorded in {@link NOT_A_PRIMITIVE} rather than omitted,
+ * because that same requirement obliges a candidate with fewer to be "recorded as ruled out WITH
+ * ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than
+ * an oversight". SIX of those seven are below the bar as this is measured; see that docblock for
+ * the seventh, which acquired a second caller and is owed a move nobody has made.
  *
- * ADJUDICATED is the bound, and it is load-bearing: 48 top-level files under `apps/manager/` sit
- * below the two-caller bar, and {@link NOT_A_PRIMITIVE} is emphatically not a list of all of them.
- * See its own docblock for the rule.
+ * ADJUDICATED is the bound, and it is load-bearing: 48 of the 73 top-level `.svelte` files under
+ * `apps/manager/` sit below the two-caller bar, and {@link NOT_A_PRIMITIVE} is emphatically not a
+ * list of all of them. See its own docblock for the rule.
  *
  * ── WHAT THIS MODULE IS DELIBERATELY NOT ───────────────────────────────────────────────────────
  *
@@ -254,15 +255,28 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * A row here records a candidate THE PROJECT HAS ALREADY ADJUDICATED — one some other artefact in
  * the repository has taken a written position on: a docblock that says why it is excluded from the
  * broad-signal set, a `library.html` entry it does or does not implement, an entry on the
- * mounted-harness hang guard. It is NOT a census of the directory. 48 of the 72 top-level files
- * under `apps/manager/` sit below the two-caller bar, and `components/` holds screen regions and
- * dead code besides; listing all of them would bury the seven judgements that were actually made in
- * dozens that were not, and the requirement cited above asks for recorded DECISIONS, not for an
- * inventory.
+ * mounted-harness hang guard. It is NOT a census of the directory. 48 of the 73 top-level `.svelte`
+ * files under `apps/manager/` sit below the two-caller bar, and `components/` holds screen regions
+ * and dead code besides; listing all of them would bury the seven judgements that were actually
+ * made in dozens that were not, and the requirement cited above asks for recorded DECISIONS, not
+ * for an inventory.
  *
  * So the next reader has two wrong moves available and neither is what this list wants: adding the
- * other 47 manager files, and deleting `InspectorActionButton` as inconsistent with them. The
+ * other 48 manager files, and deleting `InspectorActionButton` as inconsistent with them. The
  * distinguishing fact is written down beside each row.
+ *
+ * ── ONE ROW IS OWED A MOVE, AND SAYING SO IS THE POINT OF THE LIST ─────────────────────────────
+ *
+ * `InspectorActionButton` predicted its own exit — "this row moves to
+ * {@link DESIGN_SYSTEM_PRIMITIVES} when a second inspector adopts it" — and a second inspector
+ * HAS adopted it: `scoped/WorldEssenceCataloguePage.svelte` imports it as of the world essence
+ * surfaces (issue 1400), alongside `essences/EssenceBrowserInspector.svelte`. So it now meets the
+ * two-caller bar and this is no longer the right table for it. Issue 1429 measured that while
+ * recomputing the totals above and deliberately did NOT make the move: it needs its own
+ * adjudication of the `library` column, and it shifts both {@link DESIGN_SYSTEM_PRIMITIVES} and
+ * {@link NOT_A_PRIMITIVE} length pins, which is a change that should be reviewed as itself rather
+ * than ride along inside a tab-strip conversion. It is recorded here so the next reader re-tests
+ * the count rather than re-deriving the question, which is what this register exists for.
  *
  * ── THE `evidence` COLUMN HERE ─────────────────────────────────────────────────────────────────
  *
@@ -283,6 +297,14 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * `spec.md`'s Rail Marker Family makes the bare numeral the CORRECT vehicle for a record count and
  * `library.html`'s own `<TabBar>` specimen draws two vehicles on one bar. Issue 1429 widened
  * `EditorTabs` and converted the strip. Do not re-add this row.
+ *
+ * `downtime/WorldDowntimeTabs` was re-read under the SAME ruling, and its divergence claim did not
+ * survive either, so its row now records CONVERSION-PENDING work rather than a justified exemption.
+ * It stays on this list on its CALLER COUNT, which is what every other row here rests on and which
+ * the ruling does not touch. Read the row before re-deriving the question: it names which parts of
+ * that component's scoped block are a style divergence the ruling forbids as a justification, which
+ * parts author a card and an identity block that are not the tablist at all, and which two are
+ * genuinely functional capabilities `EditorTabs` still lacks.
  *
  * That is why the integrity test runs its per-row clauses over THESE rows too. The disk clause in
  * particular is live here: two of the seven name files nothing imports.

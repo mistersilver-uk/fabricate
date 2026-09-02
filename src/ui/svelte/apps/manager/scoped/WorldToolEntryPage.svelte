@@ -1715,7 +1715,7 @@
     display: flex;
     flex: 1 1 14rem;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -1759,7 +1759,7 @@
   .manager-world-tool-entry-field-copy {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 
@@ -1817,7 +1817,7 @@
   .manager-world-tool-entry-mode-copy {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--fab-space-2xs);
     min-width: 0;
   }
 

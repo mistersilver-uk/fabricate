@@ -63,6 +63,9 @@ function sourceOf(path) {
 const CATALOGUE_PROPS = [
   'actions',
   'bulk',
+  // The list's lifted view-state (issue 1438), passed through to the frame. It is on BOTH
+  // shells, so the difference clause below is unchanged: one composition, configured per scope.
+  'browserState',
   'countUnit',
   // ── THE FIVE ROW-AND-INSPECTOR PARITY SWITCHES ISSUE 1373 ADDED ─────────────────────────────
   // Every one is OPT-IN and defaults to what the component and essence catalogues already
@@ -118,6 +121,7 @@ const RULES_PROPS = [
   'actions',
   'armedToken',
   'bulk',
+  'browserState',
   'emptyHint',
   'emptyTitle',
   'filters',

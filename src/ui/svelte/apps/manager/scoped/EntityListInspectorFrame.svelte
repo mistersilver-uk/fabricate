@@ -157,6 +157,7 @@
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../../components/ManagerToolbar.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
+  import { createScopedListBrowserState } from '../../../../../utils/managerBrowserViewState.js';
 
   let {
     scope = null,
@@ -230,6 +231,16 @@
     selectedId = $bindable(''),
     onSelect = () => {},
     armedToken = $bindable(''),
+    // ── THE LIST'S VIEW-STATE IS LIFTED (issue 1438) ─────────────────────────────────────
+    // Search, membership, the lane filters, the sort pair and the page live on an object the
+    // MANAGER ROOT owns, threaded here by whichever shell mounts this frame. Opening an entry
+    // switches `currentView` to the entry route, which unmounts the catalogue page, the shell
+    // and this frame together — so a slot held in any of the three would die with the trip.
+    // Unbound, the local fallback below keeps every control reactive in-component.
+    //
+    // The BULK SELECTION is not on it, deliberately: a selection is an in-progress action over
+    // a set rather than a filter, and its owner is the lane that supplies the `bulk` descriptor.
+    browserState = $bindable(null),
   } = $props();
 
   /**
@@ -279,9 +290,12 @@
 
   const model = createScopedEntityListModel();
 
-  let query = $state('');
-  let membership = $state('all');
-  let filterValues = $state({});
+  let ownBrowserState = $state(createScopedListBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const query = $derived(String(ui.searchTerm || ''));
+  const membership = $derived(ui.membership || 'all');
+  const filterValues = $derived(ui.filterValues || {});
   // THE SORT IS TWO CONTROLS, NOT ONE `<select>` OF COMPOSITE IDS.
   //
   // The prototype's toolbar reads `SORT BY [Name ▾] [⇅ Asc]` (`essences.png`) — a KEY picker and
@@ -290,10 +304,10 @@
   // the membership key at all: `systems-asc` did not exist, and nothing said so.
   //
   // The model still takes ONE id. The decomposition is presentational and composes back to it.
-  let sortKey = $state('name');
-  let sortDirection = $state('asc');
-  let pageIndex = $state(0);
-  let pageSize = $state(DEFAULT_PAGE_SIZE);
+  const sortKey = $derived(ui.sortKey || 'name');
+  const sortDirection = $derived(ui.sortDirection || 'asc');
+  const pageIndex = $derived(ui.pageIndex || 0);
+  const pageSize = $derived(ui.pageSize || DEFAULT_PAGE_SIZE);
   let selectedIds = $state(new Set());
   /** @type {HTMLElement|null} */
   let inspectorElement = $state(null);
@@ -358,7 +372,7 @@
   // The clamp writes back, so the owner's state and the footer cannot disagree on the next pass.
   // Converges in one tick: once they are equal the effect assigns nothing.
   $effect(() => {
-    if (page.pageIndex !== pageIndex) pageIndex = page.pageIndex;
+    if (page.pageIndex !== pageIndex) ui.pageIndex = page.pageIndex;
   });
 
   // A filter that shrinks the list must not leave a phantom id in `Apply to {N}`. Guarded on
@@ -379,51 +393,51 @@
   }
 
   function changeQuery(value) {
-    query = String(value ?? '');
-    pageIndex = 0;
+    ui.searchTerm = String(value ?? '');
+    ui.pageIndex = 0;
     disarm();
   }
 
   function changeMembership(value) {
-    membership = String(value ?? 'all');
-    pageIndex = 0;
+    ui.membership = String(value ?? 'all');
+    ui.pageIndex = 0;
     disarm();
   }
 
   function changeFilter(id, value) {
-    filterValues = { ...filterValues, [id]: String(value ?? '') };
-    pageIndex = 0;
+    ui.filterValues = { ...filterValues, [id]: String(value ?? '') };
+    ui.pageIndex = 0;
     disarm();
   }
 
   function changeSortKey(value) {
-    sortKey = String(value ?? 'name');
-    pageIndex = 0;
+    ui.sortKey = String(value ?? 'name');
+    ui.pageIndex = 0;
     disarm();
   }
 
   function toggleSortDirection() {
-    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-    pageIndex = 0;
+    ui.sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    ui.pageIndex = 0;
     disarm();
   }
 
   function changePage(next) {
-    pageIndex = next;
+    ui.pageIndex = next;
     disarm();
   }
 
   function changePageSize(next) {
-    pageSize = next;
-    pageIndex = 0;
+    ui.pageSize = next;
+    ui.pageIndex = 0;
     disarm();
   }
 
   function clearFilters() {
-    query = '';
-    membership = 'all';
-    filterValues = {};
-    pageIndex = 0;
+    ui.searchTerm = '';
+    ui.membership = 'all';
+    ui.filterValues = {};
+    ui.pageIndex = 0;
     disarm();
   }
 
@@ -1517,7 +1531,7 @@
     align-items: center;
     gap: var(--fab-space-1);
     min-width: 0;
-    margin-top: 3px;
+    margin-top: var(--fab-space-2xs);
   }
 
   /* THE LABELLED ROW ACTION. Deliberately the same box as `SystemRulesRoster`'s `Rules ⧉` link,

@@ -46,6 +46,16 @@ const PROMOTE_TO_PUBLIC = `${WORKFLOW_DIR}/promote-to-public.yml`;
  */
 const GATE_SCRIPT = 'scripts/forward-port-content-gate.sh';
 
+/**
+ * The shared shell that completes a CONFLICTED forward-port from a supplied resolution (issue
+ * #1439). Needed at the same two call sites and for the same reason, and it makes NO verdict: it
+ * builds the commit, and the gate above decides it.
+ */
+const COMPLETE_MERGE_SCRIPT = 'scripts/forward-port-complete-merge.sh';
+
+/** How both `run:` bodies invoke it, on the conflict branch of their merge. */
+const COMPLETION_INVOCATION = /bash scripts\/forward-port-complete-merge\.sh/;
+
 /** How the gate resolves the verifier it delegates its decision to. */
 const VERIFIER_RESOLUTION = 'VERIFIER="${GATE_DIR}/forward-port-provenance.mjs"';
 
@@ -77,6 +87,7 @@ const MERGE_TOKENS = /git\s+merge\s+--no-ff\s+['"]?origin\/release['"]?/;
 // commit that carries no file change at all.
 const MERGE_IMPLEMENTATION = new RegExp(`${MERGE_TOKENS.source}\\s+-m\\s+["']?chore:`);
 
+/** The inputs BOTH entry points must declare, so a caller and a dispatch behave identically. */
 const INPUT_NAMES = [
   'enabled',
   'skip_reason',
@@ -86,6 +97,16 @@ const INPUT_NAMES = [
   'allow_content',
   'override_hint',
 ];
+
+/**
+ * The inputs `workflow_dispatch` declares and `workflow_call` must NOT (issue #1439).
+ *
+ * This breaks the symmetry above deliberately. No automated caller has a conflict resolution to
+ * supply, and a called workflow able to carry one would be a route by which a TREE could reach
+ * `main` from inside a promotion — a structural absence beats an asserted one, so the constant
+ * splits rather than the assertion widening.
+ */
+const DISPATCH_ONLY_INPUT_NAMES = ['resolution_ref', 'resolution_effect'];
 
 // The defaults each entry point must declare. `dry_run` diverges ON PURPOSE (see assertion 2).
 const EXPECTED_DEFAULTS = {
@@ -140,11 +161,59 @@ function forwardPortSteps() {
  *
  * @returns {string[]} The statements, in order.
  */
-function gateScriptStatements() {
-  return read(GATE_SCRIPT)
+function scriptStatements(file) {
+  return read(file)
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'));
+}
+
+function gateScriptStatements() {
+  return scriptStatements(GATE_SCRIPT);
+}
+
+/**
+ * Every shell function a script defines, by name, as its body text.
+ *
+ * The guard's own `case` is a SLICE of the file, so a check written against that slice stops at
+ * `esac` — and a guarantee about what the guard may not do (read the override, print its hint) is
+ * worth nothing if the guard can delegate to a function that does it one line further down.
+ *
+ * @param {string} file The script.
+ * @returns {Map<string, string>} Function name to body.
+ */
+function shellFunctionBodies(file) {
+  const lines = read(file).split('\n');
+  const bodies = new Map();
+  for (let index = 0; index < lines.length; index += 1) {
+    const declaration = /^([a-z_][a-z0-9_]*)\(\)\s*\{$/.exec(lines[index]);
+    if (!declaration) continue;
+    const close = lines.indexOf('}', index + 1);
+    assert.notEqual(close, -1, `${declaration[1]}() in ${file} is never closed`);
+    bodies.set(declaration[1], lines.slice(index + 1, close).join('\n'));
+  }
+  return bodies;
+}
+
+/**
+ * The names of every function reachable from a slice of a script, transitively.
+ *
+ * @param {Map<string, string>} bodies From `shellFunctionBodies`.
+ * @param {string} slice The text to start from.
+ * @returns {string[]} The reachable function names.
+ */
+function reachableFunctions(bodies, slice) {
+  const reached = new Set();
+  const pending = [slice];
+  while (pending.length > 0) {
+    const text = pending.pop();
+    for (const [name, body] of bodies) {
+      if (reached.has(name) || !new RegExp(`\\b${name}\\b`).test(text)) continue;
+      reached.add(name);
+      pending.push(body);
+    }
+  }
+  return [...reached];
 }
 
 /** The index of the first statement containing `token`, asserted to exist. */
@@ -816,10 +885,12 @@ test('the own-merge guard fails the job and is NOT overridable', () => {
     'the guard runs the re-merge predicate against the merge the push actually lands'
   );
 
-  // The ONLY accepting verdict, and the guard's polarity in one. Accepting any other token — or
-  // inverting the case so `content-free` is the one that fails — turns the guard into one that
-  // fires precisely when the merge is clean, which no other assertion here would notice.
-  assert.match(guard, /^content-free\) ;;$/m, 'only `content-free` passes the guard');
+  // The only verdict that passes UNCONDITIONALLY, and the guard's polarity in one. Inverting the
+  // case so `content-free` is the one that fails turns the guard into one that fires precisely when
+  // the merge is clean, which no other assertion here would notice. (`remerge-conflicted` can also
+  // pass since issue #1439, but only through the resolution checks below, never by falling through:
+  // its arm carries no bare `;;`.)
+  assert.match(guard, /^content-free\) ;;$/m, '`content-free` passes the guard with no further test');
   assert.match(guard, /"carries-content "\*\)/, 'an invented-content merge has its own branch');
   assert.match(guard, /\bexit 1\b/, 'the own-merge guard fails the job');
 
@@ -841,10 +912,22 @@ test('the own-merge guard fails the job and is NOT overridable', () => {
   // allow_content lets an operator vouch for content that exists somewhere to be reviewed. Content
   // invented by a conflict resolution exists nowhere else, so it has been reviewed nowhere and no
   // override applies to it.
+  //
+  // Asserted over the guard AND over every function it reaches, transitively. The `case` is read as
+  // a SLICE of the file, so a check that stopped at `esac` would be satisfied by a guard that
+  // delegated the forbidden read to a helper one line further down — and since issue #1439 the guard
+  // delegates its whole resolution branch to exactly such a helper.
+  const helpers = reachableFunctions(shellFunctionBodies(GATE_SCRIPT), guard);
   assert.ok(
-    !/ALLOW_CONTENT/.test(guard),
-    'the own-merge guard must not consult the allow_content override'
+    helpers.includes('verify_resolution'),
+    'the guard delegates the resolution checks to a helper, which this assertion must therefore reach'
   );
+  for (const [name, body] of [['the own-merge guard', guard]].concat(
+    helpers.map((helper) => [`${helper}(), which the guard calls`, shellFunctionBodies(GATE_SCRIPT).get(helper)])
+  )) {
+    assert.ok(!/ALLOW_CONTENT/.test(body), `${name} must not consult the allow_content override`);
+    assert.ok(!/OVERRIDE_HINT/.test(body), `${name} must not print the override hint`);
+  }
 
   // It runs BEFORE the content fast path, so it sees every merge this workflow lands rather than
   // only the ones that happen to carry content.
@@ -1221,4 +1304,187 @@ test('both guards are present, ordered before the push, consumed, and never fail
       `${stepLabel(steps[index], index)} is a guard and must never exit non-zero`
     );
   }
+});
+
+// ── 13 ──────────────────────────────────────────────────────────────────────────────────────────
+
+test('the resolution inputs are DISPATCH-ONLY, and both default to the empty string', () => {
+  const source = read(FORWARD_PORT);
+  const dispatchInputs = nestedEntries(triggerOf(source, 'workflow_dispatch'), 'inputs');
+  const declaredOnDispatch = scalars(dispatchInputs);
+  const declaredOnCall = scalars(nestedEntries(triggerOf(source, 'workflow_call'), 'inputs'));
+
+  for (const name of DISPATCH_ONLY_INPUT_NAMES) {
+    assert.ok(
+      Object.hasOwn(declaredOnDispatch, name),
+      `on.workflow_dispatch.inputs declares '${name}' — the hand-run recovery lever is where a ` +
+        'conflict resolution is supplied'
+    );
+
+    // The asymmetry is the point. `promote-to-public.yml` and `release.yml` both CALL this workflow;
+    // an input they could pass would be a route by which a tree reaches `main` from inside a
+    // promotion, on the one push that bypasses pull-request review.
+    assert.ok(
+      !Object.hasOwn(declaredOnCall, name),
+      `on.workflow_call.inputs must NOT declare '${name}': no automated caller has a resolution to ` +
+        'supply, and one that could would be a new bypass surface aimed at the default branch'
+    );
+
+    // Read the raw `default:` entry rather than a `?? ''` fallback: an absent `default:` and a
+    // declared `default: ""` both resolve to the empty string, so a row asserting emptiness cannot
+    // fail against a file whose declaration was deleted.
+    const entry = scalars(nestedEntries(dispatchInputs, name));
+    assert.ok(Object.hasOwn(entry, 'default'), `on.workflow_dispatch.inputs.${name} defaults`);
+    assert.equal(
+      unquote(entry.default),
+      '',
+      `${name} must default to empty: the fail-closed default is no resolution path at all`
+    );
+  }
+});
+
+// ── 14 ──────────────────────────────────────────────────────────────────────────────────────────
+
+test('the completion script runs at BOTH merge sites, anchored, and never without the gate after it', () => {
+  const steps = forwardPortSteps();
+  const invocations = steps
+    .map((step, index) => ({ step, index }))
+    .filter(({ step }) => COMPLETION_INVOCATION.test(step.run));
+
+  // Two, and exactly the two sites that merge: the first pass, and the push retry which re-performs
+  // the merge against a freshly fetched `main`. One would mean a path lost its conflict handling —
+  // the silent direction, because a conflicted forward-port there just reds with a generic exit.
+  const mergeIndex = stepIndex(steps, MERGE_IMPLEMENTATION, 'merges origin/release');
+  const pushIndex = stepIndex(steps, /git push origin HEAD:main/, 'pushes to main');
+  assert.deepEqual(
+    invocations.map(({ index }) => index),
+    [mergeIndex, pushIndex],
+    'the completion script belongs to the merge step and the push retry, and to nothing else'
+  );
+
+  for (const { step, index } of invocations) {
+    // A refusal from it must END the step. `bash …` on its own leaves the job carrying on with an
+    // unmerged or unmoved HEAD, which the gate then reads as "this run created no merge" and passes.
+    assert.match(
+      step.run,
+      new RegExp(`${COMPLETION_INVOCATION.source}[^\\n]*\\|\\|\\s*exit 1`),
+      `${stepLabel(step, index)} must fail the step on the completion script's refusal`
+    );
+
+    // The values cross into the shell through `env:` only (githubactions:S7630), mirroring how
+    // GH_TOKEN reaches the gate at both call sites.
+    assert.equal(step.env.RESOLUTION_REF, '${{ inputs.resolution_ref }}');
+    assert.equal(step.env.RESOLUTION_EFFECT, '${{ inputs.resolution_effect }}');
+
+    // THE COMPLETION MAY NEVER BE REACHED WITHOUT ITS VERDICT. The completion script makes none, so
+    // a path that completed a conflicted merge and did not then run the gate would push a
+    // human-supplied tree to `main` with nothing having checked it. The retry satisfies this inside
+    // its own body; the merge step satisfies it through the gate STEP that follows — and that is
+    // asserted by EVALUATING both conditions over every guard combination, not by comparing their
+    // `if:` strings, because two conditions can read alike and gate differently.
+    const afterCompletion = step.run.slice(step.run.search(COMPLETION_INVOCATION));
+    if (GATE_INVOCATION.test(afterCompletion)) continue;
+
+    const laterGates = steps
+      .slice(index + 1)
+      .filter((candidate) => GATE_INVOCATION.test(candidate.run));
+    assert.ok(laterGates.length > 0, `${stepLabel(step, index)} is followed by no content gate`);
+
+    // ONE later gate step must run in EVERY context this one does. The union of several is not
+    // enough and asserting it would be vacuous here: the push retry carries a gate of its own, so a
+    // union is satisfied on real runs by the retry and on dry runs by the first-pass gate, while the
+    // merge this step completed goes ungated on both.
+    const contexts = [];
+    for (const enabled of [true, false]) {
+      for (const already of ['true', 'false', '']) {
+        for (const mismatch of ['true', 'false', '']) {
+          for (const dryRun of [true, false]) {
+            contexts.push({
+              inputs: { enabled, dry_run: dryRun },
+              steps: {
+                ancestry: { outputs: { already } },
+                tipguard: { outputs: { mismatch } },
+              },
+            });
+          }
+        }
+      }
+    }
+
+    const covering = laterGates.filter((gate) =>
+      contexts.every(
+        (context) =>
+          !evaluate(unwrap(step.if), context) || Boolean(evaluate(unwrap(gate.if), context))
+      )
+    );
+    assert.ok(
+      covering.length > 0,
+      `${stepLabel(step, index)} completes a conflicted merge, and no single later step runs the ` +
+        'content gate everywhere it does — so there are guard combinations in which a ' +
+        'human-supplied tree reaches the push with nothing having checked it'
+    );
+  }
+
+  // No other workflow may reach for it: it is meaningful only after this workflow's own merge has
+  // conflicted, and a second caller would be completing a merge it does not own.
+  const callers = readdirSync(WORKFLOW_DIR)
+    .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
+    .filter((file) => read(`${WORKFLOW_DIR}/${file}`).includes(COMPLETE_MERGE_SCRIPT));
+  assert.deepEqual(callers, ['forward-port.yml']);
+});
+
+// ── 15 ──────────────────────────────────────────────────────────────────────────────────────────
+
+test('the completion script builds the merge itself, pushes nothing, and makes no verdict', () => {
+  const body = scriptStatements(COMPLETE_MERGE_SCRIPT).join('\n');
+
+  // The runbook quotes these two phrases verbatim to tell an operator how to read the job log, and
+  // nothing else guards that mirror: reword either message and CONTRIBUTING.md silently starts
+  // describing output the job no longer produces, on a path that runs once every few years.
+  const runbook = read('CONTRIBUTING.md');
+  for (const quoted of [
+    "the forward-port's merge of origin/release into main CONFLICTED",
+    'left no conflicting paths behind',
+  ]) {
+    assert.ok(body.includes(quoted), `the completion script must still print ${JSON.stringify(quoted)}`);
+    assert.ok(runbook.includes(quoted), `CONTRIBUTING.md must still quote ${JSON.stringify(quoted)}`);
+  }
+
+  // BOTH PARENTS, IN THAT ORDER, and the tree taken wholesale. The order records `origin/main` as
+  // the first parent, which is what makes the pushed commit a merge INTO main; taking the tree
+  // object rather than driving the conflicted index is what lets a resolution express a DELETION.
+  assert.match(
+    body,
+    /git commit-tree "\$\{RESOLUTION\}\^\{tree\}" -p origin\/main -p origin\/release/,
+    'the completed merge is built from the resolution tree with origin/main then origin/release'
+  );
+
+  // The `chore:` subject is load-bearing and must stay under the WORKFLOW's control: a
+  // human-authored merge carrying a `feat:` subject would make the beta.yml run this push triggers
+  // mint a version off a commit that changes nothing.
+  assert.match(
+    body,
+    /-m "chore: forward-port release into main/,
+    'the re-derived commit carries the non-releasing subject'
+  );
+  assert.ok(
+    body.includes('git reset --hard "$COMPLETED"'),
+    'the built commit must become HEAD, or the run pushes the merge it did not complete'
+  );
+
+  // A conflict is distinguished from any other merge failure BEFORE the resolution inputs are read,
+  // so an unreachable ref or a dirty tree never sends an operator to resolve a conflict that never
+  // happened.
+  assert.match(body, /git ls-files --unmerged/, 'a conflict is what unmerged index entries are');
+  assert.match(body, /git merge --abort/, 'nothing is left half-merged');
+
+  // IT MAKES NO VERDICT, and it is not a second copy of the gate. Every accept/refuse decision about
+  // the resolution lives in the gate, which runs afterwards under the same guard chain.
+  assert.ok(!/\bgit push\b/.test(body), 'the completion script must never push');
+  assert.ok(!/ALLOW_CONTENT/.test(body), 'a resolution is not an override, and this reads no override');
+  assert.ok(!/OVERRIDE_HINT/.test(body), 'nothing here may offer the override hint');
+  assert.ok(
+    !/forward-port-provenance\.mjs/.test(body),
+    'the provenance decision has ONE implementation, and it is not this script'
+  );
 });

@@ -152,15 +152,24 @@ describe('design system: a programmatic focus target declares itself focused to 
   // THE FLOOR MOVES DOWN AS THE CORPUS CONVERGES, and that is not the same thing as debt being
   // paid or a gate being loosened. A programmatic focus target is an ELEMENT, so five tab strips
   // that each rendered their own roving-tabindex button are five targets, and converting them all
-  // onto `EditorTabs` leaves one. Two changes did exactly that and the walk records both: issue
-  // 1038 converted the recipe, essence and tool strips, taking it from 26 to 23, and issue 1429
-  // converted the Checks section strip and the Knowledge tabs, taking it from 23 to 21.
-  // Re-lowering the floor per conversion would be the cheapest-repair anti-pattern, so the slack
-  // is stated once and bounded instead: TWO hand-rolled strips remain on this surface
-  // (`WorldDowntimeTabs`, recorded as justified non-reuse, and `TagsCategoriesView`, not yet
-  // adjudicated), so the reachable floor from converging tab strips alone is 19 and the gate sits
-  // one above it. The property this guards is that the walk is neither EMPTY nor TRUNCATED; a
-  // real truncation loses far more than two.
+  // onto `EditorTabs` leaves one. Three changes did exactly that: issue 1038 converted the recipe,
+  // essence and tool strips, issue 1429's first half converted the Checks section strip and the
+  // Knowledge tabs, and its second half converted `TagsCategoriesView`'s inlined vocabulary strip
+  // — the last hand-rolled one, which had to be EXTRACTED as `VocabularyTabs` before it could be
+  // converted, which is why it outlived the other five.
+  //
+  // THE COUNT IS NOT A RUNNING TOTAL OF THOSE CONVERSIONS, and reading it as one is how this
+  // comment went stale. Convergence takes targets away and ordinary feature work adds them back:
+  // between the two halves of issue 1429 the world essence surfaces and the toolbar extraction
+  // added targets of their own, so the walk stood at 22 before this conversion rather than at the
+  // 21 the subtraction predicted, and it stands at 21 after it. Re-lowering the floor per
+  // conversion would be the cheapest-repair anti-pattern, so the slack is stated once and bounded
+  // instead: ONE hand-rolled strip remains on this surface (`WorldDowntimeTabs`, whose row in
+  // `scripts/lib/designSystemPrimitives.json` records conversion-pending work rather than a
+  // justified divergence), so converging every remaining strip reaches 20 — which is this gate,
+  // deliberately, rather than 19 with a fresh unit of slack cut for it. The property this guards
+  // is that the walk is neither EMPTY nor TRUNCATED, and a real truncation loses far more than the
+  // one strip that is left.
   it('finds programmatic focus targets, so the assertions below are not vacuous', () => {
     const targets = focusTargets();
     assert.ok(

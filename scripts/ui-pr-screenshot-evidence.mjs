@@ -536,6 +536,10 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
+      // The vocabulary tab strip, extracted out of the view in issue 1429. The exact-path
+      // pattern above cannot reach a file that is no longer named `TagsCategories*`, and an
+      // uncovered state publishes an unrelated frame rather than none.
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
       // The inspector rail's contextual help and reference-safety card render through the
       // shared explainer primitive (issue 881), whose CSS is co-located in its own scoped
       // block; these frames are the ones that show it on this screen.
@@ -553,6 +557,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-tags-categories-tags-tab'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
     ],
   },

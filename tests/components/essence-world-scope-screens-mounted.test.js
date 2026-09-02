@@ -46,6 +46,8 @@ const SCOPED_RAW_MODULES = [
   'src/utils/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
   'src/utils/scopedEntityListModel.js',
+  // The frame's lifted view-state (issue 1438).
+  'src/utils/managerBrowserViewState.js',
 ];
 
 const SHELL_MODULES = [

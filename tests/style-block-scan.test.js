@@ -62,6 +62,7 @@ import {
   maskNonStyleRegions,
   pixelValuesIn,
   resolveValueCandidates,
+  scanPixelDeclarations,
   scanPixelValues,
   splitSelectorList,
   stripCssComments,
@@ -233,6 +234,63 @@ test('an uppercase property name survives the whole scan, not just the extractio
     occurrences('.a { --Foo: 40px; }', ['--foo'], [40]).length,
     0,
     'a custom property name is case-SENSITIVE, so the fold must not reach it'
+  );
+});
+
+test('a held-opaque definition is not substituted, but its fallback still is', () => {
+  // The option the spacing ratchet is built on (issue 1448). Its gate bans EVERY pixel literal
+  // in padding/margin/gap, so a scan that substituted the published scale would resolve
+  // `padding: var(--fab-space-3)` to `12px` and report the one thing the spec asks for as debt —
+  // 2989 occurrences against 1005 on the shipped corpus, which is not an edge case but the whole
+  // sanctioned population.
+  //
+  // Both directions are asserted from ONE corpus, because "opaque" only means anything against
+  // the answer the same input gives without it. The `--local` token is the control: holding the
+  // scale opaque must not stop any OTHER token resolving, or the ratchet would lose the
+  // laundering it exists to catch.
+  const corpus = {
+    'a.css': [
+      ':root { --fab-space-3: 12px; --local: 7px; }',
+      '.a { padding: var(--fab-space-3); }',
+      '.b { padding: var(--local); }',
+      '.c { padding: var(--fab-space-9, 5px); }',
+    ].join('\n'),
+  };
+  const found = (options) =>
+    scanPixelDeclarations({ corpus, properties: ['padding'], accept: () => true, ...options })
+      .occurrences.map((record) => `${record.raw} => ${record.value}`)
+      .sort(byCodePoint);
+
+  assert.deepEqual(
+    found({}),
+    ['var(--fab-space-3) => 12', 'var(--fab-space-9, 5px) => 5', 'var(--local) => 7'],
+    'with nothing held opaque, every token resolves — including the published scale'
+  );
+  assert.deepEqual(
+    found({ opaqueProperty: (name) => name.startsWith('--fab-space') }),
+    ['var(--fab-space-9, 5px) => 5', 'var(--local) => 7'],
+    'holding the scale opaque must drop ONLY the scale-mediated value: `--local` still resolves, ' +
+      'or a literal laundered into a private token would stop being caught; and a written ' +
+      'FALLBACK is still a literal on the line, so it is still found'
+  );
+});
+
+test('accept is a predicate over the value, not a list of values', () => {
+  // `scanPixelValues` takes a closed list because "32, 36 and 40 are retired" is a closed list.
+  // The spacing gate's prohibition is open — every literal outside two exempt bands — and
+  // enumerating that as a list means choosing a ceiling, which is a bypass the day anyone writes
+  // a bigger number than the one whoever wrote the list imagined.
+  const corpus = { 'a.css': '.a { gap: 3px; } .b { gap: 1px; } .c { gap: 4000px; }' };
+  const { occurrences } = scanPixelDeclarations({
+    corpus,
+    properties: ['gap'],
+    accept: (pixels) => Math.abs(pixels) !== 1,
+  });
+
+  assert.deepEqual(
+    occurrences.map((record) => record.value).sort((left, right) => left - right),
+    [3, 4000],
+    'the predicate must decide every value, including one no list would have enumerated'
   );
 });
 
