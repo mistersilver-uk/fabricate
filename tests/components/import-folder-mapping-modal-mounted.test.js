@@ -15,6 +15,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
     // InlineVocabularyAdd imports IconPicker STATICALLY (issue 878), so the picker's own
     // dependencies are in this graph even though this modal never sets `showIcon` and so
     // never renders the field. Membership follows the import graph, not the rendered tree.

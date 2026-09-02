@@ -223,8 +223,12 @@ A listbox MUST keep DOM focus on ONE element and drive selection with `aria-acti
 Where the list has a search field, that field holds focus.
 Where it does not — a plain select — the trigger is a `combobox` that Foundry will recognise as focused: either an input, or an element carrying the keyboard-focus attribute below.
 
-A floating surface MUST be portalled to the application root and positioned by measurement, flip and clamp.
+A floating surface MUST be portalled to the NEAREST application root of the element that opens it, resolved by walking UP from that element rather than by naming a root, and positioned by measurement, flip and clamp against that same element's box.
 Core clips at `.window-content` and the manager adds further clipping boundaries, so a CSS offset cannot escape them; `document.body` is NOT a valid portal target because it loses window stacking.
+The portal target and the coordinate origin MUST be the same element, because the fault is not either choice on its own but the two disagreeing: a surface that names one root resolves nothing outside it, so the portal silently no-ops while the positioning falls back to viewport coordinates written onto a node that never moved, and the panel draws in the wrong place with byte-identical markup.
+A document-wide lookup for a root is worse rather than safer, since it finds that application wherever it is and portals the surface into a different window.
+The eligible roots are `.fabricate-manager` and `.fabricate-app`, and a root is eligible only while it is a POSITIONED element, because an absolutely positioned panel appended to a static one takes its containing block from somewhere else entirely.
+A surface that resolves no application root MUST report it rather than degrade quietly; it falls back to `<body>`, which keeps the panel at its trigger but outside window stacking, and that is a fault to fix rather than a supported host.
 
 A primitive MUST set its own `height` and `min-height` on any button and its own width on any input, because Foundry's element rules otherwise crop or stretch it.
 A radio or checkbox MUST remove core's pseudo-element rendering in addition to setting `appearance: none`.
@@ -356,7 +360,8 @@ It has no trigger, its suggestion list hangs off an input whose expanded state i
 It toggles membership, stays open across choices and marks several options selected at once, while the picker carries a single value and closes on choose.
 
 A picker whose class family is scoped to one application root MUST NOT be adopted by a surface outside that root until the family is unscoped.
-The shared picker's rules are area-scoped today, so a player-window caller would portal to a host that is not present and render the panel unstyled; that adoption belongs to the change that renames and unscopes the family, not to a conversion before it.
+`SearchablePopover`'s family has been unscoped onto the primitive's own `fabricate-picker` and `fabricate-picker-popover` roots, so it satisfies this and is adoptable outside the manager.
+The icon, colour, essence-source and recipe-duration pickers do NOT: their panel rules are still written under `.fabricate-manager`, so a caller outside it would render a panel with no `position: absolute` to be placed by, and unscoping each family belongs to its own change rather than to a conversion before it.
 
 #### Scenario: A converted menu renders no query field
 

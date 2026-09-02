@@ -2,6 +2,7 @@
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
+  import { overlayHostRect, resolveOverlayHost } from '../util/overlayHost.js';
   import ManagerColorPopover from './ManagerColorPopover.svelte';
   import { normalizeManagerColorToken } from '../util/managerColorTokens.js';
 
@@ -60,9 +61,7 @@
   }
 
   function getPopoverHost() {
-    if (!pickerRoot || typeof document === 'undefined') return null;
-
-    return pickerRoot.closest('.fabricate-manager');
+    return resolveOverlayHost(pickerRoot, { component: 'ManagerColorPicker' });
   }
 
   function getPopoverHorizontalBounds(hostRect) {
@@ -82,12 +81,7 @@
     if (!open || !triggerButton || typeof window === 'undefined') return;
 
     const popoverHost = getPopoverHost();
-    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
+    const hostRect = overlayHostRect(popoverHost);
     const triggerRect = triggerButton.getBoundingClientRect();
     const horizontalBounds = getPopoverHorizontalBounds(hostRect);
 

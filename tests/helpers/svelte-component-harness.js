@@ -204,6 +204,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js'
 ]);
@@ -472,6 +473,20 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       // synchronously from hundreds of places.
       await new Promise((resolve) => setImmediate(resolve));
       target = document.createElement('div');
+      // THE MOUNT TARGET IS AN APPLICATION ROOT (issue 1466).
+      //
+      // A component that portals an overlay resolves its host by walking up to the nearest
+      // Fabricate application root (`src/ui/svelte/util/overlayHost.js`), because a panel has to
+      // escape its own scrolling, clipping container to be seen. Mounted into a bare `<div>` a
+      // picker is somewhere no production mount of it has ever been — outside every application —
+      // and its panel lands on `<body>`, out of reach of every `target.querySelector` in the suite.
+      //
+      // The class is not a convenience: every component that portals is reachable ONLY from the
+      // crafting-system manager (measured by walking the import graph from all seven application
+      // roots), so a mounted fragment of one is, in production, inside this root. Saying so makes
+      // the fixture more faithful, not less — and before this the fixtures were quietly asserting
+      // against a portal that had FAILED, which is the very defect issue 1466 removed.
+      target.className = 'fabricate-manager';
       document.body.appendChild(target);
       mounted = createClassComponent({ component: Component, target, props });
       flushSync();

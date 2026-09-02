@@ -51,6 +51,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dragDrop.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/overlayHost.js',
   // The complications section (issue 1286). Four leaves, each reached only through it:
   // the persisted vocabulary it seeds a new complication from, the ONE localized trigger
   // sentence it renders in the summary row, the operator table it filters the six numeric

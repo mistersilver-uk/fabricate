@@ -596,7 +596,10 @@ describe('RecipeEditView (mounted)', () => {
     // ids ALONE — no rule rides along.
     picker.querySelector('[data-modifier-pill-menu-button]').click();
     await flushRender();
-    picker.querySelector('[data-modifier-pill-option="alch"]').click();
+    // The OPTION is in the portaled panel, which hangs off the application root rather than off
+    // the picker (issue 1466). Scoping this to `picker` only ever worked because the portal was
+    // failing.
+    target.querySelector('[data-modifier-pill-option="alch"]').click();
     await flushRender();
     assert.deepEqual(patches.at(-1), {
       craftingModifier: { modifierIds: ['med', 'alch'] },
@@ -2919,7 +2922,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.ok(trigger, 'tools picker trigger renders on the Tools tab');
     trigger.click();
     await flushRender();
-    const options = [...document.querySelectorAll('.manager-travel-option')];
+    const options = [...target.querySelectorAll('.manager-travel-option')];
     assert.equal(options.length, 2, 'the popover lists both library tools');
     options.find((option) => /Hammer/.test(option.textContent)).click();
     await flushRender();
@@ -3043,7 +3046,7 @@ describe('RecipeEditView (mounted)', () => {
     target.querySelector('[data-recipe-section="tools"] .manager-recipe-tools-trigger').click();
     await flushRender();
 
-    const options = [...document.querySelectorAll('.manager-travel-option')];
+    const options = [...target.querySelectorAll('.manager-travel-option')];
     assert.equal(
       options.length,
       precedenceLibrary.length,
@@ -3705,7 +3708,7 @@ describe('RecipeEditView (mounted)', () => {
     );
 
     await openOrMenu(target, 'grp-1');
-    const dialog = document.querySelector('.manager-travel-popover[role="dialog"]');
+    const dialog = target.querySelector('.manager-travel-popover[role="dialog"]');
     assert.equal(dialog.getAttribute('aria-label'), NEUTRAL);
     assert.equal(dialog.querySelector('[role="listbox"]').getAttribute('aria-label'), NEUTRAL);
     // The row-level "or..." popover drops the search box entirely (issue 643): only a
@@ -3727,10 +3730,9 @@ describe('RecipeEditView (mounted)', () => {
     await openOrMenu(target, 'grp-1');
 
     // No option-group headings (flat list) and no essence choice at all.
-    assert.equal(document.querySelector('[data-popover-group]'), null, 'the menu is a flat list');
-    assert.equal(
-      document.querySelector('[data-recipe-add="alternative-essence"]'),
-      null,
+    assert.ok(!target.querySelector('[data-popover-group]'), 'the menu is a flat list');
+    assert.ok(
+      !target.querySelector('[data-recipe-add="alternative-essence"]'),
       'no essence alternative without system essences'
     );
     editHarness.remount();

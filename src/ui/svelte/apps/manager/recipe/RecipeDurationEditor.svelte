@@ -7,7 +7,7 @@
   `onChange(nextTimeRequirement | null)` — `null` when every field is 0 (clears
   the duration).
 
-  The popover is portaled to the `.fabricate-manager` host so it escapes the
+  The popover is portaled to the nearest Fabricate application root so it escapes the
   manager panel's `overflow: hidden`, positioned with the shared icon-picker
   layout helper, and dismissed on outside click / Escape (mirroring
   SearchablePopover).
@@ -23,6 +23,7 @@
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../../actions/portal.js';
   import { computeIconPickerPopoverLayout } from '../../../util/iconPickerPopover.js';
+  import { overlayHostRect, resolveOverlayHost } from '../../../util/overlayHost.js';
   import {
     TIME_UNITS,
     formatTimeRequirement,
@@ -95,19 +96,13 @@
   }
 
   function getPopoverHost() {
-    if (!pickerRoot || typeof document === 'undefined') return null;
-    return pickerRoot.closest('.fabricate-manager');
+    return resolveOverlayHost(pickerRoot, { component: 'RecipeDurationEditor' });
   }
 
   function updatePosition() {
     if (!open || !triggerButton || typeof window === 'undefined') return;
     const host = getPopoverHost();
-    const hostRect = host?.getBoundingClientRect?.() ?? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
+    const hostRect = overlayHostRect(host);
     const triggerRect = triggerButton.getBoundingClientRect();
     const layout = computeIconPickerPopoverLayout(
       {
