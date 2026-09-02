@@ -6176,16 +6176,35 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   // Their behaviour is covered by `tests/components/tool-studio-mounted.test.js`; what only a
   // real browser can answer is whether they are hit-testable where they are drawn, which is
   // exactly what these two assertions ask.
-  const breakageInheritToggle = editor.locator('[data-scoped-inherit-toggle="breakage"]');
-  await breakageInheritToggle.waitFor({ state: 'visible', timeout: 5_000 });
-  await assertPointerTarget(
-    page,
-    breakageInheritToggle,
-    '[data-scoped-inherit-toggle="breakage"]',
-    'Tool breakage inherit switch',
-  );
-  if (await editor.locator('[data-tool-rule-card="breakage"][data-tool-rule-state]').count() !== 1) {
+  //
+  // THE SWITCH IS DRAWN ONLY WHERE THERE IS A WORLD RECORD TO INHERIT FROM. This fixture's Tools
+  // are created with `csm.upsertTool` and never enter the world catalogue, so the card resolves
+  // `local` and renders no switch at all — correctly. Waiting on it unconditionally is what this
+  // walk did first, and it timed out on a screen that was behaving exactly as designed.
+  //
+  // So the state decides which assertion runs, and BOTH branches assert: `local` must draw no
+  // switch, anything else must draw one that is hit-testable. Neither branch can pass by finding
+  // nothing, which is the failure a bare `if (count)` guard would have shipped.
+  const breakageCard = editor.locator('[data-tool-rule-card="breakage"][data-tool-rule-state]');
+  if (await breakageCard.count() !== 1) {
     throw new Error('the Tool breakage section must state exactly one inheritance state');
+  }
+  const breakageRuleState = await breakageCard.getAttribute('data-tool-rule-state');
+  const breakageInheritToggle = editor.locator('[data-scoped-inherit-toggle="breakage"]');
+  if (breakageRuleState === 'local') {
+    if (await breakageInheritToggle.count() !== 0) {
+      throw new Error(
+        'a Tool with no world record drew an inherit switch with nothing to inherit from',
+      );
+    }
+  } else {
+    await breakageInheritToggle.waitFor({ state: 'visible', timeout: 5_000 });
+    await assertPointerTarget(
+      page,
+      breakageInheritToggle,
+      '[data-scoped-inherit-toggle="breakage"]',
+      'Tool breakage inherit switch',
+    );
   }
   const removeCallout = editor.locator('[data-tool-remove-from-system]');
   await scrollToolEditorPanelToReveal(
