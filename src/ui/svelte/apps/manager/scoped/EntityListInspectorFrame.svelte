@@ -920,6 +920,7 @@
               hint={selectionHint}
               trailingActions
               bareActions
+              countIcon="fa-solid fa-check-double"
               onTogglePage={togglePage}
               onSelectAllResults={selectAllResults}
               onClear={clearSelection}
