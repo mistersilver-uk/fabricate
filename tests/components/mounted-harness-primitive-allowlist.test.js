@@ -155,6 +155,12 @@ const SHARED_PRIMITIVES = [
   // in more mounted trees than any entry above except `Chip`.
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
+  // THE editor validation surface (issue 1444), closed onto seven renderers across the Checks
+  // Studio, the essence and Tool studios, the world essence entry page and both recipe
+  // editors. It sits in more mounted trees than its four direct callers suggest, because the
+  // scoped shell in between puts it in every tree that mounts an essence or a tool — and the
+  // conversion that closed it dropped it into two more, each of which had to name it or hang.
+  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

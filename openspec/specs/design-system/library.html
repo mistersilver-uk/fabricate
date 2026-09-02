@@ -1097,7 +1097,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;ValidationList&gt; &lt;ValidationSummary&gt;</h4><p class="why">Present in 11 of 21 prototypes and shipped with three callers. It is a primitive rather than a kind of rail content, because it carries its own severity vocabulary and drives the count on its own tab.</p></div>
+    <div class="spec-head"><h4>&lt;ValidationList&gt; &lt;ValidationSummary&gt;</h4><p class="why">Present in 11 of 21 prototypes and shipped as ONE closed component — four direct callers behind seven renderers, and nothing hand-rolls the arrangement any more. It is a primitive rather than a kind of rail content, because it carries its own severity vocabulary and drives the count on its own tab.</p></div>
     <div class="stage col">
       <div class="k-card" style="display:grid;gap:12px">
         <div style="display:flex;gap:12px;align-items:center"><div class="k-ic s38" style="color:var(--fab-warning-text);background:var(--fab-warning-soft)"><svg class="i"><use href="#i-alert"/></svg></div><div class="grow"><div style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Nearly ready</div><div class="k-hint">Three warnings, one blocking issue. Players cannot craft this until the blocker clears.</div></div>
@@ -1112,8 +1112,9 @@ a{color:var(--fab-accent)}
     </div>
     <div class="notes">
       <div><h5>Canonical spec</h5><ul><li><b>severity</b> <code>pass | warn | fail</code> — not the Notice tone set</li><li><b>row</b> icon + title + detail + a jump-to-issue action</li><li><b>summary</b> icon chip 38, serif line, one sentence, the counts</li><li>Drives the warn-toned count on its own tab</li></ul></div>
-      <div><h5>Svelte API</h5><ul><li><b>counts</b> {passing, warnings, blocking}</li><li><b>groups</b> {label, issues}[]</li><li><b>onSelectIssue</b> — focus moves to the offending control</li><li><b>statusLabels</b> — localized</li></ul></div>
+      <div><h5>Svelte API</h5><ul><li><b>counts</b> {passing, warnings, blocking} — a site reports the subset it can answer, and the rail draws those tiles in this order</li><li><b>groups</b> {label, issues}[]</li><li><b>onSelectIssue</b> — focus moves to the offending control</li><li><b>statusLabels</b> — localized</li><li><b>hookAttrs / countAttrs</b> — the site's own <code>data-*</code> hooks, per named region and per count</li><li><b>class</b> — appended to the surface's own, never a replacement</li></ul></div>
     </div>
+    <div class="delta">The shipped component covers BOTH names in one surface: the verdict card and the grouped row list are one tab, not two, so neither name has an implementation of its own to point at and the manifest records the correspondence as unestablished rather than guessing which one the file is.<span class="cite">7 renderers · <b>EditorValidationSurface.svelte</b></span></div>
   </div>
 
   <div class="spec">
