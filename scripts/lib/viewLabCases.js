@@ -2248,6 +2248,94 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'world-tool-entry-on-break-repair-empty-tag',
+    label: 'Manager — World Tool entry, repair route with an empty tag row',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ROW THE MAINTAINER AUTHORED, WHICH NO FIXTURE COULD SEED (issue 1373, maintainer
+    // round 7). `sm-tool-tongs` carries a POPULATED tag row because an option with no tags
+    // fails `Ingredient.validate`, so an empty-tag seed would flip this Tool's Validation badge
+    // and change what every other frame of it is evidence for. But an empty tag arm — the
+    // policy word and `+ Tag`, with no chips between them — is the state a GM meets the instant
+    // they press `Add tag`, and it is the ONE the maintainer photographed at 96px against the
+    // other rows' 46px.
+    //
+    // Pressing the adder is how this case reaches it: the state is authored rather than seeded,
+    // so the Tool's stored requirements are untouched and no other frame of it moves.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+      { selector: '[data-tool-repair-requirements] [data-recipe-add="tag-requirement"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-repair-requirements]',
+    // THE ARM, IN A ROW THAT HOLDS NO CHIPS. The populated frame beside this one cannot stand
+    // in for it: with two chips the arm is wide enough to look inline whatever its own wrap
+    // behaviour is, and it was green through the defect for exactly that reason.
+    expectContained: [
+      {
+        container:
+          '[data-tool-repair-requirements] .manager-recipe-ingredient-option-row.is-tag:last-of-type',
+        target: '[data-tool-repair-requirements] [data-recipe-option-tags]:last-of-type',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientSetCard\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-repair-suggestions',
+    label: 'Manager — World Tool entry, repair route with a suggestion list open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // NO CASE IN THE REGISTRY OPENED A SUGGESTION LIST (issue 1373, maintainer round 7), which
+    // is why the row that completes a typed name shipped centred and unphotographed. The
+    // suggestion panel is the whole point of the inline field: it is what makes the field
+    // COMPLETE a name rather than open a second surface over the row, so a registry that never
+    // draws it is evidence for the field and not for the thing the field is for.
+    //
+    // Clearing the first row and typing into it is the shortest route: `or…`-free, one
+    // requirement, and `ingot` matches several world components so the panel holds real rows
+    // rather than the `No matches` line the empty-catalogue frame would give.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+      { selector: '[data-tool-repair-requirements] [data-recipe-option-clear]' },
+      { selector: '[data-tool-repair-requirements] [data-recipe-option-search]', fill: 'ingot' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-repair-requirements] [data-recipe-option-suggestion]',
+    // THE PANEL UNDER THE FIELD IT COMPLETES. Containment against the field's own wrapper is
+    // what says the two are one control; against the page it would pass just as well over a
+    // panel drawn anywhere on the screen.
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-tool-repair-requirements] [data-recipe-option-suggestion]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'world-tool-entry-on-break-replace',
     label: 'Manager — World Tool entry, replacement component',
     reaches: 'beyond',

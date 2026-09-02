@@ -534,10 +534,14 @@
         onChoose={(tag) => addTag(tag)}
       />
     </span>
+    <!-- `tone="tag"` and NO `density`: the tone carries the design's own scale for this control
+         as well as its colour (`proto:2268`, `proto:4628`). It is the only thing a tag row
+         carries that the other three kinds do not, so its size is what decides whether an
+         empty tag row stands level with its siblings. -->
     <SegmentedControl
       options={TAG_MATCH_OPTIONS}
       value={tagMatch}
-      density="compact"
+      tone="tag"
       groupName={`tag-match-${tagMatchGroupId}`}
       ariaLabel={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
       optionDataAttr="data-recipe-tag-match"

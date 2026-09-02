@@ -289,6 +289,56 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  // ── The tag TONE (issue 1373) ───────────────────────────────────────────────────
+  //
+  // `tone` says what the track is ABOUT and repaints its edge and both segments together;
+  // the per-option `variant` tints one ACTIVE segment to say what choosing it means. They
+  // are different axes, so the opt-out side is what matters here: nine of the ten consumers
+  // pass no tone and must render exactly the markup they rendered before it existed.
+  it('adds is-tag to the track only when tone is set, and leaves the segments alone', async () => {
+    const plain = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
+    assert.equal(
+      plain.querySelector('.manager-segmented').classList.contains('is-tag'),
+      false,
+      'the default track carries no tone class'
+    );
+    harness.remount();
+    const toned = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      tone: 'tag'
+    });
+    assert.ok(
+      toned.querySelector('.manager-segmented.is-tag'),
+      'tone="tag" marks the TRACK'
+    );
+    // The tone is a track statement, so no segment gains a class: painting the chosen one
+    // through `is-tag` on the SEGMENT would collide with the per-option variant ramp, which
+    // is the axis this prop deliberately is not.
+    assert.equal(
+      [...toned.querySelectorAll('.manager-segment')].filter((segment) =>
+        segment.classList.contains('is-tag')
+      ).length,
+      0,
+      'no segment carries the tone class'
+    );
+    // An unknown tone renders the default track rather than an is-<anything> class, so a
+    // typo degrades to the shipped rendering instead of emitting a selector nothing styles.
+    harness.remount();
+    const unknown = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      tone: 'wat'
+    });
+    assert.equal(
+      unknown.querySelector('.manager-segmented').className.includes('is-wat'),
+      false,
+      'an unknown tone emits no class of its own'
+    );
+  });
+
   it('stamps dataAttr and optionDataAttr hooks', async () => {
     const root = await harness.mount({
       options: OPTIONS,

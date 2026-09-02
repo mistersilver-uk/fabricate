@@ -76,6 +76,23 @@
     // are exactly what these tracks change. A SIZE taken from the layout context is still
     // permitted, so the tier row supplies the 158px width and nothing else.
     density = 'default',
+    // '' | 'tag': the FAMILY the whole track is painted in, which is orthogonal to `density`
+    // and to the per-option `variant` above. `variant` tints one ACTIVE segment inside an
+    // otherwise neutral track to say what choosing it means; `tone` says what the track is
+    // ABOUT, and repaints its edge and both its segments together (issue 1373).
+    //
+    // One value so far. The recipe/repair requirement row's any-of / all-of control is the
+    // only member of a control run — the row's own edge, the tag chips, the `+ Tag` pill —
+    // that is entirely about tags, and a neutral track there put the one control that names
+    // the match policy in a different family from the values it applies to. `tag` is not a
+    // semantic ramp cell like `success` or `danger`: it names an entity family, so it cannot
+    // be spelled as a per-option `variant` without claiming that CHOOSING it means something.
+    //
+    // It carries the track's own scale as well as its colour, so a `tone` consumer passes no
+    // `density`: the design draws this control at one size only, and a caller free to combine
+    // the two would be choosing between two sets of the same four properties at equal
+    // specificity, decided by source order.
+    tone = '',
   } = $props();
 
   function text(key, fallback) {
@@ -99,7 +116,7 @@
 </script>
 
 <div
-  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}`}
+  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${tone === 'tag' ? ' is-tag' : ''}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...dataAttr ? { [dataAttr]: true } : {}}
@@ -215,6 +232,74 @@
   .manager-segmented.is-field .manager-segment.is-active {
     border-color: var(--fab-accent-border);
     background: var(--fab-surface-raised);
+  }
+
+  /* TAG TONE (issue 1373): the requirement row's any-of / all-of control, drawn as the design
+     draws it at `proto:2268` and `proto:4628` — an edged track in the tag family with the
+     chosen segment lit in the same hue and the unchosen one painting nothing at all.
+
+     `overflow: hidden` is why no segment restates a corner radius: the track clips them to its
+     own ends, so the pair reads as one control rather than two tiles inside a box. That is also
+     why the track carries no padding and no gap — the design's segments MEET.
+
+     THE TRACK IS SHORTER THAN THE DEFAULT AND THE COMPACT ONE, and that is load-bearing rather
+     than cosmetic. This control is the only thing a tag requirement row carries that the other
+     three kinds do not, so it is the row's tallest item unless it is smaller than the 30px
+     select and field beside it — and a taller one made an EMPTY tag row stand above every
+     sibling row in the same set (the maintainer's round-7 report, guarded by `the tag
+     requirement row keeps its arm whole, and an EMPTY one is a row like any other`).
+
+     THE SEGMENT PADDING IS TOKENS, not the design's own `4px 9px`. The two other densities
+     above authored their padding in px and are carried in the spacing ratchet's baseline as
+     debt; a third would ADD to it, which is the one thing that baseline exists to stop. The
+     nearest steps are `--fab-space-1` and `--fab-space-2`, which is a pixel narrower per side
+     than the design draws — well inside the slack this control has, since what its width has
+     to satisfy is the row's one-line budget rather than a pinned value.
+
+     The hue is written as a RATIO against `--fab-purple` rather than as the design's own
+     translucent literal, because that is how the tag family is already mixed here — the
+     requirement row's edge and the `+ Tag` pill both do it — and a literal would fail the
+     colour contract. */
+  .manager-segmented.is-tag {
+    gap: 0;
+    padding: 0;
+    border-color: color-mix(in srgb, var(--fab-purple) 40%, transparent);
+    border-radius: 7px;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .manager-segmented.is-tag .manager-segment {
+    height: auto;
+    padding: var(--fab-space-1) var(--fab-space-2);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 9.5px;
+    font-weight: 600;
+  }
+
+  /* `:not(.is-active)` is load-bearing here for the same reason it is on `.is-compact`: this
+     rule is (0,4,0) and it would otherwise out-specify `.manager-segment.is-active`'s own ink
+     and paint the lit segment as the resting one. */
+  .manager-segmented.is-tag .manager-segment:not(.is-active) {
+    color: var(--fab-text-subtle);
+  }
+
+  .manager-segmented.is-tag .manager-segment.is-active {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--fab-purple) 22%, transparent);
+    color: var(--fab-text);
+  }
+
+  /* THE FOCUS RING TURNS INWARD, and it is the `overflow: hidden` above that makes it have to.
+     An outline is painted OUTSIDE the element's border box, so the clip that gives this track
+     its rounded ends would take the shared `outline-offset: 2px` ring with it and leave a
+     keyboard user with no visible focus at all. A negative offset paints the same ring inside
+     the segment instead, where nothing clips it. This is the only density that clips, so the
+     override is scoped to the tone rather than applied to the primitive. */
+  .manager-segmented.is-tag .manager-segment:has(:focus-visible) {
+    outline-offset: -2px;
   }
 
   /* ICON-ONLY variant (issue 1036): a square glyph tile per segment. `min-width: 32px`

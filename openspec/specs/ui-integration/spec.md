@@ -2783,6 +2783,9 @@ Changing it CLEARS the row's value, because an id belonging to the old kind mean
 - **The name field has two faces.**
 Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
 Unnamed, it is an inline search field with its suggestions rendered BENEATH it, in the row — never a popover opened over it.
+- **A suggestion starts where the query starts.**
+The panel sits directly under the field it completes, so each suggestion's glyph and label are left-aligned against the typed text above them; a suggestion centred in its panel is not continuing what the GM typed.
+This is a declaration the row has to make rather than a default it can rely on: Foundry styles every `button` on the page as a centred flex box, so a suggestion row that names no justification of its own inherits that centring, and `text-align` cannot undo it because the row is a flex container rather than a text one.
 - **Losing focus commits NOTHING; Enter commits.**
 The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the pill showed the blur handler's value.
 Tabbing to a suggestion fails identically, which is why suppressing the pointer path alone is half a fix.
@@ -2795,7 +2798,10 @@ A world with no components and no essences is the state every world starts in, s
 A TAG row is one line.
 It reads as the sentence it writes — the policy word, the chosen tag chips each with their own remove, then `+ Tag` — with the any-of / all-of control that sets that word beside it, through the shared segmented-control primitive.
 There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row already says `Any of` with nothing after it.
-The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and at the narrow one the whole row does not always fit on one line.
+The any-of / all-of control is in the TAG family, edged and lit in the same hue the row's own border, the tag chips and the `+ Tag` pill already carry — a neutral track would put the one control that is about tags in a different family from every value it applies to.
+It is also the SHORTEST control in the row, and that is a requirement rather than a detail: it is the only thing a tag row carries that the other three kinds do not, so a taller one would be the row's tallest item and would raise every tag row above its siblings.
+An unfilled tag row is therefore level with the component row beside it, and asks for less room than one.
+The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and narrower still than either the whole row does not fit on one line.
 What must hold there is that the tag ARM stays whole: the policy word, the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
 
 #### Adding a requirement, and adding an alternative

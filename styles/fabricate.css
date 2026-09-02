@@ -13068,12 +13068,20 @@
   scrollbar-width: thin;
 }
 
+/* `justify-content: flex-start` is NOT a restatement of the initial value (issue 1373, round
+   7). Foundry's own `a.button, button { justify-content: center }` reaches every button on the
+   page, so a flex button that names no justification of its own is CENTRED — and this row's
+   `text-align: left` below could not undo it, because `text-align` positions the content of a
+   text container and this is a flex one. The glyph and the label sat mid-panel while the query
+   they complete sat at the field's left edge, one row above. `proto:2280` left-aligns, and so
+   does premium's `RewardRow` `.suggestion`. */
 .fabricate-manager .manager-recipe-option-suggestion {
   appearance: none;
   -webkit-appearance: none;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  justify-content: flex-start;
   gap: var(--fab-space-2);
   width: 100%;
   height: 30px;
@@ -13147,6 +13155,17 @@
   color: var(--fab-text-muted);
   font-size: 0.69rem;
   font-weight: 600;
+}
+
+/* THE ANY-OF / ALL-OF TRACK'S PLACE IN THE ROW (`proto:2268` gives it `flex: 0 0 auto`). The
+   track's own appearance is `SegmentedControl`'s `tone="tag"`, in that component's scoped block
+   where a rule here could not reach it; what is written HERE is the one thing the layout context
+   owns, which is that the track states its size and never absorbs the row's shrink. It matters
+   more than it reads: the tone clips its segments with `overflow: hidden`, so a track that could
+   be squeezed would silently cut a label in half rather than reflow. With the track fixed, the
+   tag ARM is the row's only flexible item, exactly as the name field is on every other kind. */
+.fabricate-manager .manager-recipe-ingredient-option-row > .manager-segmented {
+  flex: 0 0 auto;
 }
 
 /* `+ Tag` (`proto:2256`): a dashed pill in the tag tint, not a filled button — it is an

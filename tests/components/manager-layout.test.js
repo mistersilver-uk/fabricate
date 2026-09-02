@@ -6050,7 +6050,7 @@ test('recipe tag chips keep a zero margin and one height, whatever the host rhyt
   }
 });
 
-test('the tag requirement row keeps its arm whole at BOTH widths it is rendered at', async () => {
+test('the tag requirement row keeps its arm whole, and an EMPTY one is a row like any other', async () => {
   // REPLACES `recipe tag list spans the full row width on its own line below the controls`
   // (issue 1373, maintainer round 5). That test pinned the shape the design names as the
   // defect: `.manager-recipe-option-tags-detail` carried `flex: 1 1 100%`, so the tag arm
@@ -6061,25 +6061,33 @@ test('the tag requirement row keeps its arm whole at BOTH widths it is rendered 
   // The claim is geometric and this is where it can be made: nothing else in the corpus
   // computes a real cascade, and the mounted suites cannot see a wrap at all.
   //
-  // == TWO WIDTHS, AND A FIXTURE THAT CARRIES THE WHOLE ROW (round 6) =======================
-  // The first version of this test measured ONE width with a row that was missing three
-  // controls: the `or...` chip, the divider before it, and the real `Stepper` (it used a bare
-  // `<input type="number">`, which is a good deal narrower). Between them they are most of a
-  // hundred pixels, so the harness sized the breakpoint away - the guard was green while the
-  // Tool inspector's copy of this row rendered the policy word and each chip on a line of
-  // their OWN, four lines deep.
+  // == WHAT THIS GUARD COULD NOT SEE, TWICE (round 7) ======================================
+  // Round 6 widened it to two widths after finding the fixture was missing the `or...` chip,
+  // the divider and the real `Stepper` - most of a hundred pixels. It was still green through
+  // the defect the maintainer reported next, and the reason is not the width list:
   //
-  // So the fixture now injects `Stepper`'s and `SegmentedControl`'s real scoped CSS with their
-  // real hash classes - both own their appearance in their own `<style>` block, and a fixture
-  // reproducing only their markup measures boxes that are not the shipped size - and it runs
-  // at both widths this row is actually rendered at: the recipe tab's full-width column and
-  // the Tool Breakage tab's inspector-flanked one.
+  //   1. It only ever rendered a POPULATED arm. Two chips make the arm the widest flexible
+  //      item in the row, so it is never the item the row squeezes, and "the arm is one line"
+  //      was TRUE throughout. The row a GM meets the instant they press `Add tag` - the policy
+  //      word and `+ Tag`, nothing between them - was never measured.
+  //   2. It asserted nothing about the ROW at all. The maintainer's report is that an empty tag
+  //      row stands at 96px where every sibling requirement row stands at 46, and an arm can be
+  //      perfectly whole inside a row that has grown a second line underneath it.
+  //   3. It rendered no sibling row, so it had nothing to be wrong AGAINST. A pinned constant
+  //      would not have helped: the number it encodes is every control height in the row at once.
   //
-  // WHAT IS ASSERTED IS NOT "one line" AT BOTH. At the narrow width `Any of` + two chips +
-  // `+ Tag` + the segments + the stepper + `or...` + `x` do not fit on one line and no CSS can
-  // make them; the design's own frame is the wide one. What must hold is that the tag ARM
+  // So the fixture now renders a COMPONENT row beside the two tag rows and the empty tag row is
+  // asserted against ITS height, and the `+ Tag` pill is wrapped in the `div.fabricate-picker`
+  // namespace root `SearchablePopover` actually renders it inside
+  // (`SearchablePopover.svelte:476`) rather than dropped bare into the arm - a flex item the
+  // shipped tree has and the old fixture did not.
+  //
+  // WHAT IS ASSERTED IS NOT "one line" AT BOTH WIDTHS. At the narrow width `Any of` + two chips
+  // + `+ Tag` + the segments + the stepper + `or...` + `x` do not fit on one line and no CSS
+  // can make them; the design's own frame is the wide one. What must hold is that the tag ARM
   // stays whole - one line, with its policy word, its chips and its `+ Tag` together - so the
-  // row degrades by moving a WHOLE control down rather than by shredding the arm.
+  // row degrades by moving a WHOLE control down rather than by shredding the arm; and that an
+  // EMPTY tag row, which asks for less room than a named component row does, is no taller.
   const stepperScoped = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
   );
@@ -6098,25 +6106,9 @@ test('the tag requirement row keeps its arm whole at BOTH widths it is rendered 
       ['manager-segment-label', segmentedScoped.hashClass],
     ].reduce((html, [className, hash]) => withScopeHash(html, className, hash), markup);
 
-  // The row exactly as `RecipeIngredientOption` renders a bare tag requirement: the plate, the
-  // kind select, the tag arm, the Any of / All of segments and the trailing control cluster
-  // (Stepper, divider, `or...`, remove).
-  const row = stamp(`
-    <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option>
-      <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
-      <select class="manager-recipe-option-kind" data-recipe-option-kind>
-        <option value="tags" selected>Tag</option>
-      </select>
-      <span class="manager-recipe-option-tags" data-recipe-option-tags>
-        <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
-        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-        <span class="manager-chip manager-recipe-tag-trigger" data-recipe-add-tag><i class="fas fa-plus"></i><span>Tag</span></span>
-      </span>
-      <div class="manager-segmented is-compact" role="radiogroup" aria-label="Tag match">
-        <label class="manager-segment is-active"><input type="radio" class="manager-segment-input" name="tag-match-1" checked><span class="manager-segment-label">Any of</span></label>
-        <label class="manager-segment"><input type="radio" class="manager-segment-input" name="tag-match-1"><span class="manager-segment-label">All of</span></label>
-      </div>
+  // The trailing cluster is identical on every requirement row whatever its kind, so it is
+  // written once: a second copy would be the very thing the two rows are supposed to share.
+  const controls = `
       <div class="manager-recipe-option-controls">
         <div class="fab-stepper">
           <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
@@ -6126,17 +6118,72 @@ test('the tag requirement row keeps its arm whole at BOTH widths it is rendered 
         <span class="manager-recipe-option-divider"></span>
         <span class="manager-chip manager-recipe-or-trigger"><i class="fas fa-code-branch"></i><span>or</span></span>
         <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
-      </div>
+      </div>`;
+
+  const tagChips = `
+        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>`;
+
+  // The row exactly as `RecipeIngredientOption` renders a tag requirement: the plate, the kind
+  // select, the tag arm, the Any of / All of segments and the trailing control cluster.
+  const tagRow = (caseName, chips) =>
+    stamp(`
+    <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option data-case="${caseName}">
+      <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
+      <select class="manager-recipe-option-kind" data-recipe-option-kind>
+        <option value="tags" selected>Tag</option>
+      </select>
+      <span class="manager-recipe-option-tags" data-recipe-option-tags>
+        <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>${chips}
+        <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
+          <button type="button" class="manager-chip manager-recipe-tag-trigger" data-recipe-add-tag><i class="fas fa-plus"></i><span class="manager-travel-picker-value">Tag</span></button>
+        </div>
+      </span>
+      <div class="manager-segmented is-tag" role="radiogroup" aria-label="Tag match">
+        <label class="manager-segment is-active"><input type="radio" class="manager-segment-input" name="tag-match-1" checked><span class="manager-segment-label">Any of</span></label>
+        <label class="manager-segment"><input type="radio" class="manager-segment-input" name="tag-match-1"><span class="manager-segment-label">All of</span></label>
+      </div>${controls}
+    </div>`);
+
+  // The reference: a NAMED component requirement, the commonest row on either surface.
+  const componentRow = stamp(`
+    <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option data-case="component">
+      <span class="manager-recipe-option-lead is-component"><i class="fas fa-cube"></i></span>
+      <select class="manager-recipe-option-kind" data-recipe-option-kind>
+        <option value="component" selected>Component</option>
+      </select>
+      <span class="manager-recipe-option-name-field">
+        <span class="manager-recipe-option-chosen" data-recipe-option-chosen><i class="fas fa-cube manager-recipe-option-mark is-component"></i><span class="manager-recipe-option-chosen-name">Iron Ingot</span><button type="button" class="manager-recipe-option-clear"><i class="fa-solid fa-xmark"></i></button></span>
+      </span>${controls}
     </div>`);
 
   // `manager-recipe-edit-ingredients-cost` photographs the first; `world-tool-entry-on-break-repair`
   // and `manager-tool-stress-repair` photograph the second, and it is the one that broke.
+  //
+  // The third and fourth are neither, and they do NOT claim row parity. Below about 560px the
+  // row's five controls do not fit on one line and no CSS makes them; what those two are here
+  // to hold is the OTHER half of the report — that however hard the row is squeezed, the arm's
+  // answer is a WHOLE control moving down and never the policy word parting from `+ Tag`.
+  //
+  // THE FOURTH RAISES THE ROOT FONT rather than narrowing the column, because that is the axis
+  // the two halves of this row disagree on: the sheet sizes the policy word and the `+ Tag`
+  // pill in `rem`, so Foundry's interface font-size setting widens them, while
+  // `.manager-recipe-option-kind` states a 132px WIDTH and does not move. A guard that only
+  // ever renders at 16px cannot see a row that only fails on a GM's own font setting, and the
+  // reported stack was never reproduced at 16px at any width.
   for (const surface of [
-    { label: 'the recipe tab', width: 1006 },
-    { label: 'a Tool inspector', width: 622 },
+    { label: 'the recipe tab', width: 1006, rootFontSize: 16, rowParity: true },
+    { label: 'a Tool inspector', width: 622, rootFontSize: 16, rowParity: true },
+    { label: 'a squeezed inspector', width: 430, rootFontSize: 16, rowParity: false },
+    {
+      label: 'a Tool inspector at a raised interface font',
+      width: 622,
+      rootFontSize: 20,
+      rowParity: false,
+    },
   ]) {
     const context = await sharedBrowser.newContext({
-      viewport: { width: surface.width + 60, height: 400 },
+      viewport: { width: surface.width + 60, height: 500 },
       deviceScaleFactor: 1,
     });
     const page = await context.newPage();
@@ -6152,6 +6199,7 @@ test('the tag requirement row keeps its arm whole at BOTH widths it is rendered 
               ${chipCss}
               ${stepperScoped.css}
               ${segmentedScoped.css}
+              html { font-size: ${surface.rootFontSize}px; }
               body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
               .harness-row-width { width: ${surface.width}px; }
               .fas::before, .fa-solid::before { content: "x"; }
@@ -6159,7 +6207,11 @@ test('the tag requirement row keeps its arm whole at BOTH widths it is rendered 
           </head>
           <body>
             <main class="fabricate-manager">
-              <div class="harness-row-width">${row}</div>
+              <div class="harness-row-width">
+                ${componentRow}
+                ${tagRow('populated', tagChips)}
+                ${tagRow('empty', '')}
+              </div>
             </main>
           </body>
         </html>
@@ -6170,38 +6222,331 @@ test('the tag requirement row keeps its arm whole at BOTH widths it is rendered 
           const rect = element.getBoundingClientRect();
           return { top: rect.top, height: rect.height, width: rect.width };
         };
-        const arm = document.querySelector('[data-recipe-option-tags]');
-        return {
-          arm: box(arm),
-          // Every MEMBER of the arm, so a chip that dropped below its neighbours is visible.
-          armMembers: [...arm.children].map((child) => box(child)),
-          rowWidth: box(document.querySelector('.manager-recipe-ingredient-option-row')).width,
+        const read = (caseName) => {
+          const row = document.querySelector(`[data-case="${caseName}"]`);
+          const arm = row.querySelector('[data-recipe-option-tags]');
+          return {
+            row: box(row),
+            arm: arm ? box(arm) : null,
+            // Every MEMBER of the arm, so a chip that dropped below its neighbours is visible.
+            armMembers: arm ? [...arm.children].map((child) => box(child)) : [],
+          };
         };
+        return { component: read('component'), populated: read('populated'), empty: read('empty') };
       });
 
-      // THE ARM IS ONE LINE. Measured as "the arm is no taller than its tallest member", which
-      // is the same claim as "no member wrapped" and survives a rung change on the spacing
-      // ladder in a way a pinned pixel height would not.
-      const tallest = Math.max(...report.armMembers.map((member) => member.height));
-      assert.ok(
-        report.arm.height <= tallest + 1,
-        `${surface.label} (${surface.width}px): the tag arm is ONE line - the policy word, the ` +
-          `chips and + Tag stay together (arm ${report.arm.height}px vs tallest member ${tallest}px)`
-      );
-      for (const [index, member] of report.armMembers.entries()) {
+      for (const [caseName, measured] of [
+        ['a populated', report.populated],
+        ['an empty', report.empty],
+      ]) {
+        // THE ARM IS ONE LINE. Measured as "the arm is no taller than its tallest member", which
+        // is the same claim as "no member wrapped" and survives a rung change on the spacing
+        // ladder in a way a pinned pixel height would not.
+        const tallest = Math.max(...measured.armMembers.map((member) => member.height));
         assert.ok(
-          member.top - report.arm.top < tallest,
-          `${surface.label}: arm member ${index} wrapped onto a line of its own ` +
-            `(top +${member.top - report.arm.top}px against a ${tallest}px member)`
+          measured.arm.height <= tallest + 1,
+          `${surface.label} (${surface.width}px): ${caseName} tag arm is ONE line - the policy ` +
+            `word, the chips and + Tag stay together (arm ${measured.arm.height}px vs tallest ` +
+            `member ${tallest}px)`
+        );
+        for (const [index, member] of measured.armMembers.entries()) {
+          assert.ok(
+            member.top - measured.arm.top < tallest,
+            `${surface.label}: ${caseName} arm's member ${index} wrapped onto a line of its own ` +
+              `(top +${member.top - measured.arm.top}px against a ${tallest}px member)`
+          );
+        }
+        assert.ok(
+          measured.row.width <= surface.width + 1,
+          `${surface.label}: ${caseName} tag row stays inside its column ` +
+            `(${measured.row.width} vs ${surface.width})`
         );
       }
-      assert.ok(
-        report.rowWidth <= surface.width + 1,
-        `${surface.label}: the row stays inside its column (${report.rowWidth} vs ${surface.width})`
+
+      // AN EMPTY TAG ROW IS A ROW LIKE ANY OTHER, at every width the row's controls fit on one
+      // line at all. It asks for LESS room than the named component row beside it - a policy
+      // word and a dashed pill against an image, a name and a clear button - so there is no
+      // such width at which it may stand taller. Against the SIBLING rather than a constant,
+      // for the reason the third failure above gives.
+      if (!surface.rowParity) continue;
+      assert.equal(
+        Math.round(report.empty.row.height),
+        Math.round(report.component.row.height),
+        `${surface.label} (${surface.width}px): an EMPTY tag requirement row is no taller than ` +
+          `the component row beside it (${Math.round(report.empty.row.height)}px vs ` +
+          `${Math.round(report.component.row.height)}px) - a taller one has either stacked its ` +
+          `policy word above + Tag or moved a whole control onto a second line`
       );
     } finally {
       await context.close();
     }
+  }
+});
+
+test('a suggestion reads from the left edge the typed query does, under the host button rule', async () => {
+  // `proto:2280` draws a suggestion as `display:flex; align-items:center; gap:8px; height:30px;
+  // padding:0 8px`, then a 12px glyph and a label at `font:500 11px var(--sans)`. There is no
+  // centring anywhere in it, and there cannot be: the panel sits directly beneath the field it
+  // completes, so a suggestion that does not start where the query starts is not continuing the
+  // GM's own typing (issue 1373, maintainer round 7).
+  //
+  // IT SHIPPED CENTRED, and the sheet looked right. `.manager-recipe-option-suggestion` is a
+  // `<button>` declaring `display: flex` and `text-align: left` - and `text-align` positions
+  // the CONTENT of a text container, not the ITEMS of a flex one, so it landed on nothing.
+  // What placed them was Foundry's own `a.button, button { justify-content: center }`, which
+  // our rule left standing because it named no `justify-content` of its own to displace it.
+  //
+  // So the host rule is in the fixture, exactly as the hostile `li` margin is in the tag-chip
+  // guard above. Without it this file loads `styles/fabricate.css` alone, the initial
+  // `justify-content: normal` applies, the label sits at the left, and the guard passes over
+  // the defect it exists for.
+  //
+  // AND IT IS IN ITS REAL LAYER, which is the half a specificity comparison cannot answer.
+  // `foundry2.css` declares the cascade layers `reset, variables, elements, blocks,
+  // applications, compatibility, layouts, system, modules, exceptions` and puts that button
+  // rule in `elements.forms`; `module.json` registers `styles/fabricate.css` with no explicit
+  // layer, so Foundry imports it at `modules`. The winner is decided by LAYER ORDER before
+  // specificity is consulted at all - `modules` sorts after `elements`, so one declaration is
+  // enough and no extra class is needed to buy it. Rendering both sheets flat would prove a
+  // different cascade from the one that ships, in either direction.
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 640, height: 400 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            /* Foundry's own layer order, its own selector and its own declaration, taken
+               from the harvested \`foundry-chrome/css/foundry2.css\` the View Lab renders
+               against, with our sheet at the \`modules\` layer \`module.json\` gives it. */
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; }
+            }
+            @layer modules { ${css} }
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .harness { width: 300px; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <div class="harness">
+              <span class="manager-recipe-option-name-field">
+                <span class="manager-recipe-option-search is-typing">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" data-recipe-option-search value="ingot" placeholder="Search components...">
+                </span>
+                <span class="manager-recipe-option-suggestions">
+                  <button type="button" class="manager-recipe-option-suggestion" data-recipe-option-suggestion="sm-iron-ingot">
+                    <i class="fas fa-cube manager-recipe-option-mark is-component"></i><span>Iron Ingot</span>
+                  </button>
+                </span>
+              </span>
+            </div>
+            <!-- The tag picker's own option row (proto:2261), the same shape from the same
+                 panel family and therefore exposed to the same host rule. It is here because
+                 reading its declaration is not the same as measuring it: the question the
+                 sheet cannot answer on its own is which of two declarations the cascade keeps,
+                 and this fixture is where that is settled for both rows at once. -->
+            <div class="fabricate-picker-popover manager-travel-popover harness">
+              <button type="button" class="manager-travel-option" data-popover-option="reagent">
+                <i class="fas fa-tag"></i><span class="manager-travel-option-name">reagent</span>
+              </button>
+            </div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const suggestion = document.querySelector('[data-recipe-option-suggestion]');
+      const glyph = suggestion.querySelector('i');
+      const label = suggestion.querySelector('span');
+      const field = document.querySelector('[data-recipe-option-search]');
+      const pickerOption = document.querySelector('[data-popover-option]');
+      const style = getComputedStyle(suggestion);
+      const left = (element) => element.getBoundingClientRect().left;
+      return {
+        justifyContent: style.justifyContent,
+        pickerOptionJustifyContent: getComputedStyle(pickerOption).justifyContent,
+        // The offset of the row's FIRST item from its own padding edge. Zero means the glyph
+        // starts where the row starts; anything else is slack the row put in front of it.
+        glyphIndent:
+          left(glyph) - (left(suggestion) + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth)),
+        // …and where the LABEL lands against the query it is completing, which is the thing the
+        // maintainer actually saw: `ingot` at the field's left edge, `Iron Ingot` mid-panel.
+        labelIndent: left(label) - left(field),
+        suggestionWidth: suggestion.getBoundingClientRect().width,
+        fieldTextAlign: getComputedStyle(field).textAlign,
+        fieldFlexBasis: getComputedStyle(field).flexBasis,
+        fieldFlexGrow: getComputedStyle(field).flexGrow,
+      };
+    });
+
+    assert.notEqual(
+      report.justifyContent,
+      'center',
+      'a suggestion row must displace the host button rule rather than inherit its centring'
+    );
+    // The tag picker's option row already named its own justification and so was never
+    // centred; asserted alongside rather than taken on trust, because the two rows sit in
+    // sibling panels and the next one written in either place inherits whichever answer is
+    // guarded here.
+    assert.notEqual(
+      report.pickerOptionJustifyContent,
+      'center',
+      'a tag picker option row displaces the host button rule too'
+    );
+    assert.ok(
+      Math.abs(report.glyphIndent) <= 1,
+      `the suggestion's kind glyph starts at the row's own left edge (indent ` +
+        `${report.glyphIndent.toFixed(1)}px in a ${report.suggestionWidth.toFixed(1)}px row)`
+    );
+    // Within a glyph and a gap of the query above it: the panel is inset by its own padding,
+    // so the two left edges are near-flush rather than identical, and a centred label is half
+    // the panel away.
+    assert.ok(
+      report.labelIndent < 40,
+      `the suggestion label continues the typed query rather than sitting mid-panel ` +
+        `(+${report.labelIndent.toFixed(1)}px against the field's own text)`
+    );
+    // The field itself, measured in the same document rather than read off the sheet:
+    // `proto:2276` and premium's `RewardRow` `.search input` both give it `flex: 1; min-width: 0`
+    // and no alignment of its own, and this is where a disagreement would show.
+    assert.equal(report.fieldTextAlign, 'start', 'the search field itself reads from the left');
+    assert.equal(report.fieldFlexGrow, '1', 'the search field absorbs the row slack');
+    assert.equal(report.fieldFlexBasis, '0%', 'the search field takes a zero flex base');
+  } finally {
+    await context.close();
+  }
+});
+
+test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm one', async () => {
+  // `proto:4628` is `segStyle`: the chosen segment takes the design's own translucent tag value
+  // and `var(--text)`, the unchosen one is transparent over `var(--subtle)`, and `proto:2268`
+  // edges the track in the same hue at a lower alpha. That hue is the tag family - it is the
+  // value the row's own border, the tag chips and the `+ Tag` pill already carry here, which is
+  // `--fab-purple` - so a warm track puts the one control that is ABOUT tags in a different
+  // family from everything beside it (issue 1373, maintainer round 7).
+  //
+  // MEASURED THROUGH PROBES IN THE SAME DOCUMENT, for the reason the kind-tint guard gives: a
+  // rule that reaches the element but loses the cascade reads as correct in the source. Both
+  // tokens are resolved here and the assertion is a computed-value comparison.
+  const segmentedScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte')
+  );
+  const stamp = (markup) =>
+    [
+      ['manager-segmented', segmentedScoped.hashClass],
+      ['manager-segment', segmentedScoped.hashClass],
+      ['manager-segment-input', segmentedScoped.hashClass],
+      ['manager-segment-label', segmentedScoped.hashClass],
+    ].reduce((html, [className, hash]) => withScopeHash(html, className, hash), markup);
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 640, height: 300 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            ${segmentedScoped.css}
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            ${stamp(`
+            <div class="manager-segmented is-tag" role="radiogroup" aria-label="Tag match" data-tag-match>
+              <label class="manager-segment is-active" data-segment="any"><input type="radio" class="manager-segment-input" name="tm" checked><span class="manager-segment-label">Any of</span></label>
+              <label class="manager-segment" data-segment="all"><input type="radio" class="manager-segment-input" name="tm"><span class="manager-segment-label">All of</span></label>
+            </div>`)}
+            <span data-probe="edge" style="color: color-mix(in srgb, var(--fab-purple) 40%, transparent)"></span>
+            <span data-probe="lit" style="color: color-mix(in srgb, var(--fab-purple) 22%, transparent)"></span>
+            <span data-probe="warm" style="color: var(--fab-surface-active)"></span>
+            <span data-probe="resting" style="color: var(--fab-text-subtle)"></span>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const probe = (name) =>
+        getComputedStyle(document.querySelector(`[data-probe="${name}"]`)).color;
+      const track = document.querySelector('[data-tag-match]');
+      const lit = document.querySelector('[data-segment="any"]');
+      const unlit = document.querySelector('[data-segment="all"]');
+      // The ring is `:has(:focus-visible)`, so the radio has to be really focused by the
+      // keyboard for the rule to match; a click leaves `:focus` without `:focus-visible`.
+      unlit.querySelector('input[type="radio"]').focus();
+      return {
+        trackEdge: getComputedStyle(track).borderTopColor,
+        trackOverflow: getComputedStyle(track).overflow,
+        focusOutlineOffset: getComputedStyle(unlit).outlineOffset,
+        litBackground: getComputedStyle(lit).backgroundColor,
+        unlitBackground: getComputedStyle(unlit).backgroundColor,
+        unlitColour: getComputedStyle(unlit).color,
+        probes: {
+          edge: probe('edge'),
+          lit: probe('lit'),
+          warm: probe('warm'),
+          resting: probe('resting'),
+        },
+      };
+    });
+
+    assert.equal(
+      report.trackEdge,
+      report.probes.edge,
+      'the track is edged in the tag hue the row border and the chips already carry'
+    );
+    assert.equal(
+      report.litBackground,
+      report.probes.lit,
+      'the chosen segment is lit in the tag hue rather than the warm active tile'
+    );
+    assert.notEqual(
+      report.litBackground,
+      report.probes.warm,
+      'the chosen segment must not fall back to the shared warm active tile'
+    );
+    assert.equal(
+      report.unlitBackground,
+      'rgba(0, 0, 0, 0)',
+      'the unchosen segment paints nothing, so the track reads as one control'
+    );
+    assert.equal(
+      report.unlitColour,
+      report.probes.resting,
+      'the unchosen segment takes the resting ink'
+    );
+    // `overflow: hidden` is what lets the segments meet the track's own rounded ends without
+    // each restating a corner radius (`proto:2268`).
+    assert.equal(report.trackOverflow, 'hidden', 'the track clips its segments to its own ends');
+    // …and the clip is exactly why the focus ring has to turn inward. An outline paints outside
+    // the border box, so the shared positive offset would be clipped away and a keyboard user
+    // would see no focus at all on the one track that clips. The two are asserted together
+    // because it is the clip that creates the obligation.
+    assert.ok(
+      Number.parseFloat(report.focusOutlineOffset) < 0,
+      `a clipped track paints its focus ring INSIDE the segment (offset ${report.focusOutlineOffset})`
+    );
+  } finally {
+    await context.close();
   }
 });
 
