@@ -3670,9 +3670,14 @@
 
 /* The entry's GLYPH TILE, the row's own leading square. Its family is the accent rather
    than a per-entry tone: a modifier is not a hazard, and the tile exists to make the row
-   scannable by icon, not to grade it. */
+   scannable by icon, not to grade it.
+
+   TWO ANCHORS, NOT THREE (issue 1373, round 6). `proto:2363` tiles the bonus row's glyph and
+   `proto:2332` draws the prerequisite row's BARE, because that row leads with a checkbox and
+   the tile is what makes a glyph the row's leading anchor. The prerequisite list is therefore
+   not named here at all: the bare face is stated once, on the row's own variant class, rather
+   than reached by a later rule resetting this block's five properties back off again. */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph,
-.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-glyph,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-glyph {
   display: flex;
   flex: 0 0 26px;
@@ -3713,6 +3718,59 @@
   font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* ── THE ROW'S TWO DECLARED VARIANTS (issue 1373, maintainer round 6) ──────────────────
+   The reference draws this row twice on the Tool Requirements tab with ONE geometry string
+   and two anatomies. `proto:2361`-`2364` is the face the four blocks above state and every
+   caller gets by default: a glyph tile, the name and the expression on one line, and the
+   caller's control trailing. `proto:2331`-`2333` is the other: the control FIRST, a bare
+   accent glyph, and the name stacked over the expression.
+
+   `ModifierLibraryRow` takes `controlPlacement` and `textLayout` for those, both defaulted to
+   the face above, and emits a class per variant. The rules are stated HERE rather than in the
+   component's own `<style>`, because this sheet already owns every property of this row and a
+   scoped block would be a second owner for a box declared one screenful up.
+
+   AND THEY ARE ANCHORED ON THE ROW, NEVER ON A ROUTE. A
+   `.manager-tool-prerequisite-list`-anchored copy renders identically today and gives the next
+   caller of the prop nothing at all, which is the same silent failure the joined blocks above
+   record. `tests/components/manager-layout.test.js` asserts the rooting rather than leaving it
+   to review. Each selector weighs (0,4,0) against the joined cells' (0,3,0), so it wins on
+   specificity rather than on being 60 lines further down. */
+
+/* `proto:2332`: a bare 11px accent glyph, with no box of any kind. The tile is what makes the
+   glyph a row's LEADING ANCHOR, and a row that leads with a control already has one — which is
+   why this follows `controlPlacement` rather than taking a prop of its own. It states what the
+   glyph IS; it does not reset the tile, or the next property added up there would leak through
+   a rule written to suppress it. */
+.fabricate-manager .manager-modifier-readonly-row.is-control-leading > .manager-modifier-readonly-glyph {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--fab-accent);
+  font-size: 11px;
+}
+
+/* `proto:2333`: `<div style="min-width:0">` holding the name over the expression. This is the
+   one part of a variant that is MARKUP rather than cascade — no rule in any sheet can add an
+   element — so the block exists only when the row is asked for it, and the inline face emits
+   nothing at all and stays byte-identical. */
+.fabricate-manager .manager-modifier-readonly-row.is-text-stacked > .manager-modifier-readonly-text {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The expression cell is `flex: 1 1 0` in the inline row, which is what puts a trailing control
+   against the row's right edge with no auto margin anywhere. Inside a COLUMN that same
+   declaration means "grow to the block's height", so it is restated rather than inherited into
+   a context it was not written for. `--fab-space-2xs` is the published scale's 2px, which is
+   `proto:2333`'s own `margin-top` exactly. */
+.fabricate-manager .manager-modifier-readonly-row.is-text-stacked .manager-modifier-readonly-expression {
+  flex: 0 0 auto;
+  margin-top: var(--fab-space-2xs);
 }
 
 /* THE ROW'S TWO CHIPS ARE NOT STYLED HERE, and that is an OWNERSHIP fact, not merely a
@@ -8754,7 +8812,7 @@
    three-column combo (preview / label / caret); exactly as `.manager-condition-add` and
    `.manager-condition-pill` do for the gathering icon fields, the host re-shapes the
    `icon-only` trigger into its own tile. The class pair sits at (0,3,0) so it beats the
-   base `.fabricate-manager .essence-icon-picker-trigger` block, which is declared later
+   base `.fabricate-icon-picker .essence-icon-picker-trigger` block, which is declared later
    in this file and would otherwise win on source order alone. */
 .fabricate-manager .manager-vocabulary-icon-picker {
   position: relative;
@@ -9120,16 +9178,49 @@
   min-width: 0;
 }
 
-.fabricate-manager .essence-icon-picker,
-.fabricate-manager .essence-source-selector {
+/* ---------------------------------------------------------------------------
+   THE ICON AND SOURCE PICKERS' OWN ROOTS (issue 1470)
+
+   `fabricate-icon-picker` / `fabricate-icon-picker-popover` and
+   `fabricate-source-picker` / `fabricate-source-picker-popover` are NAMESPACE
+   roots written by `components/IconPicker.svelte` and
+   `components/EssenceSourceSelector.svelte` themselves — one on the element the
+   component owns, one on the panel it portals out of it.
+
+   Every rule below used to hang off `.fabricate-manager`. Both components live
+   in `src/ui/svelte/components/`, the shared directory whose premise is that a
+   component there works wherever it is mounted, and neither could: issue 1466
+   gave them a resolved portal host, and the panel then landed in the right host
+   and still drew `position: static`, because the rule that positions it could
+   not reach outside the manager. The rest of the family failed the same way one
+   step further in — an unstyled search field and unstyled option rows.
+
+   The root could not simply be DELETED: this sheet is loaded page-wide into the
+   Foundry document and `tests/styles-namespacing.test.js` requires every
+   selector to begin with `.fabricate`. So it is replaced by a root the COMPONENT
+   emits. One class for one class, in place, so no specificity and no source
+   position moved.
+
+   TWO roots rather than one because a PORTALED NODE KEEPS ITS CLASSES AND LOSES
+   ITS ANCESTORS. `.essence-icon-picker-preview` is the one rule that needs both:
+   the chip is painted once in the trigger, which stays inside the picker, and
+   once per option row, which travels with the panel.
+
+   A rule whose ancestor is a CALLER'S container keeps `.fabricate-manager` — it
+   is the manager's override of the manager's own markup and can only ever match
+   there. `tests/components/searchable-popover-area-scope.test.js` holds the
+   distinction for all four shared pickers.
+   --------------------------------------------------------------------------- */
+.fabricate-icon-picker.essence-icon-picker,
+.fabricate-source-picker.essence-source-selector {
   min-width: 0;
 }
 
-.fabricate-manager .essence-icon-picker-trigger,
-.fabricate-manager .essence-icon-picker-option,
-.fabricate-manager .essence-source-trigger,
-.fabricate-manager .essence-source-clear,
-.fabricate-manager .essence-source-picker-option {
+.fabricate-icon-picker .essence-icon-picker-trigger,
+.fabricate-icon-picker-popover .essence-icon-picker-option,
+.fabricate-source-picker .essence-source-trigger,
+.fabricate-source-picker .essence-source-clear,
+.fabricate-source-picker-popover .essence-source-picker-option {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--fab-border);
@@ -9138,7 +9229,7 @@
   background: var(--fab-overlay-light-06);
 }
 
-.fabricate-manager .essence-icon-picker-trigger {
+.fabricate-icon-picker .essence-icon-picker-trigger {
   display: inline-grid;
   grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr) 16px;
   align-items: center;
@@ -9149,14 +9240,15 @@
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
-.fabricate-manager .essence-icon-picker-trigger-label {
+.fabricate-icon-picker .essence-icon-picker-trigger-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fabricate-manager .essence-icon-picker-preview {
+.fabricate-icon-picker .essence-icon-picker-preview,
+.fabricate-icon-picker-popover .essence-icon-picker-preview {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -9167,12 +9259,12 @@
   background: var(--fab-overlay-dark-16);
 }
 
-.fabricate-manager .essence-source-selector-shell {
+.fabricate-source-picker .essence-source-selector-shell {
   position: relative;
   min-width: 0;
 }
 
-.fabricate-manager .essence-source-trigger {
+.fabricate-source-picker .essence-source-trigger {
   position: relative;
   display: grid;
   place-items: center;
@@ -9191,18 +9283,18 @@
   border-style: dashed;
 }
 
-.fabricate-manager .essence-source-trigger.has-value {
+.fabricate-source-picker .essence-source-trigger.has-value {
   padding: 0;
 }
 
-.fabricate-manager .essence-source-trigger-image,
-.fabricate-manager .essence-source-picker-option img {
+.fabricate-source-picker .essence-source-trigger-image,
+.fabricate-source-picker-popover .essence-source-picker-option img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.fabricate-manager .essence-source-trigger-empty {
+.fabricate-source-picker .essence-source-trigger-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -9223,7 +9315,7 @@
   font-size: 1.25rem;
 }
 
-.fabricate-manager .essence-source-trigger-corner {
+.fabricate-source-picker .essence-source-trigger-corner {
   position: absolute;
   right: 6px;
   bottom: 6px;
@@ -9235,7 +9327,7 @@
   background: var(--fab-overlay-dark-48);
 }
 
-.fabricate-manager .essence-source-clear {
+.fabricate-source-picker .essence-source-clear {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -9246,13 +9338,13 @@
   padding: 0;
 }
 
-.fabricate-manager .essence-source-selector-shell.drop-active .essence-source-trigger {
+.fabricate-source-picker .essence-source-selector-shell.drop-active .essence-source-trigger {
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .essence-icon-picker-popover,
-.fabricate-manager .essence-source-picker-popover {
+.fabricate-icon-picker-popover.essence-icon-picker-popover,
+.fabricate-source-picker-popover.essence-source-picker-popover {
   position: absolute;
   z-index: 120;
   display: flex;
@@ -9275,8 +9367,8 @@
   overflow: hidden;
 }
 
-.fabricate-manager .essence-icon-picker-search input,
-.fabricate-manager .essence-source-picker-search input {
+.fabricate-icon-picker-popover .essence-icon-picker-search input,
+.fabricate-source-picker-popover .essence-source-picker-search input {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -9287,19 +9379,19 @@
   background: var(--fab-bg-1);
 }
 
-.fabricate-manager .essence-icon-picker-options,
-.fabricate-manager .essence-source-picker-grid {
+.fabricate-icon-picker-popover .essence-icon-picker-options,
+.fabricate-source-picker-popover .essence-source-picker-grid {
   display: grid;
   gap: var(--fab-space-chip);
   min-height: 0;
   overflow: auto;
 }
 
-.fabricate-manager .essence-source-picker-grid {
+.fabricate-source-picker-popover .essence-source-picker-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.fabricate-manager .essence-icon-picker-option {
+.fabricate-icon-picker-popover .essence-icon-picker-option {
   display: grid;
   grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -9313,11 +9405,11 @@
 /* The pinned resolved row sits directly above the alphabetical list, as a sibling `role="option"`
    so the listbox keeps a flat option tree. The extra gap is what separates the two groups; the
    `.selected` rule below already gives it the selected surface. */
-.fabricate-manager .essence-icon-picker-option.pinned {
+.fabricate-icon-picker-popover .essence-icon-picker-option.pinned {
   margin-bottom: var(--fab-space-2);
 }
 
-.fabricate-manager .essence-source-picker-option {
+.fabricate-source-picker-popover .essence-source-picker-option {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -9328,26 +9420,26 @@
   text-align: left;
 }
 
-.fabricate-manager .essence-source-picker-option img {
+.fabricate-source-picker-popover .essence-source-picker-option img {
   width: 34px;
   height: 34px;
   border-radius: 5px;
 }
 
-.fabricate-manager .essence-icon-picker-option span:last-child,
-.fabricate-manager .essence-source-picker-option span {
+.fabricate-icon-picker-popover .essence-icon-picker-option span:last-child,
+.fabricate-source-picker-popover .essence-source-picker-option span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fabricate-manager .essence-icon-picker-option.selected,
-.fabricate-manager .essence-source-picker-option.selected,
-.fabricate-manager .essence-icon-picker-option:hover,
-.fabricate-manager .essence-source-picker-option:hover,
-.fabricate-manager .essence-icon-picker-option:focus-visible,
-.fabricate-manager .essence-source-picker-option:focus-visible {
+.fabricate-icon-picker-popover .essence-icon-picker-option.selected,
+.fabricate-source-picker-popover .essence-source-picker-option.selected,
+.fabricate-icon-picker-popover .essence-icon-picker-option:hover,
+.fabricate-source-picker-popover .essence-source-picker-option:hover,
+.fabricate-icon-picker-popover .essence-icon-picker-option:focus-visible,
+.fabricate-source-picker-popover .essence-source-picker-option:focus-visible {
   border-color: var(--fab-border-strong);
   background: var(--fab-success-soft);
 }
@@ -12779,19 +12871,38 @@
   font-size: 0.75rem;
 }
 
-.fabricate-manager .manager-recipe-option-lead.is-component {
+/* ONE TINT PER KIND, ON EVERY GLYPH THE ROW DRAWS FOR ITS SUBJECT (`proto:4624`-`4627`).
+
+   `KINDMETA` pairs each kind with an icon AND a tint, and `proto:4645` resolves the pair per
+   row; premium's `RewardRow` reads its own `presentation.tint` onto the plate (`:62`), the
+   chosen chip's glyph (`:80`) and each suggestion's (`:129`). The plate shipped tinted and the
+   other two did not, so a NAMED row's mark was the pill's inherited ink - one colour for all
+   four kinds, which is the reading a repair set of four component rows cannot disprove.
+
+   `.manager-recipe-option-mark` is the class those two glyphs carry, and it is declared in the
+   SAME rule as the plate so the two can never drift into two different greens. The design's
+   `--success`, `--accent` and `--info` are byte-for-byte `--fab-success`, `--fab-accent` and
+   `--fab-info`; `--tag` is the tag family, which is `--fab-purple` here (the `+ Tag` pill and
+   the tag row's own edge already read it). `--water` is the odd one: the design never declares
+   it, so its own essence glyph renders uncoloured, and `--fab-info` is the essence/water hue
+   here - the token the design's `--info` already equals. */
+.fabricate-manager .manager-recipe-option-lead.is-component,
+.fabricate-manager .manager-recipe-option-mark.is-component {
   color: var(--fab-success);
 }
 
-.fabricate-manager .manager-recipe-option-lead.is-tag {
+.fabricate-manager .manager-recipe-option-lead.is-tag,
+.fabricate-manager .manager-recipe-option-mark.is-tag {
   color: var(--fab-purple);
 }
 
-.fabricate-manager .manager-recipe-option-lead.is-currency {
+.fabricate-manager .manager-recipe-option-lead.is-currency,
+.fabricate-manager .manager-recipe-option-mark.is-currency {
   color: var(--fab-accent);
 }
 
-.fabricate-manager .manager-recipe-option-lead.is-essence {
+.fabricate-manager .manager-recipe-option-lead.is-essence,
+.fabricate-manager .manager-recipe-option-mark.is-essence {
   color: var(--fab-info);
 }
 
@@ -13011,10 +13122,20 @@
 }
 
 /* THE TAG ARM, ON THE ROW (`proto:2252`): the policy word, the chosen tags and `+ Tag`, with
-   the Any of / All of control as the row's next sibling. It was a second full-width line. */
+   the Any of / All of control as the row's next sibling. It was a second full-width line.
+
+   `flex: 1 1 auto` RATHER THAN `flex: 1`, and the difference is the whole behaviour at the
+   narrow width. `flex: 1` is `1 1 0%`: the arm's flex BASE size is zero, so it never counts
+   towards the row's wrap decision - the row fits every control onto one line and hands the
+   arm whatever is left, which in a Tool inspector is about a hundred pixels. The arm then
+   wrapped INTERNALLY and put the policy word and each chip on a line of their own, four lines
+   deep. With an `auto` basis the arm's content width is what the row wraps against, so a row
+   too narrow for everything moves a WHOLE control to the next line and the arm stays one line
+   - which is the degradation the design's own one-line reading survives. `min-width: 0` stays
+   so a very long tag list still shrinks rather than pushing the row past its column. */
 .fabricate-manager .manager-recipe-option-tags {
   display: flex;
-  flex: 1;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -13049,9 +13170,13 @@
   min-width: 0;
 }
 
-/* The REQUIRED / TAG type pill. (`.is-essence` was declared below for an ESSENCE pill on
-   the essence row; the row's flask lead chip already says that, so the pill is gone —
-   issue 676.) */
+/* The row's small end-of-row type pill. Only ONE face of it is still emitted: the disabled one,
+   the `Currency off` flag on a cost authored before the system turned currency off.
+
+   The essence face went with the ESSENCE pill the flask lead chip already said (issue 676). The
+   required face went with the `REQUIRED` badge every standalone row carried, which the design
+   draws nowhere and which the `ANY ONE OF` pill already implies by its ABSENCE (issue 1373,
+   round 6). The tag face outlived the `TAG` pill the kind select replaced. */
 .fabricate-manager .manager-recipe-req-tag {
   display: inline-flex;
   flex: 0 0 auto;
@@ -17111,7 +17236,23 @@
   overflow: visible;
 }
 
-.fabricate-manager .manager-color-swatch {
+/* ---------------------------------------------------------------------------
+   THE COLOUR PICKER'S OWN ROOTS (issue 1470)
+
+   `fabricate-color-picker` is written by `components/ManagerColorPicker.svelte`
+   and `fabricate-color-picker-popover` by `components/ManagerColorPopover.svelte`.
+   Two components, one root class each rather than two apiece: the picker portals
+   nothing (its panel IS the other component), and the popover's root element is
+   itself the portaled panel, so root and panel are the same node.
+
+   That split is why `.manager-color-swatch` is the one rule here written at both
+   roots. The swatch is painted by BOTH components — once in the picker's trigger
+   and once in every preset cell of the popover — and after the portal those two
+   live in different subtrees. See the essence-picker header above for why the
+   `.fabricate-manager` root could not simply be deleted.
+   --------------------------------------------------------------------------- */
+.fabricate-color-picker .manager-color-swatch,
+.fabricate-color-picker-popover .manager-color-swatch {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -17137,7 +17278,7 @@
   background: transparent;
 }
 
-.fabricate-manager .manager-color-picker {
+.fabricate-color-picker.manager-color-picker {
   position: relative;
   display: inline-block;
   min-width: 0;
@@ -17161,8 +17302,8 @@
   font-size: 0.8rem;
 }
 
-.fabricate-manager .manager-color-picker-trigger,
-.fabricate-manager .manager-color-preset {
+.fabricate-color-picker .manager-color-picker-trigger,
+.fabricate-color-picker-popover .manager-color-preset {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -17182,15 +17323,15 @@
   background: var(--fab-overlay-light-06);
 }
 
-.fabricate-manager .manager-color-picker-trigger:hover,
-.fabricate-manager .manager-color-picker-trigger:focus-visible,
-.fabricate-manager .manager-color-preset:hover,
-.fabricate-manager .manager-color-preset:focus-visible {
+.fabricate-color-picker .manager-color-picker-trigger:hover,
+.fabricate-color-picker .manager-color-picker-trigger:focus-visible,
+.fabricate-color-picker-popover .manager-color-preset:hover,
+.fabricate-color-picker-popover .manager-color-preset:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 1px;
 }
 
-.fabricate-manager .manager-color-picker-popover {
+.fabricate-color-picker-popover.manager-color-picker-popover {
   position: absolute;
   box-sizing: border-box;
   z-index: 120;
@@ -17204,22 +17345,22 @@
   box-shadow: var(--fab-shadow-lg);
 }
 
-.fabricate-manager .manager-color-preset-grid {
+.fabricate-color-picker-popover .manager-color-preset-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--fab-space-chip);
 }
 
-.fabricate-manager .manager-color-preset {
+.fabricate-color-picker-popover .manager-color-preset {
   aspect-ratio: 1;
   border: 1px solid var(--fab-border);
 }
 
-.fabricate-manager .manager-color-preset.is-selected {
+.fabricate-color-picker-popover .manager-color-preset.is-selected {
   border-color: var(--fab-accent);
 }
 
-.fabricate-manager .manager-color-custom {
+.fabricate-color-picker-popover .manager-color-custom {
   display: grid;
   gap: var(--fab-space-1);
   color: var(--fab-text);
@@ -17227,12 +17368,27 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-color-custom input {
+/* The hex field paints its OWN chrome (issue 1470), which is the one place this family needed a
+   declaration rather than a new root. Inside the manager the chrome came from the area baseline
+   `.fabricate-manager input:not([type])` at line 1547 — Foundry cores every `input` globally, and
+   that rule is what keeps the manager's free-text controls off Foundry's purple default. A shared
+   primitive cannot rely on it: portalled into the player window the field reverted to a 2px inset
+   UA border on grey, measured. The six values below are exactly what that baseline computes here
+   (`border-radius: 9px` is its own literal), so the manager's rendering is unchanged and the
+   popover is now self-sufficient — which is what `SearchablePopover`'s and the icon/source
+   pickers' own search inputs already were. */
+.fabricate-color-picker-popover .manager-color-custom input {
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
   min-width: 0;
   min-height: 28px;
   height: 28px;
   padding: 0 var(--fab-space-chip);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-size: 0.76rem;
 }
 

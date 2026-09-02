@@ -1686,9 +1686,15 @@ test('manager gathering settings condition panels use a two-column responsive gr
   const biomeCombinedTriggerIconBlock = blockFor(
     '.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only.manager-biome-combined-trigger i'
   );
-  const colorPickerPopoverBlock = blockFor('.fabricate-manager .manager-color-picker-popover');
-  const colorPresetGridBlock = blockFor('.fabricate-manager .manager-color-preset-grid');
-  const colorCustomInputBlock = blockFor('.fabricate-manager .manager-color-custom input');
+  // Issue 1470 re-rooted the colour family off `.fabricate-manager` and onto the namespace
+  // classes `ManagerColorPicker` and `ManagerColorPopover` write, so the two shared components
+  // paint in whatever application they are mounted in. Same declarations, same specificity, same
+  // place in the file — only the root moved, and these lookups follow it.
+  const colorPickerPopoverBlock = blockFor(
+    '.fabricate-color-picker-popover.manager-color-picker-popover'
+  );
+  const colorPresetGridBlock = blockFor('.fabricate-color-picker-popover .manager-color-preset-grid');
+  const colorCustomInputBlock = blockFor('.fabricate-color-picker-popover .manager-color-custom input');
   const labelInputBlock = blockFor('.fabricate-manager .manager-condition-label-input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
 
@@ -3898,8 +3904,11 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   );
   const usageGridBlock = blockFor('.fabricate-manager .manager-essence-usage-grid');
   const usageItemBlock = blockFor('.fabricate-manager .manager-essence-usage-item');
-  const iconTriggerBlock = blockFor('.fabricate-manager .essence-icon-picker-trigger');
-  const sourceTriggerBlock = blockFor('.fabricate-manager .essence-source-trigger');
+  // Both blocks moved off `.fabricate-manager` onto the pickers' own namespace roots (issue
+  // 1470): `IconPicker` and `EssenceSourceSelector` are shared components, and a rule rooted at
+  // one application cannot paint them anywhere else.
+  const iconTriggerBlock = blockFor('.fabricate-icon-picker .essence-icon-picker-trigger');
+  const sourceTriggerBlock = blockFor('.fabricate-source-picker .essence-source-trigger');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
   // TWO tracks now, not one: the tab strip and the scrolling tab body. A single `1fr`
@@ -6041,23 +6050,198 @@ test('recipe tag chips keep a zero margin and one height, whatever the host rhyt
   }
 });
 
-test('the tag requirement row keeps every control on ONE line', async () => {
+test('the tag requirement row keeps its arm whole at BOTH widths it is rendered at', async () => {
   // REPLACES `recipe tag list spans the full row width on its own line below the controls`
   // (issue 1373, maintainer round 5). That test pinned the shape the design names as the
   // defect: `.manager-recipe-option-tags-detail` carried `flex: 1 1 100%`, so the tag arm
   // ALWAYS wrapped to a second full-width line whatever the row's width was, taking the match
   // toggle, an `Add tag` dropdown and a bordered `No tags set` box with it.
   //
-  // `proto:2252`-`2268` draws `[Tag ▾] Any of [chips] [+ Tag] … [Any of|All of] [− 1 +] [×]`.
+  // `proto:2252`-`2268` draws `[Tag v] Any of [chips] [+ Tag] ... [Any of|All of] [- 1 +] [x]`.
   // The claim is geometric and this is where it can be made: nothing else in the corpus
   // computes a real cascade, and the mounted suites cannot see a wrap at all.
+  //
+  // == TWO WIDTHS, AND A FIXTURE THAT CARRIES THE WHOLE ROW (round 6) =======================
+  // The first version of this test measured ONE width with a row that was missing three
+  // controls: the `or...` chip, the divider before it, and the real `Stepper` (it used a bare
+  // `<input type="number">`, which is a good deal narrower). Between them they are most of a
+  // hundred pixels, so the harness sized the breakpoint away - the guard was green while the
+  // Tool inspector's copy of this row rendered the policy word and each chip on a line of
+  // their OWN, four lines deep.
+  //
+  // So the fixture now injects `Stepper`'s and `SegmentedControl`'s real scoped CSS with their
+  // real hash classes - both own their appearance in their own `<style>` block, and a fixture
+  // reproducing only their markup measures boxes that are not the shipped size - and it runs
+  // at both widths this row is actually rendered at: the recipe tab's full-width column and
+  // the Tool Breakage tab's inspector-flanked one.
+  //
+  // WHAT IS ASSERTED IS NOT "one line" AT BOTH. At the narrow width `Any of` + two chips +
+  // `+ Tag` + the segments + the stepper + `or...` + `x` do not fit on one line and no CSS can
+  // make them; the design's own frame is the wide one. What must hold is that the tag ARM
+  // stays whole - one line, with its policy word, its chips and its `+ Tag` together - so the
+  // row degrades by moving a WHOLE control down rather than by shredding the arm.
+  const stepperScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
+  );
+  const segmentedScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte')
+  );
+  const stamp = (markup) =>
+    [
+      ['manager-chip', chipScoped.hashClass],
+      ['fab-stepper', stepperScoped.hashClass],
+      ['fab-stepper-input', stepperScoped.hashClass],
+      ['fab-stepper-adjunct', stepperScoped.hashClass],
+      ['manager-segmented', segmentedScoped.hashClass],
+      ['manager-segment', segmentedScoped.hashClass],
+      ['manager-segment-input', segmentedScoped.hashClass],
+      ['manager-segment-label', segmentedScoped.hashClass],
+    ].reduce((html, [className, hash]) => withScopeHash(html, className, hash), markup);
+
+  // The row exactly as `RecipeIngredientOption` renders a bare tag requirement: the plate, the
+  // kind select, the tag arm, the Any of / All of segments and the trailing control cluster
+  // (Stepper, divider, `or...`, remove).
+  const row = stamp(`
+    <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option>
+      <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
+      <select class="manager-recipe-option-kind" data-recipe-option-kind>
+        <option value="tags" selected>Tag</option>
+      </select>
+      <span class="manager-recipe-option-tags" data-recipe-option-tags>
+        <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
+        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+        <span class="manager-chip manager-recipe-tag-trigger" data-recipe-add-tag><i class="fas fa-plus"></i><span>Tag</span></span>
+      </span>
+      <div class="manager-segmented is-compact" role="radiogroup" aria-label="Tag match">
+        <label class="manager-segment is-active"><input type="radio" class="manager-segment-input" name="tag-match-1" checked><span class="manager-segment-label">Any of</span></label>
+        <label class="manager-segment"><input type="radio" class="manager-segment-input" name="tag-match-1"><span class="manager-segment-label">All of</span></label>
+      </div>
+      <div class="manager-recipe-option-controls">
+        <div class="fab-stepper">
+          <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
+          <input type="number" class="fab-stepper-input manager-recipe-option-quantity" value="2">
+          <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+        </div>
+        <span class="manager-recipe-option-divider"></span>
+        <span class="manager-chip manager-recipe-or-trigger"><i class="fas fa-code-branch"></i><span>or</span></span>
+        <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
+      </div>
+    </div>`);
+
+  // `manager-recipe-edit-ingredients-cost` photographs the first; `world-tool-entry-on-break-repair`
+  // and `manager-tool-stress-repair` photograph the second, and it is the one that broke.
+  for (const surface of [
+    { label: 'the recipe tab', width: 1006 },
+    { label: 'a Tool inspector', width: 622 },
+  ]) {
+    const context = await sharedBrowser.newContext({
+      viewport: { width: surface.width + 60, height: 400 },
+      deviceScaleFactor: 1,
+    });
+    const page = await context.newPage();
+
+    try {
+      await page.setContent(`
+        <!doctype html>
+        <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <style>
+              ${css}
+              ${chipCss}
+              ${stepperScoped.css}
+              ${segmentedScoped.css}
+              body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+              .harness-row-width { width: ${surface.width}px; }
+              .fas::before, .fa-solid::before { content: "x"; }
+            </style>
+          </head>
+          <body>
+            <main class="fabricate-manager">
+              <div class="harness-row-width">${row}</div>
+            </main>
+          </body>
+        </html>
+      `);
+
+      const report = await page.evaluate(() => {
+        const box = (element) => {
+          const rect = element.getBoundingClientRect();
+          return { top: rect.top, height: rect.height, width: rect.width };
+        };
+        const arm = document.querySelector('[data-recipe-option-tags]');
+        return {
+          arm: box(arm),
+          // Every MEMBER of the arm, so a chip that dropped below its neighbours is visible.
+          armMembers: [...arm.children].map((child) => box(child)),
+          rowWidth: box(document.querySelector('.manager-recipe-ingredient-option-row')).width,
+        };
+      });
+
+      // THE ARM IS ONE LINE. Measured as "the arm is no taller than its tallest member", which
+      // is the same claim as "no member wrapped" and survives a rung change on the spacing
+      // ladder in a way a pinned pixel height would not.
+      const tallest = Math.max(...report.armMembers.map((member) => member.height));
+      assert.ok(
+        report.arm.height <= tallest + 1,
+        `${surface.label} (${surface.width}px): the tag arm is ONE line - the policy word, the ` +
+          `chips and + Tag stay together (arm ${report.arm.height}px vs tallest member ${tallest}px)`
+      );
+      for (const [index, member] of report.armMembers.entries()) {
+        assert.ok(
+          member.top - report.arm.top < tallest,
+          `${surface.label}: arm member ${index} wrapped onto a line of its own ` +
+            `(top +${member.top - report.arm.top}px against a ${tallest}px member)`
+        );
+      }
+      assert.ok(
+        report.rowWidth <= surface.width + 1,
+        `${surface.label}: the row stays inside its column (${report.rowWidth} vs ${surface.width})`
+      );
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test('every requirement kind marks itself in its OWN tint, on the plate and on the chosen chip', async () => {
+  // `proto:4624`-`4627` is the design's `KINDMETA`, and a tint is half of every entry in it:
+  // `comp` is `--success`, `tag` is `--tag`, `cur` is `--accent`, and `ess` is `--water` — an
+  // essence/water hue the design's own `:root` never declares, so its own frames render that
+  // one glyph uncoloured. `--fab-info` is the token that hue names here, and the other three
+  // map exactly: the design's `--success`, `--accent` and `--info` are byte-for-byte our
+  // `--fab-success`, `--fab-accent` and `--fab-info`, and `--fab-purple` is this repo's tag
+  // family (`Chip`'s `is-tag`, the tag row's own edge, the `+ Tag` pill).
+  //
+  // `proto:4645` resolves the entry PER ROW, and premium's `RewardRow` puts the same
+  // `presentation.tint` on the plate (`:62`) AND on the chosen chip's glyph (`:80`) and on
+  // each suggestion's (`:129`). The plate shipped tinted; the chip and the suggestions did
+  // not, so a NAMED row's mark was one inherited ink whatever kind the row was.
+  //
+  // MEASURED, NOT MATCHED. A rule that reaches the element but loses the cascade — an `<i>`
+  // whose colour an ancestor pill sets, a `layer(modules)` sheet rule against a component's
+  // own unlayered block — reads as correct in the source and renders as one colour. So this
+  // resolves each token through a probe element in the same document and compares computed
+  // values rather than asserting a selector exists.
   const context = await sharedBrowser.newContext({
-    viewport: { width: 760, height: 360 },
+    viewport: { width: 900, height: 420 },
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
 
   try {
+    const rowFor = (kind, icon) => `
+      <div class="manager-recipe-ingredient-option-row is-${kind}" data-recipe-option>
+        <span class="manager-recipe-option-lead is-${kind}" data-plate="${kind}"><i class="${icon}"></i></span>
+        <select class="manager-recipe-option-kind"><option>${kind}</option></select>
+        <span class="manager-recipe-option-name-field">
+          <span class="manager-recipe-option-chosen" data-recipe-option-chosen>
+            <i class="${icon} manager-recipe-option-mark is-${kind}" data-mark="${kind}"></i>
+            <span class="manager-recipe-option-chosen-name">Named</span>
+          </span>
+        </span>
+      </div>`;
     await page.setContent(`
       <!doctype html>
       <html lang="en">
@@ -6065,86 +6249,59 @@ test('the tag requirement row keeps every control on ONE line', async () => {
           <meta charset="utf-8">
           <style>
             ${css}
-            ${chipCss}
             body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
-            .harness-row-width { width: 600px; }
             .fas::before, .fa-solid::before { content: "x"; }
           </style>
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="harness-row-width">
-              <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option>
-                <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
-                <select class="manager-recipe-option-kind" data-recipe-option-kind>
-                  <option value="tags" selected>Tag</option>
-                </select>
-                <span class="manager-recipe-option-tags" data-recipe-option-tags>
-                  <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
-                  <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-                  <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-                  <span class="manager-chip manager-recipe-tag-trigger"><i class="fas fa-plus"></i><span>Tag</span></span>
-                </span>
-                <!-- The Any of / All of control is the shared SegmentedControl (issue 975). Its
-                     track/segment styling lives in that component's SCOPED style block, not in
-                     fabricate.css, so this fixture reproduces only the markup shape; the
-                     assertions below are about the ROW's own layout, which fabricate.css owns. -->
-                <div class="manager-segmented is-compact" role="radiogroup" aria-label="Tag match">
-                  <label class="manager-segment is-active"><input type="radio" name="tag-match-1" checked><span class="manager-segment-label">Any of</span></label>
-                  <label class="manager-segment"><input type="radio" name="tag-match-1"><span class="manager-segment-label">All of</span></label>
-                </div>
-                <div class="manager-recipe-option-controls">
-                  <input type="number" class="manager-recipe-option-quantity" value="1">
-                  <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
-                </div>
-              </div>
-            </div>
+            ${rowFor('component', 'fas fa-cubes')}
+            ${rowFor('tag', 'fas fa-tag')}
+            ${rowFor('essence', 'fas fa-flask-vial')}
+            ${rowFor('currency', 'fa-solid fa-coins')}
+            <span data-token="component" style="color: var(--fab-success)"></span>
+            <span data-token="tag" style="color: var(--fab-purple)"></span>
+            <span data-token="essence" style="color: var(--fab-info)"></span>
+            <span data-token="currency" style="color: var(--fab-accent)"></span>
           </main>
         </body>
       </html>
     `);
 
     const report = await page.evaluate(() => {
-      const row = document.querySelector('.manager-recipe-ingredient-option-row');
-      const rowRect = row.getBoundingClientRect();
-      const style = getComputedStyle(row);
-      const inset =
-        parseFloat(style.paddingTop) +
-        parseFloat(style.paddingBottom) +
-        parseFloat(style.borderTopWidth) +
-        parseFloat(style.borderBottomWidth);
-      return {
-        rowHeight: rowRect.height,
-        contentHeight: rowRect.height - inset,
-        // Every DIRECT child, so a control added later is measured without editing this.
-        children: [...row.children].map((child) => {
-          const rect = child.getBoundingClientRect();
-          return { name: child.className, top: rect.top - rowRect.top, height: rect.height };
-        }),
-      };
+      const colourOf = (selector) => getComputedStyle(document.querySelector(selector)).color;
+      return ['component', 'tag', 'essence', 'currency'].map((kind) => ({
+        kind,
+        plate: colourOf(`[data-plate="${kind}"] i`),
+        mark: colourOf(`[data-mark="${kind}"]`),
+        token: colourOf(`[data-token="${kind}"]`),
+      }));
     });
 
-    assert.ok(report.children.length >= 5, `the fixture draws the whole row (${report.children.length})`);
-    // ONE LINE: no child starts below the tallest one, so nothing has wrapped. Stated over the
-    // children's own heights rather than against a pinned pixel, because the row is sized by
-    // its controls and a rung change on the ladder must not fail this.
-    const tallest = Math.max(...report.children.map((child) => child.height));
-    for (const child of report.children) {
-      assert.ok(
-        child.top < tallest,
-        `${child.name} wrapped to a second line (top ${child.top} vs tallest control ${tallest})`
+    for (const kind of report) {
+      assert.equal(
+        kind.plate,
+        kind.token,
+        `the ${kind.kind} plate glyph carries the ${kind.kind} token, not an inherited ink`
+      );
+      assert.equal(
+        kind.mark,
+        kind.token,
+        `the chosen chip's ${kind.kind} glyph takes the same tint the plate does (RewardRow.svelte:80)`
       );
     }
-    // …and the row's content box is one control tall, which is the same claim measured from
-    // the other end: a wrapped row is at least twice this whatever its children report.
-    assert.ok(
-      report.contentHeight <= tallest + 1,
-      `the row is one control tall (content ${report.contentHeight} vs tallest ${tallest})`
+    // …and the four are four, not one token wearing four class names: a sheet that resolved
+    // every kind to the same colour would satisfy every assertion above.
+    assert.equal(
+      new Set(report.map((kind) => kind.plate)).size,
+      4,
+      `the four kinds resolve to four distinct tints (${report.map((k) => `${k.kind}=${k.plate}`).join(', ')})`
     );
   } finally {
     await context.close();
   }
 });
+
 
 // Until issue 785 the Books & Scrolls surface carried its own duplicate page header, so it
 // had FOUR unconditional grid children against the shared three-track `auto auto 1fr`: the
@@ -6300,6 +6457,12 @@ test('the Tags & Categories route names one grid track per section and grows the
 // COPY of shipped markup, which is exactly the kind that keeps passing after the product stops
 // emitting it — the `<div role="tablist">` host and both container classes are unchanged, so the
 // copy is faithful again rather than merely still green.
+//
+// Issue 1470 added the `<div class="fabricate-icon-picker essence-icon-picker">` the picker
+// actually renders around its trigger. That element was missing here from the start, which cost
+// nothing while every trigger rule hung off `.fabricate-manager` and costs the whole block once
+// they hang off the picker's own namespace root: without it this row measures an unstyled button
+// and still reports on the vocabulary row's height by name.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
   const context = await sharedBrowser.newContext({ viewport: { width: 760, height: 600 } });
   const page = await context.newPage();
@@ -6310,7 +6473,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <span class="manager-chip manager-vocabulary-chip-locked"><i class="fas fa-lock"></i>Locked</span>
     </div>`;
     const customRow = `<div class="manager-vocabulary-row">
-      <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></span>
+      <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><div class="fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></div></span>
       <div class="manager-vocabulary-main"><strong>Potions</strong></div>
       <span class="manager-chip is-warning"><i class="fas fa-link"></i>8 references</span>
       <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
@@ -7462,9 +7625,14 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
 // had NO metrics at all — a silent failure, since every class selector would still resolve. So
 // the two anchors JOIN one block per cell rather than the Tool route authoring a second copy.
 test('the modifier library row is one block per cell, reaching both screens that draw it', () => {
+  // THE GLYPH LEFT THIS LIST AT ROUND 6, and deliberately. `proto:2332` draws the prerequisite
+  // row's glyph BARE - `font-size:11px; color:var(--accent); flex:0 0 auto` and no box at all -
+  // where `proto:2363` gives the bonus row the 26px tile this block states. The tile is not
+  // suppressed by a rule resetting five properties; the block simply stops naming the one route
+  // that does not draw one, and the bare face is stated once, on the ROW's own variant class, in
+  // `the leading-control variant carries the reference bare glyph` below.
   const CELLS = [
     'manager-modifier-readonly-row',
-    'manager-modifier-readonly-glyph',
     'manager-modifier-readonly-label',
     'manager-modifier-readonly-expression',
   ];
@@ -7481,12 +7649,23 @@ test('the modifier library row is one block per cell, reaching both screens that
       `${cell} must be ONE joined block naming all three routes, not a copy per Tool list`
     );
     // The non-vacuity half: a second declaring block would satisfy the join above and still
-    // let the two screens drift, so each cell is declared exactly twice in the file — once in
-    // the joined selector, once nowhere else.
+    // let the two screens drift, so each cell is declared exactly once OUTSIDE a variant — in
+    // the joined selector, and nowhere else.
+    //
+    // A VARIANT BLOCK IS EXEMPT, and by NAME rather than by pattern. Round 6 gave the row two
+    // declared variants, and `is-text-stacked` restates the expression cell's `flex` for a
+    // COLUMN context the joined value was not written for. That is an extension of the one
+    // owner rather than a second one, and it is reachable only from a row that asked for it.
+    // Exempting the two variant classes and nothing else is what keeps a plain copy on a
+    // third route failing here exactly as it did before.
+    const declaringLines = css
+      .split('\n')
+      .filter((line) => line.trimEnd().endsWith(`.${cell} {`))
+      .filter((line) => !/is-text-stacked|is-control-leading/.test(line));
     assert.equal(
-      (css.match(new RegExp(`\\.${cell} \\{`, 'g')) || []).length,
+      declaringLines.length,
       1,
-      `${cell} must be declared exactly once`
+      `${cell} must be declared exactly once outside the row's declared variants`
     );
   }
   // AND THE PICK CONTROL IS THE MANAGER'S SHIPPED RADIO, joined the same way. Foundry's core
@@ -7509,6 +7688,93 @@ test('the modifier library row is one block per cell, reaching both screens that
     false,
     'the themed radio stays scoped to the surfaces that opt into it, never radios globally'
   );
+});
+
+// ── ONE ROW, TWO DECLARED VARIANTS, AND BOTH TRAVEL WITH THE PRIMITIVE (round 6) ────────────
+//
+// Round 5 put both Tool lists on this row and RECORDED two deviations from the reference rather
+// than reproducing them. The maintainer's round-6 ruling is that the reference's two rows
+// genuinely differ in exactly those two ways, and that the answer is declared variants on ONE
+// component — not two components, and not one shape forced on both:
+//
+//   `proto:2331`-`2333`  control FIRST, glyph BARE at 11px, label stacked over the expression
+//   `proto:2361`-`2364`  no leading control, label and expression INLINE, dot trailing
+//
+// Both variants are stated on the ROW's own class rather than on a route container, and that is
+// what makes them the primitive's rather than the Tool tab's: a fourth caller opting in gets the
+// rendering with the prop. A `.manager-tool-prerequisite-list`-anchored copy renders identically
+// today and gives that caller nothing, so the rooting is asserted rather than left to reading.
+test('the leading-control variant carries the reference bare glyph', () => {
+  // The TILE keeps two anchors — the two routes that still draw one.
+  const tile =
+    '.fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph,\n' +
+    '.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-glyph {';
+  assert.ok(css.includes(tile), 'the glyph tile is one block naming the two routes that draw it');
+  assert.equal(
+    css.includes('.manager-tool-prerequisite-list .manager-modifier-readonly-glyph'),
+    false,
+    'and `proto:2332` draws that row bare, so the tile block does not reach it at all'
+  );
+
+  const bare =
+    '.fabricate-manager .manager-modifier-readonly-row.is-control-leading > ' +
+    '.manager-modifier-readonly-glyph {';
+  assert.ok(
+    css.includes(bare),
+    "the bare glyph is stated once, on the row's own variant class, so it travels with the row"
+  );
+  const bareDeclarations = css.slice(css.indexOf(bare) + bare.length).split('}')[0];
+  assert.match(bareDeclarations, /font-size: 11px/, '`proto:2332`');
+  assert.match(bareDeclarations, /color: var\(--fab-accent\)/, 'and its accent ink');
+  // The non-vacuity half. A bare glyph reached by RESETTING the tile is the same five properties
+  // written twice in opposite directions, and the next property added to the tile would leak
+  // straight through it. The variant states what the glyph IS.
+  for (const reset of ['width:', 'height:', 'border-radius:', 'background:']) {
+    assert.equal(
+      bareDeclarations.includes(reset),
+      false,
+      `the bare face states what it is, never what the tile is not (${reset})`
+    );
+  }
+});
+
+test('the stacked-text variant is the row own, not the Tool tab', () => {
+  const stack =
+    '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked > ' +
+    '.manager-modifier-readonly-text {';
+  assert.ok(css.includes(stack), "the text block is stated on the row's own variant class");
+  const stackDeclarations = css.slice(css.indexOf(stack) + stack.length).split('}')[0];
+  assert.match(stackDeclarations, /flex-direction: column/, '`proto:2333` sets name over value');
+  assert.match(stackDeclarations, /min-width: 0/, 'so a long expression ellipses inside the row');
+
+  // The expression cell is `flex: 1 1 0` in the INLINE row, which is what puts a trailing control
+  // against the row's right edge with no auto margin. Left alone inside a COLUMN that same
+  // declaration grows it to the row's height, so the variant restates it — at (0,4,0) against the
+  // joined cell's (0,3,0) rather than relying on source order, because the blocks are far apart.
+  const expression =
+    '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked ' +
+    '.manager-modifier-readonly-expression {';
+  assert.ok(css.includes(expression), 'and the expression cell is re-stated for the column');
+  const expressionDeclarations = css
+    .slice(css.indexOf(expression) + expression.length)
+    .split('}')[0];
+  assert.match(expressionDeclarations, /flex: 0 0 auto/, "it does not grow to the row's height");
+  assert.match(
+    expressionDeclarations,
+    /margin-top: var\(--fab-space-2xs\)/,
+    "`proto:2333`'s 2px, taken from the published scale rather than written as a literal"
+  );
+
+  // AND NEITHER VARIANT IS GATED ON A ROUTE. This is the assertion that keeps them the row's.
+  for (const variant of ['is-control-leading', 'is-text-stacked']) {
+    for (const line of css.split('\n').filter((row) => row.includes(variant))) {
+      assert.equal(
+        /manager-tool-[a-z]+-list|manager-checks-card/.test(line),
+        false,
+        `the ${variant} variant must not be gated on a route container: ${line.trim()}`
+      );
+    }
+  }
 });
 
 // ── THE TWO PICK ROWS SHARE ONE SELECTED FACE, AT THE REFERENCE'S OWN TOKENS (round 5) ─────
@@ -9013,10 +9279,14 @@ test('the modifier row gives every field room for its longest content at every m
       `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-world-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
     const boundField = (bound, caption) =>
       `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
+    // The icon field's `<div class="fabricate-icon-picker essence-icon-picker">` is the picker's
+    // own root element, which this copy omitted until issue 1470. The trigger's geometry rules are
+    // rooted at it now, so without it the field measures a bare button rather than the 38px combo
+    // the row is being asserted to have room for.
     const editor = `
       <div class="manager-modifier-body manager-character-modifier-editor">
         <div class="manager-modifier-name-row">
-          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div>
+          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
           <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
           <div class="manager-modifier-bounds-row" data-world-modifier-bounds="mod-probe">
             ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}

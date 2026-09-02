@@ -2081,6 +2081,22 @@ const SMITHING_TOOLS = [
           { quantity: 1, match: { type: 'component', componentId: 'sm-whetstone' } },
         ],
       },
+      // A TAG ROW, BECAUSE NO REPAIR FRAME HELD ONE (issue 1373, maintainer round 6). Every
+      // repair seed in this file was components only, so the four kinds' plate tints rendered
+      // as one green four times over and the tag arm's one-line geometry - the thing the
+      // maintainer reported - was evidenced solely by `manager-recipe-edit-ingredients-cost`,
+      // on a different screen with a different container width. A tool inspector is the NARROW
+      // case of that row, so it is the one worth photographing.
+      //
+      // POPULATED rather than empty, and that is not only about showing more: an option with no
+      // tags fails `Ingredient.validate`, so an empty-tag seed would flip this Tool's Validation
+      // badge and change what every other frame of it is evidence for.
+      {
+        id: 'sm-tool-tongs-repair-g3',
+        options: [
+          { quantity: 2, match: { type: 'tags', tags: ['abrasive', 'hide'], tagMatch: 'any' } },
+        ],
+      },
     ],
   },
 ];

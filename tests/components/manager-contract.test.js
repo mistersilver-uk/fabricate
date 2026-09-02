@@ -3427,6 +3427,74 @@ describe('CraftingSystemManager source contract', () => {
       'All selected prerequisites are required (AND). When a character fails them:',
       '`proto:2334` states the AND rule and introduces the gate pair in ONE sentence'
     );
+    // ── THE ROW'S TWO VARIANTS ARE DECLARED, DEFAULTED AND NAMED FOR WHAT THEY MEAN ──────
+    // (issue 1373, maintainer round 6.)
+    //
+    // Round 5 recorded two DEVIATIONS from the reference on this row: `proto:2331` leads with the
+    // box where ours trailed it, and `proto:2333` stacks the name over the expression where ours
+    // set them on one line. The argument for recording rather than fixing them was that a row
+    // serving both lists would be "two rows wearing one name" — which holds against a single
+    // fixed shape and not against declared variants, the answer this epic already reached for a
+    // different primitive.
+    //
+    // So the row takes two props, both defaulted to the shipped rendering. NAMED FOR WHAT THEY
+    // MEAN: `controlPlacement` and `textLayout` describe the row, where a `variant="prerequisite"`
+    // would describe a CALLER and would have to grow a value per screen that ever adopts it.
+    const modifierRowSource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte'),
+      'utf8'
+    );
+    assert.match(
+      modifierRowSource,
+      /controlPlacement = 'trailing'/,
+      "the control slot defaults to the shipped trailing edge, so today's callers are unmoved"
+    );
+    assert.match(
+      modifierRowSource,
+      /textLayout = 'inline'/,
+      'and the text defaults to one line, for the same reason'
+    );
+    // The names are the row's own vocabulary. A caller-named variant is the failure this ruling
+    // rejects by name, so it is asserted rather than left to review.
+    for (const callerName of ['prerequisite', 'bonus', 'checks', 'catalogue']) {
+      assert.equal(
+        new RegExp(`variant\\s*=\\s*'${callerName}'|'${callerName}'\\s*=>`, 'i').test(
+          modifierRowSource
+        ),
+        false,
+        `the row must not name a variant after its caller (${callerName})`
+      );
+    }
+    // AND THE PREREQUISITE LIST IS THE ONE THAT OPTS IN. The bonus list one section below and
+    // the Checks Studio one screen away both pass NEITHER, which is what makes the defaults
+    // load-bearing rather than decorative.
+    // READ OFF THE ELEMENTS, not off the file. The tab's own docblock names both props in prose,
+    // so a raw count of the attribute text counts the explanation as a call site.
+    const modifierRowTags = toolRequirementsSource.match(/<ModifierLibraryRow[^>]*>/g) || [];
+    assert.equal(modifierRowTags.length, 2, 'the tab draws the shared row twice');
+    const optedIn = modifierRowTags.filter((tag) => /controlPlacement|textLayout/.test(tag));
+    assert.equal(
+      optedIn.length,
+      1,
+      'and only ONE of the two opts in — the bonus list keeps the shipped face'
+    );
+    assert.match(optedIn[0], /controlPlacement="leading"/, '`proto:2331` puts the checkbox first');
+    assert.match(
+      optedIn[0],
+      /textLayout="stacked"/,
+      '`proto:2333` sets the name over the expression'
+    );
+    assert.match(
+      optedIn[0],
+      /data-tool-prerequisite-row/,
+      'and it is the PREREQUISITE list, not the bonus list, that took them'
+    );
+    assert.equal(
+      /controlPlacement|textLayout/.test(craftingModifierCatalogueSource),
+      false,
+      'the Checks Studio caller is untouched: it passes neither prop and renders as it shipped'
+    );
+
     // The gate group keeps its accessible name — the heading is hidden, not deleted.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.GateMode,

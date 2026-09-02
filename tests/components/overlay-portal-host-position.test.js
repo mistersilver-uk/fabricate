@@ -41,6 +41,18 @@
  * that wrong and the panel's containing block silently becomes something else — the same class of
  * fault as the original defect. Naming a root in `OVERLAY_HOST_ROOT_CLASSES` that is not
  * positioned reds here.
+ *
+ * ── THE SECOND HALF OF THE SAME DEFECT (issue 1470) ──────────────────────────────────────────
+ * Resolving the host was only half of it, and finishing that half made the other half louder. The
+ * three `src/ui/svelte/components/` pickers took `position: absolute` from a rule rooted at
+ * `.fabricate-manager`, so once #1466 portalled them into the player window correctly they landed
+ * in the right host and drew STATIC: coordinates computed against a real origin and then applied
+ * to a panel that has no containing block to apply them to. Issue 1470 re-rooted each family at a
+ * namespace class the component itself writes, and all three are now measured in both hosts here.
+ *
+ * The `position` clause in `assertPanelIsAtItsTrigger` is what catches that half. It reds before
+ * the geometry does, and it reds ONLY in the non-manager host — which is the shape of the defect,
+ * and the reason a manager-only case could never have found it.
  */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
@@ -65,6 +77,34 @@ const FRAME_TOP = 140;
  * the defect produces, so it cannot mask one.
  */
 const EPSILON = 1.5;
+
+/**
+ * A stand-in for Foundry's bundled artwork.
+ *
+ * `EssenceSourceSelector` falls back to `icons/svg/item-bag.svg` for an item with no image, which
+ * is a real Foundry core path and therefore correct in the product and absent here — this server
+ * has no Foundry data directory. Without this the fixture logs a 404, and `consoleErrors` is
+ * asserted EMPTY because its job is to catch the module's own missing-host diagnostic; a resource
+ * failure filtered out of that list instead would blunt the clause for every component.
+ *
+ * A real SVG rather than an empty response, because the trigger image is `object-fit: cover` over
+ * a 140px square and a broken image box is not the same layout as a drawn one.
+ */
+function foundryIconStub() {
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+    '<rect width="64" height="64" fill="#6b7a8f"/></svg>';
+  return {
+    name: 'overlay-host-icons',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if (!/\/icons\/svg\/[\w-]+\.svg(\?|$)/.test(request.url ?? '')) return next();
+        response.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+        response.end(svg);
+      });
+    },
+  };
+}
 
 /**
  * Serve `styles/fabricate.css` RAW, outside Vite's CSS pipeline.
@@ -109,7 +149,7 @@ before(async () => {
     // with an `ENOSPC` naming a file the run never touches. Nothing is edited mid-run.
     server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
     logLevel: 'silent',
-    plugins: [rawStylesheetMount(), svelte()],
+    plugins: [rawStylesheetMount(), foundryIconStub(), svelte()],
   });
   await server.listen();
   const address = server.httpServer.address();
@@ -123,11 +163,36 @@ after(async () => {
 });
 
 /**
+ * The trigger and panel each component renders, so one measurement routine serves all four.
+ *
+ * `SearchablePopover` is matched on `button.manager-travel-trigger` because the fixture passes
+ * that class through `triggerClass`; the other three name their own.
+ */
+const SELECTORS = Object.freeze({
+  popover: Object.freeze({
+    trigger: 'button.manager-travel-trigger',
+    panel: '.fabricate-picker-popover',
+  }),
+  icon: Object.freeze({
+    trigger: '.essence-icon-picker-trigger',
+    panel: '.fabricate-icon-picker-popover',
+  }),
+  source: Object.freeze({
+    trigger: '.essence-source-trigger',
+    panel: '.fabricate-source-picker-popover',
+  }),
+  color: Object.freeze({
+    trigger: '.manager-color-picker-trigger',
+    panel: '.fabricate-color-picker-popover',
+  }),
+});
+
+/**
  * Open one overlay in one host and report the geometry, plus anything it logged.
  *
  * @param {object} options
  * @param {'manager'|'app'|'none'} options.host Which application root (or none) wraps the picker.
- * @param {'popover'|'icon'} [options.component] Which overlay component to mount.
+ * @param {'popover'|'icon'|'source'|'color'} [options.component] Which overlay component to mount.
  * @returns {Promise<object>} Measured rects, the resolved host, and console errors.
  */
 async function openOverlayIn({ host, component = 'popover' }) {
@@ -143,10 +208,7 @@ async function openOverlayIn({ host, component = 'popover' }) {
     });
     await page.waitForFunction(() => globalThis.__overlayHostFixtureReady === true);
 
-    const triggerSelector =
-      component === 'icon' ? '.essence-icon-picker-trigger' : 'button.manager-travel-trigger';
-    const panelSelector =
-      component === 'icon' ? '.essence-icon-picker-popover' : '.fabricate-picker-popover';
+    const { trigger: triggerSelector, panel: panelSelector } = SELECTORS[component];
 
     await page.click(triggerSelector);
     await page.waitForSelector(panelSelector);
@@ -303,16 +365,43 @@ describe('1466 a portaled overlay is positioned against the host it was portaled
     );
   });
 
-  it('the shared-directory picker resolves the same way', async () => {
-    // `IconPicker` lives in `src/ui/svelte/components/` and carried its own copy of the defect.
-    // It is measured in the MANAGER host because its popover's stylesheet rules are still
-    // `.fabricate-manager`-rooted (the CSS half of issue 1464 was only ever done for
-    // `SearchablePopover`), so outside the manager it has no `position: absolute` to measure yet.
-    // What this proves is that adopting the shared resolver did not move it where it does live.
-    const measured = await openOverlayIn({ host: 'manager', component: 'icon' });
-    assertPanelIsAtItsTrigger(measured, 'manager (icon picker)');
-    assert.deepEqual(measured.consoleErrors, [], 'the icon picker reported a missing host');
-  });
+  // ── THE SHARED DIRECTORY, BOTH HALVES (issue 1470) ─────────────────────────────────────────
+  // These three live in `src/ui/svelte/components/`, whose premise is that a component there works
+  // wherever it is mounted. Issue 1466 gave them the right HOST; until issue 1470 they still had
+  // no rule that positioned them outside the manager, so the panel landed in the correct host and
+  // drew `position: static` — a resolved host and an unpositioned panel, which is a worse failure
+  // than either alone because the coordinates are now computed against something real and then
+  // ignored.
+  //
+  // The manager case and the player-app case are BOTH run for each. The manager is where they
+  // always worked, so it is the regression half; the player app is the half that was impossible,
+  // and `assertPanelIsAtItsTrigger` reds there on the unfixed tree at the `position` clause before
+  // it ever reaches the geometry.
+  for (const [component, label] of [
+    ['icon', 'IconPicker'],
+    ['source', 'EssenceSourceSelector'],
+    ['color', 'ManagerColorPicker'],
+  ]) {
+    it(`${label} lands at its trigger inside the manager, which is where it always worked`, async () => {
+      const measured = await openOverlayIn({ host: 'manager', component });
+      assertPanelIsAtItsTrigger(measured, `manager (${label})`);
+      assert.ok(
+        measured.panelParentClass.includes('fabricate-manager'),
+        `${label}'s panel parent is \`${measured.panelParentClass}\`, not the manager root`
+      );
+      assert.deepEqual(measured.consoleErrors, [], `${label} reported a missing host`);
+    });
+
+    it(`${label} lands at its trigger inside the player window, which is what the shared directory promises`, async () => {
+      const measured = await openOverlayIn({ host: 'app', component });
+      assertPanelIsAtItsTrigger(measured, `player app (${label})`);
+      assert.ok(
+        measured.panelParentClass.includes('fabricate-app'),
+        `${label}'s panel parent is \`${measured.panelParentClass}\`, not the player window frame`
+      );
+      assert.deepEqual(measured.consoleErrors, [], `${label} reported a missing host`);
+    });
+  }
 
   it('the fixture can tell a host-relative arrangement from a viewport-relative one', async () => {
     // THE NON-VACUITY FLOOR FOR THE THREE CLAUSES ABOVE. They assert an alignment, and an

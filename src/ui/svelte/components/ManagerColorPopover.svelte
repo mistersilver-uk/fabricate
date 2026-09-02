@@ -123,9 +123,12 @@
   });
 </script>
 
+<!-- `fabricate-color-picker-popover` is this primitive's NAMESPACE root (issue 1470). ONE class,
+     because this component's root element IS the panel it portals: root and panel are the same node,
+     so a second class would name the same element twice. -->
 <span
   bind:this={popoverRoot}
-  class="manager-color-picker-popover"
+  class="fabricate-color-picker-popover manager-color-picker-popover"
   class:is-inline={layout === 'inline'}
   data-manager-color-picker-popover
   data-manager-color-layout={layout === 'inline' ? 'inline' : undefined}

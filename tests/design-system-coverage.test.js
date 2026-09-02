@@ -53,6 +53,7 @@ import {
 import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteComponentFiles.js';
 
 import { parseDesignLibrary, primitiveNamesIn, readDesignLibrary } from './helpers/designLibrary.js';
+import { styleTextFor } from './helpers/styleBlockScan.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -607,6 +608,129 @@ test('no declined candidate ships as a component', () => {
       `${name}.svelte ships and the ruled-out register declines it. The register says the ` +
         'absence of that primitive is a decision; a file with that name says otherwise, and one ' +
         'of the two has to be wrong.'
+    );
+  }
+});
+
+/**
+ * A rule's whole selector list, for every rule in a stylesheet.
+ *
+ * `postcss` is not a declared dependency of this repository — `postcss-scss` is, and reaching
+ * through it for a transitive peer would make a gate depend on a package nothing lists. A rule is
+ * recognisable without a parser: it is the text between the previous statement boundary and a `{`.
+ * Proved rather than assumed — this scanner was compared against `postcss` over the whole style
+ * corpus, all 185 files carrying CSS, and agreed on the multiset of selector lists in every one,
+ * including this stylesheet's 2645 rules.
+ *
+ * THE FIRST CHARACTER CLASS EXCLUDES WHITESPACE AS WELL AS `@`, and that is the one non-obvious
+ * part. `\s*` is free to backtrack, so a class that merely excluded `@` still matched by starting
+ * the capture ON a whitespace character and swallowing the at-rule behind it — which counted every
+ * `@container` prelude as a rule, silently, and made one measured count read 31 instead of 30. A
+ * nested rule INSIDE an at-rule is still counted, because its prelude follows the at-rule's `{`.
+ */
+const SELECTOR_LIST = /(?:^|[{};])\s*([^{};\s@][^{};]*)\{/g;
+
+/**
+ * @param {string} css Comment-stripped CSS.
+ * @returns {string[]} Each rule's selector list, whitespace collapsed, in source order.
+ */
+function selectorListsIn(css) {
+  const lists = [];
+  SELECTOR_LIST.lastIndex = 0;
+  for (let found = SELECTOR_LIST.exec(css); found !== null; found = SELECTOR_LIST.exec(css)) {
+    lists.push(found[1].trim().replaceAll(/\s+/gu, ' '));
+    // Step back onto the `{` this match consumed: it is the statement boundary a nested rule's
+    // own prelude is anchored on, and consuming it would hide every rule inside an at-rule.
+    SELECTOR_LIST.lastIndex = found.index + found[0].length - 1;
+  }
+  return lists;
+}
+
+/** The sheet every stylesheet claim in the manifest is about. */
+const STYLESHEET = 'styles/fabricate.css';
+
+/** Its rules, as selector lists. */
+const STYLESHEET_SELECTORS = selectorListsIn(
+  styleTextFor(STYLESHEET, readFileSync(path.join(REPO_ROOT, STYLESHEET), 'utf8'))
+);
+
+/**
+ * A claim that the manifest makes about a class family in the shipped stylesheet.
+ *
+ * `scripts/lib/designSystemPrimitives.js` states the notation and why a count stays inside `why`
+ * rather than becoming a field. Group 1 is the count, group 2 the family without its trailing
+ * `-*`, group 3 the optional root the rules must additionally sit under.
+ *
+ * The notation is deliberately the one the FALSE sentences already used. Three rows said
+ * "113 `.manager-travel-*` rules in `styles/fabricate.css`", two of them to rule a conversion
+ * structurally impossible, and it had been wrong since thirteen minutes before the first of them
+ * merged. This pattern matches that sentence as it was written, so this property is not a rule
+ * that only binds on prose authored after it.
+ */
+const FAMILY_RULE_CLAIM =
+  /(\d+) `\.([a-z][a-z\d-]*)-\*` rules(?: under `\.([a-z][a-z\d-]*)`)? in `styles\/fabricate\.css`/gu;
+
+/** A claim about the number of rules in a row's OWN component's scoped `<style>` block. */
+const SCOPED_RULE_CLAIM = /(\d+) scoped rules/gu;
+
+test('every class-family rule count the manifest asserts is re-derived from the stylesheet', () => {
+  assert.ok(
+    STYLESHEET_SELECTORS.length > 1000,
+    `${STYLESHEET} yielded ${STYLESHEET_SELECTORS.length} rules, so the scanner is broken and ` +
+      'every count below would be compared against a number nobody measured'
+  );
+  const claims = MANIFEST_ROWS.flatMap((row) =>
+    [...row.why.matchAll(FAMILY_RULE_CLAIM)].map((found) => ({
+      row,
+      text: found[0],
+      count: Number(found[1]),
+      family: `.${found[2]}-`,
+      root: found[3] === undefined ? null : `.${found[3]}`,
+    }))
+  );
+  assert.ok(
+    claims.length > 0,
+    'no manifest row states a class-family rule count in the notation this property reads, so ' +
+      'either the notation changed and every such claim is unchecked again, or the rows that ' +
+      'made one stopped and this property has no domain'
+  );
+  for (const claim of claims) {
+    const measured = STYLESHEET_SELECTORS.filter(
+      (selector) =>
+        selector.includes(claim.family) && (claim.root === null || selector.includes(claim.root))
+    );
+    assert.equal(
+      measured.length,
+      claim.count,
+      `${claim.row.path} states "${claim.text}" and ${STYLESHEET} has ${measured.length}. A ` +
+        'stylesheet claim in a register row is not decoration: two rows disqualified a component ' +
+        'on one of these, and it had been false since before the row was written.'
+    );
+  }
+});
+
+test('every scoped rule count the manifest asserts is re-derived from that component', () => {
+  const claims = MANIFEST_ROWS.flatMap((row) =>
+    [...row.why.matchAll(SCOPED_RULE_CLAIM)].map((found) => ({
+      row,
+      text: found[0],
+      count: Number(found[1]),
+    }))
+  );
+  assert.ok(
+    claims.length > 0,
+    'no manifest row states a scoped rule count in the notation this property reads, so either ' +
+      'the notation changed or this property has no domain'
+  );
+  for (const claim of claims) {
+    const source = readFileSync(path.join(REPO_ROOT, claim.row.path), 'utf8');
+    const measured = selectorListsIn(styleTextFor(claim.row.path, source));
+    assert.equal(
+      measured.length,
+      claim.count,
+      `${claim.row.path} states "${claim.text}" and its own <style> block holds ` +
+        `${measured.length}. Both rows carrying one of these use it to size the blast radius of ` +
+        'a conversion, so the figure is the argument rather than a detail of it.'
     );
   }
 });

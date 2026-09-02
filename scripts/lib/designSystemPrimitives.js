@@ -116,6 +116,48 @@
  * at two or more importers. The two halves together mean no row's membership rests on an unchecked
  * count in either direction.
  *
+ * ── A CLAIM ABOUT THE STYLESHEET IS WRITTEN IN A NOTATION, FOR THE SAME REASON ─────────────────
+ *
+ * `callers` is a field because a sentence is not checked. The identical failure ran one column
+ * over and lasted longer, because nothing here reads CSS. Three rows asserted that the
+ * `.manager-travel-*` family was 113 rules in `styles/fabricate.css` and every one of them scoped
+ * under `.fabricate-manager`, and TWO of the three used that to rule a conversion structurally
+ * impossible — a claim about a stylesheet disqualifying two components. It was true of the sheet
+ * the plan was drafted against. Issue 1464 re-rooted the family at `.fabricate-picker` THIRTEEN
+ * MINUTES before the first row repeating it merged, so the claim was already false when it was
+ * authored, and it then survived two more merges — including one that edited this very manifest —
+ * with every gate green. Issue 1472 corrected all three.
+ *
+ * A rule count is not made a field, because unlike a caller list it belongs INSIDE an argument
+ * rather than beside one: the sentence is "and that is why it cannot convert", and splitting the
+ * number out of it leaves the judgement unattached to the figure it rests on. It stays in `why`,
+ * and is written in a NOTATION that `tests/design-system-coverage.test.js` re-derives from the
+ * tree:
+ *
+ *   N `.<family>-*` rules in `styles/fabricate.css`
+ *   N `.<family>-*` rules under `.<root>` in `styles/fabricate.css`
+ *   N scoped rules                     — the rules in this row's OWN `path`, in its `<style>` block
+ *
+ * The notation was chosen to match what the false sentences ALREADY SAID, word for word, rather
+ * than to be convenient: run the property against the manifest as it stood before issue 1472 and it
+ * reports 113 against a measured 62, twice, with nothing re-authored. A notation that only reads
+ * prose written after the guard existed would have proved nothing about the prose that was there.
+ *
+ * Two consequences to know before writing a row. A count being RETRACTED must NOT be written in the
+ * notation — quote it some other way, as all three corrected rows do ("113 rules in the
+ * `.manager-travel-*` family"), or the property will correctly red on the retracted figure. And the
+ * notation is OPT-IN: a claim about the sheet phrased any other way is as unchecked as these were.
+ *
+ * What is deliberately NOT guarded is a `fabricate.css:NNN` LINE citation, of which this manifest
+ * holds five. Measured at issue 1472, ALL FIVE point at the wrong rule — every asserted VALUE still
+ * true and only the pointer moved. Guarding the number is the wrong repair twice over. 33 of the
+ * last 200 commits touch that file, so a pin would red on unrelated changes; and it does not hold
+ * still long enough to be worth pinning — two of the five were re-measured three hours apart during
+ * issue 1472 itself and had drifted a further 34 lines in between, from one merge. This module's
+ * own citation rule above already says what a line number is worth: nothing can resolve one. The
+ * answer is to cite by something that can be — a selector — which is a prose change across four
+ * MEMBER rows and `library.html` besides, so issue 1472 recorded it rather than folding it in.
+ *
  * There is deliberately no `status` field. Membership is which TABLE holds the row —
  * {@link DESIGN_SYSTEM_PRIMITIVES} or {@link NOT_A_PRIMITIVE} — and a field restating that is
  * hand-typed data no consumer reads, so it can only ever be wrong. This module exists because

@@ -345,6 +345,54 @@ describe('the check-modifier catalogue card (mounted)', () => {
     harness.remount();
   });
 
+  // -- THE VARIANTS ADDED FOR THE TOOL TAB DO NOT REACH THIS SCREEN (issue 1373, round 6) ----
+  //
+  // `ModifierLibraryRow` gained a LEADING control slot and a STACKED text option so the Tool
+  // Requirements tab's prerequisite list can draw `proto:2331`-`2333` while its bonus list keeps
+  // `proto:2361`-`2364`. Both default to the shipped rendering, and this screen is the reason
+  // that matters: it is a measured surface whose frame and parity regions are pinned, and it
+  // passes neither prop.
+  //
+  // ASSERTED ON THIS SCREEN'S OWN DOM rather than on the component's defaults, because a default
+  // is only half the claim - the other half is that nothing between here and the row starts
+  // passing one.
+  it('keeps the shipped row anatomy: trailing control, inline text, no variant class', async () => {
+    const target = await mountChecks();
+    const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    const rows = [...card.querySelectorAll('[data-crafting-modifier-row]')];
+    assert.ok(rows.length > 0, 'the library renders rows at all');
+    for (const row of rows) {
+      const glyph = row.querySelector('.manager-modifier-readonly-glyph');
+      assert.equal(
+        row.firstElementChild,
+        glyph,
+        'the glyph TILE still opens the row: this screen has no leading control'
+      );
+      const label = row.querySelector('.manager-modifier-readonly-label');
+      const expression = row.querySelector('.manager-modifier-readonly-expression');
+      assert.equal(label.parentElement, row, 'the name is a direct cell');
+      assert.equal(expression.parentElement, row, 'and so is the expression, inline beside it');
+      assert.ok(
+        !row.querySelector('.manager-modifier-readonly-text'),
+        'no stacking wrapper is introduced into a screen that did not ask for one'
+      );
+      assert.equal(row.classList.contains('is-control-leading'), false);
+      assert.equal(row.classList.contains('is-text-stacked'), false);
+      // The eligibility control this screen owns is still the row's LAST child.
+      assert.ok(
+        Boolean(row.querySelector('[data-crafting-modifier-eligibility]')),
+        "the eligibility control is this caller's trailing content"
+      );
+      assert.equal(
+        row.lastElementChild.matches('[data-crafting-modifier-eligibility]') ||
+          Boolean(row.lastElementChild.querySelector('[data-crafting-modifier-eligibility]')),
+        true,
+        'and it trails the three cells, where it has always been'
+      );
+    }
+    harness.remount();
+  });
+
   it('gives `How they combine` its own studio card, with a title and a description', async () => {
     const target = await mountChecks();
     const policyCard = target.querySelector('[data-crafting-modifier-policy-card]');

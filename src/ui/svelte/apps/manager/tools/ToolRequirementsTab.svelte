@@ -177,18 +177,21 @@
   selected treatment. Both lists are now that one component, and `ChecklistCardRow` — whose only
   caller this was — is removed rather than left standing for a fourth row to be copied from.
 
-  THE ONLY DIFFERENCE THAT SURVIVES IS THE TRAILING CONTROL, which is exactly the seam the row
-  already has. A CHECKBOX here, because several prerequisites apply at once and the AND sentence
-  below says so; a radio below, because a Tool adds one modifier. The row took no contortion to
-  carry it: `children` is the caller's, so the row never knew which control it was trailing.
+  THE CONTROL IS THE SEAM THE ROW ALREADY HAS. A CHECKBOX here, because several prerequisites
+  apply at once and the AND sentence below says so; a radio below, because a Tool adds one
+  modifier. The row took no contortion to carry it: `children` is the caller's, so the row never
+  knew which control it was rendering.
 
-  TWO THINGS THE REFERENCE'S PREREQUISITE ROW DOES THAT OURS DOES NOT, recorded rather than
-  drifted into. It leads with the box (`proto:2331`) where ours trails it, and it stacks the name
-  over the expression (`proto:2333`) where ours sets them on one line. Both are consequences of
-  the maintainer's ruling that this is ONE row: the reference's own two rows differ in exactly
-  these two ways, so a row that served both would have to be two rows wearing one name. The
-  ruling asked for the trailing control by name, and the shared anatomy is the bonus row's,
-  which is the one the Checks Studio also draws.
+  AND THE ROW'S TWO ANATOMIES ARE DECLARED VARIANTS OF IT (maintainer round 6). Round 5 shipped
+  the bonus row's anatomy for both and recorded two deviations: `proto:2331` leads with the box
+  where that shipped trailing, and `proto:2333` stacks the name over the expression where that
+  set them on one line. The ruling is that both differences are real and load-bearing, and that
+  the answer is neither two components nor one shape forced on both - it is `controlPlacement`
+  and `textLayout`, two props on the one row, each defaulted to the shipped rendering so the
+  bonus list below and the Checks Studio one screen away are byte-identical. This list is the
+  only caller that opts in. The glyph follows the control rather than taking a prop of its own:
+  `proto:2332` draws it bare here and `proto:2363` tiles it below, and the tile is what makes the
+  glyph a row's leading anchor, which a row that leads with a control already has.
 
   WHAT IS NOT REPRODUCED is `proto:4754`'s click-the-selected-row-to-clear. A radio group cannot
   be un-checked by re-clicking it, and faking that on a `<label>` wrapping a real `<input>` is
@@ -476,9 +479,15 @@
            `proto:4741` and `proto:4752` state the two rows with one identical string, so the
            reference draws one row where this tab drew two — a bespoke `ChecklistCardRow` here
            and the shared row one section down, with different metrics, a different fill and a
-           different selected treatment. The trailing control is the only difference that
-           survives, which is exactly the seam the row already has: a CHECKBOX here, because
-           several prerequisites apply at once, and a radio below, because one modifier does.
+           different selected treatment. The control is exactly the seam the row already has: a
+           CHECKBOX here, because several prerequisites apply at once, and a radio below,
+           because one modifier does.
+
+           IN THE REFERENCE'S OWN ANATOMY FOR THIS LIST (round 6), through the row's two declared
+           variants rather than a second component: `controlPlacement="leading"` puts the box
+           first (`proto:2331`) and takes the glyph's tile off with it (`proto:2332`), and
+           `textLayout="stacked"` sets the name over the expression (`proto:2333`). Both default
+           to the bonus row's face, so opting in here moves nothing anywhere else.
 
            `<Field as="fieldset">` is the group, for the reasons the bonus list records: a
            `<legend>` is only valid as a fieldset's first child and is what names the group, and
@@ -508,6 +517,8 @@
             {#each prerequisiteOptions as option (option.id)}
               <ModifierLibraryRow
                 as="label"
+                controlPlacement="leading"
+                textLayout="stacked"
                 icon={option.icon || DEFAULT_PREREQUISITE_ICON}
                 label={option.name || option.label || option.id}
                 expression={prerequisitePreview(option)}

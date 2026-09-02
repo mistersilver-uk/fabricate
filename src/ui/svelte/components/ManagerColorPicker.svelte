@@ -146,9 +146,12 @@
   });
 </script>
 
+<!-- `fabricate-color-picker` is this primitive's NAMESPACE root (issue 1470). ONE class, not two:
+     this component portals nothing. Its panel is `ManagerColorPopover`, a separate shared component
+     that carries its own root class, `fabricate-color-picker-popover`. -->
 <span
   bind:this={pickerRoot}
-  class="manager-color-picker"
+  class="fabricate-color-picker manager-color-picker"
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: closePicker,

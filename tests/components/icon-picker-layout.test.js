@@ -21,7 +21,15 @@ test('manager establishes a positioning root for portaled picker overlays', () =
 test('essence icon picker popover uses an absolute layered overlay', () => {
   // The icon picker and source picker popovers share one grouped rule; match the
   // member that directly precedes the declaration block.
-  const match = css.match(/\.fabricate-manager \.essence-source-picker-popover \{[\s\S]*?\}/);
+  //
+  // Issue 1470 re-rooted that rule off `.fabricate-manager` and onto the namespace class each
+  // primitive writes on the panel it portals, so the popover is `position: absolute` in every
+  // application rather than only inside the manager. The match is a COMPOUND now
+  // (`.fabricate-source-picker-popover.essence-source-picker-popover`) because the panel carries
+  // both classes on one element: same specificity, same place in the file.
+  const match = css.match(
+    /\.fabricate-source-picker-popover\.essence-source-picker-popover \{[\s\S]*?\}/
+  );
 
   assert.ok(match, 'icon picker popover block should exist');
   const block = match[0];
@@ -32,7 +40,9 @@ test('essence icon picker popover uses an absolute layered overlay', () => {
 });
 
 test('essence icon picker options use a fixed icon column with compact padding', () => {
-  const match = css.match(/\.fabricate-manager \.essence-icon-picker-option \{[\s\S]*?\}/);
+  const match = css.match(
+    /\.fabricate-icon-picker-popover \.essence-icon-picker-option \{[\s\S]*?\}/
+  );
 
   assert.ok(match, 'icon picker option layout block should exist');
   const block = match[0];
@@ -46,7 +56,9 @@ test('essence icon picker options use a fixed icon column with compact padding',
 });
 
 test('essence icon picker trigger shares the option icon column and padding', () => {
-  const match = css.match(/\.fabricate-manager \.essence-icon-picker-trigger \{[\s\S]*?\}/);
+  const match = css.match(
+    /\.fabricate-icon-picker \.essence-icon-picker-trigger \{[\s\S]*?\}/
+  );
 
   assert.ok(match, 'icon picker trigger block should exist');
   const block = match[0];
@@ -110,8 +122,8 @@ test('both the option row and the trigger size themselves from that token', () =
   // The trigger regressed alongside the row, at 36px for the same 38px of content, so both are
   // pinned: fixing one and leaving the other is exactly what happened last time.
   for (const selector of [
-    '.fabricate-manager .essence-icon-picker-option {',
-    '.fabricate-manager .essence-icon-picker-trigger {',
+    '.fabricate-icon-picker-popover .essence-icon-picker-option {',
+    '.fabricate-icon-picker .essence-icon-picker-trigger {',
   ]) {
     assert.equal(
       declaration(selector, 'min-height'),
@@ -123,8 +135,8 @@ test('both the option row and the trigger size themselves from that token', () =
 
 test('the chip column is the chip token too, so the grid cannot narrow it independently', () => {
   for (const selector of [
-    '.fabricate-manager .essence-icon-picker-option {',
-    '.fabricate-manager .essence-icon-picker-trigger {',
+    '.fabricate-icon-picker-popover .essence-icon-picker-option {',
+    '.fabricate-icon-picker .essence-icon-picker-trigger {',
   ]) {
     assert.match(
       declaration(selector, 'grid-template-columns'),
@@ -135,7 +147,18 @@ test('the chip column is the chip token too, so the grid cannot narrow it indepe
 });
 
 test('the chip itself is square and sized from the token', () => {
-  const selector = '.fabricate-manager .essence-icon-picker-preview {';
+  // TWO selectors share this block, and both are load-bearing (issue 1470): the chip is painted
+  // once in the trigger, which stays inside the picker's own root, and once per option row, which
+  // travels with the portaled panel and therefore loses that root. A single-rooted rule would
+  // size one of the two and leave the other at its intrinsic size.
+  const selector = '.fabricate-icon-picker-popover .essence-icon-picker-preview {';
+  assert.ok(
+    /\.fabricate-icon-picker \.essence-icon-picker-preview,\s*\.fabricate-icon-picker-popover \.essence-icon-picker-preview \{/.test(
+      css
+    ),
+    'the chip rule must be written at BOTH of the picker’s namespace roots, or the trigger chip ' +
+      'and the option-row chip stop being the same size outside the manager'
+  );
   assert.equal(declaration(selector, 'width'), 'var(--fab-icon-picker-chip)');
   assert.equal(declaration(selector, 'height'), 'var(--fab-icon-picker-chip)');
 });
