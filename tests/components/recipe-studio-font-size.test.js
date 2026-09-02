@@ -90,7 +90,7 @@ const FIXTURE = `
           <div class="manager-recipe-ingredient-option-row">
             <div class="manager-recipe-option-target">
               <div class="manager-recipe-option-component">
-                <span class="manager-recipe-component-picker">
+                <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
                   <button class="manager-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
                     <img class="manager-travel-portrait" alt="">
                     <span class="manager-recipe-stage-trigger-name" data-m="stage-picker-name">Mountain Herb</span>

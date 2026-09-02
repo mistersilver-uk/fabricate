@@ -80,14 +80,32 @@ Choosing an existing app root, or a second ancestor picked for reach, is the sam
 Re-rooting this way is specificity-neutral by construction: one class replaces one class at the same position in the sheet, so nothing in the owning screen's cascade moves.
 A rule whose ancestor chain names a CALLER's own container is exempt and stays where it is, because it can only ever match inside that caller's app and is reachable there whatever the primitive does.
 
-`SearchablePopover` satisfies this requirement, emitting `fabricate-picker` and `fabricate-picker-popover`.
-`tests/components/searchable-popover-area-scope.test.js` derives the class set from the component's own markup and fails when a rule the primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
+How many namespace roots a primitive needs is a property of its PORTAL SHAPE rather than a count to copy.
+A component that portals a panel out of its own root needs one class on each, because those two nodes end up in different subtrees; a component that portals nothing, or whose root element IS the panel it portals, needs one.
+Where two components render one class family between them, the family's roots are the union of theirs, and a class both of them paint is written at both roots.
+
+Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, and `ManagerColorPicker` and `ManagerColorPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
+`tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
+
+The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
+Its markup cannot appear outside that area, so the ancestor is free, and unscoping it would spend specificity and widen the rule's blast radius for no reachable benefit.
+`RecipeDurationEditor`, `EnvironmentsBrowserView` and the manager modal keep `.fabricate-manager`-rooted overlay rules on exactly that basis.
+
+The rule governs SELECTOR ROOTING and does not reach a bare-element baseline an area declares for itself.
+A shared primitive nonetheless MUST NOT depend on one, for the same reason it must not read an area-scoped property: `.fabricate-manager input:not([type])` themes every free-text control in the manager, and a primitive relying on it renders Foundry's default chrome everywhere else.
+Such a primitive declares that chrome on its own rule instead.
 
 #### Scenario: A primitive is adopted by a second application
 
 - **WHEN** a surface outside a primitive's original app imports that primitive
 - **THEN** the primitive paints there without the caller restating its rules
 - **AND** every rule it owns is rooted at a namespace class the primitive emits
+
+#### Scenario: A component that cannot leave its area keeps that area's root
+
+- **WHEN** a component lives under an application's own directory and its markup can only render inside that application
+- **THEN** its class family stays rooted at that application root
+- **AND** the family is not re-rooted at a namespace class, because nothing outside that root can reach the markup
 
 #### Scenario: A family is still rooted at one app
 

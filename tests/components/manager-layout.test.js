@@ -1642,9 +1642,15 @@ test('manager gathering settings condition panels use a two-column responsive gr
   const biomeCombinedTriggerIconBlock = blockFor(
     '.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only.manager-biome-combined-trigger i'
   );
-  const colorPickerPopoverBlock = blockFor('.fabricate-manager .manager-color-picker-popover');
-  const colorPresetGridBlock = blockFor('.fabricate-manager .manager-color-preset-grid');
-  const colorCustomInputBlock = blockFor('.fabricate-manager .manager-color-custom input');
+  // Issue 1470 re-rooted the colour family off `.fabricate-manager` and onto the namespace
+  // classes `ManagerColorPicker` and `ManagerColorPopover` write, so the two shared components
+  // paint in whatever application they are mounted in. Same declarations, same specificity, same
+  // place in the file — only the root moved, and these lookups follow it.
+  const colorPickerPopoverBlock = blockFor(
+    '.fabricate-color-picker-popover.manager-color-picker-popover'
+  );
+  const colorPresetGridBlock = blockFor('.fabricate-color-picker-popover .manager-color-preset-grid');
+  const colorCustomInputBlock = blockFor('.fabricate-color-picker-popover .manager-color-custom input');
   const labelInputBlock = blockFor('.fabricate-manager .manager-condition-label-input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
 
@@ -3840,8 +3846,11 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   );
   const usageGridBlock = blockFor('.fabricate-manager .manager-essence-usage-grid');
   const usageItemBlock = blockFor('.fabricate-manager .manager-essence-usage-item');
-  const iconTriggerBlock = blockFor('.fabricate-manager .essence-icon-picker-trigger');
-  const sourceTriggerBlock = blockFor('.fabricate-manager .essence-source-trigger');
+  // Both blocks moved off `.fabricate-manager` onto the pickers' own namespace roots (issue
+  // 1470): `IconPicker` and `EssenceSourceSelector` are shared components, and a rule rooted at
+  // one application cannot paint them anywhere else.
+  const iconTriggerBlock = blockFor('.fabricate-icon-picker .essence-icon-picker-trigger');
+  const sourceTriggerBlock = blockFor('.fabricate-source-picker .essence-source-trigger');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
   // TWO tracks now, not one: the tab strip and the scrolling tab body. A single `1fr`
@@ -6219,6 +6228,12 @@ test('the Tags & Categories route names one grid track per section and grows the
 // COPY of shipped markup, which is exactly the kind that keeps passing after the product stops
 // emitting it — the `<div role="tablist">` host and both container classes are unchanged, so the
 // copy is faithful again rather than merely still green.
+//
+// Issue 1470 added the `<div class="fabricate-icon-picker essence-icon-picker">` the picker
+// actually renders around its trigger. That element was missing here from the start, which cost
+// nothing while every trigger rule hung off `.fabricate-manager` and costs the whole block once
+// they hang off the picker's own namespace root: without it this row measures an unstyled button
+// and still reports on the vocabulary row's height by name.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
   const context = await sharedBrowser.newContext({ viewport: { width: 760, height: 600 } });
   const page = await context.newPage();
@@ -6229,7 +6244,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <span class="manager-chip manager-vocabulary-chip-locked"><i class="fas fa-lock"></i>Locked</span>
     </div>`;
     const customRow = `<div class="manager-vocabulary-row">
-      <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></span>
+      <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><div class="fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></div></span>
       <div class="manager-vocabulary-main"><strong>Potions</strong></div>
       <span class="manager-chip is-warning"><i class="fas fa-link"></i>8 references</span>
       <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
@@ -8729,10 +8744,14 @@ test('the modifier row gives every field room for its longest content at every m
       `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-world-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
     const boundField = (bound, caption) =>
       `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
+    // The icon field's `<div class="fabricate-icon-picker essence-icon-picker">` is the picker's
+    // own root element, which this copy omitted until issue 1470. The trigger's geometry rules are
+    // rooted at it now, so without it the field measures a bare button rather than the 38px combo
+    // the row is being asserted to have room for.
     const editor = `
       <div class="manager-modifier-body manager-character-modifier-editor">
         <div class="manager-modifier-name-row">
-          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div>
+          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><div class="fabricate-icon-picker essence-icon-picker"><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div></div>
           <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
           <div class="manager-modifier-bounds-row" data-world-modifier-bounds="mod-probe">
             ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}

@@ -270,9 +270,14 @@
   </button>
 {/snippet}
 
+<!-- `fabricate-icon-picker` is this primitive's own NAMESPACE root, and `fabricate-icon-picker-popover`
+     below is the panel's half of it (issue 1470). Every rule the picker owns hangs off one of the two
+     rather than off `.fabricate-manager`, so the component paints in whatever application it is mounted
+     in — the shared directory's premise. A portaled node keeps its classes and loses its ancestors,
+     which is why the panel needs a root class of its own rather than inheriting this one. -->
 <div
   bind:this={pickerRoot}
-  class="essence-icon-picker"
+  class="fabricate-icon-picker essence-icon-picker"
   use:dismissOnOutsideClick={{
     enabled: pickerOpen,
     onDismiss: closePicker,
@@ -308,7 +313,7 @@
   {#if pickerOpen}
     <div
       bind:this={popoverRoot}
-      class="essence-icon-picker-popover"
+      class="fabricate-icon-picker-popover essence-icon-picker-popover"
       style={popoverStyle}
       role="dialog"
       aria-label={localize('FABRICATE.Admin.Features.Essences.IconDialogLabel')}
