@@ -375,6 +375,10 @@ export default [
       // `page.evaluate` bodies driving `game`, `Actor` and the rendered DOM.
       'scripts/lib/foundryPerfScenarios.js',
       'scripts/foundry-perf-run.mjs',
+      // The Primitive Lab smoke (issue 1487): its readiness wait and its mounted-set read are
+      // `page.evaluate` bodies over `document`. Only the CLI — `scripts/lib/primitiveLabSmoke.js`
+      // is pure Node and must keep `no-undef` on a stray `document`.
+      'scripts/primitive-lab-smoke.mjs',
     ],
     languageOptions: {
       globals: { ...globals.browser, ...foundryGlobals },

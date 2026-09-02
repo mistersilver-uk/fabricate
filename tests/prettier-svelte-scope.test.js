@@ -197,6 +197,12 @@ const GATE_TARGETS = [
   'scripts/docs-screenshots.mjs',
   'scripts/lib/webpFrames.js',
   'scripts/lib/docsScreenshotRun.js',
+  // The Primitive Lab smoke (issue 1487). A maintainer-run gate for the same reason the docs
+  // generator above is one — it needs the harvested Foundry chrome, which CI has not got — so
+  // nothing else would ever format either half. The derivation and the CLI are pinned together
+  // because `unicorn/no-exports-in-scripts` is what forced them apart in the first place.
+  'scripts/lib/primitiveLabSmoke.js',
+  'scripts/primitive-lab-smoke.mjs',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
