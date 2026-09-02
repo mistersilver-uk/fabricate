@@ -304,6 +304,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/InheritRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/MembershipActions.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte');
+  // The world Tool catalogue's BULK EDIT panel (issue 1373, maintainer feedback round 2). The
+  // page imports it statically, so it is in this root's graph whether or not anything ticks a
+  // row — and an omission HANGS this file rather than failing one test in it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte');
   // The two cards the system Essence Rules editor opens and closes with (issue 1372). Both are
   // in `EssenceEditView`'s STATIC graph, so an omission does not fail this file — it HANGS it,
   // reported as `# cancelled` with no message.

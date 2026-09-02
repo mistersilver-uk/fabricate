@@ -9775,14 +9775,63 @@
   min-width: 0;
 }
 
-/* The row CONTEXT that separates the selection register from the filter row above it: a hairline
-   rule and the row's own gap. Its content is a control, a count and two text actions, so the
-   filter row's own spacing would be too loose. */
+/* ── THE SELECTION BAND (issue 1373, maintainer feedback round 4) ─────────────────────────────
+   `proto:592`: a TINTED, ENCLOSED band standing under the filter row while a selection is
+   active — `background: var(--accent-soft)`, `border: 1px solid var(--accent-border)`,
+   `border-radius: 9px`, `padding: 8px 11px`, `gap: 9px` — rather than the hairline-topped
+   continuation of the filter row that shipped here. The two constructions say different things:
+   a rule above a row reads as "the same bar, continued", and the reference draws a distinct
+   object the GM has brought onto the screen and can dismiss.
+
+   The frame gates it on a non-empty selection, so this is the only appearance it has; there is
+   no resting state for it to also be correct in.
+
+   VALUES, AND THE TWO THAT MOVED. `--accent-soft` and `--accent-border` are byte-identical to
+   `--fab-accent-soft` / `--fab-accent-border`, and 9px is a radius rather than spacing, so all
+   three cross unchanged. The two SPACING values round to the 4px scale the design system makes
+   normative: 11px of inline padding takes `--fab-space-3` (12px) and the 9px gap takes
+   `--fab-space-2` (8px), which is the gap this row already carried.
+
+   The band's own separation from the filter row is `.manager-toolbar`'s `--fab-space-2` row gap,
+   which is what the design states as `margin-bottom: 10px` on the row above it.
+
+   IT IS AUTHORED HERE AND NOT IN THE FRAME'S SCOPED BLOCK, and that is mechanical:
+   `BulkSelectionToolbar` renders `<div class="{rowClass} is-selection">` in its OWN template, so
+   a scoped rule in `EntityListInspectorFrame` cannot carry a hash this element wears. The block
+   header above states the same reason at length. */
 .fabricate-manager .manager-scoped-list-filter-row.is-selection {
   gap: var(--fab-space-2);
-  padding-top: var(--fab-space-2);
-  border-top: 1px solid var(--fab-border);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 9px;
+  background: var(--fab-accent-soft);
 }
+
+/* THE TWO TEXT ACTIONS' TRAILING-EDGE GROUPING IS NOT HERE, AND IT CANNOT BE.
+
+   `proto:595`-`596` puts the auto margin on the SELECT-ALL action with `Clear` directly after it,
+   where `BulkSelectionToolbar` puts it on `Clear` alone. Moving it from this sheet was written,
+   measured in the View Lab, and REVERTED: it does not work, and the reason is a fact about this
+   file that every future lane needs.
+
+   THIS WHOLE SHEET IS LAYERED AND SVELTE'S SCOPED CSS IS NOT. `module.json` registers
+   `styles/fabricate.css` with no explicit `layer`, and Foundry imports an unlayered module sheet
+   at `layer(modules)` — which `tests/view-lab/cascade.css` reproduces verbatim, and which the
+   theme note in `scripts/lib/viewLabCases.js` already records for the opposite case (it is why
+   this sheet's dark palettes outrank core's `layer(applications)` parchment). A Svelte component's
+   scoped block is injected as an ordinary unlayered `<style>` at runtime, and an UNLAYERED
+   declaration beats a layered one whatever the specificity. So `.fabricate-manager
+   .manager-scoped-list-filter-row.is-selection .fab-bulk-selection-link` at (0,4,0) loses to
+   `.fab-bulk-selection-link.svelte-<hash>` at (0,2,0), and no amount of added specificity here
+   can change that — only `!important` can, which is not a cascade argument.
+
+   It is a SILENT loss, which is what makes it worth this many words: the rule is emitted, it
+   matches, and its declaration is simply never used. The band's fill, edge, radius, padding and
+   gap above are unaffected because the primitive's scoped block styles its CHILDREN and
+   deliberately not the row, so nothing there competes.
+
+   The grouping therefore lives where it can win: `BulkSelectionToolbar`'s own scoped block, behind
+   a `trailingActions` prop defaulted off so the three studios are byte-identical. */
 
 /* The control type scale. See reason 2 in the block header. */
 .fabricate-manager .manager-scoped-list-toolbar .manager-search input,

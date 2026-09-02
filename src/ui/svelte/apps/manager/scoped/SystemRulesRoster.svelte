@@ -190,74 +190,95 @@
     </span>
   </div>
 
-  <ManagerSearchField
-    class="manager-scoped-roster-search"
-    value={systemQuery}
-    onInput={(next) => changeSystemQuery(next)}
-    placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems…')}
-    ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystemsLabel', 'Search systems')}
-    inputAttrs={{ 'data-scoped-list-system-search': '' }}
-  />
+  <!--
+    THE CARD, WHICH THIS PANEL HAD NONE OF (issue 1373, maintainer feedback round 2).
 
-  <ul class="manager-scoped-roster-systems" role="list">
-    {#each pageRows as row (row.systemId)}
-      <li
-        class="manager-scoped-roster-system"
-        data-scoped-list-system={row.systemId}
-        data-scoped-system={row.systemId}
-        data-scoped-system-state={membershipState(row)}
-      >
-        <span class="manager-scoped-roster-system-name">{systemLabel(row)}</span>
-        {#if (row.member === true || systemRowAction === 'navigate') && onOpenSystemRules}
-          <button
-            type="button"
-            class="manager-scoped-roster-system-link"
-            data-scoped-list-system-rules={row.systemId}
-            title={format(
-              'FABRICATE.Admin.Manager.Scoped.List.OpenSystemRulesNamed',
-              'Open {system} rules for {entity}',
-              { system: systemLabel(row), entity: entityName || entityId }
-            )}
-            onclick={() => onOpenSystemRules(entityId, row.systemId)}
-          >
-            <span>{text('FABRICATE.Admin.Manager.Scoped.List.OpenSystemRules', 'Rules')}</span>
-            <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-          </button>
-        {:else}
-          <MembershipActions
-            {entityType}
-            {entityId}
-            systemId={row.systemId}
-            {entityName}
-            systemName={systemLabel(row)}
-            member={row.member === true}
-            enabled={row.enabled === true}
-            copyable={false}
-            hint={false}
-            compact={true}
-            {armedToken}
-            onArm={(token) => onArm(token)}
-            onDisarm={() => onDisarm()}
-            onAdd={() => actions?.addToSystem?.(entityId, row.systemId)}
-            onRemove={() => actions?.removeFromSystem?.(entityId, row.systemId)}
-            onToggleEnabled={(next) => actions?.setEnabled?.(entityId, row.systemId, next)}
-          />
-        {/if}
-      </li>
-    {/each}
-  </ul>
+    The design's `SYSTEM RULES` block is a HEAD over a bordered inset holding all three parts —
+    the search field, the roster and the pager — at `proto:2022`, byte-identically at
+    `proto:3290` for the essence catalogue that shares this component. What shipped was the head
+    and then three bare siblings loose in the inspector column, so a panel the design draws as
+    one object read as three unrelated ones, its pager floated against the pinned foot action
+    with nothing between them, and a short roster left no boundary at all.
 
-  <!-- NO per-page selector: see `Pagination`'s own `showPageSize` note. The window is five rows
-       because the reference's pager states five, and a size a GM cannot change is not a control
-       they need offered. -->
-  <Pagination
-    persistent={true}
-    showPageSize={false}
-    totalCount={visibleRows.length}
-    {pageIndex}
-    pageSize={SYSTEM_PAGE_SIZE}
-    onPageChange={(next) => (systemPageIndex = next)}
-  />
+    Its BOX is the geometry the finding names; its SURFACE is not. The design recesses the card
+    one rung below the panel and lifts each part one rung above it, and our own ramp for this
+    route puts the pane at the bottom rung already — so the recess has nowhere to go and the
+    card is drawn the way every other card in this content area is: a hairline on the pane's own
+    surface, no fill. That is the shipped ruling for this region and this does not reopen it.
+  -->
+  <div class="manager-scoped-roster-card">
+    <!-- NO ELLIPSIS ON THE PLACEHOLDER. The design's field reads `Search systems` (`proto:2025`),
+         on all six screens that draw this card; the trailing `…` was this panel's own addition
+         and was the one string in the card that differed from the reference. -->
+    <ManagerSearchField
+      class="manager-scoped-roster-search"
+      value={systemQuery}
+      onInput={(next) => changeSystemQuery(next)}
+      placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems')}
+      ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystemsLabel', 'Search systems')}
+      inputAttrs={{ 'data-scoped-list-system-search': '' }}
+    />
+
+    <ul class="manager-scoped-roster-systems" role="list">
+      {#each pageRows as row (row.systemId)}
+        <li
+          class="manager-scoped-roster-system"
+          data-scoped-list-system={row.systemId}
+          data-scoped-system={row.systemId}
+          data-scoped-system-state={membershipState(row)}
+        >
+          <span class="manager-scoped-roster-system-name">{systemLabel(row)}</span>
+          {#if (row.member === true || systemRowAction === 'navigate') && onOpenSystemRules}
+            <button
+              type="button"
+              class="manager-scoped-roster-system-link"
+              data-scoped-list-system-rules={row.systemId}
+              title={format(
+                'FABRICATE.Admin.Manager.Scoped.List.OpenSystemRulesNamed',
+                'Open {system} rules for {entity}',
+                { system: systemLabel(row), entity: entityName || entityId }
+              )}
+              onclick={() => onOpenSystemRules(entityId, row.systemId)}
+            >
+              <span>{text('FABRICATE.Admin.Manager.Scoped.List.OpenSystemRules', 'Rules')}</span>
+              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+            </button>
+          {:else}
+            <MembershipActions
+              {entityType}
+              {entityId}
+              systemId={row.systemId}
+              {entityName}
+              systemName={systemLabel(row)}
+              member={row.member === true}
+              enabled={row.enabled === true}
+              copyable={false}
+              hint={false}
+              compact={true}
+              {armedToken}
+              onArm={(token) => onArm(token)}
+              onDisarm={() => onDisarm()}
+              onAdd={() => actions?.addToSystem?.(entityId, row.systemId)}
+              onRemove={() => actions?.removeFromSystem?.(entityId, row.systemId)}
+              onToggleEnabled={(next) => actions?.setEnabled?.(entityId, row.systemId, next)}
+            />
+          {/if}
+        </li>
+      {/each}
+    </ul>
+
+    <!-- NO per-page selector: see `Pagination`'s own `showPageSize` note. The window is five rows
+         because the reference's pager states five, and a size a GM cannot change is not a control
+         they need offered. -->
+    <Pagination
+      persistent={true}
+      showPageSize={false}
+      totalCount={visibleRows.length}
+      {pageIndex}
+      pageSize={SYSTEM_PAGE_SIZE}
+      onPageChange={(next) => (systemPageIndex = next)}
+    />
+  </div>
 </section>
 
 <style>
@@ -285,13 +306,39 @@
   }
 
   /* The `13 / 24` at the trailing edge of the head: members over roster. `tabular-nums` so the
-     pair does not shuffle as a GM adds systems. */
+     pair does not shuffle as a GM adds systems.
+
+     THE DESIGN INKS IT ONE STOP BRIGHTER THAN THE KICKER BESIDE IT (`proto:2021`): the head's
+     label is subtle and its count is the SECONDARY text colour, because the label names the
+     panel and the count is the fact. This drew both in the same subtle tone, which made the one
+     number in the head the quietest thing in it. Size follows the same line: 10px, not the
+     0.66rem this approximated it with. */
   .manager-scoped-roster-count {
     flex: 0 0 auto;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
-    font-size: 0.66rem;
+    font-size: 10px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* ── THE CARD (`proto:2022`) ────────────────────────────────────────────────────────────────
+     One bordered inset holding the search field, the roster and the pager, which is the object
+     the design draws and which this panel had no equivalent of at all: the three parts were bare
+     siblings in the inspector column, so nothing bounded them and the pager sat straight against
+     the panel's pinned foot action.
+
+     Its own rhythm is stated rather than inherited, because it is TIGHTER than the inspector's:
+     the design pads the card and separates its search field from the roster by about a step of
+     the scale, and leaves a wider step above the pager so the walk control reads as the card's
+     foot rather than as a sixth row. */
+  .manager-scoped-roster-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
   }
 
   /* The search field is the shipped `.manager-search`; only its own row sizing is stated here,
@@ -308,16 +355,33 @@
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
+    margin-bottom: var(--fab-space-2);
   }
 
+  /* AND ITS FIELD IS THE CARD'S SIZE, NOT THE TOOLBAR'S. The shipped `.manager-search input` is
+     a 34px page-level control; the design's system search inside this card is 28px, which is a
+     published rung of the control-height ladder and is what keeps five rows and a pager inside
+     the panel's budget. Chained `:global()` for the reason the rule above gives — the element
+     belongs to `ManagerSearchField` — and kept under the local class so no other search field
+     moves. */
+  :global(.manager-search.manager-scoped-roster-search input) {
+    height: 28px;
+    min-height: 28px;
+  }
+
+  /* THE ROSTER HOLDS ITS HEIGHT AT FIVE ROWS (`proto:2027`), which is the half of this panel a
+     screenshot cannot argue about: without a floor the card collapses onto however many systems
+     the search left, and the pager — the one control that says there ARE more — walks up and
+     down the column as a GM types. The design states the same floor for the same reason. */
   .manager-scoped-roster-systems {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-chip);
+    gap: var(--fab-space-1);
     margin: 0;
     padding: 0;
     list-style: none;
     min-width: 0;
+    min-height: 171px;
   }
 
   /* ONE LINE PER SYSTEM: the name leads and its membership cluster trails, where a stacked row
@@ -327,9 +391,12 @@
     gap: var(--fab-space-2);
     align-items: center;
     justify-content: space-between;
-    padding: 2px var(--fab-space-2);
+    /* THE DESIGN'S ROW BOX (`proto:2029`): a step of the scale down each side and a step below
+       the card's own inline padding across. It was 2px vertical, which made a row shorter than
+       the 24px control it used to carry and left the name sitting hard against the border. */
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     /* NO FILL. The reference draws every card in the content area on the pane's own surface and
        separates them with a 1px border alone; a fill here put a fifth grey on a screen that has
        one. */
@@ -337,35 +404,50 @@
     min-width: 0;
   }
 
-  /* THE `Rules ↗` LINK. A quiet bordered pill rather than a `ManagerButton`: it is a navigation
-     affordance inside a list row, so it must not compete with the panel's one primary action at
-     the foot, and the reference draws it as a small outlined link. It carries the manager's
-     `<button>` reset assumptions locally because Foundry's host rule centres a button's content
-     and pins a fixed height. */
+  /* THE `Rules ↗` LINK IS A BARE ACCENT LINK, NOT A BORDERED PILL (`proto:2031`).
+
+     The note here used to say the reference drew it as a small outlined link. It does not: the
+     design's row is a name and an accent-inked `Rules ↗` with no box, no fill and no height of
+     its own, and the pill this drew instead put a second bordered control inside an already
+     bordered row inside a card — three edges deep in a 300px column — and gave a navigation
+     affordance the same weight as the catalogue row's own `Edit tool` button.
+
+     The BOX GOES and the ink changes; the reset stays, because Foundry's host rule still centres
+     a `<button>`'s content and pins it a fixed height whatever it is drawn as. */
   .manager-scoped-roster-system-link {
     display: inline-flex;
     flex: 0 0 auto;
-    gap: var(--fab-space-chip);
+    gap: var(--fab-space-1);
     align-items: center;
     justify-content: center;
     width: auto;
-    height: 24px;
-    min-height: 24px;
-    padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 7px;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
     background: transparent;
-    color: var(--fab-text-muted);
-    font-size: 0.62rem;
+    color: var(--fab-accent);
+    font-size: 9.5px;
     font-weight: 600;
     line-height: 1;
     white-space: nowrap;
     cursor: pointer;
   }
 
+  /* The trailing mark is the design's 8px glyph rather than the link's own size, so the arrow
+     reads as a mark on the word instead of a second word. */
+  .manager-scoped-roster-system-link i {
+    font-size: 8px;
+  }
+
   .manager-scoped-roster-system-link:hover {
-    border-color: var(--fab-accent);
-    color: var(--fab-accent);
+    color: var(--fab-accent-hover);
+    text-decoration: underline;
+  }
+
+  .manager-scoped-roster-system-link:focus-visible {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 
   /* THE ROW IS ~36px, AND THE 34px CONTROL INSIDE IT IS WHY IT TAKES A RULE.
@@ -379,10 +461,15 @@
     padding: 0 var(--fab-space-2);
   }
 
+  /* THE SYSTEM NAME IS A SERIF (`proto:2030`), which is the type half of this finding: every
+     other place this app prints an entity's NAME — the catalogue row, the inspector heading, the
+     empty state's title — is set in the serif face, and this one row printed a crafting system's
+     name in the sans and so read as a label rather than as a name. */
   .manager-scoped-roster-system-name {
     flex: 1 1 0;
     color: var(--fab-text);
-    font-size: 0.7rem;
+    font-family: var(--fab-font-serif);
+    font-size: 11px;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -412,12 +499,45 @@
      scroll edge — so the frame published `Showing 1-5 of 6` with no way to reach row six, which
      is a pager that states there is more and then hides the only control that gets to it.
 
-     `nowrap` plus the tighter metrics put the summary and the nav on one line at this width. */
-  .manager-scoped-roster > :global(.manager-pagination) {
+     `nowrap` plus the tighter metrics put the summary and the nav on one line at this width.
+
+     ── THE ANCESTOR MOVED WITH THE MARKUP, AND THAT IS THE WHOLE REASON IT IS RESTATED ─────────
+     The pager is a child of the CARD now, not of the section, so the direct-child combinator
+     that used to reach it reaches nothing. Svelte emits a pruned-selector warning for a scoped
+     compound it can prove is unused, but not for one whose only failing part is `:global()`, so
+     this would have compiled clean and simply put the shipped full-width bar back inside a 300px
+     column — the exact defect the three rules here exist to prevent.
+
+     The trailing step above it is the design's (`proto:2037`), and it is wider than the row gap
+     so the walk control reads as the card's foot rather than as a sixth system.
+
+     ── THE PAGER IS A BORDERED ROW, NOT A BARE STRIP UNDER A HAIRLINE (issue 1373, maintainer
+     feedback round 3) ─────────────────────────────────────────────────────────────────────────
+     `proto:2037` draws it as `padding:6px 8px; border:1px solid var(--border); border-radius:8px`
+     — the same construction, the same border colour and the same horizontal inset as a roster
+     row three lines above it (`proto:2029`), separated from the last row by `margin-top:11px`.
+     The design has NO separator rule anywhere inside this card.
+
+     What shipped was the shared bar's `border-top: 1px solid` running the full width of the card
+     with the pager loose beneath it — the one part of the card not brought across, and the only
+     hairline on a screen whose every other boundary is a card edge. The `border` SHORTHAND is
+     what removes it: a `border-top: 0` beside a `border` declaration is two rules stating one
+     edge, and the next reader has to work out which wins.
+
+     `margin-top` rather than the old `padding-top`, because the step is now OUTSIDE a box that
+     has an edge of its own; padding would have put the 12px inside the border. */
+  .manager-scoped-roster-card > :global(.manager-pagination) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
+    margin-top: var(--fab-space-3);
+    padding: var(--fab-space-chip) var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    /* NO FILL, for the reason the row rule above gives: the reference recesses this card one
+       rung and lifts its parts one rung above it, and this route's pane is on the bottom rung
+       already — so every part of the card is drawn by its border alone. */
+    background: transparent;
     font-size: 0.62rem;
   }
 

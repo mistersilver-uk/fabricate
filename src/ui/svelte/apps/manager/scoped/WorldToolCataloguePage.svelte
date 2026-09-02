@@ -75,6 +75,7 @@
   } from '../tools/toolStudio.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
+  import ToolCatalogueBulkPanel from './ToolCatalogueBulkPanel.svelte';
   import {
     breakModeOverrideCount,
     breakModeOverridesKnown,
@@ -111,6 +112,41 @@
   // bindable prop, and Svelte 5 THROWS `props_invalid_value` when a bindable prop has a setter
   // and the incoming value is `undefined`. `$state()` with no initialiser kills the mount.
   let selectedId = $state('');
+
+  // AN IN-FLIGHT BULK WRITE. It inerts the panel's track and its Apply for the duration, which is
+  // what stops a second selection's instruction racing the first across the same setting: every
+  // `setWorldEnabled` is a read-modify-write of the WHOLE world tool payload, so two overlapping
+  // runs would each persist a snapshot taken before the other's writes.
+  let bulkApplying = $state(false);
+
+  /**
+   * Write the staged world master switch across every ticked Tool, then drop the selection.
+   *
+   * SEQUENTIAL, and that is not caution. `worldScopeActions` mutates by loading the persisted
+   * payload, editing it and writing it back, so a `Promise.all` over twelve ids would have twelve
+   * writers racing one setting and the last one home would carry only its own edit.
+   *
+   * The selection is cleared on the way out because the instruction has LANDED: leaving twelve
+   * rows ticked under a panel whose staged axis has reset reads as an edit still pending.
+   *
+   * @param {string[]} entityIds the ticked rows, in list order.
+   * @param {string} status `'on'` or `'off'`.
+   * @param {() => void} clearSelection the frame's own selection reset.
+   * @returns {Promise<void>}
+   */
+  async function applyBulkWorldStatus(entityIds, status, clearSelection) {
+    if (bulkApplying) return;
+    const enabled = status === 'on';
+    bulkApplying = true;
+    try {
+      for (const entityId of entityIds) {
+        await actions?.setWorldEnabled?.(entityId, enabled);
+      }
+    } finally {
+      bulkApplying = false;
+    }
+    clearSelection();
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -414,137 +450,159 @@
 </script>
 
 <main class="manager-main" data-scoped-page="world-tools" aria-label={catalogueTitle}>
-  <!--
-    THE SCOPE BAND: the world break mode, FULL WIDTH, above the list.
-
-    == THE ZONE IS NO LONGER BESIDE IT, AND THAT WAS THE WHOLE OF THE DEFECT ================
-    The design spans this card edge to edge across the content column and opens the LIST with
-    the dashed zone, directly under the toolbar (`tmp/proto/tool-catalogue.png`). The zone was
-    parked beside the card instead, taking a third of the band's width and squeezing the card
-    that states a world-wide rule into two thirds of the room the design gives it.
-
-    The reason recorded here was that `EntityListInspectorFrame` took no before-rows snippet and
-    both shared shells were closed to the lane, so the only alternative was a THIRD stacked band
-    costing the column 86px - measured, not guessed: the View Lab reported
-    `[data-world-tool-defaults] is clipped or extends outside [data-scoped-list-inspector]` on
-    the stacked version, because the shell's inspector floors its roster at 120px and pins its
-    lane panel at `flex: 0 0 auto`.
-
-    THE FRAME TAKES ONE NOW. `listLead` renders the zone INSIDE the list's own scroller, above
-    the first row, which is the design's placement and which costs the inspector column nothing
-    at all - the zone scrolls with the rows rather than standing over them.
-  -->
-  <div class="manager-world-tool-scope-band">
-    <InspectorCard class="manager-world-tool-break-card" data-world-tool-break-mode="">
-      <div class="manager-world-tool-break-head">
-        <i class="fas fa-sliders" aria-hidden="true"></i>
-        <span class="manager-world-tool-break-title"
-          >{text(
-            'FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle',
-            'World breakage default'
-          )}</span
-        >
-        {#if overridesKnown}
-          <span class="manager-world-tool-break-count" data-world-tool-break-overrides>
-            {format(
-              overrideCount === 1
-                ? 'FABRICATE.Admin.Manager.Tools.WorldAuthorityOverrideOne'
-                : 'FABRICATE.Admin.Manager.Tools.WorldAuthorityOverrideCount',
-              overrideCount === 1 ? '{count} system overrides it' : '{count} systems override it',
-              { count: overrideCount }
-            )}
-          </span>
-        {/if}
-      </div>
-      <div
-        class="manager-world-tool-break-segments"
-        role="radiogroup"
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle',
-          'World breakage default'
-        )}
-      >
-        {#each breakModeOptions as option (option.value)}
-          <label class:is-selected={option.selected} data-world-tool-break-segment={option.value}>
-            <input
-              type="radio"
-              name="world-tool-breakage-authority"
-              value={option.value}
-              checked={option.selected}
-              onchange={() => actions?.setWorldToolBreakage?.(option.value)}
-            />
-            <span class="manager-world-tool-break-option">
-              <i class={option.icon} aria-hidden="true"></i>
-              <span>{option.label}</span>
-            </span>
-          </label>
-        {/each}
-      </div>
-      <!-- WHAT THE SELECTED MODE MEANS, not a sentence naming the segment already highlighted
-         two lines above it. The old copy read `Every crafting system uses Tool-specific unless
-         it overrides the break mode in its own Tool Rules`, which restates the control and the
-         override count on either side of it and says nothing about the rule itself. -->
-      <p class="manager-muted manager-world-tool-break-note">
-        {(worldAuthority || 'toolSpecific') === 'checkDriven'
-          ? text(
-              'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteCheckDriven',
-              'The active check decides breakage \u00b7 world default for every system'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteToolSpecific',
-              'Each Tool tracks its own breakage \u00b7 world default for every system'
-            )}
-      </p>
-    </InspectorCard>
-  </div>
-
-  <div class="manager-world-tool-catalogue-body">
-    <EntityCatalogueShell
-      {scope}
-      {actions}
-      {systems}
-      hookValue={PAGE_ID}
-      title={catalogueTitle}
-      subtitle={text(
-        'FABRICATE.Admin.Manager.Scoped.ToolCatalogueSubtitle',
-        'One Tool per game-world Item, shared by every system.'
-      )}
-      icon={PAGE_ICON}
-      emptyTitle={text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}
-      emptyHint={text(
-        'FABRICATE.Admin.Manager.Scoped.ToolCatalogueEmptyHint',
-        'Tools lifted to world scope appear here, each shared by every crafting system that adopts it.'
-      )}
-      {sorts}
-      searchOf={worldToolSearchText}
-      {sectionIcons}
-      {sectionTitles}
-      {sectionNotes}
-      inspectorKicker={text('FABRICATE.Admin.Manager.Scoped.Tool.InspectorKicker', 'Tool page')}
-      countUnit={text('FABRICATE.Admin.Manager.Scoped.Tool.CountUnit', 'tools')}
-      selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.SelectAllShort', 'All')}
-      searchPlaceholder={text(
-        'FABRICATE.Admin.Manager.Scoped.Tool.SearchPlaceholder',
-        'Search tools…'
-      )}
-      inspectorFoot={toolInspectorFoot}
-      inspectorCaption={toolInspectorCaption}
-      describeEntry={describeFromLinkedItem}
-      nameEntry={nameFromLinkedItem}
-      listLead={toolCreateZone}
-      openEntryLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.RowOpenEntry', 'Edit tool')}
-      rowSecondLine="meta"
-      systemRowAction="navigate"
-      membershipFilter={false}
-      bind:selectedId
-      onSelect={(entityId) => (selectedId = entityId)}
-      {onOpenEntry}
-      {onOpenSystemRules}
-      {rowMeta}
-      {rowTrailing}
-    />
-  </div>
+  <EntityCatalogueShell
+    {scope}
+    {actions}
+    {systems}
+    hookValue={PAGE_ID}
+    title={catalogueTitle}
+    subtitle={text(
+      'FABRICATE.Admin.Manager.Scoped.ToolCatalogueSubtitle',
+      'One Tool per game-world Item, shared by every system.'
+    )}
+    icon={PAGE_ICON}
+    emptyTitle={text('FABRICATE.Admin.Manager.Tools.EmptyTitle', 'No Tools yet')}
+    emptyHint={text(
+      'FABRICATE.Admin.Manager.Scoped.ToolCatalogueEmptyHint',
+      'Tools lifted to world scope appear here, each shared by every crafting system that adopts it.'
+    )}
+    {sorts}
+    searchOf={worldToolSearchText}
+    {sectionIcons}
+    {sectionTitles}
+    {sectionNotes}
+    inspectorKicker={text('FABRICATE.Admin.Manager.Scoped.Tool.InspectorKicker', 'Tool page')}
+    countUnit={text('FABRICATE.Admin.Manager.Scoped.Tool.CountUnit', 'tools')}
+    selectAllLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.SelectAllShort', 'All')}
+    searchPlaceholder={text(
+      'FABRICATE.Admin.Manager.Scoped.Tool.SearchPlaceholder',
+      'Search tools…'
+    )}
+    inspectorFoot={toolInspectorFoot}
+    inspectorCaption={toolInspectorCaption}
+    describeEntry={describeFromLinkedItem}
+    nameEntry={nameFromLinkedItem}
+    listLead={toolCreateZone}
+    columnLead={toolScopeBand}
+    bulk={toolBulkEdit}
+    restingTitle={text('FABRICATE.Admin.Manager.Tools.SelectTitle', 'Select a Tool')}
+    restingHint={text(
+      'FABRICATE.Admin.Manager.Tools.SelectHint',
+      'Choose a Tool to inspect its behaviour.'
+    )}
+    openEntryLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.RowOpenEntry', 'Edit tool')}
+    rowSecondLine="meta"
+    systemRowAction="navigate"
+    membershipFilter={false}
+    bind:selectedId
+    onSelect={(entityId) => (selectedId = entityId)}
+    {onOpenEntry}
+    {onOpenSystemRules}
+    {rowMeta}
+    {rowTrailing}
+  />
 </main>
+
+<!--
+  THE INSPECTOR'S BULK FACE (issue 1373, maintainer feedback round 2).
+
+  The frame swaps the identity panel for this the moment a row is ticked, and it never had one to
+  swap to: `bulk` is a lane snippet and this page passed none, so a screen whose toolbar counted
+  `4 selected` went on saying `Nothing selected` beside it. See `ToolCatalogueBulkPanel` for why
+  the world master switch is the one axis a world Tool can stage across a selection.
+
+  `ctx.clearSelection` is the FRAME's, threaded through the row context: the ticked set belongs to
+  the frame, and a panel that received only the ids could not undo the selection its own header
+  offers to clear.
+-->
+{#snippet toolBulkEdit(selectedIds, ctx)}
+  <ToolCatalogueBulkPanel
+    count={selectedIds.length}
+    applying={bulkApplying}
+    onClearSelection={() => ctx?.clearSelection?.()}
+    onApply={(status) => applyBulkWorldStatus(selectedIds, status, () => ctx?.clearSelection?.())}
+  />
+{/snippet}
+
+<!--
+  THE SCOPE BAND: the world break mode, above the list and INSIDE THE LIST'S OWN COLUMN.
+
+  == IT USED TO SPAN THE WHOLE ROUTE, AND THAT COST THE INSPECTOR ITS HEIGHT =================
+  This page drew the card as a SIBLING of the shell in its own `<main>` grid row, which is
+  edge-to-edge across the content area — so the band stood over the inspector's track as well as
+  the list's, and the inspector started a card's height below the app header bar instead of
+  running the whole route. The design draws the two columns as one grid under the header, the
+  card inside the left one and the panel beside it full height (`proto:1956`-`1959`).
+
+  So it is the frame's `columnLead` now. That is the same seam, one level down, that `listLead`
+  already is for the creation zone: the card is chrome above the toolbar rather than a row, and
+  the column owns it. `<main>` therefore holds ONE child again and needs no grid of its own —
+  the world-scope rule in the host sheet gives this view a single `minmax(0, 1fr)` track, which
+  is exactly what one shell wants.
+
+  The zone stays where it is: `listLead` renders it INSIDE the list's scroller, above the first
+  row, which is the design's placement and costs the inspector column nothing at all.
+-->
+{#snippet toolScopeBand()}
+  <InspectorCard class="manager-world-tool-break-card" data-world-tool-break-mode="">
+    <div class="manager-world-tool-break-head">
+      <i class="fas fa-sliders" aria-hidden="true"></i>
+      <span class="manager-world-tool-break-title"
+        >{text('FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle', 'World breakage default')}</span
+      >
+      {#if overridesKnown}
+        <span class="manager-world-tool-break-count" data-world-tool-break-overrides>
+          {format(
+            overrideCount === 1
+              ? 'FABRICATE.Admin.Manager.Tools.WorldAuthorityOverrideOne'
+              : 'FABRICATE.Admin.Manager.Tools.WorldAuthorityOverrideCount',
+            overrideCount === 1 ? '{count} system overrides it' : '{count} systems override it',
+            { count: overrideCount }
+          )}
+        </span>
+      {/if}
+    </div>
+    <div
+      class="manager-world-tool-break-segments"
+      role="radiogroup"
+      aria-label={text(
+        'FABRICATE.Admin.Manager.Tools.WorldAuthorityTitle',
+        'World breakage default'
+      )}
+    >
+      {#each breakModeOptions as option (option.value)}
+        <label class:is-selected={option.selected} data-world-tool-break-segment={option.value}>
+          <input
+            type="radio"
+            name="world-tool-breakage-authority"
+            value={option.value}
+            checked={option.selected}
+            onchange={() => actions?.setWorldToolBreakage?.(option.value)}
+          />
+          <span class="manager-world-tool-break-option">
+            <i class={option.icon} aria-hidden="true"></i>
+            <span>{option.label}</span>
+          </span>
+        </label>
+      {/each}
+    </div>
+    <!-- WHAT THE SELECTED MODE MEANS, not a sentence naming the segment already highlighted
+       two lines above it. The old copy read `Every crafting system uses Tool-specific unless
+       it overrides the break mode in its own Tool Rules`, which restates the control and the
+       override count on either side of it and says nothing about the rule itself. -->
+    <p class="manager-muted manager-world-tool-break-note">
+      {(worldAuthority || 'toolSpecific') === 'checkDriven'
+        ? text(
+            'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteCheckDriven',
+            'The active check decides breakage \u00b7 world default for every system'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Tools.WorldAuthorityNoteToolSpecific',
+            'Each Tool tracks its own breakage \u00b7 world default for every system'
+          )}
+    </p>
+  </InspectorCard>
+{/snippet}
 
 <!--
   THE LIST'S FIRST ELEMENT: the surface that makes a Tool.
@@ -681,22 +739,11 @@
      markup. `.manager-main`, `.manager-inspector-card` and `.manager-muted` are shipped and
      reused rather than restated. */
 
-  /* THE TEMPLATE THIS PAGE ACTUALLY NEEDS. See the header: the world-scope override at
-     `styles/fabricate.css:9592` gives this view ONE `minmax(0, 1fr)` track, so the card and the
-     list cannot both be placed by spanning. The element selector carries this past the shipped
-     rule on specificity rather than on injection order. */
-  main.manager-main[data-scoped-page='world-tools'] {
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  /* ONE STATEMENT, EDGE TO EDGE. The band held the break card and the creation zone side by
-     side; the zone is the list's lead now, so what remains spans the content column exactly as
-     the design draws it. */
-  .manager-world-tool-scope-band {
-    display: grid;
-    grid-row: 1;
-    min-width: 0;
-  }
+  /* NO GRID OF ITS OWN ANY MORE (issue 1373, maintainer feedback round 2). This page used to
+     redeclare `grid-template-rows: auto minmax(0, 1fr)` to place a band above the shell, and
+     carried two wrapper rules to put each of them in a track. The band is the frame's
+     `columnLead` now, so `<main>` holds exactly one child and the world-scope rule in the host
+     sheet — one `minmax(0, 1fr)` track — is already the right template for it. */
 
   /* `:global()` AND CHAINED (issue 1427's rule, applied here by issue 1373): this class now
      sits on an `<InspectorCard>` tag rather than on an element this component writes, so Svelte
@@ -711,14 +758,6 @@
     gap: var(--fab-space-2);
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
-  }
-
-  .manager-world-tool-catalogue-body {
-    display: grid;
-    grid-row: 2 / -1;
-    grid-template-rows: minmax(0, 1fr);
-    min-width: 0;
-    min-height: 0;
   }
 
   .manager-world-tool-break-head {

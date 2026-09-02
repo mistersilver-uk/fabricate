@@ -165,10 +165,16 @@ export function createVocabularyBrowserState() {
  * a fixed set of axes; the frame replaces it wholesale on every change, which the proxy carries.
  * The frame's BULK SELECTION is deliberately absent: a selection is an in-progress action over a
  * set rather than a filter, and its owner is the lane that supplies the `bulk` descriptor.
+ *
+ * `pageSize` RESTATES the frame's own `DEFAULT_PAGE_SIZE` and has to move with it (issue 1373,
+ * maintainer feedback round 2). The frame falls back to its constant only when nothing binds a
+ * view-state, so a stale size here would pin the old twenty-five-row window on every surface
+ * that DOES bind one — which is most of them — and the frame's default would look like it had
+ * simply not worked.
  */
 export function createScopedListBrowserState() {
   return browseState({
-    pageSize: 25,
+    pageSize: 10,
     membership: 'all',
     filterValues: {},
     sortKey: 'name',

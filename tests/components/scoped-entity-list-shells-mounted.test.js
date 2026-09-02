@@ -462,8 +462,33 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
 
   it('passes the row class and all five hook names, and inherits no studio default', async () => {
     const root = await catalogueHarness.mount(catalogueProps('component'));
+
+    // ── AT REST THE REGISTER IS NOT ON THE SCREEN AT ALL (issue 1373, round 4) ────────────────
+    // It used to render unconditionally, so a resting catalogue carried a select-all box in its
+    // filter row. `proto:1970` draws no selection affordance in that row in any state and
+    // `proto:591` gates the whole band on `selActive`, so the register is a state the screen
+    // enters. A GM opens it from a ROW's own box, which is the design's entry point too
+    // (`proto:603`) and is asserted below rather than assumed.
+    assert.ok(
+      !root.querySelector('[data-scoped-list-selection-toolbar]'),
+      'the selection band renders before anything is selected, so the resting filter row still ' +
+        'carries a control the reference does not have'
+    );
+    assert.ok(
+      !root.querySelector('[data-scoped-list-select-all-page]'),
+      'the `All` box survives at a count of zero'
+    );
+    const rowBox = root.querySelector('[data-scoped-list-select="component-0"]');
+    assert.ok(
+      Boolean(rowBox),
+      'no row checkbox, so a selection cannot be started from scratch at all'
+    );
+
+    rowBox.click();
+    await catalogueHarness.setProps({});
+
     const toolbar = root.querySelector('[data-scoped-list-selection-toolbar]');
-    assert.ok(Boolean(toolbar), 'the toolbar renders unconditionally, at a count of zero');
+    assert.ok(Boolean(toolbar), 'ticking a row produced no selection band');
     // TOKENS, not the whole string: Svelte appends its own scoping hash to the class attribute
     // of every element the primitive renders. The contract is which of the four candidate row
     // classes this root wears, and that no studio's leaked in.
@@ -476,7 +501,6 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
     ]) {
       assert.equal(toolbar.classList.contains(studio), false, `${studio} leaked in`);
     }
-    assert.ok(Boolean(root.querySelector('[data-scoped-list-select-all-page]')));
 
     // The Component Studio's five defaults must be nowhere in this tree: inheriting them would
     // retune six scoped screens silently the next time that studio moves.
@@ -490,11 +514,66 @@ describe("the composed selection toolbar wears the frame's own clothes", () => {
       assert.equal(root.querySelectorAll(`[${inherited}]`).length, 0, `${inherited} leaked in`);
     }
 
-    // The remaining three hooks render only once something is selected, so tick a row.
+    // THE REGISTER IS INSIDE THE BAND, ALL OF IT. A construction that moved the band but left any
+    // one control in the filter row would satisfy a bare presence query on `root`, so each hook
+    // is counted on the whole tree and inside the band and the two totals must agree.
+    //
+    // `select-all-results` renders only when the filtered set is bigger than the rendered one, so
+    // it is counted rather than required: this fixture is one page and draws none. The equality
+    // still bites — it is `0 === 0` here and `1 === 0` the moment the link is rendered outside
+    // the band.
+    for (const hook of [
+      'data-scoped-list-select-all-page',
+      'data-scoped-list-selection-count',
+      'data-scoped-list-select-all-results',
+      'data-scoped-list-clear-selection',
+    ]) {
+      assert.equal(
+        toolbar.querySelectorAll(`[${hook}]`).length,
+        root.querySelectorAll(`[${hook}]`).length,
+        `${hook} renders outside the selection band`
+      );
+    }
+    for (const required of [
+      'data-scoped-list-select-all-page',
+      'data-scoped-list-selection-count',
+      'data-scoped-list-clear-selection',
+    ]) {
+      assert.ok(Boolean(toolbar.querySelector(`[${required}]`)), `${required} never rendered`);
+    }
+  });
+
+  it('points at the inspector rather than restating what the panel there offers', async () => {
+    // `proto:594`. The band and the bulk panel BOTH state the count — the design does that too
+    // (`proto:629` is the panel's own accent hero) — and the difference is what each does next:
+    // the band names where the verbs are, the panel holds them. Without the sentence the band's
+    // `Select all` and `Clear` read as the bulk actions, which is the competition this avoids.
+    //
+    // A `bulk` SNIPPET IS SUPPLIED HERE and the base fixture has none, which is the other half of
+    // the contract: the sentence is true only when the bulk body lands in the inspector, so the
+    // frame says it only for `bulk && inspectorBody`. The second mount below is that negative.
+    const root = await catalogueHarness.mount(
+      catalogueProps('component', { bulk: markerSnippet('data-lane-bulk-body') })
+    );
     root.querySelector('[data-scoped-list-select="component-0"]').click();
     await catalogueHarness.setProps({});
-    assert.ok(Boolean(root.querySelector('[data-scoped-list-selection-count]')));
-    assert.ok(Boolean(root.querySelector('[data-scoped-list-clear-selection]')));
+    const band = root.querySelector('[data-scoped-list-selection-toolbar]');
+    assert.ok(Boolean(band), 'no band, so there is nothing to carry the sentence');
+    assert.match(
+      band.textContent,
+      /Bulk actions are in the inspector/,
+      'the band states a count and two actions and never says where the bulk verbs live'
+    );
+
+    const noBulk = await catalogueHarness.mount(catalogueProps('component'));
+    noBulk.querySelector('[data-scoped-list-select="component-0"]').click();
+    await catalogueHarness.setProps({});
+    const bareBand = noBulk.querySelector('[data-scoped-list-selection-toolbar]');
+    assert.ok(Boolean(bareBand), 'the band is gated on the bulk snippet rather than on a count');
+    assert.ok(
+      !/Bulk actions are in the inspector/.test(bareBand.textContent),
+      'a catalogue with no bulk panel still points a GM at one'
+    );
   });
 });
 
@@ -505,7 +584,20 @@ describe('every snippet is invoked with the documented parameters', () => {
   after(() => catalogueHarness.teardown());
   afterEach(() => catalogueHarness.remount());
 
-  const CTX_KEYS = ['scope', 'systems', 'systemId', 'selected', 'member', 'systemRow'];
+  // `clearSelection` joined the set at issue 1373's maintainer feedback round, and it is the one
+  // key that is a FUNCTION rather than a fact. The `bulk` snippet renders the shared
+  // `BulkEditPanelShell`, whose header carries a `Clear selection` action, and a lane holds the
+  // ticked ids only as the array it was rendered with — so without a way back to the set's owner
+  // that control could not do the one thing it names.
+  const CTX_KEYS = [
+    'scope',
+    'systems',
+    'systemId',
+    'selected',
+    'member',
+    'systemRow',
+    'clearSelection',
+  ];
 
   it('rowMeta and inspectorBody receive (entry, ctx) with exactly the documented ctx keys', async () => {
     const seen = [];
@@ -546,6 +638,16 @@ describe('every snippet is invoked with the documented parameters', () => {
     assert.equal(ctx.selected, false, 'a bulk body addresses no single row');
     assert.equal(ctx.member, false);
     assert.equal(ctx.systemRow, null);
+    // AND THE ONE CALLABLE KEY ACTUALLY CLEARS. Asserted as an EFFECT rather than as a typeof:
+    // a stub of the right shape satisfies `typeof ctx.clearSelection === 'function'` while the
+    // panel's Clear goes on doing nothing, which is the failure this key exists to prevent.
+    assert.equal(typeof ctx.clearSelection, 'function', 'the bulk body can reach the set owner');
+    ctx.clearSelection();
+    await catalogueHarness.setProps({});
+    assert.ok(
+      !root.querySelector('[data-lane-bulk]'),
+      'the bulk body still renders, so ctx.clearSelection did not reach the frame selection'
+    );
   });
 
   it('reaches a conditionally present projection field through ctx.scope', async () => {
@@ -754,14 +856,22 @@ describe('a list has three no-content states, each its own treatment', () => {
       false,
       'an empty world is an absence of content, not a query that matched nothing'
     );
+    // THE SELECTION BAND IS NOT ON THIS LIST, and its absence is the point rather than a gap
+    // (issue 1373, round 4). The register is a STATE now — `proto:591` gates the whole band on
+    // an active selection — and an empty corpus has no row to tick, so a band here would be a
+    // control acting on nothing. What "the surface stays live" means is the FILTERS, which is
+    // what an unreadable corpus suspends and a readable-but-empty one does not.
     for (const live of [
       '[data-scoped-list-search]',
       '[data-scoped-list-membership]',
       '[data-scoped-list-sort]',
-      '[data-scoped-list-selection-toolbar]',
     ]) {
       assert.ok(Boolean(root.querySelector(live)), `${live} was suppressed on a readable corpus`);
     }
+    assert.ok(
+      !root.querySelector('[data-scoped-list-selection-toolbar]'),
+      'an empty catalogue draws a selection band, which can only act on rows it does not have'
+    );
   });
 
   it('states a query that matched NOTHING with the filtered treatment and a way out', async () => {
@@ -860,13 +970,25 @@ describe('the shells own the list state machine', () => {
     const root = await catalogueHarness.mount(
       catalogueProps('component', { scope: scopeOf('component', { count: 60 }) })
     );
+    // THE PAGE BOX IS INSIDE THE BAND NOW, so it has to be opened before it can be used (issue
+    // 1373, round 4). One row's own box is what a GM clicks first, exactly as `proto:603` draws
+    // it; the band then appears carrying `All`, and clicking that completes the page. The
+    // intermediate count is asserted so a box that silently stopped selecting anything cannot
+    // read as this step working.
+    root.querySelector('[data-scoped-list-select="component-0"]').click();
+    await catalogueHarness.setProps({});
+    assert.match(
+      root.querySelector('[data-scoped-list-selection-count]').textContent,
+      /1 selected/,
+      'ticking a row selected nothing, so the band below is not the state this case measures'
+    );
     // Page one only: the tri-state box acts on the RENDERED rows.
     root.querySelector('[data-scoped-list-select-all-page]').click();
     await catalogueHarness.setProps({});
-    assert.equal(rows(root).length, 25, 'the default page size');
+    assert.equal(rows(root).length, 10, 'the default page size');
     assert.match(
       root.querySelector('[data-scoped-list-selection-count]').textContent,
-      /25 selected/
+      /10 selected/
     );
     // Page two: the count survives paging, so it is the whole selection rather than the page's
     // intersection with it.
@@ -874,7 +996,7 @@ describe('the shells own the list state machine', () => {
     await catalogueHarness.setProps({});
     assert.match(
       root.querySelector('[data-scoped-list-selection-count]').textContent,
-      /25 selected/
+      /10 selected/
     );
     assert.equal(
       root.querySelector('[data-scoped-list-select-all-page]').checked,
@@ -894,6 +1016,10 @@ describe('the shells own the list state machine', () => {
     const root = await catalogueHarness.mount(
       catalogueProps('component', { scope: scopeOf('component', { count: 5 }) })
     );
+    // A row's own box first, because the band that carries `All` renders only under a selection
+    // (issue 1373, round 4). See the case above.
+    root.querySelector('[data-scoped-list-select="component-0"]').click();
+    await catalogueHarness.setProps({});
     root.querySelector('[data-scoped-list-select-all-page]').click();
     await catalogueHarness.setProps({});
     assert.match(
@@ -968,18 +1094,18 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     await catalogueHarness.setProps({});
     assert.match(
       root.querySelector('[data-pagination-page]').textContent,
-      /Page 3 of 3/,
+      /Page 3 of 6/,
       'the fixture never reached page three, so nothing below has a stale index to clamp'
     );
 
     // ── (1) CLAMPED INTO A CORPUS THAT IS STILL MULTI-PAGE, where the FOOTER is the observation.
     //
-    // 30 rows at the default page size is two pages, so the bar renders and states the clamped
-    // index directly. This half is here because the foot pager is `multiPageOnly` since issue
-    // 1372: the shorter-corpus case below no longer draws one, and a clamp gate that only ever
-    // measured the no-footer case would stop covering the footer-reads-the-clamped-value half of
-    // `ui-integration/spec.md`'s list-shell requirement 13 altogether.
-    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 30 }) });
+    // 15 rows at the ten-row default page size is two pages, so the bar renders and states the
+    // clamped index directly. This half is here because the foot pager is `multiPageOnly` since
+    // issue 1372: the shorter-corpus case below no longer draws one, and a clamp gate that only
+    // ever measured the no-footer case would stop covering the footer-reads-the-clamped-value
+    // half of `ui-integration/spec.md`'s list-shell requirement 13 altogether.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 15 }) });
     assert.equal(
       rows(root).length,
       5,
@@ -989,28 +1115,28 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 2/);
     assert.match(
       root.querySelector('[data-pagination-summary]').textContent,
-      /Showing 26–30 of 30/,
+      /Showing 11–15 of 15/,
       'the footer states a range the list does not show'
     );
 
     // ── (2) CLAMPED INTO A ONE-PAGE CORPUS, where the ROW SLICE is the observation.
     //
     // The bar is gone here — one page — so the clamped value is read off the rows instead, and it
-    // is read as an IDENTIFIED slice rather than a count: `slice(50, 75)` over ten entries is
-    // empty, and any index above zero over a ten-row single page is empty too, so the whole
+    // is read as an IDENTIFIED slice rather than a count: `slice(10, 20)` over eight entries is
+    // empty, and any index above zero over an eight-row single page is empty too, so the whole
     // corpus being present AND starting at its first record is what says the index came back to
-    // zero. The count alone would be satisfied by a frame that rendered ten unrelated rows.
-    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 10 }) });
+    // zero. The count alone would be satisfied by a frame that rendered eight unrelated rows.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 8 }) });
     assert.ok(
       !root.querySelector('[data-pagination-summary]'),
-      'ten rows on a twenty-five-row page is ONE page, so this half is measuring the no-footer ' +
+      'eight rows on a ten-row page is ONE page, so this half is measuring the no-footer ' +
         'case it exists for'
     );
     assert.deepEqual(
       rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
-      Array.from({ length: 10 }, (unused, index) => `component-${index}`),
-      'the list does not show the whole ten-record corpus from its first row, so the stale page ' +
-        'index was not clamped back to zero'
+      Array.from({ length: 8 }, (unused, index) => `component-${index}`),
+      'the list does not show the whole eight-record corpus from its first row, so the stale ' +
+        'page index was not clamped back to zero'
     );
     assert.equal(
       root.querySelector('.manager-scoped-list-rows').querySelectorAll('.manager-empty').length,
@@ -1028,16 +1154,17 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     );
     root.querySelector('[data-pagination-next]').click();
     await catalogueHarness.setProps({});
-    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 3/);
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 6/);
     const search = root.querySelector('[data-scoped-list-search]');
     search.value = 'Ash 0';
     search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     await catalogueHarness.setProps({});
-    // The filtered set is `Ash 00`-`Ash 09` and it is ONE page, so since issue 1372 there is no
-    // footer to read the reset index off. The rows say it instead, and they say it as an
-    // IDENTIFIED slice: a page index left at 1 slices `component-25` onward out of a ten-row set
-    // and renders nothing, and any index above zero renders nothing, so the whole filtered set
-    // being present AND starting at its first record is what says the index went back to zero.
+    // The filtered set is `Ash 00`-`Ash 09` and it is ONE page at the ten-row default, so since
+    // issue 1372 there is no footer to read the reset index off. The rows say it instead, and
+    // they say it as an IDENTIFIED slice: a page index left at 1 slices `component-10` onward out
+    // of a ten-row set and renders nothing, and any index above zero renders nothing, so the
+    // whole filtered set being present AND starting at its first record is what says the index
+    // went back to zero.
     assert.deepEqual(
       rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
       Array.from({ length: 10 }, (unused, index) => `component-${index}`),
@@ -1067,14 +1194,18 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     );
     assert.ok(
       !root.querySelector('[data-pagination-summary]'),
-      'three rows on a twenty-five-row page is ONE page, and a bar that can only say ' +
+      'three rows on a ten-row page is ONE page, and a bar that can only say ' +
         '"Page 1 of 1" states nothing the rows do not'
     );
 
-    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 60 }) });
+    // ELEVEN, WHICH IS THE MAINTAINER'S OWN PAIR (issue 1373, feedback round 2). The window was
+    // twenty-five, so an eleven-tool world catalogue was one page and drew no bar at all - twelve
+    // tools as one unbounded scroll. Three must still show none and eleven must now show one, and
+    // this case is where both halves of that ruling are stated against one mount.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 11 }) });
     assert.ok(
       Boolean(root.querySelector('[data-pagination-summary]')),
-      'sixty rows is three pages, and the browse recipe requires the bar back'
+      'eleven rows is two pages at the default window, and the browse recipe requires the bar'
     );
     assert.ok(Boolean(root.querySelector('[data-pagination-prev]')));
     assert.equal(

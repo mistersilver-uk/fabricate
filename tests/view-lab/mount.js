@@ -150,6 +150,11 @@ function readParams() {
     // function of the persisted `gatheringParties` setting, so the fixture seeds `[]` and
     // the real store reads it exactly as it reads a populated one.
     noParties: params.get('noParties') === '1',
+    // Build a world with NO Tools at all, for the world Tools Catalogue's empty state. It takes
+    // more than an empty `toolScope` setting: the lab runs every migration on every build and the
+    // world-scope pass LIFTS each crafting system's own tools into world records, so the systems'
+    // libraries have to go with the corpus. `stripTools` in `labWorld.js` owns that and says why.
+    noTools: params.get('noTools') === '1',
     // Evidence-only localization stress. It changes no shipped string and exists solely so the
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
@@ -863,6 +868,7 @@ async function boot() {
         experimentalFeatures: params.experimental,
         clearSystem: params.clearSystem,
         noParties: params.noParties,
+        noTools: params.noTools,
         longTravelLabels: params.longTravelLabels,
       });
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);

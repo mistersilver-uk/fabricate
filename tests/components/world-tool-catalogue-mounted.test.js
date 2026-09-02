@@ -52,6 +52,13 @@ const harness = createMountedComponentHarness({
     ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+    // THE BULK PANEL AND THE SHARED CHROME IT COMPOSES (issue 1373, maintainer feedback round 2).
+    // The page IMPORTS the panel, so all three are in this tree's static graph whether or not a
+    // given case ticks a row — and a compiled child missing from this list does not fail, it
+    // HANGS, which is exactly how this suite reported itself the first time they were left out.
+    'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+    'src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
@@ -189,9 +196,24 @@ describe('world Tools Catalogue (issue 1373)', () => {
     );
     assert.ok(!target.querySelector('select[data-scoped-list-membership]'));
     // AND THE BULK SELECTION SURVIVES IT, which is the distinction that makes this safe: the
-    // ruled-in `All` box and the per-row checkboxes are a different control from the filter.
-    assert.ok(Boolean(target.querySelector('[data-scoped-list-select-all-page]')), 'select-all');
+    // per-row checkboxes are a different control from the filter.
+    //
+    // THE ENTRY POINT IS THE ROW BOX, and at rest it is the ONLY one (issue 1373, round 4). The
+    // `All` box used to stand in this filter row; it is inside the selection band now, which
+    // renders only under an active selection, because `proto:1970` draws no selection affordance
+    // in this row in any state. Both halves are asserted, since "the row box is there" alone
+    // would also pass on a screen that kept `All` beside it.
     assert.ok(Boolean(target.querySelector('[data-scoped-list-select="hammer"]')), 'row box');
+    assert.ok(
+      !target.querySelector('[data-scoped-list-select-all-page]'),
+      'the `All` box still stands in the resting filter row'
+    );
+    target.querySelector('[data-scoped-list-select="hammer"]').click();
+    await harness.setProps({});
+    assert.ok(
+      Boolean(target.querySelector('[data-scoped-list-select-all-page]')),
+      'ticking a row produced no band, so the page control is unreachable from this screen'
+    );
   });
 
   it('opens the LIST with the creation zone, not a band beside the breakage card', async () => {
@@ -392,6 +414,192 @@ describe('world Tools Catalogue (issue 1373)', () => {
       assert.equal(toggle.getAttribute('aria-pressed'), 'false');
       toggle.click();
       assert.deepEqual(calls, [['hammer', true]], 'the click writes the OPPOSITE of what is drawn');
+    });
+  });
+
+  // ── THE MAINTAINER'S FEEDBACK ROUND (issue 1373) ──────────────────────────────────────────
+  //
+  // Four of the six findings on this screen were states no case and no test could reach, which
+  // is exactly why two automated parity passes reported it complete. Each block below reaches
+  // one of them.
+
+  describe('the scope band sits in the LIST column, not across the whole route', () => {
+    // FINDING 2b AND FINDING 6, WHICH ARE ONE STRUCTURE. The page drew the world breakage card as
+    // a SIBLING of the shell in its own grid row, which spans the content area edge to edge - so
+    // the band stood over the inspector's track as well as the list's, and the inspector started
+    // a card's height below the app header bar instead of running the whole route.
+    //
+    // Asserted as CONTAINMENT rather than by measuring: the card being inside
+    // `.manager-scoped-list-column` is what makes it the middle track's, and it is the one fact
+    // that cannot be true while the band spans the route.
+    it('renders the breakage card inside the list column and not beside the inspector', async () => {
+      const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      const card = target.querySelector('[data-world-tool-break-mode]');
+      assert.ok(Boolean(card), 'the catalogue still authors the world breakage default');
+      assert.ok(
+        Boolean(card.closest('.manager-scoped-list-column')),
+        'the card is outside the list column, so it spans the inspector track as well'
+      );
+      // AND THE INSPECTOR IS ITS SIBLING TRACK rather than something below the band. A panel that
+      // shared an ancestor with the card would be under it in the same column.
+      const inspector = target.querySelector('[data-scoped-list-inspector]');
+      assert.ok(Boolean(inspector), 'the catalogue renders its own inspector column');
+      assert.ok(
+        !inspector.closest('.manager-scoped-list-column'),
+        'the inspector is inside the list column, so the card above it is still over its track'
+      );
+    });
+
+    // AND IT SURVIVES AN UNREADABLE CORPUS, which is not a detail. The band was a sibling of the
+    // frame before, so it rendered whatever the corpus said; moving it into the frame put it
+    // behind the availability branch, and a control that vanishes when a setting fails to read
+    // is a behaviour change nobody asked for.
+    it('keeps the band on the unavailable branch, where it used to render too', async () => {
+      const target = await harness.mount({
+        scope: projectWorldScopeEntity({ entityType: 'tool', corpus: null, systems: SYSTEMS }),
+        systems: SYSTEMS,
+        actions: {},
+      });
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-list-state="unavailable"]')),
+        'the fixture is not on the unavailable branch, so the assertion below is vacuous'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-world-tool-break-mode]')),
+        'the world breakage card disappeared with an unreadable corpus'
+      );
+    });
+  });
+
+  it('states the TOOL verb at rest, not the page subtitle a second time', async () => {
+    // FINDING 2a. The resting inspector read `Nothing selected` over the catalogue's own
+    // SUBTITLE - the sentence the header prints a few pixels above it - so on an empty catalogue
+    // the one column that could have said what the panel is for repeated the header instead.
+    const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+    const resting = target.querySelector('[data-scoped-list-inspector-state="resting"]');
+    assert.ok(Boolean(resting), 'nothing is selected, so the resting panel must render');
+    assert.match(resting.textContent, /Select a Tool/);
+    assert.match(resting.textContent, /Choose a Tool to inspect its behaviour/);
+    assert.ok(
+      !resting.textContent.includes('One Tool per game-world Item'),
+      'the resting panel still repeats the page subtitle'
+    );
+  });
+
+  describe('bulk edit', () => {
+    /**
+     * Tick a row's selection box through its LABEL, which is what a GM clicks: the real control
+     * is visually hidden behind the primitive's own box.
+     *
+     * @param {HTMLElement} target the mounted root.
+     * @param {string} entityId
+     * @returns {void}
+     */
+    function tick(target, entityId) {
+      const input = target.querySelector(`[data-scoped-list-select="${entityId}"]`);
+      assert.ok(Boolean(input), `no selection box for ${entityId}`);
+      input.click();
+    }
+
+    // THE FINDING ITSELF (finding 4). Rows selected, the toolbar counting them, and the inspector
+    // still saying `Nothing selected` - because `bulk` is a lane snippet and the page passed
+    // none. Both halves are asserted against ONE mount, because the whole defect is that the two
+    // disagreed: a test that only looked at the panel would pass against a screen whose toolbar
+    // had silently stopped counting.
+    it('swaps the inspector to the bulk panel, and the two counts agree', async () => {
+      const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-list-inspector-state="resting"]')),
+        'the panel is not at rest before the tick, so the swap below proves nothing'
+      );
+      tick(target, 'hammer');
+      tick(target, 'orphan');
+      await harness.setProps({});
+
+      const panel = target.querySelector('[data-world-tool-bulk-panel]');
+      assert.ok(Boolean(panel), 'the inspector never changed to bulk-edit controls');
+      assert.ok(
+        Boolean(panel.closest('[data-scoped-list-inspector]')),
+        'the panel rendered outside the inspector column it is meant to replace'
+      );
+      assert.ok(
+        !target.querySelector('[data-scoped-list-inspector-state="resting"]'),
+        'the resting panel is still on screen beside the bulk one'
+      );
+      assert.match(target.querySelector('[data-world-tool-bulk-count]').textContent, /2 Tools/);
+      assert.match(
+        target.querySelector('[data-scoped-list-selection-count]').textContent,
+        /2 selected/,
+        'the toolbar and the panel disagree about how many rows are ticked'
+      );
+    });
+
+    it('keeps Apply inert until an axis is staged', async () => {
+      const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      tick(target, 'hammer');
+      await harness.setProps({});
+      assert.equal(
+        target.querySelector('[data-world-tool-bulk-apply]').disabled,
+        true,
+        'a GM can fire a no-op write and read success from it'
+      );
+      target.querySelector('[data-world-tool-bulk-status-option="off"] input').click();
+      await harness.setProps({});
+      assert.equal(target.querySelector('[data-world-tool-bulk-apply]').disabled, false);
+    });
+
+    it('writes the staged switch to EVERY ticked Tool and then drops the selection', async () => {
+      const calls = [];
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: SYSTEMS,
+        actions: { setWorldEnabled: (id, enabled) => calls.push([id, enabled]) },
+      });
+      tick(target, 'hammer');
+      tick(target, 'orphan');
+      await harness.setProps({});
+      target.querySelector('[data-world-tool-bulk-status-option="off"] input').click();
+      await harness.setProps({});
+      target.querySelector('[data-world-tool-bulk-apply]').click();
+      // The write is a sequence of awaited store calls, so the assertions below need the
+      // microtask queue drained before the panel and the selection can have moved.
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+      await harness.setProps({});
+
+      assert.deepEqual(
+        calls,
+        [
+          ['hammer', false],
+          ['orphan', false],
+        ],
+        'the staged instruction did not reach every ticked row'
+      );
+      assert.ok(
+        !target.querySelector('[data-world-tool-bulk-panel]'),
+        'the selection survived the write, so twelve rows stay ticked under a panel whose ' +
+          'staged axis has reset - which reads as an edit still pending'
+      );
+    });
+
+    it('clears the selection from the panel header without writing anything', async () => {
+      const calls = [];
+      const target = await harness.mount({
+        scope: scopeFor(),
+        systems: SYSTEMS,
+        actions: { setWorldEnabled: (id, enabled) => calls.push([id, enabled]) },
+      });
+      tick(target, 'hammer');
+      await harness.setProps({});
+      // THE PANEL'S OWN CLEAR, which only works because the frame threads `clearSelection` onto
+      // the row context: a lane holds the ticked ids as the array it was rendered with and has no
+      // other way back to the set's owner.
+      target.querySelector('[data-world-tool-bulk-clear]').click();
+      await harness.setProps({});
+      assert.ok(
+        !target.querySelector('[data-world-tool-bulk-panel]'),
+        'the panel header Clear did not reach the frame selection'
+      );
+      assert.deepEqual(calls, [], 'Clear is not a write');
     });
   });
 

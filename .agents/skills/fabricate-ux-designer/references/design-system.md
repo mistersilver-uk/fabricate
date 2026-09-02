@@ -54,6 +54,27 @@ Unknown ids fall back to the default (`fabricate`).
 The six theme ids are `fabricate`, `mythwright`, `ironblood-forge`, `hearth-herb`,
 `starglass-arcana`, and `foundry-native`.
 
+### 1.1a Two CASCADE layers, and the module sheet is the weaker one
+
+`module.json` registers `styles/fabricate.css` with no explicit `layer`, so Foundry imports it at
+`layer(modules)`.
+A Svelte component's scoped block is injected as an unlayered `<style>` at runtime.
+An unlayered declaration beats a layered one whatever the specificity, so for any property a
+component declares in its own scoped block, NO rule in `styles/fabricate.css` can override it at
+any specificity that can be written.
+The failure is silent — the selector is emitted, it matches, and the declaration is unused — and
+no gate reports it, so a route-scoped repair aimed at a primitive's own border, margin or colour
+looks correct in review and does nothing in the product.
+Override such a property by extending the primitive with a prop whose default preserves the
+shipped rendering; leave the sheet everything the primitive does not declare.
+
+`tests/view-lab/cascade.css` reproduces the layer order verbatim, which is why the View Lab
+catches this and a flat browser harness does not.
+Svelte also emits some scope hashes as `:where(.svelte-<hash>)`, which contributes zero
+specificity, and moving a compound in or out of `:global()` changes which form it emits — so
+settle any specificity question by compiling the component with `css: 'external'` and reading the
+emitted selector rather than by reading the source.
+
 ### 1.2 Two token layers
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->

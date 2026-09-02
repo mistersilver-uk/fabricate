@@ -166,7 +166,7 @@ export function isExemptSpacingPixels(pixels) {
  * paid by TOKENIZING rather than by deleting, so it is banked here rather than left as a slot
  * the next author could fill for free.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 927;
+export const KNOWN_RAW_SPACING_TOTAL = 926;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

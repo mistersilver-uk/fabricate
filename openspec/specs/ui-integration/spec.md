@@ -318,7 +318,10 @@ A surface that paints its permanent hint in `warning` alongside a conditional `w
 Every multi-select affordance in the manager renders through one shared selection-control primitive: a square custom control with a checked, unchecked and indeterminate state, at the sizes its host row needs.
 A host-supplied `<input type="checkbox">` rendered with Foundry's default control chrome is a second selection design and is not an acceptable rendering.
 A multi-select surface's SELECTION TOOLBAR — the tri-state control over the rendered rows, the selected-count readout, the select-all-results action and Clear — likewise renders through one shared toolbar primitive that every browser imports.
-Its test and screenshot hook names, its host row class and its labels are parameters of that primitive, not a reason to fork it.
+Its test and screenshot hook names, its host row class, its labels and its standing hint are parameters of that primitive, not a reason to fork it.
+Where a surface gates that toolbar on an active selection, the toolbar carries the WHOLE register — the tri-state control included — so no part of it is left standing in the filter row it was lifted out of.
+The hint is the sentence that keeps the band and the bulk edit panel from competing: the band states the count and names where the bulk actions are, and the panel holds them.
+A surface whose bulk body does not render in an inspector states nothing there rather than pointing at a rail it has not got.
 
 #### Bulk edit panels
 
@@ -2332,9 +2335,26 @@ The world catalogues and the system-scope rules lists share ONE list composition
     The container and the element the query lays out are therefore two elements, and the gate measures BOTH sides of the query at real window widths: a harness sized to one side reports a breakpoint that is not there.
 20. **THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE.**
     These shells take the browse recipe's single-page suppression (`design-system/spec.md`): the reference draws no foot pager under either shell's list — six rows on the world catalogue, three on the system rules list — and a bar that can only ever say `Page 1 of 1` restates what the rows already show.
-    The condition is MORE THAN ONE PAGE and not "more items than the smallest offered page size", which is the primitive's ordinary hidden state and renders the bar for a single page of eleven rows.
+    The condition is MORE THAN ONE PAGE and not "more items than the smallest offered page size", which is the primitive's ordinary hidden state and renders the bar for a fifteen-row list a GM has put on a twenty-five-row page.
     Wherever it does render it is unchanged: outside the scroll area, disabled arrows shown, per-page selector offered.
     The ROWS REGION takes the column's slack whether or not a pager is under it, and the pager never does — the two are separate declarations and a gate that measured only "the pager ends at the foot of the column" is satisfied by a pager that fills it.
+    **THE DEFAULT PAGE WINDOW MUST BE NARROW ENOUGH THAT THE SUPPRESSION STAYS AN EXCEPTION**, and it is TEN rows: the smallest size the pager itself offers, and about what the column holds at the window sizes these screens are used at.
+    A suppression rule and a wide window compose into a screen with no page control at all — at twenty-five an eleven-record catalogue was one unbounded scroll — so the two are one decision and the ruling is stated as a pair: eleven rows MUST draw a bar and three MUST NOT.
+    The window is declared in the frame and RESTATED on the lifted browse view-state, because the frame's own constant is reached only when nothing binds one; a stale restatement pins the old window on every surface that does bind one, while the frame's default looks as though it simply had not worked.
+
+21. **A SCOPE-WIDE CONTROL SITS INSIDE THE LIST COLUMN, ABOVE THE FILTER BAR — never across the route.**
+    A value that governs every record in the corpus is neither a row nor an entity, so it has nowhere to live in the list; drawn as a sibling of the list frame it spans the CONTENT AREA, which is the list column plus the inspector's track, and the inspector then starts a card's height below the app header bar instead of running the whole route.
+    The inspector rail runs the FULL HEIGHT of the content area on every scoped list, which is the property the shared aside has by construction and the one a self-drawn column has to be given.
+    The control renders on the unavailable branch too, because it was chrome for the route before it was part of the list and a corpus that failed to read must not take a scope-level control off screen.
+
+22. **THE RESTING INSPECTOR STATES ITS OWN SURFACE'S VERB, not the page subtitle a second time.**
+    A generic "nothing selected" over the screen's own lede repeats the sentence the header prints a few pixels above it, and on an EMPTY corpus that panel is the whole of the right-hand track — the one place that could have said what the column is for.
+    The copy is the lane's, defaulting to the generic pair, and the panel fills its column rather than floating as a short card in a tall empty one.
+
+23. **A LIST THAT OFFERS SELECTION MUST OFFER SOMETHING TO DO WITH IT.**
+    These shells render a per-row selection box and a counting selection register unconditionally, and the inspector's bulk face is a LANE snippet — so a lane that supplies none ships a screen that counts ticks and then says "nothing selected" beside them, with nothing failing anywhere, because a conditional on an absent snippet is silent.
+    The bulk face replaces the identity panel from the first ticked row, states the same count the register does, and reaches the selection's owner: the ticked ids arrive as an array, so clearing the set is a capability the shells must pass down rather than something a lane can do for itself.
+    A bulk axis is offered only where its value is CLOSED and means the same thing for every record in the selection; an axis carrying a per-record value is named as staying per-record rather than left to be inferred from a short panel.
 
 ### GM Travel Route
 

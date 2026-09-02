@@ -66,6 +66,16 @@ const CATALOGUE_PROPS = [
   // The list's lifted view-state (issue 1438), passed through to the frame. It is on BOTH
   // shells, so the difference clause below is unchanged: one composition, configured per scope.
   'browserState',
+  // ── THE THREE ISSUE 1373 FEEDBACK-ROUND SEAMS ───────────────────────────────────────────────
+  // `columnLead` puts a scope-wide card ABOVE the toolbar and INSIDE the list column, which is
+  // the only placement that leaves the inspector running the whole route's height: the world Tool
+  // catalogue drew its breakage card as a sibling of this shell, so the band spanned the
+  // inspector's track too and the panel started a card's height below the app header bar.
+  // `restingTitle` and `restingHint` replace a generic `Nothing selected` over the page SUBTITLE
+  // — the sentence the header already prints — with the lane's own verb.
+  //
+  // All three default to what shipped, so the component and essence catalogues are untouched.
+  'columnLead',
   'countUnit',
   // ── THE FIVE ROW-AND-INSPECTOR PARITY SWITCHES ISSUE 1373 ADDED ─────────────────────────────
   // Every one is OPT-IN and defaults to what the component and essence catalogues already
@@ -99,6 +109,8 @@ const CATALOGUE_PROPS = [
   'onOpenSystemRules',
   'onSelect',
   'openEntryLabel',
+  'restingHint',
+  'restingTitle',
   'rowMeta',
   'rowSecondLine',
   'rowTrailing',
@@ -178,6 +190,10 @@ describe('the shells declare the pinned prop sets', () => {
       // They are catalogue-only because the rules-list shell supplies NO `inspectorBody` and so
       // renders no inspector at all: there is nothing on that screen for a kicker, a card title or
       // a pinned foot action to appear in.
+      // The three feedback-round seams are catalogue-only for the same reason as the rest: two of
+      // them are the INSPECTOR's copy and the rules-list shell renders no inspector, and
+      // `columnLead` places a card in a column that shell's own page owns.
+      'columnLead',
       'countUnit',
       // The five parity switches (issue 1373) are catalogue-only for the same reason: four of
       // them describe a ROW the rules-list shell draws differently, and `systemRowAction` names
@@ -197,6 +213,8 @@ describe('the shells declare the pinned prop sets', () => {
       'onOpenEntry',
       'onOpenSystemRules',
       'openEntryLabel',
+      'restingHint',
+      'restingTitle',
       'rowSecondLine',
       'rowTrailing',
       'searchPlaceholder',

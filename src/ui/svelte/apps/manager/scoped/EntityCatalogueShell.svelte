@@ -72,6 +72,9 @@
      defaulting to what shipped. See the frame's prop notes, and `SystemRulesRoster`'s own note
      for `systemRowAction`. `listLead` is what puts a lane's create-from-drop zone at the head of
      the list where the design draws it, instead of in a band above the toolbar.
+   - columnLead / restingTitle / restingHint: threaded straight to the frame; see its prop notes.
+     `columnLead` renders a scope-wide card above the toolbar INSIDE the list column, which is the
+     only placement that leaves the inspector running the whole route's height.
    - onOpenSystemRules(entityId, systemId): the inspector system row's `Rules ↗` deep link, into
      that system's own rules for this entity. `null` — the default — falls the row back to the
      membership cluster, so a lane whose shell has nowhere to route to still gets a usable row.
@@ -131,6 +134,16 @@
     // exactly what the component and essence catalogues render today.
     nameEntry = undefined,
     listLead = undefined,
+    // Threaded straight to the frame; see its own prop notes. `columnLead` is what puts a
+    // scope-wide card ABOVE the toolbar and INSIDE the list column, which is where the design
+    // draws the world Tool catalogue's breakage card — a page that renders such a card as a
+    // sibling of this shell spans it across the inspector's track too, and starts the inspector
+    // a card's height below the app header (issue 1373, maintainer feedback round 2).
+    columnLead = undefined,
+    // The resting inspector's copy. Both default to what shipped, so only a lane that names its
+    // noun changes.
+    restingTitle = '',
+    restingHint = '',
     // The ROW ACTION the list offers per entity. The shipped icon button stays the default; a
     // lane that NAMES the verb gets the design's bordered `Edit <noun>` button instead, which is
     // also what our own system rules list already draws.
@@ -226,6 +239,9 @@
     {describeEntry}
     {nameEntry}
     {listLead}
+    {columnLead}
+    {restingTitle}
+    {restingHint}
     {bulk}
     {inspectorKicker}
     {inspectorCaption}

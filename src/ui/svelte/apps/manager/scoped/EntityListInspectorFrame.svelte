@@ -103,6 +103,10 @@
      lane supplies one.
    - inspectorFoot(entry): the full-width action pinned to the BOTTOM of the inspector, outside
      its scroll area, exactly as the pagination bar sits outside the list's.
+   - columnLead(): a scope-wide card standing above the toolbar INSIDE the list column, so the
+     inspector beside it keeps the whole route's height. See the prop note.
+   - restingTitle / restingHint: the resting inspector's own copy, replacing the generic
+     `Nothing selected` over the page subtitle. See the prop note.
    - countUnit: the plural noun the result count is stated in (`essences`). The count itself is
      this frame's arithmetic; only the word is the lane's.
    - selectedId: the inspected row, and BINDABLE — the same idiom `armedToken` uses two lines
@@ -215,6 +219,19 @@
     // row: it sits outside the `<ul>`, because a drop target is not a list item and every row
     // affordance below — selection, inspection, the row action — would be a lie on it.
     listLead = undefined,
+    // ── WHAT STANDS ABOVE THE TOOLBAR, INSIDE THE LIST COLUMN ───────────────────────────────
+    // A snippet rendered as the FIRST child of `.manager-scoped-list-column` — above the filter
+    // row, outside the scroller, and inside the middle track rather than across the whole frame.
+    //
+    // The world Tool catalogue's breakage card is what needed it (issue 1373, maintainer
+    // feedback round 2). That card is one value for every Tool in the world, so it is neither a
+    // row nor an entity and the page drew it as a SIBLING of this frame — which put it across
+    // the inspector's track as well as the list's, and pushed the inspector down so it started
+    // a card's height below the app header instead of running the whole route. The design draws
+    // it inside the list column with the inspector beside it, full height (`proto:1956`-`1959`).
+    //
+    // Absent by default, so the component and essence catalogues render unchanged.
+    columnLead = undefined,
     countUnit = '',
     // Whether the toolbar offers the world/system MEMBERSHIP `<select>`. Default ON, so every
     // other caller renders unchanged. The essence catalogue turns it off: the prototype's toolbar
@@ -228,6 +245,17 @@
     // untouched, because `All` is not an accessible name a screen-reader user can act on.
     selectAllLabel = '',
     bulk = undefined,
+    // ── THE RESTING INSPECTOR'S OWN COPY (issue 1373, maintainer feedback round 2) ───────────
+    // What the panel says while nothing is selected. It shipped as a generic `Nothing selected`
+    // over the PAGE SUBTITLE, which is the sentence already printed in the header a few pixels
+    // above it — so on an empty catalogue the one column that could have told a GM what the
+    // panel is for repeated the header instead. The system Tool Rules rail states the verb
+    // (`Select a Tool` / `Choose a Tool to inspect its behaviour.`), and a lane that names its
+    // noun gets to say the same thing here.
+    //
+    // Both default to exactly what shipped, so a lane that names neither renders unchanged.
+    restingTitle = '',
+    restingHint = '',
     selectedId = $bindable(''),
     onSelect = () => {},
     armedToken = $bindable(''),
@@ -255,7 +283,22 @@
   const RESULTS_ATTR = 'data-scoped-list-select-all-results';
   const CLEAR_ATTR = 'data-scoped-list-clear-selection';
 
-  const DEFAULT_PAGE_SIZE = 25;
+  /**
+   * The scoped list's page window (issue 1373, maintainer feedback round 2).
+   *
+   * TEN, WHICH IS THE SMALLEST SIZE THE PAGER ITSELF OFFERS. The foot bar is `multiPageOnly`
+   * since issue 1372 - it renders past one page and not before - and at a twenty-five row
+   * window an eleven-tool world catalogue is one page, so a GM scrolled eleven rows under a
+   * screen that offered no page control at all. The maintainer's ruling is stated on the pair:
+   * eleven rows must show a pager and three must not, which is only true of a window at or
+   * below ten. Ten is also what the column actually holds - about seven rows at 900px - so the
+   * window and the viewport no longer disagree by a factor of three.
+   *
+   * It is the FRAME's default and `createScopedListBrowserState` restates it, because a lifted
+   * view-state seeds its own `pageSize` and would otherwise pin the old window on every
+   * surface that binds one.
+   */
+  const DEFAULT_PAGE_SIZE = 10;
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -510,9 +553,15 @@
    * addressed system's answers, so both are inert in world scope where there is no addressed
    * system.
    *
+   * `clearSelection` is on it because the SELECTION IS THIS FRAME'S (issue 1373, maintainer
+   * feedback round 2): a `bulk` panel renders the shared `BulkEditPanelShell`, whose header
+   * carries a Clear action, and a lane holds the ticked ids only as the array it was rendered
+   * with. Without a way back to the set's owner that Clear would be a button that cannot do the
+   * one thing it names.
+   *
    * @param {object|null} entry
    * @returns {{scope: object|null, systems: object[], systemId: string, selected: boolean,
-   *   member: boolean, systemRow: object|null}}
+   *   member: boolean, systemRow: object|null, clearSelection: () => void}}
    */
   function rowContext(entry) {
     const systemRow = entry ? (projected.systemRows.get(entry.id) ?? null) : null;
@@ -523,6 +572,7 @@
       selected: entry ? selectedIds.has(entry.id) : false,
       member: systemRow?.member === true,
       systemRow,
+      clearSelection,
     };
   }
 
@@ -651,6 +701,25 @@
         })
       : ''
   );
+
+  /**
+   * The selection band's standing sentence, and the condition on it is the honest half.
+   *
+   * `proto:594` reads `Bulk actions are in the inspector →`, and that is only TRUE when the bulk
+   * body actually lands in the inspector — which is `bulk && inspectorBody`, exactly the pair the
+   * inspector's own `{#if}` requires. `EntityRulesListShell` supplies a `bulk` snippet and NO
+   * `inspectorBody`, so its bulk body renders in `.manager-scoped-list-bulk` directly under this
+   * toolbar; pointing a GM at an inspector that is not on the screen would be a sentence about
+   * another screen. There it says nothing, and the band is the count and its two actions.
+   */
+  const selectionHint = $derived(
+    bulk && inspectorBody
+      ? text(
+          'FABRICATE.Admin.Manager.Scoped.List.SelectionInspectorHint',
+          'Bulk actions are in the inspector →'
+        )
+      : ''
+  );
 </script>
 
 <!--
@@ -669,61 +738,59 @@
     void the width of the panel that is not there.
   -->
   <div class="manager-scoped-list-layout" class:has-inspector={Boolean(inspectorBody) && available}>
-    {#if !available}
-      <div class="manager-scoped-list-unavailable">
-        <Callout
-          tone="warning"
-          text={text(
-            'FABRICATE.Admin.Manager.Scoped.List.Unavailable',
-            'This world corpus could not be read, so nothing here can be listed or edited. Reload the world once its settings are readable.'
-          )}
-          dataAttr="data-scoped-list-state"
-          dataValue="unavailable"
-        />
-      </div>
-    {:else}
-      <div class="manager-scoped-list-column">
+    <!--
+      THE COLUMN IS THE MIDDLE TRACK IN BOTH STATES, and the lead is above the branch rather than
+      inside its available half (issue 1373, maintainer feedback round 2).
+
+      A lane's `columnLead` is CHROME FOR THE ROUTE, not part of the list: the world Tool
+      catalogue's breakage card states one value for every Tool in the world and is the only
+      surface at world scope that authors it, so a corpus that failed to read must not make the
+      control disappear — that was its shipped behaviour when the page drew it as a sibling of
+      this frame, and the swap to `columnLead` must not quietly change it.
+    -->
+    <div class="manager-scoped-list-column">
+      {#if columnLead}
+        <div class="manager-scoped-list-column-lead">{@render columnLead()}</div>
+      {/if}
+      {#if !available}
+        <div class="manager-scoped-list-unavailable">
+          <Callout
+            tone="warning"
+            text={text(
+              'FABRICATE.Admin.Manager.Scoped.List.Unavailable',
+              'This world corpus could not be read, so nothing here can be listed or edited. Reload the world once its settings are readable.'
+            )}
+            dataAttr="data-scoped-list-state"
+            dataValue="unavailable"
+          />
+        </div>
+      {:else}
         <ManagerToolbar
           class="manager-scoped-list-toolbar"
           data-scoped-list-toolbar=""
           ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.Filters', 'List filters')}
         >
           <!--
-            ONE ROW, AND THE SELECTION CONTROL IS IN IT.
+            THE FILTER ROW HOLDS FILTERS, AND NOTHING THE SELECTION STATE CHANGES.
 
-            The prototype's catalogue toolbar is a single line — `[☐ All] [🔍 Search essences…]
-            SORT BY [Name ▾] [⇅ Asc]  6 of 6 essences` (`essences.png`) — where this frame shipped
-            two bands, the second holding nothing but a select-all box. The band cost about 40px
-            above the first row and read as a mode the GM had entered rather than as a control.
+            `proto:1970` is this row for the tool catalogue and `proto:3162` is it for the essence
+            one, and both are the same five things: the search field, `Sort by`, the sort select,
+            the direction toggle, and the count pushed right by `margin-left: auto`. NO selection
+            affordance appears in either, in any state — the design's own select-all is a text
+            action inside the band below, which renders only while a selection is active
+            (`proto:591`-`597`).
 
-            `BulkSelectionToolbar` renders its own `<div class="{rowClass} is-selection">` and
-            cannot be told not to, so it is NESTED INSIDE the filter row and flattened to
-            `display: contents` by the scoped rule below. Its children — the box, and the count,
-            select-all-results and Clear controls that appear only at a non-zero count — then join
-            this row directly, which is exactly the register the prototype draws.
-
-            Its `rowClass` is UNCHANGED. `scoped-entity-list-shells-mounted.test.js` asserts this
-            root wears `manager-scoped-list-filter-row` and no studio default, and the flattening
-            is a layout fact rather than a naming one.
+            THIS ROW HAS NOW BEEN THREE THINGS AND THIS IS THE REFERENCE'S. It shipped as two
+            bands, the second holding nothing but a select-all box; round 3 flattened the register
+            INTO this row with `display: contents` and then had to shrink the search field to
+            about 150px under a selection to stop the eleven resulting items wrapping. Both were
+            the same mistake at different sizes: a row whose composition depends on whether rows
+            are ticked. With the register gone the row is the same five items ticked or not, and
+            the field keeps its full ~400px in both states — which is what
+            `scoped-list-inspector-geometry.test.js` now measures, at rest and selected, off one
+            mount.
           -->
           <div class={TOOLBAR_ROW_CLASS}>
-            <BulkSelectionToolbar
-              rowClass={TOOLBAR_ROW_CLASS}
-              toolbarAttr={TOOLBAR_ATTR}
-              pageBoxAttr={PAGE_BOX_ATTR}
-              countAttr={COUNT_ATTR}
-              resultsAttr={RESULTS_ATTR}
-              clearAttr={CLEAR_ATTR}
-              pageSelectionState={selection.pageSelectionState}
-              count={selection.count}
-              showSelectAllResults={selection.showSelectAllResults}
-              selectAllResultsCount={selection.selectAllResultsCount}
-              {selectAllLabel}
-              onTogglePage={togglePage}
-              onSelectAllResults={selectAllResults}
-              onClear={clearSelection}
-            />
-
             <ManagerSearchField
               value={query}
               onInput={(next) => changeQuery(next)}
@@ -811,6 +878,53 @@
               <span class="manager-scoped-list-count" data-scoped-list-count>{resultCount}</span>
             {/if}
           </div>
+
+          <!--
+            ── THE SELECTION STATE IS ITS OWN BAND (issue 1373, maintainer feedback round 4) ────
+
+            `proto:591`-`597`: a tinted row directly beneath the filter row, rendered ONLY while a
+            selection is active, holding the count, a sentence pointing at the inspector, and the
+            two text actions at its trailing edge. `{#if selection.count > 0}` is the whole of
+            `sc-if value="{{ d.cl.selActive }}"` — the register is a STATE the screen enters, so
+            it has no resting appearance to design.
+
+            WHAT THIS COSTS, STATED RATHER THAN HIDDEN. `BulkSelectionToolbar` renders the
+            tri-state page box unconditionally and takes no prop to suppress it, so gating the
+            band on a non-empty selection takes the `All` box off the resting toolbar with it.
+            That is the right half of the trade: the design draws NOTHING selection-shaped in the
+            filter row, and it opens a selection from the row's own checkbox (`proto:603`, whose
+            `title` on the essence and system lists is literally `Select for bulk edit`). So the
+            row box is the entry point, the band's `All` completes the page once a selection
+            exists, and `Select all N results` completes the corpus. The alternative — leaving
+            `All` in the filter row — keeps a control the reference does not have on every frame
+            of every state, which is the finding this round exists to close.
+
+            IT STAYS INSIDE `<ManagerToolbar>`, as the register's last row. The toolbar is the
+            labelled landmark the manager's "emptying a bulk selection" contract hops focus to
+            (`design-system/spec.md`), and moving the band out of it would leave that hop landing
+            on a row that no longer holds the selection register.
+          -->
+          {#if selection.count > 0}
+            <BulkSelectionToolbar
+              rowClass={TOOLBAR_ROW_CLASS}
+              toolbarAttr={TOOLBAR_ATTR}
+              pageBoxAttr={PAGE_BOX_ATTR}
+              countAttr={COUNT_ATTR}
+              resultsAttr={RESULTS_ATTR}
+              clearAttr={CLEAR_ATTR}
+              pageSelectionState={selection.pageSelectionState}
+              count={selection.count}
+              showSelectAllResults={selection.showSelectAllResults}
+              selectAllResultsCount={selection.selectAllResultsCount}
+              {selectAllLabel}
+              hint={selectionHint}
+              trailingActions
+              bareActions
+              onTogglePage={togglePage}
+              onSelectAllResults={selectAllResults}
+              onClear={clearSelection}
+            />
+          {/if}
         </ManagerToolbar>
 
         {#if bulk && !inspectorBody && selection.count > 0}
@@ -827,7 +941,18 @@
                because it is not a list item. It renders in the empty states too: a catalogue
                with nothing in it is exactly when a GM most needs the surface that creates the
                first record. -->
-          {#if listLead}{@render listLead()}{/if}
+          <!--
+            WRAPPED, AND THE WRAPPER IS WHERE THE GAP LIVES (issue 1373, maintainer feedback
+            round 2). The lead had no separation from whatever follows it at all: the drop zone
+            touched the `No tools yet` hero on an empty catalogue and butted straight against
+            the first row on a populated one. Those look like two defects and are one — the
+            space belongs BELOW the lead, stated once here, so all three states below it inherit
+            it rather than each restating a margin of its own. The design gives the zone the same
+            relationship: a bottom margin about twice the row rhythm (`proto:1980`).
+          -->
+          {#if listLead}
+            <div class="manager-scoped-list-lead">{@render listLead()}</div>
+          {/if}
           {#if page.rows.length === 0 && filtered}
             <EmptyState
               filtered
@@ -1073,25 +1198,28 @@
           onPageChange={changePage}
           onPageSizeChange={changePageSize}
         />
-      </div>
+      {/if}
+    </div>
 
-      {#if inspectorBody}
-        <aside
-          class="manager-scoped-list-inspector"
-          bind:this={inspectorElement}
-          tabindex="-1"
-          data-keyboard-focus="true"
-          data-scoped-list-inspector
-          aria-label={text('FABRICATE.Admin.Manager.Scoped.List.Inspector', 'Details')}
-        >
-          {#if bulk && selection.count > 0}
-            <div class="manager-scoped-list-inspector-scroll">
-              {@render bulk([...selectedIds], rowContext(null))}
-            </div>
-          {:else if inspectedEntry}
-            {@const thumbnail = thumbnailOf(inspectedEntry)}
-            {@const caption = colourCaption(inspectedEntry?.entity?.colorToken)}
-            <!--
+    <!-- `&& available` for the reason the layout's own note gives: the unavailable state draws
+         one callout and no panel, so a 300px track beside it would be a painted void. -->
+    {#if inspectorBody && available}
+      <aside
+        class="manager-scoped-list-inspector"
+        bind:this={inspectorElement}
+        tabindex="-1"
+        data-keyboard-focus="true"
+        data-scoped-list-inspector
+        aria-label={text('FABRICATE.Admin.Manager.Scoped.List.Inspector', 'Details')}
+      >
+        {#if bulk && selection.count > 0}
+          <div class="manager-scoped-list-inspector-scroll">
+            {@render bulk([...selectedIds], rowContext(null))}
+          </div>
+        {:else if inspectedEntry}
+          {@const thumbnail = thumbnailOf(inspectedEntry)}
+          {@const caption = colourCaption(inspectedEntry?.entity?.colorToken)}
+          <!--
               THE IDENTITY BLOCK IS THREE STACKED PARTS, NOT A TWO-COLUMN ROW.
 
               The prototype's inspector opens with a kicker, then the medallion beside the name
@@ -1100,31 +1228,31 @@
               medallion, which is a 190px measure inside a 300px panel — the frame captured on
               the branch clipped `The binding between things, drawn thin…` at the first line.
             -->
-            <div class="manager-scoped-list-inspector-identity">
-              {#if inspectorKicker}
-                <p class="manager-kicker" data-scoped-list-inspector-kicker>{inspectorKicker}</p>
-              {/if}
-              <div class="manager-inspector-title-row">
-                <span class="manager-inspector-icon">
-                  <Medallion
-                    src={thumbnail.src}
-                    icon={thumbnail.icon}
-                    tint={thumbnail.tint}
-                    size={42}
-                  />
-                </span>
-                <span class="manager-inspector-copy">
-                  <!--
+          <div class="manager-scoped-list-inspector-identity">
+            {#if inspectorKicker}
+              <p class="manager-kicker" data-scoped-list-inspector-kicker>{inspectorKicker}</p>
+            {/if}
+            <div class="manager-inspector-title-row">
+              <span class="manager-inspector-icon">
+                <Medallion
+                  src={thumbnail.src}
+                  icon={thumbnail.icon}
+                  tint={thumbnail.tint}
+                  size={42}
+                />
+              </span>
+              <span class="manager-inspector-copy">
+                <!--
                     AN `<h2>`, as every shipped inspector renders it. `.manager-inspector-name`
                     fully specifies its own appearance, so the element choice is free — and it is
                     the entry point a screen-reader user browsing by heading needs into the panel
                     focus was just moved to. It also puts the catalogue shell's own `<h3>` group
                     head at a level that does not skip.
                   -->
-                  <h2 class="manager-inspector-name" data-scoped-list-inspector-name>
-                    {scopedEntryName(inspectedEntry)}
-                  </h2>
-                  <!--
+                <h2 class="manager-inspector-name" data-scoped-list-inspector-name>
+                  {scopedEntryName(inspectedEntry)}
+                </h2>
+                <!--
                     THE GATE IS THE SNIPPET OR THE COLOUR, NEVER THE COLOUR ALONE.
 
                     It was `{#if caption}`, and `caption` is `colourCaption(colorToken)` — so a
@@ -1136,41 +1264,44 @@
                     A LANE SNIPPET WINS OUTRIGHT when it is supplied, which is unchanged; what
                     changed is that supplying one is now sufficient to reach the DOM.
                   -->
-                  {#if inspectorCaption || caption}
-                    <span class="manager-scoped-list-inspector-caption" data-scoped-list-caption>
-                      {#if inspectorCaption}
-                        {@render inspectorCaption(inspectedEntry)}
-                      {:else}{caption}{/if}
-                    </span>
-                  {/if}
-                </span>
-              </div>
-              <p class="manager-scoped-list-inspector-description">
-                {descriptionOf(inspectedEntry)}
-              </p>
+                {#if inspectorCaption || caption}
+                  <span class="manager-scoped-list-inspector-caption" data-scoped-list-caption>
+                    {#if inspectorCaption}
+                      {@render inspectorCaption(inspectedEntry)}
+                    {:else}{caption}{/if}
+                  </span>
+                {/if}
+              </span>
             </div>
-            <div class="manager-scoped-list-inspector-scroll">
-              {@render inspectorBody(inspectedEntry, rowContext(inspectedEntry))}
-            </div>
-            {#if inspectorFoot}
-              <div class="manager-scoped-list-inspector-foot" data-scoped-list-inspector-foot>
-                {@render inspectorFoot(inspectedEntry)}
-              </div>
-            {/if}
-          {:else}
-            <div class="manager-scoped-list-inspector-scroll">
-              <EmptyState
-                compact
-                {icon}
-                title={text('FABRICATE.Admin.Manager.Scoped.List.RestingTitle', 'Nothing selected')}
-                hint={subtitle}
-                dataAttr="data-scoped-list-inspector-state"
-                dataValue="resting"
-              />
+            <p class="manager-scoped-list-inspector-description">
+              {descriptionOf(inspectedEntry)}
+            </p>
+          </div>
+          <div class="manager-scoped-list-inspector-scroll">
+            {@render inspectorBody(inspectedEntry, rowContext(inspectedEntry))}
+          </div>
+          {#if inspectorFoot}
+            <div class="manager-scoped-list-inspector-foot" data-scoped-list-inspector-foot>
+              {@render inspectorFoot(inspectedEntry)}
             </div>
           {/if}
-        </aside>
-      {/if}
+        {:else}
+          <div class="manager-scoped-list-inspector-scroll">
+            <!-- THE LANE'S COPY WINS, and the shipped pair is the fallback. See the
+                   `restingTitle` prop note: the hint defaulted to the page SUBTITLE, which is
+                   the sentence the header already prints. -->
+            <EmptyState
+              compact
+              {icon}
+              title={restingTitle ||
+                text('FABRICATE.Admin.Manager.Scoped.List.RestingTitle', 'Nothing selected')}
+              hint={restingHint || subtitle}
+              dataAttr="data-scoped-list-inspector-state"
+              dataValue="resting"
+            />
+          </div>
+        {/if}
+      </aside>
     {/if}
   </div>
 </div>
@@ -1256,6 +1387,15 @@
      this component writes. */
   :global(.manager-toolbar.manager-scoped-list-toolbar) {
     flex: 0 0 auto;
+  }
+
+  /* THE COLUMN LEAD IS CHROME, so it takes none of the column's slack — the same `0 0 auto`
+     the toolbar and the pager take, for the same reason. It is a `display: grid` box so a
+     single card child spans the column exactly as the design draws it. */
+  .manager-scoped-list-column-lead {
+    display: grid;
+    flex: 0 0 auto;
+    min-width: 0;
   }
 
   .manager-scoped-list-bulk {
@@ -1357,26 +1497,20 @@
     min-width: 0;
   }
 
-  /* THE SELECTION REGISTER IS FLATTENED INTO THE FILTER ROW. `BulkSelectionToolbar` renders its
-     own row element and takes no "render inline" prop, so the box is nested and its wrapper is
-     removed from the box tree — which also drops the global `.is-selection` hairline and its
-     `padding-top`, since neither paints on a `display: contents` box.
+  /* ── TWO RULES USED TO LIVE HERE, AND BOTH WENT WITH THE FLATTENING (issue 1373, round 4) ───
+     `.manager-scoped-list-filter-row.is-selection { display: contents }` removed the register's
+     own wrapper from the box tree so its controls joined the filter row; the `:has()` rule under
+     it then shrank the search field to about 150px whenever that row carried a selection count,
+     because eleven items no longer fitted 1280px. The register is its own band now
+     (`proto:591`-`597`), so the filter row never carries those items, never overflows, and the
+     field never yields. A flattening rule against a band that is no longer nested, and a
+     `:has()` guard against a count that is no longer in this row, would both compile to
+     selectors matching nothing — silently, since neither compound could carry this component's
+     hash. They are deleted rather than left as inert text.
 
-     `:global()` because the element is the PRIMITIVE'S, not this template's: Svelte's
-     unused-selector analysis cannot see across a component boundary and would emit this whole
-     block as a dead comment. The local half of the selector keeps it out of every other screen,
-     exactly as the `.manager-pagination` rule above does. */
-  /* BOTH compounds are `:global` now (issue 1039), and it has to be both. The ancestor is a
-     `<ManagerToolbar>` tag and the child is `BulkSelectionToolbar`'s own element, so NEITHER can
-     carry this component's scope hash — leaving the ancestor scoped emitted
-     `.manager-scoped-list-toolbar.svelte-… .manager-scoped-list-filter-row.is-selection`, which
-     matched nothing while looking exactly like the working rule. Specificity is unchanged at
-     (0,4,0): two classes on the ancestor, two on the child, and a `:global()` contributes none of
-     its own. The pair still keeps this off every other screen, exactly as the note below says. */
-  :global(.manager-toolbar.manager-scoped-list-toolbar)
-    :global(.manager-scoped-list-filter-row.is-selection) {
-    display: contents;
-  }
+     The band's own appearance is `.manager-scoped-list-filter-row.is-selection` in
+     `styles/fabricate.css`, and it has to be: `BulkSelectionToolbar` writes that element in ITS
+     template, so no rule in this block can reach it at all. */
 
   /* `SORT BY`, the prototype's tracked micro-label before the key select. It is a `<span>` rather
      than a `<label>` because it names TWO controls — the key and the direction toggle — and a
@@ -1473,6 +1607,19 @@
     scroll-snap-align: start;
   }
 
+  /* THE ONE GAP UNDER THE LEAD (issue 1373, maintainer feedback round 2). Stated on the lead
+     rather than on each of the three things that can follow it — the filtered hero, the empty
+     hero and the `<ul>` — because it is one relationship, and three copies of it is how the
+     empty state came to touch the drop zone while the rows did not.
+
+     A step above the `--fab-space-2` rhythm the rows themselves keep, which is the design's own
+     proportion at `proto:1980`: the zone is a different KIND of thing from the rows under it and
+     reads as one only when it is spaced further than they are from each other. */
+  .manager-scoped-list-lead {
+    margin-bottom: var(--fab-space-3);
+    min-width: 0;
+  }
+
   /* THE SCROLL MOVED OFF THE PANEL AND ONTO ITS MIDDLE CHILD.
 
      The prototype pins `Open definition` to the FOOT of the inspector, full width, below a
@@ -1515,6 +1662,27 @@
     overflow-y: auto;
   }
 
+  /* THE RESTING PANEL IS CONTENT-HEIGHT AT THE TOP OF THE COLUMN (issue 1373, maintainer
+     feedback round 3). The ASIDE runs the full height of the app — that is finding 6 and it
+     stays — but the panel inside it does not stretch to fill it.
+
+     THIS REVERSES THE `flex: 1 1 auto` THE PREVIOUS ROUND SHIPPED, and the argument is already
+     settled in this repository rather than re-opened here. `styles/fabricate.css` records the
+     identical correction for the identical control on the screen the finding names as the
+     model: `.manager-tool-browser-inspector-empty` went from `flex: 1 1 auto` to `flex: 0 0
+     auto` for issue 1373 because stretching it "introduced a container the POPULATED panel does
+     not have" — a ~700px dashed box answering a ~220px list card, the two halves of one screen
+     stating the same absence at three times the size. The system Tool Rules rail draws it
+     content-height and top-aligned, and this is the shared frame's half of the same treatment.
+
+     `:global()` and a DIRECT-CHILD combinator: the element is `EmptyState`'s, so it can never
+     carry this component's scope hash, and the `>` keeps the rule off any empty state a lane's
+     own inspector body renders further down the same scroller. */
+  .manager-scoped-list-inspector-scroll > :global(.manager-empty) {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
   .manager-scoped-list-inspector-identity {
     display: flex;
     flex: 0 0 auto;
@@ -1534,11 +1702,16 @@
     margin-top: var(--fab-space-2xs);
   }
 
-  /* THE LABELLED ROW ACTION. Deliberately the same box as `SystemRulesRoster`'s `Rules ⧉` link,
-     the value: the design draws both as one small bordered button with a trailing external-link
-     glyph, and two near-identical treatments a panel apart is what this repository keeps
-     finding. Foundry's fixed button geometry is reset explicitly, as every other manager
-     `<button>` wearing its own chrome resets it. */
+  /* THE LABELLED ROW ACTION: a small bordered button with a trailing external-link glyph, which
+     is what the design draws at the trailing edge of a catalogue row (`proto:1997`). Foundry's
+     fixed button geometry is reset explicitly, as every other manager `<button>` wearing its own
+     chrome resets it.
+
+     IT IS NOT THE SAME BOX AS `SystemRulesRoster`'s `Rules ↗`, and this note used to claim it
+     was. Read against the design's own markup the two are deliberately different controls: this
+     one is a bordered button on a filled surface, and the roster's is a bare accent TEXT link
+     inside a 300px panel (`proto:2031`). Matching them made the inspector's navigation compete
+     with the panel's pinned primary action for the same weight. */
   .manager-scoped-list-row-action {
     appearance: none;
     -webkit-appearance: none;
