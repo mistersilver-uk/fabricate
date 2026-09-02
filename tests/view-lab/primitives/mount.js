@@ -27,6 +27,15 @@
  *                                is also the convention `tests/view-lab/mount.js` already uses for
  *                                `data-view-lab-error`.
  *
+ * ── EACH CATALOGUED ROW'S PLINTH ALSO NAMES ITSELF ────────────────────────────────────────────
+ *
+ *   data-primitive-lab-specimen  the catalogue row's `path`, on exactly one plinth per row. The
+ *                                count above can then be checked for IDENTITY rather than only for
+ *                                size, because a page that mounted the right NUMBER of the wrong
+ *                                components reports a count indistinguishable from a correct one.
+ *                                `Plinth.svelte` holds the one-element-per-path invariant and
+ *                                `PrimitiveLab.svelte` decides which call site carries it.
+ *
  * ── AND IT FAILS CLOSED ON A MISSING CHROME HARVEST ───────────────────────────────────────────
  *
  * `scripts/lib/foundryChromeCache.js` already rules on this for the View Lab: it "never renders
@@ -55,6 +64,12 @@ import { readStateRules, readThemeTokenTable } from './tokens.js';
 const MOUNTED_ATTRIBUTE = 'data-primitive-lab-mounted';
 const READY_ATTRIBUTE = 'data-primitive-lab-ready';
 const ERROR_ATTRIBUTE = 'data-primitive-lab-error';
+
+/** The query parameter that says how much of the catalogue to mount. */
+const MOUNT_PARAMETER = 'mount';
+
+/** The only value it accepts — and what `scripts/primitive-lab-smoke.mjs` navigates with. */
+const MOUNT_ALL_VALUE = 'all';
 
 /** The stylesheet whose absence means no chrome. Probed, then linked by the page itself. */
 const CHROME_PROBE_URL = '/@foundry-chrome/css/foundry2.css';
@@ -134,7 +149,40 @@ function publishProgress({ mounted, failed, settled, expected }) {
   else document.body.removeAttribute(READY_ATTRIBUTE);
 }
 
+/**
+ * Honour `?mount=all` — which this page satisfies by already having done it.
+ *
+ * WITHOUT THE QUERY: every catalogued row is mounted. `PrimitiveLab.svelte`'s third region draws
+ * one plinth per catalogue row, for every group, unconditionally. The rail's selection decides only
+ * which row is ADDITIONALLY repeated on the workbench, across the seven-theme comparison row and
+ * over the story matrix, so there is no selection-only mode for the query to switch out of.
+ *
+ * WITH THE QUERY: nothing changes. It is an explicit no-op, stated rather than inferred, because
+ * `scripts/primitive-lab-smoke.mjs` navigates with it — it has to drive every specimen and will not
+ * walk the rail — and a reader who found the query there and no mention of it here would have to
+ * read the whole render plan to discover it was already satisfied.
+ *
+ * ANY OTHER VALUE IS REFUSED rather than ignored, and that is what keeps the no-op honest. A page
+ * that answered `?mount=controls` by mounting all fifty-seven would report a partial request as a
+ * complete catalogue, and the refusal costs one comparison.
+ *
+ * @throws {Error} When the query names a mode this page does not have.
+ */
+function requireSupportedMountMode() {
+  const requested = new URLSearchParams(globalThis.location.search).get(MOUNT_PARAMETER);
+  if (requested === null || requested === MOUNT_ALL_VALUE) return;
+  throw new Error(
+    `Fabricate Primitive Lab: ?${MOUNT_PARAMETER}=${requested} is not a mode this page has. ` +
+      `The only accepted value is ${MOUNT_ALL_VALUE}, and it is also what the page does with ` +
+      'no query at all: every catalogued row is mounted on its own plinth either way.'
+  );
+}
+
 async function boot() {
+  // BEFORE the chrome probe: this one is a read of the request itself, and a page asked for a mode
+  // it does not have should say so rather than spend a harvest check answering a question nobody
+  // asked.
+  requireSupportedMountMode();
   await requireChrome();
 
   const i18n = toI18nStub(await createLocalizer());

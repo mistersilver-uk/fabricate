@@ -23,6 +23,19 @@
   is a live component and not a photograph of one: clicking a `Stepper` in the catalogue moves it,
   through the same `writes` path the workbench uses. The knob PANEL drives the selection because
   there is one panel; the specimens themselves are all real.
+
+  ── AND THE CATALOGUE IS THE ONE REGION THAT NAMES WHAT IT DREW ─────────────────────────────────
+
+  Region 3 renders exactly one plinth per catalogue row, so it is the only region that can carry a
+  row's identity: it is the only one whose plinth count equals the catalogue's row count. Region 2's
+  three call sites all draw the SELECTED row — driven, then once in each of the seven themes, then
+  once per story cell — so an identity on any of them would publish one path from a dozen elements.
+  `Plinth.svelte` states the invariant the smoke is decided on: exactly one element per catalogue
+  path, page-wide.
+
+  It is also why region 3 is unconditional. The rail's selection changes what region 2 repeats and
+  nothing else, so the page mounts the whole catalogue on every load, with or without `?mount=all` —
+  see `mount.js`, which owns that query.
 -->
 <script>
   import Chip from '../../../src/ui/svelte/apps/manager/Chip.svelte';
@@ -230,11 +243,16 @@
               <span><Chip icon="fas fa-layer-group">{group.num} · {group.title}</Chip></span>
               <div class="pl-plinth-row">
                 {#each rows as row (row.path)}
+                  <!--
+                    THE CANONICAL PLINTH FOR THIS ROW, and the only one that says so. `specimen` is
+                    passed here and at no other `<Plinth>` on this page; see `Plinth.svelte`.
+                  -->
                   <Plinth
                     root={row.entry.root ?? 'manager'}
                     width={420}
                     height={plinth.height}
                     label={row.name}
+                    specimen={row.path}
                   >
                     {@render specimen(`cat:${row.path}`, row, valuesFor(row), {})}
                   </Plinth>

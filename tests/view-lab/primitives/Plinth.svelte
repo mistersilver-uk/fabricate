@@ -40,6 +40,31 @@
   theme. `styles/fabricate.css:161` declares each theme on `.fabricate[data-fabricate-theme="…"]`,
   on ANY element, so the attribute is written onto this frame and reaches nothing else.
 
+  ── ONE PLINTH PER CATALOGUE ROW NAMES THAT ROW, AND ONLY ONE ─────────────────────────────────
+
+  `data-primitive-lab-specimen` carries the catalogue row's `path`, and it is the whole identity
+  half of the smoke's contract: `scripts/primitive-lab-smoke.mjs` collects every element carrying
+  it and compares the resulting SET against the paths `scripts/lib/primitiveLabSmoke.js` reads off
+  the catalogue files. The invariant that makes the comparison mean anything, and the one thing to
+  preserve when this component gains another call site:
+
+      EXACTLY ONE ELEMENT PER CATALOGUE PATH, PAGE-WIDE.
+
+  So it arrives as a PROP rather than being derived here from `children`, because a plinth cannot
+  tell whether it is the canonical one. `PrimitiveLab.svelte` draws the selected row once on the
+  workbench, seven more times across the theme comparison row and once per story cell — a row with
+  two story matrices is already a dozen plinths holding one component. A plinth that named itself
+  would publish its path from every one of them, and the smoke would compare a bag of duplicates
+  against a set: a page that mounted everything correctly would then pass or fail for reasons that
+  have nothing to do with what mounted. `PrimitiveLab.svelte`'s catalogue region is the single call
+  site that passes it, because it is the single region that renders one plinth per catalogue row.
+
+  The attribute name is spelled here rather than imported: `scripts/lib/primitiveLabSmoke.js` reads
+  `node:fs` and this file is a browser bundle, so there is no constant the two halves can share.
+  What catches a drift between them is `npm run lab:check` itself, and loudly — rename either half
+  and the smoke finds zero specimen roots against a non-empty catalogue and reports every row as
+  never mounted.
+
   ── `overflow: clip` IS NOT OVERRIDDEN ──────────────────────────────────────────────────────────
 
   `.fabricate-manager` clips deliberately (issue 1286). Unclipping it here would show a popover
@@ -65,6 +90,7 @@
     height = MIN_PLINTH_HEIGHT,
     label = '',
     probe = false,
+    specimen = '',
     children,
   } = $props();
 
@@ -79,6 +105,16 @@
       .filter(Boolean)
       .join(';')
   );
+
+  /**
+   * The catalogue path this plinth is the specimen for, or `undefined` when it is not one.
+   *
+   * `undefined` and never `''`, because Svelte OMITS an attribute valued `undefined` while it
+   * renders an empty string as `data-primitive-lab-specimen=""` — and the smoke's selector tests
+   * for the attribute's PRESENCE, so every unidentified plinth on the page would join the mounted
+   * set as an empty path.
+   */
+  const specimenPath = $derived(specimen || undefined);
 
   let frame = $state(null);
   let observed = $state(null);
@@ -158,6 +194,7 @@
     class={frameClass}
     style={frameStyle}
     data-primitive-lab-plinth={root}
+    data-primitive-lab-specimen={specimenPath}
     {...{ [FABRICATE_THEME_ATTRIBUTE]: normalizeFabricateTheme(theme) }}
   >
     <section class="window-content">
