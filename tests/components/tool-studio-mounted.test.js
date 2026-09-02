@@ -1795,6 +1795,152 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(patches.some((patch) => patch.prerequisites?.ids?.includes('smith')));
   });
 
+  // -- THE TWO ROWS ARE ONE COMPONENT WITH TWO DECLARED VARIANTS (issue 1373, round 6) ------
+  //
+  // Round 5 landed both lists on `ModifierLibraryRow` and recorded two DEVIATIONS from the
+  // reference rather than reproducing them: the prerequisite row's control moved to the trailing
+  // edge and its label and expression went inline. The maintainer's round-6 ruling is that both
+  // differences are real and load-bearing, and that the answer is declared variants on ONE
+  // component rather than two components or one shape forced on both.
+  //
+  // `proto:2331`-`2333`: the checkbox is the FIRST child, then the glyph, then a text block whose
+  // label and expression are STACKED. `proto:2361`-`2364`: no leading control, the label and
+  // expression INLINE in a flex row, and the radio dot trailing at `margin-left: auto`.
+  //
+  // ASSERTED AS DOCUMENT POSITION, not as a class list. A class assertion is satisfied by a row
+  // that emits `is-control-leading` and still renders its control last, which is the exact defect
+  // this guard exists to catch.
+  it('leads the prerequisite row with its control and stacks its text, and trails the bonus row', async () => {
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        tool: tool({
+          prerequisites: { enabled: true, ids: ['expert'], gateMode: 'block' },
+          bonus: { enabled: true, expression: '@prof' },
+        }),
+      })
+    );
+
+    // -- THE PREREQUISITE ROW: CONTROL FIRST, TEXT STACKED ----------------------------------
+    for (const row of root.querySelectorAll('[data-tool-prerequisite-row]')) {
+      const box = row.querySelector('.fab-selection-check');
+      const glyph = row.querySelector('.manager-modifier-readonly-glyph');
+      assert.ok(Boolean(box), 'the prerequisite row draws the shared selection box');
+      // DOCUMENT_POSITION_FOLLOWING (4): the glyph comes AFTER the box, so the control leads.
+      assert.equal(
+        box.compareDocumentPosition(glyph) & 4,
+        4,
+        '`proto:2331` puts the checkbox FIRST, before the glyph — round 5 trailed it'
+      );
+      // The literal first child is `SelectionCheckbox`'s real input, which is what makes the
+      // control the row's leading slot rather than merely its first PAINTED cell.
+      assert.equal(
+        row.firstElementChild.tagName,
+        'INPUT',
+        'the caller control is rendered into the row before anything the row owns'
+      );
+
+      const label = row.querySelector('.manager-modifier-readonly-label');
+      const expression = row.querySelector('.manager-modifier-readonly-expression');
+      const stack = row.querySelector('.manager-modifier-readonly-text');
+      assert.ok(Boolean(stack), '`proto:2333` sets the name over the expression in one text block');
+      assert.equal(label.parentElement, stack, 'the name is inside that block');
+      assert.equal(expression.parentElement, stack, 'and so is the expression');
+      assert.ok(
+        row.classList.contains('is-text-stacked'),
+        'and the row declares the stacked variant, which is what the sheet paints'
+      );
+      assert.ok(row.classList.contains('is-control-leading'));
+    }
+
+    // -- THE BONUS ROW: CONTROL LAST, TEXT INLINE -------------------------------------------
+    for (const row of root.querySelectorAll('[data-tool-bonus-modifier]')) {
+      const dot = row.querySelector('input[type="radio"]');
+      assert.ok(Boolean(dot), 'the bonus row draws a real radio');
+      assert.equal(
+        row.lastElementChild,
+        dot,
+        '`proto:2364` trails the dot — the bonus row keeps the shipped trailing slot'
+      );
+      const label = row.querySelector('.manager-modifier-readonly-label');
+      const expression = row.querySelector('.manager-modifier-readonly-expression');
+      assert.equal(label.parentElement, row, 'the name is a direct cell of the row');
+      assert.equal(expression.parentElement, row, 'and the expression sits inline beside it');
+      assert.ok(
+        !row.querySelector('.manager-modifier-readonly-text'),
+        'the inline face renders no text block at all, so the Checks Studio DOM is untouched'
+      );
+      assert.equal(row.classList.contains('is-control-leading'), false);
+      assert.equal(row.classList.contains('is-text-stacked'), false);
+    }
+  });
+
+  // -- ONE PREREQUISITE IS "One prerequisite", NOT "1 prerequisites" (issue 1373, round 6) --
+  //
+  // `manager-tool-prerequisites-selected-1280x720` photographed the preview rail with exactly one
+  // prerequisite chosen and it read `1 prerequisites must be met.`. The singular string is not
+  // missing - `FABRICATE.Admin.Manager.Tools.Editor.PreviewGateCountOne` has been in `lang/en.json`
+  // all along - the call BRANCHED ITS FALLBACK and passed the plural KEY either way, so the
+  // singular was selected only in a world with no translation loaded at all.
+  //
+  // WHICH IS WHY THIS TEST INSTALLS THE REAL LOCALE. The shared harness's `game.i18n.localize`
+  // returns the key, so every `text()`/`formattedText()` call in this suite takes its FALLBACK
+  // branch - the one branch that was already correct. Mounted against that double the defect is
+  // invisible and the guard would pass on the broken tree, which is the vacuity this suite has
+  // been bitten by before.
+  it('says "One prerequisite" for one, reading the real locale', async () => {
+    const locale = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    const flat = new Map();
+    (function walk(node, prefix) {
+      for (const [key, value] of Object.entries(node)) {
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (value && typeof value === 'object') walk(value, path);
+        else flat.set(path, value);
+      }
+    })(locale, '');
+    const previous = globalThis.game.i18n;
+    globalThis.game.i18n = {
+      localize: (key) => flat.get(key) ?? key,
+      format: (key, data) =>
+        Object.entries(data || {}).reduce(
+          (copy, [name, value]) => copy.replaceAll(`{${name}}`, String(value)),
+          flat.get(key) ?? key
+        ),
+    };
+    try {
+      // The locale double is only honest if it can be SEEN: a sentence this suite already pins
+      // through its fallback must now arrive from `lang/en.json` instead.
+      const one = await harness.mount(
+        props({
+          activeTab: 'requirements',
+          tool: tool({ prerequisites: { enabled: true, ids: ['expert'], gateMode: 'block' } }),
+        })
+      );
+      assert.equal(
+        one.querySelector('[data-tool-preview-gate]').textContent.trim(),
+        'One prerequisite must be met.',
+        'one selected prerequisite reads as one'
+      );
+
+      harness.remount();
+      const several = await harness.mount(
+        props({
+          activeTab: 'requirements',
+          tool: tool({
+            prerequisites: { enabled: true, ids: ['expert', 'smith'], gateMode: 'block' },
+          }),
+        })
+      );
+      assert.equal(
+        several.querySelector('[data-tool-preview-gate]').textContent.trim(),
+        '2 prerequisites must be met.',
+        'and the plural is untouched'
+      );
+    } finally {
+      globalThis.game.i18n = previous;
+    }
+  });
+
   it('renders the recipe-style grouped validation surface and Validation-only live preview note', async () => {
     const invalidTool = tool({
       breakage: { mode: 'breakageChance', breakageChance: 101 },

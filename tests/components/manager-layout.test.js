@@ -7450,9 +7450,14 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
 // had NO metrics at all — a silent failure, since every class selector would still resolve. So
 // the two anchors JOIN one block per cell rather than the Tool route authoring a second copy.
 test('the modifier library row is one block per cell, reaching both screens that draw it', () => {
+  // THE GLYPH LEFT THIS LIST AT ROUND 6, and deliberately. `proto:2332` draws the prerequisite
+  // row's glyph BARE - `font-size:11px; color:var(--accent); flex:0 0 auto` and no box at all -
+  // where `proto:2363` gives the bonus row the 26px tile this block states. The tile is not
+  // suppressed by a rule resetting five properties; the block simply stops naming the one route
+  // that does not draw one, and the bare face is stated once, on the ROW's own variant class, in
+  // `the leading-control variant carries the reference bare glyph` below.
   const CELLS = [
     'manager-modifier-readonly-row',
-    'manager-modifier-readonly-glyph',
     'manager-modifier-readonly-label',
     'manager-modifier-readonly-expression',
   ];
@@ -7469,12 +7474,23 @@ test('the modifier library row is one block per cell, reaching both screens that
       `${cell} must be ONE joined block naming all three routes, not a copy per Tool list`
     );
     // The non-vacuity half: a second declaring block would satisfy the join above and still
-    // let the two screens drift, so each cell is declared exactly twice in the file — once in
-    // the joined selector, once nowhere else.
+    // let the two screens drift, so each cell is declared exactly once OUTSIDE a variant — in
+    // the joined selector, and nowhere else.
+    //
+    // A VARIANT BLOCK IS EXEMPT, and by NAME rather than by pattern. Round 6 gave the row two
+    // declared variants, and `is-text-stacked` restates the expression cell's `flex` for a
+    // COLUMN context the joined value was not written for. That is an extension of the one
+    // owner rather than a second one, and it is reachable only from a row that asked for it.
+    // Exempting the two variant classes and nothing else is what keeps a plain copy on a
+    // third route failing here exactly as it did before.
+    const declaringLines = css
+      .split('\n')
+      .filter((line) => line.trimEnd().endsWith(`.${cell} {`))
+      .filter((line) => !/is-text-stacked|is-control-leading/.test(line));
     assert.equal(
-      (css.match(new RegExp(`\\.${cell} \\{`, 'g')) || []).length,
+      declaringLines.length,
       1,
-      `${cell} must be declared exactly once`
+      `${cell} must be declared exactly once outside the row's declared variants`
     );
   }
   // AND THE PICK CONTROL IS THE MANAGER'S SHIPPED RADIO, joined the same way. Foundry's core
@@ -7497,6 +7513,93 @@ test('the modifier library row is one block per cell, reaching both screens that
     false,
     'the themed radio stays scoped to the surfaces that opt into it, never radios globally'
   );
+});
+
+// ── ONE ROW, TWO DECLARED VARIANTS, AND BOTH TRAVEL WITH THE PRIMITIVE (round 6) ────────────
+//
+// Round 5 put both Tool lists on this row and RECORDED two deviations from the reference rather
+// than reproducing them. The maintainer's round-6 ruling is that the reference's two rows
+// genuinely differ in exactly those two ways, and that the answer is declared variants on ONE
+// component — not two components, and not one shape forced on both:
+//
+//   `proto:2331`-`2333`  control FIRST, glyph BARE at 11px, label stacked over the expression
+//   `proto:2361`-`2364`  no leading control, label and expression INLINE, dot trailing
+//
+// Both variants are stated on the ROW's own class rather than on a route container, and that is
+// what makes them the primitive's rather than the Tool tab's: a fourth caller opting in gets the
+// rendering with the prop. A `.manager-tool-prerequisite-list`-anchored copy renders identically
+// today and gives that caller nothing, so the rooting is asserted rather than left to reading.
+test('the leading-control variant carries the reference bare glyph', () => {
+  // The TILE keeps two anchors — the two routes that still draw one.
+  const tile =
+    '.fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph,\n' +
+    '.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-glyph {';
+  assert.ok(css.includes(tile), 'the glyph tile is one block naming the two routes that draw it');
+  assert.equal(
+    css.includes('.manager-tool-prerequisite-list .manager-modifier-readonly-glyph'),
+    false,
+    'and `proto:2332` draws that row bare, so the tile block does not reach it at all'
+  );
+
+  const bare =
+    '.fabricate-manager .manager-modifier-readonly-row.is-control-leading > ' +
+    '.manager-modifier-readonly-glyph {';
+  assert.ok(
+    css.includes(bare),
+    "the bare glyph is stated once, on the row's own variant class, so it travels with the row"
+  );
+  const bareDeclarations = css.slice(css.indexOf(bare) + bare.length).split('}')[0];
+  assert.match(bareDeclarations, /font-size: 11px/, '`proto:2332`');
+  assert.match(bareDeclarations, /color: var\(--fab-accent\)/, 'and its accent ink');
+  // The non-vacuity half. A bare glyph reached by RESETTING the tile is the same five properties
+  // written twice in opposite directions, and the next property added to the tile would leak
+  // straight through it. The variant states what the glyph IS.
+  for (const reset of ['width:', 'height:', 'border-radius:', 'background:']) {
+    assert.equal(
+      bareDeclarations.includes(reset),
+      false,
+      `the bare face states what it is, never what the tile is not (${reset})`
+    );
+  }
+});
+
+test('the stacked-text variant is the row own, not the Tool tab', () => {
+  const stack =
+    '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked > ' +
+    '.manager-modifier-readonly-text {';
+  assert.ok(css.includes(stack), "the text block is stated on the row's own variant class");
+  const stackDeclarations = css.slice(css.indexOf(stack) + stack.length).split('}')[0];
+  assert.match(stackDeclarations, /flex-direction: column/, '`proto:2333` sets name over value');
+  assert.match(stackDeclarations, /min-width: 0/, 'so a long expression ellipses inside the row');
+
+  // The expression cell is `flex: 1 1 0` in the INLINE row, which is what puts a trailing control
+  // against the row's right edge with no auto margin. Left alone inside a COLUMN that same
+  // declaration grows it to the row's height, so the variant restates it — at (0,4,0) against the
+  // joined cell's (0,3,0) rather than relying on source order, because the blocks are far apart.
+  const expression =
+    '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked ' +
+    '.manager-modifier-readonly-expression {';
+  assert.ok(css.includes(expression), 'and the expression cell is re-stated for the column');
+  const expressionDeclarations = css
+    .slice(css.indexOf(expression) + expression.length)
+    .split('}')[0];
+  assert.match(expressionDeclarations, /flex: 0 0 auto/, "it does not grow to the row's height");
+  assert.match(
+    expressionDeclarations,
+    /margin-top: var\(--fab-space-2xs\)/,
+    "`proto:2333`'s 2px, taken from the published scale rather than written as a literal"
+  );
+
+  // AND NEITHER VARIANT IS GATED ON A ROUTE. This is the assertion that keeps them the row's.
+  for (const variant of ['is-control-leading', 'is-text-stacked']) {
+    for (const line of css.split('\n').filter((row) => row.includes(variant))) {
+      assert.equal(
+        /manager-tool-[a-z]+-list|manager-checks-card/.test(line),
+        false,
+        `the ${variant} variant must not be gated on a route container: ${line.trim()}`
+      );
+    }
+  }
 });
 
 // ── THE TWO PICK ROWS SHARE ONE SELECTED FACE, AT THE REFERENCE'S OWN TOKENS (round 5) ─────

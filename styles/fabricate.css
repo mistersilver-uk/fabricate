@@ -3670,9 +3670,14 @@
 
 /* The entry's GLYPH TILE, the row's own leading square. Its family is the accent rather
    than a per-entry tone: a modifier is not a hazard, and the tile exists to make the row
-   scannable by icon, not to grade it. */
+   scannable by icon, not to grade it.
+
+   TWO ANCHORS, NOT THREE (issue 1373, round 6). `proto:2363` tiles the bonus row's glyph and
+   `proto:2332` draws the prerequisite row's BARE, because that row leads with a checkbox and
+   the tile is what makes a glyph the row's leading anchor. The prerequisite list is therefore
+   not named here at all: the bare face is stated once, on the row's own variant class, rather
+   than reached by a later rule resetting this block's five properties back off again. */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph,
-.fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-glyph,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-glyph {
   display: flex;
   flex: 0 0 26px;
@@ -3713,6 +3718,59 @@
   font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* ── THE ROW'S TWO DECLARED VARIANTS (issue 1373, maintainer round 6) ──────────────────
+   The reference draws this row twice on the Tool Requirements tab with ONE geometry string
+   and two anatomies. `proto:2361`-`2364` is the face the four blocks above state and every
+   caller gets by default: a glyph tile, the name and the expression on one line, and the
+   caller's control trailing. `proto:2331`-`2333` is the other: the control FIRST, a bare
+   accent glyph, and the name stacked over the expression.
+
+   `ModifierLibraryRow` takes `controlPlacement` and `textLayout` for those, both defaulted to
+   the face above, and emits a class per variant. The rules are stated HERE rather than in the
+   component's own `<style>`, because this sheet already owns every property of this row and a
+   scoped block would be a second owner for a box declared one screenful up.
+
+   AND THEY ARE ANCHORED ON THE ROW, NEVER ON A ROUTE. A
+   `.manager-tool-prerequisite-list`-anchored copy renders identically today and gives the next
+   caller of the prop nothing at all, which is the same silent failure the joined blocks above
+   record. `tests/components/manager-layout.test.js` asserts the rooting rather than leaving it
+   to review. Each selector weighs (0,4,0) against the joined cells' (0,3,0), so it wins on
+   specificity rather than on being 60 lines further down. */
+
+/* `proto:2332`: a bare 11px accent glyph, with no box of any kind. The tile is what makes the
+   glyph a row's LEADING ANCHOR, and a row that leads with a control already has one — which is
+   why this follows `controlPlacement` rather than taking a prop of its own. It states what the
+   glyph IS; it does not reset the tile, or the next property added up there would leak through
+   a rule written to suppress it. */
+.fabricate-manager .manager-modifier-readonly-row.is-control-leading > .manager-modifier-readonly-glyph {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--fab-accent);
+  font-size: 11px;
+}
+
+/* `proto:2333`: `<div style="min-width:0">` holding the name over the expression. This is the
+   one part of a variant that is MARKUP rather than cascade — no rule in any sheet can add an
+   element — so the block exists only when the row is asked for it, and the inline face emits
+   nothing at all and stays byte-identical. */
+.fabricate-manager .manager-modifier-readonly-row.is-text-stacked > .manager-modifier-readonly-text {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The expression cell is `flex: 1 1 0` in the inline row, which is what puts a trailing control
+   against the row's right edge with no auto margin anywhere. Inside a COLUMN that same
+   declaration means "grow to the block's height", so it is restated rather than inherited into
+   a context it was not written for. `--fab-space-2xs` is the published scale's 2px, which is
+   `proto:2333`'s own `margin-top` exactly. */
+.fabricate-manager .manager-modifier-readonly-row.is-text-stacked .manager-modifier-readonly-expression {
+  flex: 0 0 auto;
+  margin-top: var(--fab-space-2xs);
 }
 
 /* THE ROW'S TWO CHIPS ARE NOT STYLED HERE, and that is an OWNERSHIP fact, not merely a

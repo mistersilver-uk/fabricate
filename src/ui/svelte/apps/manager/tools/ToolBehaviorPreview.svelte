@@ -211,8 +211,16 @@
       );
     }
     if (!previewOutcome) {
+      // THE KEY IS SELECTED, NOT JUST THE FALLBACK (issue 1373, round 6). This branched only its
+      // fallback and passed the PLURAL key either way, so `lang/en.json`'s
+      // `PreviewGateCountOne` - which has been there all along - was unreachable and one chosen
+      // prerequisite read `1 prerequisites must be met.` in every world with a locale loaded.
+      // The singular was correct only where no translation was, which is exactly the mounted
+      // harness, and is why the frame found this before any test did.
       return formattedText(
-        'FABRICATE.Admin.Manager.Tools.Editor.PreviewGateCount',
+        selectedPrerequisites.length === 1
+          ? 'FABRICATE.Admin.Manager.Tools.Editor.PreviewGateCountOne'
+          : 'FABRICATE.Admin.Manager.Tools.Editor.PreviewGateCount',
         { count: selectedPrerequisites.length },
         selectedPrerequisites.length === 1
           ? 'One prerequisite must be met.'
