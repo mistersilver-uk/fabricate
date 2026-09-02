@@ -78,6 +78,27 @@ function listSection(name) {
   return listSource.slice(start, next === -1 ? listSource.length : start + 1 + next);
 }
 
+/**
+ * The body of one of `CompositionList.svelte`'s four menu-item builders.
+ *
+ * Issue 1477 moved the four hand-rolled `role="menu"` blocks onto the shared `<ActionMenu>`
+ * primitive, so the verbs a menu offers are no longer markup inside a `data-section` — they are
+ * an item list built in the `<script>`. {@link listSection} still answers WHICH builder each
+ * section renders, and this answers what that builder puts in the menu, so the two together pin
+ * exactly what one section-scoped markup assertion used to.
+ *
+ * @param {string} name The builder function's name.
+ * @returns {string} Its source, from the declaration to its closing brace.
+ */
+function menuBuilder(name) {
+  const start = listSource.indexOf(`function ${name}(`);
+  assert.ok(start !== -1, `CompositionList.svelte should still declare ${name}()`);
+  const rest = listSource.slice(start);
+  const end = rest.indexOf('\n  }');
+  assert.ok(end !== -1, `${name}() has no recognisable end, so this slice reads the whole file`);
+  return rest.slice(0, end);
+}
+
 const SHARED_INCLUDED_STATES_IMPORT =
   /import\s*\{[^}]*\bENVIRONMENT_INCLUDED_COMPOSITION_STATES\b[^}]*\}\s*from\s*'[^']*systems\/gatheringComposition\.js'/;
 
@@ -304,8 +325,17 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('active={entry.hasDropRateAdjustment === true}'), 'override chips are driven by drop-rate adjustment state');
     assert.ok(!listSource.includes('compositionState={entry.compositionState}'), 'override chips are not driven by composition state');
     assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
-    assert.ok(listSource.includes('dismissOnOutsideClick'), 'row overflow menu dismisses on outside click');
-    assert.ok(listSource.includes('manager-environment-comp-menu'), 'rows expose an overflow action menu');
+    // Issue 1477 moved the overflow menu into the shared `<ActionMenu>` primitive, which owns the
+    // dismiss-on-outside-click wiring, the menu ARIA and the keyboard contract this file used to
+    // check by looking for a class name. The class is gone from this component on purpose — the
+    // family is rooted at the primitive now — so what is pinned here is that the rows still reach
+    // for the shared control rather than hand-rolling a menu again.
+    assert.ok(listSource.includes('<ActionMenu'), 'rows expose an overflow action menu');
+    assert.ok(
+      !listSource.split('</script>')[1].includes('role="menu"'),
+      'and do not hand-roll one beside it: the primitive writes the role. Scoped to the MARKUP ' +
+        'region, because the script above it names the role in prose explaining the conversion'
+    );
     assert.ok(/const showEventRankControls = \$derived\(\s*kind === 'event' && eventSelectionMode === 'highestRankedDrop'\s*\)/.test(listSource), 'event rank controls are gated by the highest-ranked system rule');
     assert.ok(listSource.includes('draggable={showEventRankControls ? true : undefined}'), 'reorder drag is enabled only when event rank controls are active');
     assert.ok(!tasksTabSource.includes('data-composition-mode-select'), 'composition mode is set globally on the overview tab, not per-tab');
@@ -357,10 +387,23 @@ describe('environment composition editor structure', () => {
 
   it('collapses task row actions into the overflow menu while preserving event row controls', () => {
     assert.ok(listSource.includes("{#if kind === 'task'}"), 'composition list branches task rows for compact action menus');
-    assert.ok(/data-action="include"\s+onclick=\{\(\) => \{\s*onInclude/.test(listSection('available-to-add')), 'the manual Available to add menu offers a plain include');
-    assert.ok(/data-action="force-include"\s+onclick=\{\(\) => \{\s*onForceInclude/.test(listSection('non-matching')), 'the AUTOMATIC-mode Non-matching menu is where a task force-add lives (issue #1315)');
-    assert.ok(/data-action="restore"\s+onclick=\{\(\) => \{\s*onRestore/.test(listSource), 'task restore action is available from a menu item');
-    assert.ok(/data-action="exclude"\s+onclick=\{\(\) => \{\s*onExclude/.test(listSource), 'task remove/exclude action remains available from a menu item');
+    // WHICH MENU EACH SECTION RENDERS, then WHAT THAT MENU OFFERS. Before issue 1477 one
+    // section-scoped markup match answered both at once; the primitive took the markup, so the
+    // pair is written out. Dropping either half loses the discrimination the section scoping
+    // exists for — a file-wide `force-include` match cannot tell the automatic-mode control from
+    // a manual-mode one, which is the mistake issue #1315 was opened on.
+    assert.ok(listSection('available-to-add').includes('items={availableMenuItems(entry)}'), 'the manual Available to add rows render the available menu');
+    assert.ok(/'data-action': 'include'/.test(menuBuilder('availableMenuItems')), 'the manual Available to add menu offers a plain include');
+    assert.ok(listSection('non-matching').includes('items={nonMatchingMenuItems(entry)}'), 'the automatic Non-matching rows render the non-matching menu');
+    assert.ok(/'data-action': 'force-include'/.test(menuBuilder('nonMatchingMenuItems')), 'the AUTOMATIC-mode Non-matching menu is where a task force-add lives (issue #1315)');
+    assert.ok(/'data-action': 'restore'/.test(menuBuilder('excludedMenuItems')), 'task restore action is available from a menu item');
+    assert.ok(/'data-action': 'exclude'/.test(menuBuilder('includedMenuItems')), 'task remove/exclude action remains available from a menu item');
+    // The verbs still reach the props they always did. One dispatcher serves all four menus, so
+    // this is where a mis-wired item id would land rather than in the markup.
+    assert.ok(/id === 'include'\) onInclude\(kind, entry\.id\)/.test(listSource), 'the include item calls onInclude');
+    assert.ok(/id === 'force-include'\) onForceInclude\(kind, entry\.id\)/.test(listSource), 'the force-add item calls onForceInclude');
+    assert.ok(/id === 'exclude'\) onExclude\(kind, entry\.id\)/.test(listSource), 'the exclude item calls onExclude');
+    assert.ok(/id === 'restore'\) onRestore\(kind, entry\.id\)/.test(listSource), 'the restore item calls onRestore');
     assert.ok(listSource.includes('manager-environment-comp-quick-action'), 'manual task rows expose icon-only quick action buttons beside the menu');
     assert.ok(listSource.includes("data-quick-action=\"exclude\""), 'included manual task rows expose a quick remove action through the shared exclude handler');
     assert.ok(listSource.includes('Composition.QuickRemove'), 'manual included task quick action uses Remove copy');
@@ -370,7 +413,7 @@ describe('environment composition editor structure', () => {
     // override, so a non-matching row is plainly added: one verb, one icon, whether it matches or
     // not. Scoped to the section, because the surviving control spells the same `data-action` and
     // a file-wide negative would red on it.
-    assert.ok(!listSection('available-to-add').includes('force-include'), 'the manual Available to add list offers no force add at all');
+    assert.ok(!menuBuilder('availableMenuItems').includes('force-include'), 'the manual Available to add list offers no force add at all');
     assert.ok(/availableRowAction\(entry\) === 'include'/.test(listSource), 'and its rows key off the plain include action');
     assert.ok(!/return 'force-include'/.test(listSource), 'availableRowAction no longer returns a force-add action for any row');
     assert.ok(listSource.includes("{#if showEventRankControls}"), 'ranked event rows keep their distinct action/reorder branch');

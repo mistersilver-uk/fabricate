@@ -313,6 +313,34 @@ const PRIMITIVES = Object.freeze([
     ],
     minimumTokens: 40,
   }),
+  // THE overflow action menu (issue 1477), and the entry that DECLINES the gap the picker above
+  // documents. That note ends by saying the emitted half would catch a caller writing
+  // `class="…"` on a `<SearchablePopover>`; it would not, because `class` is not in that row's
+  // `classProps`, so `classTokensPassedTo` never sees such a token and the rule that names it
+  // goes through this guard unexamined. This row lists `class` FIRST for exactly that reason.
+  //
+  // It costs nothing today — neither caller passes one, so the prop contributes zero tokens and
+  // the census below is the one `triggerClass` token the identity strip hands over. It is not a
+  // hypothetical either: `class` is the obvious spelling for a caller reaching for the root, this
+  // primitive does not declare that prop at all, and a class literal on a COMPONENT tag is the
+  // documented SILENT case — emitted with the caller's hash attached, matching nothing, with no
+  // compiler warning and byte-identical `css.code`.
+  //
+  // The floor is 0 against a measured census of 1, and the assertion is strictly greater, so it
+  // reds the moment the scan stops resolving that single token. A floor of 1 would pass
+  // vacuously the day the identity strip stops passing a bespoke class.
+  Object.freeze({
+    tag: 'ActionMenu',
+    classProps: ['class', 'triggerClass', 'menuClass'],
+    contractClasses: [
+      'fabricate-action-menu',
+      'fabricate-action-menu-panel',
+      'manager-action-menu',
+      'manager-action-menu-panel',
+      'manager-action-menu-item',
+    ],
+    minimumTokens: 0,
+  }),
 ]);
 
 test('no component scopes a rule onto a class it hands to a shared primitive', () => {
@@ -459,7 +487,8 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
     [],
     'these rules select a class that only a `<ManagerButton>`, `<IconButton>`, ' +
       '`<InspectorCard>`, `<ManagerToolbar>`, `<ManagerSearchField>`, ' +
-      '`<EditorValidationSurface>` or `<SearchablePopover>` carries, so they match ' +
+      '`<EditorValidationSurface>`, `<SearchablePopover>` or `<ActionMenu>` carries, so they ' +
+      'match ' +
       'NOTHING ' +
       'and the control is silently unstyled — either emitted with this component`s scoping ' +
       'class attached, or pruned by the compiler before they were emitted at all. Wrap each ' +
