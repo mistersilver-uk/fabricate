@@ -51,6 +51,7 @@ const harness = createMountedComponentHarness({
     // now (issue 1458), which portals its panel and lays it out against the trigger.
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.

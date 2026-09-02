@@ -34,6 +34,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

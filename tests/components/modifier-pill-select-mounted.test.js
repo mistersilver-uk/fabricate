@@ -36,6 +36,7 @@ const harness = createMountedComponentHarness({
     // the trigger, so the add menu reaches these two as well (issue 1458).
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
   ],
   // `Field.svelte` is THE manager's labelled form field (issue 1428): this control's
   // `.manager-field` column renders through it since the conversion, so it is in this

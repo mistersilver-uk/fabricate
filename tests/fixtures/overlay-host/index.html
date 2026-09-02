@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Overlay portal host — positioning proof</title>
+    <!--
+      Served by `tests/components/overlay-portal-host-position.test.js` from a Vite dev server, so
+      `mount.js` below can import the REAL `.svelte` components through the real Svelte plugin.
+      That is the whole reason this page exists rather than a `page.setContent` fixture: the thing
+      under test is what the component's SCRIPT decides at runtime, and hand-written markup cannot
+      run a script. See the test's header.
+    -->
+    <link rel="stylesheet" href="/@overlay-host-styles/fabricate.css" />
+    <style>
+      /*
+        Foundry core's universal border-box reset (`foundry2.css` `@layer reset`, line 10). NOT
+        optional and not cosmetic: `styles/fabricate.css` reproduces it AREA-SCOPED as
+        `.fabricate-manager * { box-sizing: border-box }`, so without core's copy the manager host
+        gets border-box and the player-app host gets content-box. A padded, `height: 100%` scroller
+        then overflows its own window in one host and not the other, the window clips it, and the
+        trigger ends up measured outside the frame — a fixture artefact that reads exactly like a
+        product defect. Both hosts have to sit on the same reset the real page gives them.
+      */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #0b0a13;
+      }
+
+      /*
+        Foundry core's own window rule, transcribed. In production this comes from `foundry2.css`
+        (`.application { position: absolute }`, line 6985 of the harvested 14.365 sheet) and
+        ApplicationV2's `#applyPosition` writes `left`/`top`/`width`/`height` inline on top of it.
+
+        IT IS LOAD-BEARING, NOT DECORATION. `.fabricate-app` IS the ApplicationV2 frame element,
+        and it only works as an overlay host because core positions it — that is what makes it the
+        containing block for the `position: absolute` panel portaled into it. A fixture that left
+        the frame static would silently move the containing block up to the initial one and
+        measure a different arrangement than production has. The test asserts the property is
+        genuinely in effect on every declared root rather than trusting this comment.
+
+        `tests/fixtures/foundry-core-min.css` is deliberately NOT reused here: it is shared with
+        the font-size suites, which measure text against it, and adding a positioning rule to it
+        to serve this file would change what those measure.
+      */
+      .application {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: #17161f;
+        border: 1px solid #3b3a48;
+        border-radius: 6px;
+      }
+
+      .application > .window-content {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      /*
+        The "outside every application root" case: a positioned container that is NOT one of the
+        declared roots. Positioned on purpose — an unpositioned one would let the panel fall
+        through to the initial containing block by accident and pass for the wrong reason.
+      */
+      .unhosted-container {
+        position: absolute;
+        left: 260px;
+        top: 180px;
+        width: 620px;
+        height: 400px;
+        background: #17161f;
+        border: 1px solid #3b3a48;
+      }
+
+      .fixture-scroller {
+        height: 100%;
+        padding: 24px;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <script type="module" src="/tests/fixtures/overlay-host/mount.js"></script>
+  </body>
+</html>

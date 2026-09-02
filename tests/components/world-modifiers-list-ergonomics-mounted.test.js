@@ -40,6 +40,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/components/stepperLabels.js',
     // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
     // preset bundle it reads.

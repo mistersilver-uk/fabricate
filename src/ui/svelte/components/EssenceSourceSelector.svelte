@@ -5,6 +5,7 @@
   import { portal } from '../actions/portal.js';
   import { localize } from '../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
+  import { overlayHostRect, resolveOverlayHost } from '../util/overlayHost.js';
 
   let {
     value = null,
@@ -68,8 +69,7 @@
   }
 
   function getPopoverHost() {
-    if (!selectorRoot || typeof document === 'undefined') return null;
-    return selectorRoot.closest('.fabricate-manager');
+    return resolveOverlayHost(selectorRoot, { component: 'EssenceSourceSelector' });
   }
 
   function getPopoverHorizontalBounds(hostRect) {
@@ -89,12 +89,7 @@
     if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
 
     const popoverHost = getPopoverHost();
-    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
+    const hostRect = overlayHostRect(popoverHost);
     const triggerRect = triggerButton.getBoundingClientRect();
     const horizontalBounds = getPopoverHorizontalBounds(hostRect);
 

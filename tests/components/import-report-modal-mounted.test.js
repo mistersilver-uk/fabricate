@@ -23,6 +23,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    // The shared portal-host resolver (issue 1466): `ManagerModal` imports it to find the
+    // application root it portals its dialog into.
+    'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the

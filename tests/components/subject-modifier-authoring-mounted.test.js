@@ -244,7 +244,9 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
     });
     target.querySelector(`${PICKER} [data-modifier-pill-menu-button]`).click();
     await Promise.resolve();
-    const option = target.querySelector(`${PICKER} [data-modifier-pill-option="alch"]`);
+    // The option is in the PORTALED panel, which is no longer a descendant of the picker
+    // (issue 1466); the mount hosts exactly one picker, so this stays unambiguous.
+    const option = target.querySelector('[data-modifier-pill-option="alch"]');
     assert.ok(Boolean(option), 'the add menu offers the catalogue entry');
     option.click();
     await flushEffects();
@@ -279,6 +281,7 @@ const gatheringHarness = createMountedComponentHarness({
     // now (issue 1458), which portals its panel and lays it out against the trigger.
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
   ],
   compiledModules: [

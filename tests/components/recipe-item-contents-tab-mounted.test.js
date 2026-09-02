@@ -20,6 +20,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness

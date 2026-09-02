@@ -91,7 +91,10 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     flushSync();
     await tick();
     flushSync();
-    const option = Array.from(rows()[1].querySelectorAll('.manager-travel-option'))
+    // The options live in the PORTALED panel, which hangs off the application root rather than
+    // off the row that opened it (issue 1466). Only one picker is open, so scoping to the mount
+    // is exact.
+    const option = Array.from(harness.target.querySelectorAll('.manager-travel-option'))
       .find(node => /Verdant/.test(node.textContent));
     assert.ok(option, 'the Verdant option should be present');
     option.click();

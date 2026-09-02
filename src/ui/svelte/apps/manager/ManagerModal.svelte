@@ -5,7 +5,7 @@
   Every centred, portaled manager dialog — the folder-mapping step and the post-import
   reference report today — renders through this component, so "modal dialog" has a
   single implementation rather than one per feature. It owns the chrome only: the
-  portal into `.fabricate-manager`, the fixed centring and panel surface, the compact
+  portal into the nearest Fabricate application root, the fixed centring and panel surface, the compact
   title + subtitle heading, the round close control, and the right-aligned footer rail.
   Everything between the header and the footer is the caller's `body` snippet, which
   keeps its own component's style scope, so a feature's row/list styling stays with
@@ -19,6 +19,7 @@
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../actions/portal.js';
   import IconButton from '../../components/IconButton.svelte';
+  import { resolveOverlayHost } from '../../util/overlayHost.js';
 
   let {
     open = false,
@@ -35,9 +36,14 @@
     footer = undefined,
   } = $props();
 
-  function getHost() {
-    if (typeof document === 'undefined') return null;
-    return document.querySelector('.fabricate-manager') || document.body;
+  // Resolved from the dialog node UPWARDS, never by querying the document for an application
+  // root by name (issue 1466). The old lookup was `document.querySelector('.fabricate-manager')`,
+  // which finds the manager window wherever it happens to be — so this chrome opened from any
+  // other application would have portaled its dialog into a DIFFERENT WINDOW, and its
+  // `|| document.body` fallback made that silent. An ancestor walk can only ever land inside the
+  // application the dialog was actually opened in.
+  function getHost(node) {
+    return resolveOverlayHost(node, { component: 'ManagerModal' });
   }
 </script>
 
@@ -51,7 +57,7 @@
       style={`--manager-modal-width: ${width};`}
       data-manager-modal
       {...rootAttributes}
-      use:portal={() => getHost()}
+      use:portal={(node) => getHost(node)}
       use:dismissOnOutsideClick={{ enabled: open, onDismiss: onClose }}
     >
       <div class="manager-modal-header">
