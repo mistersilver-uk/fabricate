@@ -6393,6 +6393,19 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   );
   await requireSingleLocator(editorManager, 'current check-driven Tool Studio editor manager');
   await requireSingleLocator(editor, 'current check-driven Tool Studio editor');
+  // A ROUND TRIP, because the editor now OPENS on Breakage. Issue 1373 retired the `Overview`
+  // tab, so re-entering the editor and clicking Breakage no longer changes anything, and
+  // `clickToolTabAndAssertEffect` correctly refuses to call that a working tab click — its whole
+  // job is to reject an assertion made from the tab it was already on.
+  //
+  // Going out to Requirements first restores a real transition and asserts twice instead of
+  // once: the leave and the return.
+  await clickToolTabAndAssertEffect(
+    page,
+    editor,
+    'requirements',
+    'check-driven Tool Requirements tab',
+  );
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'check-driven Tool Breakage tab');
   const immuneChoice = editor.locator('input[name="tool-check-breakable"][value="immune"]');
   await withSingleToolStoreMutation(
@@ -6430,6 +6443,14 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     'tool-specific Tool Edit route',
     () => manager.locator(`[data-tool-edit-rules="${fixture.toolId}"]`).click(),
     () => editorManager.waitFor({ state: 'visible', timeout: 5_000 }),
+  );
+  // Same round trip as the check-driven path above: this one also re-enters the editor, which
+  // now opens on Breakage, so clicking Breakage would be a click onto the tab it is already on.
+  await clickToolTabAndAssertEffect(
+    page,
+    editor,
+    'requirements',
+    'tool-specific Tool Requirements tab',
   );
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'tool-specific Tool Breakage tab');
   const destroyChoice = editor.locator('input[name="tool-on-break"][value="destroy"]');
