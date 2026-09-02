@@ -24,6 +24,8 @@ const harness = createMountedComponentHarness({
     // craftingImageDefaults (issue 544).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    // `SearchablePopover` lays its portaled panel out against the trigger (issue 1458).
+    'src/ui/svelte/util/iconPickerPopover.js',
     // The essence colour fold, reached through the embedded player inventory detail.
     'src/ui/svelte/util/essenceTint.js',
     // NOTE: the progressive order/threshold leaves are deliberately NOT listed.
@@ -79,8 +81,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
+    // The Contents tab's Link-recipe menu is a `SearchablePopover` (issue 1458).
+    // `Chip`, `EmptyState` and the popover's raw dependencies are already listed above.
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
+    // THE validation surface and the push-button its View rows render (issue 1444). The
+    // Validation tab hands the surface its checks and renders no markup itself, so omitting
+    // either HANGS this suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
     'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
   ],

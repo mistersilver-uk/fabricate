@@ -168,6 +168,25 @@ const SHARED_PRIMITIVES = [
   // in more mounted trees than any entry above except `Chip`.
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
+  // THE editor validation surface (issue 1444), closed onto seven renderers across the Checks
+  // Studio, the essence and Tool studios, the world essence entry page and both recipe
+  // editors. It sits in more mounted trees than its four direct callers suggest, because the
+  // scoped shell in between puts it in every tree that mounts an essence or a tool — and the
+  // conversion that closed it dropped it into two more, each of which had to name it or hang.
+  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  // THE manager's searchable picker (issue 1458), and the entry with the LONGEST tail: it
+  // renders `Chip` and `EmptyState`, both already here, so an omission does not cancel one
+  // suite's tests — it cancels them for the reason a reader will not look for, a missing
+  // dependency of a dependency. 16 components call it as this lands and the conversion adds
+  // three more (`GatheringEventEditView`, `GatheringTaskEditView`, `ModifierPillSelect`) plus
+  // `RecipeItemContentsTab`, which is what carries it out of the editors this list already
+  // covers and into the recipe-item, subject-modifier and gathering-stepper trees.
+  //
+  // `ModifierPillSelect` is the sharpest of those: it is a LEAF two rungs down — the recipe
+  // Overview tab and the Checks card render it — so a suite that mounts either pulls this
+  // picker in without naming a popover anywhere, which is exactly the shape this list exists
+  // to turn into a named failure rather than a cancelled run.
+  'src/ui/svelte/apps/manager/SearchablePopover.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

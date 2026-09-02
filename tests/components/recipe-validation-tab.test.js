@@ -28,6 +28,9 @@ const harness = createMountedComponentHarness({
     // Each issue row's "View" renders through the manager's push-button primitive
     // (issue 1118).
     'src/ui/svelte/components/ManagerButton.svelte',
+    // THE validation surface (issue 1444). This tab hands it the readiness and renders
+    // none of the markup itself, so omitting it here CANCELS the suite.
+    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'

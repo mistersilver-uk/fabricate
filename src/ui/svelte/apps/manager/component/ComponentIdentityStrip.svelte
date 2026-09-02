@@ -255,6 +255,10 @@
             'FABRICATE.Admin.Manager.Component.SourceActions',
             'Source actions'
           )}
+          dialogAriaLabel={text(
+            'FABRICATE.Admin.Manager.Component.SourceActions',
+            'Source actions'
+          )}
           popoverClass="manager-component-overflow-popover"
           onChoose={chooseOverflow}
         />

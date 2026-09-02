@@ -70,7 +70,7 @@ const FIXTURE = `
           <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fas fa-cubes"></i></span>
           <div class="manager-recipe-option-target">
             <div class="manager-recipe-option-component">
-              <span class="manager-travel-picker manager-recipe-component-picker">
+              <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
                 <button class="manager-button manager-recipe-component-trigger" data-m="flat-picker">
                   <img class="manager-travel-portrait" alt="">
                   <span class="manager-travel-picker-value manager-recipe-component-name" data-m="flat-picker-name">Venom Gland</span>
@@ -203,7 +203,7 @@ const FIXTURE = `
             accumulates below it. All three are new roles the Component Studio's panel does
             not render, so none of them has a committed number there.
           -->
-          <div class="manager-travel-popover">
+          <div class="fabricate-picker-popover manager-travel-popover">
             <button type="button" class="manager-travel-option">
               <span class="manager-travel-option-lines">
                 <span class="manager-travel-option-name">Alchemist Primer</span>

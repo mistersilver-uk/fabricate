@@ -11,10 +11,10 @@
  * a rung, and the gate fails just as loudly when a row is paid down without being banked.
  *
  * ── THE KEY IS (file, property, value), NOT file ────────────────────────────────────────
- * A per-file count absorbs a swap INSIDE a file, and `styles/fabricate.css` holds 51 of the 86:
+ * A per-file count absorbs a swap INSIDE a file, and `styles/fabricate.css` holds 49 of the 84:
  * turn a 36 into a 40 there, or move a retired value off a card and onto a control, and a
  * per-file count is unchanged and ships green. Three files hold more than one distinct
- * (property, value) pair and carry 58 of the 86 between them, so the finer key is not
+ * (property, value) pair and carry 56 of the 84 between them, so the finer key is not
  * theoretical. `tests/manager-button-source-contract.test.js` made the same choice, for the
  * reason its own docblock gives: "counted, so that deleting one of two identical probes is not
  * silently absorbed". It costs 38 rows instead of 30.
@@ -64,8 +64,14 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
 /**
  * The headline. Pinned exactly rather than derived, so a hand edit to one row's count that
  * forgets this number fails rather than quietly re-baselining.
+ *
+ * It was 86. Issue 1464 deleted the retired combined Travel view's dead CSS, and two of those
+ * rules — `.manager-travel-realms-toggle` and `.manager-travel-realm-select` — carried a
+ * `min-height: 32px` each. The debt was PAID DOWN by deletion rather than by moving a control
+ * onto a rung, so it is banked here and on the `styles/fabricate.css | min-height | 32` row
+ * rather than left as a slot the next author could fill for free.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 86;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 84;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -79,7 +85,7 @@ export const KNOWN_RETIRED_HEIGHT_TOTAL = 86;
  * would notice. Both were already stale by four and seven when a rebase grew the corpus.
  *
  * They are NOT pinned like {@link KNOWN_RETIRED_HEIGHT_TOTAL}, and the difference is what each
- * one is. The 86 is DEBT: it must not grow, so every movement is a thing to adjudicate. A
+ * one is. The 84 is DEBT: it must not grow, so every movement is a thing to adjudicate. A
  * declaration count moves whenever anyone adds a screen, so pinning it would red this gate on
  * unrelated work and teach the next author to re-baseline a number without reading it. The
  * enforced figures are the floors, which are the ones with a failure mode worth stopping.
@@ -126,7 +132,7 @@ const ROWS = Object.freeze([
   'styles/fabricate.css | height | 32 | 5 | 32px => 32px',
   'styles/fabricate.css | height | 36 | 15 | 36px => 36px',
   'styles/fabricate.css | height | 40 | 7 | 40px => 40px',
-  'styles/fabricate.css | min-height | 32 | 11 | 32px => 32px',
+  'styles/fabricate.css | min-height | 32 | 9 | 32px => 32px',
   'styles/fabricate.css | min-height | 36 | 8 | 36px => 36px',
   'styles/fabricate.css | min-height | 40 | 5 | 40px => 40px ; calc(40px + (2 * var(--fab-space-3)) + 2px) => calc(40px + (2 * 12px) + 2px)',
 ]);

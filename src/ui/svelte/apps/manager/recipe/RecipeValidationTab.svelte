@@ -11,10 +11,15 @@
   Deviation 1 (issue 643): this reuses the ONE `evaluateRecipeReadiness` evaluator
   the rail's mini-list also reads — it does NOT introduce a second `recipeValidationGroups`
   evaluator that could disagree. The category map below is display metadata only.
+
+  The MARKUP is `EditorValidationSurface`'s since issue 1444: this file computes the readiness
+  and hands over title, intro, summary, counts, groups and labels. Every `data-*` hook the tab
+  shipped is preserved through `hookAttrs`, `countAttrs`, `viewDataAttr` and each row's own
+  `dataAttrs`, so nothing reading this surface — the smoke harness, `recipe-edit-mounted`,
+  `recipe-validation-tab` — has to learn a new name.
 -->
 <script>
-  import Chip from '../Chip.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import EditorValidationSurface from '../EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { localizeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
   import { evaluateRecipeReadiness } from './recipeReadiness.js';
@@ -152,6 +157,26 @@
     return issue.stepName ? `${issue.stepName}: ${base}` : base;
   }
 
+  /**
+   * The two per-row hooks this tab has always emitted, as the bag the surface spreads.
+   *
+   * Built conditionally rather than with `undefined` values, because the surface spreads this
+   * onto the row element and "the attribute is absent" and "the attribute is present and empty"
+   * are different DOM states to a `[data-issue]` presence selector — which is what every
+   * consumer of these two uses.
+   *
+   * @param {string} checkId the check row's id, empty for an issue-only row
+   * @param {boolean} satisfied whether the check holds
+   * @param {string} issueId the owning issue's id, empty when the check holds
+   * @returns {object} the row's `data-*` bag
+   */
+  function rowAttrs(checkId, satisfied, issueId) {
+    const attrs = {};
+    if (checkId) attrs['data-satisfied'] = satisfied;
+    if (issueId) attrs['data-issue'] = issueId;
+    return attrs;
+  }
+
   // Build one row per check, borrowing the owning issue when the check fails.
   const rows = $derived.by(() => {
     // Function-local bookkeeping scratch, discarded when the $derived.by returns.
@@ -171,11 +196,10 @@
       return {
         id: check.id,
         category: CHECK_CATEGORY[check.id] || 'requirements',
-        satisfied: check.satisfied,
         status,
         title: checkLabel(check.id),
         detail: issue ? issueTitle(issue) : '',
-        issueId: issue ? issue.id : '',
+        dataAttrs: rowAttrs(check.id, check.satisfied, issue ? issue.id : ''),
         target: issue ? issue.target || '' : '',
       };
     });
@@ -192,11 +216,10 @@
       .map((issue) => ({
         id: '',
         category: targetGroup[issue.target] || 'requirements',
-        satisfied: false,
         status: issue.blocks === 'enable' || issue.severity === 'critical' ? 'block' : 'warn',
         title: issueTitle(issue),
         detail: '',
-        issueId: issue.id,
+        dataAttrs: rowAttrs('', false, issue.id),
         target: issue.target || '',
       }));
     return [...checkRows, ...orphanRows];
@@ -269,120 +292,62 @@
           }
   );
 
-  const STATUS_META = {
-    pass: ['fas fa-circle-check', 'StatusPass', 'PASS'],
-    warn: ['fas fa-triangle-exclamation', 'StatusWarn', 'WARNING'],
-    block: ['fas fa-circle-exclamation', 'StatusBlock', 'BLOCKS ENABLE'],
+  // The pill WORD per status. The three status ICONS this table also used to carry are the
+  // surface's own — glyph for glyph, `fa-circle-check` / `fa-triangle-exclamation` /
+  // `fa-circle-exclamation` — so they are no longer restated here where a second copy could
+  // drift from the one that renders.
+  const STATUS_LABELS = {
+    pass: ['StatusPass', 'PASS'],
+    warn: ['StatusWarn', 'WARNING'],
+    block: ['StatusBlock', 'BLOCKS ENABLE'],
   };
 
   function statusPill(status) {
-    const meta = STATUS_META[status] || STATUS_META.pass;
-    return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[1]}`, meta[2]);
+    const meta = STATUS_LABELS[status] || STATUS_LABELS.pass;
+    return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
   }
-  function statusIcon(status) {
-    return (STATUS_META[status] || STATUS_META.pass)[0];
-  }
+
+  const statusLabels = $derived({
+    pass: statusPill('pass'),
+    warn: statusPill('warn'),
+    block: statusPill('block'),
+  });
+
+  const tabTitle = $derived(text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation'));
 </script>
 
-<section
-  class="manager-recipe-tab manager-recipe-validation"
-  data-recipe-tab="validation"
-  aria-label={text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}
->
-  <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">
-      {text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}
-    </h2>
-    <p class="manager-muted">
-      {text(
-        'FABRICATE.Admin.Manager.Recipe.Validation.Intro',
-        'A recipe saves even while incomplete, but only enables when every blocking issue is cleared.'
-      )}
-    </p>
-  </div>
-
-  <!-- The aggregate header (issue 676): a status medallion + the Passing/Warnings/
-       Blocking counts, off the SAME readiness the grouped rows below are built from.
-       The rail's markup, classes and data hooks are kept verbatim so nothing that
-       already reads this surface has to learn a new name. Laid out as a ROW here — the
-       rail stacked it in a 300px column; a tab is ~1060px wide. -->
-  <section class="manager-recipe-validation-summary-row" data-recipe-section="validation-summary">
-    <div
-      class={`manager-recipe-rail-summary is-${summaryStatus}`}
-      data-recipe-validation-summary={summaryStatus}
-    >
-      <span class="manager-recipe-rail-summary-medallion" aria-hidden="true">
-        <i class={summaryMeta.icon}></i>
-      </span>
-      <span class="manager-recipe-rail-summary-copy">
-        <span class="manager-recipe-rail-summary-title">{summaryMeta.title}</span>
-        <span class="manager-recipe-rail-summary-sub manager-muted">{summaryMeta.sub}</span>
-      </span>
-    </div>
-    <ul class="manager-recipe-rail-counts" data-recipe-validation-counts>
-      <li class="manager-recipe-rail-count is-passing">
-        <i class="fas fa-circle-check" aria-hidden="true"></i>
-        <span class="manager-recipe-rail-count-label"
-          >{text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing')}</span
-        >
-        <span class="manager-recipe-rail-count-value" data-recipe-count-passing>{passingCount}</span
-        >
-      </li>
-      <li class="manager-recipe-rail-count is-warning">
-        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-        <span class="manager-recipe-rail-count-label"
-          >{text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings')}</span
-        >
-        <span class="manager-recipe-rail-count-value" data-recipe-count-warnings
-          >{warningCount}</span
-        >
-      </li>
-      <li class="manager-recipe-rail-count is-blocking">
-        <i class="fas fa-circle-xmark" aria-hidden="true"></i>
-        <span class="manager-recipe-rail-count-label"
-          >{text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking')}</span
-        >
-        <span class="manager-recipe-rail-count-value" data-recipe-count-blocking
-          >{blockingCount}</span
-        >
-      </li>
-    </ul>
-  </section>
-
-  {#each groups as group (group.id)}
-    <div class="manager-recipe-val-group" data-validation-group={group.id}>
-      <p class="manager-recipe-val-group-label">
-        <i class={group.icon} aria-hidden="true"></i>
-        <span>{group.label}</span>
-      </p>
-      <ul class="manager-recipe-val-rows">
-        {#each group.rows as row, index (`${group.id}-${row.id || row.issueId}-${index}`)}
-          <li
-            class={`manager-recipe-val-row is-${row.status}`}
-            data-check={row.id || undefined}
-            data-satisfied={row.id ? row.satisfied : undefined}
-            data-issue={row.issueId || undefined}
-          >
-            <i class={`manager-recipe-val-status ${statusIcon(row.status)}`} aria-hidden="true"></i>
-            <div class="manager-recipe-val-copy">
-              <span class="manager-recipe-val-title">{row.title}</span>
-              {#if row.detail}
-                <span class="manager-recipe-val-detail manager-muted">{row.detail}</span>
-              {/if}
-            </div>
-            {#if row.target}
-              <ManagerButton
-                role="ghost"
-                class="manager-recipe-val-view"
-                data-recipe-issue-view={row.target}
-                onclick={() => onSelectIssue(row.target)}
-                >{text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}</ManagerButton
-              >
-            {/if}
-            <Chip class={`manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</Chip>
-          </li>
-        {/each}
-      </ul>
-    </div>
-  {/each}
-</section>
+<EditorValidationSurface
+  title={tabTitle}
+  intro={text(
+    'FABRICATE.Admin.Manager.Recipe.Validation.Intro',
+    'A recipe saves even while incomplete, but only enables when every blocking issue is cleared.'
+  )}
+  summary={{
+    status: summaryStatus,
+    icon: summaryMeta.icon,
+    title: summaryMeta.title,
+    sub: summaryMeta.sub,
+  }}
+  counts={{ passing: passingCount, warnings: warningCount, blocking: blockingCount }}
+  countLabels={{
+    passing: text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing'),
+    warnings: text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings'),
+    blocking: text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking'),
+  }}
+  {groups}
+  {statusLabels}
+  viewDataAttr="data-recipe-issue-view"
+  viewLabel={text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}
+  hookAttrs={{
+    root: { 'data-recipe-tab': 'validation', 'aria-label': tabTitle },
+    summaryRow: { 'data-recipe-section': 'validation-summary' },
+    summary: { 'data-recipe-validation-summary': summaryStatus },
+    counts: { 'data-recipe-validation-counts': '' },
+  }}
+  countAttrs={{
+    passing: { 'data-recipe-count-passing': '' },
+    warnings: { 'data-recipe-count-warnings': '' },
+    blocking: { 'data-recipe-count-blocking': '' },
+  }}
+  {onSelectIssue}
+/>

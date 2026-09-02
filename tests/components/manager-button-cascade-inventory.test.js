@@ -200,7 +200,9 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 8,
     files: Object.freeze([
-      // 14 sites across the recipe editor tree, all `<button>`. Ten already carried
+      // 14 sites across the recipe editor tree, all `<button>` — 13 booked here now, the
+      // fourteenth having merged into the shared validation surface at issue 1444 (below).
+      // Ten already carried
       // `is-dashed` and repaint accent -> muted under task 4's reconciliation, which is the
       // ruled outcome rather than a casualty. One carried a forgotten `dashed`: the "Add a
       // step" at the foot of the Step durations accordion.
@@ -221,10 +223,19 @@ const CONVERTED_BATCHES = Object.freeze([
         sites: 2,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/RecipeStepsCard.svelte', sites: 1 }),
-      Object.freeze({
-        file: 'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
-        sites: 1,
-      }),
+      // REMOVED at issue 1444, and the removal is recorded rather than performed silently.
+      //
+      // The entry was `recipe/RecipeValidationTab.svelte`, booked for the ONE `<ManagerButton>`
+      // its issue rows rendered as the View deep-link. That tab renders through
+      // `EditorValidationSurface` now, and the surface already draws that button from its OWN
+      // booked site (task 7 above) — so the control did not change file, it MERGED into one
+      // the ledger already holds, and the recipe tab renders no button of its own at all.
+      //
+      // That is the "the site left the product" case the totals paragraph below licenses, so
+      // the conserved pins move 129 -> 128 and 42 -> 41 rather than this entry being
+      // repointed. Booking it against the primitive instead would claim two converted sites
+      // for one rendered button and buy back a total that legitimately shrank; leaving it here
+      // fails outright, because the file now renders `<ManagerButton>` zero times.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
         sites: 1,
@@ -302,8 +313,10 @@ const CONVERTED_BATCHES = Object.freeze([
     // rebase by naming the file. It converts the same way task 8's "Add a step" and task 9's
     // three `ComponentEditView` "Add result"/"Add group" sites did — `dashed` and `fullWidth`,
     // the append-a-row verb at the foot of the single-column list it appends to — so the
-    // conserved totals below move from 128/41 to 129/42, the SAME numbers the sweep was
-    // planned against before `GatheringRealmQuickList` was found to be dead code.
+    // conserved totals below moved from 128/41 to 129/42, the SAME numbers the sweep was
+    // planned against before `GatheringRealmQuickList` was found to be dead code. They are
+    // 128/41 again since issue 1444; see the totals paragraph for why that is a licensed
+    // move rather than a countdown.
     task: 'post-plan (issue 1118, catching #1286)',
     files: Object.freeze([
       Object.freeze({
@@ -746,11 +759,13 @@ const REVIEWED = [
     why: 'Travel parties override popover trigger, population B.',
   },
   {
-    id: globalRule('.fabricate-manager .manager-travel-picker-trigger'),
+    id: globalRule('.fabricate-picker .manager-travel-picker-trigger'),
     disposition: 'EXCLUDE',
     why:
       'NOT IN THE SEEDED LIST. The (0,2,0) shared treatment behind four population-B ' +
-      'triggers; re-chaining it would repaint controls the sweep is not converting.',
+      'triggers; re-chaining it would repaint controls the sweep is not converting. Its ' +
+      'root is the picker primitive`s own namespace class rather than the manager`s since ' +
+      'issue 1464 unscoped the family, which is the same (0,2,0) at the same position.',
   },
   // REMOVED at issue 1427, and the removal is recorded rather than performed silently.
   //
@@ -1279,8 +1294,11 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // was deleted rather than converted, and are 129 across 42 again because issue #1286 landed
   // a new hand-written manager button, `ComponentComplicationsSection.svelte`'s "Add
   // complication", on `main` while this sweep was in flight; this guard caught it on rebase by
-  // naming the file, and the post-plan batch above converts it. Both are licensed ways to move
-  // these numbers, and both are licensed precisely because the site left or entered the
+  // naming the file, and the post-plan batch above converts it — and are 128 across 41 once
+  // more, because issue 1444 merged `recipe/RecipeValidationTab`'s single View button into
+  // `EditorValidationSurface`'s, which task 7 already books: one rendered button where there
+  // were two, in a file the ledger already holds. All three are licensed ways to move
+  // these numbers, and all three are licensed precisely because the site left or entered the
   // product rather than leaving or entering the instrument's view: the ledger assertions below
   // re-read every booked file from the tree, so neither a deleted nor a booked-but-unconverted
   // component can stay silently mismatched, and the paragraph above is the reason a number
@@ -1288,13 +1306,13 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    129,
-    'the conversion is 129 sites, whether or not a given one has been converted yet'
+    128,
+    'the conversion is 128 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    42,
-    'across 42 components'
+    41,
+    'across 41 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the

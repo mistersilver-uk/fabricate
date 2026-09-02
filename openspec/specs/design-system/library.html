@@ -792,9 +792,9 @@ a{color:var(--fab-accent)}
     </div>
     <div class="notes">
       <div><h5>Canonical spec</h5><ul><li><b>panel</b> bg-0 · 1px border-strong · radius 11 · <b>shadow-lg</b></li><li><b>anchor</b> portalled to the application root, measured against the scrolling panel, flipped and clamped — <b>never a CSS offset</b></li><li><b>width</b> trigger width, min 240 / max 340</li><li><b>focus</b> enters the search input on open, returns to the trigger on close</li><li><b>selection</b> <code>aria-activedescendant</code> over <code>role="listbox"</code>; options are <code>tabindex="-1"</code></li></ul></div>
-      <div><h5>Svelte API</h5><ul><li><b>open</b> <span class="req">bindable</span> · <b>onClose</b></li><li><b>source</b> (query) — sync or async</li><li><b>as</b> list | grid · <b>value · multiple</b></li><li><b>optionGroups</b> · header and footer snippets</li><li><b>loading · error · emptyText</b> — an async source has all three</li><li>Trigger sets <code>aria-expanded</code> and <code>aria-haspopup</code></li></ul></div>
+      <div><h5>Svelte API</h5><ul><li><b>open</b> <span class="req">bindable</span> · <b>onClose</b></li><li><b>source</b> (query) — sync or async</li><li><b>as</b> list | grid · <b>value · multiple</b></li><li><b>optionGroups</b> · header and footer snippets</li><li><b>loading · error · emptyText</b> — an async source has all three</li><li>Trigger sets <code>aria-expanded</code>, and takes <code>aria-haspopup</code> as a <b>declared capability</b> &mdash; <code>dialog</code> (default) or <code>listbox</code>. The value states what OPENS: a panel with a query field is a dialog, a bare option list is a listbox, so the two are not interchangeable and a caller passing <code>listbox</code> must also pass <code>showSearch={false}</code></li></ul></div>
     </div>
-    <div class="delta warn"><b>Why the focus model is mandatory, not a preference.</b> Foundry treats an element as focused only if it is a form control, contentEditable, or a button with a form. Roving focus onto an option button re-arms the canvas bindings, so &uarr;&darr; would pan the map. Keeping focus in the input is the only model that works — which is what the shipped popover already does, by design.<span class="cite"><b>SearchablePopover.svelte:385, 462</b> (16 importing files) · <b>iconPickerPopover.js</b> · <b>portal.js</b></span></div>
+    <div class="delta warn"><b>Why the focus model is mandatory, not a preference.</b> Foundry treats an element as focused only if it is a form control, contentEditable, or a button with a form. Roving focus onto an option button re-arms the canvas bindings, so &uarr;&darr; would pan the map. Keeping focus in the input is the only model that works — which is what the shipped popover already does, by design.<span class="cite"><b>SearchablePopover.svelte:429, 535</b> (20 importing files) · <b>iconPickerPopover.js</b> · <b>portal.js</b></span></div>
   </div>
 
   <div class="spec">
@@ -1097,7 +1097,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec">
-    <div class="spec-head"><h4>&lt;ValidationList&gt; &lt;ValidationSummary&gt;</h4><p class="why">Present in 11 of 21 prototypes and shipped with three callers. It is a primitive rather than a kind of rail content, because it carries its own severity vocabulary and drives the count on its own tab.</p></div>
+    <div class="spec-head"><h4>&lt;ValidationList&gt; &lt;ValidationSummary&gt;</h4><p class="why">Present in 11 of 21 prototypes and shipped as ONE closed component — four direct callers behind seven renderers, and nothing hand-rolls the arrangement any more. It is a primitive rather than a kind of rail content, because it carries its own severity vocabulary and drives the count on its own tab.</p></div>
     <div class="stage col">
       <div class="k-card" style="display:grid;gap:12px">
         <div style="display:flex;gap:12px;align-items:center"><div class="k-ic s38" style="color:var(--fab-warning-text);background:var(--fab-warning-soft)"><svg class="i"><use href="#i-alert"/></svg></div><div class="grow"><div style="font-family:var(--fab-font-serif);font-size:15px;font-weight:600">Nearly ready</div><div class="k-hint">Three warnings, one blocking issue. Players cannot craft this until the blocker clears.</div></div>
@@ -1112,8 +1112,9 @@ a{color:var(--fab-accent)}
     </div>
     <div class="notes">
       <div><h5>Canonical spec</h5><ul><li><b>severity</b> <code>pass | warn | fail</code> — not the Notice tone set</li><li><b>row</b> icon + title + detail + a jump-to-issue action</li><li><b>summary</b> icon chip 38, serif line, one sentence, the counts</li><li>Drives the warn-toned count on its own tab</li></ul></div>
-      <div><h5>Svelte API</h5><ul><li><b>counts</b> {passing, warnings, blocking}</li><li><b>groups</b> {label, issues}[]</li><li><b>onSelectIssue</b> — focus moves to the offending control</li><li><b>statusLabels</b> — localized</li></ul></div>
+      <div><h5>Svelte API</h5><ul><li><b>counts</b> {passing, warnings, blocking} — a site reports the subset it can answer, and the rail draws those tiles in this order</li><li><b>groups</b> {label, issues}[]</li><li><b>onSelectIssue</b> — focus moves to the offending control</li><li><b>statusLabels</b> — localized</li><li><b>hookAttrs / countAttrs</b> — the site's own <code>data-*</code> hooks, per named region and per count</li><li><b>class</b> — appended to the surface's own, never a replacement</li></ul></div>
     </div>
+    <div class="delta">The shipped component covers BOTH names in one surface: the verdict card and the grouped row list are one tab, not two, so neither name has an implementation of its own to point at and the manifest records the correspondence as unestablished rather than guessing which one the file is.<span class="cite">7 renderers · <b>EditorValidationSurface.svelte</b></span></div>
   </div>
 
   <div class="spec">

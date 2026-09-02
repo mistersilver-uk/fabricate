@@ -420,6 +420,40 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
   ]),
+  // THE editor validation surface (issue 1444), closed onto seven renderers. NEITHER
+  // representative frame can contain one, and that is established from the static import
+  // closure rather than from looking at a frame: walking every transitive `.svelte` import,
+  // `ComponentsBrowserView` reaches 22 modules and `FabricateAppRoot` reaches 164, and this
+  // surface is in neither closure — only `CraftingSystemManagerRoot`'s 356-module closure holds
+  // it. So a restyle of the medallion, the count tiles or the row stack published two frames
+  // that structurally could not contain one.
+  //
+  // Two, because the surface has two rail ARITIES and one frame cannot hold both.
+  //
+  // `manager-checks-validation` is the only published frame that draws it inside
+  // `.manager-checks-validation-route`, and that route is the one place its metrics are
+  // re-stated: `styles/fabricate.css:3897-3929` overrides the summary card's gap, padding,
+  // radius and fill, the count tile's height and radius, the group label's size and tracking,
+  // and the row stack's radius and fill. Every geometry decision in the surface is therefore
+  // arbitrated twice, and this is the frame that shows the second arbitration.
+  //
+  // `manager-recipe-item-validation-blocked` is the only published frame that draws the
+  // TWO-TILE rail. The Books & Scrolls check set has no warning tier at all, so that tab
+  // reports `{ passing, blocking }` and the surface omits the Warnings tile — the one state
+  // where the rail's own flex distribution differs, and the state issue 1444 turned from a
+  // hand-rolled second markup block into a property of what a caller reports. Its all-clear
+  // twin is NOT listed: the arity is the same in both and the blocked one additionally draws
+  // the danger medallion and a Block pill.
+  //
+  // Still uncovered, and named rather than left to be discovered: the row's View deep-link,
+  // which renders only where a row carries a `target` and so appears in the recipe editor's
+  // and the Checks route's ISSUE rows rather than in every frame. Whether the lab world's
+  // fixtures put either surface into a state that has one was not established here, so a
+  // change to that button's treatment may publish two frames that do not contain it.
+  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte': Object.freeze([
+    'manager-checks-validation',
+    'manager-recipe-item-validation-blocked',
+  ]),
   // The shared empty panel. Both representative frames are POPULATED states — the components
   // browser lists components and the player app shell lists recipes — so the dashed panel this
   // primitive draws appears in neither, and a restyle of it would publish two frames that do not
@@ -449,9 +483,35 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
   ]),
+  //
+  // A THIRD entry as of issue 1458, and it is a third MODE rather than a third instance. Both
+  // parties pickers above render the search row; the three converted add menus render none, which
+  // is the `showSearch={false}` presentation that keeps `triggerHasPopup="listbox"` truthful on
+  // the trigger. `manager-gathering-task-availability-menu` is the one frame in the registry that
+  // OPENS one — every other gathering-task frame draws the trigger closed, where the whole
+  // conversion is a wrapper class and a scoping hash.
   'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
     'manager-world-parties-realm-override-picker',
+    'manager-gathering-task-availability-menu',
+  ]),
+  // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same
+  // change. It sits under `components/`, so the directory leg of `BROAD_SIGNAL_PATTERN` claims it
+  // whatever anyone thinks of it — and until now it published only the representative pair, in
+  // which it appears nowhere: `manager-components-normal` is a browse list and
+  // `fabricate-app-shell` is the player window, and this control exists on two manager editors.
+  //
+  // `manager-recipe-edit-crafting-modifier-cap-reached` is the frame that answers for it, and it
+  // is chosen for the state rather than for the presence. The conversion left this component
+  // exactly ONE painted rule of its own — the at-cap trigger treatment, `aria-disabled='true'`
+  // taking `--fab-text-disabled` at `opacity: 0.55` — and that rule had to be re-anchored as
+  // `:global(.manager-availability-multi .manager-availability-menu-button[aria-disabled='true'])`
+  // because the button is the primitive's element now. A repair that reaches the button but loses
+  // its (0,3,0) to `.fabricate-manager .manager-availability-menu-button:hover` renders the capped
+  // control as a live one, which is precisely what this frame draws. Its sibling
+  // `-cap-available` draws the un-capped reading and would show nothing about the repair.
+  'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([
+    'manager-recipe-edit-crafting-modifier-cap-reached',
   ]),
 });
 
@@ -4640,6 +4700,53 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-availability-menu',
+    label: 'Manager — Gathering task availability menu open',
+    // BEYOND the smoke: no smoke routine opens an availability menu, so there is no counterpart
+    // frame of this state and no label to name.
+    //
+    // THE FRAME THE CONVERSION TURNS ON (issue 1458). Three hand-rolled add menus became
+    // `SearchablePopover`, and the change a GM sees is entirely in the OPEN panel: it was a
+    // `.manager-availability-menu` pinned `left: 0; right: 0` under its own field and clipped by
+    // the editor's scroller, and it is now the shared popover — PORTALED to the `.fabricate-manager`
+    // host, laid out against the trigger, 240-340px wide, drawn in the picker's neutral chrome
+    // rather than the availability widget's amber one. Every other gathering-task frame shows the
+    // menu CLOSED, where the only differences are a wrapper class and a scoping hash, so without
+    // this case the whole visible half of the conversion is unphotographed.
+    //
+    // It is also the frame that answers for the primitive's `showSearch={false}` presentation:
+    // the two World > Parties pickers this primitive's `BROAD_SIGNAL_CASE_OVERRIDES` entry names
+    // both render the search row, and this panel deliberately renders none — which is what keeps
+    // `triggerHasPopup="listbox"` truthful on the trigger.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // `hb-task-slowbloom` authors `biomes: ['mountain']` against a four-entry biome vocabulary, so
+    // the menu opens on the THREE still-unselected biomes rather than on the empty state. That is
+    // the reading worth photographing: an add menu that offers nothing draws `EmptyState` and says
+    // nothing about the option rows.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-availability]', scroll: true },
+      { selector: '[data-gathering-task-field="biomes"] .manager-availability-menu-button' },
+    ],
+    expectView: 'gathering-task-edit',
+    // The PORTALED panel, and an option inside it. Asserting the option alone would be satisfied
+    // by the old in-place menu; asserting the popover alone would be satisfied by an empty one.
+    // Together they say the menu opened, moved to the manager host, and has rows in it.
+    expectSelector:
+      '.fabricate-manager .manager-travel-popover [data-gathering-task-availability-option="biomes"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(EventEditView|TaskEditView)\.svelte$/,
     ],
   }),
   managerCase({

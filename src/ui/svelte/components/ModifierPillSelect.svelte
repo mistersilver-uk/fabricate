@@ -13,7 +13,7 @@
 -->
 <script>
   import Field from './Field.svelte';
-  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import SearchablePopover from '../apps/manager/SearchablePopover.svelte';
   import { formatList, localize } from '../util/foundryBridge.js';
 
   let {
@@ -51,7 +51,6 @@
   } = $props();
 
   let open = $state(false);
-  let menuButton = $state(null);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -126,11 +125,31 @@
   //     user to `<body>`, which is precisely the regression that fallback exists to
   //     prevent. Staying focusable keeps the landing spot real.
   //
-  // The trade is that `aria-disabled` does not suppress the click, so the handler must.
-  function openMenu() {
-    if (addDisabled) return;
-    open = !open;
-  }
+  // The trade is that `aria-disabled` does not suppress the click, so something must. That
+  // used to be this component's own `openMenu`; it is `SearchablePopover`'s `triggerAriaDisabled`
+  // now, which refuses to open for the same reason and keeps the button enabled and focusable.
+
+  // The trigger's visible text, AND the popover's accessible name. `menuLabel` alone is not
+  // usable for either: it is optional, and when a caller omits it the hand-rolled listbox this
+  // replaced rendered `aria-label={menuLabel}` — an empty string, which Svelte drops, leaving a
+  // `role="listbox"` with no accessible name at all. Naming both surfaces from the resolved
+  // label means the announcement cannot go quiet because a caller left a prop out.
+  const menuButtonLabel = $derived(
+    menuLabel || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')
+  );
+
+  // The still-unselected options, shaped for `SearchablePopover`. `data` carries
+  // `data-modifier-pill-option` VERBATIM rather than folding it into the primitive's own
+  // `dataId`/`data-popover-option`, because four mounted suites address a row by that exact
+  // attribute and renaming a hook is not part of converting a widget.
+  const menuOptions = $derived(
+    availableOptions.map((option) => ({
+      id: option.id,
+      label: optionLabel(option),
+      icon: option.icon || 'fa-solid fa-dice-d20',
+      data: { 'data-modifier-pill-option': option.id },
+    }))
+  );
 
   function add(id) {
     onToggle(id, true);
@@ -147,7 +166,16 @@
   function focusAfterRemoval(button) {
     const pill = button?.closest?.('[data-modifier-pill]');
     const neighbour = pill?.nextElementSibling || pill?.previousElementSibling || null;
-    const target = neighbour?.querySelector?.('[data-modifier-pill-remove]') || menuButton;
+    // The menu button is found by HOOK rather than through a `bind:this` reference, because it
+    // is `SearchablePopover`'s element now and `bind:this` on a component tag binds the
+    // component INSTANCE, not its host. `.manager-availability-multi` is the class THIS
+    // component hands its own `<Field>` below, so the anchor and the selector that finds it sit
+    // in one file; the trigger is never portaled (only the open panel is), so it is always
+    // inside that subtree.
+    const group = pill?.closest?.('.manager-availability-multi');
+    const target =
+      neighbour?.querySelector?.('[data-modifier-pill-remove]') ||
+      group?.querySelector?.('[data-modifier-pill-menu-button]');
     target?.focus?.();
   }
 
@@ -165,53 +193,38 @@
   aria-describedby={describedBy || undefined}
   data-modifier-pill-select={testId || undefined}
 >
-  <div
-    class="manager-availability-picker"
-    use:dismissOnOutsideClick={{ enabled: open, onDismiss: () => (open = false) }}
-  >
-    <button
-      type="button"
-      class="manager-availability-menu-button"
-      aria-haspopup="listbox"
-      aria-expanded={open}
-      {disabled}
-      aria-disabled={addDisabled || undefined}
-      bind:this={menuButton}
-      data-modifier-pill-menu-button
-      onclick={openMenu}
-    >
-      <span
-        >{menuLabel ||
-          text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')}</span
-      >
-      <i class="fas fa-chevron-down" aria-hidden="true"></i>
-    </button>
-    {#if open}
-      <div class="manager-availability-menu" role="listbox" aria-label={menuLabel}>
-        {#each availableOptions as option (option.id)}
-          <button
-            type="button"
-            class="manager-availability-option"
-            role="option"
-            aria-selected="false"
-            data-modifier-pill-option={option.id}
-            onclick={() => add(option.id)}
-          >
-            <i class={option.icon || 'fa-solid fa-dice-d20'} aria-hidden="true"></i>
-            <span>{optionLabel(option)}</span>
-          </button>
-        {:else}
-          <p class="manager-availability-empty">
-            {allSelectedLabel ||
-              text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
-                'All modifiers selected.'
-              )}
-          </p>
-        {/each}
-      </div>
-    {/if}
-  </div>
+  <!-- The add menu is `SearchablePopover` (issue 1458). This control was written to mirror
+       the gathering availability widget's markup, and those two menus converted in the same
+       change, so hand-rolling a third copy of the same trigger-plus-listbox is exactly the
+       duplication the primitive exists to close.
+
+       The `.manager-availability-picker` wrapper is GONE rather than kept: it declared
+       `position: relative; min-width: 0`, which is `.manager-travel-picker`'s own declaration
+       verbatim, so keeping it would state the primitive's layout twice. `triggerAriaDisabled`
+       rather than `disabled` for the at-cap state, for the two reasons recorded above.
+
+       `data-modifier-pill-menu-button` rides `triggerData` with an EMPTY-STRING value, not as
+       a bare attribute: a bare `data-x` on a component tag arrives in the rest spread as the
+       boolean `true` and renders `data-x="true"`, which every presence selector resolves
+       either way — so the DOM would change and nothing would report it. -->
+  <SearchablePopover
+    bind:open
+    options={menuOptions}
+    showSearch={false}
+    triggerHasPopup="listbox"
+    triggerClass="manager-availability-menu-button"
+    triggerLabel={menuButtonLabel}
+    dialogAriaLabel={menuButtonLabel}
+    triggerAriaDisabled={addDisabled}
+    triggerData={{ 'data-modifier-pill-menu-button': '' }}
+    {disabled}
+    emptyHint={allSelectedLabel ||
+      text(
+        'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
+        'All modifiers selected.'
+      )}
+    onChoose={add}
+  />
   <div class="manager-availability-pill-row" data-modifier-pill-row>
     {#each selectedOptions as option (option.id)}
       <span class="manager-availability-pill is-modifier" data-modifier-pill={option.id}>
@@ -254,18 +267,39 @@
 
 <style>
   /* The at-cap menu button. It keeps its box and its focus ring — it is still a real tab
-     stop, deliberately (see `openMenu`) — and only loses the affordance colour and the
-     pointer, so it reads as "unavailable right now" rather than "gone". The global sheet
+     stop, deliberately (see the `aria-disabled` note in the script above) — and only loses
+     the affordance colour and the pointer, so it reads as "unavailable right now" rather
+     than "gone". The global sheet
      gives `.manager-availability-menu-button` no disabled treatment at all, so this is
      the state's only visual, and it is scoped here rather than added to the global class
      because the cap is this call site's concept, not the widget's chrome. */
-  .manager-availability-menu-button[aria-disabled='true'] {
+  /* `:global(...)` around the WHOLE selector, and the `.manager-availability-multi` ancestor
+     is load-bearing rather than decorative (issue 1458). The button is `SearchablePopover`'s
+     element now, so the scoped spelling compiled to
+     `.manager-availability-menu-button[aria-disabled='true'].svelte-<hash>` — a hash this
+     component no longer stamps on anything — and the compiler PRUNED both rules with an
+     `Unused CSS selector` warning rather than emitting them dead. (That is this primitive's
+     ordinary mode, and it is a property of its PROP NAME: the silent, warning-free variant
+     needs the class literal to sit in a `class` attribute on the component tag, and this one
+     travels as `triggerClass`. `manager-button-scoped-class-reach.test.js` covers both halves,
+     so the conversion does not depend on that holding.)
+
+     Specificity is preserved EXACTLY, which is why the ancestor is here rather than dropped:
+     the scoped form was (0,3,0) — class + attribute + hash — and a bare
+     `:global(.manager-availability-menu-button[aria-disabled='true'])` is (0,2,0), which would
+     smuggle a cascade change in as a repair and lose to
+     `.fabricate-manager .manager-availability-menu-button:hover` at (0,3,0). The `:hover` pair
+     keeps its (0,4,0) the same way. `.manager-availability-multi` is the class this component
+     hands its own `<Field>` below, so the anchor is local rather than borrowed. */
+  :global(.manager-availability-multi .manager-availability-menu-button[aria-disabled='true']) {
     color: var(--fab-text-disabled);
     cursor: default;
     opacity: 0.55;
   }
 
-  .manager-availability-menu-button[aria-disabled='true']:hover {
+  :global(
+    .manager-availability-multi .manager-availability-menu-button[aria-disabled='true']:hover
+  ) {
     border-color: var(--fab-border);
     box-shadow: none;
   }

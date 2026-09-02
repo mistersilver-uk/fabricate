@@ -14320,161 +14320,141 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(weatherPill.textContent.includes('Clear Sky'));
     assert.ok(weatherPill.querySelector('i.fas.fa-sun'));
 
-    biomeAvailability.querySelector('.manager-availability-menu-button').click();
-    await tick();
-    flushSync();
-    assert.equal(
-      biomeAvailability.querySelector(
-        '[data-gathering-task-availability-option="biomes"][data-condition-id="forest"]'
-      ),
-      null
+    // The three availability add menus are `SearchablePopover`s (issue 1458), and the primitive
+    // PORTALS its open panel to the `.fabricate-manager` host — so an option is no longer a
+    // descendant of the field that anchors it. Every option lookup below therefore goes through
+    // the DOCUMENT, which the per-menu `data-gathering-task-availability-option="<kind>"` hook
+    // keeps unambiguous across the three menus.
+    //
+    // Scoping them to the field instead is not merely stale, it is VACUOUS in the direction that
+    // reports clean: `assert.equal(field.querySelector('[…option…]'), null)` passes because the
+    // panel is somewhere else entirely, not because the option is absent. The one clause that
+    // could not pass that way — the deep-equal on the remaining option LABELS — is what caught
+    // this conversion, and it is why each menu below is read by its labels rather than only by
+    // the absence of the option already chosen.
+    const availabilityOptions = (kind) =>
+      Array.from(document.querySelectorAll(`[data-gathering-task-availability-option="${kind}"]`));
+    const availabilityOption = (kind, conditionId) =>
+      document.querySelector(
+        `[data-gathering-task-availability-option="${kind}"][data-condition-id="${conditionId}"]`
+      );
+    const availabilityPill = (field, kind, conditionId) =>
+      field.querySelector(
+        `[data-gathering-task-availability-pill="${kind}"][data-condition-id="${conditionId}"]`
+      );
+    const availabilityTrigger = (field) =>
+      field.querySelector('.manager-availability-menu-button');
+    const openAvailabilityMenu = async (field) => {
+      availabilityTrigger(field).click();
+      await tick();
+      flushSync();
+    };
+    const removeAvailabilityPill = async (field, kind, conditionId) => {
+      availabilityPill(field, kind, conditionId)
+        .querySelector('.manager-availability-remove')
+        .click();
+      await tick();
+      flushSync();
+    };
+
+    await openAvailabilityMenu(biomeAvailability);
+    assert.ok(
+      !availabilityOption('biomes', 'forest'),
+      'the already-selected biome should not be offered again'
     );
     assert.deepEqual(
-      Array.from(
-        biomeAvailability.querySelectorAll('[data-gathering-task-availability-option="biomes"]')
-      ).map((option) => option.textContent.trim()),
+      availabilityOptions('biomes').map((option) => option.textContent.trim()),
       ['Crystal Cavern']
     );
-    assert.ok(biomeAvailability.querySelector('[data-condition-id="cavern"] i.fas.fa-gem'));
-    biomeAvailability
-      .querySelector(
-        '[data-gathering-task-availability-option="biomes"][data-condition-id="cavern"]'
-      )
-      .click();
+    assert.ok(availabilityOption('biomes', 'cavern').querySelector('i.fas.fa-gem'));
+    availabilityOption('biomes', 'cavern').click();
     await tick();
     flushSync();
+    assert.ok(availabilityPill(biomeAvailability, 'biomes', 'cavern'));
+
+    await removeAvailabilityPill(biomeAvailability, 'biomes', 'forest');
     assert.ok(
-      biomeAvailability.querySelector(
-        '[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"]'
-      )
+      !availabilityPill(biomeAvailability, 'biomes', 'forest'),
+      'removing a pill should drop the condition'
     );
 
-    biomeAvailability
-      .querySelector(
-        '[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"] .manager-availability-remove'
-      )
-      .click();
-    await tick();
-    flushSync();
-    assert.equal(
-      biomeAvailability.querySelector(
-        '[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"]'
-      ),
-      null
-    );
-
-    biomeAvailability
-      .querySelector(
-        '[data-gathering-task-availability-pill="biomes"][data-condition-id="cavern"] .manager-availability-remove'
-      )
-      .click();
-    await tick();
-    flushSync();
+    await removeAvailabilityPill(biomeAvailability, 'biomes', 'cavern');
     assert.ok(biomeAvailability.textContent.includes('Any Biome'));
 
-    timeAvailability.querySelector('.manager-availability-menu-button').click();
-    await tick();
-    flushSync();
-    assert.equal(
-      timeAvailability.querySelector(
-        '[data-gathering-task-availability-option="timeOfDay"][data-condition-id="day"]'
-      ),
-      null
+    await openAvailabilityMenu(timeAvailability);
+    assert.ok(
+      !availabilityOption('timeOfDay', 'day'),
+      'the already-selected time of day should not be offered again'
     );
     assert.deepEqual(
-      Array.from(
-        timeAvailability.querySelectorAll('[data-gathering-task-availability-option="timeOfDay"]')
-      ).map((option) => option.textContent.trim()),
+      availabilityOptions('timeOfDay').map((option) => option.textContent.trim()),
       ['First Light', 'Deep Night']
     );
-    assert.ok(timeAvailability.querySelector('[data-condition-id="night"] i.fas.fa-moon'));
-    timeAvailability
-      .querySelector(
-        '[data-gathering-task-availability-option="timeOfDay"][data-condition-id="night"]'
-      )
-      .click();
+    assert.ok(availabilityOption('timeOfDay', 'night').querySelector('i.fas.fa-moon'));
+    availabilityOption('timeOfDay', 'night').click();
     await tick();
     flushSync();
+    assert.ok(availabilityPill(timeAvailability, 'timeOfDay', 'night'));
+
+    await removeAvailabilityPill(timeAvailability, 'timeOfDay', 'day');
     assert.ok(
-      timeAvailability.querySelector(
-        '[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="night"]'
-      )
+      !availabilityPill(timeAvailability, 'timeOfDay', 'day'),
+      'removing a pill should drop the time of day'
     );
 
-    timeAvailability
-      .querySelector(
-        '[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"] .manager-availability-remove'
-      )
-      .click();
-    await tick();
-    flushSync();
-    assert.equal(
-      timeAvailability.querySelector(
-        '[data-gathering-task-availability-pill="timeOfDay"][data-condition-id="day"]'
-      ),
-      null
-    );
-
-    weatherAvailability.querySelector('.manager-availability-menu-button').click();
-    await tick();
-    flushSync();
-    assert.equal(
-      weatherAvailability.querySelector(
-        '[data-gathering-task-availability-option="weather"][data-condition-id="clear"]'
-      ),
-      null
+    await openAvailabilityMenu(weatherAvailability);
+    assert.ok(
+      !availabilityOption('weather', 'clear'),
+      'the already-selected weather should not be offered again'
     );
     assert.deepEqual(
-      Array.from(
-        weatherAvailability.querySelectorAll('[data-gathering-task-availability-option="weather"]')
-      ).map((option) => option.textContent.trim()),
+      availabilityOptions('weather').map((option) => option.textContent.trim()),
       ['Storm Rain']
     );
     assert.ok(
-      weatherAvailability.querySelector(
-        '[data-condition-id="heavy-rain"] i.fas.fa-cloud-showers-heavy'
-      )
+      availabilityOption('weather', 'heavy-rain').querySelector('i.fas.fa-cloud-showers-heavy')
     );
-    weatherAvailability
-      .querySelector(
-        '[data-gathering-task-availability-option="weather"][data-condition-id="heavy-rain"]'
-      )
-      .click();
+    availabilityOption('weather', 'heavy-rain').click();
     await tick();
     flushSync();
+    assert.ok(availabilityPill(weatherAvailability, 'weather', 'heavy-rain'));
+
+    await removeAvailabilityPill(weatherAvailability, 'weather', 'clear');
     assert.ok(
-      weatherAvailability.querySelector(
-        '[data-gathering-task-availability-pill="weather"][data-condition-id="heavy-rain"]'
-      )
+      !availabilityPill(weatherAvailability, 'weather', 'clear'),
+      'removing a pill should drop the weather'
     );
 
-    weatherAvailability
-      .querySelector(
-        '[data-gathering-task-availability-pill="weather"][data-condition-id="clear"] .manager-availability-remove'
-      )
-      .click();
-    await tick();
-    flushSync();
-    assert.equal(
-      weatherAvailability.querySelector(
-        '[data-gathering-task-availability-pill="weather"][data-condition-id="clear"]'
-      ),
-      null
-    );
-    for (const availability of [biomeAvailability, timeAvailability, weatherAvailability]) {
-      availability.querySelector('.manager-availability-menu-button').click();
-      await tick();
-      flushSync();
+    // Open / dismiss, read through the ARIA contract as well as the DOM. `aria-expanded` is
+    // what a screen reader is told and the portaled panel is what a pointer sees, and after a
+    // conversion that moved the panel out of this subtree only asserting BOTH distinguishes
+    // "the menu closed" from "the menu was never here".
+    for (const [field, kind] of [
+      [biomeAvailability, 'biomes'],
+      [timeAvailability, 'timeOfDay'],
+      [weatherAvailability, 'weather'],
+    ]) {
+      await openAvailabilityMenu(field);
+      assert.equal(
+        availabilityTrigger(field).getAttribute('aria-expanded'),
+        'true',
+        'the trigger should announce the menu as expanded'
+      );
       assert.ok(
-        availability.querySelector('.manager-availability-menu'),
+        availabilityOptions(kind).length > 0,
         'picker menu should open on trigger click'
       );
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
       await tick();
       flushSync();
       assert.equal(
-        availability.querySelector('.manager-availability-menu'),
-        null,
+        availabilityTrigger(field).getAttribute('aria-expanded'),
+        'false',
+        'the trigger should announce the menu as collapsed after an outside mousedown'
+      );
+      assert.equal(
+        availabilityOptions(kind).length,
+        0,
         'picker menu should dismiss on outside mousedown'
       );
     }

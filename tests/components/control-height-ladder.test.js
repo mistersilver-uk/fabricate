@@ -8,6 +8,8 @@
  * 440 height declarations most likely to drift were entirely unlinted. Measured against that
  * silence: 86 occurrences of a retired value across 30 files, 26 of which carry exactly one —
  * the signature of a value copied once and never revisited rather than a deliberate system.
+ * That first measurement stands as the record of what was found; the pinned total is 84 today,
+ * because issue 1464 deleted two of them along with the dead Travel CSS that carried them.
  *
  * This gate FREEZES that. It does not require the whole ladder, and the reason is in the
  * requirement's own wording rather than in the size of the finding: `spec.md` governs "a control
