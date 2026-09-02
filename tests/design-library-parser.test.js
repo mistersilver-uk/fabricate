@@ -35,13 +35,23 @@ import { parseDesignLibrary, primitiveNamesIn } from './helpers/designLibrary.js
  * mentions `.spec-head` the way the real page's stylesheet does, so a parser matching the literal
  * string rather than the element over-counts blocks. The prose heading carries an entity so the
  * decoding is exercised where it matters — the heading census pins these by text.
+ *
+ * THE TWO ENTRIES SIT IN DIFFERENT PLACES IN THE DOCUMENT, which is what `headingSections`
+ * discriminates on (issue 1487). `<Anchored>` is inside `section#controls`; the prose block is
+ * inside no section at all; and `section#ruledout` follows both. Every wrong way to answer
+ * "which section is this heading in" gives a different answer over this fixture: the first
+ * `section[id]` in the document gives `controls` twice, the LAST gives `ruledout` twice, and a
+ * position-tracking walk gives `controls` then `controls`. Only asking each heading for its own
+ * ancestor gives `controls` then nothing.
  */
 const FIXTURE = [
   '<!doctype html><html><head>',
   '<style>.spec-head{display:flex}.spec-head h4{margin:0}.spec-head .why{font-size:12px}</style>',
   '</head><body>',
+  '<section id="controls">',
   '<div class="spec"><div class="spec-head"><h4>&lt;Anchored&gt;</h4>',
   '<p class="why">Its dense variant exists only for <code>&lt;CitedInWhy&gt;</code>.</p></div></div>',
+  '</section>',
   '<div class="spec"><div class="spec-head"><h4>Depth &amp; interaction</h4></div></div>',
   '<section id="ruledout"><span class="k-mono">&lt;Declined&gt;</span>',
   '<p class="k-hint">Composes out of members already in the set.</p></section>',
@@ -104,4 +114,21 @@ test('blocks are elements, not occurrences of the class name in the stylesheet',
 test('headings are reported decoded, which is what the census pins', () => {
   assert.deepEqual(parsed.headings, ['<Anchored>', 'Depth & interaction']);
   assert.deepEqual(parsed.nonPrimitiveHeadings, ['Depth & interaction']);
+});
+
+test('each heading reports its OWN enclosing section, or nothing', () => {
+  // The fixture holds two `section[id]`s and two headings, arranged so that no constant answer is
+  // correct: see the FIXTURE docblock for the three wrong readings this discriminates against.
+  assert.ok(FIXTURE.includes('id="controls"'), 'no enclosing section for the anchored entry');
+  assert.ok(
+    FIXTURE.includes('id="ruledout"'),
+    'no second section, so a constant answer would pass'
+  );
+  assert.deepEqual(parsed.headingSections, ['controls', null]);
+  assert.equal(
+    parsed.headingSections.length,
+    parsed.headings.length,
+    'headingSections is read positionally against headings, so a length mismatch silently ' +
+      'reassigns every entry after the gap to another section'
+  );
 });

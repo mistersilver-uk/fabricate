@@ -100,6 +100,11 @@ function distinct(values) {
  * @property {number} headingCount every `div.spec-head > h4`; equal to `blockCount` when the
  *   one-heading-per-block relation holds, which is the only reason both are reported
  * @property {string[]} headings decoded `h4` text, in document order
+ * @property {(string|null)[]} headingSections the `id` of each heading's enclosing `section[id]`,
+ *   parallel to {@link DesignLibrary.headings}, `null` when a heading sits under no section. The
+ *   library's information architecture is its sections, and until this field existed the only way
+ *   to ask which section an entry belonged to was to re-parse the file, which is how a second
+ *   reader of a normative artifact starts. The Primitive Lab groups its rail by it.
  * @property {string[]} nonPrimitiveHeadings the headings that name no primitive — section prose
  * @property {string[]} names distinct primitive names, in code-point order
  * @property {number} nameOccurrences total names across all headings, duplicates included
@@ -126,6 +131,13 @@ export function parseDesignLibrary(html) {
   const blockCount = document.querySelectorAll('div.spec-head').length;
   const headingElements = [...document.querySelectorAll('div.spec-head > h4')];
   const headings = headingElements.map((heading) => heading.textContent);
+  // `closest`, not "the section this walk is currently inside": the anchor is already an element
+  // query rather than a document walk, so asking each heading for its own ancestor keeps the two
+  // consistent. An implementation that tracked position would answer with the FIRST section for
+  // every heading, which is indistinguishable from a correct answer on any one-section document.
+  const headingSections = headingElements.map(
+    (heading) => heading.closest('section[id]')?.id ?? null
+  );
   const occurrences = headings.flatMap((heading) => primitiveNamesIn(heading));
   const names = distinct(occurrences);
   const fileWideNames = distinct(primitiveNamesIn(document.documentElement.textContent));
@@ -136,6 +148,7 @@ export function parseDesignLibrary(html) {
     blockCount,
     headingCount: headingElements.length,
     headings,
+    headingSections,
     nonPrimitiveHeadings: headings.filter((heading) => primitiveNamesIn(heading).length === 0),
     names,
     nameOccurrences: occurrences.length,
