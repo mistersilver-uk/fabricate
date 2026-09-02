@@ -24101,10 +24101,15 @@
 
 /* ── THE "or…" MENU (`proto:2292`-`2293`, `proto:4683`) ────────────────────────────
    A COMPACT MENU OF KINDS, not a picker of records — which is what the shared popover above is
-   sized for, and why this one needs its own scale. `proto:2292` draws a 150px panel with a 5px
-   inset and a 9px corner on `--bg0`; the shared box is a 240-340px `--fab-bg-3` panel with an
-   8px corner and a 7px list inset, because the lists it usually holds are world components and
-   actors whose names are as long as they are.
+   sized for, and why this one needs its own scale. `proto:2292` draws it as a 150px panel with
+   a 9px corner; the shared box is 240-340px with a 10px corner, because the lists it usually
+   holds are world components and actors whose names are as long as they are.
+
+   ONLY THE THREE VALUES THAT DIFFER ARE WRITTEN. The shared box already supplies this panel’s
+   surface, its edge, its shadow and its 6px inset, so restating any of them here would be a
+   second copy of a value that is not this menu’s to own. The 9px corner IS this menu’s own:
+   `proto:2292` draws this panel at 9 and `proto:2259` draws the tag picker’s at 10, so the one
+   pixel is the design’s distinction rather than drift from the family.
 
    The WIDTH is not written here. `SearchablePopover` computes it from `minWidth`/`maxWidth` and
    writes it onto the node as an inline style, so the caller states 150 twice and this sheet
@@ -24124,9 +24129,7 @@
      the panel is 150px whether or not the positioning pass has run yet. */
   min-width: 150px;
   max-width: 150px;
-  padding: var(--fab-space-1);
   border-radius: 9px;
-  background: var(--fab-bg-0);
 }
 
 /* The panel IS the inset, so the list adds none of its own, and the entries stack without a gap
