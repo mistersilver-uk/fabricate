@@ -4,7 +4,7 @@ import { join, resolve, sep } from 'node:path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 
-import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
+import { missingChromeMessage, resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const chromeCache = resolveChromeCache(repoRoot);
@@ -97,10 +97,45 @@ function stripGlobalCssImport() {
   };
 }
 
+/**
+ * Answer, in the browser, whether the chrome was harvested — and if not, how to harvest it.
+ *
+ * `missingChromeMessage()` is the project's one statement of that answer. It reads the filesystem
+ * (it reports whether a release archive is already cached, which changes the instructions), so it
+ * cannot run in the page. Restating it there would make a second copy of an instruction whose whole
+ * value is being right, and the View Lab has already measured what happens to duplicated prose.
+ *
+ * So the message is produced where it can be produced and served as data. The page still PROBES the
+ * stylesheet rather than trusting this endpoint: a status that says "available" while the mount
+ * 404s a file is a state the page must not boot in.
+ */
+function chromeStatusEndpoint() {
+  return {
+    name: 'view-lab-chrome-status',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if ((request.url ?? '').split('?')[0] !== CHROME_STATUS_PATH) return next();
+        response.setHeader('Content-Type', 'application/json; charset=utf-8');
+        response.setHeader('Cache-Control', 'no-store');
+        response.end(
+          JSON.stringify({
+            available: Boolean(chromeCache),
+            version: chromeCache?.version ?? null,
+            message: chromeCache ? null : missingChromeMessage(repoRoot),
+          })
+        );
+      });
+    },
+  };
+}
+
+const CHROME_STATUS_PATH = '/@primitive-lab/chrome-status';
+
 export default defineConfig({
   root: repoRoot,
   plugins: [
     stripGlobalCssImport(),
+    chromeStatusEndpoint(),
     svelte(),
     staticMount('/@foundry-chrome/', chromeCache?.dir ?? null, 'Harvested Foundry window chrome'),
     staticMount('/@foundry-system/dnd5e/', existsSync(dnd5eRoot) ? dnd5eRoot : null, 'The dnd5e system tree'),
@@ -109,6 +144,19 @@ export default defineConfig({
     // them and discard the layer annotations, which are what reproduce Foundry's cascade.
     staticMount('/@fabricate-styles/', join(repoRoot, 'styles'), 'The Fabricate stylesheet'),
     staticMount('/@view-lab/', resolve(import.meta.dirname), 'The View Lab cascade shim'),
+    // `openspec/specs/design-system/library.html`, served RAW for the Primitive Lab to parse.
+    //
+    // Not read through its repository path, and not because of the filesystem: Vite applies its
+    // HTML transform to any `.html` under the dev root, which injects the client script and
+    // rewrites asset URLs. Neither breaks the parse today, but it would make the lab a reader of a
+    // REWRITTEN copy of a spec artifact — so a change to that transform would look exactly like a
+    // change to the library. Same reason the harvested chrome and the raw stylesheet are mounted
+    // rather than imported.
+    staticMount(
+      '/@design-library/',
+      join(repoRoot, 'openspec', 'specs', 'design-system'),
+      'The design system library'
+    ),
     // Foundry serves its core art at /icons/; Fabricate's default images reference it that way.
     staticMount('/icons/', chromeCache ? join(chromeCache.dir, 'icons') : null, 'Foundry core icons'),
   ],
@@ -138,5 +186,9 @@ export default defineConfig({
       ],
     },
   },
-  optimizeDeps: { entries: ['tests/view-lab/mount.js'] },
+  // BOTH entries. The optimiser pre-bundles the dependency graph reachable from what is listed
+  // here; a page whose entry is absent pays that cost on its first navigation instead, which is
+  // measured in tens of seconds against a Playwright default of 30 and reads as a broken page
+  // rather than as a cold cache.
+  optimizeDeps: { entries: ['tests/view-lab/mount.js', 'tests/view-lab/primitives/mount.js'] },
 });

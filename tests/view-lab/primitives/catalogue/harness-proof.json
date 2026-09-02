@@ -1,0 +1,518 @@
+[
+  {
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "root": "manager",
+    "note": "Proves the snippet path: `children` is a real snippet handed over as a VALUE, and a six-option `role` is above the segmented ceiling so its knob is a SearchablePopover.",
+    "states": {
+      "rest": true,
+      "hover": "No prop. `:hover` is not settable from a prop at all — read the plinth's live pseudo-class readout instead.",
+      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium, so a knob would render nothing and read as a missing focus ring.",
+      "disabled": true,
+      "loading": "No `loading` prop, and no way to set `aria-busy` — which the spec requires of a loading control, because Foundry's Font Awesome kills `fa-spin` under reduced motion.",
+      "invalid": "Not applicable: a button holds no value that could be invalid.",
+      "readonly": "Not applicable: a button holds no value that could be read-only.",
+      "empty": "Not applicable: a button renders its children, never a collection."
+    },
+    "knobs": [
+      {
+        "prop": "role",
+        "type": "select",
+        "options": ["neutral", "primary", "ghost", "danger", "dashed", "warning"],
+        "value": "primary",
+        "default": "neutral"
+      },
+      {
+        "prop": "tag",
+        "type": "select",
+        "options": ["button", "a"],
+        "value": "button",
+        "default": "button"
+      },
+      {
+        "prop": "type",
+        "type": "select",
+        "options": ["button", "submit", "reset"],
+        "value": "button",
+        "default": "button"
+      },
+      {
+        "prop": "fullWidth",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "disabled",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "children",
+        "type": "snippet",
+        "value": "icon-text",
+        "default": ""
+      },
+      {
+        "prop": "onclick",
+        "type": "event"
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "href",
+        "why": "Only reachable with `tag=\"a\"`, and the component deliberately falls back to a button when an anchor has no href — so a driven href would silently change which element renders."
+      },
+      {
+        "prop": "target",
+        "why": "An anchor concern, and navigating away from the lab is not a state worth reaching."
+      },
+      {
+        "prop": "rel",
+        "why": "An anchor concern with no visual consequence: it changes the referrer policy and nothing on screen."
+      },
+      {
+        "prop": "class",
+        "why": "An EXTRA class appended to the primitive's own. Driving it would let the lab paint a button the design system does not draw, which is the one thing this page must never do."
+      }
+    ],
+    "stories": [
+      {
+        "title": "Every role",
+        "matrix": {
+          "role": "*"
+        }
+      },
+      {
+        "title": "Full width",
+        "matrix": {
+          "fullWidth": "*"
+        }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "root": "manager",
+    "note": "Proves the write-back: `onChange` declares `writes: \"value\"`, so pressing the component's OWN plus and minus buttons moves the rendered number. Without it the specimen would log and never move.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; see the plinth's pseudo-class readout.",
+      "focus-visible": "No prop; the input's own ring is reachable by tabbing to it on the plinth.",
+      "disabled": true,
+      "loading": "No prop. A stepper has no pending state — its edits are synchronous.",
+      "invalid": "No prop. Out-of-range entry is CLAMPED rather than marked invalid, which is a deliberate difference from a validated field.",
+      "readonly": "No prop. `disabled` is the only off state, and the header records that `inputProps.disabled` is the wrong way to reach it.",
+      "empty": "Reachable through `allowUnset`, which makes absence a real value in the field's domain rather than a blank that coerces back to the model."
+    },
+    "knobs": [
+      {
+        "prop": "value",
+        "type": "number",
+        "value": 3,
+        "default": null,
+        "allowUnset": true,
+        "min": -50,
+        "max": 50
+      },
+      {
+        "prop": "min",
+        "type": "number",
+        "value": 0,
+        "default": null,
+        "allowUnset": true
+      },
+      {
+        "prop": "max",
+        "type": "number",
+        "value": 10,
+        "default": null,
+        "allowUnset": true
+      },
+      {
+        "prop": "step",
+        "type": "number",
+        "value": 1,
+        "default": 1,
+        "min": 1,
+        "max": 10
+      },
+      {
+        "prop": "allowUnset",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "disabled",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "fill",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "orientation",
+        "type": "select",
+        "options": ["horizontal", "vertical"],
+        "value": "horizontal",
+        "default": "horizontal"
+      },
+      {
+        "prop": "density",
+        "type": "select",
+        "options": ["default", "comfortable"],
+        "value": "default",
+        "default": "default"
+      },
+      {
+        "prop": "ariaLabel",
+        "type": "text",
+        "value": "Quantity",
+        "default": ""
+      },
+      {
+        "prop": "decrementLabel",
+        "type": "text",
+        "value": "Decrease quantity",
+        "default": ""
+      },
+      {
+        "prop": "incrementLabel",
+        "type": "text",
+        "value": "Increase quantity",
+        "default": ""
+      },
+      {
+        "prop": "placeholder",
+        "type": "text",
+        "value": "",
+        "default": ""
+      },
+      {
+        "prop": "inputProps",
+        "type": "json",
+        "value": {},
+        "default": {}
+      },
+      {
+        "prop": "onChange",
+        "type": "event",
+        "writes": "value"
+      }
+    ],
+    "stories": [
+      {
+        "title": "Absence is a value",
+        "matrix": {
+          "allowUnset": "*"
+        }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
+    "root": "manager",
+    "note": "Proves the overlay path: the panel portals into its OWN plinth's `.fabricate-manager` and is clipped by it exactly as the product clips it (issue 1286). The option list is long enough that the panel exceeds a minimum-height plinth, so the clip is observable on purpose rather than by accident, and long enough that the search field is doing something.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; see the plinth's pseudo-class readout.",
+      "focus-visible": "No prop. The trigger and every option row take a ring; tab to them on the plinth.",
+      "disabled": true,
+      "loading": "No prop. The option list is passed in already resolved, so the component never awaits anything.",
+      "invalid": "No prop. A closed set cannot hold an invalid value; an unmatched `value` simply marks nothing.",
+      "readonly": "No prop. `disabled` and `triggerAriaDisabled` are the two off states and neither is read-only.",
+      "empty": "Reachable by filtering to nothing, which renders `emptyHint` and `emptyDetail` — the component's own empty state."
+    },
+    "knobs": [
+      {
+        "prop": "options",
+        "type": "json",
+        "default": null,
+        "value": [
+          {
+            "id": "iron",
+            "label": "Iron ingot",
+            "icon": "fas fa-cube"
+          },
+          {
+            "id": "oak",
+            "label": "Oak haft",
+            "icon": "fas fa-tree"
+          },
+          {
+            "id": "cord",
+            "label": "Waxed cord",
+            "icon": "fas fa-link"
+          },
+          {
+            "id": "leather",
+            "label": "Boiled leather",
+            "icon": "fas fa-shield"
+          },
+          {
+            "id": "quartz",
+            "label": "Clear quartz",
+            "icon": "fas fa-gem"
+          },
+          {
+            "id": "resin",
+            "label": "Pine resin",
+            "icon": "fas fa-droplet"
+          },
+          {
+            "id": "silver",
+            "label": "Silver wire",
+            "icon": "fas fa-bolt"
+          },
+          {
+            "id": "ash",
+            "label": "Ash bark",
+            "icon": "fas fa-leaf"
+          },
+          {
+            "id": "chitin",
+            "label": "Beetle chitin",
+            "icon": "fas fa-bug"
+          },
+          {
+            "id": "ember",
+            "label": "Banked ember",
+            "icon": "fas fa-fire"
+          },
+          {
+            "id": "brine",
+            "label": "Deep brine",
+            "icon": "fas fa-water"
+          },
+          {
+            "id": "obsidian",
+            "label": "Obsidian shard",
+            "icon": "fas fa-mountain"
+          },
+          {
+            "id": "vellum",
+            "label": "Scraped vellum",
+            "icon": "fas fa-scroll"
+          },
+          {
+            "id": "amber",
+            "label": "Fossil amber",
+            "icon": "fas fa-circle"
+          },
+          {
+            "id": "sinew",
+            "label": "Dried sinew",
+            "icon": "fas fa-link-slash"
+          },
+          {
+            "id": "salt",
+            "label": "Rock salt",
+            "icon": "fas fa-snowflake"
+          },
+          {
+            "id": "tallow",
+            "label": "Rendered tallow",
+            "icon": "fas fa-jar"
+          },
+          {
+            "id": "loam",
+            "label": "River loam",
+            "icon": "fas fa-seedling"
+          }
+        ]
+      },
+      {
+        "prop": "value",
+        "type": "text",
+        "value": "iron",
+        "default": ""
+      },
+      {
+        "prop": "triggerLabel",
+        "type": "text",
+        "value": "Ingredient",
+        "default": ""
+      },
+      {
+        "prop": "triggerIcon",
+        "type": "text",
+        "value": "fas fa-cube",
+        "default": ""
+      },
+      {
+        "prop": "triggerChip",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "disabled",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "showChevron",
+        "type": "boolean",
+        "value": true,
+        "default": true
+      },
+      {
+        "prop": "showSearch",
+        "type": "boolean",
+        "value": true,
+        "default": true
+      },
+      {
+        "prop": "compactOptionRows",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "showFilteredCount",
+        "type": "boolean",
+        "value": true,
+        "default": false
+      },
+      {
+        "prop": "popoverTitle",
+        "type": "text",
+        "value": "Choose an ingredient",
+        "default": ""
+      },
+      {
+        "prop": "maxHeight",
+        "type": "number",
+        "value": 0,
+        "default": 0,
+        "min": 0,
+        "max": 600
+      },
+      {
+        "prop": "minWidth",
+        "type": "number",
+        "value": 240,
+        "default": 240,
+        "min": 120,
+        "max": 600
+      },
+      {
+        "prop": "maxWidth",
+        "type": "number",
+        "value": 340,
+        "default": 340,
+        "min": 160,
+        "max": 800
+      },
+      {
+        "prop": "header",
+        "type": "snippet",
+        "value": "",
+        "default": ""
+      },
+      {
+        "prop": "footer",
+        "type": "snippet",
+        "value": "",
+        "default": ""
+      },
+      {
+        "prop": "onChoose",
+        "type": "event",
+        "writes": "value"
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "optionGroups",
+        "why": "A second, mutually exclusive shape for the same data. Driving both from one panel would let the lab render a combination no call site can produce."
+      },
+      {
+        "prop": "triggerClass",
+        "why": "An EXTRA class on the trigger. Driving it would let the harness paint a trigger the design system does not draw."
+      },
+      {
+        "prop": "valueClass",
+        "why": "The same, on the value span."
+      },
+      {
+        "prop": "pickerClass",
+        "why": "The same, on the picker root."
+      },
+      {
+        "prop": "popoverClass",
+        "why": "The same, on the portaled panel."
+      },
+      {
+        "prop": "triggerImg",
+        "why": "An image URL. The lab must never invent a Foundry asset path — an unvalidated `img` 404s silently — and a real one would be fixture data rather than a knob."
+      },
+      {
+        "prop": "triggerData",
+        "why": "Arbitrary `data-*` attributes for a caller's own selectors. No visual consequence at all."
+      },
+      {
+        "prop": "triggerAddMarker",
+        "why": "A caller's marker attribute, read by the recipe editor's own tests. No visual consequence."
+      },
+      {
+        "prop": "triggerTitle",
+        "why": "A pointer tooltip. Real, but it renders outside the plinth and cannot be captured with the specimen."
+      },
+      {
+        "prop": "triggerHasPopup",
+        "why": "An ARIA relationship, not a rendering. Changing it would misdescribe the panel this component actually opens."
+      },
+      {
+        "prop": "triggerAriaDisabled",
+        "why": "The announced half of `disabled`, which is already driven. Driving them apart would let the lab render a control that says one thing and does another."
+      },
+      {
+        "prop": "triggerAriaLabel",
+        "why": "An accessible name. Driven from `triggerLabel` instead so the two cannot disagree."
+      },
+      {
+        "prop": "dialogAriaLabel",
+        "why": "The panel's accessible name; same reason, driven from `popoverTitle`."
+      },
+      {
+        "prop": "searchAriaLabel",
+        "why": "The search field's accessible name; same reason."
+      },
+      {
+        "prop": "searchPlaceholder",
+        "why": "Placeholder text inside the panel. Set to a realistic string rather than driven, because an empty placeholder is a localization gap rather than a state worth exploring."
+      },
+      {
+        "prop": "emptyHint",
+        "why": "Shown when the query matches nothing, which is reached by TYPING rather than by a knob — the honest route to that state is the search field itself."
+      },
+      {
+        "prop": "emptyDetail",
+        "why": "The same state, same route."
+      },
+      {
+        "prop": "filteredCountTemplate",
+        "why": "A format string for the matched/total readout. `showFilteredCount` is driven; the template is localization."
+      },
+      {
+        "prop": "inlineSearchTrigger",
+        "why": "Replaces the trigger with an inline field, which is a different component shape rather than a state of this one. It belongs in a story once this row has a caller that uses it."
+      },
+      {
+        "prop": "inlineCloseLabel",
+        "why": "Only reachable through `inlineSearchTrigger`."
+      },
+      {
+        "prop": "open",
+        "why": "`$bindable`. The lab holds knob values in its own state and hands them down, so binding a two-way handle here would give the open state two owners that disagree."
+      }
+    ]
+  }
+]

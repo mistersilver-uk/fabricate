@@ -61,14 +61,16 @@ const APPENDED_GROUPS = [
   },
 ];
 
-const RULED_OUT_GROUP = {
-  id: 'ruled-out',
-  num: '15',
-  title: 'Ruled out',
-  lede:
-    'Candidates adjudicated and declined, with the composition that replaces each one. Recorded so ' +
-    'they are not re-proposed.',
-};
+/**
+ * The library's own Ruled out section.
+ *
+ * The manifest's `ruledOut` rows file INTO it rather than into a group of their own, and the num,
+ * title and lede therefore come off the file like every other section's. An appended group here
+ * carrying `num: '15'` and its own lede was a copy of a section head that already exists, and once
+ * every section is rendered rather than only the populated ones it was also a VISIBLE duplicate:
+ * section 15 drawn empty from the library, then drawn again from a literal.
+ */
+const RULED_OUT_SECTION_ID = 'ruledout';
 
 /**
  * Build the page model.
@@ -96,10 +98,17 @@ export async function buildModel() {
         member: table === 'designSystemPrimitives',
         why: name ? (library.whyOf.get(name) ?? row.why) : row.why,
         entry: catalogue.get(row.path) ?? null,
-        // TABLE FIRST, NAME SECOND. The near-member table holds three rows the library DOES name
-        // (`<RowDisclosure>`, `<ArtPathPicker>`, `<ExprInput>`), and those belong in the register
-        // that records why they are not members rather than in the section whose other entries are.
-        // Deciding on the name would file them beside primitives they were adjudicated against.
+        // TABLE FIRST, NAME SECOND. The near-member table holds TWO rows the library does name
+        // (`<ArtPathPicker>` in Pickers, `<RowDisclosure>` in Surfaces), and those belong in the
+        // register that records why they are not members rather than in the section whose other
+        // entries are. Deciding on the name would file them beside primitives they were
+        // adjudicated against.
+        //
+        // Measured on `origin/main` rather than assumed: an earlier version of this comment named
+        // three and included `<ExprInput>`, which is a MEMBER — it is `RollDataExpressionInput` in
+        // `designSystemPrimitives`, so it reaches its Composites section by the ordinary path and
+        // was never affected by this rule at all. `crossReferences` below is what stops the two
+        // real cases from making their library sections look as if they lack an entry.
         groupId:
           table === 'notAPrimitive'
             ? 'near-members'
@@ -107,6 +116,24 @@ export async function buildModel() {
       });
     }
   }
+
+  // The near-member cross-reference. `<ArtPathPicker>` has a Pickers entry and `<RowDisclosure>` a
+  // Surfaces entry, and filing both under "Below the caller bar" leaves those two sections looking
+  // as though the library names something the lab cannot show. A derived pointer row appears in the
+  // library's own section, says where the component actually lives, and stays correct on its own:
+  // promote either row to the primitive table and it becomes an ordinary mounted row in the same
+  // section, with nothing here to edit.
+  const crossReferences = mounted
+    .filter((row) => row.groupId === 'near-members' && row.libraryName)
+    .map((row) => ({
+      kind: 'xref',
+      name: row.libraryName,
+      path: row.path,
+      why: row.why,
+      target: 'near-members',
+      groupId: library.sectionOf.get(row.libraryName) ?? 'undocumented',
+    }))
+    .filter((row) => row.groupId !== 'near-members');
 
   const unbuilt = library.names
     .filter((name) => !shippedNames.has(name))
@@ -126,21 +153,39 @@ export async function buildModel() {
     verdict: row.verdict,
     replacement: row.replacement,
     why: row.why,
-    groupId: 'ruled-out',
+    groupId: RULED_OUT_SECTION_ID,
   }));
 
-  const rows = [...mounted, ...unbuilt, ...ruledOut];
-  const sectionGroups = library.sections
-    .map((section) => ({ ...section, rows: rows.filter((row) => row.groupId === section.id) }))
-    .filter((group) => group.rows.length > 0);
-  const appended = [...APPENDED_GROUPS, RULED_OUT_GROUP]
-    .map((group) => ({ ...group, rows: rows.filter((row) => row.groupId === group.id) }))
-    .filter((group) => group.rows.length > 0);
+  const rows = [...mounted, ...crossReferences, ...unbuilt, ...ruledOut];
+
+  // EVERY SECTION THE PARSER SEES, INCLUDING THE ONES WITH NOTHING TO DRIVE.
+  //
+  // Dropping the empty ones dropped 00 How to use this, 01 Colour, 02 Type, 03 Space & geometry,
+  // 04 States & targets, 05 Foundry contract, 12 Sets & groups, 13 Screen recipes, 14 Which one do
+  // I use? and 16 Planned migrations — ten of the seventeen. The page then OPENED at "06 Controls"
+  // and read as a truncated library rather than as a complete one whose first six sections carry
+  // rules instead of components, which is precisely the reading the numbering exists to prevent.
+  // Sections 01–04 are additionally rendered LIVE, from `getComputedStyle` over the theme roots.
+  const sectionGroups = library.sections.map((section) => ({
+    ...section,
+    rows: rows.filter((row) => row.groupId === section.id),
+  }));
+  const appended = APPENDED_GROUPS.map((group) => ({
+    ...group,
+    rows: rows.filter((row) => row.groupId === group.id),
+  }));
 
   return {
     groups: [...sectionGroups, ...appended],
     counts: {
-      mounted: mounted.length,
+      shipped: mounted.length,
+      // The rows the page can actually MOUNT: a manifest row with no catalogue entry has a name, a
+      // section and a reason, and nothing that says how to drive it. Reported separately from
+      // `shipped` because the two answer different questions — "what ships" and "what this page can
+      // put on a plinth" — and a single number that quietly meant the second while being read as
+      // the first is the shape of every drift this programme has already measured.
+      catalogued: mounted.filter((row) => row.entry).length,
+      crossReferenced: crossReferences.length,
       unbuilt: unbuilt.length,
       ruledOut: ruledOut.length,
     },

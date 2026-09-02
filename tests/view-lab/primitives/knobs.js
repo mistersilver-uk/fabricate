@@ -26,6 +26,20 @@
  *   event    NOT A CONTROL. It contributes a recorder function to the props and renders as a row in
  *            the event log rather than as an input.
  *
+ * ── `value` IS WHERE THE KNOB STARTS; `default` IS WHAT THE COMPONENT DECLARES ────────────────
+ *
+ * They are different facts and conflating them produced a wrong answer on screen. A row that opens
+ * on `role: "primary"` because that is the interesting state still has `role = 'neutral'` as the
+ * COMPONENT's default, so an invocation that omits every prop equal to its STARTING value pastes
+ * `<ManagerButton>` with no `role` — markup that renders a neutral button, under a specimen showing
+ * a primary one. Nothing in the generated snippet says so.
+ *
+ * So `value` seeds the control, `default` (optional, and only where it differs) is the value a call
+ * site gets by omission, and {@link renderInvocation} compares against `default`. Where a row
+ * declares no `default` the type's own zero stands in, which is right for the many props whose
+ * declared default IS the zero and is a knob-authoring error nowhere else — the coverage gate reads
+ * both fields, so a `default` that names a value the component cannot take is reportable.
+ *
  * ── `writes`, AND WHY A CONTROLLED PRIMITIVE NEEDS IT ─────────────────────────────────────────
  *
  * Almost every interactive primitive here is CONTROLLED: `Stepper` renders `value` and reports
@@ -77,10 +91,31 @@ function zeroFor(knob) {
     case 'select': {
       return knob.options?.[0] ?? '';
     }
+    // `<input type="color">` HAS NO EMPTY STATE. Assigning `''` to one is invalid, so the element
+    // sanitises it to `#000000` at first paint: the swatch shows black while the knob believes it
+    // holds `''`, the generated invocation omits the prop as unset, and the specimen is mounted
+    // with a colour string no control on the page is displaying. Starting at the value the input
+    // will hold anyway keeps all three in agreement.
+    case 'colour': {
+      return '#000000';
+    }
     default: {
       return '';
     }
   }
+}
+
+/**
+ * The value a call site gets by OMITTING the prop.
+ *
+ * See the header for why this is not `knob.value`: that is where the control starts, which a row
+ * chooses for interest, and the two are equal only by coincidence.
+ *
+ * @param {object} knob A knob declaration.
+ * @returns {unknown} The component's declared default.
+ */
+function declaredDefault(knob) {
+  return Object.hasOwn(knob, 'default') ? knob.default : zeroFor(knob);
 }
 
 /**
@@ -135,9 +170,53 @@ export function buildProps({ entry, values, resolveSnippet, onEvent }) {
 export function applyWriteBack({ entry, values, prop, args }) {
   const knob = (entry.knobs ?? []).find((candidate) => candidate.prop === prop);
   if (!knob?.writes) return null;
-  const next = args[knob.arg ?? 0];
-  if (values[knob.writes] === next) return null;
-  return { ...values, [knob.writes]: next };
+
+  // NOTHING IS WRITTEN BY A CALL THAT CARRIED NOTHING. A callback fired with no arguments, or a
+  // row whose `arg` index is past the end of the call, would otherwise write `undefined` — and
+  // `undefined` is the one value that does not behave like a value here: `buildProps` sets the prop
+  // to it, Svelte's `$props()` fallback fires, and the component silently reverts to its own
+  // default. The knob has stopped controlling its prop and nothing on the page says so.
+  const index = knob.arg ?? 0;
+  if (index >= args.length) return null;
+  const next = args[index];
+  if (next === undefined) return null;
+
+  // STRUCTURAL COMPARISON, AND A DETACHED COPY. `===` was wrong in both directions and each
+  // direction is its own defect:
+  //
+  //   - An OBJECT argument rebuilt on every call (a `{token, hex}`, an options array) is never
+  //     `===` the stored one, so every fire replaced the whole values object and re-rendered the
+  //     specimen — a controlled primitive that flickers on each keystroke for no state change.
+  //   - An ARRAY the component mutates IN PLACE and hands back IS `===` the stored one, so the
+  //     write-back concluded nothing had changed and the specimen never re-rendered at all.
+  //
+  // `sameValue` fixes the first. The second cannot be fixed by any comparison, because both sides
+  // are the same object: the stored value is therefore DETACHED from the caller's, so a later
+  // in-place mutation can no longer alias it and the next comparison sees the difference.
+  const stored = detachTopLevel(next);
+  if (sameValue(values[knob.writes], stored)) return null;
+  return { ...values, [knob.writes]: stored };
+}
+
+/**
+ * A shallow copy of a plain array or object, and anything else untouched.
+ *
+ * Shallow is the right depth: it is the TOP-LEVEL identity that the write-back compares and that
+ * Svelte's proxy tracks, and a deep clone would additionally have to survive a value the lab does
+ * not own — a component instance, a DOM node, a snippet — which `structuredClone` throws on.
+ *
+ * @param {unknown} value A callback argument.
+ * @returns {unknown} A value that does not alias `value` when it is plain data.
+ */
+function detachTopLevel(value) {
+  if (Array.isArray(value)) return [...value];
+  if (value !== null && typeof value === 'object' && isPlainObject(value)) return { ...value };
+  return value;
+}
+
+function isPlainObject(value) {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }
 
 /**
@@ -155,8 +234,7 @@ export function applyWriteBack({ entry, values, prop, args }) {
 export function expandMatrix(entry, story, base) {
   const axes = Object.entries(story.matrix ?? {}).map(([prop, spec]) => {
     const knob = (entry.knobs ?? []).find((candidate) => candidate.prop === prop);
-    const options = spec === '*' ? (knob?.options ?? []) : spec;
-    return { prop, options };
+    return { prop, options: spec === '*' ? everyValueOf(knob) : spec };
   });
   if (axes.length === 0) return [{ label: story.title ?? '', values: { ...base } }];
 
@@ -170,6 +248,22 @@ export function expandMatrix(entry, story, base) {
     );
   }
   return cells.map((cell) => ({ label: cell.label.join('  ·  '), values: cell.values }));
+}
+
+/**
+ * Every value a knob can take, for a matrix axis written `'*'`.
+ *
+ * A BOOLEAN knob declares no `options` — its option list is its type. Resolving `'*'` through
+ * `options` alone therefore yielded an EMPTY axis, and an empty axis makes the cartesian product
+ * empty: the story rendered zero cells, drew nothing, and reported nothing, which reads as a story
+ * that has not been written rather than one whose axis silently evaporated.
+ *
+ * @param {object|undefined} knob The knob the axis names, if the row declares one.
+ * @returns {unknown[]} The axis values.
+ */
+function everyValueOf(knob) {
+  if (knob?.type === 'boolean') return [false, true];
+  return knob?.options ?? [];
 }
 
 function formatScalar(value) {
@@ -195,18 +289,36 @@ export function tagFor(entry) {
 /**
  * Render the current knob values as the Svelte a call site would write.
  *
- * Omits a prop whose value equals the knob's declared default, because a generated snippet that
- * spells out every prop at its default is not what anybody would paste — it buries the two lines
- * that matter under fifteen that do not.
+ * Omits a prop whose value equals the COMPONENT's declared default (see the header on `value` vs
+ * `default`), because a generated snippet that spells out every prop at its default is not what
+ * anybody would paste — it buries the two lines that matter under fifteen that do not.
+ *
+ * ── EVERY SNIPPET PROP IS A CHILD, NOT AN ATTRIBUTE ──────────────────────────────────────────
+ *
+ * `{#snippet header()}…{/snippet}` inside the attribute list is not Svelte. It is not a subtly
+ * unidiomatic spelling of the right thing either: a `{#...}` block in attribute position does not
+ * parse, so the six primitives here taking a non-`children` snippet each generated markup that
+ * fails to compile the moment it is pasted — which is the one job this output has. Svelte 5 takes
+ * a named snippet as a CHILD of the component, and that is where it is emitted.
+ *
+ * `fixedProps` are emitted for the same reason: `buildProps` spreads them onto the mounted
+ * specimen, so markup that leaves them out does not reproduce what is on the screen above it.
  *
  * @param {object} entry A catalogue row.
  * @param {Record<string, unknown>} values Current knob values.
+ * @param {object} [options] Options.
+ * @param {(id: string) => string} [options.describeFiller] Filler id to the markup it stands for.
+ *   Passed in through the same seam as `buildProps`'s `resolveSnippet`, and for the same reason:
+ *   the filler set is the browser's, this module is also run by the coverage gate under
+ *   `node --test`, and a copy of the descriptions kept here would be a second record of them that
+ *   nothing compares. The two-outcome version this replaces knew `icon` from everything else and
+ *   reported the other nine fillers as the string "Save changes".
  * @returns {string} Svelte markup.
  */
-export function renderInvocation(entry, values) {
+export function renderInvocation(entry, values, { describeFiller = (id) => id } = {}) {
   const tag = tagFor(entry);
   const attributes = [];
-  let childContent = null;
+  const children = [];
 
   for (const knob of entry.knobs ?? []) {
     if (knob.type === 'event') {
@@ -216,22 +328,42 @@ export function renderInvocation(entry, values) {
     if (!VALUE_TYPES.has(knob.type)) continue;
 
     const value = values[knob.prop];
-    const isDefault = Object.hasOwn(knob, 'value')
-      ? sameValue(value, knob.value)
-      : sameValue(value, zeroFor(knob));
-    if (isDefault) continue;
+    if (sameValue(value, declaredDefault(knob))) continue;
 
     if (knob.type === 'snippet') {
-      if (knob.prop === 'children') childContent = `  ${describeFiller(value)}`;
-      else attributes.push(`{#snippet ${knob.prop}()}…{/snippet}`);
+      if (!value) continue;
+      const filler = describeFiller(value);
+      children.push(
+        knob.prop === 'children' ? `  ${filler}` : `  {#snippet ${knob.prop}()}${filler}{/snippet}`
+      );
       continue;
     }
     attributes.push(renderAttribute(knob, value));
   }
 
+  for (const [prop, value] of Object.entries(entry.fixedProps ?? {})) {
+    attributes.push(renderFixedProp(prop, value));
+  }
+
   const open = attributes.length === 0 ? `<${tag}` : `<${tag}\n  ${attributes.join('\n  ')}\n`;
-  if (childContent === null) return `${open}${attributes.length === 0 ? ' ' : ''}/>`;
-  return `${open}>\n${childContent}\n</${tag}>`;
+  if (children.length === 0) return `${open}${attributes.length === 0 ? ' ' : ''}/>`;
+  return `${open}>\n${children.join('\n')}\n</${tag}>`;
+}
+
+/**
+ * One `fixedProps` entry as an attribute.
+ *
+ * Separate from {@link renderAttribute} because a fixed prop carries no knob and therefore no
+ * declared type: the shape has to be read off the value itself.
+ *
+ * @param {string} prop Prop name.
+ * @param {unknown} value The value passed verbatim on every render.
+ * @returns {string} One attribute.
+ */
+function renderFixedProp(prop, value) {
+  if (value === true) return prop;
+  if (typeof value === 'string') return `${prop}=${JSON.stringify(value)}`;
+  return `${prop}={${JSON.stringify(value) ?? 'undefined'}}`;
 }
 
 function renderAttribute(knob, value) {
@@ -242,10 +374,6 @@ function renderAttribute(knob, value) {
   if (knob.type === 'number') return `${knob.prop}={${value === null ? 'null' : value}}`;
   if (knob.type === 'json') return `${knob.prop}={${JSON.stringify(value)}}`;
   return `${knob.prop}=${JSON.stringify(String(value))}`;
-}
-
-function describeFiller(id) {
-  return id === 'icon' ? '<i class="fas fa-trash"></i>' : 'Save changes';
 }
 
 function handlerName(prop) {

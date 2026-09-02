@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabricate Primitive Lab</title>
+    <!--
+      Foundry serves the game view from the web ROOT, so module code that references an asset the
+      Foundry way - `icons/svg/item-bag.svg`, no leading slash - resolves against `/`. This page
+      lives at /tests/view-lab/, so without this those paths would resolve against that directory
+      and 404. Same reason and same value as index.html.
+    -->
+    <base href="/" />
+    <!--
+      STYLESHEET ORDER IS THE SAME ORDER AS index.html, AND IT IS LOAD-BEARING. It reproduces
+      Foundry's own game view (templates/views/layouts/main.hbs plus Express.CORE_VIEW_STYLES):
+
+        1. foundry2.css   - UNLAYERED, and unlayered beats every layer.
+        2. Font Awesome   - layer "variables", via cascade.css.
+        3. fabricate.css  - layer "modules", via cascade.css. Loading it unlayered would let
+                            rules win here that LOSE in production.
+        4. Component CSS  - svelte.config.js sets css: 'injected', so component <style> blocks
+                            become unlayered runtime <style> elements here and in production alike.
+
+      A primitive drawn under any other order is a primitive drawn under a cascade production does
+      not have, which would make this page confidently wrong rather than merely empty.
+    -->
+    <link rel="stylesheet" href="/@foundry-chrome/css/foundry2.css" media="all" />
+    <link rel="stylesheet" href="/@view-lab/cascade.css" />
+    <!--
+      The harness's own chrome, LAST and unlayered. It has to be unlayered for one rule: the plinth
+      override, which beats `.application { position: absolute }` from Foundry's own sheet. Every
+      other rule in it is `pl-` prefixed, so its position in the cascade changes nothing.
+
+      Served raw through the `/@view-lab/` mount rather than imported, so the browser rather than
+      Vite's PostCSS pipeline resolves it — the same reason `cascade.css` is served raw.
+    -->
+    <link rel="stylesheet" href="/@view-lab/primitives/lab.css" />
+    <style>
+      /*
+        NOT index.html's backdrop block. That page pins `html, body` to the viewport and sets
+        `overflow: hidden`, because it draws exactly one window and clips the capture to it. This
+        page is a catalogue: it is taller than the viewport by design and it SCROLLS.
+
+        `margin: 0; padding: 0` still has to be stated, because foundry2.css:13930 gives `body` a
+        `padding: 1rem` and a black background. The padding is the harness's to decide (`.pl-page`
+        owns it, so the page gutter is one number in one place), and the backdrop is deliberately
+        NOT black: every plinth on this page paints its own opaque surface, and a black page behind
+        them makes an unstyled region indistinguishable from a correctly dark one.
+      */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #0b0a13;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/tests/view-lab/primitives/mount.js"></script>
+  </body>
+</html>
