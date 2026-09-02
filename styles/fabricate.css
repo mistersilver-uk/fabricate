@@ -23830,6 +23830,36 @@
   min-height: 36px;
 }
 
+/* THE PANEL, AT THE DESIGN'S OWN FIGURES (issue 1373). `proto:2258` states it as
+   `padding:7px; border-radius:10px; background:var(--bg0); border:1px solid
+   var(--border-strong); box-shadow` (a deep 16/38 drop, which `--fab-shadow-lg` already
+   answers for); `display:flex; flex-direction:column; gap:5px`. This drew an 8px-cornered,
+   unpadded, ungapped sheet on `--fab-bg-3`.
+
+   The design's shadow value is described rather than quoted because
+   `theme-colour-contract.test.js` reads COMMENTS as well as declarations, and it is right to:
+   a literal parked in a comment is the first thing the next author copies into a rule.
+
+   THE FILL IS A JUDGEMENT AND NOT A TRANSCRIPTION. The design's background ramp is shifted a
+   rung against ours - its `--bg1` is our `--fab-bg-0` and its `--bg2` our `--fab-bg-1` - so
+   the `--bg0` it paints this panel with sits BELOW our darkest token and has no equivalent.
+   What the design is expressing is a RELATIONSHIP: the popover is darker than the block it
+   floats over, held off it by `--border-strong` and a deep shadow. `--fab-bg-3` inverted that
+   - it is the LIGHTEST rung, so the panel was brighter than every pane it opened over, which
+   is most of why it read as a heavy sheet. `--fab-bg-0` is the darkest rung we publish and
+   restores the relationship without inventing an eighth rung across seven themes; all seven
+   run the same direction, so no theme reads it backwards.
+
+   The 7px inset and the 5px gap are not transcribed either: `spacing-scale-ratchet.test.js`
+   bans a new raw literal in `padding`/`margin`/`gap`, so each takes its nearest published
+   step, as `EmptyState`'s `is-filtered` variant took the design's 26px to 24px.
+
+   WIDTH IS DELIBERATELY NOT THE DESIGN'S 228px. That figure belongs to one popover holding
+   one-word tags; this primitive sizes to its trigger and its content through
+   `computeIconPickerPopoverLayout` and the `minWidth`/`maxWidth` props, which is the same job
+   done for 22 call sites instead of one. `max-height` is left alone for the same reason -
+   `proto:2260`'s 180px cap is that popover's, and the `maxHeight` prop is how a narrow column
+   asks for a shorter panel here. */
 .fabricate-picker-popover.manager-travel-popover {
   position: absolute;
   top: calc(100% + 6px);
@@ -23837,31 +23867,59 @@
   z-index: 4000;
   display: flex;
   flex-direction: column;
+  gap: var(--fab-space-1);
   width: max-content;
   min-width: 240px;
   max-width: 340px;
   max-height: min(50vh, 360px);
+  padding: var(--fab-space-chip);
   border: 1px solid var(--fab-border-strong);
-  border-radius: 8px;
-  background: var(--fab-bg-3);
+  border-radius: 10px;
+  background: var(--fab-bg-0);
   box-shadow: var(--fab-shadow-lg);
   overflow: hidden;
 }
 
+/* The field is a DIRECT column item of the panel now, so the panel's own inset and gap place
+   it and this row keeps neither an inset nor a rule of its own. `proto:2259` draws no divider
+   under it: the field is edged in its own right, and a second horizontal rule immediately
+   under an edged control reads as a second boundary.
+
+   `flex: 0 0 auto` is the same load-bearing declaration the compact search row carries and for
+   the same reason - the panel is a capped column, so a full list makes every item a shrink
+   candidate and the field's height becomes a hint rather than a height. */
 .fabricate-picker-popover .manager-travel-popover-search {
-  padding: var(--fab-space-2);
-  border-bottom: 1px solid var(--fab-border);
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
+/* `proto:2259` is `padding:7px 9px; border-radius:7px; border:1px solid var(--accent-border);
+   background:var(--bg1)`, and that `--bg1` IS our `--fab-bg-0` under the ramp shift the panel
+   block above describes - so the field sits on the same rung as the panel and is told apart
+   by its accent edge rather than by a fill, which is what the design does.
+
+   The design's height is padding-driven and lands near 30px; it is stated as 30 here because
+   `openspec/specs/design-system/spec.md` closes the control ladder at 26/28/30/34/38/44 and
+   retires the 32 this used to carry. It is also the height the compact search row already
+   stands at, so the two shapes of this one control agree.
+
+   `min-height` IS REQUIRED, not belt-and-braces, and measuring the field is what found it.
+   `.fabricate-manager input[type="text"]` sets `min-height: 34px` and ties this rule on
+   specificity, so the height stated here was only ever a floor to be raised: the field
+   rendered at 34px while the sheet said 32 and every reader of the sheet believed it. Outside
+   the manager - the player window's actor bar is a caller - that base rule does not apply at
+   all, so the same control was two different heights in two apps. */
 .fabricate-picker-popover .manager-travel-popover-search input {
   width: 100%;
   box-sizing: border-box;
-  height: 32px;
+  height: 30px;
+  min-height: 30px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 7px;
   color: var(--fab-text);
-  background: var(--fab-bg-1);
+  background: var(--fab-bg-0);
 }
 
 .fabricate-picker-popover .manager-travel-popover-search input:focus-visible {
@@ -23870,14 +23928,26 @@
   box-shadow: 0 0 0 1px var(--fab-accent);
 }
 
+/* `proto:2260`: `max-height:180px; overflow:auto; display:flex; flex-direction:column;
+   gap:2px`, and no inset of its own - the panel's 7px is what every left edge in the popover
+   sits on. Ours added a second 8px inset inside the panel, which put the rows three steps in
+   from the panel edge and made the list read as a card within a card.
+
+   The empty branch is a SIBLING of this box rather than a child of it (issue 1035), so it
+   takes its own class: a list owns a scroll and an inset, and a one-line note owns neither. */
 .fabricate-picker-popover .manager-travel-popover-options {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
-  padding: var(--fab-space-2);
+  padding: 0;
   overflow-y: auto;
+}
+
+.fabricate-picker-popover .manager-travel-popover-empty {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 /* Optional grouped choices (issue 643). A menu whose choices do not all mean the
@@ -23908,6 +23978,21 @@
   text-transform: uppercase;
 }
 
+/* `proto:2261`: `display:flex; align-items:center; gap:8px; height:30px; padding:0 8px;
+   border-radius:7px`. The 8px gap and the 8px inset were already the design's; the height was
+   40 - a RETIRED rung - and the corner 6px.
+
+   `min-height` rather than the design's fixed `height`, because a row here may carry a second
+   line: `meta` promotes an option to a label over a secondary sentence, and a fixed 30px would
+   clip the fact the GM is choosing on. A single-line row measures exactly 30. The 4px of
+   vertical padding is kept rather than taken to the design's 0 for the same reason - with a
+   fixed height there is nothing for a second line to breathe into, and with `min-height` there
+   has to be.
+
+   `justify-content: flex-start` is not tidiness: `foundry2.css` declares
+   `button { display: flex; justify-content: center }` in `@layer elements`, and this sheet is
+   imported at `layer(modules)`, so the row must state its own justification or every label in
+   every picker centres. `manager-layout.test.js` measures it in that real layering. */
 .fabricate-picker-popover .manager-travel-option {
   box-sizing: border-box;
   width: 100%;
@@ -23916,10 +24001,10 @@
   justify-content: flex-start;
   gap: var(--fab-space-2);
   height: auto;
-  min-height: 40px;
+  min-height: 30px;
   padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--fab-text);
   text-align: left;

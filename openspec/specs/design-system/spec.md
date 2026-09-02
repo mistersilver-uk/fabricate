@@ -359,6 +359,7 @@ A rule that is always true is a callout, which stays put.
 Something that just happened or is wrong right now is a notice, which goes away.
 Current values a GM checks are an info strip in mono, and no control ever lives in a strip.
 Nothing to show is an empty state, which says what the emptiness means rather than "no items" and distinguishes an unfiltered emptiness from a filtered one.
+An empty state INSIDE AN OVERLAY the product has already drawn a boundary around — a picker popover, a suggestion list — is a note rather than a panel: one quiet line at that overlay's own scale, with no border, no fill and no icon tile, because a second bordered box inside a bordered panel reads as a card the GM could act on.
 
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.

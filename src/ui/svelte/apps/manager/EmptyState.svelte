@@ -40,6 +40,13 @@
      the PLAYER app's own empties (`salvage-empty`, `alchemy-*-empty`,
      `inventory-detail-empty-note`) are still a different area shell and are NOT this
      variant's remit, as the note at the foot of this block says of the primitive at large.
+   - note: the POPOVER form (issue 1373) — the panel itself is released. No dashed edge, no
+     corner, no fill and no tile: one quiet line at the popover's own type scale, reading from
+     the left. It is NOT a smaller `inline`; `inline` puts the sentence on one line and KEEPS
+     the box, and a bordered card inside a 240px picker panel is the shape the design does not
+     draw (`proto:2262` is `padding:7px; font:500 10px var(--sans); color:var(--subtle)` and
+     nothing else). `SearchablePopover` is its consumer, which is every picker in the manager
+     and the player window's actor bar.
    - filtered: the filtered-to-nothing treatment — a quieter, wider-padded panel for
      "your filters match nothing", which is not an absence of content and deliberately
      skips the icon/title apparatus while keeping ONE dashed panel vocabulary.
@@ -64,6 +71,7 @@
     hint = '',
     compact = false,
     inline = false,
+    note = false,
     filtered = false,
     contextClass = '',
     dataAttr = '',
@@ -80,6 +88,7 @@
   class="manager-empty {contextClass}"
   class:is-compact={compact}
   class:is-inline={inline}
+  class:is-note={note}
   class:is-filtered={filtered}
   {...hookAttributes}
 >
@@ -244,6 +253,64 @@
   .manager-empty.is-inline p {
     max-width: none;
     font-size: 11.5px;
+  }
+
+  /* ── THE POPOVER NOTE (issue 1373) ────────────────────────────────────────────────────
+     The one variant that releases the PANEL. Every other member of this family — base,
+     `is-compact`, `is-inline`, `is-filtered` — keeps the dashed box, because each of them
+     answers for a region of a screen and a box is what marks the region out. A picker's
+     popover is not a region: it is already a bordered, shadowed panel 228-340px wide, and a
+     second bordered box drawn inside it reads as a card the GM might be able to act on.
+     `proto:2262` states it as one line and nothing else, and `proto:2281` states the sibling
+     popover's the same way.
+
+     Written AFTER `.is-inline` so a caller that set both still gets the released panel, and
+     the tile is released the way `is-inline` releases it rather than resized — a third tile
+     size is exactly what that variant's own comment refuses.
+
+     26px had no step on the spacing scale and took 24; 7px has none either and takes
+     `--fab-space-chip`. */
+  .manager-empty.is-note {
+    place-items: start;
+    padding: var(--fab-space-chip);
+    border: 0;
+    border-radius: 0;
+    background: none;
+    text-align: left;
+  }
+
+  .manager-empty.is-note > div {
+    align-items: flex-start;
+    gap: var(--fab-space-2xs);
+  }
+
+  .manager-empty.is-note > div > i {
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    background: none;
+    font-size: 10px;
+  }
+
+  /* The line itself, at the popover's scale rather than the panel family's. `proto:2262` is
+     `500 10px var(--sans)` in the subtle tone: a sentence in the list's own voice, quieter
+     than the rows it stands in for. The serif face the hero title carries is deliberately
+     dropped — a serif heading is the loudest thing in a 228px panel. */
+  .manager-empty.is-note h3 {
+    color: var(--fab-text-subtle);
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  /* The optional second line — the travel-actor picker names a module setting here — kept at
+     the same quiet scale so a two-line note is one voice rather than a heading over a body. */
+  .manager-empty.is-note p {
+    max-width: none;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.4;
   }
 
   /*

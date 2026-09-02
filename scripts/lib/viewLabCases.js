@@ -472,7 +472,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // contain it. `manager-systems-empty` is the frame that does, and it is the frame
   // `docs/help/quickstart.md` Step 1 embeds, so a silent miss here is the first screenshot a new
   // reader sees going stale.
-  'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze(['manager-systems-empty']),
+  // A SECOND ENTRY as of issue 1373, and it is a second TREATMENT rather than a second
+  // instance. `manager-systems-empty` is the hero panel filling a pane; the `note` variant
+  // released the panel entirely for an empty inside an overlay the product has already drawn a
+  // boundary around, and that treatment appears in no frame that draws a pane.
+  // `world-tool-entry-on-break-repair-tag-picker-empty` is the one frame that draws it.
+  'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze([
+    'manager-systems-empty',
+    'world-tool-entry-on-break-repair-tag-picker-empty',
+  ]),
   // BOTH parties pickers, because between them they are the primitive's two modes and
   // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
   // its trigger with the search field and suppresses the in-popover search row; the
@@ -515,11 +523,24 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // a portal host; `player-actor-picker` is the frame that shows it doing so. A change to this
   // primitive that broke only outside the manager would otherwise publish three frames in which it
   // still works.
+  //
+  // A FIFTH AND A SIXTH as of issue 1373, and they are the primitive's EMPTY branch and the one
+  // caller whose panel had no frame at all. Every one of the four above opens a picker over a
+  // populated list, so the branch that renders when the list is empty — reached by all 22 call
+  // sites, and by five of them with no `emptyHint` to render — was published by nothing, which
+  // is how a dashed hero panel with a magnifier and no words shipped inside a 240px popover.
+  // `manager-recipe-edit-tag-picker` is the populated tag picker, over the herbalism system's
+  // own eight-tag vocabulary; `world-tool-entry-on-break-repair-tag-picker-empty` is the same
+  // control at WORLD scope, where the vocabulary is the union of every world component's own
+  // `defaults.tags` and only `setWorldTags` ever writes one — so it is empty in the lab world
+  // and in a freshly installed one alike, which is the state a GM meets on day one.
   'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
     'manager-world-parties-realm-override-picker',
     'manager-gathering-task-availability-menu',
     'player-actor-picker',
+    'manager-recipe-edit-tag-picker',
+    'world-tool-entry-on-break-repair-tag-picker-empty',
   ]),
   // The player window's shared top bar (issue 1475). It sits under `components/`, so the directory
   // leg of `BROAD_SIGNAL_PATTERN` claims it and it published only the representative pair — in
@@ -2307,6 +2328,55 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'world-tool-entry-on-break-repair-tag-picker-empty',
+    label: 'Manager — World Tool entry, the tag picker over a world with no tags',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE MAINTAINER'S OWN WORLD IS IN, and the one the redesign is actually about. A
+    // world that has authored no component tags gives this picker nothing to list, and until
+    // this case existed no frame in the registry drew ANY picker with an empty list — so the
+    // dashed hero panel `EmptyState` used to put inside a 240px popover was unphotographed at
+    // all 22 call sites. `EmptyState`'s own override names `manager-systems-empty`, which is the
+    // hero panel in a full pane and cannot show the note.
+    //
+    // NO `clearSystem`, AND THAT IS THE FINDING. The world tag vocabulary is not lifted from
+    // the crafting systems the way the world component and essence catalogues are: it is the
+    // union of every world component's own `defaults.tags`, which only the explicit
+    // `setWorldTags` action ever writes. Nothing in the lab world calls it and nothing in a
+    // freshly installed world has either, so the world Tool repair route's `+ Tag` picker is
+    // empty on the ORDINARY fixture — which is precisely why this is the panel the maintainer
+    // met and photographed. Its populated twin therefore runs in the recipe editor, where
+    // `itemTags` is the selected system's own vocabulary.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+      { selector: '[data-tool-repair-requirements] [data-recipe-add-tag]' },
+    ],
+    expectView: 'world-tool-entry',
+    // THE NOTE, BY ITS VARIANT CLASS. `.manager-empty` alone would pass over the dashed hero this
+    // frame exists to prove is gone, and the popover alone would pass over a list of rows.
+    expectSelector:
+      '.fabricate-manager .fabricate-picker-popover .manager-travel-popover-empty ' +
+      '.manager-empty.is-note',
+    expectContained: [
+      {
+        container: '.fabricate-manager',
+        target: '.fabricate-picker-popover .manager-travel-popover-empty',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'world-tool-entry-on-break-repair-suggestions',
     label: 'Manager — World Tool entry, repair route with a suggestion list open',
     reaches: 'beyond',
@@ -3469,6 +3539,57 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-option-currency]', scroll: true },
     ],
     expectView: 'recipe-edit',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-tag-picker',
+    label: 'Manager — Recipe edit, the tag picker open over a system vocabulary',
+    smokeLabels: [],
+    // NO CASE IN THE REGISTRY OPENED THIS POPOVER (issue 1373, maintainer round 8), which is the
+    // third such gap in as many rounds and is why it went on drawing a panel that is not the
+    // design's. `BROAD_SIGNAL_CASE_OVERRIDES` routes a `SearchablePopover` change to four frames
+    // and each is a picker in a different surface over a populated list, so the panel, the field
+    // and the option rows this primitive draws for the recipe editor's `+ Tag` — the control the
+    // maintainer put beside `proto:2258` — were published by nothing.
+    //
+    // `hb-r-tincture` is the one lab recipe carrying a TAG requirement: `hb-set-tincture-g3`
+    // matches `solvent`, and herbalism authors eight tags, so opening the picker over that row
+    // lists the seven it does not already hold. `reaches: 'beyond'` because the state is
+    // authored by clicking rather than seeded, exactly as the sibling cost frame's scroll is.
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-option-tags]', scroll: true },
+      { selector: '[data-recipe-option-tags] [data-recipe-add-tag]' },
+    ],
+    expectView: 'recipe-edit',
+    // THE PANEL AND A ROW IN IT. The panel alone would pass over an empty list, which is the
+    // OTHER new case and a different picture; the row is what makes this frame evidence for the
+    // populated presentation — the 30px option rows, their 8px gap and their 7px corner.
+    expectSelector:
+      '.fabricate-manager .fabricate-picker-popover.manager-travel-popover ' +
+      '.manager-travel-popover-options .manager-travel-option',
+    // Portaled, so containment is asserted against the APPLICATION ROOT rather than against the
+    // row that owns the trigger: the panel escapes the editor's clipping on purpose, so a
+    // container assertion on that row could only ever fail.
+    //
+    // `SearchablePopover.svelte` is deliberately NOT in `sourceMatches`. It is a broad-signal
+    // file, so a pattern naming it is shadowed by that signal and the mapping gate reds on it;
+    // the routing that reaches this frame from a change to the primitive is its
+    // `BROAD_SIGNAL_CASE_OVERRIDES` entry, which names both of these cases.
+    expectContained: [
+      {
+        container: '.fabricate-manager',
+        target: '.fabricate-picker-popover .manager-travel-popover-search input',
+      },
+    ],
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,

@@ -3,6 +3,9 @@
     "ModuleName": "Fabricate - Universal Crafting",
     "Common": {
       "General": "General",
+      "Picker": {
+        "NoMatches": "No matches"
+      },
       "Stepper": {
         "Decrease": "Decrease {label}",
         "Increase": "Increase {label}"

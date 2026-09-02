@@ -165,23 +165,30 @@
     }))
   );
 
-  // TWO reasons, in precedence order, mirroring `PartyTravelActorPanel`. The zero-actor
-  // reason names a module setting the player cannot see, which is prose and belongs in the
-  // body — `SearchablePopover` feeds `emptyHint` to `EmptyState`'s TITLE slot, an `<h3>` with
-  // no width cap, so a paragraph handed to it sets as a multi-line serif heading. The
-  // search-miss reason is complete in a line and carries no body.
+  // TWO reasons, and the PRIMITIVE routes between them now (issue 1373). This used to hold a
+  // `hasActors` ternary in each of the two strings below, which reimplemented at one call site
+  // the distinction `openspec/specs/design-system/spec.md` requires of every empty state —
+  // "distinguishes an unfiltered emptiness from a filtered one" — and reimplemented it on a
+  // proxy predicate. `hasActors` answers whether the SELECTABLE SET is empty; what the panel
+  // is actually in is decided by whether the SEARCH filtered a non-empty list to nothing, and
+  // the two agree here only because `actorOptions` is derived from `selectableActors`. Every
+  // other picker in the app had no such ternary at all and told a GM who typed `zzz` that
+  // nothing was defined. So the predicate moved onto `SearchablePopover` and this site keeps
+  // only its two SENTENCES, which are the part that is genuinely this surface's.
   //
-  // The zero-actor branch is defensive rather than reachable today: the trigger is
-  // `disabled` with no actors, so the panel cannot be opened to read it. It is derived
-  // anyway because the shipped copy was the OTHER way round — the long
-  // "no player-character type" explanation was the only empty string the panel could render,
-  // and the state it actually renders in is the search miss.
-  const pickerEmptyHint = $derived(
-    hasActors
-      ? localize('FABRICATE.App.ActorBar.NoMatches')
-      : localize('FABRICATE.App.ActorBar.NoActorsTitle')
-  );
-  const pickerEmptyDetail = $derived(hasActors ? '' : localize('FABRICATE.App.ActorBar.NoActors'));
+  // `emptyHint` is the zero-actor reason. It stays defensive rather than reachable: the
+  // trigger is `disabled` with no actors, so the panel cannot be opened to read it.
+  //
+  // The zero-actor reason names a module setting the player cannot see, which is prose and
+  // belongs in the body — `SearchablePopover` feeds `emptyHint` to `EmptyState`'s TITLE slot
+  // and `emptyDetail` to its body, so a paragraph handed to the first would set as a heading.
+  const pickerEmptyHint = $derived(localize('FABRICATE.App.ActorBar.NoActorsTitle'));
+  const pickerEmptyDetail = $derived(localize('FABRICATE.App.ActorBar.NoActors'));
+  // The FILTERED reason, which the primitive shows in place of both of the above whenever a
+  // search empties a list that holds something. It is stated here rather than left to the
+  // primitive's own `No matches` default because this panel lists CHARACTERS, and "No
+  // character matches your search" is a sentence only this surface can write.
+  const pickerNoMatchesHint = $derived(localize('FABRICATE.App.ActorBar.NoMatches'));
 
   function chooseActor(id) {
     const actorId = id ?? '';
@@ -219,6 +226,7 @@
     searchAriaLabel={localize('FABRICATE.App.ActorBar.SearchLabel')}
     emptyHint={pickerEmptyHint}
     emptyDetail={pickerEmptyDetail}
+    noMatchesHint={pickerNoMatchesHint}
     onChoose={chooseActor}
   />
 

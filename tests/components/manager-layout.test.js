@@ -6428,6 +6428,180 @@ test('a suggestion reads from the left edge the typed query does, under the host
   }
 });
 
+test('the picker popover is the design’s panel, field and rows, not a heavy sheet', async () => {
+  // THE `+ Tag` PICKER THE MAINTAINER PUT BESIDE THE DESIGN (issue 1373). `proto:2258`-`2263`
+  // states the whole panel: a 7px-inset column over `var(--bg0)` with a 10px corner and a 5px
+  // gap; a 7px/9px field with a 7px corner edged in `--accent-border` over `var(--bg1)`; a 2px-
+  // gapped list carrying its own scroll; and 30px rows at `0 8px` with a 7px corner. Ours drew
+  // a 240px sheet on `--fab-bg-3` — the LIGHTEST rung, over a pane painted darker than it — with
+  // a 6px corner, an 8px-inset divider-ruled field, an 8px-inset list and 40px rows.
+  //
+  // ── THE ONE SUBSTITUTION, AND WHY IT IS A JUDGEMENT ──────────────────────────────────────
+  // The design's ramp is shifted a rung against ours: its `--bg1` is our `--fab-bg-0` and its
+  // `--bg2` our `--fab-bg-1`, so the `--bg0` it paints this panel with sits BELOW our darkest
+  // token and has no equivalent. Inventing an eighth rung across seven themes to transcribe one
+  // popover would be a token-generation change; the relationship the design is expressing is
+  // that the panel is DARKER than the block it floats over, separated by `--border-strong` and
+  // a deep shadow. `--fab-bg-0` is the darkest rung we publish and preserves that relationship,
+  // so it is what the panel takes. Every theme's ramp runs the same direction — all seven are
+  // dark and `--fab-bg-0` is the darkest in each — so no theme inverts the reading.
+  //
+  // The 7px and 5px insets are not transcribed either: `spacing-scale-ratchet.test.js` bans a
+  // new raw literal in `padding`/`margin`/`gap`, so each takes its nearest published step —
+  // 7 to `--fab-space-chip` (6) and 5 to `--fab-space-1` (4) — exactly as `EmptyState`'s
+  // `is-filtered` variant took the design's 26 to 24.
+  //
+  // ── MEASURED, NOT READ ───────────────────────────────────────────────────────────────────
+  // `styles/fabricate.css` is layered at `modules` and `SearchablePopover`'s own block is
+  // UNLAYERED, so a scoped declaration beats a sheet declaration at any specificity. That makes
+  // "the sheet says 10px" and "the panel is 10px" different questions, and only the second one
+  // is the product. The component's compiled CSS (`css: 'external'`) is appended after the
+  // layered sheet and its hash stamped onto the fixture, so a compact-mode rule that grew past
+  // its `.is-compact-option-rows` qualifier would be caught here rather than shipping.
+  const popoverScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/SearchablePopover.svelte')
+  );
+  const stamp = (markup) =>
+    [
+      'manager-travel-popover',
+      'manager-travel-popover-search',
+      'manager-travel-popover-options',
+      'manager-travel-option',
+      'manager-travel-option-name',
+    ].reduce((html, className) => withScopeHash(html, className, popoverScoped.hashClass), markup);
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 640, height: 400 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @layer reset, variables, elements, blocks, applications, compatibility, layouts, system, modules, exceptions;
+            @layer elements.forms {
+              a.button, button { display: flex; justify-content: center; }
+            }
+            @layer modules { ${css} }
+            ${popoverScoped.css}
+            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            .fas::before, .fa-solid::before { content: "x"; }
+            .probe { width: 10px; height: 10px; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            ${stamp(`
+            <div class="fabricate-picker-popover manager-travel-popover" data-probe="panel">
+              <div class="manager-travel-popover-search">
+                <input type="text" data-probe="field" placeholder="Search tags...">
+              </div>
+              <div class="manager-travel-popover-options" role="listbox" data-probe="list">
+                <button type="button" class="manager-travel-option" data-probe="row">
+                  <i class="fas fa-tag"></i><span class="manager-travel-option-name">reagent</span>
+                </button>
+              </div>
+            </div>`)}
+            <div class="probe" data-probe="bg0" style="background: var(--fab-bg-0)"></div>
+            <div class="probe" data-probe="bg3" style="background: var(--fab-bg-3)"></div>
+            <div class="probe" data-probe="accent-edge" style="background: var(--fab-accent-border)"></div>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const report = await page.evaluate(() => {
+      const at = (name) => document.querySelector(`[data-probe="${name}"]`);
+      const of = (name) => getComputedStyle(at(name));
+      const panel = of('panel');
+      const field = of('field');
+      const list = of('list');
+      const row = of('row');
+      return {
+        panel: {
+          radius: panel.borderTopLeftRadius,
+          padding: panel.paddingTop,
+          gap: panel.rowGap,
+          background: panel.backgroundColor,
+        },
+        field: {
+          radius: field.borderTopLeftRadius,
+          height: at('field').getBoundingClientRect().height,
+          borderColour: field.borderTopColor,
+          background: field.backgroundColor,
+        },
+        list: { gap: list.rowGap, padding: list.paddingTop, paddingLeft: list.paddingLeft },
+        row: {
+          radius: row.borderTopLeftRadius,
+          height: at('row').getBoundingClientRect().height,
+          gap: row.columnGap,
+          justify: row.justifyContent,
+        },
+        bg0: of('bg0').backgroundColor,
+        bg3: of('bg3').backgroundColor,
+        accentEdge: of('accent-edge').backgroundColor,
+      };
+    });
+
+    assert.equal(report.panel.radius, '10px', 'proto:2258 corners the panel at 10px');
+    assert.equal(report.panel.padding, '6px', 'proto:2258 insets it by 7px, nearest step 6');
+    assert.equal(report.panel.gap, '4px', 'proto:2258 gaps its column by 5px, nearest step 4');
+    assert.equal(
+      report.panel.background,
+      report.bg0,
+      'the panel takes the darkest rung we publish, as proto:2258 takes the one below its pane'
+    );
+    assert.notEqual(
+      report.panel.background,
+      report.bg3,
+      'and no longer the LIGHTEST rung, which drew the panel brighter than the pane under it'
+    );
+
+    assert.equal(report.field.radius, '7px', 'proto:2259 corners the field at 7px');
+    assert.equal(
+      report.field.borderColour,
+      report.accentEdge,
+      'proto:2259 edges the field in the accent border, not the neutral one'
+    );
+    assert.equal(
+      report.field.background,
+      report.bg0,
+      'proto:2259 fills the field with the rung our --fab-bg-0 answers for'
+    );
+    assert.ok(
+      Math.abs(report.field.height - 30) <= 1,
+      `the field stands on the ladder's 30 (measured ${report.field.height.toFixed(1)}px)`
+    );
+
+    assert.equal(report.list.gap, '2px', 'proto:2260 gaps the list by 2px');
+    assert.equal(report.list.padding, '0px', 'proto:2260 gives the list no inset of its own');
+    assert.equal(
+      report.list.paddingLeft,
+      '0px',
+      'the panel’s own inset is what the list’s left edge sits on'
+    );
+
+    assert.equal(report.row.radius, '7px', 'proto:2261 corners an option row at 7px');
+    assert.equal(report.row.gap, '8px', 'proto:2261 gaps the row’s glyph from its label by 8px');
+    assert.ok(
+      Math.abs(report.row.height - 30) <= 1,
+      `proto:2261 stands an option row at 30px (measured ${report.row.height.toFixed(1)}px)`
+    );
+    assert.notEqual(
+      report.row.justify,
+      'center',
+      'and it still displaces Foundry’s `button { justify-content: center }` host rule'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm one', async () => {
   // `proto:4628` is `segStyle`: the chosen segment takes the design's own translucent tag value
   // and `var(--text)`, the unchosen one is transparent over `var(--subtle)`, and `proto:2268`

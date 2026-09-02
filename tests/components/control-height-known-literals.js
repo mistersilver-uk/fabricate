@@ -75,8 +75,17 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * field off `height: 36px` and onto the ladder's 30 — the rung nearest the design's own 32,
  * which is itself retired. That is the ordinary way this number should fall: a control moved
  * onto a rung, banked here on the `styles/fabricate.css | height | 36` row.
+ *
+ * It was 82 until the same issue's picker-popover parity pass, which took TWO rows down at
+ * once. `proto:2261` stands an option row at 30, so the popover's `min-height: 40px` moved
+ * onto that rung; and the popover's search field, declared at `height: 32px`, moved to the
+ * 30 the compact search row already stands at. The field's row is worth reading twice: it
+ * had never RENDERED at 32 at all, because `.fabricate-manager input[type="text"]` ties it
+ * on specificity and sets `min-height: 34px`, so the retired literal this baseline recorded
+ * was a value no GM ever saw. A browser measurement in `manager-layout.test.js` is what
+ * found that; a text scan cannot, which is the limitation this baseline is honest about.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 82;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 80;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -133,12 +142,12 @@ const ROWS = Object.freeze([
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte | min-height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte | min-height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/components/Stepper.svelte | height | 36 | 1 | var(--fab-stepper-fill-height, 36px) => 36px',
-  'styles/fabricate.css | height | 32 | 5 | 32px => 32px',
+  'styles/fabricate.css | height | 32 | 4 | 32px => 32px',
   'styles/fabricate.css | height | 36 | 14 | 36px => 36px',
   'styles/fabricate.css | height | 40 | 7 | 40px => 40px',
   'styles/fabricate.css | min-height | 32 | 9 | 32px => 32px',
   'styles/fabricate.css | min-height | 36 | 8 | 36px => 36px',
-  'styles/fabricate.css | min-height | 40 | 5 | 40px => 40px ; calc(40px + (2 * var(--fab-space-3)) + 2px) => calc(40px + (2 * 12px) + 2px)',
+  'styles/fabricate.css | min-height | 40 | 4 | 40px => 40px ; calc(40px + (2 * var(--fab-space-3)) + 2px) => calc(40px + (2 * 12px) + 2px)',
 ]);
 
 /**
@@ -172,12 +181,13 @@ export const INDIRECT_HEIGHT_NOTES = Object.freeze({
     'resolved text rather than replacing one by the other. Paying it down means choosing a rung ' +
     'for the unparented case, not deleting the fallback.',
   'styles/fabricate.css min-height 40':
-    'One of these five is not a 40px control. Line 19235 is ' +
+    'One of these four is not a 40px control. Line 19235 is ' +
     '`min-height: calc(40px + (2 * var(--fab-space-3)) + 2px)`, where the 40px is a CONTENT ' +
     'contribution inside a padded well and the resulting control is nowhere near 40px tall. It ' +
     'is baselined because a value scanner cannot tell a contribution from a height, and it is ' +
     'called out here so nobody "fixes" it by snapping the 40 to 38 and shrinking the content ' +
-    'box. The other four in this row are plain `40px`.',
+    'box. The other three in this row are plain `40px`. There were four until issue 1373 took ' +
+    'the picker popover option row onto the ladder rung 30, which `proto:2261` states.',
 });
 
 /**

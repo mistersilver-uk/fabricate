@@ -123,21 +123,34 @@
   // and a world whose actors are all of an unconfigured type are different problems with
   // different fixes, and collapsing them into "no actor matches your search" tells a GM
   // staring at a world full of actors to search harder.
+  //
+  // TWO OF THE THREE LIVE HERE NOW (issue 1373). Both are reasons the LIST IS EMPTY, which is
+  // a fact about this world; the third was the SEARCH MISS, which is a fact about the control
+  // and is `noMatchesHint` below. Splitting them that way is not tidying: this site's third
+  // branch fired on `eligibleActors.length > 0`, a proxy for "the list holds something", and
+  // every other picker in the app had no such branch at all and answered a search miss with
+  // its own list-is-empty sentence. `SearchablePopover` owns the predicate now, so the
+  // distinction `openspec/specs/design-system/spec.md` requires holds at all 22 call sites
+  // rather than at the two that had remembered to write it.
   const pickerEmptyHint = $derived(
     actorOptions.length === 0
       ? text(
           'FABRICATE.Admin.Manager.Travel.NoActorsInWorld',
           'No actors exist in this world yet — create an Actor first.'
         )
-      : eligibleActors.length === 0
-        ? text(
-            'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActors',
-            'No eligible actors'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoMatches',
-            'No actor matches your search.'
-          )
+      : text(
+          'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActors',
+          'No eligible actors'
+        )
+  );
+
+  // The SEARCH MISS, stated here rather than left to the primitive's `No matches` default
+  // because this panel lists actors and names them as such.
+  const pickerNoMatchesHint = $derived(
+    text(
+      'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoMatches',
+      'No actor matches your search.'
+    )
   );
 
   // The explanation, rendered as the panel's BODY rather than appended to its title: it
@@ -288,6 +301,7 @@
         compactOptionRows
         emptyHint={pickerEmptyHint}
         emptyDetail={pickerEmptyDetail}
+        noMatchesHint={pickerNoMatchesHint}
         onChoose={(uuid) => onSet(party.id, uuid)}
       />
 

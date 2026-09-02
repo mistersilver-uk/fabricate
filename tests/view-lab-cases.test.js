@@ -1821,15 +1821,28 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   // a regression that broke the primitive only outside the manager — a re-rooted family
   // reverted, a portal host narrowed back to `.fabricate-manager` — no longer publishes
   // three frames in every one of which it still works.
+  //
+  // THE FIFTH AND SIXTH ARE THE PRIMITIVE'S EMPTY BRANCH (issue 1373), and they are the gap that
+  // let a dashed hero panel with a magnifier and no words ship inside a 240px popover. All four
+  // above open a picker over a POPULATED list, so the branch that renders when the list is empty
+  // — reached by every one of the 22 call sites, and by five of them with no `emptyHint` to draw
+  // — was in no frame at all. `manager-recipe-edit-tag-picker` is the populated tag picker,
+  // over the herbalism system's own eight-tag vocabulary and the one lab recipe carrying a tag
+  // requirement; `world-tool-entry-on-break-repair-tag-picker-empty` is the same control at
+  // WORLD scope, where the vocabulary is the union of every world component's own
+  // `defaults.tags` and only `setWorldTags` ever writes one — so it is empty in the lab world
+  // and in a freshly installed one alike, which is the state the maintainer met.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
       'fabricate-app-shell',
       'manager-components-normal',
       'manager-gathering-task-availability-menu',
+      'manager-recipe-edit-tag-picker',
       'manager-world-parties-actor-picker',
       'manager-world-parties-realm-override-picker',
       'player-actor-picker',
+      'world-tool-entry-on-break-repair-tag-picker-empty',
     ]
   );
 });

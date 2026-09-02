@@ -386,11 +386,20 @@ test('(a) the two older overrides still name the frame that renders their state'
       'the frame that draws the dashed empty panel, and the one `docs/help/quickstart.md` Step 1 ' +
         'embeds — both representative frames are POPULATED states',
     ],
+    // The `note` variant (issue 1373) released the panel entirely for an empty inside an overlay
+    // the product has already bounded — a picker popover. `manager-systems-empty` is a hero panel
+    // filling a pane and cannot show it, so the primitive gained a SECOND treatment with no frame
+    // rather than a second instance of one it had.
+    [
+      'src/ui/svelte/apps/manager/EmptyState.svelte',
+      'world-tool-entry-on-break-repair-tag-picker-empty',
+      'the one frame that draws the `note` variant — every other empty in the corpus is a ' +
+        'bordered panel filling a region',
+    ],
   ];
   for (const [file, caseId, because] of expectations) {
-    assert.deepEqual(
-      BROAD_SIGNAL_CASE_OVERRIDES[file],
-      [caseId],
+    assert.ok(
+      BROAD_SIGNAL_CASE_OVERRIDES[file].includes(caseId),
       `${file} no longer overrides to '${caseId}', ${because}`
     );
     const selected = mapChangedFilesToCases([file]).map((viewCase) => viewCase.id);
