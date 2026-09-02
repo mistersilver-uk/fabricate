@@ -42,6 +42,11 @@
     currencyUnits = [],
     currencyEnabled = false,
     prerequisiteOptions = [],
+    // THE WORLD MODIFIER LIBRARY, for the Requirements tab's bonus section (issue 1373,
+    // maintainer round 3). Same shape and same scope as `prerequisiteOptions`: the bonus is a
+    // PICK from `characterLibraries.modifiers[]` rather than a typed expression, at both the
+    // world Tool entry and here, so both callers thread the same roster.
+    modifierOptions = [],
     // The rail's `PREVIEW AS` roster and its roll-data resolver, and its `REQUIRED FOR` list.
     // All three are projections the store owns: this view counts nothing and reads no document.
     actorOptions = [],
@@ -298,6 +303,7 @@
           {tool}
           {authority}
           {prerequisiteOptions}
+          {modifierOptions}
           {saving}
           {member}
           {inherited}

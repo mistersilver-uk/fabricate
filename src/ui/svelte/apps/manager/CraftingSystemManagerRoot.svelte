@@ -11842,6 +11842,7 @@
         entityId={worldScopedEntryId}
         worldItems={worldItemOptions}
         prerequisiteOptions={selectedCharacterPrerequisites}
+        modifierOptions={selectedSystemModifiers}
         componentOptions={worldComponentOptions}
         essenceOptions={worldEssenceOptions}
         itemTags={worldComponentTags}
@@ -12282,6 +12283,7 @@
         currencyUnits={selectedCurrencyUnits}
         currencyEnabled={selectedCurrencyEnabled}
         prerequisiteOptions={selectedCharacterPrerequisites}
+        modifierOptions={selectedSystemModifiers}
         actorOptions={$viewState.actorOptions || []}
         getActorRollData={(uuid) => store.getActorRollData?.(uuid)}
         requiredFor={$viewState.toolRequiredFor?.[focusedToolDraft.id] || []}

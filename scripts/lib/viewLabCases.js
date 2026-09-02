@@ -2000,6 +2000,21 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-tool-entry-card="requirements"]',
         target: '[data-tool-section-note="prerequisites"]',
       },
+      // AND THE BONUS IS A PICK FROM THE WORLD MODIFIER LIBRARY (issue 1373, maintainer round
+      // 3). The tab shipped a free-text `Bonus expression` field the design has no counterpart
+      // for; `proto:2353`-`2369` draws a single-select list of `characterLibraries.modifiers[]`
+      // instead. This frame could not have caught that: `sm-tool-hammer` carried neither
+      // section, so both cards drew their off-state sentence and the control under test was on
+      // no frame at all. `TOOL_WORLD_REQUIREMENT_DEFAULTS` gives the hammer a bonus, and the
+      // containment below is what stops the list falling back to the empty-library sentence.
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-bonus-modifier]',
+      },
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-bonus-note]',
+      },
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
@@ -2010,6 +2025,61 @@ export const VIEW_LAB_CASES = Object.freeze([
       // un-hides here (issue 1373). This frame is the only one that photographs the WORLD face
       // of either: the card's `headingStyle="kicker"` and the gate-mode group's visible legend.
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-bonus-empty-library',
+    label: 'Manager — World Tool entry, bonus with no world modifiers',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE MAINTAINER'S OWN WORLD IS IN (issue 1373, maintainer round 3): the bonus
+    // section selects over the WORLD modifier library, and most worlds have authored none. The
+    // section then draws one muted sentence naming where modifiers come from — the shape and
+    // voice the prerequisite list one section up already uses for the same absence, which this
+    // frame shows directly BELOW it for exactly that comparison.
+    //
+    // `clearSystem` is the whole mechanism and it is not a side effect: both world libraries are
+    // built by the `1.28.0`/`1.30.0` passes LIFTING each crafting system's own copy, so a world
+    // with no crafting systems is the honest way to reach an empty one. It leaves the world Tool
+    // corpus, the entry route and the record's own authored bonus untouched, so what changes
+    // between this frame and `world-tool-entry-requirements` is the library and nothing else.
+    //
+    // THE `1` ON THE VALIDATION TAB IS THAT WORLD, NOT THIS SECTION: with no crafting systems
+    // the entry's `membership` check warns that nothing has the Tool. It is stated here because
+    // a reader comparing this frame with its sibling would otherwise read the badge as a fault
+    // the bonus list introduced.
+    //
+    // AND THE RECORD'S OWN `@prof` IS STILL SET, so this frame carries the second state as well:
+    // an authored expression the library cannot account for keeps its own row rather than being
+    // silently dropped. Those two are the same picture in a world with no library at all, which
+    // is exactly the world a GM installing Fabricate starts in.
+    query: { clearSystem: '1' },
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="requirements"]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-bonus-empty]',
+    // BOTH SENTENCES, because the claim is that the two absences read the same way. Asserting
+    // the bonus one alone would pass just as well against a second voice invented for it.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-bonus-empty]',
+      },
+      {
+        container: '[data-world-tool-entry-card="requirements"]',
+        target: '[data-tool-bonus-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
     ],
   }),
   managerCase({
@@ -6961,6 +7031,52 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
     ],
+  }),
+  managerCase({
+    id: 'manager-tool-bonus-hand-typed-1280x720',
+    label: 'Manager — Tool requirements, hand-typed bonus 1280x720',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE VALUE THE LIBRARY DOES NOT CONTAIN (issue 1373, maintainer round 3). Replacing a free
+    // text field with a pick list makes every expression a GM already typed unrepresentable, and
+    // the honest failure mode — highlighting nothing, then dropping the value on the next save —
+    // is invisible in a screenshot because a list with nothing selected looks like a list.
+    //
+    // `rw-tool-stylus` carries `+2`, a flat bonus no world modifier expresses, so this frame is
+    // that record's own row at the head of the list: selected, showing the value, and saying
+    // where it came from. It needs no fixture of its own — the stylus has carried that bonus
+    // since the Tool corpus was seeded, and nothing could render it until now.
+    //
+    // IT IS ALSO THE SYSTEM-SCOPE TWIN OF THE WHOLE SECTION (`proto:2886`-`2905`). The stylus is
+    // a MEMBER of a world Tool record — the world-scope pass lifts every in-system tool into one
+    // — so this is the overriding face, with the inherit switch on the card head and the
+    // section's own enable switch as the first row of the body, and it is the only frame that
+    // shows the modifier list at that scope. `manager-tool-parity-04-requirements-1280x720`
+    // opens the Anvil, whose two sections are the canonical empty, so it photographs two
+    // off-switches and no decision at all — which is how a free-text bonus field survived two
+    // parity rounds here. The stylus's prerequisites are off, which is what keeps the bonus
+    // card's head, its eyebrow and its rows in one 720px frame with no scroll step.
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] [data-tool-edit-rules]',
+      },
+      { selector: '#tool-tab-requirements' },
+    ],
+    expectView: 'tool-edit',
+    expectSelector: '[data-tool-bonus-modifier="fabricate:tool-bonus-custom"]',
+    expectContained: [
+      {
+        container: '[data-tool-rule-card="bonus"]',
+        target: '[data-tool-bonus-modifier="fabricate:tool-bonus-custom"] input:checked',
+      },
+      { container: '[data-tool-rule-card="bonus"]', target: '[data-tool-bonus-note]' },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/],
   }),
   managerCase({
     id: 'manager-tool-parity-05-validation-1280x720',

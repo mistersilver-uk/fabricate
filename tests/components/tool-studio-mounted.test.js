@@ -156,6 +156,34 @@ const prerequisites = [
   { id: 'strong', name: 'Strength 13 or higher', expression: '@abilities.str.mod >= 2' },
   { id: 'arena', name: 'Trained in Arcana', expression: '@skills.arcana >= 1' },
 ];
+// The WORLD modifier library (`characterLibraries.modifiers[]`), in the shape
+// `normalizeModifierLibrary` publishes. It is the design's `MODS` (`proto:3797`) and the roster
+// the bonus section selects over since issue 1373's maintainer round 3. Three entries, and the
+// third is a dice expression, because `isRollExpression` is the one field the row does NOT draw
+// and a library of interchangeable scalars could not show that.
+const modifiers = [
+  {
+    id: 'mod-prof',
+    label: 'Proficiency',
+    icon: 'fa-solid fa-medal',
+    expression: '@prof',
+    isRollExpression: false,
+  },
+  {
+    id: 'mod-int',
+    label: 'Intelligence modifier',
+    icon: 'fa-solid fa-brain',
+    expression: '@abilities.int.mod',
+    isRollExpression: false,
+  },
+  {
+    id: 'mod-guidance',
+    label: 'Guidance',
+    icon: 'fa-solid fa-dice-d4',
+    expression: '1d4',
+    isRollExpression: true,
+  },
+];
 const itemTags = ['metal', 'salvage'];
 const essenceOptions = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
 const currencyUnits = [{ id: 'gp', label: 'Gold', icon: 'fas fa-coins' }];
@@ -236,6 +264,7 @@ function props(overrides = {}) {
     currencyUnits,
     currencyEnabled: true,
     prerequisiteOptions: prerequisites,
+    modifierOptions: modifiers,
     ...overrides,
   };
 }
@@ -1363,7 +1392,7 @@ describe('Tool Studio editor (mounted)', () => {
     }
   });
 
-  it('authors prerequisite AND gates, gate mode, and a hint-led bonus expression', async () => {
+  it('authors prerequisite AND gates, gate mode, and a world-modifier bonus', async () => {
     const patches = [];
     const root = await harness.mount(
       props({ activeTab: 'requirements', onPatch: (patch) => patches.push(patch) })
@@ -1411,19 +1440,159 @@ describe('Tool Studio editor (mounted)', () => {
       [...root.querySelectorAll('[data-tool-rule-card]')].map((card) => card.dataset.toolRuleCard),
       ['prerequisites', 'bonus']
     );
-    assert.match(
-      root.querySelector('.manager-tool-bonus-field small').textContent,
-      /without @.*stored with @ automatically/i
+    // THE BONUS IS A PICK FROM THE WORLD LIBRARY, NOT A TYPED EXPRESSION (issue 1373, maintainer
+    // round 3). `proto:2353`-`2369` draws a `World modifiers` list and `proto:4753` sets `bonus`
+    // to the chosen entry's `expr`; the free-text field this tab shipped with had no counterpart
+    // anywhere in the design. The persisted shape is unchanged - `bonus.expression` is still a
+    // string - so what this asserts is that the only way to author one is the list.
+    assert.ok(
+      !root.querySelector('[data-roll-data-expression="tool-bonus"]'),
+      'no free-text bonus expression field'
     );
     assert.equal(root.querySelector('[data-tool-bonus-preset]'), null);
     root.querySelector('.manager-tool-prerequisite-list input[value="strong"]').click();
     root.querySelector('input[name="tool-gate-mode"][value="bonus"]').click();
-    const bonusInput = root.querySelector('[data-roll-data-expression="tool-bonus"]');
-    bonusInput.value = '1d4';
-    bonusInput.dispatchEvent(new Event('input', { bubbles: true }));
+    root.querySelector('[data-tool-bonus-modifier="mod-guidance"] input[type="radio"]').click();
     assert.ok(patches.some((patch) => patch.prerequisites?.ids?.includes('strong')));
     assert.ok(patches.some((patch) => patch.prerequisites?.gateMode === 'bonus'));
     assert.ok(patches.some((patch) => patch.bonus?.expression === '1d4'));
+  });
+
+  // ── THE BONUS SECTION IS THE WORLD MODIFIER LIBRARY (issue 1373, maintainer round 3) ──────
+  //
+  // `proto:3797` is the library the design's list reads (`MODS`, `{id, label, expr, note, icon}`)
+  // and ours is `characterLibraries.modifiers[]` — the same roster, normalized to
+  // `{id, label, expression, isRollExpression, icon?}`. `proto:4750` marks a row selected by
+  // `r.bonus === m.expr`, so the selection is resolved by EXPRESSION even though the radio's own
+  // value is the entry id: two entries may share an expression and a duplicate `{#each}` key
+  // throws, while `normalizeModifierLibrary` guarantees the ids are unique.
+  it('draws the world modifier library as a single-select list, one row per entry', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+
+    const rows = [...root.querySelectorAll('[data-tool-bonus-modifier]')];
+    assert.deepEqual(
+      rows.map((row) => row.dataset.toolBonusModifier),
+      ['mod-prof', 'mod-int', 'mod-guidance'],
+      'one row per library entry, in library order'
+    );
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('[data-tool-choice-title]').textContent.trim()),
+      ['Proficiency @prof', 'Intelligence modifier @abilities.int.mod', 'Guidance 1d4'],
+      'each row carries the label and, beside it, the entry’s own expression (`proto:2363`)'
+    );
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('[data-radio-card-meta]').textContent.trim()),
+      ['@prof', '@abilities.int.mod', '1d4'],
+      'and the expression is its own element, so the two can be typed differently'
+    );
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('input[type="radio"]').checked),
+      [true, false, false],
+      '`@prof` selects the entry whose expression it is'
+    );
+    // NO THIRD LINE. The design's rows carry an authored `note`; ours have no such field and
+    // one is NOT invented on the persisted shape. See the tab's own docblock.
+    assert.ok(
+      !rows[0].querySelector('[data-tool-choice-description]'),
+      'a library row is icon + label + expression and nothing else'
+    );
+    assert.equal(
+      root.querySelector('[data-tool-bonus-note]').textContent.trim(),
+      'Applied to the crafting check as @prof.',
+      '`proto:4755`'
+    );
+  });
+
+  it('states that nothing is added until a modifier is picked', async () => {
+    const root = await harness.mount(
+      props({ activeTab: 'requirements', tool: tool({ bonus: { enabled: true, expression: '' } }) })
+    );
+
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-tool-bonus-modifier] input[type="radio"]')].map(
+        (radio) => radio.checked
+      ),
+      [false, false, false]
+    );
+    assert.equal(
+      root.querySelector('[data-tool-bonus-note]').textContent.trim(),
+      'Nothing is added to the check until you pick a modifier.',
+      '`proto:4755`'
+    );
+  });
+
+  // ── AN EXPRESSION THE LIBRARY DOES NOT CONTAIN IS NOT DISCARDED ──────────────────────────
+  //
+  // A GM could type one under the control this list replaces, and the design's own model simply
+  // highlights nothing in that case. Dropping it would be silent data loss on save, so it keeps
+  // its own row at the head of the list, selected, saying where it came from — and picking a
+  // library entry replaces it.
+  it('keeps a hand-typed expression as its own row and lets a library entry replace it', async () => {
+    const patches = [];
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        tool: tool({ bonus: { enabled: true, expression: '@abilities.str.mod + 2' } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+
+    const rows = [...root.querySelectorAll('[data-tool-bonus-modifier]')];
+    assert.equal(rows.length, 4, 'the authored value joins the three library entries');
+    const custom = rows[0];
+    assert.equal(
+      custom.dataset.toolBonusModifier,
+      'fabricate:tool-bonus-custom',
+      'and it is FIRST, because it is the answer the record currently holds'
+    );
+    assert.equal(custom.querySelector('[data-radio-card-meta]').textContent.trim(), '@abilities.str.mod + 2');
+    assert.equal(custom.querySelector('input[type="radio"]').checked, true);
+    assert.match(
+      custom.querySelector('[data-tool-choice-description]').textContent,
+      /not one of the world modifiers/i,
+      'the row says why it is not in the library'
+    );
+    assert.deepEqual(
+      rows.slice(1).map((row) => row.querySelector('input[type="radio"]').checked),
+      [false, false, false]
+    );
+
+    rows[2].querySelector('input[type="radio"]').click();
+    assert.deepEqual(
+      patches.map((patch) => patch.bonus?.expression),
+      ['@abilities.int.mod'],
+      'picking a library entry replaces the typed value'
+    );
+  });
+
+  // ── AND THE LIBRARY CAN BE EMPTY ─────────────────────────────────────────────────────────
+  //
+  // The same state the prerequisite list one section up already draws, in the same words and
+  // the same shape: one muted sentence, no control. It carries the route as well, because
+  // `ToolInheritCard` renders the card's `subtitle` at WORLD scope only — at system scope the
+  // head is spent on the inherit row — so this sentence is the one line both scopes show.
+  it('states the empty world modifier library the way the prerequisite list does', async () => {
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        modifierOptions: [],
+        tool: tool({ bonus: { enabled: true, expression: '' } }),
+      })
+    );
+
+    assert.equal(
+      root.querySelector('[data-tool-bonus-empty]').textContent.trim(),
+      'No modifiers are defined in this world yet. They are defined under World, Rules and resources.'
+    );
+    assert.ok(
+      !root.querySelector('[data-radio-card-group="tool-bonus-modifier"]'),
+      'and no empty list frame around nothing'
+    );
+    assert.equal(
+      root.querySelector('[data-tool-bonus-note]').textContent.trim(),
+      'Nothing is added to the check until you pick a modifier.',
+      'and the standing note still says what the section resolves to'
+    );
   });
 
   // Issue 772, acceptance 11 — the ONLY proof that extracting the check box out of

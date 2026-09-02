@@ -89,6 +89,52 @@
   AND THE EYEBROW AND THE TITLE WERE INVERTED. The design's eyebrow is the short WORD and its
   title is the SENTENCE; ours had the sentence, uppercased, as the only heading.
 
+  == THE BONUS IS PICKED FROM THE WORLD MODIFIER LIBRARY (issue 1373, maintainer round 3) ====
+  This tab shipped a free-text `Bonus expression` field, and the design has no such control at
+  either scope. `proto:2353`-`2369` (world Tool entry) and `proto:2886`-`2905` (system Tool
+  rules) both draw a `World modifiers` eyebrow with a hairline beside it, a single-select list
+  of the world's modifier library, and a standing note saying what the check now gets.
+  `proto:3797` is the library the list reads and `proto:4753` sets `bonus` to the chosen entry's
+  expression.
+
+  THE PERSISTED SHAPE DOES NOT MOVE. `bonus.expression` is still a string and still the only
+  thing written; what went away is the ability to TYPE one. `proto:4750` marks a row selected by
+  `r.bonus === m.expr`, so the SELECTION is resolved by expression while the radio's own value
+  is the entry ID — two library entries may legitimately share an expression, and a duplicate
+  `{#each}` key throws, whereas `normalizeModifierLibrary` guarantees unique ids. Where two
+  entries DO share an expression the first of them is the one highlighted, which is the design's
+  own answer and the only one the persisted shape can give: a stored expression does not name
+  which entry produced it.
+
+  OUR LIBRARY IS `characterLibraries.modifiers[]`, the same roster every activity's check
+  selects over (`src/systems/modifierLibrary.js`), so no new library and no new persisted field
+  were introduced. It is threaded as `modifierOptions` from both call sites explicitly, exactly
+  as `prerequisiteOptions` is.
+
+  THREE THINGS THE DESIGN DOES NOT ANSWER FOR OUR MODEL, decided here:
+
+  1. NO THIRD LINE ON A ROW. The design's `MODS` entries carry an authored `note` and ours carry
+     no such field. Inventing one on the persisted shape would make a library entry answer to
+     this screen, and the two facts we DO hold that read like prose — `min`/`max` bounds and
+     `isRollExpression` — are not notes and, worse, would be untrue here: picking a modifier
+     copies its EXPRESSION and nothing else, so its bounds do not travel to the Tool bonus. A
+     library row is therefore icon + label + expression, and the description slot is left for
+     the one row that has a real sentence to say (below).
+  2. AN EXPRESSION THE LIBRARY DOES NOT CONTAIN IS PRESERVED. A GM may have typed one under the
+     old control. The design's own model simply highlights nothing in that case, which for us
+     would read as "no bonus" over a record that has one, and the next save would drop it. It
+     keeps its own row at the HEAD of the list instead — selected, showing the value, saying it
+     did not come from the library — and picking any library entry replaces it.
+  3. THE LIBRARY CAN BE EMPTY, and most worlds start that way. The sentence is the prerequisite
+     list's own, one section up, with the route appended: `ToolInheritCard` renders a card's
+     `subtitle` at WORLD scope only (at system scope the head is spent on the inherit row), so
+     the empty line is the one place both scopes can be told where modifiers are authored.
+
+  WHAT IS NOT REPRODUCED is `proto:4754`'s click-the-selected-row-to-clear. A radio group cannot
+  be un-checked by re-clicking it, and faking that on a `<label>` wrapping a real `<input>` is
+  the nested-interaction trap this studio has already paid for; the section's own enable switch
+  is the control that says "adds nothing", and it says it in a sentence rather than by absence.
+
   THE ENABLE SWITCH MOVES TO THE HEADER ROW WHEN, AND ONLY WHEN, THE CARD CANNOT INHERIT.
   At WORLD scope there is exactly one switch per section - the section's own enable - so it
   takes the header row and the design's anatomy is reproduced exactly. At SYSTEM scope the
@@ -106,13 +152,25 @@
   import ChecklistCardRow from '../ChecklistCardRow.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
   import { toolWorldDefaultFact } from './toolStudio.js';
+
+  // The row that stands for an authored expression the library does not contain. It is a
+  // RADIO VALUE, never a persisted id, and it is spelled so that no library entry can collide
+  // with it: `normalizeModifierLibrary` trims an id but does not otherwise constrain it.
+  const CUSTOM_BONUS_VALUE = 'fabricate:tool-bonus-custom';
+  /** What a modifier row shows when the library entry has no expression yet. */
+  const NO_EXPRESSION = '—';
 
   let {
     tool = null,
     prerequisiteOptions = [],
+    // The WORLD modifier library (`characterLibraries.modifiers[]`), normalized to
+    // `{id, label, expression, isRollExpression, icon?, min?, max?}`. The design's `MODS`
+    // (`proto:3797`). Passed explicitly by BOTH call sites — a declared-but-unpassed prop
+    // subscribes its readers to the whole spread bundle, and an empty roster here is
+    // indistinguishable on screen from a world that has authored none.
+    modifierOptions = [],
     authority = 'toolSpecific',
     saving = false,
     member = false,
@@ -166,6 +224,70 @@
   }
   function patchBonus(patch) {
     onPatch({ bonus: { ...bonus, ...patch } });
+  }
+
+  // ── THE BONUS PICK LIST ───────────────────────────────────────────────────────────────────
+  const modifierLibrary = $derived(Array.isArray(modifierOptions) ? modifierOptions : []);
+  // BY EXPRESSION, because that is what is persisted (`proto:4750`: `r.bonus === m.expr`). The
+  // first match wins, exactly as the design's `.map` marks every row whose expression equals
+  // the stored one and the radio then keeps one checked.
+  const selectedModifier = $derived(
+    bonus.expression
+      ? (modifierLibrary.find((entry) => entry?.expression === bonus.expression) ?? null)
+      : null
+  );
+  const bonusIsCustom = $derived(Boolean(bonus.expression) && !selectedModifier);
+  const libraryChoices = $derived(
+    modifierLibrary.map((entry) => ({
+      value: entry.id,
+      label: entry.label || entry.id,
+      icon: entry.icon || 'fa-solid fa-dice-d20',
+      meta: entry.expression || NO_EXPRESSION,
+    }))
+  );
+  // FIRST, because it is the answer the record currently holds; below eight library rows it
+  // would be the one thing on the screen a GM could not find.
+  const bonusChoices = $derived(
+    bonusIsCustom
+      ? [
+          {
+            value: CUSTOM_BONUS_VALUE,
+            label: text('FABRICATE.Admin.Manager.Tools.Editor.BonusCustom', 'Set by hand'),
+            icon: 'fas fa-pen',
+            meta: bonus.expression,
+            description: text(
+              'FABRICATE.Admin.Manager.Tools.Editor.BonusCustomHint',
+              'This expression is not one of the world modifiers. Pick one below to replace it.'
+            ),
+          },
+          ...libraryChoices,
+        ]
+      : libraryChoices
+  );
+  const selectedBonusValue = $derived(
+    bonusIsCustom ? CUSTOM_BONUS_VALUE : (selectedModifier?.id ?? '')
+  );
+  // `proto:4755`. Our stored expressions already carry the `@` a roll-data path needs, so the
+  // design's `(/^[0-9]/.test(expr) ? '' : '@')` prefixing has no counterpart here: the value is
+  // rendered exactly as it is persisted and exactly as the roll will read it.
+  const bonusNote = $derived(
+    bonus.expression
+      ? formattedText(
+          'FABRICATE.Admin.Manager.Tools.Editor.BonusApplied',
+          { expression: bonus.expression },
+          'Applied to the crafting check as {expression}.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Tools.Editor.BonusUnset',
+          'Nothing is added to the check until you pick a modifier.'
+        )
+  );
+  function chooseBonusModifier(value) {
+    // The custom row is already the selected one, so re-selecting it is a no-op rather than a
+    // write: it carries no library entry to read an expression off.
+    if (value === CUSTOM_BONUS_VALUE) return;
+    const modifier = modifierLibrary.find((entry) => entry?.id === value);
+    patchBonus({ expression: modifier?.expression || '' });
   }
 
   /**
@@ -379,26 +501,42 @@
         </div>
       {/if}
       {#if bonus.enabled}
-        <label class="manager-tool-bonus-field">
-          <span
-            >{text(
-              'FABRICATE.Admin.Manager.Tools.Editor.BonusExpression',
-              'Bonus expression'
-            )}</span
-          >
-          <RollDataExpressionInput
-            dataField="tool-bonus"
-            value={bonus.expression || ''}
-            placeholder="prof"
-            onChange={(expression) => patchBonus({ expression })}
+        <!-- ── WHICH WORLD MODIFIER ──────────────────────────────────────────────────────────
+             The eyebrow is `manager-kicker`, the same treatment the prerequisite list's heading
+             takes one section up, so the tab keeps one heading voice. The HAIRLINE beside it is
+             the design's (`proto:2357`) and belongs to this eyebrow alone: it names the SOURCE
+             of the rows rather than sub-heading a question, and it is also what separates the
+             library from the enable row above it at system scope.
+
+             `RadioCardGroup`'s own `<legend>` stays visually hidden, which is the shipped
+             `is-config-cards` contract — the host renders the heading, the fieldset keeps the
+             accessible name. Its geometry is taken AS GIVEN by maintainer ruling (see that
+             component's header); the only thing this caller adds is the inline expression. -->
+        <p class="manager-kicker manager-tool-bonus-kicker">
+          {text('FABRICATE.Admin.Manager.Tools.Editor.WorldModifiers', 'World modifiers')}
+        </p>
+        {#if modifierLibrary.length === 0}
+          <p class="manager-muted" data-tool-bonus-empty>
+            {text(
+              'FABRICATE.Admin.Manager.Tools.Editor.NoModifiers',
+              'No modifiers are defined in this world yet. They are defined under World, Rules and resources.'
+            )}
+          </p>
+        {/if}
+        {#if bonusChoices.length > 0}
+          <RadioCardGroup
+            legend={text('FABRICATE.Admin.Manager.Tools.Editor.WorldModifiers', 'World modifiers')}
+            options={bonusChoices}
+            selectedValue={selectedBonusValue}
+            groupName="tool-bonus-modifier"
+            columns={1}
+            dataGroup="tool-bonus-modifier"
+            optionDataAttr="data-tool-bonus-modifier"
+            disabled={saving}
+            onChange={chooseBonusModifier}
           />
-          <small
-            >{text(
-              'FABRICATE.Admin.Manager.Tools.Editor.BonusExpressionHint',
-              'Enter a roll-data path without @, or a numeric or dice expression. Roll-data paths are stored with @ automatically.'
-            )}</small
-          >
-        </label>
+        {/if}
+        <p class="manager-tool-requirements-summary" data-tool-bonus-note>{bonusNote}</p>
       {:else}
         <p class="manager-tool-requirements-summary" data-tool-bonus-off>
           {text(
@@ -445,6 +583,26 @@
     margin-top: var(--fab-space-4);
     padding-top: var(--fab-space-4);
     border-top: 1px solid var(--fab-border);
+  }
+
+  /* THE `World modifiers` EYEBROW AND ITS HAIRLINE (issue 1373, maintainer round 3).
+     `proto:2355`-`2357` draws the eyebrow and, beside it, a `flex: 1; height: 1px;
+     background: var(--border)` rule filling the remainder of the line. The eyebrow's own type
+     stays `manager-kicker`'s, so this tab has one heading voice; only the rule is added, and it
+     is on THIS eyebrow alone because it marks where the world's library begins rather than
+     heading a question the way `Which prerequisites` does. `--fab-space-2` rounds the design's
+     9px gap to the 4px scale's 8px rung. */
+  .manager-tool-bonus-kicker {
+    display: flex;
+    gap: var(--fab-space-2);
+    align-items: center;
+  }
+
+  .manager-tool-bonus-kicker::after {
+    flex: 1;
+    height: 1px;
+    background: var(--fab-border);
+    content: '';
   }
 
   /* The per-section trailing line. It is the last thing in the card and a claim about the

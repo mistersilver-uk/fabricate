@@ -238,8 +238,16 @@ test('the un-capped expression field renders as an ordinary field, with no affix
   assert.ok(branch > -1, 'the component still branches on `sigil`');
   assert.ok(
     markup.slice(0, branch).includes('manager-prerequisite-path-input'),
-    'the SIGIL branch still renders the affix wrapper — the Tool Studio depends on it'
+    'the SIGIL branch still renders the affix wrapper, which is what the un-capped branch is ' +
+      'measured AGAINST below'
   );
+  // THE TOOL STUDIO NO LONGER DEPENDS ON IT, and this comment used to say it did. Issue 1373's
+  // maintainer round 3 replaced the Tool bonus text field with a pick from the world modifier
+  // library, which leaves `WorldModifiersTab` (`sigil={false}`) as this component's only caller
+  // and the sigil branch with none. The branch is retained rather than removed here because
+  // removing it is a change to a shared primitive with its own reviewers, and because this
+  // test's non-vacuity half below measures the capped shape as its control; it is reported as a
+  // dead branch for a follow-up rather than deleted in a Tool Studio change.
   // THE ANCHOR, stated as the fact and not as an ordering. A first draft asserted that the
   // wrapper appears BEFORE `{:else}`, which a component that wrapped BOTH branches satisfies —
   // and the mutation that did exactly that left this test green, because the rendered half

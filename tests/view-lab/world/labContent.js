@@ -1983,6 +1983,36 @@ const ALCHEMY_RECIPES = [
   ),
 ];
 
+/**
+ * The world-default `prerequisites` / `bonus` sections, per world Tool record (issue 1373).
+ *
+ * Two records rather than one. `hb-tool-mortar` is the tool the INHERITING case adopts, so it is
+ * the one whose world value has to be resolvable from a system; `sm-tool-hammer` is the tool
+ * `world-tool-entry-requirements` opens, so it is the one whose value has to be VISIBLE on the
+ * world entry itself. Each expression names a real entry of the world modifier library the
+ * migration lifts out of the crafting systems, so both rows render as a library SELECTION rather
+ * than as the hand-typed fallback.
+ *
+ * `@prof` is carried by TWO of that library's entries — herbalism's `Herbalism kit` and
+ * runework's `Inscriber's chisel` — and that is left standing rather than tidied away. The
+ * design selects a row by EXPRESSION (`proto:4750`), so a world whose library says the same
+ * thing twice can only highlight the first of them, and a fixture that never contained a
+ * duplicate would leave that behaviour depicted nowhere.
+ *
+ * `gateMode: 'bonus'` rather than `usability`: a usability gate makes the Tool unusable for a
+ * character that fails it, which would reach the player gathering and crafting frames.
+ * Withholding the bonus states the same rule on every Tool screen and blocks nothing.
+ */
+const TOOL_WORLD_REQUIREMENT_DEFAULTS = Object.freeze({
+  'hb-tool-mortar': {
+    prerequisites: { enabled: true, ids: ['hb-prereq-nature'], gateMode: 'bonus' },
+    bonus: { enabled: true, expression: '@prof' },
+  },
+  'sm-tool-hammer': {
+    bonus: { enabled: true, expression: '@prof' },
+  },
+});
+
 const SMITHING_TOOLS = [
   {
     id: 'sm-tool-hammer',
@@ -3999,16 +4029,22 @@ export function buildLabContent() {
             // unusable for a character that fails it, which would reach the player gathering and
             // crafting frames. Withholding the bonus states the same rule on every Tool screen
             // and blocks nothing.
-            ...(tool.id === 'hb-tool-mortar'
-              ? {
-                  prerequisites: {
-                    enabled: true,
-                    ids: ['hb-prereq-nature'],
-                    gateMode: 'bonus',
-                  },
-                  bonus: { enabled: true, expression: 'prof' },
-                }
-              : {}),
+            //
+            // THE EXPRESSION IS STORED WITH ITS SIGIL, and it used to read `'prof'`. That is not
+            // a shape any writer produces: the Tool bonus is a roll-data path and every writer
+            // of one stores the leading `@` (`toStoredRollDataExpression`), which is also what
+            // the world modifier library persists. Since issue 1373's maintainer round 3 the
+            // bonus is a PICK from that library, matched by expression (`proto:4750`), so the
+            // un-sigilled value would have matched nothing and depicted the hand-typed state on
+            // the one frame that exists to show the library state.
+            //
+            // `sm-tool-hammer` CARRIES A BONUS TOO, and it is the reason the world Tool entry's
+            // Requirements frame can photograph the list at all: `world-tool-entry-requirements`
+            // opens the hammer, and with both sections at the canonical empty that frame proved
+            // only that two switches render. Nothing inherits either default (the frame's own
+            // reach line reads `0 crafting systems`), so this reaches exactly the one screen it
+            // is authored for and no roll anywhere.
+            ...(TOOL_WORLD_REQUIREMENT_DEFAULTS[tool.id] ?? {}),
           },
         ])
       ),

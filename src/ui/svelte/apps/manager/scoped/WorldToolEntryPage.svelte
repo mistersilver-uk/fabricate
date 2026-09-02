@@ -137,6 +137,11 @@
     // itself (issue 1308), which is what makes a world-default `prerequisites.ids` addressable
     // from here at all: a system-local id would name nothing in the next system to inherit it.
     prerequisiteOptions = [],
+    // THE WORLD MODIFIER LIBRARY, for the Requirements tab's bonus section (issue 1373,
+    // maintainer round 3). World scope for the same reason the prerequisite library is: a
+    // world-default `bonus.expression` picked from a system-local roster would name a modifier
+    // the next system to inherit it has never heard of.
+    modifierOptions = [],
     // ── THE THREE WORLD ROSTERS THE BREAKAGE TAB NAMES (issue 1373, maintainer round 2) ────
     //
     // `componentOptions` IS THE WORLD COMPONENT CATALOGUE, not a system's managed items, and
@@ -1691,6 +1696,7 @@
               tool={requirementsTool}
               headingStyle="kicker"
               {prerequisiteOptions}
+              {modifierOptions}
               sectionNotes={{
                 prerequisites: inheritCountLine('prerequisites'),
                 bonus: inheritCountLine('bonus'),

@@ -207,6 +207,11 @@ async function mountTab({
   tab = 'identity',
   worldItems = [],
   prerequisiteOptions = [],
+  // THE WORLD MODIFIER LIBRARY (issue 1373, maintainer round 3). The Requirements tab's bonus
+  // section selects over `characterLibraries.modifiers[]` rather than taking a typed
+  // expression, at BOTH scopes, so the world entry threads the roster exactly as the system
+  // rules editor does.
+  modifierOptions = [],
   // THE WORLD INGREDIENT ROSTERS (issue 1373, maintainer round 2). The Breakage tab's two
   // mode-argument controls — the replacement target and the repair route — name WORLD
   // Components and WORLD essences, so a case that exercises either supplies them the way the
@@ -227,6 +232,7 @@ async function mountTab({
     entityId: 'pick',
     worldItems,
     prerequisiteOptions,
+    modifierOptions,
     componentOptions,
     essenceOptions,
     itemTags,
@@ -918,6 +924,16 @@ describe('the world Tool entry (issue 1373)', () => {
       { id: 'trained', name: 'Trained in Smithing', expression: '@prof >= 2' },
       { id: 'strong', name: 'Strength 13 or higher', expression: '@abilities.str.mod >= 2' },
     ];
+    // The WORLD modifier library, in the shape `normalizeModifierLibrary` publishes.
+    const MODIFIERS = [
+      { id: 'mod-prof', label: 'Proficiency', icon: 'fa-solid fa-medal', expression: '@prof' },
+      {
+        id: 'mod-int',
+        label: 'Intelligence modifier',
+        icon: 'fa-solid fa-brain',
+        expression: '@abilities.int.mod',
+      },
+    ];
 
     it('is the FOURTH tab, between Breakage and Validation', async () => {
       const target = await mountTab({ scope: scopeFor() });
@@ -951,6 +967,7 @@ describe('the world Tool entry (issue 1373)', () => {
         }),
         tab: 'requirements',
         prerequisiteOptions: PREREQUISITES,
+        modifierOptions: MODIFIERS,
       });
 
       assert.ok(Boolean(target.querySelector('[data-tool-requirements-tab]')));
@@ -964,6 +981,52 @@ describe('the world Tool entry (issue 1373)', () => {
         .filter((input) => input.checked)
         .map((input) => input.value);
       assert.deepEqual(checked, ['trained']);
+    });
+
+    // ── THE BONUS IS A WORLD-MODIFIER PICK AT THIS SCOPE TOO (issue 1373, round 3) ─────────
+    //
+    // `proto:2353` (world Tool entry) and `proto:2886` (system Tool rules) draw the SAME list,
+    // and the tab is one component, so the risk this covers is not the markup but the
+    // THREADING: a `modifierOptions` prop declared here and not passed by one of the two
+    // callers renders an empty library on that screen and reads as "this world has none".
+    it('selects the bonus from the world modifier library, and writes the expression', async () => {
+      const writes = [];
+      const target = await mountTab({
+        scope: scopeFor({ bonus: { enabled: true, expression: '@prof' } }),
+        tab: 'requirements',
+        prerequisiteOptions: PREREQUISITES,
+        modifierOptions: MODIFIERS,
+        actions: {
+          updateWorldDefaultSection: (id, section, value) => {
+            writes.push([id, section, value]);
+            return true;
+          },
+        },
+      });
+
+      assert.ok(
+        !target.querySelector('[data-roll-data-expression="tool-bonus"]'),
+        'the world entry has no free-text bonus field either'
+      );
+      const rows = [...target.querySelectorAll('[data-tool-bonus-modifier]')];
+      assert.deepEqual(
+        rows.map((row) => row.dataset.toolBonusModifier),
+        ['mod-prof', 'mod-int']
+      );
+      assert.deepEqual(
+        rows.map((row) => row.querySelector('input[type="radio"]').checked),
+        [true, false]
+      );
+      assert.equal(
+        target.querySelector('[data-tool-bonus-note]').textContent.trim(),
+        'Applied to the crafting check as @prof.'
+      );
+
+      rows[1].querySelector('input[type="radio"]').click();
+      await flushDraft();
+      assert.deepEqual(writes, [
+        ['pick', 'bonus', { enabled: true, expression: '@abilities.int.mod' }],
+      ]);
     });
 
     it('BUFFERS a prerequisite edit and writes it as a world-default SECTION on Save', async () => {

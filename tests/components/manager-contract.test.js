@@ -3309,9 +3309,36 @@ describe('CraftingSystemManager source contract', () => {
       toolRequirementsSource.includes('manager-tool-prerequisite-list'),
       'Tool requirements should expose the shared prerequisite picker'
     );
+    // ── THE BONUS TAKES ITS VALUE FROM THE WORLD LIBRARY (issue 1373, maintainer round 3) ──
+    // The tab used to render a free-text `RollDataExpressionInput` labelled `Bonus expression`,
+    // which the design has no counterpart for at either scope: `proto:2353`-`2369` and
+    // `proto:2886`-`2905` both draw a single-select `World modifiers` list, and `proto:4753`
+    // sets `bonus` to the chosen entry's expression. The persisted shape is untouched; what
+    // went away is the ability to TYPE one.
     assert.ok(
-      toolRequirementsSource.includes('RollDataExpressionInput'),
-      'Tool requirements should reuse the roll-data expression input'
+      !toolRequirementsSource.includes('RollDataExpressionInput'),
+      'Tool requirements should not offer a raw bonus-expression field'
+    );
+    assert.ok(
+      toolRequirementsSource.includes('data-tool-bonus-modifier'),
+      'Tool requirements should select the bonus from the world modifier library'
+    );
+    // AND BOTH CALLERS MUST PASS THE ROSTER. A prop declared and not passed renders an empty
+    // library that reads as "this world has none" — and it also subscribes the whole spread
+    // bundle, because Svelte evaluates a spread only on a key MISS.
+    for (const [name, source] of [
+      ['ToolEditView', toolEditSource],
+      ['WorldToolEntryPage', worldToolEntrySource],
+    ]) {
+      assert.ok(
+        /\{modifierOptions\}/.test(source),
+        `${name} should forward modifierOptions to the requirements tab`
+      );
+    }
+    assert.equal(
+      (rootSource.match(/modifierOptions=\{selectedSystemModifiers\}/g) || []).length,
+      2,
+      'the manager root should pass the world modifier roster to BOTH Tool requirement scopes'
     );
     // ── EVERY BEHAVIOUR SECTION IS A CARD, NOT A BARE HEADING (issue 1373) ────────────────
     // This used to require a `manager-tool-section-heading` block — an unenclosed `<h3>` with a
