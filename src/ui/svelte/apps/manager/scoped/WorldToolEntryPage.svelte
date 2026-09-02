@@ -156,14 +156,23 @@
     // `essenceOptions` is the world ESSENCE catalogue on the identical argument, and `itemTags`
     // is the union of every world component's own `tags` — the list `setWorldTags` authors.
     //
-    // CURRENCY IS DELIBERATELY ABSENT. Units are world-wide, but whether a cost is HONOURED is
-    // `requirements.currency.enabled` on each crafting system, and a world default cannot state
-    // which of them has it on. `ToolRepairRequirements` is therefore mounted with
-    // `currencyEnabled={false}`, which is the shipped read-only face: an imported seed carrying
-    // a cost still renders, and this screen does not offer to author a new one.
+    // AND `currencyUnits` IS THE WORLD LADDER, on exactly the same argument (issue 1373,
+    // maintainer round 5). This screen used to mount the repair editor with
+    // `currencyEnabled={false}`, reasoning that whether a cost is HONOURED is
+    // `requirements.currency.enabled` on each crafting system and a world default cannot state
+    // which of them has it on. That conflates two different things.
+    //
+    // The LADDER is world scope — `CraftingSystemManagerRoot` states the fact: one config for
+    // the whole world, because a world runs exactly one ruleset and so has exactly one way
+    // actors store coins (issue 1278). The per-system flag exists so the RECIPE editor can gate
+    // a cost on the system it is authoring for. At world scope there is no system to gate on,
+    // so the flag has no referent here — and reading `false` for "no referent" made the screen
+    // refuse to author a cost over units it can address perfectly well, which is the same
+    // mistake the component and essence rosters above were corrected for.
     componentOptions = [],
     essenceOptions = [],
     itemTags = [],
+    currencyUnits = [],
     // ── THE `PREVIEW AS` SEAM (issue 1373) ────────────────────────────────────────────────
     // `{id, name, img}` per previewable actor, and a reader that answers ONE actor's prepared
     // roll data. Both are the shell's: resolving an Actor document and calling `getRollData()`
@@ -1637,8 +1646,8 @@
                 {componentOptions}
                 {itemTags}
                 {essenceOptions}
-                currencyUnits={[]}
-                currencyEnabled={false}
+                {currencyUnits}
+                currencyEnabled={true}
                 onChange={(groups) => actions?.setWorldRepairRequirements?.(entityId, groups)}
               />
               <p

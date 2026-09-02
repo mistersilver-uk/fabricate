@@ -2177,6 +2177,61 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'world-tool-entry-on-break-repair-empty-catalogue',
+    label: 'Manager — World Tool entry, repair route with no catalogue',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE MAINTAINER'S OWN WORLD IS IN (issue 1373, maintainer round 5). The repair
+    // row's name field completes from the world component and essence catalogues, and a world
+    // that has authored neither — which is every world a GM installs Fabricate into — gets a
+    // field that can complete nothing. The design's answer, and premium's, is a DEGRADED field
+    // rather than a blocked one: the input still renders and is still typeable, and one muted
+    // line under it says there is nothing to name yet.
+    //
+    // `clearSystem` is the whole mechanism, and it is the same one
+    // `world-tool-entry-bonus-empty-library` uses: both world catalogues are built by LIFTING
+    // each crafting system's own copy, so a world with no crafting systems is the honest way to
+    // reach an empty one. It leaves the world Tool corpus, the entry route and this Tool's own
+    // authored repair seed untouched, so what changes between this frame and
+    // `world-tool-entry-on-break-repair` is the catalogue and nothing else.
+    //
+    // WHICH IS ALSO WHY BOTH FRAMES ARE NEEDED. The populated one photographs a named row
+    // reading back on its chip; this one photographs the field a GM meets on day one. A single
+    // frame of either would be evidence that the OTHER state renders correctly by assumption.
+    query: { clearSystem: '1' },
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-repair-requirements]',
+    // THE DEGRADED FIELD ITSELF, not merely the section. A frame asserting only that the editor
+    // rendered would pass just as well over a row that had silently dropped its field, which is
+    // the failure this state is most likely to arrive as — and the marker is what separates a
+    // field that CANNOT complete from one that simply has not been typed into yet.
+    expectContained: [
+      {
+        container: '[data-tool-repair-requirements] [data-recipe-option]',
+        target: '[data-recipe-option-search]',
+      },
+      {
+        container: '[data-tool-repair-requirements] [data-recipe-option]',
+        target: '[data-recipe-option-empty-catalogue] input',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'world-tool-entry-on-break-replace',
     label: 'Manager — World Tool entry, replacement component',
     reaches: 'beyond',

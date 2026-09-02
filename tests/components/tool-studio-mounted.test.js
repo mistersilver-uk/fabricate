@@ -39,6 +39,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // The repair block's plain-language readback (issue 1373, maintainer round 5): a pure
+    // module so the two scopes that render the block share one copy of the sentence.
+    'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',
@@ -1280,9 +1283,12 @@ describe('Tool Studio editor (mounted)', () => {
     await tick();
     document.querySelector('[data-recipe-add="alternative-essence"]').click();
     await tick();
+    // BORN UNNAMED since issue 1373's maintainer round 5: the alternative used to arrive
+    // holding the first selectable essence. Its row's own field names it, which is also what
+    // lets a GM retype the row afterwards rather than deleting it.
     assert.deepEqual(patches.at(-1).repairRequirements[0].options[1].match, {
       type: 'essence',
-      essenceId: 'fire',
+      essenceId: '',
       amount: 1,
     });
   });

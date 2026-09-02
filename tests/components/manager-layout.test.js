@@ -5969,11 +5969,18 @@ test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions f
   }
 });
 
-test('recipe tag chips zero their list-item margins so a host list rule cannot inflate one chip', async () => {
-  // Regression: chips are <li>s, and a host (Foundry) global list rule giving
-  // non-last items a margin-bottom inflated only the first chip's box (e.g. it
-  // rendered 34px tall vs the last chip's 30px). Our class rule must zero the
-  // margin and win on specificity even when the host rule is declared later.
+test('recipe tag chips keep a zero margin and one height, whatever the host rhythm says', async () => {
+  // Regression: chips WERE `<li>`s in a `<ul>` on a second line, and a host (Foundry) global
+  // list rule giving non-last items a margin-bottom inflated only the first chip's box — it
+  // rendered 34px tall against the last chip's 30px. Issue 1373's maintainer round 5 moved the
+  // chips onto the ROW itself (`proto:2254`), so they are `<span>`s and that particular host
+  // rule can no longer reach them.
+  //
+  // The GUARD is kept and re-aimed rather than deleted, because the declaration it was written
+  // for is still doing work: `.manager-chip.manager-recipe-tag-chip` zeroes its margin and pins
+  // its height, and it is now an inline member of a wrapping flex row where an inherited margin
+  // or a stretched box would misalign it against the policy word and `+ Tag` beside it. The
+  // hostile `li` rule stays in the fixture as the negative half: it must reach nothing.
   const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 320 },
     deviceScaleFactor: 1,
@@ -5997,12 +6004,11 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
-              <ul class="manager-recipe-tag-chips">
-                <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
-                <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
-              </ul>
-            </div>
+            <span class="manager-recipe-option-tags" data-recipe-option-tags>
+              <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
+              <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+              <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+            </span>
           </main>
         </body>
       </html>
@@ -6035,9 +6041,16 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
   }
 });
 
-test('recipe tag list spans the full row width on its own line below the controls', async () => {
-  // The chosen-tags box should drop to a full-width line under the match
-  // controls + quantity row, so chips never share width with the row-end controls.
+test('the tag requirement row keeps every control on ONE line', async () => {
+  // REPLACES `recipe tag list spans the full row width on its own line below the controls`
+  // (issue 1373, maintainer round 5). That test pinned the shape the design names as the
+  // defect: `.manager-recipe-option-tags-detail` carried `flex: 1 1 100%`, so the tag arm
+  // ALWAYS wrapped to a second full-width line whatever the row's width was, taking the match
+  // toggle, an `Add tag` dropdown and a bordered `No tags set` box with it.
+  //
+  // `proto:2252`-`2268` draws `[Tag ▾] Any of [chips] [+ Tag] … [Any of|All of] [− 1 +] [×]`.
+  // The claim is geometric and this is where it can be made: nothing else in the corpus
+  // computes a real cascade, and the mounted suites cannot see a wrap at all.
   const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 360 },
     deviceScaleFactor: 1,
@@ -6063,33 +6076,26 @@ test('recipe tag list spans the full row width on its own line below the control
             <div class="harness-row-width">
               <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option>
                 <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
-                <div class="manager-recipe-option-target">
-                  <span class="manager-recipe-option-tag-name">any #reagent #rare</span>
-                  <span class="manager-recipe-req-tag is-tag">Tag</span>
+                <select class="manager-recipe-option-kind" data-recipe-option-kind>
+                  <option value="tags" selected>Tag</option>
+                </select>
+                <span class="manager-recipe-option-tags" data-recipe-option-tags>
+                  <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
+                  <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+                  <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+                  <span class="manager-chip manager-recipe-tag-trigger"><i class="fas fa-plus"></i><span>Tag</span></span>
+                </span>
+                <!-- The Any of / All of control is the shared SegmentedControl (issue 975). Its
+                     track/segment styling lives in that component's SCOPED style block, not in
+                     fabricate.css, so this fixture reproduces only the markup shape; the
+                     assertions below are about the ROW's own layout, which fabricate.css owns. -->
+                <div class="manager-segmented is-compact" role="radiogroup" aria-label="Tag match">
+                  <label class="manager-segment is-active"><input type="radio" name="tag-match-1" checked><span class="manager-segment-label">Any of</span></label>
+                  <label class="manager-segment"><input type="radio" name="tag-match-1"><span class="manager-segment-label">All of</span></label>
                 </div>
                 <div class="manager-recipe-option-controls">
                   <input type="number" class="manager-recipe-option-quantity" value="1">
                   <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
-                </div>
-                <div class="manager-recipe-option-tags-detail">
-                  <div class="manager-recipe-option-tags-controls">
-                    <!-- The Any/All control is the shared SegmentedControl (issue 975).
-                         Its track/segment styling lives in that component's SCOPED style
-                         block, not in fabricate.css, so this fixture reproduces only the
-                         markup shape; the assertions below are about the tag detail's own
-                         full-width line, which fabricate.css does own. -->
-                    <div class="manager-segmented" role="radiogroup" aria-label="Tag match">
-                      <label class="manager-segment is-active"><input type="radio" name="tag-match-1" checked><span class="manager-segment-label">Any</span></label>
-                      <label class="manager-segment"><input type="radio" name="tag-match-1"><span class="manager-segment-label">All</span></label>
-                    </div>
-                    <button type="button" class="manager-button is-subtle manager-recipe-tag-trigger"><i class="fas fa-tag"></i><span>Add tag</span></button>
-                  </div>
-                  <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
-                    <ul class="manager-recipe-tag-chips">
-                      <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
-                      <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></li>
-                    </ul>
-                  </div>
                 </div>
               </div>
             </div>
@@ -6099,35 +6105,41 @@ test('recipe tag list spans the full row width on its own line below the control
     `);
 
     const report = await page.evaluate(() => {
-      const rectFor = (selector) => {
-        const rect = document.querySelector(selector).getBoundingClientRect();
-        return { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width };
-      };
       const row = document.querySelector('.manager-recipe-ingredient-option-row');
+      const rowRect = row.getBoundingClientRect();
       const style = getComputedStyle(row);
+      const inset =
+        parseFloat(style.paddingTop) +
+        parseFloat(style.paddingBottom) +
+        parseFloat(style.borderTopWidth) +
+        parseFloat(style.borderBottomWidth);
       return {
-        row: rectFor('.manager-recipe-ingredient-option-row'),
-        rowPadding:
-          parseFloat(style.paddingLeft) +
-          parseFloat(style.paddingRight) +
-          parseFloat(style.borderLeftWidth) +
-          parseFloat(style.borderRightWidth),
-        target: rectFor('.manager-recipe-option-target'),
-        controls: rectFor('.manager-recipe-option-controls'),
-        detail: rectFor('.manager-recipe-option-tags-detail'),
-        list: rectFor('.manager-recipe-option-tags-list'),
+        rowHeight: rowRect.height,
+        contentHeight: rowRect.height - inset,
+        // Every DIRECT child, so a control added later is measured without editing this.
+        children: [...row.children].map((child) => {
+          const rect = child.getBoundingClientRect();
+          return { name: child.className, top: rect.top - rowRect.top, height: rect.height };
+        }),
       };
     });
 
-    // §B4: the tag detail (controls + chip list) wraps to its own full-width line below
-    // the main row; it fills the row's CONTENT box (row width minus its padding).
+    assert.ok(report.children.length >= 5, `the fixture draws the whole row (${report.children.length})`);
+    // ONE LINE: no child starts below the tallest one, so nothing has wrapped. Stated over the
+    // children's own heights rather than against a pinned pixel, because the row is sized by
+    // its controls and a rung change on the ladder must not fail this.
+    const tallest = Math.max(...report.children.map((child) => child.height));
+    for (const child of report.children) {
+      assert.ok(
+        child.top < tallest,
+        `${child.name} wrapped to a second line (top ${child.top} vs tallest control ${tallest})`
+      );
+    }
+    // …and the row's content box is one control tall, which is the same claim measured from
+    // the other end: a wrapped row is at least twice this whatever its children report.
     assert.ok(
-      Math.abs(report.detail.width - (report.row.width - report.rowPadding)) <= 1,
-      `tags detail should fill the row content width (detail ${report.detail.width} vs content ${report.row.width - report.rowPadding})`
-    );
-    assert.ok(
-      report.list.top >= report.controls.bottom - 1 && report.list.top >= report.target.bottom - 1,
-      'tags list should sit on its own line below the controls/quantity row'
+      report.contentHeight <= tallest + 1,
+      `the row is one control tall (content ${report.contentHeight} vs tallest ${tallest})`
     );
   } finally {
     await context.close();

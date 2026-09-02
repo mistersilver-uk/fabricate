@@ -12679,12 +12679,16 @@
 }
 
 /* §B2: the ANY-ONE-OF (OR) container is an accent-bordered box with a header pill,
-   not a plain box with a left bar. */
+   not a plain box with a left bar.
+
+   `proto:4690` fills it with `--surface-soft` rather than `--accent-soft`: the accent lives on
+   the BORDER and the pill, and filling the box with it too made a group of three rows the
+   loudest object on a tab where every row is equally important. */
 .fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives {
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-accent-border);
   border-radius: 8px;
-  background: var(--fab-accent-soft);
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-manager .manager-recipe-any-one-of-head {
@@ -12719,9 +12723,17 @@
   gap: var(--fab-space-1);
 }
 
-/* A requirement row: lead chip + match editor grow on the left; the REQUIRED tag,
-   quantity stepper, "or…" and remove cluster on the right. The tag detail wraps to
-   its own full-width line below. */
+/* ONE REQUIREMENT ROW, ON ONE LINE (issue 1373, maintainer round 5; `proto:4658`).
+
+     [plate] [kind select] [name field] [quantity] [or…] [×]
+
+   `padding: 7px 9px` and `gap: 8px` in the design; 8px is `--fab-space-2` exactly and 7 and 9
+   both round to it on the 4px scale, so the whole row is one token.
+
+   `flex-wrap` is KEPT even though the design draws one line: this row renders inside a Tool
+   inspector as well as a full-width recipe tab, and a row that could not wrap would overflow
+   its container rather than reflow. What it no longer holds is a child with a 100% flex-basis,
+   which is what FORCED the second line whatever the width was. */
 .fabricate-manager .manager-recipe-ingredient-option-row {
   display: flex;
   flex-wrap: wrap;
@@ -12731,45 +12743,302 @@
   padding: var(--fab-space-2);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-surface-soft);
-}
-
-/* Inside an ANY-ONE-OF box the alternatives read as nested cards on the tinted
-   background. */
-.fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives .manager-recipe-ingredient-option-row {
   background: var(--fab-bg-1);
 }
 
-/* The small type-tinted lead chip that opens each requirement row. */
+/* A TAG ROW IS EDGED IN THE TAG TINT (`proto:4658`), which is the design's one per-kind row
+   treatment: the tag arm is the only one that carries several values at once, so its edge says
+   where the list ends. The design writes the edge as a raw translucent value, which resolves to
+   its own `--tag` hue at 34% alpha; `--fab-purple` is that hue here, and the chip primitive
+   already mixes against it the same way, so the RATIO is written and the literal is not. */
+.fabricate-manager .manager-recipe-ingredient-option-row.is-tag {
+  border-color: color-mix(in srgb, var(--fab-purple) 34%, transparent);
+}
+
+/* Inside an ANY-ONE-OF box the alternatives sit one rung DOWN the ramp rather than up
+   (`proto:4658` gives a member row `--bg1` where a standalone row gets `--bg2`), so a group
+   reads as a well the rows sit in. The design's ramp is offset one rung from ours: its `--bg1`
+   is our `--fab-bg-0` and its `--bg2` is our `--fab-bg-1`. */
+.fabricate-manager .manager-recipe-ingredient-requirement.has-alternatives .manager-recipe-ingredient-option-row {
+  background: var(--fab-bg-0);
+}
+
+/* THE PLATE (`proto:2247`, premium's `RewardRow` `.plate`): a NEUTRAL 28px tile carrying the
+   kind's own tinted glyph. It used to be a tinted 30px tile, which made four rows of four
+   kinds read as four differently-coloured cards; the tint belongs on the mark, not the box. */
 .fabricate-manager .manager-recipe-option-lead {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--fab-border);
   border-radius: 7px;
-  font-size: 0.82rem;
+  background: var(--fab-bg-2);
+  font-size: 0.75rem;
 }
 
 .fabricate-manager .manager-recipe-option-lead.is-component {
   color: var(--fab-success);
-  background: var(--fab-success-soft);
 }
 
 .fabricate-manager .manager-recipe-option-lead.is-tag {
   color: var(--fab-purple);
-  background: var(--fab-purple-soft);
 }
 
 .fabricate-manager .manager-recipe-option-lead.is-currency {
   color: var(--fab-accent);
-  background: var(--fab-accent-soft);
 }
 
 .fabricate-manager .manager-recipe-option-lead.is-essence {
   color: var(--fab-info);
-  background: var(--fab-info-soft);
+}
+
+/* THE KIND SELECT (`proto:2248`), which is what makes the row retypeable in place.
+
+   An explicit WIDTH, for the reason premium's `RewardRow` states: Foundry styles a bare
+   `select` to fill its container, so left intrinsic it takes the whole row and pushes every
+   other control onto its own line — which is exactly the three-line card this change removes.
+   132px is premium's own figure. Specificity (0,2,0) beats the (0,1,1) baseline
+   `.fabricate-manager select` rule, so the radius and surface here are the ones that paint. */
+.fabricate-manager .manager-recipe-option-kind {
+  flex: 0 0 auto;
+  width: 132px;
+  height: 30px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text-secondary);
+  background: var(--fab-bg-2);
+  font-size: 0.69rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* THE NAME FIELD. `min-width: 0` and `flex: 1` because it is the row's ONLY flexible item —
+   every other control states its own size — so it absorbs the row's slack and shrinks rather
+   than forcing a wrap. `position: relative` anchors the suggestion list to it. */
+.fabricate-manager .manager-recipe-option-name-field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--fab-space-2);
+  min-width: 0;
+}
+
+/* CHOSEN (`proto:2273`): an accent-edged pill carrying the mark, the name and a clear ×. */
+.fabricate-manager .manager-recipe-option-chosen {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  box-sizing: border-box;
+  max-width: 100%;
+  height: 30px;
+  padding: 0 var(--fab-space-chip) 0 var(--fab-space-2);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 999px;
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-recipe-option-chosen > i {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+}
+
+.fabricate-manager .manager-recipe-option-chosen-img {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.fabricate-manager .manager-recipe-option-chosen-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A REAL BUTTON inside the pill. Its own reset, because Foundry sizes every `button` to a
+   fixed height and this one is a 20px circle inside a 30px pill. */
+.fabricate-manager .manager-recipe-option-clear {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-raised);
+  font-size: 0.55rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-option-clear:hover {
+  color: var(--fab-text);
+  background: var(--fab-surface-active);
+}
+
+/* UNCHOSEN (`proto:2276`): an inline search field, in the row rather than behind a popover. */
+.fabricate-manager .manager-recipe-option-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  box-sizing: border-box;
+  min-width: 0;
+  height: 30px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 7px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-recipe-option-search.is-typing {
+  border-color: var(--fab-accent-border);
+}
+
+.fabricate-manager .manager-recipe-option-search > i {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 0.56rem;
+}
+
+/* The input paints NOTHING: `.manager-recipe-option-search` draws the box, so the field inside
+   it must not draw a second one. The baseline free-text rule above would otherwise give it the
+   manager surface and a border of its own. */
+.fabricate-manager .manager-recipe-option-search input[type='text'] {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: var(--fab-text);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 600;
+  outline: none;
+}
+
+/* THE SUGGESTIONS, BENEATH THE FIELD (`proto:2279`) rather than in a portaled popover. That is
+   the whole difference between a field that completes what the GM is typing and a second
+   surface opened over the first. */
+.fabricate-manager .manager-recipe-option-suggestions {
+  position: absolute;
+  top: 33px;
+  right: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  max-height: 190px;
+  padding: var(--fab-space-1);
+  border: 1px solid var(--fab-border-strong);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+  box-shadow: 0 14px 30px var(--fab-overlay-dark-48);
+  overflow: auto;
+  scrollbar-color: var(--fab-bg-3) transparent;
+  scrollbar-width: thin;
+}
+
+.fabricate-manager .manager-recipe-option-suggestion {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-2);
+  width: 100%;
+  height: 30px;
+  min-height: 0;
+  padding: 0 var(--fab-space-2);
+  border: 0;
+  border-radius: 6px;
+  color: var(--fab-text);
+  background: none;
+  font-size: 0.69rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-recipe-option-suggestion:hover {
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-recipe-option-suggestion > i {
+  flex: 0 0 auto;
+  width: 12px;
+  font-size: 0.62rem;
+}
+
+.fabricate-manager .manager-recipe-option-suggestion > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-recipe-option-no-matches {
+  padding: var(--fab-space-2);
+  color: var(--fab-text-subtle);
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+/* THE DEGRADED FACE: a world with no components and no essences, which is the world a GM
+   installing Fabricate starts in. The field is still there and still typeable — its own
+   placeholder carries the sentence — but its edge drops back to the resting border, because an
+   accented one would read as a field waiting for input it can never complete. */
+.fabricate-manager .manager-recipe-option-search.is-empty-catalogue {
+  border-color: var(--fab-border);
+}
+
+/* THE TAG ARM, ON THE ROW (`proto:2252`): the policy word, the chosen tags and `+ Tag`, with
+   the Any of / All of control as the row's next sibling. It was a second full-width line. */
+.fabricate-manager .manager-recipe-option-tags {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-manager .manager-recipe-tag-policy {
+  flex: 0 0 auto;
+  color: var(--fab-text-muted);
+  font-size: 0.69rem;
+  font-weight: 600;
+}
+
+/* `+ Tag` (`proto:2256`): a dashed pill in the tag tint, not a filled button — it is an
+   affordance for adding, standing in a row of chips that are values. */
+.fabricate-manager .manager-chip.manager-recipe-tag-trigger {
+  border: 1px dashed color-mix(in srgb, var(--fab-purple) 60%, transparent);
+  color: var(--fab-purple);
+  background: transparent;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-chip.manager-recipe-tag-trigger:hover {
+  background: var(--fab-purple-soft);
 }
 
 .fabricate-manager .manager-recipe-option-target {
@@ -12778,15 +13047,6 @@
   align-items: center;
   gap: var(--fab-space-2);
   min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-option-tag-name {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* The REQUIRED / TAG type pill. (`.is-essence` was declared below for an ESSENCE pill on
@@ -12819,6 +13079,8 @@
   opacity: 0.85;
 }
 
+/* The read-only currency face, which is the one place a unit is still static text: a cost
+   authored before the system turned currency off. */
 .fabricate-manager .manager-recipe-currency-unit.is-readonly,
 .fabricate-manager .manager-recipe-option-quantity.is-readonly {
   display: inline-flex;
@@ -12842,14 +13104,12 @@
   background: var(--fab-border);
 }
 
-/* The tag editing detail wraps to its own full-width line below the row. */
-.fabricate-manager .manager-recipe-option-tags-detail {
-  display: flex;
-  flex: 1 1 100%;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
+/* (`.manager-recipe-option-tag-name` and `.manager-recipe-option-tags-detail` were declared
+   here. The first was a read-only summary of the tags — `any #liquid` — beside a `TAG` pill;
+   the second was the `flex: 1 1 100%` that FORCED the tag row onto a second line, carrying the
+   match toggle, an `Add tag` dropdown and a bordered chip area with a dashed `No tags set`
+   empty state. `proto:2252` draws all of it on the row itself, and the kind select now says
+   `Tag` where the pill did, so summary, pill, second line and empty state all go together.) */
 
 /* (The Any/All tag-match toggle used to declare its own track and segment rules here.
    It was a hand-rolled twin of the check-trigger outcome toggle's; both now render the
@@ -12920,44 +13180,6 @@
    component editor rather than editing in place: component.difficulty has four
    consumers, so an inline stepper would write across an aggregate boundary. */
 
-.fabricate-manager .manager-recipe-option-tags {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-option-tags-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-/* The chosen tags sit in their own bordered area on a full-width line below the
-   match controls/quantity row; as a flex item with a 100% basis it always wraps
-   to its own line and fills the row. When empty it shows a muted "No tags set". */
-.fabricate-manager .manager-recipe-option-tags-list {
-  flex: 1 1 100%;
-  box-sizing: border-box;
-  min-width: 0;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-03);
-}
-
-.fabricate-manager .manager-recipe-tag-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
 /* Chips are <li>s. `margin: 0` zeroes a host list rule that gives non-last items
    a margin-bottom (which inflated the first chip's box, e.g. 34px vs 30px). The
    min-width floors short tags ("rare") so they don't collapse to a near-square
@@ -12967,8 +13189,14 @@
    or sub-pixel rounding. */
 
 /* Three classes: `justify-content` and `min-height` collide with the chip primitive,
-   and this pill carries a remove button so it is deliberately taller (issue 883). */
+   and this pill carries a remove button so it is deliberately taller (issue 883).
+
+   `flex: 0 0 auto` because the chip is an inline member of the tag ROW now rather than of a
+   wrapping `<ul>` beneath it, and a flexible chip would give up its width to the name field
+   beside it. `min-width` still floors a short tag so `rare` is not a near-square pill next to
+   `reagent`. */
 .fabricate-manager .manager-chip.manager-recipe-tag-chip {
+  flex: 0 0 auto;
   gap: var(--fab-space-chip);
   box-sizing: border-box;
   margin: 0;
@@ -13000,25 +13228,10 @@
   font-family: var(--fab-font-mono);
 }
 
-/* A currency/essence match editor is now just its picker: the amount moved out to the
-   shared end-of-row Stepper (issue 676), so `.manager-recipe-currency-amount` /
-   `.manager-recipe-essence-amount` (which sized the bare 3.75rem number inputs that
-   opened these rows) and `.manager-recipe-option-essence-detail` (the removed
-   "met by any components carrying this essence" sub-line) are gone with them. */
-.fabricate-manager .manager-recipe-option-currency,
-.fabricate-manager .manager-recipe-option-essence {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-recipe-currency-unit,
-.fabricate-manager .manager-recipe-essence-picker-wrap {
-  display: inline-flex;
-  min-width: 0;
-}
+/* (`.manager-recipe-option-currency` / `.manager-recipe-option-essence` and the two picker
+   wrappers inside them were declared here. A currency row and an essence row are named through
+   the SAME `.manager-recipe-option-name-field` every other kind uses now, so there is no
+   per-kind editor left to size — which is the point of the shared row.) */
 
 /* §B1: subtle × remove — never a loud red trash/minus button. */
 .fabricate-manager .manager-recipe-option-remove {

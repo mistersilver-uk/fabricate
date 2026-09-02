@@ -17,22 +17,31 @@
   THE COUNT IS THE DESIGN'S OWN, down to its empty face: `rows.length + ' requirement(s)'`, or
   `none yet` when there are none (`countLabel` in the design's state object).
 
-  == WHAT IS DELIBERATELY NOT MATCHED =========================================================
-  The design puts a kind `<select>` on every ingredient ROW (`proto:2217`). We render the shipped
-  `RecipeIngredientSetCard`, the same primitive the recipe editor and the downtime reward editor
-  author their ingredient sets through, and its row anatomy is not reshaped for this one caller:
-  three surfaces authoring one persisted shape through two implementations is how a record and
-  its editors drift. The divergence is a recorded decision, not an oversight.
+  == THE ROW ANATOMY CONVERGED RATHER THAN FORKING (issue 1373, maintainer round 5) ===========
+  An earlier round recorded the design's per-row kind `<select>` (`proto:2248`) as a deliberate
+  divergence, on the ground that reshaping `RecipeIngredientSetCard` for one caller would be a
+  second implementation of one persisted shape. The maintainer ruled the other way, and the
+  reasoning is better: the answer to "three surfaces, one shape" is to change the ONE row all
+  three render, not to leave it disagreeing with the design everywhere. `RecipeIngredientOption`
+  carries the kind select, the chip-or-search name field and the one-line tag row now, and the
+  recipe editor gets them in the same change — see that component's own docblock.
 
   The one thing that IS caller-specific is the note beside a choice group's `Any one of` pill.
   The recipe editor enumerates the four kinds a crafter may pick between; a repair set says what
   picking one DOES (`any one of these mends it`, `proto:2242`). `anyOneOfHint` carries it, and it
   is empty at every other call site.
+
+  == AND THE BLOCK ENDS IN A SENTENCE ========================================================
+  `proto:2317` closes the repair block with one plain-language line at `400 10px/1.45` in the
+  subtle ink: `Mending consumes ...`. It is the only place the whole set is stated as a cost
+  rather than drawn as an editor, which is what a GM checking their own work reads. See
+  `toolRepairSummary.js` for how the sentence is built.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../Chip.svelte';
   import RecipeIngredientSetCard from '../recipe/RecipeIngredientSetCard.svelte';
+  import { repairSummarySentence } from './toolRepairSummary.js';
 
   let {
     groups = [],
@@ -85,6 +94,41 @@
       'One ingredient set, no recipe needed. Everything listed is consumed to mend a broken copy. Use {or} on a row to accept an alternative in its place.'
     ).split('{or}')
   );
+
+  // Every word of the sentence, resolved once. The module that assembles it is pure — see its
+  // docblock for why it takes the strings rather than reaching for `localize` itself.
+  const summaryLabels = $derived({
+    lead: text('FABRICATE.Admin.Manager.Tools.Editor.RepairSummary', 'Mending consumes {list}.'),
+    empty: text(
+      'FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryEmpty',
+      'Nothing listed — a broken copy cannot be mended.'
+    ),
+    or: text('FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryOr', ' or '),
+    and: text('FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryAnd', ' + '),
+    anyOf: text('FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryAnyOf', 'any of '),
+    allOf: text('FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryAllOf', 'all of '),
+    essenceSuffix: text('FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryEssence', ' essence'),
+    unsetComponent: text(
+      'FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryUnsetComponent',
+      'unset component'
+    ),
+    unsetTag: text('FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryUnsetTag', 'unset tag'),
+    unsetEssence: text(
+      'FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryUnsetEssence',
+      'unset essence'
+    ),
+    unsetCurrency: text(
+      'FABRICATE.Admin.Manager.Tools.Editor.RepairSummaryUnsetCurrency',
+      'unset currency'
+    ),
+  });
+  const summary = $derived(
+    repairSummarySentence(
+      groups,
+      { components: componentOptions, essences: essenceOptions, currencyUnits },
+      summaryLabels
+    )
+  );
 </script>
 
 <section class="manager-tool-repair" data-tool-repair-requirements>
@@ -115,6 +159,7 @@
       onChange={(nextSet) => onChange(nextSet.ingredientGroups || [])}
     />
   </fieldset>
+  <p class="manager-muted manager-tool-repair-summary" data-tool-repair-summary>{summary}</p>
 </section>
 
 <style>
@@ -147,5 +192,15 @@
      reader is about to look for, not a warning. */
   .manager-tool-repair-or {
     color: var(--fab-text-secondary);
+  }
+
+  /* `400 10px/1.45 var(--sans); color: var(--subtle)` at `proto:2317` - 0.62rem against the 16px
+     root, and a shade quieter than the explainer above the editor. It reads as a readback of
+     what the GM just authored rather than as a second instruction. */
+  .manager-tool-repair-summary {
+    margin: 0;
+    color: var(--fab-text-subtle);
+    font-size: 0.62rem;
+    line-height: 1.45;
   }
 </style>
