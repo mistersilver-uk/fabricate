@@ -2389,9 +2389,17 @@ function assertHorizontalContainment(parent, child, label) {
   }
 }
 
+// THREE, not four. Issue 1373 retired the editor's `Overview` tab: at SYSTEM scope a crafting
+// system authors no identity, so the linked-Item card and the description moved to the world Tool
+// entry that owns them, and the display label became an override card on Breakage. The strip is
+// `Breakage · Requirements · Validation`, which is what the design draws.
+//
+// The count is asserted rather than left open because this check exists to prove every tab is
+// MEASURABLE and horizontally contained — a strip that rendered one tab would satisfy a loop over
+// whatever it found. `screenshot-capture-scoping.test.js` pins the message, so both move together.
 function assertToolStudioTabContainment(report) {
-  if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 4) {
-    throw new Error(`Tool editor must render four measurable tabs: ${JSON.stringify(report)}`);
+  if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 3) {
+    throw new Error(`Tool editor must render three measurable tabs: ${JSON.stringify(report)}`);
   }
   const overflow = report.tabsOverflow;
   if (

@@ -1757,13 +1757,15 @@ test('the Knowledge walk seeds every projected state, proves the inert merge, an
   assert.ok(HARNESS.includes("'.manager-knowledge-copy-row'"));
 });
 
-test('Tool tab geometry contract rejects clipping, actual overflow, and a missing fourth tab', () => {
+// THREE tabs since issue 1373 retired `Overview` from the SYSTEM-scope editor: a crafting system
+// authors no identity, so the linked-Item card and the description moved to the world Tool entry
+// and the display label became an override card on Breakage.
+test('Tool tab geometry contract rejects clipping, actual overflow, and a missing third tab', () => {
   const rect = (left, right) => ({ left, right });
   const valid = {
     manager: rect(0, 832),
     tabs: rect(210, 512),
     tabButtons: [
-      { id: 'tool-tab-overview', ...rect(218, 274) },
       { id: 'tool-tab-breakage', ...rect(280, 340) },
       { id: 'tool-tab-requirements', ...rect(346, 430) },
       { id: 'tool-tab-validation', ...rect(436, 504) },
@@ -1779,9 +1781,9 @@ test('Tool tab geometry contract rejects clipping, actual overflow, and a missin
   assert.throws(
     () => toolTabContracts.assertToolStudioTabContainment({
       ...valid,
-      tabButtons: valid.tabButtons.slice(0, 3),
+      tabButtons: valid.tabButtons.slice(0, 2),
     }),
-    /four measurable tabs/,
+    /three measurable tabs/,
   );
   assert.throws(
     () => toolTabContracts.assertToolStudioTabContainment({
@@ -1793,8 +1795,11 @@ test('Tool tab geometry contract rejects clipping, actual overflow, and a missin
   assert.throws(
     () => toolTabContracts.assertToolStudioTabContainment({
       ...valid,
+      // The LAST tab, derived rather than written: this case pushed index 3 past the strip's
+      // right edge, and when issue 1373 retired `Overview` there was no index 3 left to push,
+      // so nothing escaped, nothing threw, and the clipping arm silently stopped testing.
       tabButtons: valid.tabButtons.map((tab, index) => (
-        index === 3 ? { ...tab, right: 520 } : tab
+        index === valid.tabButtons.length - 1 ? { ...tab, right: 520 } : tab
       )),
     }),
     /within visible tab list escapes horizontal containment/,
