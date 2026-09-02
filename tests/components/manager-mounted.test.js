@@ -625,6 +625,10 @@ function compileManagerRoot() {
     'foundryIconVocabulary.js',
     'foundryIconCatalogue.js',
     'iconPickerPopover.js',
+    // The shared portal-host resolver (issue 1466): every picker in this tree imports it
+    // statically to find the application root its overlay is portaled into. This suite has
+    // no dependency validator, so an omission HANGS it (# cancelled) rather than naming it.
+    'overlayHost.js',
     'componentEditor.js',
     'chanceColorScale.js',
     'dropRateTier.js',

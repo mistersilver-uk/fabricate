@@ -6,6 +6,7 @@
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
+  import { overlayHostRect, resolveOverlayHost } from '../../util/overlayHost.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
@@ -571,9 +572,9 @@
   }
 
   function getBiomeColorPopoverHost() {
-    if (!biomeColorTriggerButton || typeof document === 'undefined') return null;
-
-    return biomeColorTriggerButton.closest('.fabricate-manager');
+    return resolveOverlayHost(biomeColorTriggerButton, {
+      component: 'EnvironmentsBrowserView biome colour picker',
+    });
   }
 
   function getBiomeColorPopoverHorizontalBounds(hostRect) {
@@ -594,12 +595,7 @@
       return;
 
     const popoverHost = getBiomeColorPopoverHost();
-    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
+    const hostRect = overlayHostRect(popoverHost);
     const triggerRect = biomeColorTriggerButton.getBoundingClientRect();
     const horizontalBounds = getBiomeColorPopoverHorizontalBounds(hostRect);
     const layout = computeIconPickerPopoverLayout(

@@ -26,6 +26,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
     // `SearchablePopover` lays its portaled panel out against the trigger (issue 1458).
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
     // The essence colour fold, reached through the embedded player inventory detail.
     'src/ui/svelte/util/essenceTint.js',
     // NOTE: the progressive order/threshold leaves are deliberately NOT listed.

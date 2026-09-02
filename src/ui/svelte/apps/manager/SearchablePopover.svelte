@@ -1,8 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
   Generic searchable popover used by the World > Parties and selected-system
-  Travel surfaces (realm-override picker and move-to-party picker). The popover is portaled to the `.fabricate-manager`
-  host so it escapes the `overflow: hidden` manager panel, positioned with
+  Travel surfaces (realm-override picker and move-to-party picker). The popover is portaled to the
+  nearest Fabricate application root (`util/overlayHost.js`, issue 1466) so it escapes the
+  `overflow: hidden` manager panel, positioned with
   `computeIconPickerPopoverLayout`, and dismissed on outside click / Escape (the
   portaled popover is registered as an additional "inside" node so clicking
   within it does not dismiss).
@@ -186,6 +187,7 @@
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../actions/portal.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
+  import { overlayHostRect, resolveOverlayHost } from '../../util/overlayHost.js';
 
   let {
     options = [],
@@ -337,8 +339,7 @@
   }
 
   function getPopoverHost() {
-    if (!pickerRoot || typeof document === 'undefined') return null;
-    return pickerRoot.closest('.fabricate-manager');
+    return resolveOverlayHost(pickerRoot, { component: 'SearchablePopover' });
   }
 
   function getHorizontalBounds(hostRect) {
@@ -377,12 +378,7 @@
     const anchor = triggerButton ?? pickerRoot;
     if (!open || !anchor || typeof window === 'undefined') return;
     const host = getPopoverHost();
-    const hostRect = host?.getBoundingClientRect?.() ?? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
+    const hostRect = overlayHostRect(host);
     const triggerRect = anchor.getBoundingClientRect();
     const bounds = getHorizontalBounds(hostRect);
     const layout = computeIconPickerPopoverLayout(

@@ -11,6 +11,7 @@
     normalizeEssenceIcon,
   } from '../util/essenceIcons.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
+  import { overlayHostRect, resolveOverlayHost } from '../util/overlayHost.js';
 
   let {
     value = DEFAULT_ESSENCE_ICON,
@@ -109,9 +110,7 @@
   }
 
   function getPopoverHost() {
-    if (!pickerRoot || typeof document === 'undefined') return null;
-
-    return pickerRoot.closest('.fabricate-manager');
+    return resolveOverlayHost(pickerRoot, { component: 'IconPicker' });
   }
 
   function getPopoverHorizontalBounds(hostRect) {
@@ -159,12 +158,7 @@
     if (!pickerOpen || !triggerButton || typeof window === 'undefined') return;
 
     const popoverHost = getPopoverHost();
-    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
+    const hostRect = overlayHostRect(popoverHost);
     const triggerRect = triggerButton.getBoundingClientRect();
     const horizontalBounds = getPopoverHorizontalBounds(hostRect);
 

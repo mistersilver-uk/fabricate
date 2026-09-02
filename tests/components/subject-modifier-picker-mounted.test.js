@@ -42,6 +42,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
