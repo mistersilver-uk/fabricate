@@ -1332,6 +1332,15 @@ export const VIEW_LAB_CASES = Object.freeze([
       // well as on `manager-essences-normal` because the reference draws the identical panel on
       // both rails and a change to it has to publish both.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
+      // The inspector's FOOT ACTION, which this case draws and did not claim (issue 1446). The
+      // `essenceInspectorFoot` snippet renders `Open definition` as an `InspectorActionButton`,
+      // and `expectContained` above already asserts `[data-scoped-list-inspector-foot]` is inside
+      // the inspector — so the frame provably contains it. It was claimed only by the four
+      // `manager-essences-*` frames, which render the OTHER caller, so a change to the primitive
+      // published four frames of one adopter and none of the other. That is the same rule the two
+      // shared list primitives above are claimed under, applied to the third thing this screen
+      // composes rather than owns.
+      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
       /^src\/utils\/scopedEntityListModel\.js$/,
     ],
