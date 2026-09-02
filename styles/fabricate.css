@@ -22472,8 +22472,7 @@
 .fabricate-manager .manager-party-add-candidate,
 .fabricate-manager .manager-party-actor-tile,
 .fabricate-manager .manager-party-actor-unlink,
-.fabricate-manager .manager-party-actor-open,
-.fabricate-manager .manager-travel-picker-inline-close {
+.fabricate-manager .manager-party-actor-open {
   appearance: none;
   -webkit-appearance: none;
   box-sizing: border-box;
@@ -22559,7 +22558,28 @@
   font-size: 9px;
 }
 
-.fabricate-manager .manager-travel-picker-inline {
+/* ---------------------------------------------------------------------------
+   THE PICKER PRIMITIVE'S OWN ROOTS (issue 1464)
+
+   `.fabricate-picker` and `.fabricate-picker-popover` are written by
+   `SearchablePopover` itself, on its root element and on the panel it portals
+   out of that root. They are NAMESPACE roots, not area roots.
+
+   Every rule below used to hang off `.fabricate-manager`, which made a shared
+   primitive paint on exactly one screen: a player-window caller portalled its
+   panel to a host the selectors could not reach and drew entirely unstyled.
+   The root could not simply be deleted — this sheet is loaded page-wide into
+   the Foundry document and `tests/styles-namespacing.test.js` requires every
+   selector to begin with `.fabricate` — so the replacement is a root the
+   COMPONENT emits. One class for one class, in place, so no specificity and no
+   source position moved.
+
+   A rule whose ancestor is a CALLER'S container keeps `.fabricate-manager`:
+   it is the manager's override of the manager's own markup and can only ever
+   match there. `tests/components/searchable-popover-area-scope.test.js` holds
+   the distinction.
+   --------------------------------------------------------------------------- */
+.fabricate-picker .manager-travel-picker-inline {
   display: flex;
   flex: 1;
   align-items: center;
@@ -22572,7 +22592,7 @@
   background: var(--fab-bg-0);
 }
 
-.fabricate-manager .manager-travel-picker-inline > i {
+.fabricate-picker .manager-travel-picker-inline > i {
   color: var(--fab-text-subtle);
   font-size: 9px;
 }
@@ -22581,7 +22601,7 @@
    core gives every input `height: var(--input-height)` (~32px), which overflows this
    30px row by a pixel top and bottom — invisible until the field takes focus, at which
    point its ring is drawn around the overflowing box rather than the row. */
-.fabricate-manager .manager-travel-picker-inline input {
+.fabricate-picker .manager-travel-picker-inline input {
   flex: 1;
   align-self: stretch;
   min-width: 0;
@@ -22595,13 +22615,29 @@
   font-weight: 500;
 }
 
-.fabricate-manager .manager-travel-picker-inline-close {
+/* The inline search field's close control, which `SearchablePopover` renders itself and
+   which therefore has to paint outside `.fabricate-manager`. It carries the button reset
+   the World > Parties list above applies to its own controls — Foundry core pins a fixed
+   height on every `button` — because splitting that reset out of a shared selector list is
+   what let this one control leave the area scope.
+
+   The primitive's OWN root stands in for the area root rather than the area root being
+   dropped: same specificity, same position, so nothing about the manager's cascade moves.
+   A bare `.manager-travel-picker-inline-close` is (0,1,0) and would lose the 10px glyph and
+   the 1.2 line box to `.fabricate-manager button { font: inherit }` at (0,1,1). */
+.fabricate-picker .manager-travel-picker-inline-close {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
   flex: 0 0 auto;
+  height: auto;
   padding: 0;
   border: 0;
   color: var(--fab-text-subtle);
   background: none;
   font-size: 10px;
+  line-height: 1.2;
+  cursor: pointer;
 }
 
 /*
@@ -22625,9 +22661,15 @@
   engine keeps the manager's default 2px outline instead.
 */
 @supports selector(:has(*)) {
-  .fabricate-manager .manager-travel-picker-inline input:focus-visible,
   .fabricate-manager .manager-party-add-search .manager-party-add-query:focus-visible,
   .fabricate-manager .manager-travel-parties-search .manager-travel-parties-query:focus-visible {
+    outline: none;
+  }
+
+  /* The picker's own inline field, split out of the row above so it keeps this treatment
+     outside `.fabricate-manager`. The primitive's root stands in for the area root: same
+     specificity, same position, so nothing about the manager's cascade moves. */
+  .fabricate-picker .manager-travel-picker-inline input:focus-visible {
     outline: none;
   }
 
@@ -22643,7 +22685,7 @@
      weaker than the same treatment on the two rows that rest on the neutral `--fab-border`.
      Two pixels restores parity with the manager's 2px focus standard, and inset it still
      cannot exceed the field. */
-  .fabricate-manager .manager-travel-picker-inline:has(input:focus-visible) {
+  .fabricate-picker .manager-travel-picker-inline:has(input:focus-visible) {
     border-color: var(--fab-accent);
     box-shadow: inset 0 0 0 2px var(--fab-accent);
   }
@@ -22656,7 +22698,7 @@
    realm-override picker opted into the same one and would otherwise have needed to borrow
    a class named after actors to get them. */
 
-.fabricate-manager .manager-travel-option-marker {
+.fabricate-picker-popover .manager-travel-option-marker {
   flex: 0 0 auto;
   color: var(--fab-accent);
   font-size: 9px;
@@ -22716,7 +22758,8 @@
   color: var(--fab-text);
 }
 
-.fabricate-manager .manager-travel-portrait {
+.fabricate-picker .manager-travel-portrait,
+.fabricate-picker-popover .manager-travel-portrait {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -22729,14 +22772,15 @@
   color: var(--fab-text-muted);
 }
 
-.fabricate-manager .manager-travel-portrait img {
+.fabricate-picker .manager-travel-portrait img,
+.fabricate-picker-popover .manager-travel-portrait img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.fabricate-manager .manager-travel-option-name {
+.fabricate-picker-popover .manager-travel-option-name {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -22756,7 +22800,7 @@
    by a name states that fact on a second line; the wrapper takes over the flex sizing the
    single-line name carries alone, so the label still ellipsises instead of pushing a
    trailing chip out of the row. */
-.fabricate-manager .manager-travel-option-lines {
+.fabricate-picker-popover .manager-travel-option-lines {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -22764,11 +22808,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-travel-option-lines > .manager-travel-option-name {
+.fabricate-picker-popover .manager-travel-option-lines > .manager-travel-option-name {
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-travel-option-meta {
+.fabricate-picker-popover .manager-travel-option-meta {
   min-width: 0;
   overflow: hidden;
   color: var(--fab-text-subtle);
@@ -22778,7 +22822,7 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-travel-picker {
+.fabricate-picker.manager-travel-picker {
   position: relative;
   min-width: 0;
 }
@@ -22791,13 +22835,13 @@
   width: 100%;
 }
 
-.fabricate-manager .manager-travel-picker-trigger {
+.fabricate-picker .manager-travel-picker-trigger {
   justify-content: flex-start;
   height: auto;
   min-height: 36px;
 }
 
-.fabricate-manager .manager-travel-popover {
+.fabricate-picker-popover.manager-travel-popover {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -22815,12 +22859,12 @@
   overflow: hidden;
 }
 
-.fabricate-manager .manager-travel-popover-search {
+.fabricate-picker-popover .manager-travel-popover-search {
   padding: var(--fab-space-2);
   border-bottom: 1px solid var(--fab-border);
 }
 
-.fabricate-manager .manager-travel-popover-search input {
+.fabricate-picker-popover .manager-travel-popover-search input {
   width: 100%;
   box-sizing: border-box;
   height: 32px;
@@ -22831,13 +22875,13 @@
   background: var(--fab-bg-1);
 }
 
-.fabricate-manager .manager-travel-popover-search input:focus-visible {
+.fabricate-picker-popover .manager-travel-popover-search input:focus-visible {
   outline: none;
   border-color: var(--fab-accent);
   box-shadow: 0 0 0 1px var(--fab-accent);
 }
 
-.fabricate-manager .manager-travel-popover-options {
+.fabricate-picker-popover .manager-travel-popover-options {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -22852,20 +22896,20 @@
    recipe editor's "or…" menu splits OR alternatives ("Accept instead") from the
    essence requirement that bubbles to the ingredient SET ("Require as well"). The
    heading is `aria-hidden`; the group carries the same text as its accessible name. */
-.fabricate-manager .manager-travel-popover-group {
+.fabricate-picker-popover .manager-travel-popover-group {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
-.fabricate-manager .manager-travel-popover-group + .manager-travel-popover-group {
+.fabricate-picker-popover .manager-travel-popover-group + .manager-travel-popover-group {
   margin-top: var(--fab-space-2);
   padding-top: var(--fab-space-2);
   border-top: 1px solid var(--fab-border);
 }
 
-.fabricate-manager .manager-travel-popover-group-label {
+.fabricate-picker-popover .manager-travel-popover-group-label {
   margin: 0 0 var(--fab-space-2xs);
   padding: 0 var(--fab-space-1);
   color: var(--fab-text-subtle);
@@ -22875,7 +22919,7 @@
   text-transform: uppercase;
 }
 
-.fabricate-manager .manager-travel-option {
+.fabricate-picker-popover .manager-travel-option {
   box-sizing: border-box;
   width: 100%;
   display: flex;
@@ -22893,7 +22937,7 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-travel-option:hover {
+.fabricate-picker-popover .manager-travel-option:hover {
   background: var(--fab-surface-raised);
 }
 

@@ -301,7 +301,7 @@ const FIXTURE = `
                 <li class="manager-salvage-stage-row">
                   <span class="manager-salvage-result-ordinal" data-m="stage-ordinal">1</span>
                   <span class="manager-salvage-component-field">
-                    <span class="manager-travel-picker manager-salvage-component-picker">
+                    <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
                       <button type="button" class="manager-button manager-salvage-component-trigger" data-m="stage-picker">
                         <span class="manager-travel-portrait"><img src="" alt=""></span>
                         <span class="manager-travel-picker-value manager-salvage-component-name" data-m="stage-picker-name">Brass Casing</span>
