@@ -505,7 +505,20 @@ describe('every snippet is invoked with the documented parameters', () => {
   after(() => catalogueHarness.teardown());
   afterEach(() => catalogueHarness.remount());
 
-  const CTX_KEYS = ['scope', 'systems', 'systemId', 'selected', 'member', 'systemRow'];
+  // `clearSelection` joined the set at issue 1373's maintainer feedback round, and it is the one
+  // key that is a FUNCTION rather than a fact. The `bulk` snippet renders the shared
+  // `BulkEditPanelShell`, whose header carries a `Clear selection` action, and a lane holds the
+  // ticked ids only as the array it was rendered with — so without a way back to the set's owner
+  // that control could not do the one thing it names.
+  const CTX_KEYS = [
+    'scope',
+    'systems',
+    'systemId',
+    'selected',
+    'member',
+    'systemRow',
+    'clearSelection',
+  ];
 
   it('rowMeta and inspectorBody receive (entry, ctx) with exactly the documented ctx keys', async () => {
     const seen = [];
@@ -546,6 +559,16 @@ describe('every snippet is invoked with the documented parameters', () => {
     assert.equal(ctx.selected, false, 'a bulk body addresses no single row');
     assert.equal(ctx.member, false);
     assert.equal(ctx.systemRow, null);
+    // AND THE ONE CALLABLE KEY ACTUALLY CLEARS. Asserted as an EFFECT rather than as a typeof:
+    // a stub of the right shape satisfies `typeof ctx.clearSelection === 'function'` while the
+    // panel's Clear goes on doing nothing, which is the failure this key exists to prevent.
+    assert.equal(typeof ctx.clearSelection, 'function', 'the bulk body can reach the set owner');
+    ctx.clearSelection();
+    await catalogueHarness.setProps({});
+    assert.ok(
+      !root.querySelector('[data-lane-bulk]'),
+      'the bulk body still renders, so ctx.clearSelection did not reach the frame selection'
+    );
   });
 
   it('reaches a conditionally present projection field through ctx.scope', async () => {
@@ -863,10 +886,10 @@ describe('the shells own the list state machine', () => {
     // Page one only: the tri-state box acts on the RENDERED rows.
     root.querySelector('[data-scoped-list-select-all-page]').click();
     await catalogueHarness.setProps({});
-    assert.equal(rows(root).length, 25, 'the default page size');
+    assert.equal(rows(root).length, 10, 'the default page size');
     assert.match(
       root.querySelector('[data-scoped-list-selection-count]').textContent,
-      /25 selected/
+      /10 selected/
     );
     // Page two: the count survives paging, so it is the whole selection rather than the page's
     // intersection with it.
@@ -874,7 +897,7 @@ describe('the shells own the list state machine', () => {
     await catalogueHarness.setProps({});
     assert.match(
       root.querySelector('[data-scoped-list-selection-count]').textContent,
-      /25 selected/
+      /10 selected/
     );
     assert.equal(
       root.querySelector('[data-scoped-list-select-all-page]').checked,
@@ -968,18 +991,18 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     await catalogueHarness.setProps({});
     assert.match(
       root.querySelector('[data-pagination-page]').textContent,
-      /Page 3 of 3/,
+      /Page 3 of 6/,
       'the fixture never reached page three, so nothing below has a stale index to clamp'
     );
 
     // ── (1) CLAMPED INTO A CORPUS THAT IS STILL MULTI-PAGE, where the FOOTER is the observation.
     //
-    // 30 rows at the default page size is two pages, so the bar renders and states the clamped
-    // index directly. This half is here because the foot pager is `multiPageOnly` since issue
-    // 1372: the shorter-corpus case below no longer draws one, and a clamp gate that only ever
-    // measured the no-footer case would stop covering the footer-reads-the-clamped-value half of
-    // `ui-integration/spec.md`'s list-shell requirement 13 altogether.
-    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 30 }) });
+    // 15 rows at the ten-row default page size is two pages, so the bar renders and states the
+    // clamped index directly. This half is here because the foot pager is `multiPageOnly` since
+    // issue 1372: the shorter-corpus case below no longer draws one, and a clamp gate that only
+    // ever measured the no-footer case would stop covering the footer-reads-the-clamped-value
+    // half of `ui-integration/spec.md`'s list-shell requirement 13 altogether.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 15 }) });
     assert.equal(
       rows(root).length,
       5,
@@ -989,28 +1012,28 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 2/);
     assert.match(
       root.querySelector('[data-pagination-summary]').textContent,
-      /Showing 26–30 of 30/,
+      /Showing 11–15 of 15/,
       'the footer states a range the list does not show'
     );
 
     // ── (2) CLAMPED INTO A ONE-PAGE CORPUS, where the ROW SLICE is the observation.
     //
     // The bar is gone here — one page — so the clamped value is read off the rows instead, and it
-    // is read as an IDENTIFIED slice rather than a count: `slice(50, 75)` over ten entries is
-    // empty, and any index above zero over a ten-row single page is empty too, so the whole
+    // is read as an IDENTIFIED slice rather than a count: `slice(10, 20)` over eight entries is
+    // empty, and any index above zero over an eight-row single page is empty too, so the whole
     // corpus being present AND starting at its first record is what says the index came back to
-    // zero. The count alone would be satisfied by a frame that rendered ten unrelated rows.
-    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 10 }) });
+    // zero. The count alone would be satisfied by a frame that rendered eight unrelated rows.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 8 }) });
     assert.ok(
       !root.querySelector('[data-pagination-summary]'),
-      'ten rows on a twenty-five-row page is ONE page, so this half is measuring the no-footer ' +
+      'eight rows on a ten-row page is ONE page, so this half is measuring the no-footer ' +
         'case it exists for'
     );
     assert.deepEqual(
       rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
-      Array.from({ length: 10 }, (unused, index) => `component-${index}`),
-      'the list does not show the whole ten-record corpus from its first row, so the stale page ' +
-        'index was not clamped back to zero'
+      Array.from({ length: 8 }, (unused, index) => `component-${index}`),
+      'the list does not show the whole eight-record corpus from its first row, so the stale ' +
+        'page index was not clamped back to zero'
     );
     assert.equal(
       root.querySelector('.manager-scoped-list-rows').querySelectorAll('.manager-empty').length,
@@ -1028,16 +1051,17 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     );
     root.querySelector('[data-pagination-next]').click();
     await catalogueHarness.setProps({});
-    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 3/);
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 6/);
     const search = root.querySelector('[data-scoped-list-search]');
     search.value = 'Ash 0';
     search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     await catalogueHarness.setProps({});
-    // The filtered set is `Ash 00`-`Ash 09` and it is ONE page, so since issue 1372 there is no
-    // footer to read the reset index off. The rows say it instead, and they say it as an
-    // IDENTIFIED slice: a page index left at 1 slices `component-25` onward out of a ten-row set
-    // and renders nothing, and any index above zero renders nothing, so the whole filtered set
-    // being present AND starting at its first record is what says the index went back to zero.
+    // The filtered set is `Ash 00`-`Ash 09` and it is ONE page at the ten-row default, so since
+    // issue 1372 there is no footer to read the reset index off. The rows say it instead, and
+    // they say it as an IDENTIFIED slice: a page index left at 1 slices `component-10` onward out
+    // of a ten-row set and renders nothing, and any index above zero renders nothing, so the
+    // whole filtered set being present AND starting at its first record is what says the index
+    // went back to zero.
     assert.deepEqual(
       rows(root).map((row) => row.getAttribute('data-scoped-list-row')),
       Array.from({ length: 10 }, (unused, index) => `component-${index}`),
@@ -1067,14 +1091,18 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     );
     assert.ok(
       !root.querySelector('[data-pagination-summary]'),
-      'three rows on a twenty-five-row page is ONE page, and a bar that can only say ' +
+      'three rows on a ten-row page is ONE page, and a bar that can only say ' +
         '"Page 1 of 1" states nothing the rows do not'
     );
 
-    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 60 }) });
+    // ELEVEN, WHICH IS THE MAINTAINER'S OWN PAIR (issue 1373, feedback round 2). The window was
+    // twenty-five, so an eleven-tool world catalogue was one page and drew no bar at all - twelve
+    // tools as one unbounded scroll. Three must still show none and eleven must now show one, and
+    // this case is where both halves of that ruling are stated against one mount.
+    await catalogueHarness.setProps({ scope: scopeOf('component', { count: 11 }) });
     assert.ok(
       Boolean(root.querySelector('[data-pagination-summary]')),
-      'sixty rows is three pages, and the browse recipe requires the bar back'
+      'eleven rows is two pages at the default window, and the browse recipe requires the bar'
     );
     assert.ok(Boolean(root.querySelector('[data-pagination-prev]')));
     assert.equal(

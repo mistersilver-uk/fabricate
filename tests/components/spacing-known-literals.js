@@ -160,7 +160,7 @@ export function isExemptSpacingPixels(pixels) {
  * The headline. Pinned exactly rather than derived, so a hand edit to one row's count that
  * forgets this number fails rather than quietly re-baselining.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 932;
+export const KNOWN_RAW_SPACING_TOTAL = 931;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

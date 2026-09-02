@@ -1543,13 +1543,14 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-list="world-tools"]',
         target: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-row-facts]',
       },
-      // AND THE SOURCE BADGE STILL, on the row that HAS one. A linked record carries no pill any
-      // more — a `Linked` chip on every row of a catalogue whose premise is that each record IS
-      // an Item states the rule rather than the exception — so the badge is asserted where it is
-      // now a real answer: the one world record no Item stands behind.
+      // AND THE FOOT PAGER, WHICH ELEVEN ROWS NOW HAVE (issue 1373, maintainer feedback round 2).
+      // The window was twenty-five, so an eleven-tool world was one page and the `multiPageOnly`
+      // bar never rendered — twelve tools as one unbounded scroll, with no page control at all.
+      // Asserted INSIDE the list column rather than merely present, because the inspector's own
+      // system roster carries a pager too and a bare presence check is satisfied by that one.
       {
-        container: '[data-scoped-list="world-tools"]',
-        target: '[data-scoped-list-row="lab-tool-unlinked"] [data-scoped-list-source]',
+        container: '.manager-scoped-list-column',
+        target: '[data-pagination-page]',
       },
       {
         container: '[data-scoped-list-inspector]',
@@ -1565,6 +1566,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // thirds down an eleven-row list auto-scrolls the head of the list off the top — so this
       // frame structurally cannot contain it. `world-tool-catalogue-list-head` is the one that
       // does, and it claims the same two files.
+      //
+      // AND THE UNLINKED ROW'S SOURCE BADGE MOVED TO `world-tool-catalogue-page-two` for the
+      // same kind of reason: `Unclaimed Bellows` sorts last of eleven, so at a ten-row window it
+      // is the whole of page two and no page-one frame can contain it. That case walks to it.
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
@@ -1581,6 +1586,181 @@ export const VIEW_LAB_CASES = Object.freeze([
       // and an unclaimed reachable component selects an UNRELATED frame as its evidence.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/MembershipActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-page-two',
+    label: 'Manager — World Tools Catalogue, page two',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE PAGER, DRIVEN (issue 1373, maintainer feedback round 2).
+    //
+    // The catalogue had no pagination at all: `Pagination` is `multiPageOnly` on this frame, the
+    // window was twenty-five rows, and the lab world holds eleven tools - so the bar never
+    // rendered and a real world's twelve tools were one unbounded scroll. The window is ten now,
+    // which is the smallest size the pager itself offers and the maintainer's stated pair
+    // (eleven rows must show a bar, three must not).
+    //
+    // A SECOND PAGE IS THE ONLY THING THAT PROVES IT WORKS. A frame of page one shows a bar; this
+    // one shows the bar MOVING the list, which is the difference between a rendered control and a
+    // working one. It is also where the unlinked record lives now - `Unclaimed Bellows` sorts
+    // last of eleven - so the source badge this registry has always photographed comes with it
+    // rather than being dropped.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: '[data-pagination-next]' },
+    ],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-page="world-tools"]',
+    expectContained: [
+      // THE ROW THAT ONLY PAGE TWO HAS. Present anywhere it would satisfy a bare selector; this
+      // says the walk actually landed on the page that holds it.
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-row="lab-tool-unlinked"] [data-scoped-list-source]',
+      },
+      // AND THE BAR ITSELF, inside the LIST column rather than the inspector's - the roster panel
+      // beside it carries a pager of its own, so an unscoped assertion is answered by that one.
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-pagination-prev]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      // The page window itself. It is restated on the lifted view-state, and a change there with
+      // no claim would publish a frame of some other screen as evidence that the pager moved.
+      /^src\/utils\/managerBrowserViewState\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-bulk',
+    label: 'Manager — World Tools Catalogue, bulk edit',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THAT SHIPPED BROKEN AND THAT NO CASE COULD SEE (issue 1373, maintainer feedback
+    // round 2). Every row on this screen has carried a selection box since it shipped and the
+    // toolbar has counted the ticks; the inspector beside it went on saying `Nothing selected`,
+    // because `bulk` is a lane snippet and the page passed none. A conditional on an undefined
+    // snippet is silent, so nothing failed and no frame showed it - this registry photographed
+    // the resting panel and the inspected panel and never a selected one.
+    //
+    // FOUR ROWS, which is the maintainer's own reproduction and is not arbitrary: it is enough
+    // for the count in the toolbar and the count in the panel hero to be checked against each
+    // other in one photograph, and enough for the plural wording of both.
+    //
+    // Ticked through the LABEL rather than the input, which is the idiom every other
+    // multi-select case here uses: `SelectionCheckbox` renders the real control visually hidden
+    // behind its own box, and the label is the click target a GM actually has.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      { selector: 'label:has(input[data-scoped-list-select="sm-tool-anvil"])' },
+      { selector: 'label:has(input[data-scoped-list-select="sm-tool-tongs"])' },
+      { selector: 'label:has(input[data-scoped-list-select="hb-tool-mortar"])' },
+      { selector: 'label:has(input[data-scoped-list-select="sm-tool-hammer"])' },
+    ],
+    expectView: 'world-tools',
+    expectSelector: '[data-world-tool-bulk-panel]',
+    expectContained: [
+      // IN THE INSPECTOR'S OWN COLUMN. Rendered anywhere on the screen the panel would satisfy
+      // `expectSelector`; this is what says it REPLACED the identity panel rather than appearing
+      // somewhere else, which is the whole of the finding.
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-world-tool-bulk-panel]',
+      },
+      // The staged axis and the Apply that names the blast radius, both inside the panel: an
+      // Apply outside its own dock would be a panel that had lost its primary action.
+      {
+        container: '[data-world-tool-bulk-panel]',
+        target: '[data-world-tool-bulk-status]',
+      },
+      {
+        container: '[data-world-tool-bulk-panel]',
+        target: '[data-world-tool-bulk-apply]',
+      },
+      // AND THE TOOLBAR'S OWN COUNT, in the same frame. The two numbers are derived from one
+      // `selection` object, so a frame holding both is what makes "the toolbar says four and the
+      // inspector says nothing" impossible to ship again unnoticed.
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-scoped-list-selection-count]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ToolCatalogueBulkPanel\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      // The shared bulk chrome the panel composes. These sit directly under `apps/manager/` and
+      // fall through every directory glob in the registry, so the case that RENDERS them claims
+      // them by name - the same rule the studio bulk cases follow.
+      /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/BulkEditSection\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/BulkSelectionToolbar\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-catalogue-empty',
+    label: 'Manager — World Tools Catalogue, empty world',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE EMPTY CATALOGUE, WHICH THE FIXTURE COULD NOT PRODUCE (issue 1373, maintainer feedback
+    // round 2). `noTools` is a lab flag rather than a fixture edit for the reason `stripTools`
+    // records: the lab runs every migration on every build and the world-scope pass lifts each
+    // crafting system's own tools into world records, so an empty `toolScope` alone still boots
+    // an eleven-row catalogue. Nothing here could reach the state, so nothing photographed it -
+    // which is exactly why its drop zone touched the hero and its inspector said nothing.
+    //
+    // The scope band is deliberately still authored: it is a world SETTING rather than a Tool,
+    // and a frame that had blanked it too would photograph two absences as one.
+    query: { noTools: '1' },
+    steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
+    expectView: 'world-tools',
+    expectSelector: '[data-scoped-list-state="empty"]',
+    expectContained: [
+      // THE HERO, UNDER THE ZONE AND INSIDE THE LIST. The zone renders in the empty states too -
+      // an empty catalogue is when a GM most needs the surface that makes the first record - and
+      // the two touched, because the gap belonged to neither of them.
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-item-drop-zone="tool-create"]',
+      },
+      {
+        container: '[data-scoped-list="world-tools"]',
+        target: '[data-scoped-list-state="empty"]',
+      },
+      // AND THE INSPECTOR'S OWN NO-STATE, inside the column that owns it. On an empty catalogue
+      // the whole right-hand track is this one box, so a short dashed panel floating at the top
+      // of it was the only thing the column said.
+      {
+        container: '[data-scoped-list-inspector]',
+        target: '[data-scoped-list-inspector-state="resting"]',
+      },
+      // The scope band survives an empty corpus and is still confined to the LIST column - the
+      // half of the finding that says the band must not span the inspector's track.
+      {
+        container: '.manager-scoped-list-column',
+        target: '[data-world-tool-break-mode]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
+      // The no-state primitive both halves of this frame render, and the drop zone above the
+      // hero. Claimed here because this is the only case in the registry that renders the
+      // catalogue's empty face at all.
+      /^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
     ],
   }),
   managerCase({

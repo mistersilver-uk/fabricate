@@ -201,6 +201,58 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
 }
 
 /**
+ * Empty the world of Tools ENTIRELY, so the world Tools Catalogue renders its no-state
+ * (issue 1373, maintainer feedback round 2).
+ *
+ * ── WHY CLEARING `toolScope` IS NOT ENOUGH, AND FINDING THAT OUT IS THE POINT ────────────────
+ * The lab seeds no `migrationVersion`, so every registered migration runs on every build — and
+ * `1.30.0`'s world-scope pass LIFTS each crafting system's own `tools[]` into world records. A
+ * world with an empty `toolScope` and three systems carrying eleven tools between them therefore
+ * boots with an ELEVEN-ROW catalogue, which is precisely why "there is no empty world tool
+ * catalogue" survived two automated parity passes: the state is unreachable from the corpus the
+ * fixture authors, and only reachable by removing the tools the migration reads.
+ *
+ * So all three sources go: the world corpus, every system's library, and the flat roster beside
+ * them. `toolIds` references are nulled with them, because a recipe requiring a Tool that no
+ * longer exists is a different world state from one that requires none, and this flag is for the
+ * catalogue's empty state rather than for a broken-reference frame.
+ *
+ * The world break mode is KEPT. It is a world setting rather than a Tool, the catalogue's scope
+ * band states it whether or not any Tool exists, and an empty catalogue whose one authored
+ * control had also been blanked would photograph two absences as one.
+ *
+ * @param {object} content the built lab content, mutated in place.
+ * @returns {void}
+ */
+function stripTools(content) {
+  content.tools = [];
+  for (const system of content.systems ?? []) {
+    if (system && typeof system === 'object') system.tools = [];
+  }
+  content.toolScope = {
+    entities: [],
+    defaults: {},
+    membership: {},
+    toolBreakage: content.toolScope?.toolBreakage ?? { authority: 'toolSpecific' },
+  };
+  const clearToolIds = (node) => {
+    if (Array.isArray(node)) {
+      for (const item of node) clearToolIds(item);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'toolIds' && Array.isArray(value)) {
+        node[key] = [];
+        continue;
+      }
+      clearToolIds(value);
+    }
+  };
+  clearToolIds(content.recipes ?? []);
+}
+
+/**
  * Build the lab world and boot the real Fabricate facade against it.
  *
  * @param {object} [options] Options.
@@ -208,6 +260,8 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
  * @param {boolean} [options.noParties] Seed an EMPTY party list. Unlike `clearSystem` this
  *   needs no post-construction store call: the pane's empty state is a function of the
  *   persisted setting, so seeding `[]` is both the shortest path and the truthful one.
+ * @param {boolean} [options.noTools] Build a world with NO Tools anywhere. See
+ *   {@link stripTools} for why an empty `toolScope` alone would not produce one.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -217,8 +271,10 @@ export async function buildLabWorld({
   clearSystem = false,
   longTravelLabels = false,
   noParties = false,
+  noTools = false,
 } = {}) {
   const content = buildLabContent();
+  if (noTools) stripTools(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   // The dedicated World Parties no-selection case therefore needs the truthful world state that
   // makes an empty selection stable: no crafting systems, while global Parties and actors remain.

@@ -58,15 +58,24 @@ const INSPECTOR_PX = 300;
 /** Sub-pixel tolerance; every defect this catches moves an edge by hundreds of pixels. */
 const EPSILON_PX = 1;
 /**
- * A FULL DEFAULT PAGE OF ROWS, and the count is load-bearing.
+ * MORE ROWS THAN THE VIEWPORT HOLDS, and the count is load-bearing.
  *
  * This fixture rendered four rows, which is short enough that the whole column fits the viewport
  * — and a frame that never passes its height down is indistinguishable from one that does when
  * nothing overflows. At 25 the list is taller than the window, which is the ordinary case for a
  * world catalogue and the only one in which "the inspector is a bounded, scrollable column"
  * differs from "the inspector is a panel spanning the whole scroll region".
+ *
+ * IT IS NO LONGER ONE PAGE, and the fixture therefore DRIVES the size control to show all of it
+ * (issue 1373, maintainer feedback round 2). The default window is ten rows now — an eleven-row
+ * catalogue has to draw a pager, which a twenty-five-row window made impossible — so twenty-five
+ * entities render ten rows and about 712px inside a 900px host, and the overflow every case below
+ * measures simply is not there. The probe does what a GM does: opens the corpus, then picks the
+ * bigger page size. Its own precondition assertion is what would catch this drifting again.
  */
 const ROW_COUNT = 25;
+/** The size the tall fixture is driven to, so all {@link ROW_COUNT} rows render at once. */
+const TALL_PAGE_SIZE = 25;
 /** The manager host's height, so the column has a definite one to be bounded by. */
 const HOST_HEIGHT_PX = 900;
 /**
@@ -92,6 +101,17 @@ const NARROW_WINDOW_PX = 900;
 
 const laneInspectorBody = createRawSnippet(() => ({
   render: () => `<p data-lane-inspector-body>The lane's own panel.</p>`,
+}));
+
+/**
+ * A lane's `listLead`, standing in for the world Tool catalogue's create-from-drop zone.
+ *
+ * Deliberately a plain block with a stated height rather than the real `ItemDropZone`: what the
+ * case below measures is the SEPARATION the frame gives whatever a lane puts there, and a fixture
+ * that composed the real zone would be measuring that component's own margins as well.
+ */
+const laneListLead = createRawSnippet(() => ({
+  render: () => `<div data-lane-list-lead style="height:60px">Drop zone</div>`,
 }));
 
 const harness = createMountedComponentHarness({
@@ -204,6 +224,7 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
   let unavailableMarkup = '';
   let shortMarkup = '';
   let shortPagedMarkup = '';
+  let leadMarkup = '';
 
   before(async () => {
     assert.ok(
@@ -236,6 +257,27 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       selectedId: 'component-0',
       inspectorBody: laneInspectorBody,
     });
+    // DRIVEN TO A SIZE THAT SHOWS THE WHOLE CORPUS. See `ROW_COUNT`: at the ten-row default this
+    // fixture renders one short page and nothing overflows, so the bounded-column assertions
+    // below would all be measuring a column that never needed bounding.
+    const tallSizeSelect = target.querySelector(
+      '.manager-scoped-list-column [data-pagination-size]'
+    );
+    assert.ok(
+      Boolean(tallSizeSelect),
+      `a ${ROW_COUNT}-entity corpus rendered no page-size control in the list column, so this ` +
+        'fixture cannot be driven onto one page and the overflow below is unreachable'
+    );
+    tallSizeSelect.value = String(TALL_PAGE_SIZE);
+    tallSizeSelect.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    await harness.setProps({});
+    assert.equal(
+      target.querySelectorAll('[data-scoped-list-row]').length,
+      ROW_COUNT,
+      `the size control did not take: ${ROW_COUNT} entities rendered ` +
+        `${target.querySelectorAll('[data-scoped-list-row]').length} rows, so the list is still ` +
+        'a short page and every overflow assertion below is vacuous'
+    );
     markup = target.innerHTML;
     const unavailableTarget = await harness.mount({
       scope: projectWorldScopeEntity({ entityType: 'component', corpus: null }),
@@ -269,10 +311,43 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
     });
     shortMarkup = shortTarget.innerHTML;
 
+    // THE LEAD FIXTURE (issue 1373, maintainer feedback round 2). `listLead` renders inside the
+    // list's own scroller, above the first row, and it had NO separation from whatever follows
+    // it: the drop zone touched the `No tools yet` hero on an empty catalogue and butted straight
+    // against the first row on a populated one. Those read as two defects and are one gap.
+    const leadTarget = await harness.mount({
+      scope: projectWorldScopeEntity({
+        entityType: 'component',
+        corpus: {
+          entities: Array.from({ length: 3 }, (unused, index) => ({
+            id: `component-${index}`,
+            name: `Ash ${index}`,
+            description: 'A component',
+            img: 'icons/commodities/ash.webp',
+          })),
+          defaults: [],
+          membership: [],
+        },
+        systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      }),
+      actions: {},
+      systems: [{ id: 'sys-a', name: 'Mythwright Forge' }],
+      hookValue: 'world-components',
+      title: 'Component catalogue',
+      subtitle: 'One per world.',
+      listLead: laneListLead,
+      inspectorBody: laneInspectorBody,
+    });
+    leadMarkup = leadTarget.innerHTML;
+
     // THE SHORT-BUT-MULTI-PAGE FIXTURE, built by DRIVING the control rather than by a prop: the
     // frame owns its own page size and exposes no way in, so the probe does what a GM does —
-    // opens a corpus that pages, then picks the smallest size. Twenty-six entities is two default
-    // pages, which is what makes the size selector reachable at all; at ten a page it is three.
+    // opens a corpus that pages, then picks the smallest size. Twenty-six entities is three pages
+    // at the ten-row default, which is what makes the size selector reachable at all.
+    //
+    // The drive is IDEMPOTENT since the default window became ten (issue 1373, feedback round 2)
+    // and is kept rather than deleted: it states the size this case's arithmetic depends on, and
+    // it is what would keep this fixture at ten rows if the default moved again.
     const pagedTarget = await harness.mount({
       scope: projectWorldScopeEntity({
         entityType: 'component',
@@ -454,6 +529,51 @@ describe("the catalogue shell's inspector column, measured in a real browser", (
       true,
       `the rows region is ${box.rowsHeight}px around ${box.rowsScrollHeight}px of rows and ` +
         'cannot scroll, so its own `overflow-y: auto` is dead and the page scrolls instead'
+    );
+  });
+
+  it('SEPARATES the list lead from whatever follows it, by more than the row rhythm', async () => {
+    // FINDING 1, MEASURED RATHER THAN LOOKED AT. The gap belongs BELOW the lead and is stated
+    // once there, so all three things that can follow it — the filtered hero, the empty hero and
+    // the `<ul>` — inherit it. Measured against the list's OWN row gap rather than a pixel
+    // literal: the claim is that a drop zone is a different kind of thing from the rows under it
+    // and must not read as one of them, which a fixed number cannot express and which survives
+    // the row rhythm being retuned.
+    const context = await browser.newContext({
+      viewport: { width: WIDE_WINDOW_PX, height: HOST_HEIGHT_PX },
+    });
+    const tab = await context.newPage();
+    await tab.setContent(page(leadMarkup, WIDE_WINDOW_PX));
+    const box = await tab.evaluate(() => {
+      const lead = document.querySelector('.manager-scoped-list-lead');
+      const list = document.querySelector('.manager-scoped-list');
+      const rows = list ? [...list.querySelectorAll('.manager-scoped-list-row')] : [];
+      if (!lead || !list || rows.length < 2) return { rendered: false, rowCount: rows.length };
+      return {
+        rendered: true,
+        rowCount: rows.length,
+        leadBottom: lead.getBoundingClientRect().bottom,
+        listTop: list.getBoundingClientRect().top,
+        rowGap: rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().bottom,
+      };
+    });
+    await context.close();
+
+    assert.equal(
+      box.rendered,
+      true,
+      `the lead fixture rendered ${box.rowCount} rows and needs at least two: the row rhythm ` +
+        'this case measures against is the distance between them'
+    );
+    assert.ok(
+      box.rowGap > 0,
+      'the rows measured no gap between them, so the bound below compares against nothing'
+    );
+    assert.ok(
+      box.listTop - box.leadBottom > box.rowGap,
+      `the lead ends at ${Math.round(box.leadBottom)} and the list starts at ` +
+        `${Math.round(box.listTop)}, a ${Math.round(box.listTop - box.leadBottom)}px gap against ` +
+        `a ${Math.round(box.rowGap)}px row rhythm: the lead reads as one more row`
     );
   });
 
