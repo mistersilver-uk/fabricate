@@ -3892,8 +3892,20 @@
 }
 
 /* ── The Validation screen ────────────────────────────────────────────────────────────
-   `EditorValidationSurface` is shared with the recipe editor, so every rule here is scoped to
-   the checks route: same primitive, this studio's metrics. */
+   `EditorValidationSurface` is the ONE implementation of the validation arrangement (issue
+   1444 closed it onto seven renderers), so every rule here is scoped to the checks route:
+   same primitive, this studio's metrics.
+
+   KEPT DELIBERATELY, and re-examined when the surface closed rather than assumed. This block
+   is not a second copy of the global definitions at the bottom of this file — every one of
+   its six rules states a DIFFERENT value from the rule it refines: the summary card takes
+   16px/19-20px/11px on `--fab-bg-2` against `var(--fab-space-3)`/12px on the page fill, the
+   count tile 34px and radius 9 against the shared padding pair and radius 7, the group label
+   9px/0.11em against 0.62rem/0.08em, the row list radius 11 against 10, and the row 11px/13-14px.
+   `.is-pass` is not a refinement at all — it is the Checks Studio's own summary vocabulary,
+   which the recipe editors spell `is-clear`/`is-warning`/`is-blocked`, so the global block has
+   no counterpart to duplicate. Deleting it would silently re-metric the whole studio, and
+   hoisting it would re-metric the four other studios instead. */
 .fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary {
   gap: 16px;
   padding: 19px 20px;

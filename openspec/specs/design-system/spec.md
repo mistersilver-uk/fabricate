@@ -567,10 +567,26 @@ Each issue offers an action that moves focus to the offending control.
 
 The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
 
+The arrangement has ONE implementation, `src/ui/svelte/apps/manager/EditorValidationSurface.svelte`, and an editor that draws it MUST render through that component rather than restate its markup.
+That is what makes the sentence above enforceable rather than aspirational: while a second copy of the markup exists, "the same arrangement" is a convention each copy is free to drift from, and the two class families the sheet paints it with have more than one writer.
+A site whose DOM hooks, root classes, status words or reported counts differ passes them as props, and a site needing something the surface does not draw extends the surface rather than forking it.
+The counts are a closed, ordered vocabulary the surface owns — pass, then warning, then blocking — and a site reports the subset it can answer rather than choosing an order or inventing a fourth.
+
+One editor does not use the arrangement yet, and it is recorded here rather than left to be rediscovered: the environment editor's validation tab renders check and issue LISTS inside cards, carries severity on a chip, and has no verdict medallion, no counts rail and no grouped row stack.
+It writes none of the arrangement's classes, so it is a REDESIGN of that screen rather than an adoption, and it is outstanding conformance debt against this requirement rather than an exemption from it.
+The system overview route is NOT in this requirement's scope and is recorded alongside it so the two are not confused: it collects every issue across a whole crafting system, groups them by the entity that owns each one, and is a route rather than an editor's tab.
+Both measurements live in `scripts/lib/designSystemPrimitives.json` so that neither is re-proposed as an unconverted call site of the shared surface.
+
 #### Scenario: A GM opens validation on a different editor
 
 - **WHEN** a GM opens the validation surface of an editor they have not used before
 - **THEN** the verdict, counts and grouped issues appear in the same arrangement as every other editor
+
+#### Scenario: An editor's validation tab needs a hook or a label the surface does not emit
+
+- **WHEN** an editor's validation tab needs its own DOM hooks, root classes, status words or a count it does not report
+- **THEN** it renders the shared surface and passes them as props
+- **AND** it does not restate the surface's markup in its own template
 
 ### Requirement: A player chooses the item, not just the requirement
 

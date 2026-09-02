@@ -146,6 +146,7 @@ const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/comp
  * that unrepresentable rather than merely unlikely.
  */
 const EXPECTED_OVERRIDE_KEYS = [
+  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/components/Field.svelte',
@@ -206,8 +207,9 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * whose path ends `.svelte` and which has no `BROAD_SIGNAL_CASE_OVERRIDES` entry. A change to one
  * of these publishes `manager-components-normal` and `fabricate-app-shell` and nothing else, and
  * whether either frame contains the changed component is unexamined — which is issue 1116's
- * complaint, unresolved for these 28 and resolved for `Stepper` and `ThresholdBandStrip`, whose
- * entries this change added.
+ * complaint, unresolved for these 27 and resolved for `Stepper` and `ThresholdBandStrip`, whose
+ * entries issue 1378 added, and for `EditorValidationSurface`, whose entry issue 1444 added when
+ * it closed that primitive.
  *
  * The three non-Svelte broad signals — `styles/fabricate.css`, `src/ui/theme.js` and
  * `components/stepperLabels.js` — are excluded by the rule rather than by an exception, because no
@@ -227,7 +229,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/Chip.svelte',
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/ItemDropZone.svelte',
@@ -268,7 +269,7 @@ test('the inputs every property below quantifies over are alive', () => {
   );
   assert.ok(BROAD_SIGNAL_FILES.length > 0, 'BROAD_SIGNAL_PATTERN matched nothing on disk');
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 44, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 7, 'the recorded non-member set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 9, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
