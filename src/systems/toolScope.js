@@ -25,8 +25,18 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * tool is added to a system and then diverges freely, so `seedToolRepairRequirements` is a
  * function the membership action calls once and NOT a section the resolver reads through.
  * Modelling it as a section with a permanently-false inherit switch would be a lie the UI would
- * then have to hide, and it would be untrue on its own terms: a repair recipe names ingredient
- * groups over the OWNING SYSTEM's components, which the world scope cannot address.
+ * then have to hide, and it would be untrue on its own terms: a repair recipe prices a set of
+ * referents FOR ONE SYSTEM, and a live world value would change what a repair costs in a system
+ * that never authored it.
+ *
+ * THAT IS ABOUT COST AND MEMBERSHIP, NOT ABOUT NAMING, and this sentence used to say otherwise
+ * (issue 1373, maintainer round 2). It read "names ingredient groups over the OWNING SYSTEM's
+ * components, which the world scope cannot address" - true before epic 1357 gave the world its
+ * own component catalogue, and not true now: a world component id IS the id a membership record
+ * carries, so a repair group may name world components, world essences and world tags. What
+ * world scope cannot promise is that every system inheriting the Tool has ADOPTED each named
+ * Component, which is why the seed is copied on adoption rather than resolved live - and why
+ * the world Tool entry that authors it states that reach on the screen.
  *
  * `prerequisites` AND `bonus` JOINED THE LIST AT `1.31.0` (issue 1373), because the design treats
  * a Tool's character gate and its check bonus as world defaults a system INHERITS and may

@@ -349,16 +349,40 @@
     {text('FABRICATE.Admin.Manager.Tools.Editor.PlayersKicker', 'How players see it')}
   </p>
   <section class="manager-tool-player-card" data-tool-player-preview>
-    <div class="manager-tool-player-tile" class:is-broken={playerPreview.dimmed}>
-      <img src={image} alt="" />
+    <!--
+      THE TILE SHOWS THE CONSEQUENCE (issue 1373, maintainer round 2). `projectToolPlayerPreview`
+      answers WHICH picture an on-break action leaves in an inventory, and the three answers are
+      genuinely different pictures rather than three captions on one:
+
+       - `none` renders an EMPTY slot, because destroy-on-break leaves one. The `<img>` is not
+         rendered at all rather than pointed at a transparent asset: an `<img>` with no usable
+         source is a broken-image glyph in Foundry, which reads as a fault rather than as an
+         absence, and there is no "nothing" image to invent (never invent a Foundry asset path).
+       - `replacement` renders the chosen Component's art, which is what the copy BECOMES.
+       - `tool` is the working copy and the marked-broken copy, unchanged.
+
+      `data-tool-player-image` is the hook a case and the mounted suite read to tell the three
+      apart, since an empty box and a missing region look identical to a selector on the tile.
+    -->
+    <div
+      class="manager-tool-player-tile"
+      class:is-broken={playerPreview.dimmed}
+      class:is-empty={playerPreview.imageKind === 'none'}
+      data-tool-player-image={playerPreview.imageKind}
+    >
+      {#if playerPreview.imageKind !== 'none'}
+        <img src={playerPreview.image || image} alt="" />
+      {/if}
       <span class="manager-tool-player-quantity" aria-hidden="true">×1</span>
     </div>
     <div class="manager-tool-player-copy">
-      <StatusPill
-        tone={playerPreview.pill.tone}
-        icon={playerPreview.pill.icon}
-        label={playerPreview.pill.label}
-      />
+      {#if playerPreview.pill}
+        <StatusPill
+          tone={playerPreview.pill.tone}
+          icon={playerPreview.pill.icon}
+          label={playerPreview.pill.label}
+        />
+      {/if}
       <div class="manager-tool-player-toggle">
         <span>{text('FABRICATE.Admin.Manager.Tools.Editor.ShowAsBroken', 'Show as broken')}</span>
         <!-- The `checkbox` host, which is the one this site hand-rolled: a real
@@ -379,7 +403,11 @@
       </div>
       <p data-tool-player-note>{playerPreview.note}</p>
     </div>
-    <p class="manager-tool-player-name" data-tool-player-name>{name}{playerPreview.nameSuffix}</p>
+    <!-- THE CAPTION FOLLOWS THE TILE. In replace mode the picture is the replacement Component's,
+         so a caption still reading the Tool's name would name the wrong thing under it. -->
+    <p class="manager-tool-player-name" data-tool-player-name>
+      {playerPreview.name || name}{playerPreview.nameSuffix}
+    </p>
   </section>
 
   <p class="manager-kicker">
@@ -456,6 +484,23 @@
 </ScopedEntityPreview>
 
 <style>
+  /* THE EMPTY INVENTORY SLOT (issue 1373, maintainer round 2).
+
+     Destroy-on-break leaves nothing behind, and the design's own note says the tile is "gone
+     from the inventory entirely". A filled box with no art in it reads as a load failure, so the
+     empty state takes the DASHED edge every other absence in this manager wears — the same
+     treatment `EmptyState`'s ghost panel carries two regions below it — and drops the fill.
+
+     WRITTEN HERE rather than in `styles/fabricate.css` because this template writes the element,
+     so the rule carries this component's scoping hash and reaches it. The shipped
+     `.manager-tool-player-tile` box (110px, radius, border, fill) is inherited and only the edge
+     and the fill are overridden. */
+  .manager-tool-player-tile.is-empty {
+    border-style: dashed;
+    border-color: var(--fab-border-strong);
+    background: transparent;
+  }
+
   /* `Pagination` renders its own `<section>`, so the sizing has to be stated from this side of
      the boundary — the same repair, for the same reason, that `SystemRulesRoster` makes for the
      inspector roster's pager. The shipped bar is built for the foot of a full-width list

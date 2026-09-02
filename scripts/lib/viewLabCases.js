@@ -1758,9 +1758,14 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-tool-entry-card="requirements"]',
         target: '[data-tool-prerequisites-enabled]',
       },
+      // THE REACH LINE MOVED INSIDE THE SECTION IT COUNTS (issue 1373, maintainer round 2).
+      // It was `data-world-tool-entry-inherit-count="prerequisites"`, a paragraph stacked at the
+      // foot of a WRAPPER card beside an identical one for the bonus; the wrapper is gone with
+      // the card-inside-a-card it made, and each sentence is now the last line of its own
+      // section's card as `data-tool-section-note`.
       {
         container: '[data-world-tool-entry-card="requirements"]',
-        target: '[data-world-tool-entry-inherit-count="prerequisites"]',
+        target: '[data-tool-section-note="prerequisites"]',
       },
     ],
     position: { width: 1280, height: 900 },
@@ -1772,6 +1777,158 @@ export const VIEW_LAB_CASES = Object.freeze([
       // un-hides here (issue 1373). This frame is the only one that photographs the WORLD face
       // of either: the card's `headingStyle="kicker"` and the gate-mode group's visible legend.
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-repair',
+    label: 'Manager — World Tool entry, repair route',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A STATE NO CASE COULD REACH, WHICH IS WHY THE SCREEN SHIPPED WITHOUT THE CONTROL (issue
+    // 1373, maintainer round 2). `Mark as broken` is the on-break action that takes an ARGUMENT
+    // — the ingredient groups that mend a broken copy — and no lab tool selected it, so every
+    // frame of this tab photographed `Destroy the item`, which configures nothing. Two automated
+    // parity passes then read the tab as complete while it rendered nothing at all for the two
+    // modes that DO configure something.
+    //
+    // `sm-tool-tongs` carries `onBreak: {mode: 'flagBroken'}` and a two-group repair seed for
+    // this case, and a 22% break chance so this frame also shows the chance track and its band
+    // one step along from the hammer's.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      // SCROLLED, because the repair editor is the LAST thing in the second card of a panel
+      // that also holds the read-only mode band and the whole breakage card. Anchored on the
+      // repair section itself rather than on a row inside it: `scrollIntoView` aligns what it is
+      // given to the TOP of the scroller, so anchoring deeper would leave the section's own
+      // heading above the fold and the frame would prove rows with nothing naming them.
+      { selector: '[data-tool-repair-requirements]', scroll: true },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-repair-requirements]',
+    // THE ROWS AND THE ADDERS. A frame proving the section exists but not that it holds real
+    // ingredient rows would be evidence for a heading, and the repair editor's whole claim is
+    // that world scope can now NAME the Components a broken copy is mended with. The adder
+    // proves it is a CONTROL: the `REPAIR MATERIALS` card this replaces could state a group
+    // COUNT and offered only to destroy the list behind it.
+    //
+    // THE BREAK-CHANCE BAND IS DELIBERATELY NOT ASSERTED HERE even though this Tool has one:
+    // the frame is scrolled to the repair section, which puts the band above the fold, so a
+    // containment assertion on it could never pass. `world-tool-entry` photographs the band.
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-tool-repair-requirements] [data-recipe-group]',
+      },
+      {
+        container: '[data-scoped-page="world-tool-entry"]',
+        target: '[data-tool-repair-requirements] [data-recipe-add="component"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-on-break-replace',
+    label: 'Manager — World Tool entry, replacement component',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE OTHER UNREACHABLE STATE: replace-mode WITH a component attached. `hb-tool-alembic`
+    // has carried `onBreak: {mode: 'replaceWith', replacementTarget: {componentId:
+    // 'hb-empty-vial'}}` in the fixture all along, and no case ever opened it — so the world
+    // entry could offer `Replace with component` and name nothing, and nothing photographed the
+    // gap.
+    //
+    // IT ALSO CARRIES THE PLAYER PREVIEW'S SECOND FACE. `Show as broken` on a replace-mode Tool
+    // draws the REPLACEMENT Component's art rather than a `Replaced` chip over the Tool's own,
+    // and this is the only Tool in the lab that can show it.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="hb-tool-alembic"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-world-tool-entry-tab="breakage"]' },
+      { selector: '[data-tool-player-broken]' },
+      // SCROLLED for the reason the repair frame is: the card is the last thing in the second
+      // card of the panel, and its unlink control sits at the foot of it.
+      { selector: '[data-tool-replacement-target]', scroll: true },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-tool-replacement-target]',
+    // THE FILLED FACE OF THE DROP ZONE AND THE TILE IT EXPLAINS. `data-tool-replacement-tile`
+    // proves a Component is actually attached rather than that the card rendered empty, and
+    // `data-tool-player-image="replacement"` is the assertion that the preview swapped the art
+    // — an empty box and a Tool's own art are the same selector without it.
+    expectContained: [
+      {
+        container: '[data-tool-replacement-target]',
+        target: '[data-tool-replacement-tile]',
+      },
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-player-image="replacement"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolReplacementTarget\.svelte$/,
+      // The rail's player tile is what this frame's second assertion is about, so a change to
+      // the shared preview publishes it rather than a frame of the working copy alone.
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'world-tool-entry-destroyed-preview',
+    label: 'Manager — World Tool entry, destroyed copy',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE THIRD FACE OF `Show as broken`, and the one no case could reach (issue 1373,
+    // maintainer round 2). Destroy-on-break leaves NOTHING in the inventory, and the rail drew
+    // the Tool's own art dimmed under a chip reading `Destroyed` — a word for the outcome
+    // beside a picture of the opposite of it. It draws an EMPTY SLOT now, and an empty slot is
+    // exactly what a selector on the tile cannot distinguish from a missing region, which is
+    // why the frame is asserted on `data-tool-player-image="none"`.
+    //
+    // `sm-tool-hammer` is the lab's destroy-mode Tool, so this case is its Overview route with
+    // the preview toggle flipped; its sibling `world-tool-entry-on-break-replace` photographs
+    // the replacement face on `hb-tool-alembic`, and `world-tool-entry-player-preview` the
+    // working copy.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
+      },
+      { selector: '[data-tool-player-broken]' },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-preview]',
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-player-image="none"]',
+      },
+      // AND THE SENTENCE THAT EXPLAINS THE EMPTY BOX. With the chip gone, this note is the only
+      // thing that says WHY the slot is empty, so a frame without it would show an absence with
+      // no account of itself.
+      {
+        container: '[data-world-tool-entry-preview]',
+        target: '[data-tool-player-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
     ],
   }),
   managerCase({

@@ -321,6 +321,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte');
+  // The shared `REPLACEMENT COMPONENT` card both Tool editors render (issue 1373, maintainer
+  // round 2). Static in both graphs, so an omission HANGS every test in this file.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolReplacementTarget.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');

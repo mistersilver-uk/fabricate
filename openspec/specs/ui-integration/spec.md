@@ -2194,13 +2194,19 @@ The two world tool screens and the system-scope Tool Rules list share one break-
    Selection is read from the published authoring scope, one value per branch of the resolver, and never from a comparison of the resolved token against the world's: that comparison is wrong for a REDUNDANT override, which is exactly the state the two-state control produced.
    The inherit option is LABELLED with the world's own token, and where the world authored nothing the label says so rather than crediting the world with the shipped fallback.
    The pill beside it names the layer the current answer came from, and it has THREE states for the resolver's three branches rather than the prototype's two.
-4. **NEITHER world Tool screen states anything about `repairRequirements`, and the reason is that neither of them CAN.**
-   A repair group names ingredient quantities over the OWNING crafting system's components, which world scope cannot address (`## Scoped Entity Definitions` `### Tool scope` requirement 2), so the only fact either screen could offer is a bare group COUNT — a number a GM has nothing to check against, over a list the screen has just said it cannot show.
-   The entry offered that count and a `Clear the seed` write beside it, and the catalogue inspector offered the same count as a fifth world-default card; both are removed, and the design draws neither at either scope.
-   The seed itself is untouched: it is still world-scoped, still copied once on adoption, and still written by import, migration and its own tool-family action.
-   Its contents are authored where they can be checked, in the system Tool Rules editor, which owns the components they name.
+4. **The world Tool ENTRY authors `repairRequirements` by SHOWING it; the world Tool CATALOGUE still states nothing about it.**
+   The entry's Breakage tab renders the repair editor — the SAME component the system Tool Rules editor mounts — in the `flagBroken` on-break mode and in no other, over the WORLD component, essence and tag rosters, and routes its change to the tool-family seed action rather than to the section writer, which would refuse the name.
+   Currency is withheld there: units are world-wide, but whether a cost is HONOURED is each system's own `requirements.currency.enabled`, which a world default cannot state, so the editor is mounted with currency disabled — an imported cost still renders read-only and no new one is offered.
+   The tab states the seed's reach beside it: an edit reaches the next system to ADOPT the Tool and none that already has it.
 
-   **A SCREEN MAY NOT OFFER A WRITE OVER DATA IT HAS DECLARED ITSELF UNABLE TO SHOW.** That is the general rule this requirement is an instance of, and it is stricter than "state the seed rule rather than a count": a destructive control over an unreadable list is worse than no control, because refusing it costs a GM one navigation and taking it costs them a repair recipe they never saw.
+   **THIS IS A CORRECTION OF AN EARLIER READING OF THIS REQUIREMENT, NOT A REVERSAL OF ITS RULE** (issue 1373, maintainer round 2).
+   The earlier text said neither world Tool screen CAN state anything about the seed, because a repair group names quantities over the owning system's components "which world scope cannot address".
+   That premise was retired by `## Scoped Entity Definitions` itself: components are a WORLD entity, a world component id is the id a membership record carries, and `### Tool scope` requirement 2 now records the same correction.
+   What world scope genuinely cannot promise is MEMBERSHIP — that every system inheriting the Tool has adopted each named Component — which is a reason the seed is copied on adoption rather than resolved live, not a reason it cannot be authored.
+
+   **A SCREEN MAY NOT OFFER A WRITE OVER DATA IT HAS DECLARED ITSELF UNABLE TO SHOW.** That general rule STANDS and is what the removed card broke: it stated a bare group COUNT — a number a GM has nothing to check against — and offered `Clear the seed` beside it, so a destructive control sat over an unreadable list, where refusing it costs a GM one navigation and taking it costs them a repair recipe they never saw.
+   The requirement is satisfied by SHOWING the groups, never by restoring the count.
+   The catalogue inspector's fifth world-default card stays removed for the same reason it was removed: an inspector states facts about a selected record and has no room for an ingredient editor, so a count is all it could offer.
 5. **The world Tool entry BUFFERS its edit and is saved explicitly**, under `### Scoped entity editor patterns` requirement 14 and through that requirement's shared module and shared action pair rather than a second implementation of either.
    What it buffers is the display label and the two INHERITED world-default sections; the world break mode is not among them because this screen does not author it at all, and the DESCRIPTION is not among them because the screen no longer authors that either — the description a Tool has is the linked game-world Item's, which the Overview tab states read-only on the card that names the Item, and a second editable copy of it was the same paragraph rendered twice on one tab.
 
@@ -2234,6 +2240,9 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
 7. **A WORLD-DEFAULTS EDITOR MAY OFFER ONLY WORLD-ADDRESSABLE REFERENTS.**
    `data-models/spec.md` `### Essence scope` requirement 5 binds a world essence default's `effectSource` to a world-addressable referent and never a system-local component id.
    The store writes section values OPAQUELY and the normalizer coerces shape rather than addressability, so neither can enforce it: the PICKER is the enforcement point.
+   The world Tool entry's two on-break arguments are bound the same way: the REPLACEMENT COMPONENT names a world component, and a repair group names world components, world essences and world tags.
+   Each is offered from the corresponding WORLD corpus and from no system's roster, which is what makes a world default that a second system inherits resolve to the same referent it resolved to in the first.
+   A drop onto the replacement zone is resolved against that same offered set — a dragged document matched on the world record's own source-link uuids — so an Item this scope does not manage names nothing and writes nothing, rather than storing an id no reader resolves.
 8. **The validation tab and the player preview are shared shells**, and the six editors are callers rather than authors of them.
    The validation shell renders the shipped editor-validation surface and owns the count and pass/warn status labels both existing sites already agreed on; only the BLOCK label differs, because an essence always saves while a Tool refuses to.
 9. **Requirement rows introduce NO new component:** the shipped tool repair-requirement editor is the recipe-free ingredient editor, already rendered chromeless.

@@ -85,6 +85,18 @@
     worldDefaults = null,
     // `'title'` — the system editor's sentence-case bold — or `'kicker'`. See the file header.
     headingStyle = 'title',
+    // ── ONE TRAILING LINE PER SECTION (issue 1373, maintainer round 2) ────────────────────
+    // `{prerequisites?: string, bonus?: string}`, rendered at the foot of each section's own
+    // card. It exists because the WORLD entry states how many crafting systems inherit each
+    // default, and it was stating both OUTSIDE this component, stacked at the bottom of a
+    // wrapper card: two identical sentences under two cards, neither beside the section it
+    // counted, reading as a duplication fault rather than as two facts.
+    //
+    // A MAP RATHER THAN A SNIPPET, deliberately: the note is one sentence the caller has
+    // already resolved, and a snippet would let a caller put arbitrary markup inside a card
+    // whose whole point is that both scopes draw it the same way. An absent key renders
+    // nothing, so the system editor is untouched.
+    sectionNotes = {},
     onPatch = () => {},
     onToggleInherited = () => {},
   } = $props();
@@ -260,6 +272,14 @@
           )}
         </p>
       {/if}
+      {#if sectionNotes.prerequisites}
+        <p
+          class="manager-muted manager-tool-requirements-note"
+          data-tool-section-note="prerequisites"
+        >
+          {sectionNotes.prerequisites}
+        </p>
+      {/if}
     </section>
   </ToolInheritCard>
 
@@ -336,6 +356,21 @@
           )}
         </p>
       {/if}
+      {#if sectionNotes.bonus}
+        <p class="manager-muted manager-tool-requirements-note" data-tool-section-note="bonus">
+          {sectionNotes.bonus}
+        </p>
+      {/if}
     </section>
   </ToolInheritCard>
 </div>
+
+<style>
+  /* The per-section trailing line. It is the last thing in the card and a claim about the
+     section rather than a control, so it takes the muted micro size the world entry's other
+     reach sentences already use. `--fab-space-1` is the design's own 4px rule gap. */
+  .manager-tool-requirements-note {
+    margin: var(--fab-space-1) 0 0;
+    font-size: 0.62rem;
+  }
+</style>

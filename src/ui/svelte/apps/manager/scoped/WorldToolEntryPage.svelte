@@ -63,16 +63,22 @@
   `entry.inheritCounts`, which `worldScopeProjection` populates from `descriptor.sections`
   alone.
 
-  `repairRequirements` IS NOT AMONG THEM AND IS NOT DRAWN HERE AT ALL. It is not in
+  `repairRequirements` IS NOT AMONG THEM, AND IT IS DRAWN HERE ANYWAY. It is not in
   `descriptor.sections` - correctly, because it is copied ONCE when a tool joins a system and
   then diverges freely, so an inherit count would claim a live parent the resolver does not
-  honour and `resolveTool` reads the list from the MEMBERSHIP RECORD ALONE. But the deeper
-  reason it is absent is that world scope cannot say anything USEFUL about it: a repair group
-  names ingredient quantities over the OWNING SYSTEM's components, which world scope cannot
-  address - `toolScope.js` says so in those terms - so a card here could only ever state a bare
-  group COUNT and offer to destroy the list behind it. It said exactly that, and offered exactly
-  that, until issue 1373's parity round removed it. The system Tool rules editor owns the seed's
-  contents and therefore owns the seed.
+  honour and `resolveTool` reads the list from the MEMBERSHIP RECORD ALONE. That is why it takes
+  no inherit count and no inherit switch, and why it writes through its own action rather than
+  through `updateWorldDefaultSection`, which would refuse the name and store nothing.
+
+  IT IS AUTHORED ON THE BREAKAGE TAB, in `Mark as broken` and no other mode (issue 1373,
+  maintainer round 2). An earlier round removed a card that stated a bare group COUNT and offered
+  `Clear the seed` beside it, and the rule it recorded stands: a screen may not offer a write over
+  data it has declared itself unable to show. What has changed is the premise underneath it. That
+  card's own body said a repair group names components "in the owning crafting system, which world
+  scope cannot address" - true before epic 1357 gave the world a component catalogue, and not true
+  now: a world component id IS the id a membership record carries. So the answer is to SHOW the
+  groups, over the world component, essence and tag rosters, rather than to keep a count nobody can
+  check. `toolScope.js` and `## Scoped Entity Definitions` both carry the same correction.
 
   == THE TAB STRIP IS THE SHIPPED ONE ====================================================
   `EditorTabs` was promoted to `apps/manager/` for exactly this, and `tools/ToolEditorTabs`
@@ -82,6 +88,7 @@
 <script>
   import { formulaRolls } from '../../../../../utils/rollFormulaRollability.js';
   import { localize } from '../../../util/foundryBridge.js';
+  import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Field from '../../../components/Field.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
@@ -92,8 +99,14 @@
   import ItemDropZone from '../ItemDropZone.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import ToolBehaviorPreview from '../tools/ToolBehaviorPreview.svelte';
+  import ToolRepairRequirements from '../tools/ToolRepairRequirements.svelte';
+  import ToolReplacementTarget from '../tools/ToolReplacementTarget.svelte';
   import ToolRequirementsTab from '../tools/ToolRequirementsTab.svelte';
-  import { toolBreakageSummary, toolSourceSnapshot } from '../tools/toolStudio.js';
+  import {
+    toolBreakageChanceBand,
+    toolBreakageSummary,
+    toolSourceSnapshot,
+  } from '../tools/toolStudio.js';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import { scopedSectionLabel } from './scopedStudio.js';
   import {
@@ -124,6 +137,28 @@
     // itself (issue 1308), which is what makes a world-default `prerequisites.ids` addressable
     // from here at all: a system-local id would name nothing in the next system to inherit it.
     prerequisiteOptions = [],
+    // ── THE THREE WORLD ROSTERS THE BREAKAGE TAB NAMES (issue 1373, maintainer round 2) ────
+    //
+    // `componentOptions` IS THE WORLD COMPONENT CATALOGUE, not a system's managed items, and
+    // that is the whole answer to whether this screen may offer a replacement target or a
+    // repair route at all. `toolScope.js` USED TO record that a repair group named quantities
+    // over the owning system's components, which world scope could not address — true before
+    // epic 1357 gave the world its own component catalogue, and corrected there since.
+    // A world component id IS the id a membership record carries, so a world default naming one
+    // resolves in every system that has adopted that component and in no other; the same
+    // property `prerequisites.ids` already relies on one tab across.
+    //
+    // `essenceOptions` is the world ESSENCE catalogue on the identical argument, and `itemTags`
+    // is the union of every world component's own `tags` — the list `setWorldTags` authors.
+    //
+    // CURRENCY IS DELIBERATELY ABSENT. Units are world-wide, but whether a cost is HONOURED is
+    // `requirements.currency.enabled` on each crafting system, and a world default cannot state
+    // which of them has it on. `ToolRepairRequirements` is therefore mounted with
+    // `currencyEnabled={false}`, which is the shipped read-only face: an imported seed carrying
+    // a cost still renders, and this screen does not offer to author a new one.
+    componentOptions = [],
+    essenceOptions = [],
+    itemTags = [],
     // ── THE `PREVIEW AS` SEAM (issue 1373) ────────────────────────────────────────────────
     // `{id, name, img}` per previewable actor, and a reader that answers ONE actor's prepared
     // roll data. Both are the shell's: resolving an Actor document and calling `getRollData()`
@@ -459,6 +494,30 @@
   }
 
   /**
+   * One section's reach sentence, resolved ONCE.
+   *
+   * It was written out inline at four call sites — the same eleven-line `format` block with one
+   * section name changed — which is both the duplication SonarCloud counts in `.svelte` and the
+   * reason two of the four ended up stacked outside the cards they describe. Stated here, the
+   * call sites are one expression each and the sentence cannot drift between them.
+   *
+   * @param {string} section
+   * @returns {string}
+   */
+  function inheritCountLine(section) {
+    const count = inheritCount(section);
+    return format(
+      count === 1
+        ? 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCountOne'
+        : 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
+      count === 1
+        ? '{count} crafting system inherits this world default today.'
+        : '{count} crafting systems inherit this world default today.',
+      { count }
+    );
+  }
+
+  /**
    * The world default read as a tool-shaped record, for the shipped summary helpers.
    *
    * @returns {{breakage: object|null, onBreak: object|null, checkBreakable: boolean}}
@@ -706,6 +765,34 @@
    * the Validation tab is where an incomplete record is reported.
    */
   const formulaRollable = $derived(breakFormula.trim() === '' || formulaRolls(breakFormula));
+
+  // ── THE BREAK-CHANCE BAND ──────────────────────────────────────────────────────────────
+  // What the number MEANS, beside the number. The design states it as a coloured word on the
+  // slider's own label line and runs the track through the same ramp; the screen had neither, so
+  // a 5% and a 90% Tool were the same picture with a different digit in it.
+  const chanceBand = $derived(toolBreakageChanceBand(defaults.breakage?.breakageChance ?? 0, text));
+
+  // ── WHAT `Replace with component` NAMES, AND WHAT `Mark as broken` MENDS ────────────────
+  // Both are world-scope answers over the WORLD component catalogue; see the props block for
+  // why that is addressable here and what it does and does not promise a system that inherits.
+  const replacementComponentId = $derived(
+    String(defaults.onBreak?.replacementTarget?.componentId || '')
+  );
+
+  /**
+   * The world repair SEED, read from the persisted record rather than the draft.
+   *
+   * `repairRequirements` IS NOT A BUFFERED SECTION and cannot be: `TOOL_SECTIONS` does not name
+   * it, so `scopedEntryWrites` would refuse the key and a Save would drop the edit silently. It
+   * is a SEED with its own action (`setWorldRepairRequirements`), and it therefore writes
+   * IMMEDIATELY — which is the same rule every other non-section control on this screen follows,
+   * for the same reason the file header gives: it acts through a different write path.
+   *
+   * @type {Array<object>}
+   */
+  const repairGroups = $derived(
+    Array.isArray(entry?.defaults?.repairRequirements) ? entry.defaults.repairRequirements : []
+  );
 
   /**
    * The game-world Item this record names, for the linked-item tile.
@@ -1002,22 +1089,33 @@
   $effect(() => () => onDeleteChange(null));
 </script>
 
-<main class="manager-main" data-scoped-page="world-tool-entry" aria-label={pageTitle}>
-  <div class="manager-world-tool-entry-body">
-    <EditorTabs
-      {tabs}
-      {activeTab}
-      onSelect={(tab) => (activeTab = tab)}
-      ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Entry.Tabs"
-      ariaLabel="Tool entry sections"
-      idStem="world-tool-entry"
-      hookAttribute="data-world-tool-entry-tab"
-      badges={tabBadges}
-      badgeAttribute="data-world-tool-entry-tab-badge"
-      danger
-    />
+<!--
+  THE RAIL IS A SIBLING OF THE TAB COLUMN, NOT OF THE TAB PANEL (issue 1373, maintainer round 2).
 
-    <div class="manager-world-tool-entry-columns">
+  The screen nested the rail INSIDE the tabbed body, so it began under the tab strip and ended
+  wherever the panel did — a 300px column floating in the middle of the right-hand third with the
+  page background above and below it. The design's editor is `grid-template-columns: minmax(0,1fr)
+  326px` over the WHOLE workspace (`proto:2073`), with the left track holding the tab strip and
+  its panel and the right track running the full height of the pane, from the bottom edge of the
+  app header band down to the bottom of the window. The system Tool Rules editor one route away
+  already draws it that way; only this screen did not.
+-->
+<main class="manager-main" data-scoped-page="world-tool-entry" aria-label={pageTitle}>
+  <div class="manager-world-tool-entry-columns">
+    <div class="manager-world-tool-entry-body">
+      <EditorTabs
+        {tabs}
+        {activeTab}
+        onSelect={(tab) => (activeTab = tab)}
+        ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Entry.Tabs"
+        ariaLabel="Tool entry sections"
+        idStem="world-tool-entry"
+        hookAttribute="data-world-tool-entry-tab"
+        badges={tabBadges}
+        badgeAttribute="data-world-tool-entry-tab-badge"
+        danger
+      />
+
       <div
         class="manager-world-tool-entry-panel"
         data-scoped-entry={PAGE_ID}
@@ -1348,27 +1446,47 @@
                   />
                 </div>
               {:else if breakMode === 'breakageChance'}
-                <div class="manager-world-tool-entry-field-copy">
-                  <span class="manager-kicker"
-                    >{text(
-                      'FABRICATE.Admin.Manager.Tools.BreakageChancePerUse',
-                      'Break chance per use'
-                    )}</span
-                  >
-                  <small class="manager-muted"
-                    >{text(
-                      'FABRICATE.Admin.Manager.Tools.BreakageChanceControlHint',
-                      'Each time the Tool is used, this percentage is its chance to break.'
-                    )}</small
+                <div class="manager-world-tool-entry-chance-head">
+                  <div class="manager-world-tool-entry-field-copy">
+                    <span class="manager-kicker"
+                      >{text(
+                        'FABRICATE.Admin.Manager.Tools.BreakageChancePerUse',
+                        'Break chance per use'
+                      )}</span
+                    >
+                    <small class="manager-muted"
+                      >{text(
+                        'FABRICATE.Admin.Manager.Tools.BreakageChanceControlHint',
+                        'Each time the Tool is used, this percentage is its chance to break.'
+                      )}</small
+                    >
+                  </div>
+                  <!-- THE PLAIN-LANGUAGE BAND (issue 1373, maintainer round 2). `5%` is a
+                       quantity; `Rarely breaks` is the decision a GM was actually making, and
+                       the design states both. Its five cuts are `proto:4618`'s. -->
+                  <Chip tone={chanceBand.tone} data-world-tool-entry-chance-band={chanceBand.tone}
+                    >{chanceBand.label}</Chip
                   >
                 </div>
-                <!-- NO MULTI-HUE TRACK, AND NO PER-VALUE HUE (issue 1373). The design uses a
-                     gradient track nowhere, at either scope, and what this one was saying is not
-                     true of a world DEFAULT: `toolBreakageChanceColor` ramps green-to-red on the
-                     premise that a high number is a worse outcome, which is the reading a drop
-                     RATE has and a break chance does not — a 90% breakage Tool is an authored
-                     rule, not a warning. The control keeps the shipped accent track every other
-                     slider in the manager wears. -->
+                <!--
+                  THE TRACK RUNS THE RAMP, AND AN EARLIER ROUND WAS WRONG TO REMOVE IT (issue
+                  1373, maintainer round 2).
+
+                  That round's note said "the design uses a gradient track nowhere, at either
+                  scope", reasoning from the design's FRAMES. The design's own markup says
+                  otherwise: `proto:491` styles this exact control with a four-stop horizontal
+                  ramp, green through gold and amber to red, at 0%, 38%, 68% and 100%. Neither
+                  its CSS function name nor its stop values are quoted here — the flat-style
+                  contract greps for the first and the colour contract for the second, in
+                  comments as well as code. It is the same
+                  ramp the SYSTEM editor one route away already renders, through the shipped
+                  `--fab-tool-breakage-chance-track-gradient` — so what shipped was one control
+                  wearing two treatments at two scopes.
+
+                  NO NEW TOKENS. The gradient token and `toolBreakageChanceColor` are both
+                  already published and both resolve through `--fab-success` / `--fab-warning` /
+                  `--fab-badge-gold` / `--fab-danger`, so all seven themes keep their own ramp.
+                -->
                 <ChanceSlider
                   value={defaults.breakage?.breakageChance ?? 0}
                   numberLabel={text(
@@ -1379,6 +1497,9 @@
                     'FABRICATE.Admin.Manager.Tools.BreakageChance',
                     'Breakage chance'
                   )}
+                  resolveColor={toolBreakageChanceColor}
+                  trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
+                  controlClass="manager-tool-breakage-chance-control"
                   numberInputProps={{ 'data-world-tool-entry-breakage-chance': '' }}
                   rangeInputProps={{ 'data-world-tool-entry-breakage-chance-range': '' }}
                   onChange={(breakageChance) => patchSection('breakage', { breakageChance })}
@@ -1439,15 +1560,7 @@
               {breakageSummaryLabel}
             </p>
             <p class="manager-muted" data-world-tool-entry-inherit-count="breakage">
-              {format(
-                inheritCount('breakage') === 1
-                  ? 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCountOne'
-                  : 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
-                inheritCount('breakage') === 1
-                  ? '{count} crafting system inherits this world default today.'
-                  : '{count} crafting systems inherit this world default today.',
-                { count: inheritCount('breakage') }
-              )}
+              {inheritCountLine('breakage')}
             </p>
           </section>
 
@@ -1465,40 +1578,82 @@
               optionDataAttr="data-world-tool-entry-onbreak-mode"
               onChange={(mode) => patchSection('onBreak', { mode })}
             />
+            <!--
+              THE MODE'S OWN CONTROL, WHICH THE SCREEN HAD FOR NEITHER MODE (issue 1373,
+              maintainer round 2).
+
+              `Replace with component` and `Mark as broken` are the two on-break actions that
+              take an argument, and world scope could author neither: a GM could select
+              `Replace with component` and never say WITH WHAT, and a marked-broken Tool's
+              repair route — the seed every system copies on adoption — had no authoring surface
+              at all, so `setWorldRepairRequirements` existed and nothing on any screen called it.
+
+              BOTH NAME WORLD RECORDS. See the props block for what `componentOptions` is and
+              what a world default naming one does and does not promise a system that inherits.
+            -->
+            {#if (defaults.onBreak?.mode ?? 'destroy') === 'replaceWith'}
+              <ToolReplacementTarget
+                {componentOptions}
+                componentId={replacementComponentId}
+                sourceText={text(
+                  'FABRICATE.Admin.Manager.Tools.Editor.ReplacementSourceWorld',
+                  'A Component in the world catalogue'
+                )}
+                onChoose={(componentId) =>
+                  patchSection('onBreak', {
+                    replacementTarget: { type: 'component', componentId },
+                  })}
+                onClear={() => patchSection('onBreak', { replacementTarget: null })}
+              />
+            {:else if (defaults.onBreak?.mode ?? 'destroy') === 'flagBroken'}
+              <!--
+                THE REPAIR SEED, AUTHORED WHERE IT IS STORED.
+
+                An earlier round removed a `REPAIR MATERIALS` card from this screen, and it was
+                right to: that card stated a bare group COUNT and offered `Clear the seed`, which
+                is a write over data it had just said it could not show. The rule it left behind
+                stands. What changes is the second half of the premise — world scope CAN address
+                Components now — so the answer is to SHOW the groups rather than to keep the
+                count and drop the control.
+
+                IT IS THE SAME COMPONENT THE SYSTEM EDITOR MOUNTS, on the Requirements tab's own
+                argument: two scopes authoring one shape through two implementations is how a
+                persisted record and its editors drift.
+
+                AND THE WRITE IS IMMEDIATE, not buffered: `repairRequirements` is not in
+                `TOOL_SECTIONS`, so `scopedEntryWrites` would refuse the key and a Save would
+                drop the edit without saying so. `setWorldRepairRequirements` is its own action
+                for exactly that reason.
+              -->
+              <ToolRepairRequirements
+                groups={repairGroups}
+                {componentOptions}
+                {itemTags}
+                {essenceOptions}
+                currencyUnits={[]}
+                currencyEnabled={false}
+                onChange={(groups) => actions?.setWorldRepairRequirements?.(entityId, groups)}
+              />
+              <p
+                class="manager-muted manager-world-tool-entry-hint"
+                data-world-tool-entry-repair-note
+              >
+                {text(
+                  'FABRICATE.Admin.Manager.Tools.Editor.RepairSeedNote',
+                  'This is the seed. It is copied into a crafting system the moment that system adopts this Tool, and edited there afterwards — so a change here reaches the next system to adopt it, not the ones that already have it.'
+                )}
+              </p>
+            {/if}
             <p class="manager-muted" data-world-tool-entry-inherit-count="onBreak">
-              {format(
-                inheritCount('onBreak') === 1
-                  ? 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCountOne'
-                  : 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
-                inheritCount('onBreak') === 1
-                  ? '{count} crafting system inherits this world default today.'
-                  : '{count} crafting systems inherit this world default today.',
-                { count: inheritCount('onBreak') }
-              )}
+              {inheritCountLine('onBreak')}
             </p>
           </section>
 
           <!--
-            THERE IS NO `REPAIR MATERIALS` SECTION HERE, and its removal is the answer to a
-            question the section asked and could not answer (issue 1373).
-
-            WHAT IT SAID ABOUT ITSELF IS WHY IT WENT. Its own body read `A repair group names
-            components in the owning crafting system, which world scope cannot address` — and
-            then offered `Clear the seed`, a write. A control that destroys a list whose contents
-            the screen has just said it cannot show is worse than no control: the only fact a GM
-            could read was a bare `1 group`, and a group is a set of ingredient quantities over
-            components this scope cannot name, so `1` is not a number they can check anything
-            against before pressing.
-
-            THE DESIGN DRAWS NO SUCH SECTION AT EITHER SCOPE. The seed is real, it is world
-            scoped, and it is copied once when a system adopts the Tool — but everything that
-            makes it MEANING rather than a count lives in the system Tool Rules editor, which
-            owns the components and already edits the groups. So the honest thing world scope can
-            say about repair materials is nothing, and it says nothing.
-
-            `setWorldRepairRequirements` is untouched: import, migration and the system editor's
-            adoption copy all still write the seed. What is gone is one screen's claim to author
-            it blind.
+            THERE IS STILL NO STANDALONE `REPAIR MATERIALS` CARD HERE, and there should not be:
+            the repair route belongs INSIDE the on-break card, under the one mode it configures.
+            See the file header for what changed and why the rule the removed card recorded is
+            satisfied rather than reversed.
           -->
         {:else if activeTab === 'requirements'}
           <!--
@@ -1510,40 +1665,37 @@
             WHAT IT NEEDS IS A TOOL-SHAPED RECORD, which the world defaults already are from its
             point of view: it reads `tool.prerequisites` and `tool.bonus` and nothing else.
           -->
-          <section class="manager-world-tool-entry-card" data-world-tool-entry-card="requirements">
-            <!-- `headingStyle` IS THE ONE SCOPE DIFFERENCE, and it is a treatment rather than a
-                 behaviour: every other card on this screen heads itself with an uppercase
-                 kicker, and the system editor's design frame heads its sections in sentence-case
-                 display type. Mounting the tab unchanged put both idioms on this screen. -->
+          <!--
+            NO WRAPPER CARD (issue 1373, maintainer round 2). `ToolRequirementsTab` draws a
+            `ToolInheritCard` PER SECTION, so enclosing it put a bordered, filled card inside
+            another bordered, filled card with a third border on each section inside that — three
+            nested edges where the design draws one (`proto:2321`), and every inner card's
+            padding compounded with the wrapper's.
+
+            THE TWO REACH SENTENCES MOVED INSIDE THE SECTIONS THEY COUNT. They were stacked at
+            the foot of the wrapper, identical to the character, under two cards — which reads as
+            the same sentence printed twice rather than as one fact about prerequisites and one
+            about the bonus. `sectionNotes` puts each in its own card.
+
+            `headingStyle` IS THE ONE SCOPE DIFFERENCE, and it is a treatment rather than a
+            behaviour: every other card on this screen heads itself with an uppercase kicker, and
+            the system editor's design frame heads its sections in sentence-case display type.
+          -->
+          <div
+            class="manager-world-tool-entry-requirements"
+            data-world-tool-entry-card="requirements"
+          >
             <ToolRequirementsTab
               tool={requirementsTool}
               headingStyle="kicker"
               {prerequisiteOptions}
+              sectionNotes={{
+                prerequisites: inheritCountLine('prerequisites'),
+                bonus: inheritCountLine('bonus'),
+              }}
               onPatch={stageRequirementSections}
             />
-            <p class="manager-muted" data-world-tool-entry-inherit-count="prerequisites">
-              {format(
-                inheritCount('prerequisites') === 1
-                  ? 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCountOne'
-                  : 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
-                inheritCount('prerequisites') === 1
-                  ? '{count} crafting system inherits this world default today.'
-                  : '{count} crafting systems inherit this world default today.',
-                { count: inheritCount('prerequisites') }
-              )}
-            </p>
-            <p class="manager-muted" data-world-tool-entry-inherit-count="bonus">
-              {format(
-                inheritCount('bonus') === 1
-                  ? 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCountOne'
-                  : 'FABRICATE.Admin.Manager.Scoped.Entry.InheritCount',
-                inheritCount('bonus') === 1
-                  ? '{count} crafting system inherits this world default today.'
-                  : '{count} crafting systems inherit this world default today.',
-                { count: inheritCount('bonus') }
-              )}
-            </p>
-          </section>
+          </div>
         {:else}
           <ScopedValidationTab
             title={text('FABRICATE.Admin.Manager.Scoped.Entry.TabValidation', 'Validation')}
@@ -1570,9 +1722,10 @@
           />
         {/if}
       </div>
+    </div>
 
-      <!--
-        THE RAIL IS THE SHARED `ToolBehaviorPreview`, NOT A SECOND ONE (issue 1373).
+    <!--
+      THE RAIL IS THE SHARED `ToolBehaviorPreview`, NOT A SECOND ONE (issue 1373).
 
         This screen carried a FORK of it: the same five regions, re-implemented, and each
         re-implementation lost the treatment the shared component already had. The player tile
@@ -1593,24 +1746,31 @@
 
         THE RULES KICKER IS THE SHARED ONE, `EFFECTIVE RULES`. It read `THE WORLD DEFAULTS,
         RESOLVED` here, which is the same four facts under a second name one route away.
+
+        `managedItems` IS THE WORLD COMPONENT ROSTER, passed for exactly one reason: the player
+        tile draws the REPLACEMENT Component's art when `Show as broken` is flipped on a
+        replace-mode Tool (issue 1373, maintainer round 2). It does not re-point the record's own
+        identity — `linkedComponentFor` short-circuits on an absent `tool.componentId`, and
+        `previewTool` carries none, because a world Tool's art is the linked game-world Item's
+        and arrives as `img`.
       -->
-      <ToolBehaviorPreview
-        classPrefix="manager-scoped-preview"
-        hookAttribute="data-world-tool-entry-preview"
-        tool={previewTool}
-        authority={worldAuthority || DEFAULT_BREAK_MODE}
-        contextText={sourceSubline}
-        actorOptions={previewActorOptions}
-        {prerequisiteOptions}
-        getActorRollData={(uuid) => getPreviewRollData(uuid)}
-        requiredFor={requiredByRows}
-        requiredForPageSize={REQUIRED_FOR_PAGE_SIZE}
-        requiredForEmptyText={text(
-          'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForNone',
-          'Nothing requires this Tool yet.'
-        )}
-      />
-    </div>
+    <ToolBehaviorPreview
+      classPrefix="manager-scoped-preview"
+      hookAttribute="data-world-tool-entry-preview"
+      tool={previewTool}
+      managedItems={componentOptions}
+      authority={worldAuthority || DEFAULT_BREAK_MODE}
+      contextText={sourceSubline}
+      actorOptions={previewActorOptions}
+      {prerequisiteOptions}
+      getActorRollData={(uuid) => getPreviewRollData(uuid)}
+      requiredFor={requiredByRows}
+      requiredForPageSize={REQUIRED_FOR_PAGE_SIZE}
+      requiredForEmptyText={text(
+        'FABRICATE.Admin.Manager.Tools.PreviewPanel.RequiredForNone',
+        'Nothing requires this Tool yet.'
+      )}
+    />
   </div>
 </main>
 
@@ -1656,15 +1816,48 @@
 
      `--fab-bg-1` lands on the sampled value to the byte, so this is an index-aligned token
      rather than a new raw colour, and the seven themes keep their own ramps. */
+  /* ── AND ITS BOX IS MEASURED, NOT ESTIMATED (issue 1373, maintainer round 2) ────────────
+     `proto:2086`: `padding: 15px; border: 1px solid var(--border); border-radius: 12px`. 15
+     rounds up to `--fab-space-4`; the radius is a token-free geometry value and is the design's
+     12 exactly. The card shipped at `--fab-space-3` — 12px, a quarter tighter than the design
+     on every one of the eight cards this screen stacks.
+
+     THE GAP IS `--fab-space-3` AND IT IS A COMPROMISE THAT IS WORTH NAMING. The design spaces a
+     card's kicker from its body by 9px and its body blocks from each other by 11px; one flex
+     `gap` cannot be both, and neither 9 nor 11 is on the 4px scale. 12 is the nearer of the two
+     and the one that governs the taller relationship. */
   .manager-world-tool-entry-card {
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-3);
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
     border-radius: 12px;
     background: var(--fab-bg-1);
+    min-width: 0;
+  }
+
+  /* The break-chance card's label line and the band that reads it, on one row — `proto:2144`
+     (`display: flex; align-items: center; gap: 12px`), where 12 is `--fab-space-3` exactly. */
+  .manager-world-tool-entry-chance-head {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-3);
+    min-width: 0;
+  }
+
+  .manager-world-tool-entry-chance-head > .manager-world-tool-entry-field-copy {
+    flex: 1 1 auto;
+  }
+
+  /* THE REQUIREMENTS TAB IS NOT A CARD, and this is what it is instead: a plain stack whose
+     children are `ToolInheritCard`s. The gap is the panel's own between-card rhythm, restated
+     because the tab's two sections are siblings of each other rather than of the panel. */
+  .manager-world-tool-entry-requirements {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
     min-width: 0;
   }
 
@@ -1732,11 +1925,26 @@
 
   /* THE BREAKAGE VALUE EDITORS. One column, because only ONE of the three ever renders and a
      grid sized for the widest of them would leave the other two floating in a track they do
-     not fill. */
+     not fill.
+
+     AND IT IS AN INSET PANEL, WHICH IT WAS NOT (issue 1373, maintainer round 2). The design
+     draws each of the three value editors on its own surface inside the mode card —
+     `proto:2133`, `proto:2143` and `proto:2159` all state `padding: 11px 13px; border: 1px
+     solid var(--border); border-radius: 10px` on a rung below the card. Ours floated the label,
+     the number field and the slider straight on the card, so the control that CONFIGURES the
+     selected mode read as more copy under the cards that choose it.
+
+     `11` and `13` both round to `--fab-space-3`. The rung is `--fab-bg-0`: this theme's ramp is
+     shifted one step against the design's, whose `--bg1` inset is `--fab-bg-0` here and whose
+     `--bg2` card is the `--fab-bg-1` the card above already uses. */
   .manager-world-tool-entry-break-value {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 10px;
+    background: var(--fab-bg-0);
     min-width: 0;
   }
 
@@ -1828,33 +2036,70 @@
     text-align: right;
   }
 
-  /* THE TAB STRIP AND THE BODY SHARE THE LAST TRACK. The strip is `auto` inside it and the
-     body takes the slack, so a long section scrolls inside the panel rather than pushing the
-     tabs off screen. */
-  .manager-world-tool-entry-body {
-    display: grid;
-    grid-row: 1;
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: var(--fab-space-2);
-    padding: 0 var(--fab-space-3) var(--fab-space-3);
-    min-width: 0;
-    min-height: 0;
-  }
+  /* ── THE TWO-TRACK WORKSPACE (issue 1373, maintainer round 2) ───────────────────────────
+     `minmax(0, 1fr) 326px` is `proto:2073` verbatim, and the 326 is the design's number rather
+     than a rounding of the 300 that shipped. NO GAP between the tracks: the rail draws its own
+     `border-left` and fill, and a gap would open a strip of page background between the divider
+     and the panel it divides.
 
+     IT IS THE TOP-LEVEL CHILD NOW. It used to be nested inside the tabbed body, one row below
+     the tab strip, which is what left the rail short at both ends. */
   .manager-world-tool-entry-columns {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: var(--fab-space-3);
+    grid-row: 1;
+    grid-template-columns: minmax(0, 1fr) 326px;
     min-width: 0;
     min-height: 0;
   }
 
+  /* THE TAB STRIP AND THE PANEL SHARE THE LEFT TRACK. The strip is `auto` and the panel takes
+     the slack, so a long section scrolls inside the panel rather than pushing the tabs off
+     screen. NO PADDING and NO GAP here: the design gutters the strip and the panel
+     independently (`proto:2075` `padding: 0 22px`, `proto:2079` `padding: 16px 22px 40px`), and
+     a shared inset would pull the strip's own bottom divider off the pane edges. */
+  .manager-world-tool-entry-body {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* THE STRIP'S GUTTER IS THE DESIGN'S 22px, ROUNDED TO THE 4px SCALE. `EditorTabs` writes this
+     element, not this template, so the rule has to be `:global()` — the scoped form compiles to
+     a selector matching nothing, which is the trap this epic has hit four times. It is scoped
+     under a class THIS file writes, so the reach is this screen's strip and not every editor's.
+     */
+  .manager-world-tool-entry-body > :global(.manager-editor-tabs) {
+    padding: 0 var(--fab-space-6);
+  }
+
+  /* `proto:2079`: `padding: 16px 22px 40px; gap: 14px`. 16 is `--fab-space-4` exactly; 22
+     rounds to `--fab-space-6` and 14 to `--fab-space-4`. The 40px bottom clearance is written
+     as a literal deliberately — it is a one-off scroll clearance inside the spec's documented
+     34-42px exempt band, not a spacing-scale step, and rounding it to 40 from anything else
+     would be inventing a number the design did not state. */
   .manager-world-tool-entry-panel {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-4);
+    padding: var(--fab-space-4) var(--fab-space-6) 40px;
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
+  }
+
+  /* ── THE RAIL'S OWN SURFACE ─────────────────────────────────────────────────────────────
+     `proto:2395`: `background: var(--bg2); border-left: 1px solid var(--border); padding: 17px;
+     gap: 13px`. 17 rounds to `--fab-space-4` and 13 to `--fab-space-3`, which are the exact two
+     values the SYSTEM Tool Studio's rail already uses — so the two editors' rails are now the
+     same object rather than the same component in two boxes.
+
+     `:global()` because `ScopedEntityPreview` writes `.manager-scoped-preview`, not this
+     template. Scoped under the columns grid this file DOES write, so no other caller of that
+     class prefix is reached. */
+  .manager-world-tool-entry-columns > :global(.manager-scoped-preview) {
+    padding: var(--fab-space-4);
+    border-left: 1px solid var(--fab-border);
+    background: var(--fab-bg-2);
   }
 </style>

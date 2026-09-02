@@ -517,6 +517,95 @@ export function toolHasLinkedSource(tool) {
 }
 
 /**
+ * THE PLAIN-LANGUAGE BAND A BREAK PERCENTAGE FALLS IN (issue 1373, maintainer round 2).
+ *
+ * The design states the band beside the slider and runs the track through the same ramp, so a
+ * number and a sentence say the same thing about one value. `5%` is a quantity; `Rarely breaks`
+ * is what a GM was actually deciding, and the screen shipped only the quantity.
+ *
+ * THE FIVE BANDS AND THEIR CUTS ARE THE DESIGN'S (`proto:4618`): `0`, `<=10`, `<=30`, `<=60`,
+ * above. Its own colours are five RAW HEX LITERALS from an older palette that never entered the
+ * theme's `:root` and are deliberately not copied here (this repository's colour contract scans
+ * comments as well as code). They are mapped instead onto the SEMANTIC ramp
+ * `--fab-tool-breakage-chance-track-gradient` already interpolates — blue, green, gold, amber,
+ * red, in that order — which is what keeps the chip and the track it labels the same colour in
+ * all seven themes.
+ *
+ * `0` IS ITS OWN BAND AND ITS OWN HUE. An unbreakable Tool is not "very rarely breaks", it is a
+ * different rule, and the design tints it informational rather than green for that reason.
+ *
+ * @param {unknown} chance The authored break percentage.
+ * @param {(key: string, fallback: string) => string} [text]
+ * @returns {{tone: string, color: string, label: string}}
+ */
+export function toolBreakageChanceBand(chance, text = (_key, fallback) => fallback) {
+  const percent = Number(chance);
+  const value = Number.isFinite(percent) ? percent : 0;
+  if (value <= 0) {
+    return {
+      tone: 'info',
+      color: 'var(--fab-info)',
+      label: text('FABRICATE.Admin.Manager.Tools.ChanceBandNever', 'Unbreakable'),
+    };
+  }
+  if (value <= 10) {
+    return {
+      tone: 'success',
+      color: 'var(--fab-success)',
+      label: text('FABRICATE.Admin.Manager.Tools.ChanceBandRare', 'Rarely breaks'),
+    };
+  }
+  if (value <= 30) {
+    return {
+      tone: 'warning',
+      color: 'var(--fab-warning)',
+      label: text('FABRICATE.Admin.Manager.Tools.ChanceBandOccasional', 'Breaks now and then'),
+    };
+  }
+  if (value <= 60) {
+    return {
+      tone: 'warning',
+      color: 'var(--fab-badge-gold)',
+      label: text('FABRICATE.Admin.Manager.Tools.ChanceBandOften', 'Breaks often'),
+    };
+  }
+  return {
+    tone: 'danger',
+    color: 'var(--fab-danger)',
+    label: text('FABRICATE.Admin.Manager.Tools.ChanceBandConstant', 'Breaks almost every use'),
+  };
+}
+
+/**
+ * Resolve a drag payload onto ONE managed Component, or `null`.
+ *
+ * PURE, and that is why it is here rather than in a component: the two Tool editors are leaves
+ * with no `game`, so a drop can only ever be answered against the option list the caller was
+ * already handed. Two payload shapes are accepted, and both are ones a GM can actually produce:
+ * a Foundry document drag (`{uuid}` / `{type: 'Item', uuid}`), matched against each option's
+ * `registeredItemUuid` then `originItemUuid`; and a Fabricate component drag carrying an `id`.
+ *
+ * A payload naming a Component this scope cannot address answers `null`, and the caller writes
+ * nothing — which is the honest answer for an Item that is not managed here.
+ *
+ * @param {unknown} payload The parsed drag data.
+ * @param {Array<object>} componentOptions
+ * @returns {string} The resolved component id, or `''`.
+ */
+export function resolveDroppedComponentId(payload, componentOptions = []) {
+  const options = Array.isArray(componentOptions) ? componentOptions : [];
+  if (!payload || typeof payload !== 'object') return '';
+  const droppedId = String(payload.componentId ?? payload.id ?? '').trim();
+  if (droppedId && options.some((option) => option?.id === droppedId)) return droppedId;
+  const uuid = String(payload.uuid ?? '').trim();
+  if (!uuid) return '';
+  const byRegistered = options.find((option) => option?.registeredItemUuid === uuid);
+  if (byRegistered) return String(byRegistered.id);
+  const byOrigin = options.find((option) => option?.originItemUuid === uuid);
+  return byOrigin ? String(byOrigin.id) : '';
+}
+
+/**
  * The `projectToolBehaviorFacts` fact id each world-default SECTION resolves through.
  *
  * The section names are the resolver's (`TOOL_SECTIONS`) and the fact ids are this module's;
@@ -575,14 +664,33 @@ export function toolWorldDefaultFact(section, worldDefault, authority, text, for
  * what the on-break action actually does to a character's copy, which is the one thing the
  * effective-rules rows state in the abstract and never show.
  *
+ * == THE PREVIEW SHOWS THE CONSEQUENCE, NOT A WORD FOR IT (issue 1373, maintainer round 2) ====
+ * All three on-break actions used to draw the SAME picture — the Tool's own art, dimmed, under a
+ * differently-worded chip. `Destroyed` and `Replaced` are labels for two outcomes a GM can only
+ * check by looking at the tile, and the tile was showing neither of them:
+ *
+ *  - DESTROY empties the box. The copy is gone from the inventory, so the one honest picture of
+ *    it is an inventory slot with nothing in it. `imageKind: 'none'`.
+ *  - REPLACE shows the REPLACEMENT COMPONENT's art and name — the thing the Tool becomes. A GM
+ *    picking a replacement can then see the swap they authored rather than read that one
+ *    happened. `imageKind: 'replacement'`, with `image` and `name` resolved out of
+ *    `componentOptions`; both fall back to the Tool's own when the target is unset or names a
+ *    Component this scope cannot address, because an unset replacement is a real state and the
+ *    Validation tab is where it is reported.
+ *  - MARK AS BROKEN is unchanged and keeps its pill: a broken copy IS still the Tool, dimmed,
+ *    renamed, and the pill is the only thing that says the flag is set.
+ *
+ * The two changed branches therefore carry NO pill (`pill: null`). A chip that names the outcome
+ * beside a picture of the outcome is the same statement twice.
+ *
  * @param {object|null} tool
  * @param {string} authority Active system breakage authority.
  * @param {boolean} broken Show the post-breakage state.
- * @param {Array<object>} componentOptions Managed components, for a replacement target's name.
+ * @param {Array<object>} componentOptions Managed components, for a replacement target's art.
  * @param {(key: string, fallback: string) => string} text
  * @param {(key: string, data: object, fallback: string) => string} format
- * @returns {{pill: {tone: string, icon: string, label: string}, note: string, dimmed: boolean,
- *   nameSuffix: string}}
+ * @returns {{pill: {tone: string, icon: string, label: string}|null, note: string,
+ *   dimmed: boolean, nameSuffix: string, imageKind: string, image: string, name: string}}
  */
 export function projectToolPlayerPreview(
   tool,
@@ -627,6 +735,9 @@ export function projectToolPlayerPreview(
       ),
       dimmed: false,
       nameSuffix: '',
+      imageKind: 'tool',
+      image: '',
+      name: '',
     };
   }
 
@@ -644,6 +755,9 @@ export function projectToolPlayerPreview(
       ),
       dimmed: true,
       nameSuffix: text('FABRICATE.Admin.Manager.Tools.Editor.PlayerBrokenSuffix', ' (Broken)'),
+      imageKind: 'tool',
+      image: '',
+      name: '',
     };
   }
   if (mode === 'replaceWith') {
@@ -652,11 +766,9 @@ export function projectToolPlayerPreview(
       (option) => option?.id === componentId
     );
     return {
-      pill: {
-        tone: 'accent',
-        icon: 'fas fa-arrow-right-arrow-left',
-        label: text('FABRICATE.Admin.Manager.Tools.Editor.PlayerReplacedPill', 'Replaced'),
-      },
+      // NO PILL. The tile beside it now carries the replacement's own art and name, which is
+      // the statement `Replaced` was standing in for.
+      pill: null,
       note: replacement?.name
         ? format(
             'FABRICATE.Admin.Manager.Tools.Editor.PlayerReplacedNamed',
@@ -667,21 +779,26 @@ export function projectToolPlayerPreview(
             'FABRICATE.Admin.Manager.Tools.Editor.PlayerReplaced',
             'The copy is removed and its replacement Component is added in its place.'
           ),
-      dimmed: true,
+      // NOT DIMMED. The replacement is a real, working copy of something else in the inventory,
+      // so dimming it would say it is unusable.
+      dimmed: false,
       nameSuffix: '',
+      imageKind: replacement ? 'replacement' : 'tool',
+      image: String(replacement?.img || ''),
+      name: String(replacement?.name || ''),
     };
   }
   return {
-    pill: {
-      tone: 'danger',
-      icon: 'fas fa-trash',
-      label: text('FABRICATE.Admin.Manager.Tools.Editor.PlayerDestroyedPill', 'Destroyed'),
-    },
+    // NO PILL, for the reason `replaceWith` has none: the empty box is the statement.
+    pill: null,
     note: text(
       'FABRICATE.Admin.Manager.Tools.Editor.PlayerDestroyed',
       'The copy is consumed and removed from the inventory it was used from.'
     ),
     dimmed: true,
     nameSuffix: '',
+    imageKind: 'none',
+    image: '',
+    name: '',
   };
 }
