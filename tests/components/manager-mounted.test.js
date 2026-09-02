@@ -811,6 +811,11 @@ function compileManagerRoot() {
     'src/systems/characterPrerequisites.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // The repair block's plain-language readback (issue 1373, maintainer round 5). A pure
+    // module, so the two scopes that render the block share one copy of the sentence — which
+    // is what puts it in every mounted tree that reaches `ToolRepairRequirements`. This suite
+    // has NO dependency validator, so an omission HANGS it (# cancelled) rather than naming it.
+    'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',

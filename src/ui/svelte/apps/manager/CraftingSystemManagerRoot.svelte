@@ -11846,6 +11846,7 @@
         componentOptions={worldComponentOptions}
         essenceOptions={worldEssenceOptions}
         itemTags={worldComponentTags}
+        currencyUnits={selectedCurrencyUnits}
         previewActors={worldToolPreviewActors}
         getPreviewRollData={worldToolPreviewRollData}
         onBackToCatalogue={() => setView('world-tools')}

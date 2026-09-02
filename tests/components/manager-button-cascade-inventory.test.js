@@ -1380,10 +1380,23 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // shipped at both scopes, and the two faces are two `triggerClass` sites where the block it
   // replaced had one. The count moves by one rather than by two for that reason. Both stay
   // unconverted on the standing argument above.
+  //
+  // AND SIX LEFT AT ISSUE 1373's MAINTAINER ROUND 5, taking the count to 12. The repair and
+  // ingredient row converged on the design's own anatomy (`proto:2248`), which is a kind
+  // `<select>` plus a field the GM types into — so the row's three `SearchablePopover` triggers
+  // (component, essence, currency unit) are not triggers any more, they are an inline search
+  // with its suggestions beneath it, and the two set-level adders that were PICKERS became
+  // plain dashed `<ManagerButton>`s that create an empty row. The sixth is `+ Tag`, which the
+  // design draws as a dashed tag-tinted PILL (`proto:2256`) and which is a `triggerChip` now,
+  // writing no `manager-button` class at all.
+  //
+  // Licensed by the same rule as the entries above: each of the six SITES left the product,
+  // rather than leaving this instrument's view. Five of them are `<ManagerButton>` or an inline
+  // field in the same place on the same screen; none was silently unconverted.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    18,
-    'plus the 18 SearchablePopover triggerClass sites named as debt'
+    12,
+    'plus the 12 SearchablePopover triggerClass sites named as debt'
   );
   // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
   // converted it, so a bare `=== 0` would be satisfied just as well by the site having been

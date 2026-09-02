@@ -223,6 +223,10 @@ async function mountTab({
   componentOptions = [],
   essenceOptions = [],
   itemTags = [],
+  // THE WORLD CURRENCY LADDER (issue 1373, maintainer round 5). Units are world scope
+  // (issue 1278) and the world Tool entry is a world-scope screen, so the repair set offers
+  // a cost here exactly as the recipe editor does for a system that enables one.
+  currencyUnits = [],
   onSourceDrop = () => {},
   onUnlinkSource = () => {},
 }) {
@@ -240,6 +244,7 @@ async function mountTab({
     componentOptions,
     essenceOptions,
     itemTags,
+    currencyUnits,
     onSourceDrop,
     onUnlinkSource,
     onDraftChange: (handle) => {
@@ -1648,6 +1653,65 @@ describe('the world Tool entry (issue 1373)', () => {
         sectionWrites,
         [],
         'the seed must not travel through the section write path, which would refuse its name'
+      );
+    });
+
+    // ── CURRENCY IS WORLD SCOPE (issue 1373, maintainer round 5) ──────────────────────────
+    // The screen used to mount the repair set with `currencyEnabled={false}`, reasoning that a
+    // world default cannot know whether a system honours currency costs. That conflates the
+    // LADDER with the per-system honouring flag. The ladder is world scope (issue 1278) — one
+    // config for the whole world, because a world runs exactly one ruleset — and
+    // `requirements.currency.enabled` exists so the RECIPE editor can gate on a system. At
+    // world scope there is no system to gate on, so the flag has no referent here.
+    it('offers a currency requirement at world scope, over the world ladder', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        { currencyUnits: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }] }
+      );
+      const editor = target.querySelector('[data-tool-repair-requirements]');
+      assert.ok(
+        Boolean(editor.querySelector('[data-recipe-add="cost"]')),
+        'the world repair set offers a cost, because the ladder it would spend is world scope'
+      );
+    });
+
+    // THE PLAIN-LANGUAGE SUMMARY (`proto:4068`): each row's alternatives joined by ` or `,
+    // groups joined by ` + `. The screen stated no summary at all.
+    it('states in plain language what mending consumes', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [
+                  { quantity: 1, match: { type: 'component', componentId: 'ingot' } },
+                  { quantity: 2, match: { type: 'component', componentId: 'shard' } },
+                ],
+              },
+              {
+                id: 'g2',
+                options: [{ quantity: 1, match: { type: 'tags', tags: ['rare'], tagMatch: 'all' } }],
+              },
+            ],
+          },
+        }
+      );
+      const summary = target.querySelector('[data-tool-repair-summary]');
+      assert.ok(Boolean(summary), 'the repair block states what mending consumes');
+      assert.equal(
+        summary.textContent.trim(),
+        'Mending consumes Iron Ingot or 2\u00d7 Glass Shard + all of rare.',
+        'alternatives join with " or ", requirements join with " + "'
+      );
+    });
+
+    it('says nothing can mend a copy when the repair set is empty', async () => {
+      const target = await mountBreakage({ mode: 'flagBroken' });
+      assert.match(
+        target.querySelector('[data-tool-repair-summary]').textContent,
+        /Nothing listed/
       );
     });
 

@@ -2203,8 +2203,15 @@ The two world tool screens and the system-scope Tool Rules list share one break-
    The pill beside it names the layer the current answer came from, and it has THREE states for the resolver's three branches rather than the prototype's two.
 4. **The world Tool ENTRY authors `repairRequirements` by SHOWING it; the world Tool CATALOGUE still states nothing about it.**
    The entry's Breakage tab renders the repair editor — the SAME component the system Tool Rules editor mounts — in the `flagBroken` on-break mode and in no other, over the WORLD component, essence and tag rosters, and routes its change to the tool-family seed action rather than to the section writer, which would refuse the name.
-   Currency is withheld there: units are world-wide, but whether a cost is HONOURED is each system's own `requirements.currency.enabled`, which a world default cannot state, so the editor is mounted with currency disabled — an imported cost still renders read-only and no new one is offered.
+   Currency IS offered there, over the WORLD ladder.
+   The ladder is world scope (`### World Currency`): one configuration for the whole world, because a world runs exactly one ruleset and so has exactly one way actors store coins.
+   The per-system `requirements.currency.enabled` flag exists so the RECIPE editor can gate a cost on the system it is authoring for; at world scope there is no system to gate on, so the flag has no referent and reading `false` for "no referent" refused a write over units the screen can address perfectly well.
+   That is the same mistake the component and essence rosters above were corrected for.
    The tab states the seed's reach beside it: an edit reaches the next system to ADOPT the Tool and none that already has it.
+
+   **AND IT STATES WHAT MENDING COSTS, in one plain-language sentence** beneath the editor, at both scopes.
+   Alternatives within a requirement join with ` or `, requirements join with ` + `, and an empty set says a broken copy cannot be mended.
+   It is the only place the whole set is stated as a COST rather than drawn as an editor, which is what a GM checking their own work reads; an id the roster can no longer resolve is named by that id, because "you never named one" and "the thing you named is gone" are different facts a GM needs to tell apart.
 
    **THIS IS A CORRECTION OF AN EARLIER READING OF THIS REQUIREMENT, NOT A REVERSAL OF ITS RULE** (issue 1373, maintainer round 2).
    The earlier text said neither world Tool screen CAN state anything about the seed, because a repair group names quantities over the owning system's components "which world scope cannot address".
@@ -2751,8 +2758,41 @@ Rows contain Tool identity and removal only: Recipe data exposes no breakage, co
 
 ### Ingredients tab
 
-A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" popover** per requirement, replacing the loose per-row and footer add-buttons.
-It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Currency, and Essence — each appended to that requirement as a new OR alternative for the row's own picker to fill in.
+#### The requirement row
+
+ONE row shape authors every requirement, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set, and the world Tool entry's copy of that same set.
+Its anatomy is the kind FIRST and the value second:
+
+```text
+[plate] [kind select] [name field] [quantity] [or…] [remove]
+```
+
+- **The kind is a real `<select>`,** carrying the kinds the adders offer plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
+Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
+- **The name field has two faces.**
+Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
+Unnamed, it is an inline search field with its suggestions rendered BENEATH it, in the row — never a popover opened over it.
+- **Losing focus commits NOTHING; Enter commits.**
+The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the pill showed the blur handler's value.
+Tabbing to a suggestion fails identically, which is why suppressing the pointer path alone is half a fix.
+- **What Enter commits is the top suggestion, not the typed string.**
+A requirement names a catalogue ENTRY by id rather than carrying a free name, so a query matching nothing commits nothing rather than authoring an unresolvable id.
+- **An empty catalogue DEGRADES the field rather than blocking it.**
+The input still renders and is still typeable, and its own placeholder says there is nothing to name yet.
+A world with no components and no essences is the state every world starts in, so it is a first-class face of this control rather than an error.
+
+A TAG row is one line.
+It reads as the sentence it writes — the policy word, the chosen tag chips each with their own remove, then `+ Tag` — with the any-of / all-of control that sets that word beside it, through the shared segmented-control primitive.
+There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row already says `Any of` with nothing after it.
+
+#### Adding a requirement, and adding an alternative
+
+Every adder creates a row carrying its KIND and no value; the row's own field names it.
+No adder chooses a subject, so none can dedupe against a requirement the set already holds — a GM who names one component twice is told so by the Validation tab, which is where a check the adder cannot make belongs.
+
+A requirement's alternatives (`IngredientGroup.options`, satisfied by ANY one of them) are added through a single **"or…" popover** per bare requirement, replacing the loose per-row and footer add-buttons.
+It is a single flat **"Accept instead"** list of the four real ingredient match types — Component, Tag, Essence, and Currency, in that order — each appended to that requirement as a new OR alternative for the row's own field to fill in.
+A requirement that already holds two or more alternatives renders that choice as four explicit dashed adders at the foot of its box instead, worded `alt component` / `alt tag` / `alt essence` / `alt currency`: inside a choice group every one of them appends an ALTERNATIVE, and `Add component` beside `Add cost` is two verbs for one act.
 Essence is a first-class ingredient match type, so "component OR essence" is a genuine alternative; the old two-heading Accept-instead / Require-as-well split is retired.
 
 Currency and Essence appear only when the system can honour them, so the menu never offers a choice the system cannot satisfy.
@@ -2762,7 +2802,9 @@ Essence appears when the system enables essences.
 An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
 A currency requirement persisted while currency was enabled remains **visible** when the feature is later disabled, but renders read-only (its unit and amount as static text, flagged inactive) rather than being silently hidden.
 The per-option `tagMatch` (any / all) control is retained on every tag alternative, and renders through the shared segmented-control primitive rather than a hand-rolled toggle-button pair.
-The set-level **"Add essence requirement"** control is retained and now appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
+The set-level **"Add essence"** control is retained and appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
+The add-new essence OFFER — withholding a DISABLED essence, while keeping an already-authored one reachable — is applied where an essence is actually CHOSEN, which is the row's own field.
+An adder that names nothing cannot leak a disabled essence, so the adders gate on the system HAVING essences and the field narrows the list.
 
 Multi-set authoring is gated by **`Recipe.complex`** plus the mode's structural constraints (`simple` and `progressive` are one set to one group; alchemy forces a single set) — never by `resolutionMode` alone.
 

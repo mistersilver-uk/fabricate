@@ -25,12 +25,14 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  // The add-new offer projection (issue 1036). The `essenceOptions` PROP stays unfiltered
-  // — `RecipeIngredientOption` resolves an already-authored option's display through it,
-  // and `hasEssences` gates the whole essence match TYPE on it, so filtering the prop
-  // would render authored options unresolved and remove essence requirements entirely
-  // from a system whose essences are all disabled.
-  import { selectableEssenceOptions } from '../../../../../utils/essenceValidation.js';
+  // (The add-new essence OFFER used to be projected here, through `selectableEssenceOptions`,
+  // because the essence adder SEEDED its new alternative with the first selectable essence.
+  // It seeds nothing now — issue 1373's maintainer round 5 — so the offer lives where the
+  // choice is made, which is `RecipeIngredientOption`'s own field. The `essenceOptions` PROP
+  // stays unfiltered here for the reason it always did: `hasEssences` gates the whole essence
+  // match TYPE on it, and filtering it would remove essence requirements entirely from a
+  // system whose essences are all disabled — including the ability to see and clear the ones
+  // it already has, which issue 1036/2 ruled against.)
   import RecipeIngredientOption from './RecipeIngredientOption.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
@@ -99,6 +101,16 @@
         'Add alternative tag requirement'
       ),
     },
+    ...(hasEssences
+      ? [
+          {
+            id: 'essence',
+            addMarker: 'alternative-essence',
+            icon: 'fas fa-flask-vial',
+            label: text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence'),
+          },
+        ]
+      : []),
     ...(canAddCost
       ? [
           {
@@ -109,16 +121,6 @@
               'FABRICATE.Admin.Manager.Recipe.AddAlternativeCost',
               'Add alternative cost'
             ),
-          },
-        ]
-      : []),
-    ...(hasEssences
-      ? [
-          {
-            id: 'essence',
-            addMarker: 'alternative-essence',
-            icon: 'fas fa-flask-vial',
-            label: text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence'),
           },
         ]
       : []),
@@ -141,22 +143,25 @@
     onChange({ ...group, options: options.filter((_, i) => i !== index) });
   }
 
-  // A new alternative is born EMPTY (the row's own picker fills it in); a currency
-  // alternative takes the first configured unit and an essence alternative the first
-  // configured essence so their amount input is usable at once.
+  /**
+   * A NEW ALTERNATIVE IS A KIND AND NOTHING ELSE (issue 1373, maintainer round 5).
+   *
+   * `proto:4632`'s `blankReq` is the shape: `{kind, ref: '', tags: [], pol: 'any', qty: 1}`.
+   * A currency alternative used to arrive holding the first configured unit and an essence
+   * alternative the first selectable essence, so that their amount field was usable at once —
+   * but that authors a choice the GM did not make, and it is the same choice every time, which
+   * is how a set ends up requiring gold pieces nobody asked for. The row's own field is where
+   * the value is named now, and it opens on the search face for exactly that reason.
+   *
+   * @param {'component'|'tags'|'essence'|'currency'} type
+   */
   function appendAlternative(type) {
     if (type === 'essence') {
-      // The DEFAULT selection is part of the offer: without this filter, adding an essence
-      // alternative to a system whose first essence happens to be disabled would author a
-      // requirement on a disabled essence, which then BLOCKS the recipe's activation. An
-      // empty string is the correct answer for an all-disabled system — the picker opens
-      // unchosen rather than pre-committed.
-      const firstEssence = selectableEssenceOptions(essenceOptions)[0]?.id || '';
       onChange({
         ...group,
         options: [
           ...options,
-          { quantity: 1, match: { type: 'essence', essenceId: firstEssence, amount: 1 } },
+          { quantity: 1, match: { type: 'essence', essenceId: '', amount: 1 } },
         ],
       });
       return;
@@ -169,13 +174,9 @@
       return;
     }
     if (type === 'currency') {
-      const firstUnit = (currencyUnits || [])[0]?.id || '';
       onChange({
         ...group,
-        options: [
-          ...options,
-          { quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } },
-        ],
+        options: [...options, { quantity: 1, match: { type: 'currency', unit: '', amount: 1 } }],
       });
       return;
     }
@@ -258,13 +259,15 @@
         />
       {/each}
     </div>
-    <!-- The multi-alternative box uses explicit dashed add-buttons (issue 643),
-         modelled on the set-level add row, instead of the compact "or…" popover the
-         bare rows keep. They reuse the same append semantics: each button appends a real
-         OR alternative to THIS requirement (component / tag / currency / essence).
-         Currency shows only when the system configures units, essence only when the
-         system enables essences, and the `data-recipe-add` marker family is preserved on
-         each button. -->
+    <!-- THE CHOICE GROUP'S OWN ADDERS (`proto:2305`, built at `proto:4692`): dashed accent
+         chips reading `alt component / alt tag / alt essence / alt currency`. They are worded
+         and ordered as the design words and orders them — `alt <kind>`, in the same kind order
+         the row's own select offers — because inside an `ANY ONE OF` group every one of them
+         appends an ALTERNATIVE, and `Add component` beside `Add cost` reads as two different
+         verbs for one act.
+
+         Currency shows only when the system enables it AND configures units; essence only when
+         the system has a selectable one. The `data-recipe-add` marker family is preserved. -->
     <div class="manager-recipe-requirement-adds">
       <ManagerButton
         role="dashed"
@@ -272,7 +275,7 @@
         onclick={() => appendAlternative('component')}
       >
         <i class="fas fa-cube" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}</span>
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AltComponent', 'alt component')}</span>
       </ManagerButton>
       <ManagerButton
         role="dashed"
@@ -280,20 +283,8 @@
         onclick={() => appendAlternative('tags')}
       >
         <i class="fas fa-tags" aria-hidden="true"></i>
-        <span
-          >{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span
-        >
+        <span>{text('FABRICATE.Admin.Manager.Recipe.AltTag', 'alt tag')}</span>
       </ManagerButton>
-      {#if canAddCost}
-        <ManagerButton
-          role="dashed"
-          data-recipe-add="alternative-cost"
-          onclick={() => appendAlternative('currency')}
-        >
-          <i class="fa-solid fa-coins" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.AddCost', 'Add cost')}</span>
-        </ManagerButton>
-      {/if}
       {#if hasEssences}
         <ManagerButton
           role="dashed"
@@ -301,7 +292,17 @@
           onclick={() => appendAlternative('essence')}
         >
           <i class="fas fa-flask-vial" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.AltEssence', 'alt essence')}</span>
+        </ManagerButton>
+      {/if}
+      {#if canAddCost}
+        <ManagerButton
+          role="dashed"
+          data-recipe-add="alternative-cost"
+          onclick={() => appendAlternative('currency')}
+        >
+          <i class="fa-solid fa-coins" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.Recipe.AltCurrency', 'alt currency')}</span>
         </ManagerButton>
       {/if}
     </div>

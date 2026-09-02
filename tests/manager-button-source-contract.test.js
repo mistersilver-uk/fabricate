@@ -97,16 +97,12 @@ const FIXTURE_ALLOWLIST = Object.freeze([
       'pass. The other is the Delete in the knowledge-row geometry fixture, which is an ' +
       '`ArmedDangerButton` and writes this string in the product too.',
   }),
-  Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
-    classes: 'manager-button is-subtle manager-recipe-tag-trigger',
-    count: 1,
-    why:
-      'Population B: `SearchablePopover` renders this trigger itself from a `triggerClass` ' +
-      'STRING (`recipe/RecipeIngredientOption.svelte`), so it never gains the primitive class. ' +
-      'The 17 such sites are named debt in the issue delta, and a fixture that converted this ' +
-      'one would be modelling a control the product does not render.',
-  }),
+  // (`manager-layout.test.js: manager-button is-subtle manager-recipe-tag-trigger` was booked
+  // here as population B. Issue 1373's maintainer round 5 made `+ Tag` a CHIP trigger — the
+  // design draws a dashed tag-tinted pill, not a button (`proto:2256`) — so it writes no
+  // `manager-button` class at all and the fixture that modelled it went with it. Recorded
+  // rather than quietly deleted, because this list exists to catch exactly the reverse: a
+  // fixture outliving the control it models.)
   Object.freeze({
     file: 'tests/components/manager-layout.test.js',
     classes: 'manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger',

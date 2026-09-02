@@ -1,23 +1,54 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  One alternative (an `Ingredient`) inside a requirement. Alternatives have no id,
-  so the parent keys them by index and owns the option list; this component renders
-  the requirement ROW to the prototype anatomy (issue 643 §B1):
+  ONE REQUIREMENT ROW, FOR EVERY SURFACE THAT AUTHORS ONE (issue 1373, maintainer round 5).
 
-    [lead chip] [picker / summary] … [REQUIRED tag] [count stepper] | [or…] [× remove]
+  Three screens author the same persisted shape through this component: the recipe editor's
+  ingredient list, the Tool Breakage tab's repair set (which mounts `RecipeIngredientSetCard`
+  directly), and the world Tool entry's copy of that same set. `fabricate-premium`'s downtime
+  rewards picker is the fourth instance of the idea, and this row is now the same shape it is —
+  which is the point: a fourth row anatomy would be a fourth thing to keep in step.
 
-  The lead chip is a small type-tinted square (component → cubes, tag → tag, currency
-  → coins, essence → flask). A component alternative shows one picker trigger carrying
-  the image AND the name (issue 676); a tag alternative shows a summary "any #tag" name
-  + a TAG pill, with the any/all control and chip list as an editing detail below;
-  currency and essence alternatives show only their unit/essence picker.
+  == KIND FIRST, THEN VALUE =================================================================
+  The row USED to be created by a value. A set-level `Add component` opened a popover, the GM
+  picked a component, and the row arrived with its kind already fixed and no way to change it;
+  retyping a row meant deleting it and adding another. The design (`proto:2248`) and premium's
+  `RewardRow` both create the row from its KIND alone:
 
-  EVERY row type edits its count with the same shared `Stepper` in the same end-of-row
-  slot (issue 676) — see the note at the stepper itself for why the marker attribute is
-  still per-kind. The remove control is a subtle `×` (`fa-xmark`), never a loud
-  `fa-minus` (§B1). The requirement-level "or…" popover is passed in as the `orControl` snippet
-  by the parent for a BARE (single-alternative) requirement, so it sits INLINE at the
-  row's right end; a multi-alternative box renders it at the box bottom instead.
+    [plate] [kind select] [name field] [quantity] [or…] [×]
+
+  and let the value be named, cleared and re-named inside the row. `proto:4660` is the write
+  this mirrors: changing the kind clears `ref`, `tags` and `pol`, so a retyped row is an EMPTY
+  row of the new kind rather than one carrying a stale id of the old one.
+
+  == THE NAME FIELD HAS TWO FACES ===========================================================
+  Chosen (`proto:2273`): an accent-bordered pill carrying the icon, the name and a clear `×`.
+  Unchosen (`proto:2276`): an inline search field with the suggestions rendered BENEATH it
+  (`proto:2279`), inside the row — not in a portaled popover. That is what makes the field
+  typeable and the suggestion list a narrowing of what the GM typed rather than a second
+  surface opened over the first.
+
+  BLUR COMMITS NOTHING; ENTER COMMITS. Premium's `commitTyped` docblock records the defect this
+  rule exists for: the DOM fires `change` on a text input when it LOSES FOCUS, not only on
+  Enter, so clicking a suggestion committed the raw query first and unmounted the suggestion
+  button before its own click could run. The GM's click never did anything. Tabbing to a
+  suggestion broke identically, so suppressing the mouse path alone would have been half a fix.
+
+  WHERE WE DEPART FROM PREMIUM, AND WHY. A premium reward stores a NAME, so a GM can type one
+  the catalogue has never heard of and premium's field degrades to a plain text input. A
+  Fabricate requirement stores an ID — `componentId`, `essenceId`, a currency `unit` — which is
+  only meaningful against a catalogue entry, so Enter commits the TOP SUGGESTION rather than the
+  raw string. When the catalogue is empty the field still renders and is still typeable, and its
+  own placeholder says there is nothing to name yet (`data-recipe-option-empty-catalogue`) —
+  degraded rather than blocked, and the state the maintainer's own world starts in.
+
+  == THE TAG ROW IS ONE LINE ================================================================
+  `proto:2251`-`2268` draws it as `[Tag ▾] All of [Rare ×] [Volatile ×] [+ Tag] … [Any of|All
+  of]`, all on the row. It shipped as a second full-width line carrying an `Any|All` control, an
+  `Add tag` dropdown and a large dashed `No tags set` box — three controls and an empty state
+  for what the design says in one sentence the row already reads.
+
+  A TAG IS A STRING, not an id, so this arm keeps the shipped `SearchablePopover` for `+ Tag`:
+  the choice is over the world tag roster and there is nothing to type into the row.
 -->
 <script module>
   // Alternatives carry no id (the parent keys them by index), so the tag-match radio
@@ -29,11 +60,10 @@
 
 <script>
   import Chip from '../Chip.svelte';
-  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  // The add-new offer projection (issue 1036). `selectedEssence` below deliberately
-  // resolves against the UNFILTERED prop, so an authored requirement on a disabled essence
-  // still reads back by name instead of collapsing to "Pick essence".
+  // The add-new offer projection (issue 1036). It feeds the SUGGESTION list; `selectedEssence`
+  // below deliberately resolves against the UNFILTERED prop, so an authored requirement on a
+  // disabled essence still reads back by name instead of collapsing to an empty search field.
   import { visibleEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import {
     currencyUnitLabel,
@@ -47,10 +77,9 @@
   tagMatchGroupSeq += 1;
   const tagMatchGroupId = tagMatchGroupSeq;
 
-  const TAG_MATCH_OPTIONS = [
-    { value: 'any', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAny', fallback: 'Any' },
-    { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAll', fallback: 'All' },
-  ];
+  // How many suggestions the inline list offers. `proto:4652` takes seven; the field is inside
+  // a row rather than in a dialog, so an unbounded list would cover the rows beneath it.
+  const MAX_SUGGESTIONS = 7;
 
   let {
     option = {},
@@ -61,10 +90,10 @@
     // while currency was on stays VISIBLE when it is later disabled, but renders read-only
     // (its unit + amount as static text, no pickers/stepper) so no authored data is hidden.
     currencyEnabled = true,
-    // The system's essences ({ id, name, icon, enabled }), for an essence OR alternative's
-    // picker. Empty when the system has no essences (the essence arm never appears).
-    // UNFILTERED by contract (issue 1036): the picker narrows to enabled essences itself,
-    // but `selectedEssence` must resolve an already-authored disabled essence by name.
+    // The system's essences ({ id, name, icon, enabled }), for an essence row's own search.
+    // Empty when the system has no essences (the Essence kind is not offered).
+    // UNFILTERED by contract (issue 1036): the suggestion list narrows to enabled essences
+    // itself, but `selectedEssence` must resolve an already-authored disabled essence by name.
     essenceOptions = [],
     // Render the "REQUIRED" tag — set by the parent for a bare (single-alternative)
     // requirement; box alternatives (inside "ANY ONE OF") never carry it.
@@ -82,6 +111,12 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // WHAT THE GM HAS TYPED INTO THIS ROW'S NAME FIELD, and nothing else. It is component-local
+  // rather than lifted, because it is not part of the requirement: a query that survived into
+  // the persisted shape would be a half-typed name saved as data. The parent keys its rows by
+  // INDEX, so a row keeps its instance — and therefore this — across an edit to a sibling.
+  let query = $state('');
+
   const matchType = $derived(
     option?.match?.type === 'tags' ||
       option?.match?.type === 'currency' ||
@@ -97,17 +132,6 @@
     option?.match?.type === 'tags' && Array.isArray(option.match.tags) ? option.match.tags : []
   );
   const tagMatch = $derived(option?.match?.tagMatch === 'all' ? 'all' : 'any');
-
-  // The single-line tag summary shown beside the medallion: "any #reagent #rare".
-  const tagSummary = $derived.by(() => {
-    const word =
-      tagMatch === 'all'
-        ? text('FABRICATE.Admin.Manager.Recipe.TagMatchAllWord', 'all')
-        : text('FABRICATE.Admin.Manager.Recipe.TagMatchAnyWord', 'any');
-    if (tags.length === 0)
-      return text('FABRICATE.Admin.Manager.Recipe.TagRowEmptyName', 'any tagged item');
-    return `${word} ${tags.map((tag) => `#${tag}`).join(' ')}`;
-  });
 
   const currencyUnitId = $derived(
     option?.match?.type === 'currency' ? option.match.unit || '' : ''
@@ -127,13 +151,6 @@
       : currencyUnitId ||
           text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledUnitFallback', 'Currency')
   );
-  const currencyPickerOptions = $derived(
-    (currencyUnits || []).map((unit) => ({
-      id: unit.id,
-      label: currencyUnitLabel(currencyUnits, unit.id),
-      icon: currencyUnitIcon(currencyUnits, unit.id),
-    }))
-  );
 
   const essenceId = $derived(option?.match?.type === 'essence' ? option.match.essenceId || '' : '');
   const essenceAmount = $derived(
@@ -147,7 +164,7 @@
   // Every ENABLED essence, plus whichever one this option already names. Keeping the
   // current choice in the list is what makes an authored requirement on a disabled essence
   // editable and clearable rather than stranded (issue 1036).
-  const essencePickerOptions = $derived(
+  const essenceCatalogue = $derived(
     visibleEssenceOptions(essenceOptions, (essence) => essence?.id === essenceId).map(
       (essence) => ({
         id: essence.id,
@@ -161,10 +178,21 @@
     componentId ? (componentOptions || []).find((item) => item.id === componentId) || null : null
   );
 
-  // The picker lists every system component; the trigger resolves the current id
-  // to its name/image so a chosen component reads back clearly.
-  const componentPickerOptions = $derived(
-    (componentOptions || []).map((item) => ({ id: item.id, label: item.name, img: item.img }))
+  const componentCatalogue = $derived(
+    (componentOptions || []).map((item) => ({
+      id: item.id,
+      label: item.name,
+      img: item.img,
+      icon: 'fas fa-cube',
+    }))
+  );
+
+  const currencyCatalogue = $derived(
+    (currencyUnits || []).map((unit) => ({
+      id: unit.id,
+      label: currencyUnitLabel(currencyUnits, unit.id),
+      icon: currencyUnitIcon(currencyUnits, unit.id),
+    }))
   );
 
   // The tag picker offers system tags not already on this option.
@@ -172,6 +200,108 @@
     (itemTags || [])
       .filter((tag) => !tags.includes(tag))
       .map((tag) => ({ id: tag, label: tag, icon: 'fas fa-tag' }))
+  );
+
+  // ── WHICH KINDS THE SELECT OFFERS ───────────────────────────────────────────────────────
+  // The chooser offers what the ADDERS offer, on premium's own argument: a chooser still
+  // listing a type the set-level and alternative adders will not create would let a GM retype
+  // a row into a requirement no control on the screen could have authored.
+  //
+  // PLUS THIS ROW'S OWN KIND, always. An authored currency row on a currency-off system, or an
+  // essence row whose essence has since been disabled, must still read back as what it IS;
+  // dropping its kind from the list would make the select display the wrong answer.
+  const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
+  // The UNFILTERED roster, matching the adders: issue 1036/2 keeps the essence match type
+  // available to a system whose essences are all disabled. What the disabled ones are withheld
+  // from is the SUGGESTION list below, which is where an essence is actually chosen.
+  const canAddEssence = $derived((essenceOptions || []).length > 0);
+  const kindOptions = $derived(
+    [
+      {
+        value: 'component',
+        label: text('FABRICATE.Admin.Manager.Recipe.ComponentTypeLabel', 'Component'),
+        offered: true,
+      },
+      {
+        value: 'tags',
+        label: text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag'),
+        offered: true,
+      },
+      {
+        value: 'essence',
+        label: text('FABRICATE.Admin.Manager.Recipe.EssenceTypeLabel', 'Essence'),
+        offered: canAddEssence,
+      },
+      {
+        value: 'currency',
+        label: text('FABRICATE.Admin.Manager.Recipe.CurrencyTypeLabel', 'Currency'),
+        offered: canAddCost,
+      },
+    ].filter((kind) => kind.offered || kind.value === matchType)
+  );
+
+  // ── THE NAME FIELD'S SUBJECT, PER KIND ──────────────────────────────────────────────────
+  // One shape (`{ catalogue, chosen, placeholder, emptyHint }`) so the markup below reads the
+  // same three branches whichever kind the row is; the differences are all data.
+  const named = $derived.by(() => {
+    if (matchType === 'essence') return Boolean(selectedEssence);
+    if (matchType === 'currency') return Boolean(selectedCurrencyUnit);
+    return Boolean(selectedComponent);
+  });
+  const catalogue = $derived.by(() => {
+    if (matchType === 'essence') return essenceCatalogue;
+    if (matchType === 'currency') return currencyCatalogue;
+    return componentCatalogue;
+  });
+  const chosen = $derived.by(() => {
+    if (!named) return null;
+    if (matchType === 'essence') {
+      return {
+        label: selectedEssence.name,
+        icon: selectedEssence.icon || 'fas fa-flask-vial',
+        img: '',
+      };
+    }
+    if (matchType === 'currency') {
+      return {
+        label: currencyUnitLabel(currencyUnits, currencyUnitId),
+        icon: currencyUnitIcon(currencyUnits, currencyUnitId),
+        img: '',
+      };
+    }
+    return {
+      label: selectedComponent.name,
+      icon: 'fas fa-cube',
+      img: selectedComponent.img || '',
+    };
+  });
+  const searchPlaceholder = $derived.by(() => {
+    if (matchType === 'essence')
+      return text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...');
+    if (matchType === 'currency')
+      return text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency');
+    return text(
+      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+      'Search components...'
+    );
+  });
+  const emptyCatalogueHint = $derived.by(() => {
+    if (matchType === 'essence')
+      return text('FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined');
+    if (matchType === 'currency')
+      return text('FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined', 'No currencies defined');
+    return text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined');
+  });
+
+  const normalizedQuery = $derived(query.trim().toLowerCase());
+  const suggestions = $derived(
+    catalogue
+      .filter((entry) =>
+        String(entry.label || '')
+          .toLowerCase()
+          .includes(normalizedQuery)
+      )
+      .slice(0, MAX_SUGGESTIONS)
   );
 
   function emit(next) {
@@ -185,8 +315,62 @@
     emit({ quantity: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1 });
   }
 
-  function chooseComponent(id) {
-    emit({ match: { type: 'component', componentId: id } });
+  /**
+   * Name this row, whichever kind it is, and drop the query that named it.
+   *
+   * @param {string} id the catalogue id the GM chose (or '' to clear the row)
+   */
+  function choose(id) {
+    const value = String(id || '');
+    query = '';
+    if (matchType === 'essence') {
+      emit({ match: { type: 'essence', essenceId: value, amount: essenceAmount } });
+      return;
+    }
+    if (matchType === 'currency') {
+      emit({ match: { type: 'currency', unit: value, amount: currencyAmount } });
+      return;
+    }
+    emit({ match: { type: 'component', componentId: value || null } });
+  }
+
+  /**
+   * Take what the GM typed, on ENTER and on nothing else.
+   *
+   * A Fabricate requirement names a catalogue ENTRY rather than carrying a free string, so
+   * what Enter commits is the top suggestion — the same row the GM is looking at — and a query
+   * that matches nothing commits nothing rather than authoring an unresolvable id.
+   */
+  function commitTyped() {
+    if (normalizedQuery === '') return;
+    const top = suggestions[0];
+    if (!top) return;
+    choose(top.id);
+  }
+
+  /**
+   * Retype this row (`proto:4660`). The old value goes with the old kind: a component id means
+   * nothing to an essence row, and leaving it behind would persist a field the new kind's own
+   * editor cannot see or clear.
+   *
+   * @param {string} kind one of `component` / `tags` / `essence` / `currency`
+   */
+  function setKind(kind) {
+    if (kind === matchType) return;
+    query = '';
+    if (kind === 'tags') {
+      emit({ quantity, match: { type: 'tags', tags: [], tagMatch: 'any' } });
+      return;
+    }
+    if (kind === 'essence') {
+      emit({ quantity: 1, match: { type: 'essence', essenceId: '', amount: 1 } });
+      return;
+    }
+    if (kind === 'currency') {
+      emit({ quantity: 1, match: { type: 'currency', unit: '', amount: 1 } });
+      return;
+    }
+    emit({ quantity, match: { type: 'component', componentId: null } });
   }
 
   function addTag(tag) {
@@ -203,10 +387,6 @@
     emit({ match: { type: 'tags', tags: [...tags], tagMatch: mode === 'all' ? 'all' : 'any' } });
   }
 
-  function chooseCurrencyUnit(unitId) {
-    emit({ match: { type: 'currency', unit: String(unitId || ''), amount: currencyAmount } });
-  }
-
   // Currency amounts share the four-digit cap with quantities and are stored on the
   // match (not the option quantity), which stays the default 1.
   function setCurrencyAmount(value) {
@@ -218,10 +398,6 @@
         amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1,
       },
     });
-  }
-
-  function chooseEssence(id) {
-    emit({ match: { type: 'essence', essenceId: String(id || ''), amount: essenceAmount } });
   }
 
   // Essence amounts share the four-digit cap with quantities and are stored on the
@@ -237,8 +413,9 @@
     });
   }
 
-  // Lead-chip tone + icon per match type (the small type-tinted square that opens
-  // the row, matching the prototype). Essence reuses the existing `is-essence` tone.
+  // The plate that opens the row (`proto:2247`): a neutral tile carrying the kind's own tinted
+  // glyph. The tint is on the GLYPH rather than on the tile, so four rows of different kinds
+  // read as one list with four marks in it rather than as four differently-coloured cards.
   const leadTone = $derived(
     matchType === 'tags'
       ? 'tag'
@@ -263,6 +440,21 @@
       ? text('FABRICATE.Admin.Manager.Recipe.RemoveComponent', 'Remove component')
       : text('FABRICATE.Admin.Manager.Recipe.RemoveAlternative', 'Remove alternative')
   );
+  const tagPolicyWord = $derived(
+    tagMatch === 'all'
+      ? text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All of')
+      : text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any of')
+  );
+  const kindLabel = $derived(
+    text('FABRICATE.Admin.Manager.Recipe.RequirementKind', 'Requirement kind')
+  );
+
+  // The SAME two strings the policy word above reads, so the control and the sentence it
+  // writes can never disagree: `proto:2253` and `proto:2268` both render `Any of` / `All of`.
+  const TAG_MATCH_OPTIONS = [
+    { value: 'any', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAny', fallback: 'Any of' },
+    { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAll', fallback: 'All of' },
+  ];
 </script>
 
 <div class={`manager-recipe-ingredient-option-row is-${leadTone}`} data-recipe-option>
@@ -270,131 +462,191 @@
     <i class={leadIcon}></i>
   </span>
 
-  <div class="manager-recipe-option-target">
-    {#if matchType === 'component'}
-      <!-- The NAME lives INSIDE the trigger (issue 676), sized to the name's length — the
-           shape the progressive stage rows and the salvage yield picker already use, now
-           shared by every component picker in the studio. It was an image-only button with
-           the name as loose text beside it: the name is the only thing that identifies the
-           component to a GM who has not memorised the art, yet clicking it did nothing, so
-           the obvious target was inert and the real one was a 24px thumbnail. -->
-      <div class="manager-recipe-option-component">
-        <SearchablePopover
-          options={componentPickerOptions}
-          value={componentId}
-          pickerClass="manager-recipe-component-picker"
-          triggerClass="manager-button manager-recipe-component-trigger"
-          triggerImg={selectedComponent?.img || ''}
-          triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-          triggerLabel={selectedComponent?.name ||
-            text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-          valueClass="manager-recipe-component-name"
-          triggerTitle={selectedComponent?.name || ''}
-          triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-          dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-          searchPlaceholder={text(
-            'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-            'Search components...'
-          )}
-          searchAriaLabel={text(
-            'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-            'Search components...'
-          )}
-          emptyHint={text(
-            'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
-            'No components defined'
-          )}
-          onChoose={(id) => chooseComponent(id)}
-        />
-      </div>
-    {:else if matchType === 'tags'}
-      <span class="manager-recipe-option-tag-name" data-recipe-tag-summary>{tagSummary}</span>
-      <span class="manager-recipe-req-tag is-tag" data-recipe-req-tag="tag"
-        >{text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}</span
+  <!-- A REAL `<select>`, not a segmented control or a popover: four mutually exclusive values
+       with no search and no imagery is exactly what a select is for, and the platform widget
+       carries keyboard, screen-reader and touch behaviour a hand-rolled menu would have to
+       reimplement. `proto:2248` draws one too. -->
+  <select
+    class="manager-recipe-option-kind"
+    data-recipe-option-kind
+    aria-label={kindLabel}
+    title={kindLabel}
+    value={matchType}
+    onchange={(event) => setKind(event.currentTarget.value)}
+  >
+    {#each kindOptions as kind (kind.value)}
+      <option value={kind.value}>{kind.label}</option>
+    {/each}
+  </select>
+
+  {#if matchType === 'tags'}
+    <!-- ONE LINE (`proto:2252`-`2268`): the policy word, the chosen tags, `+ Tag`, and the
+         Any of / All of control that sets the word. No empty state — an unfilled tag row is
+         its own empty state, and it already says `Any of` with nothing after it. -->
+    <span class="manager-recipe-option-tags" data-recipe-option-tags>
+      <span class="manager-recipe-tag-policy" data-recipe-tag-policy>{tagPolicyWord}</span>
+      {#each tags as tag (tag)}
+        <Chip tag="span" tone="tag" class="manager-recipe-tag-chip" data-recipe-tag={tag}>
+          <span>{tag}</span>
+          <button
+            type="button"
+            class="manager-recipe-tag-remove"
+            data-recipe-remove="tag"
+            aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+            title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+            onclick={() => removeTag(tag)}><i class="fas fa-times" aria-hidden="true"></i></button
+          >
+        </Chip>
+      {/each}
+      <SearchablePopover
+        options={tagPickerOptions}
+        pickerClass="manager-recipe-tag-picker"
+        triggerChip
+        triggerClass="manager-recipe-tag-trigger"
+        triggerIcon="fas fa-plus"
+        triggerLabel={text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}
+        triggerData={{ 'data-recipe-add-tag': '' }}
+        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        searchPlaceholder={text(
+          'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
+          'Search tags...'
+        )}
+        searchAriaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
+          'Search tags...'
+        )}
+        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
+        showChevron={false}
+        onChoose={(tag) => addTag(tag)}
+      />
+    </span>
+    <SegmentedControl
+      options={TAG_MATCH_OPTIONS}
+      value={tagMatch}
+      density="compact"
+      groupName={`tag-match-${tagMatchGroupId}`}
+      ariaLabel={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
+      optionDataAttr="data-recipe-tag-match"
+      onChange={(mode) => setTagMatch(mode)}
+    />
+  {:else if currencyReadonly}
+    <!-- Currency feature disabled: the unit is a static label, not a searchable field, and a
+         flag marks the requirement inert. The value stays visible so nothing the recipe
+         already requires is silently hidden. -->
+    <span class="manager-recipe-option-name-field" data-recipe-option-currency>
+      <span
+        class="manager-recipe-currency-unit is-readonly"
+        data-recipe-currency-unit
+        data-recipe-currency-readonly>{currencyUnitReadonlyLabel}</span
       >
-    {:else if matchType === 'essence'}
-      <div class="manager-recipe-option-essence" data-recipe-option-essence>
-        <span class="manager-recipe-essence-picker-wrap" data-recipe-essence-picker>
-          <SearchablePopover
-            options={essencePickerOptions}
-            value={essenceId}
-            pickerClass="manager-recipe-essence-picker"
-            triggerClass="manager-button is-subtle manager-recipe-essence-trigger"
-            triggerIcon={selectedEssence?.icon || 'fas fa-flask-vial'}
-            triggerLabel={selectedEssence
-              ? selectedEssence.name
-              : text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
-            triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
-            triggerTitle={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
-            dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
-            searchPlaceholder={text(
-              'FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder',
-              'Search essences...'
+      <span
+        class="manager-recipe-req-tag is-disabled"
+        data-recipe-currency-disabled
+        title={text(
+          'FABRICATE.Admin.Manager.Recipe.CurrencyDisabledHint',
+          'Currency is disabled for this system; this cost is inactive until it is re-enabled.'
+        )}>{text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off')}</span
+      >
+    </span>
+  {:else}
+    <span
+      class="manager-recipe-option-name-field"
+      data-recipe-option-currency={matchType === 'currency' ? '' : undefined}
+      data-recipe-option-essence={matchType === 'essence' ? '' : undefined}
+    >
+      {#if named}
+        <span class="manager-recipe-option-chosen" data-recipe-option-chosen title={chosen.label}>
+          {#if chosen.img}
+            <img src={chosen.img} alt="" class="manager-recipe-option-chosen-img" />
+          {:else}
+            <i class={chosen.icon} aria-hidden="true"></i>
+          {/if}
+          <span class="manager-recipe-option-chosen-name">{chosen.label}</span>
+          <!-- A REAL BUTTON, nested inside the pill rather than made of it. The pill is a
+               `<span>`, so this is a button inside a non-interactive element — never a
+               `role="button"` wrapper with a button inside it, which is the nested-button
+               trap this row would otherwise walk into. -->
+          <button
+            type="button"
+            class="manager-recipe-option-clear"
+            data-recipe-option-clear
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Recipe.ClearChoice',
+              'Clear and search again'
             )}
-            searchAriaLabel={text(
-              'FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder',
-              'Search essences...'
-            )}
-            emptyHint={text(
-              'FABRICATE.Admin.Manager.Recipe.NoEssencesDefined',
-              'No essences defined'
-            )}
-            onChoose={(id) => chooseEssence(id)}
+            title={text('FABRICATE.Admin.Manager.Recipe.ClearChoice', 'Clear and search again')}
+            onclick={() => choose('')}><i class="fa-solid fa-xmark" aria-hidden="true"></i></button
+          >
+        </span>
+      {:else}
+        <!-- THE DEGRADED FACE, and the one the maintainer's own world starts in: a world with
+             no components and no essences. The field still renders and is still typeable; what
+             changes is that its own placeholder says there is nothing to name yet, rather than
+             inviting a search that can never return.
+
+             STATED ON THE PLACEHOLDER RATHER THAN IN A SECOND ELEMENT BESIDE IT. A muted note
+             was tried first and is a worse answer twice over: the row must stay on one line, so
+             a `nowrap` sentence beside the field starved the field itself down to about thirty
+             pixels, and the note repeated word for word what the placeholder inside it already
+             said. -->
+        <span
+          class="manager-recipe-option-search"
+          class:is-typing={normalizedQuery !== ''}
+          class:is-empty-catalogue={catalogue.length === 0}
+          data-recipe-option-empty-catalogue={catalogue.length === 0 ? '' : undefined}
+        >
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input
+            type="text"
+            data-recipe-option-search
+            value={query}
+            placeholder={catalogue.length === 0 ? emptyCatalogueHint : searchPlaceholder}
+            aria-label={searchPlaceholder}
+            oninput={(event) => {
+              query = event.currentTarget.value;
+            }}
+            onkeydown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              commitTyped();
+            }}
           />
         </span>
-      </div>
-    {:else}
-      <div class="manager-recipe-option-currency" data-recipe-option-currency>
-        {#if currencyReadonly}
-          <!-- Currency feature disabled: the unit is a static label, not a picker, and a
-               flag marks the requirement inert. The value stays visible so nothing the
-               recipe already requires is silently hidden. -->
-          <span
-            class="manager-recipe-currency-unit is-readonly"
-            data-recipe-currency-unit
-            data-recipe-currency-readonly>{currencyUnitReadonlyLabel}</span
-          >
-          <span
-            class="manager-recipe-req-tag is-disabled"
-            data-recipe-currency-disabled
-            title={text(
-              'FABRICATE.Admin.Manager.Recipe.CurrencyDisabledHint',
-              'Currency is disabled for this system; this cost is inactive until it is re-enabled.'
-            )}>{text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off')}</span
-          >
-        {:else}
-          <span class="manager-recipe-currency-unit" data-recipe-currency-unit>
-            <SearchablePopover
-              options={currencyPickerOptions}
-              value={currencyUnitId}
-              pickerClass="manager-recipe-currency-picker"
-              triggerClass="manager-button is-subtle manager-recipe-currency-trigger"
-              triggerIcon={currencyUnitIcon(currencyUnits, currencyUnitId)}
-              triggerLabel={selectedCurrencyUnit
-                ? currencyUnitLabel(currencyUnits, currencyUnitId)
-                : text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-              triggerAriaLabel={text(
-                'FABRICATE.Admin.Manager.Recipe.PickCurrency',
-                'Pick currency'
-              )}
-              triggerTitle={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-              dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-              searchPlaceholder={text(
-                'FABRICATE.Admin.Manager.Recipe.PickCurrency',
-                'Pick currency'
-              )}
-              searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-              emptyHint={text(
-                'FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined',
-                'No currencies defined'
-              )}
-              onChoose={(unitId) => chooseCurrencyUnit(unitId)}
-            />
+        {#if normalizedQuery !== ''}
+          <span class="manager-recipe-option-suggestions">
+            <!-- KEYED ON POSITION plus the id, never on the id alone. `componentOptions` and
+                 `essenceOptions` are injected rosters this row cannot make a uniqueness promise
+                 about, and Svelte throws `each_key_duplicate` on a repeated key in PRODUCTION
+                 as well as in development — one repeat would blank the whole editor rather than
+                 draw a row twice. The id rides along so a row whose contents changed under a
+                 narrowing search is re-created rather than updated in place. -->
+            {#each suggestions as suggestion, index (`${index}:${suggestion.id}`)}
+              <button
+                type="button"
+                class="manager-recipe-option-suggestion"
+                data-recipe-option-suggestion={suggestion.id}
+                onclick={() => choose(suggestion.id)}
+              >
+                {#if suggestion.img}
+                  <img src={suggestion.img} alt="" class="manager-recipe-option-chosen-img" />
+                {:else}
+                  <i class={suggestion.icon} aria-hidden="true"></i>
+                {/if}
+                <span>{suggestion.label}</span>
+              </button>
+            {/each}
+            {#if suggestions.length === 0}
+              <span class="manager-recipe-option-no-matches" data-recipe-option-no-matches
+                >{text('FABRICATE.Admin.Manager.Recipe.NoMatches', 'No matches')}</span
+              >
+            {/if}
           </span>
         {/if}
-      </div>
-    {/if}
-  </div>
+      {/if}
+    </span>
+  {/if}
 
   <div class="manager-recipe-option-controls">
     {#if showRequiredTag}
@@ -404,18 +656,12 @@
     {/if}
 
     <!-- EVERY row type edits its count through the SAME Stepper in the SAME end-of-row
-         position (issue 676). Essence and currency used to put a bare `<input type=number>`
-         at the row's START, so the one thing all four row types have in common — "how many"
-         — was two different controls in two different places depending on the row's kind.
-         The count is the same question, so it is the same control.
-
-         The MODEL differs even though the control does not: a component/tag row counts with
-         `option.quantity`, while essence and currency carry their count on the MATCH
-         (`match.amount`) with `option.quantity` pinned at 1. So the marker attribute stays
-         per-kind (`data-recipe-essence-amount` / `data-recipe-currency-amount` /
-         `data-recipe-option-quantity`) — a shared marker would claim these write the same
-         field, and `data-recipe-option-quantity` specifically means "this row's
-         option.quantity", which is not what an essence stepper edits. -->
+         position (issue 676). The MODEL differs even though the control does not: a
+         component/tag row counts with `option.quantity`, while essence and currency carry
+         their count on the MATCH (`match.amount`) with `option.quantity` pinned at 1. So the
+         marker attribute stays per-kind (`data-recipe-essence-amount` /
+         `data-recipe-currency-amount` / `data-recipe-option-quantity`) — a shared marker would
+         claim these write the same field. -->
     {#if matchType === 'essence'}
       <Stepper
         value={essenceAmount}
@@ -502,74 +748,4 @@
       >
     {/if}
   </div>
-
-  {#if matchType === 'tags'}
-    <!-- The tag editing detail: the any/all segmented control + Add tag picker, then
-         the chosen tags in a full-width bordered area (chips or "No tags set"). -->
-    <div class="manager-recipe-option-tags-detail">
-      <div class="manager-recipe-option-tags-controls">
-        <SegmentedControl
-          options={TAG_MATCH_OPTIONS}
-          value={tagMatch}
-          groupName={`tag-match-${tagMatchGroupId}`}
-          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
-          optionDataAttr="data-recipe-tag-match"
-          onChange={(mode) => setTagMatch(mode)}
-        />
-        <SearchablePopover
-          options={tagPickerOptions}
-          pickerClass="manager-recipe-tag-picker"
-          triggerClass="manager-button is-subtle manager-recipe-tag-trigger"
-          triggerIcon="fas fa-tag"
-          triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-          triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-          dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-          searchPlaceholder={text(
-            'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
-            'Search tags...'
-          )}
-          searchAriaLabel={text(
-            'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
-            'Search tags...'
-          )}
-          emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
-          onChoose={(tag) => addTag(tag)}
-        />
-      </div>
-      <div class="manager-recipe-option-tags-list" data-recipe-tags-list>
-        {#if tags.length > 0}
-          <ul class="manager-recipe-tag-chips">
-            {#each tags as tag (tag)}
-              <Chip tag="li" class="manager-recipe-tag-chip" data-recipe-tag={tag}>
-                <span>{tag}</span>
-                <button
-                  type="button"
-                  class="manager-recipe-tag-remove"
-                  data-recipe-remove="tag"
-                  aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                  title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
-                  onclick={() => removeTag(tag)}
-                  ><i class="fas fa-times" aria-hidden="true"></i></button
-                >
-              </Chip>
-            {/each}
-          </ul>
-        {:else}
-          <EmptyState
-            compact
-            icon="fas fa-tags"
-            title={text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}
-            dataAttr="data-recipe-tags-empty"
-          />
-        {/if}
-      </div>
-    </div>
-  {/if}
-
-  <!-- (An essence row carried a full-width "met by any components carrying this essence"
-       sub-line here, and an ESSENCE pill after its picker. Both are gone (issue 676): the
-       row already opens with the flask lead chip and its picker names an essence, so the
-       pill restated the chip and the sub-line explained the feature to a GM who had just
-       chosen it deliberately from an essence-only menu. Explanation belongs in the tab's
-       intro copy, not repeated under every row.) -->
 </div>

@@ -327,7 +327,12 @@ const EXPECTED = {
   // ── The FLAT component picker (issue 676). Same shared rule as the stage/salvage
   // triggers below, so it reads at the same 0.82rem — a flat row and a stage row name a
   // component identically. If these ever diverge from `stage-picker`, the sharing broke.
-  'option-lead': 13.12, // 0.82rem — the type-tinted lead chip's glyph
+  // The requirement row's PLATE (issue 1373, maintainer round 5). It was a 30px tinted tile
+  // whose glyph read at 0.82rem; `proto:2247` and premium's `RewardRow` both draw a neutral
+  // 28px tile at 12px carrying the kind's tinted glyph, so the tile shrank by a rung and its
+  // mark with it. It no longer shares a number with the pickers below, and that is the change
+  // rather than a drift: a plate is a MARK and a picker trigger is a control naming a thing.
+  'option-lead': 12, // 0.75rem — the neutral plate's type-tinted glyph
   'flat-picker': 13.12, // 0.82rem — shared .manager-recipe-component-trigger rule
   'flat-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
   // ── The progressive stage row (issue 676). Every number below is the one the salvage
