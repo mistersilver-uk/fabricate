@@ -3230,6 +3230,26 @@ describe('RecipeEditView (mounted)', () => {
       'no AND divider is rendered between AND’d requirements'
     );
 
+    // NO `REQUIRED` PILL, ON ANY ROW (issue 1373, maintainer round 6). The word appears ZERO
+    // times in the design's 6,236 lines — `proto:2466` and `proto:3008` head a "Required for"
+    // BACK-REFERENCE panel, which is a different question entirely (what needs this essence),
+    // and nothing draws a per-row badge. It is redundant as well as absent: a choice group
+    // says OR in its own `ANY ONE OF` pill, so every row OUTSIDE one is required by position,
+    // and the tab's own intro sentence already states the AND.
+    //
+    // Asserted over the WHOLE SET rather than over the bare requirement that carried it, so a
+    // reintroduction anywhere in the ingredient list fails here.
+    assert.equal(
+      set.querySelectorAll('[data-recipe-req-tag="required"]').length,
+      0,
+      'no requirement row emits a REQUIRED pill'
+    );
+    assert.doesNotMatch(
+      set.textContent,
+      /REQUIRED/i,
+      'and the word is not rendered by some other element either'
+    );
+
     // The essence requirement renders as a first-class essence OPTION row (issue 649),
     // its amount edited by the SAME end-of-row Stepper every other row type uses (676).
     const essenceReq = set.querySelector('[data-recipe-group-id="grp-3"]');

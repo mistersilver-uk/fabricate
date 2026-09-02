@@ -319,7 +319,6 @@
           {currencyEnabled}
           {essenceOptions}
           canRemove={true}
-          showRequiredTag={true}
           orControl={orMenu}
           onChange={(nextOption) => updateOption(index, nextOption)}
           onRemove={() => removeOption(index)}

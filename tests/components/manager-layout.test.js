@@ -6050,23 +6050,198 @@ test('recipe tag chips keep a zero margin and one height, whatever the host rhyt
   }
 });
 
-test('the tag requirement row keeps every control on ONE line', async () => {
+test('the tag requirement row keeps its arm whole at BOTH widths it is rendered at', async () => {
   // REPLACES `recipe tag list spans the full row width on its own line below the controls`
   // (issue 1373, maintainer round 5). That test pinned the shape the design names as the
   // defect: `.manager-recipe-option-tags-detail` carried `flex: 1 1 100%`, so the tag arm
   // ALWAYS wrapped to a second full-width line whatever the row's width was, taking the match
   // toggle, an `Add tag` dropdown and a bordered `No tags set` box with it.
   //
-  // `proto:2252`-`2268` draws `[Tag ▾] Any of [chips] [+ Tag] … [Any of|All of] [− 1 +] [×]`.
+  // `proto:2252`-`2268` draws `[Tag v] Any of [chips] [+ Tag] ... [Any of|All of] [- 1 +] [x]`.
   // The claim is geometric and this is where it can be made: nothing else in the corpus
   // computes a real cascade, and the mounted suites cannot see a wrap at all.
+  //
+  // == TWO WIDTHS, AND A FIXTURE THAT CARRIES THE WHOLE ROW (round 6) =======================
+  // The first version of this test measured ONE width with a row that was missing three
+  // controls: the `or...` chip, the divider before it, and the real `Stepper` (it used a bare
+  // `<input type="number">`, which is a good deal narrower). Between them they are most of a
+  // hundred pixels, so the harness sized the breakpoint away - the guard was green while the
+  // Tool inspector's copy of this row rendered the policy word and each chip on a line of
+  // their OWN, four lines deep.
+  //
+  // So the fixture now injects `Stepper`'s and `SegmentedControl`'s real scoped CSS with their
+  // real hash classes - both own their appearance in their own `<style>` block, and a fixture
+  // reproducing only their markup measures boxes that are not the shipped size - and it runs
+  // at both widths this row is actually rendered at: the recipe tab's full-width column and
+  // the Tool Breakage tab's inspector-flanked one.
+  //
+  // WHAT IS ASSERTED IS NOT "one line" AT BOTH. At the narrow width `Any of` + two chips +
+  // `+ Tag` + the segments + the stepper + `or...` + `x` do not fit on one line and no CSS can
+  // make them; the design's own frame is the wide one. What must hold is that the tag ARM
+  // stays whole - one line, with its policy word, its chips and its `+ Tag` together - so the
+  // row degrades by moving a WHOLE control down rather than by shredding the arm.
+  const stepperScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
+  );
+  const segmentedScoped = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte')
+  );
+  const stamp = (markup) =>
+    [
+      ['manager-chip', chipScoped.hashClass],
+      ['fab-stepper', stepperScoped.hashClass],
+      ['fab-stepper-input', stepperScoped.hashClass],
+      ['fab-stepper-adjunct', stepperScoped.hashClass],
+      ['manager-segmented', segmentedScoped.hashClass],
+      ['manager-segment', segmentedScoped.hashClass],
+      ['manager-segment-input', segmentedScoped.hashClass],
+      ['manager-segment-label', segmentedScoped.hashClass],
+    ].reduce((html, [className, hash]) => withScopeHash(html, className, hash), markup);
+
+  // The row exactly as `RecipeIngredientOption` renders a bare tag requirement: the plate, the
+  // kind select, the tag arm, the Any of / All of segments and the trailing control cluster
+  // (Stepper, divider, `or...`, remove).
+  const row = stamp(`
+    <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option>
+      <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
+      <select class="manager-recipe-option-kind" data-recipe-option-kind>
+        <option value="tags" selected>Tag</option>
+      </select>
+      <span class="manager-recipe-option-tags" data-recipe-option-tags>
+        <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
+        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+        <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+        <span class="manager-chip manager-recipe-tag-trigger" data-recipe-add-tag><i class="fas fa-plus"></i><span>Tag</span></span>
+      </span>
+      <div class="manager-segmented is-compact" role="radiogroup" aria-label="Tag match">
+        <label class="manager-segment is-active"><input type="radio" class="manager-segment-input" name="tag-match-1" checked><span class="manager-segment-label">Any of</span></label>
+        <label class="manager-segment"><input type="radio" class="manager-segment-input" name="tag-match-1"><span class="manager-segment-label">All of</span></label>
+      </div>
+      <div class="manager-recipe-option-controls">
+        <div class="fab-stepper">
+          <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
+          <input type="number" class="fab-stepper-input manager-recipe-option-quantity" value="2">
+          <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+        </div>
+        <span class="manager-recipe-option-divider"></span>
+        <span class="manager-chip manager-recipe-or-trigger"><i class="fas fa-code-branch"></i><span>or</span></span>
+        <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
+      </div>
+    </div>`);
+
+  // `manager-recipe-edit-ingredients-cost` photographs the first; `world-tool-entry-on-break-repair`
+  // and `manager-tool-stress-repair` photograph the second, and it is the one that broke.
+  for (const surface of [
+    { label: 'the recipe tab', width: 1006 },
+    { label: 'a Tool inspector', width: 622 },
+  ]) {
+    const context = await sharedBrowser.newContext({
+      viewport: { width: surface.width + 60, height: 400 },
+      deviceScaleFactor: 1,
+    });
+    const page = await context.newPage();
+
+    try {
+      await page.setContent(`
+        <!doctype html>
+        <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <style>
+              ${css}
+              ${chipCss}
+              ${stepperScoped.css}
+              ${segmentedScoped.css}
+              body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+              .harness-row-width { width: ${surface.width}px; }
+              .fas::before, .fa-solid::before { content: "x"; }
+            </style>
+          </head>
+          <body>
+            <main class="fabricate-manager">
+              <div class="harness-row-width">${row}</div>
+            </main>
+          </body>
+        </html>
+      `);
+
+      const report = await page.evaluate(() => {
+        const box = (element) => {
+          const rect = element.getBoundingClientRect();
+          return { top: rect.top, height: rect.height, width: rect.width };
+        };
+        const arm = document.querySelector('[data-recipe-option-tags]');
+        return {
+          arm: box(arm),
+          // Every MEMBER of the arm, so a chip that dropped below its neighbours is visible.
+          armMembers: [...arm.children].map((child) => box(child)),
+          rowWidth: box(document.querySelector('.manager-recipe-ingredient-option-row')).width,
+        };
+      });
+
+      // THE ARM IS ONE LINE. Measured as "the arm is no taller than its tallest member", which
+      // is the same claim as "no member wrapped" and survives a rung change on the spacing
+      // ladder in a way a pinned pixel height would not.
+      const tallest = Math.max(...report.armMembers.map((member) => member.height));
+      assert.ok(
+        report.arm.height <= tallest + 1,
+        `${surface.label} (${surface.width}px): the tag arm is ONE line - the policy word, the ` +
+          `chips and + Tag stay together (arm ${report.arm.height}px vs tallest member ${tallest}px)`
+      );
+      for (const [index, member] of report.armMembers.entries()) {
+        assert.ok(
+          member.top - report.arm.top < tallest,
+          `${surface.label}: arm member ${index} wrapped onto a line of its own ` +
+            `(top +${member.top - report.arm.top}px against a ${tallest}px member)`
+        );
+      }
+      assert.ok(
+        report.rowWidth <= surface.width + 1,
+        `${surface.label}: the row stays inside its column (${report.rowWidth} vs ${surface.width})`
+      );
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test('every requirement kind marks itself in its OWN tint, on the plate and on the chosen chip', async () => {
+  // `proto:4624`-`4627` is the design's `KINDMETA`, and a tint is half of every entry in it:
+  // `comp` is `--success`, `tag` is `--tag`, `cur` is `--accent`, and `ess` is `--water` — an
+  // essence/water hue the design's own `:root` never declares, so its own frames render that
+  // one glyph uncoloured. `--fab-info` is the token that hue names here, and the other three
+  // map exactly: the design's `--success`, `--accent` and `--info` are byte-for-byte our
+  // `--fab-success`, `--fab-accent` and `--fab-info`, and `--fab-purple` is this repo's tag
+  // family (`Chip`'s `is-tag`, the tag row's own edge, the `+ Tag` pill).
+  //
+  // `proto:4645` resolves the entry PER ROW, and premium's `RewardRow` puts the same
+  // `presentation.tint` on the plate (`:62`) AND on the chosen chip's glyph (`:80`) and on
+  // each suggestion's (`:129`). The plate shipped tinted; the chip and the suggestions did
+  // not, so a NAMED row's mark was one inherited ink whatever kind the row was.
+  //
+  // MEASURED, NOT MATCHED. A rule that reaches the element but loses the cascade — an `<i>`
+  // whose colour an ancestor pill sets, a `layer(modules)` sheet rule against a component's
+  // own unlayered block — reads as correct in the source and renders as one colour. So this
+  // resolves each token through a probe element in the same document and compares computed
+  // values rather than asserting a selector exists.
   const context = await sharedBrowser.newContext({
-    viewport: { width: 760, height: 360 },
+    viewport: { width: 900, height: 420 },
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
 
   try {
+    const rowFor = (kind, icon) => `
+      <div class="manager-recipe-ingredient-option-row is-${kind}" data-recipe-option>
+        <span class="manager-recipe-option-lead is-${kind}" data-plate="${kind}"><i class="${icon}"></i></span>
+        <select class="manager-recipe-option-kind"><option>${kind}</option></select>
+        <span class="manager-recipe-option-name-field">
+          <span class="manager-recipe-option-chosen" data-recipe-option-chosen>
+            <i class="${icon} manager-recipe-option-mark is-${kind}" data-mark="${kind}"></i>
+            <span class="manager-recipe-option-chosen-name">Named</span>
+          </span>
+        </span>
+      </div>`;
     await page.setContent(`
       <!doctype html>
       <html lang="en">
@@ -6074,86 +6249,59 @@ test('the tag requirement row keeps every control on ONE line', async () => {
           <meta charset="utf-8">
           <style>
             ${css}
-            ${chipCss}
             body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
-            .harness-row-width { width: 600px; }
             .fas::before, .fa-solid::before { content: "x"; }
           </style>
         </head>
         <body>
           <main class="fabricate-manager">
-            <div class="harness-row-width">
-              <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option>
-                <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
-                <select class="manager-recipe-option-kind" data-recipe-option-kind>
-                  <option value="tags" selected>Tag</option>
-                </select>
-                <span class="manager-recipe-option-tags" data-recipe-option-tags>
-                  <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
-                  <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-                  <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-                  <span class="manager-chip manager-recipe-tag-trigger"><i class="fas fa-plus"></i><span>Tag</span></span>
-                </span>
-                <!-- The Any of / All of control is the shared SegmentedControl (issue 975). Its
-                     track/segment styling lives in that component's SCOPED style block, not in
-                     fabricate.css, so this fixture reproduces only the markup shape; the
-                     assertions below are about the ROW's own layout, which fabricate.css owns. -->
-                <div class="manager-segmented is-compact" role="radiogroup" aria-label="Tag match">
-                  <label class="manager-segment is-active"><input type="radio" name="tag-match-1" checked><span class="manager-segment-label">Any of</span></label>
-                  <label class="manager-segment"><input type="radio" name="tag-match-1"><span class="manager-segment-label">All of</span></label>
-                </div>
-                <div class="manager-recipe-option-controls">
-                  <input type="number" class="manager-recipe-option-quantity" value="1">
-                  <button type="button" class="manager-recipe-option-remove"><i class="fas fa-xmark"></i></button>
-                </div>
-              </div>
-            </div>
+            ${rowFor('component', 'fas fa-cubes')}
+            ${rowFor('tag', 'fas fa-tag')}
+            ${rowFor('essence', 'fas fa-flask-vial')}
+            ${rowFor('currency', 'fa-solid fa-coins')}
+            <span data-token="component" style="color: var(--fab-success)"></span>
+            <span data-token="tag" style="color: var(--fab-purple)"></span>
+            <span data-token="essence" style="color: var(--fab-info)"></span>
+            <span data-token="currency" style="color: var(--fab-accent)"></span>
           </main>
         </body>
       </html>
     `);
 
     const report = await page.evaluate(() => {
-      const row = document.querySelector('.manager-recipe-ingredient-option-row');
-      const rowRect = row.getBoundingClientRect();
-      const style = getComputedStyle(row);
-      const inset =
-        parseFloat(style.paddingTop) +
-        parseFloat(style.paddingBottom) +
-        parseFloat(style.borderTopWidth) +
-        parseFloat(style.borderBottomWidth);
-      return {
-        rowHeight: rowRect.height,
-        contentHeight: rowRect.height - inset,
-        // Every DIRECT child, so a control added later is measured without editing this.
-        children: [...row.children].map((child) => {
-          const rect = child.getBoundingClientRect();
-          return { name: child.className, top: rect.top - rowRect.top, height: rect.height };
-        }),
-      };
+      const colourOf = (selector) => getComputedStyle(document.querySelector(selector)).color;
+      return ['component', 'tag', 'essence', 'currency'].map((kind) => ({
+        kind,
+        plate: colourOf(`[data-plate="${kind}"] i`),
+        mark: colourOf(`[data-mark="${kind}"]`),
+        token: colourOf(`[data-token="${kind}"]`),
+      }));
     });
 
-    assert.ok(report.children.length >= 5, `the fixture draws the whole row (${report.children.length})`);
-    // ONE LINE: no child starts below the tallest one, so nothing has wrapped. Stated over the
-    // children's own heights rather than against a pinned pixel, because the row is sized by
-    // its controls and a rung change on the ladder must not fail this.
-    const tallest = Math.max(...report.children.map((child) => child.height));
-    for (const child of report.children) {
-      assert.ok(
-        child.top < tallest,
-        `${child.name} wrapped to a second line (top ${child.top} vs tallest control ${tallest})`
+    for (const kind of report) {
+      assert.equal(
+        kind.plate,
+        kind.token,
+        `the ${kind.kind} plate glyph carries the ${kind.kind} token, not an inherited ink`
+      );
+      assert.equal(
+        kind.mark,
+        kind.token,
+        `the chosen chip's ${kind.kind} glyph takes the same tint the plate does (RewardRow.svelte:80)`
       );
     }
-    // …and the row's content box is one control tall, which is the same claim measured from
-    // the other end: a wrapped row is at least twice this whatever its children report.
-    assert.ok(
-      report.contentHeight <= tallest + 1,
-      `the row is one control tall (content ${report.contentHeight} vs tallest ${tallest})`
+    // …and the four are four, not one token wearing four class names: a sheet that resolved
+    // every kind to the same colour would satisfy every assertion above.
+    assert.equal(
+      new Set(report.map((kind) => kind.plate)).size,
+      4,
+      `the four kinds resolve to four distinct tints (${report.map((k) => `${k.kind}=${k.plate}`).join(', ')})`
     );
   } finally {
     await context.close();
   }
 });
+
 
 // Until issue 785 the Books & Scrolls surface carried its own duplicate page header, so it
 // had FOUR unconditional grid children against the shared three-track `auto auto 1fr`: the

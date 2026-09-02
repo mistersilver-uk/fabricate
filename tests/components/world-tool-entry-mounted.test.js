@@ -1815,6 +1815,57 @@ describe('the world Tool entry (issue 1373)', () => {
       );
     });
 
+    // AN UNRESOLVED REFERENCE IS NAMED, NEVER PRINTED (issue 1373, maintainer round 6).
+    // `proto:4700`-`4703` resolves every id against the live catalogue and falls back to
+    // `unset component` / `unset essence` / `unset currency` / `unset tag`, and `proto:4064`
+    // does the same for currency against the ladder. The sentence printed the STORED ID when
+    // the catalogue could not resolve it, so the world the maintainer installs Fabricate into
+    // — one whose components have not been lifted yet — read
+    // `Mending consumes sm-iron-ingot + 2× sm-coal or sm-whetstone.`
+    //
+    // The two unresolvable cases are ONE case here. An id that was never set and an id whose
+    // catalogue entry is gone are indistinguishable to a reader and the design collapses them
+    // too (`CAT.find(...)||{}` answers the same for both), so both take the unset name.
+    it('names an unresolvable reference rather than printing the id it stored', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          currencyUnits: [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }],
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [
+                  { quantity: 1, match: { type: 'component', componentId: 'sm-iron-ingot' } },
+                ],
+              },
+              {
+                id: 'g2',
+                options: [{ quantity: 1, match: { type: 'essence', essenceId: 'sm-fire', amount: 2 } }],
+              },
+              {
+                id: 'g3',
+                options: [{ quantity: 1, match: { type: 'currency', unit: 'zorkmid', amount: 5 } }],
+              },
+              {
+                id: 'g4',
+                options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+              },
+            ],
+          },
+        }
+      );
+      const summary = target.querySelector('[data-tool-repair-summary]').textContent.trim();
+      assert.equal(
+        summary,
+        'Mending consumes unset component + unset essence + unset currency + unset tag.',
+        'every kind falls back to its own localized unset name'
+      );
+      for (const id of ['sm-iron-ingot', 'sm-fire', 'zorkmid']) {
+        assert.doesNotMatch(summary, new RegExp(id), `the stored ${id} is never shown to a GM`);
+      }
+    });
+
     it('says nothing can mend a copy when the repair set is empty', async () => {
       const target = await mountBreakage({ mode: 'flagBroken' });
       assert.match(

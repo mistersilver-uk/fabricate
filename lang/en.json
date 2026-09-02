@@ -2301,7 +2301,6 @@
           "And": "AND",
           "AnyOneOf": "Any one of",
           "AnyOneOfHint": "crafter picks a component, a tagged item, a currency cost, or an essence",
-          "RequiredTag": "Required",
           "RequirementKind": "Requirement kind",
           "ComponentTypeLabel": "Component",
           "TagTypeLabel": "Tag",

@@ -49,6 +49,17 @@
 
   A TAG IS A STRING, not an id, so this arm keeps the shipped `SearchablePopover` for `+ Tag`:
   the choice is over the world tag roster and there is nothing to type into the row.
+
+  == AND THE ROW CARRIES NO `REQUIRED` PILL =================================================
+  `REQUIRED` appears ZERO times in the design's 6,236 lines. The two `Required for` headings
+  (`proto:2466`, `proto:3008`) head a BACK-REFERENCE panel - what needs this essence - which is
+  a different question, and nothing anywhere draws a per-row badge.
+
+  It was redundant as well as absent, which is the better reason to drop it. A choice group
+  states OR in its own `ANY ONE OF` pill (`proto:2242`), so every row OUTSIDE a group is
+  AND-required BY POSITION; the pill spent a slot on every standalone row restating what the
+  absence of the group already said, and said nothing at all on the rows where the algebra is
+  actually worth stating.
 -->
 <script module>
   // Alternatives carry no id (the parent keys them by index), so the tag-match radio
@@ -95,9 +106,6 @@
     // UNFILTERED by contract (issue 1036): the suggestion list narrows to enabled essences
     // itself, but `selectedEssence` must resolve an already-authored disabled essence by name.
     essenceOptions = [],
-    // Render the "REQUIRED" tag — set by the parent for a bare (single-alternative)
-    // requirement; box alternatives (inside "ANY ONE OF") never carry it.
-    showRequiredTag = false,
     // The requirement's single "or…" popover, passed by the parent for a bare
     // requirement so it renders inline at the row's right end.
     orControl = null,
@@ -413,9 +421,13 @@
     });
   }
 
-  // The plate that opens the row (`proto:2247`): a neutral tile carrying the kind's own tinted
-  // glyph. The tint is on the GLYPH rather than on the tile, so four rows of different kinds
-  // read as one list with four marks in it rather than as four differently-coloured cards.
+  // THE KIND'S OWN TINT (`proto:4624`-`4627` `KINDMETA`, resolved per row at `proto:4645`).
+  // It rides on the GLYPH rather than on the tile, so four rows of different kinds read as one
+  // list with four marks in it rather than as four differently-coloured cards - and it reaches
+  // EVERY glyph the row draws for its subject: the plate (`proto:2247`), the chosen chip's mark
+  // and each suggestion's, exactly as premium's `RewardRow` tints all three from one
+  // `presentation.tint` (`:62`, `:80`, `:129`). It shipped on the plate ALONE, so a named row's
+  // mark was one inherited ink whatever kind the row was.
   const leadTone = $derived(
     matchType === 'tags'
       ? 'tag'
@@ -561,7 +573,8 @@
           {#if chosen.img}
             <img src={chosen.img} alt="" class="manager-recipe-option-chosen-img" />
           {:else}
-            <i class={chosen.icon} aria-hidden="true"></i>
+            <i class={`${chosen.icon} manager-recipe-option-mark is-${leadTone}`} aria-hidden="true"
+            ></i>
           {/if}
           <span class="manager-recipe-option-chosen-name">{chosen.label}</span>
           <!-- A REAL BUTTON, nested inside the pill rather than made of it. The pill is a
@@ -632,7 +645,10 @@
                 {#if suggestion.img}
                   <img src={suggestion.img} alt="" class="manager-recipe-option-chosen-img" />
                 {:else}
-                  <i class={suggestion.icon} aria-hidden="true"></i>
+                  <i
+                    class={`${suggestion.icon} manager-recipe-option-mark is-${leadTone}`}
+                    aria-hidden="true"
+                  ></i>
                 {/if}
                 <span>{suggestion.label}</span>
               </button>
@@ -649,12 +665,6 @@
   {/if}
 
   <div class="manager-recipe-option-controls">
-    {#if showRequiredTag}
-      <span class="manager-recipe-req-tag is-required" data-recipe-req-tag="required"
-        >{text('FABRICATE.Admin.Manager.Recipe.RequiredTag', 'Required')}</span
-      >
-    {/if}
-
     <!-- EVERY row type edits its count through the SAME Stepper in the SAME end-of-row
          position (issue 676). The MODEL differs even though the control does not: a
          component/tag row counts with `option.quantity`, while essence and currency carry

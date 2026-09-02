@@ -2159,6 +2159,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     // THE BREAK-CHANCE BAND IS DELIBERATELY NOT ASSERTED HERE even though this Tool has one:
     // the frame is scrolled to the repair section, which puts the band above the fold, so a
     // containment assertion on it could never pass. `world-tool-entry` photographs the band.
+    //
+    // AND THE TAG ROW, which no repair frame held until round 6. `sm-tool-tongs` carries a
+    // third group whose one row is a TAG requirement, because the tag arm is the only row
+    // anatomy that carries several values at once and a Tool inspector is the NARROW copy of
+    // it - narrower than the recipe tab `manager-recipe-edit-ingredients-cost` measures. The
+    // arm not being drawn at all, and the arm being drawn shredded one chip to a line, are the
+    // two failures this containment separates from a frame of the section alone.
     expectContained: [
       {
         container: '[data-scoped-page="world-tool-entry"]',
@@ -2168,12 +2175,21 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-page="world-tool-entry"]',
         target: '[data-tool-repair-requirements] [data-recipe-add="component"]',
       },
+      {
+        container: '[data-tool-repair-requirements] .manager-recipe-ingredient-option-row.is-tag',
+        target: '[data-tool-repair-requirements] [data-recipe-option-tags]',
+      },
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      // THE ROW ITSELF, because this is the only frame in the registry that photographs a TAG
+      // requirement inside a Tool inspector. Without the claim a change to the row published
+      // the recipe tab's frames and left this one stale - which is how a four-line tag arm
+      // shipped past two capture runs.
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
     ],
   }),
   managerCase({
@@ -7060,6 +7076,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
+      // The repair set IS a list of `RecipeIngredientOption` rows at system scope too, and this
+      // frame is the only one that photographs them there (issue 1373, round 6).
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
     ],
   }),
   managerCase({

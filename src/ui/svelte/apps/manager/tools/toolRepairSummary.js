@@ -35,10 +35,10 @@
  * @property {string} anyOf leads a tag row satisfied by any one of its tags
  * @property {string} allOf leads a tag row that needs all of them
  * @property {string} essenceSuffix follows an essence's name, e.g. ` essence`
- * @property {string} unsetComponent what an unnamed component row is called
- * @property {string} unsetTag what a tag row with no tags is called
- * @property {string} unsetEssence what an unnamed essence row is called
- * @property {string} unsetCurrency what a currency row with no unit is called
+ * @property {string} unsetComponent a component row the catalogue cannot name (`proto:4700`)
+ * @property {string} unsetTag a tag row carrying no tags (`proto:4703`)
+ * @property {string} unsetEssence an essence row the catalogue cannot name (`proto:4701`)
+ * @property {string} unsetCurrency a currency row the ladder cannot name (`proto:4064`)
  */
 
 /**
@@ -54,9 +54,52 @@ function times(count) {
   return Number.isFinite(n) && n > 1 ? `${n}× ` : '';
 }
 
-function nameIn(roster, id, fallback) {
+/**
+ * The roster's name for an id, or `null` when the reference resolves to nothing.
+ *
+ * A STORED ID IS NEVER THE ANSWER. `proto:4700`-`4702` looks every reference up in the live
+ * catalogue (`CAT.find(...)||{}`) and falls back to `unset component` / `unset essence`, and
+ * `proto:4064` does the same for a currency unit against the ladder. This module printed the ID
+ * when the lookup missed, so a world whose components have not been lifted yet - the world every
+ * GM installs Fabricate into - read `Mending consumes sm-iron-ingot + 2x sm-coal or sm-whetstone.`
+ *
+ * THE TWO MISSES ARE ONE CASE. An id that was never set and an id whose catalogue entry has gone
+ * are indistinguishable to a reader, and the design collapses them too: its `||` sees the same
+ * `undefined` for both.
+ *
+ * `null` RATHER THAN THE UNSET LABEL, because the caller has to know WHICH it got: a resolved
+ * name takes a multiplier and, for an essence, a suffix, and an unresolved one takes neither
+ * (`2x unset component` counts nothing; `unset essence essence` names nothing twice). Returning
+ * the label would also make a roster entry actually called `unset component` read as a miss.
+ *
+ * @param {Array<{id: string, name?: string}>} roster the catalogue to resolve against
+ * @param {string} id the stored reference
+ * @returns {string|null}
+ */
+function nameIn(roster, id) {
+  if (!id) return null;
   const found = (roster || []).find((entry) => entry?.id === id);
-  return found?.name || fallback;
+  return found?.name || null;
+}
+
+/**
+ * What one currency reference reads as, or `null` when the ladder cannot name its unit.
+ *
+ * RESOLVED AGAINST THE LADDER, not merely non-empty. `proto:4064` checks `CURR.find(...)` before
+ * it prints anything; the design's own summary at `proto:4702` gets away with printing the bare
+ * reference only because THERE the reference IS the abbreviation (`10 gp`). Here it is a unit id,
+ * which is as opaque to a reader as a component id.
+ *
+ * @param {object} match the option's `match`
+ * @param {Array<{id: string, label?: string, abbreviation?: string}>} ladder the currency units
+ * @returns {string|null}
+ */
+function currencyPhrase(match, ladder) {
+  const unit = (ladder || []).find((entry) => entry?.id === match.unit);
+  const name = unit?.abbreviation || unit?.label;
+  if (!match.unit || !name) return null;
+  const amount = Number(match.amount) > 0 ? Number(match.amount) : 1;
+  return `${amount} ${name}`;
 }
 
 /**
@@ -76,18 +119,16 @@ function phraseFor(option, rosters, labels) {
     return `${times(option?.quantity)}${lead}${tags.join(', ')}`;
   }
   if (match.type === 'essence') {
-    if (!match.essenceId) return labels.unsetEssence;
-    const name = nameIn(rosters.essences, match.essenceId, match.essenceId);
+    const name = nameIn(rosters.essences, match.essenceId);
+    if (name === null) return labels.unsetEssence;
     return `${times(match.amount)}${name}${labels.essenceSuffix}`;
   }
   if (match.type === 'currency') {
-    if (!match.unit) return labels.unsetCurrency;
-    const unit = (rosters.currencyUnits || []).find((entry) => entry?.id === match.unit);
-    const amount = Number(match.amount) > 0 ? Number(match.amount) : 1;
-    return `${amount} ${unit?.abbreviation || unit?.label || match.unit}`;
+    return currencyPhrase(match, rosters.currencyUnits) ?? labels.unsetCurrency;
   }
-  if (!match.componentId) return labels.unsetComponent;
-  return `${times(option?.quantity)}${nameIn(rosters.components, match.componentId, match.componentId)}`;
+  const name = nameIn(rosters.components, match.componentId);
+  if (name === null) return labels.unsetComponent;
+  return `${times(option?.quantity)}${name}`;
 }
 
 /**

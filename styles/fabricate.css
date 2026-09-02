@@ -12871,19 +12871,38 @@
   font-size: 0.75rem;
 }
 
-.fabricate-manager .manager-recipe-option-lead.is-component {
+/* ONE TINT PER KIND, ON EVERY GLYPH THE ROW DRAWS FOR ITS SUBJECT (`proto:4624`-`4627`).
+
+   `KINDMETA` pairs each kind with an icon AND a tint, and `proto:4645` resolves the pair per
+   row; premium's `RewardRow` reads its own `presentation.tint` onto the plate (`:62`), the
+   chosen chip's glyph (`:80`) and each suggestion's (`:129`). The plate shipped tinted and the
+   other two did not, so a NAMED row's mark was the pill's inherited ink - one colour for all
+   four kinds, which is the reading a repair set of four component rows cannot disprove.
+
+   `.manager-recipe-option-mark` is the class those two glyphs carry, and it is declared in the
+   SAME rule as the plate so the two can never drift into two different greens. The design's
+   `--success`, `--accent` and `--info` are byte-for-byte `--fab-success`, `--fab-accent` and
+   `--fab-info`; `--tag` is the tag family, which is `--fab-purple` here (the `+ Tag` pill and
+   the tag row's own edge already read it). `--water` is the odd one: the design never declares
+   it, so its own essence glyph renders uncoloured, and `--fab-info` is the essence/water hue
+   here - the token the design's `--info` already equals. */
+.fabricate-manager .manager-recipe-option-lead.is-component,
+.fabricate-manager .manager-recipe-option-mark.is-component {
   color: var(--fab-success);
 }
 
-.fabricate-manager .manager-recipe-option-lead.is-tag {
+.fabricate-manager .manager-recipe-option-lead.is-tag,
+.fabricate-manager .manager-recipe-option-mark.is-tag {
   color: var(--fab-purple);
 }
 
-.fabricate-manager .manager-recipe-option-lead.is-currency {
+.fabricate-manager .manager-recipe-option-lead.is-currency,
+.fabricate-manager .manager-recipe-option-mark.is-currency {
   color: var(--fab-accent);
 }
 
-.fabricate-manager .manager-recipe-option-lead.is-essence {
+.fabricate-manager .manager-recipe-option-lead.is-essence,
+.fabricate-manager .manager-recipe-option-mark.is-essence {
   color: var(--fab-info);
 }
 
@@ -13103,10 +13122,20 @@
 }
 
 /* THE TAG ARM, ON THE ROW (`proto:2252`): the policy word, the chosen tags and `+ Tag`, with
-   the Any of / All of control as the row's next sibling. It was a second full-width line. */
+   the Any of / All of control as the row's next sibling. It was a second full-width line.
+
+   `flex: 1 1 auto` RATHER THAN `flex: 1`, and the difference is the whole behaviour at the
+   narrow width. `flex: 1` is `1 1 0%`: the arm's flex BASE size is zero, so it never counts
+   towards the row's wrap decision - the row fits every control onto one line and hands the
+   arm whatever is left, which in a Tool inspector is about a hundred pixels. The arm then
+   wrapped INTERNALLY and put the policy word and each chip on a line of their own, four lines
+   deep. With an `auto` basis the arm's content width is what the row wraps against, so a row
+   too narrow for everything moves a WHOLE control to the next line and the arm stays one line
+   - which is the degradation the design's own one-line reading survives. `min-width: 0` stays
+   so a very long tag list still shrinks rather than pushing the row past its column. */
 .fabricate-manager .manager-recipe-option-tags {
   display: flex;
-  flex: 1;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -13141,9 +13170,13 @@
   min-width: 0;
 }
 
-/* The REQUIRED / TAG type pill. (`.is-essence` was declared below for an ESSENCE pill on
-   the essence row; the row's flask lead chip already says that, so the pill is gone —
-   issue 676.) */
+/* The row's small end-of-row type pill. Only ONE face of it is still emitted: the disabled one,
+   the `Currency off` flag on a cost authored before the system turned currency off.
+
+   The essence face went with the ESSENCE pill the flask lead chip already said (issue 676). The
+   required face went with the `REQUIRED` badge every standalone row carried, which the design
+   draws nowhere and which the `ANY ONE OF` pill already implies by its ABSENCE (issue 1373,
+   round 6). The tag face outlived the `TAG` pill the kind select replaced. */
 .fabricate-manager .manager-recipe-req-tag {
   display: inline-flex;
   flex: 0 0 auto;

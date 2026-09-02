@@ -2211,7 +2211,13 @@ The two world tool screens and the system-scope Tool Rules list share one break-
 
    **AND IT STATES WHAT MENDING COSTS, in one plain-language sentence** beneath the editor, at both scopes.
    Alternatives within a requirement join with ` or `, requirements join with ` + `, and an empty set says a broken copy cannot be mended.
-   It is the only place the whole set is stated as a COST rather than drawn as an editor, which is what a GM checking their own work reads; an id the roster can no longer resolve is named by that id, because "you never named one" and "the thing you named is gone" are different facts a GM needs to tell apart.
+   It is the only place the whole set is stated as a COST rather than drawn as an editor, which is what a GM checking their own work reads.
+   **A reference the roster cannot resolve is NAMED, never printed**: `unset component`, `unset essence`, `unset currency`, or `unset tag`, each a localized string rather than the stored id.
+   This covers both misses — a reference that was never set and one whose catalogue entry has gone — because the two are indistinguishable to the reader of a sentence and the design collapses them the same way.
+   A currency unit is resolved against the LADDER before it is printed rather than merely tested for presence, since a unit id is as opaque to a GM as a component id is.
+   An unresolved reference carries neither the multiplier nor the kind suffix a resolved one gets, because a count of a thing that cannot be named states nothing.
+   **This REPLACES an earlier reading of this requirement** (issue 1373, maintainer round 6), which said an unresolvable id is named by that id so a GM can tell "never named" from "gone".
+   The design draws no such distinction, and the state the rule was written to serve is the one every world starts in — a world whose components have not been lifted yet, where every row prints an id and the sentence reads as a database dump.
 
    **THIS IS A CORRECTION OF AN EARLIER READING OF THIS REQUIREMENT, NOT A REVERSAL OF ITS RULE** (issue 1373, maintainer round 2).
    The earlier text said neither world Tool screen CAN state anything about the seed, because a repair group names quantities over the owning system's components "which world scope cannot address".
@@ -2767,6 +2773,11 @@ Its anatomy is the kind FIRST and the value second:
 [plate] [kind select] [name field] [quantity] [or…] [remove]
 ```
 
+- **Each kind carries its own tint, on every glyph the row draws for its subject.**
+The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence and currency are four distinct hues — so a mixed list reads as one list with four marks in it.
+The tint is on the MARK and never on the tile or the pill, which would make four rows of four kinds read as four differently-coloured cards.
+- **No row carries a `REQUIRED` badge.**
+A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a group is AND-required by position and a per-row badge restates what the absence of the group already says.
 - **The kind is a real `<select>`,** carrying the kinds the adders offer plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
 Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
 - **The name field has two faces.**
@@ -2784,6 +2795,8 @@ A world with no components and no essences is the state every world starts in, s
 A TAG row is one line.
 It reads as the sentence it writes — the policy word, the chosen tag chips each with their own remove, then `+ Tag` — with the any-of / all-of control that sets that word beside it, through the shared segmented-control primitive.
 There is no second full-width line, no separate match-controls row and no bordered empty state: an unfilled tag row already says `Any of` with nothing after it.
+The row is rendered at two widths — a recipe tab's full-width column and a Tool inspector's narrower one — and at the narrow one the whole row does not always fit on one line.
+What must hold there is that the tag ARM stays whole: the policy word, the chips and `+ Tag` on one line together, with a WHOLE trailing control moving down rather than the arm shredding into one chip per line.
 
 #### Adding a requirement, and adding an alternative
 
