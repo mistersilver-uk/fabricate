@@ -927,6 +927,13 @@ The order is fixed: **reuse, then extend, then add.**
 A surface that hand-rolls markup a primitive already owns is a defect, not a variant.
 - **Extend.** If the case needs behaviour the primitive lacks, add a prop to the primitive that owns the meaning.
 Adding flexibility there takes precedence over a second component that owns half of it.
+It is also, for anything a primitive declares in its OWN scoped block, the only route that works.
+`module.json` registers `styles/fabricate.css` with no explicit `layer`, so Foundry imports it at `layer(modules)`, while a Svelte scoped block is injected as an unlayered `<style>` at runtime — and an unlayered declaration beats a layered one WHATEVER the specificity.
+A route-scoped or app-scoped rule in that sheet aimed at a primitive's own property is therefore emitted, matches, and has its declaration discarded, with no gate objecting: Stylelint does not read `.svelte`, Svelte's unused-selector analysis never sees the other file, and a browser harness that loads both sheets flat reports the global rule winning because in that page it does.
+So the prop's default preserves the shipped rendering and only the new caller opts out; the sheet keeps everything the primitive does NOT declare, which is a host's row metrics, its layout context and its surface.
+Markup is not a cascade question at all — an element a primitive renders unconditionally can only be removed by a prop.
+Before comparing two selectors' specificity, establish the layer each sits in; and because Svelte emits some scope hashes as `:where(.svelte-<hash>)`, which contributes zero specificity, and because moving a compound in or out of `:global()` changes which form it emits, settle the question by compiling the component with `css: 'external'` and reading the emitted selector rather than by reading the source.
+`openspec/specs/design-system/spec.md`'s *A component's own declaration outranks the module sheet* is the normative statement; `tests/view-lab/cascade.css` is the reproduction of the layer order.
 - **Add.** Only when neither holds, and only with two or more independent callers, does a new primitive enter the set.
 That change adds its specimen to `openspec/specs/design-system/library.html` AND, once it ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change.
 A component under `src/ui/svelte/components/` with no specimen is an undocumented primitive, a specimen with no row for a shipped primitive is a name no diff can be attributed to, and `tests/design-system-coverage.test.js` is the gate that fails on either: it requires every file in that directory to carry a manifest row, and requires no library entry recorded as unbuilt to ship as a component.

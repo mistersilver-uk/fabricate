@@ -919,6 +919,7 @@
               {selectAllLabel}
               hint={selectionHint}
               trailingActions
+              bareActions
               onTogglePage={togglePage}
               onSelectAllResults={selectAllResults}
               onClear={clearSelection}

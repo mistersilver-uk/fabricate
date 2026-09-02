@@ -255,6 +255,50 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
     assert.equal(hint.textContent.trim(), 'Bulk actions are in the inspector');
   });
 
+  it('draws the two actions as bare type only when asked, glyph and underline together', async () => {
+    // `proto:595` is a bare clickable span in `--info` with NO border; `proto:596` is the same
+    // shape in `--subtle` with NO glyph. The `fa-xmark` this component draws is not invented —
+    // `proto:626` is the INSPECTOR PANEL's Clear and it carries one — it is the panel's treatment
+    // borrowed for the band, where the reference states the plainer one.
+    //
+    // BOTH HALVES ON ONE PROP, and both directions asserted: a variant that dropped the glyph and
+    // kept the underline would satisfy either clause on its own.
+    const shipped = await toolbar.mount({ count: 3, showSelectAllResults: true });
+    assert.ok(
+      Boolean(shipped.querySelector('.fab-bulk-selection-clear i')),
+      'the default lost the xmark, so the three studios are no longer byte-identical'
+    );
+    assert.ok(
+      !shipped.querySelector('.fab-bulk-selection-link').classList.contains('is-bare'),
+      'the default marks the link bare, so the studios lose their underline too'
+    );
+
+    const bare = await toolbar.mount({ count: 3, showSelectAllResults: true, bareActions: true });
+    assert.ok(
+      !bare.querySelector('.fab-bulk-selection-clear i'),
+      '`Clear` still draws the panel’s xmark, which `proto:596` does not'
+    );
+    assert.ok(
+      bare.querySelector('.fab-bulk-selection-link').classList.contains('is-bare'),
+      'the link never takes the class its underline override is keyed on'
+    );
+    // AND THE LABEL SURVIVES THE GLYPH. Removing the `<i>` from a button whose accessible name is
+    // its text is safe; removing the text would not be, and the two edits look alike in a diff.
+    assert.match(bare.querySelector('.fab-bulk-selection-clear').textContent, /Clear/);
+
+    // THE OVERRIDE IS A RULE, not just a class. A `class:` directive with no selector behind it
+    // renders identically to one with a broken selector.
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte'),
+      'utf8'
+    );
+    assert.match(
+      source,
+      /\.fab-bulk-selection-link\.is-bare\s*\{[^}]*border-bottom:\s*0/,
+      'nothing removes the underline `proto:595` does not draw'
+    );
+  });
+
   it('groups the two text actions at the trailing edge only when asked, and pays for the pair', () => {
     // ── WHY THIS IS A SOURCE ASSERTION AND NOT A MOUNTED ONE ─────────────────────────────────
     // happy-dom computes no cascade, so the mounted tree can state that `is-trailing` is on the

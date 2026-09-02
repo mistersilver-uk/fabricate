@@ -91,6 +91,29 @@
     // unlayered, so a rule there loses to the one below WHATEVER its specificity — silently, with
     // the selector matching and the declaration unused. The sheet records the measurement.
     trailingActions = false,
+    // ── THE PAIR AS BARE TYPE, WHICH IS WHAT THE REFERENCE DRAWS ────────────────────────────
+    // `proto:595` is a bare clickable span — `font:600 11px var(--sans); color:var(--info);
+    // cursor:pointer` — with NO border and no underline, and `proto:596` is the same shape in
+    // `--subtle` with NO glyph. This component draws the link with a `--fab-info-border`
+    // underline and puts a `fa-xmark` before `Clear`, and neither is in that reference.
+    //
+    // The xmark is not invented, and where it belongs is the point: `proto:626` is the INSPECTOR
+    // PANEL's Clear and it DOES carry one, at `600 10px` with a `gap:5px`. `BulkEditPanelShell`
+    // draws that correctly. What happened here is that the panel's treatment was borrowed for the
+    // band, where the design states the plainer one.
+    //
+    // ONE PROP FOR BOTH, because `proto:595` and `proto:596` are one statement about one pair:
+    // the band's two actions are type, not chrome. Splitting it would let a caller take half of a
+    // ruling. `false` is today's rendering exactly, so the Component, Recipe and Essence Studios
+    // are byte-identical — including the hand-copied markup in their two font-size fixtures,
+    // which spell the `fa-xmark` out.
+    //
+    // A PROP RATHER THAN A ROUTE-SCOPED RULE IN `styles/fabricate.css`, for the reason
+    // `trailingActions` records: this block declares `border-bottom` on the element, that sheet
+    // ships at `layer(modules)`, and a layered declaration loses to an unlayered one whatever its
+    // specificity. The glyph is not a cascade question at all — no stylesheet can remove an
+    // element the template renders.
+    bareActions = false,
     rowClass = 'manager-component-filter-row',
     toolbarAttr = 'data-component-selection-toolbar',
     pageBoxAttr = 'data-component-select-all-page',
@@ -184,12 +207,13 @@
         type="button"
         class="fab-bulk-selection-link"
         class:is-trailing={trailingActions}
+        class:is-bare={bareActions}
         {...resultsHook}
         onclick={() => onSelectAllResults()}>{resultsLabel}</button
       >
     {/if}
     <button type="button" class="fab-bulk-selection-clear" {...clearHook} onclick={() => onClear()}>
-      <i class="fas fa-xmark" aria-hidden="true"></i>
+      {#if !bareActions}<i class="fas fa-xmark" aria-hidden="true"></i>{/if}
       <span>{clearLabel}</span>
     </button>
   {/if}
@@ -320,6 +344,19 @@
     color: var(--fab-info);
     border-bottom: 1px solid var(--fab-info-border);
     border-radius: 0;
+  }
+
+  /* ── `bareActions`: THE LINK LOSES ITS UNDERLINE (issue 1373, round 4) ─────────────────────
+     `proto:595` gives the select-all action colour and weight and nothing else. The rule above
+     is the shipped treatment and stays the default; this removes only the border, since the
+     colour was already right. `Clear`'s half of the same ruling is a MARKUP change — the
+     `fa-xmark` simply is not rendered — because no stylesheet can delete an element.
+
+     `border-bottom: 0` rather than dropping the declaration from a variant, so the override is
+     one property against one property and a future change to the default's colour or width does
+     not have to be mirrored here. */
+  .fab-bulk-selection-link.is-bare {
+    border-bottom: 0;
   }
 
   /* Clear is the quiet escape from the whole mode, so it recedes and sits at the far end

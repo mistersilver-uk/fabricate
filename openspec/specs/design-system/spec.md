@@ -77,6 +77,38 @@ A rule whose ancestor chain names a CALLER's own container is exempt and stays w
 - **THEN** the family is re-rooted first, in its own change
 - **AND** the adoption is not landed on top of a family that only paints on one screen
 
+### Requirement: A component's own declaration outranks the module sheet, whatever the specificity
+
+`module.json` registers `styles/fabricate.css` with no explicit `layer`, and Foundry imports an unlayered module stylesheet at `layer(modules)`.
+A Svelte component's scoped block is injected as an ordinary UNLAYERED `<style>` at runtime.
+An unlayered declaration beats a layered one whatever the specificity, so for any property a component declares in its own scoped block, no rule in `styles/fabricate.css` can override it — not at (0,4,0) against the component's (0,2,0), and not at any specificity that can be written.
+
+The failure is SILENT and no gate reports it.
+The selector is emitted, it matches the element, and the declaration is simply never used; Stylelint does not read `.svelte`, Svelte's unused-selector analysis never sees the other file, and a browser measurement that loads both sheets flat reports the global rule winning because in that page it does.
+So a change verified only in a harness can pass and do nothing in the product.
+
+The consequence for the primitive set is a rule about WHERE, not about specificity.
+A property a shared primitive declares for itself is overridden by EXTENDING that primitive — a prop with a default that preserves the shipped rendering, so its existing callers are byte-identical — and never by a route-scoped or app-scoped rule in the module sheet.
+That is the same `reuse, then extend, then add` order this capability already states, reached from the cascade instead of from the vocabulary.
+A property the primitive does NOT declare is unaffected and the module sheet remains its home: a host's row metrics, its layout context and its surface are layered against nothing.
+Markup is not a cascade question at all, so an element the primitive renders unconditionally can only be removed by a prop.
+
+Two corollaries a reader will otherwise get wrong.
+Svelte emits some scope hashes as `:where(.svelte-<hash>)`, which contributes ZERO specificity, so a compound that looks like it gained a class may not have; and changing whether a selector's compounds sit inside `:global()` changes which form Svelte emits, which moves specificity silently while looking like a repair.
+Neither is answerable by reading the source, so the method that settles both is to compile the component with `css: 'external'` and read the emitted selector.
+
+#### Scenario: A screen wants one property of a shared primitive to differ
+
+- **WHEN** a surface needs a primitive to drop a border, a margin or a glyph the primitive declares for itself
+- **THEN** the primitive takes a prop whose default is the shipped rendering
+- **AND** no rule targeting that primitive's own classes is added to `styles/fabricate.css`
+
+#### Scenario: A cascade question is settled
+
+- **WHEN** two rules for one property are believed to be in a specificity relationship
+- **THEN** the component is compiled with `css: 'external'` and the emitted selector is read
+- **AND** the layer each rule sits in is established before its specificity is compared
+
 ### Requirement: Token foundations are the only source of colour, space and elevation
 
 Every colour, spacing value and shadow MUST come from a `--fab-*` token.
