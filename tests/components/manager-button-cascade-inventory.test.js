@@ -700,6 +700,36 @@ const REVIEWED = [
   },
 
   {
+    id: scopedRule(
+      'tools/ToolReplacementTarget.svelte',
+      '.manager-tool-replacement .manager-tool-replacement-tile:where() ' +
+        '.manager-tool-replacement-component-trigger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'NOT IN THE REVIEWED LIST BEFORE - issue 1373`s round-2 parity pass wrote it. The ' +
+      'replacement Component control is a `SearchablePopover` trigger rendered from this ' +
+      'card`s own `triggerClass` string, so it never gains `fab-manager-button` and this rule ' +
+      'cannot be re-chained onto the primitive. What it states is that the FILLED face is the ' +
+      'design`s tile (`proto:2205`) rather than a select: the box moves to the row that holds ' +
+      'the trigger and the unlink, and the trigger itself is neutralised to a chromeless ' +
+      'region inside it.',
+  },
+  {
+    id: scopedRule(
+      'tools/ToolReplacementTarget.svelte',
+      '.manager-tool-replacement .manager-tool-replacement-drop:where() ' +
+        '.manager-tool-replacement-component-trigger'
+    ),
+    disposition: 'EXCLUDE',
+    why:
+      'The EMPTY face`s half of the entry above, and the same population: one ' +
+      '`SearchablePopover` trigger, from the same `triggerClass` string. It states the 28px ' +
+      'inline search pill the design draws inside the drop zone (`proto:2216`) against the ' +
+      'sheet`s `width: 100%`, which had made the affordance a second full-width select.',
+  },
+
+  {
     id: globalRule('.fabricate-manager .manager-button.is-dashed'),
     disposition: 'EXCLUDE',
     why:

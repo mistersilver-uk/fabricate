@@ -747,6 +747,38 @@ describe('the world Tool entry (issue 1373)', () => {
       );
     });
 
+    // ── E1 ────────────────────────────────────────────────────────────────────────────────
+    // THE TWO FACES ARE DISTINGUISHABLE IN THE DOM, which is what makes them distinguishable on
+    // screen (issue 1373, maintainer round 2).
+    //
+    // The design draws the LINKED tile solid and filled and reserves the dashed edge for the
+    // UNLINKED prompt in the danger ink (`proto:2089` against `proto:2098`); this screen had
+    // given the healthy state the broken state's clothes, painting both from one box. The
+    // repair is a pair of scoped rules keyed on `.is-linked`, so what a mounted suite can hold
+    // is that the class the rules turn on tracks the state — a primitive that stopped writing
+    // it would leave both rules matching nothing, silently, and the frames would revert.
+    //
+    // The frames themselves are `world-tool-entry-overview` and `world-tool-entry-unlinked`.
+    it('marks the linked and unlinked source faces apart, which is what the two treatments key on', async () => {
+      const linked = await mountTab({ scope: scopeFor(), worldItems: [LINKED_ITEM] });
+      const linkedZone = linked.querySelector('[data-tool-source-card]');
+      assert.ok(
+        linkedZone.classList.contains('is-linked'),
+        'a resolved source is the LINKED face, which the solid filled tile keys on'
+      );
+
+      const scope = scopeFor();
+      scope.entries[0].originItemUuid = '';
+      scope.entries[0].registeredItemUuid = '';
+      scope.entries[0].hasSourceLink = false;
+      const unlinked = await mountTab({ scope });
+      const unlinkedZone = unlinked.querySelector('[data-tool-source-card]');
+      assert.ok(
+        !unlinkedZone.classList.contains('is-linked'),
+        'and an unlinked record is not, which is what the danger-dashed prompt keys on'
+      );
+    });
+
     it('draws the display label as OPTIONAL, naming what a blank falls back to', async () => {
       const target = await mountTab({ scope: scopeFor(), worldItems: [LINKED_ITEM] });
       const input = target.querySelector(':scope [data-world-tool-entry-field="name"] input');
@@ -900,6 +932,73 @@ describe('the world Tool entry (issue 1373)', () => {
           card.querySelector(`[data-tool-section-note="${section}"]`).textContent,
           /2 crafting systems inherit this world default today\./,
           `${section} states its reach inside its own card`
+        );
+      }
+    });
+
+    // ── E3 ────────────────────────────────────────────────────────────────────────────────
+    // ONE HEADING PER SECTION, AND THE SWITCH ON THE HEADER ROW (issue 1373, round 2).
+    //
+    // Each section stated itself TWICE: an uppercase eyebrow carrying the whole sentence
+    // (`CHARACTER PREREQUISITES`) with a description, and then a bold `Require prerequisites`
+    // row underneath restating it with its own subtitle and its own toggle. The design
+    // (`proto:2324`) heads a section with the short WORD over the SENTENCE and puts the one
+    // switch on that same row.
+    it('heads each requirements section once, with the toggle on the header row', async () => {
+      const target = await mountTab({ scope: scopeFor(), tab: 'requirements' });
+      for (const [section, eyebrow, title] of [
+        ['prerequisites', 'Prerequisites', 'Character prerequisites'],
+        ['bonus', 'Bonus', 'Bonus to the check'],
+      ]) {
+        const card = target.querySelector(`[data-tool-rule-card="${section}"]`);
+        assert.equal(
+          card.querySelector(`[data-tool-rule-eyebrow="${section}"]`).textContent.trim(),
+          eyebrow,
+          'the eyebrow is the short word'
+        );
+        assert.equal(
+          card.querySelector('.manager-tool-rule-card-title h3').textContent.trim(),
+          title,
+          'and the title is the sentence'
+        );
+      }
+
+      // THE SWITCH IS ON THE HEADER ROW, and the row that used to restate the heading is gone.
+      // Asserted through containment rather than by hook alone: the hook survived the move, so
+      // a bare `querySelector` would pass on either arrangement.
+      for (const hook of ['data-tool-prerequisites-enabled', 'data-tool-bonus-enabled']) {
+        const toggle = target.querySelector(`[${hook}]`);
+        assert.ok(Boolean(toggle), 'the section still carries its enable switch');
+        assert.ok(
+          Boolean(toggle.closest('.manager-tool-rule-card-head')),
+          'and it sits on the card head, not on a heading row of its own'
+        );
+      }
+      assert.ok(
+        !target.querySelector('[data-tool-requirements-tab] .manager-tool-setting-row'),
+        'the second heading row is gone at world scope, where the head has room for the switch'
+      );
+    });
+
+    // ONE CARD, NOT TWO. The design draws the whole tab as a single bordered panel whose two
+    // sections are separated by a rule (`proto:2322`, `proto:2349`), and both sections keep the
+    // `data-tool-rule-card` name every other reader addresses them by.
+    it('draws both requirements sections inside ONE card', async () => {
+      const target = await mountTab({ scope: scopeFor(), tab: 'requirements' });
+      const card = target.querySelector('.manager-tool-requirements-card');
+      assert.ok(Boolean(card), 'the tab is the card');
+      assert.equal(card.dataset.toolRequirementsTab, '');
+      assert.deepEqual(
+        [...card.querySelectorAll('[data-tool-rule-card]')].map(
+          (section) => section.dataset.toolRuleCard
+        ),
+        ['prerequisites', 'bonus'],
+        'and both sections are inside it'
+      );
+      for (const section of card.querySelectorAll('[data-tool-rule-card]')) {
+        assert.ok(
+          section.classList.contains('is-flush'),
+          'a section inside the card draws no box of its own'
         );
       }
     });
@@ -1118,6 +1217,53 @@ describe('the world Tool entry (issue 1373)', () => {
       assert.ok(!card.querySelector('[data-tool-replacement-drop]'), 'the empty face is gone');
     });
 
+    // ── E2 ────────────────────────────────────────────────────────────────────────────────
+    // THE FILLED FACE IS THE DESIGN'S TILE, NOT A SELECT (issue 1373, maintainer round 2).
+    //
+    // `proto:2205`-`2208` draws one row holding the chip, a two-line block whose second line is
+    // the SOURCE, and a 30px unlink. It shipped as a full-width picker button with a chevron,
+    // the unlink outside it and the source under the whole row — which reads as a form control
+    // where the design reads as a card.
+    //
+    // ASSERTED ON STRUCTURE, not on the CSS, because the CSS is what a mounted suite cannot
+    // compute: what a rule can move is where an element SITS, and every claim below is about
+    // containment or absence.
+    it('makes the tile itself the picker trigger, with the source as its second line', async () => {
+      const target = await mountBreakage({
+        mode: 'replaceWith',
+        replacementTarget: { type: 'component', componentId: 'ingot' },
+      });
+      const tile = target.querySelector('[data-tool-replacement-tile]');
+      const trigger = tile.querySelector('.manager-tool-replacement-component-trigger');
+      assert.ok(Boolean(trigger), 'the tile holds the trigger the Foundry smoke clicks');
+      assert.match(
+        trigger.textContent,
+        /Iron Ingot/,
+        "the smoke asserts the trigger's OWN text contains the label it picked"
+      );
+
+      // THE SOURCE IS A LINE INSIDE THE TRIGGER, under the name. Before, it was a paragraph
+      // BELOW the whole row — so this is the assertion the reshape exists to satisfy, and it
+      // is stated through the trigger rather than through the card so it cannot pass on a
+      // source that has fallen back outside the tile.
+      const meta = trigger.querySelector('[data-popover-trigger-meta]');
+      assert.ok(Boolean(meta), 'the source is the trigger meta line');
+      assert.equal(meta.textContent.trim(), 'A Component in the world catalogue');
+
+      // AND THE UNLINK IS A SIBLING OF THE TRIGGER. A button inside a button is dropped by the
+      // browser and the picker stops opening, so the nesting is the defect this guards.
+      const unlink = tile.querySelector('[data-tool-replacement-unlink]');
+      assert.ok(Boolean(unlink), 'the unlink is inside the tile');
+      assert.ok(
+        !trigger.contains(unlink),
+        'and OUTSIDE the trigger button, so neither swallows the other'
+      );
+      assert.ok(
+        !trigger.querySelector('.fa-chevron-down, .fa-chevron-up'),
+        'a tile carries no select chevron'
+      );
+    });
+
     // THE DROP RESOLVES PURELY, against the option list the caller passed. Both Tool editors are
     // leaves holding no Foundry global, so this is the only answer available to them — and a
     // payload naming something world scope cannot address must write NOTHING rather than store
@@ -1216,6 +1362,86 @@ describe('the world Tool entry (issue 1373)', () => {
         target.querySelector('[data-world-tool-entry-repair-note]').textContent,
         /copied into a crafting system the moment that system adopts this Tool/
       );
+    });
+
+    // ── E4 ────────────────────────────────────────────────────────────────────────────────
+    // ONE HEADING WITH A COUNT, AND THE DESIGN'S EXPLAINER (issue 1373, maintainer round 2).
+    // It had two heading levels — an uppercase `REPAIR MATERIALS` over a serif `Ingredient
+    // groups` — and an explainer stating the AND/OR algebra the groups already draw.
+    it('heads the repair set once, with a count, and explains what the set is for', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [{ quantity: 1, match: { type: 'component', componentId: 'ingot' } }],
+              },
+              {
+                id: 'g2',
+                options: [{ quantity: 2, match: { type: 'component', componentId: 'ingot' } }],
+              },
+            ],
+          },
+        }
+      );
+      const editor = target.querySelector('[data-tool-repair-requirements]');
+      assert.equal(
+        editor.querySelectorAll('.manager-tool-repair-heading h3').length,
+        0,
+        'the second heading level is gone'
+      );
+      assert.match(editor.querySelector('.manager-kicker').textContent, /Repair requirements/);
+      assert.equal(
+        editor.querySelector('[data-tool-repair-count]').textContent.trim(),
+        '2 requirements',
+        "the design states the set's size beside its eyebrow"
+      );
+      const hint = editor.querySelector('[data-tool-repair-hint]');
+      assert.match(hint.textContent, /One ingredient set, no recipe needed/);
+      assert.match(hint.textContent, /consumed to mend a broken copy/);
+      assert.equal(
+        hint.querySelector('.manager-tool-repair-or').textContent,
+        'or…',
+        'and emphasises the control it tells the GM to reach for'
+      );
+    });
+
+    // THE COUNT'S EMPTY FACE, which is a different word rather than a zero: `none yet`.
+    it('states `none yet` when the repair set is empty', async () => {
+      const target = await mountBreakage({ mode: 'flagBroken' });
+      assert.equal(
+        target.querySelector('[data-tool-repair-count]').textContent.trim(),
+        'none yet'
+      );
+    });
+
+    // THE CHOICE-GROUP NOTE IS THE REPAIR SENTENCE, not the recipe editor's enumeration of the
+    // four kinds a crafter may pick between. One prop, defaulted to the shipped copy, so no
+    // recipe or downtime call site moves.
+    it('tells a repair choice group what picking one of its options DOES', async () => {
+      const target = await mountBreakage(
+        { mode: 'flagBroken' },
+        {
+          worldDefault: {
+            repairRequirements: [
+              {
+                id: 'g1',
+                options: [
+                  { quantity: 1, match: { type: 'component', componentId: 'ingot' } },
+                  { quantity: 1, match: { type: 'component', componentId: 'ingot' } },
+                ],
+              },
+            ],
+          },
+        }
+      );
+      const note = target.querySelector(
+        '[data-tool-repair-requirements] .manager-recipe-any-one-of-hint'
+      );
+      assert.ok(Boolean(note), 'a two-option group draws the `Any one of` head');
+      assert.equal(note.textContent.trim(), 'any one of these mends it');
     });
 
     // IMMEDIATE, NOT BUFFERED, and that is forced rather than chosen: `repairRequirements` is not

@@ -4329,6 +4329,28 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
 // So the ids the cases click are resolved against the lab world's own corpus, through the REAL
 // store and the REAL projection rather than by reading the fixture literal: what has to hold is
 // that the record survives normalization and projects a row, not that a key is present.
+/**
+ * The one `(case, row)` pair whose row deliberately has NO membership record.
+ *
+ * The clause this exempts is a real one and stays for every other case: a world Tool ENTRY frame
+ * taken on a record no crafting system has adopted shows an empty per-system cluster, and that is
+ * a frame of an empty state rather than of the screen.
+ *
+ * `world-tool-entry-unlinked` is photographing something else, and its own `expectContained`
+ * says so: the SOURCE tile's unlinked face, on the Overview tab, which is where a world record
+ * with no game-world Item behind it states what it has and what it lacks. `worldScopeEntityGrouping`
+ * records that state as one the `1.30.0` migration produces, and `lab-tool-unlinked` is the lab
+ * corpus's instance of it. Giving it a membership to satisfy the clause would put a row it does
+ * not have into the catalogue, the system Tool Rules library and three other frames, to green a
+ * clause about a cluster this case's frame does not contain.
+ *
+ * The key is `<caseId>|<rowId>`, so the exemption is a pair rather than a blanket pass on the id:
+ * a second case clicking the same row still has to answer the clause.
+ *
+ * @type {Set<string>}
+ */
+const MEMBERLESS_ROW_CASES = new Set(['world-tool-entry-unlinked|lab-tool-unlinked']);
+
 test('every world tool id the capture cases click exists in the lab world, projected', async () => {
   const [{ buildLabContent }, { createToolScopeStore }, { projectWorldScopeEntity }] =
     await Promise.all([
@@ -4350,28 +4372,48 @@ test('every world tool id the capture cases click exists in the lab world, proje
     systems: content.systems.map((system) => ({ id: system.id, name: system.name })),
   });
 
-  const clicked = new Set();
+  // PAIRED WITH THE CASE THAT CLICKS IT, not flattened to a set of ids (issue 1373, round 2).
+  // The membership clause below has exactly one honest exception and it is a PER-CASE fact, so
+  // a bare set of ids could not express it without exempting the id everywhere.
+  const clicked = [];
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps || []) {
       for (const [, id] of String(step.selector || '').matchAll(
         /\[data-scoped-list-(?:row|inspect)="([^"]+)"\]/g
       )) {
-        clicked.add(id);
+        clicked.push({ caseId: viewCase.id, id });
       }
     }
   }
-  assert.ok(clicked.size > 0, 'the scan found no clicked row ids; it is broken');
+  assert.ok(clicked.length > 0, 'the scan found no clicked row ids; it is broken');
 
-  for (const id of clicked) {
+  for (const { caseId, id } of clicked) {
     const entry = scope.entries.find((candidate) => candidate.id === id);
     assert.ok(
       Boolean(entry),
       `a capture case clicks the world row "${id}", which the lab world does not hold`
     );
+    if (MEMBERLESS_ROW_CASES.has(`${caseId}|${id}`)) continue;
     assert.ok(
       entry.membershipCount > 0,
       `"${id}" has no membership record, so its entry editor shows no per-system row and the ` +
         'frame is evidence of an empty state rather than of the screen'
+    );
+  }
+
+  // AND THE EXEMPTIONS ARE LIVE. An entry naming a pair no case makes, or one whose record has
+  // since gained a membership, is a permission that has stopped describing anything - and it
+  // would sit here silently granting the next author a pass they did not ask for.
+  for (const key of MEMBERLESS_ROW_CASES) {
+    const [caseId, id] = key.split('|');
+    assert.ok(
+      clicked.some((pair) => pair.caseId === caseId && pair.id === id),
+      `${key} exempts a click no case makes; the exemption is stale`
+    );
+    assert.equal(
+      scope.entries.find((candidate) => candidate.id === id)?.membershipCount,
+      0,
+      `${key} exempts a record that HAS a membership now, so the exemption is stale`
     );
   }
 

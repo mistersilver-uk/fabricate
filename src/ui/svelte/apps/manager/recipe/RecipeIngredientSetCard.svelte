@@ -39,6 +39,10 @@
     // The default display name for an unnamed set ("Set 1"): shown in the editable
     // field when the set has no explicit name, and read-only in check mode.
     defaultName = '',
+    // Threaded straight through to every group card: the note beside its `Any one of` pill.
+    // See `RecipeIngredientGroupCard` for why a caller would replace it. Empty everywhere but
+    // the Tool repair set, so no recipe or downtime call site moves.
+    anyOneOfHint = '',
     onChange = () => {},
     onRemove = () => {},
     onDuplicate = () => {},
@@ -235,6 +239,7 @@
           {currencyUnits}
           {currencyEnabled}
           {essenceOptions}
+          {anyOneOfHint}
           onChange={(nextGroup) => updateGroup(index, nextGroup)}
           onRemove={() => removeGroup(index)}
         />

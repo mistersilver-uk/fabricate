@@ -1731,6 +1731,52 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'world-tool-entry-unlinked',
+    label: 'Manager — World Tool entry, no linked Item',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE OTHER FACE OF THE SOURCE TILE, which no case reached (issue 1373, maintainer round 2).
+    //
+    // `ItemDropZone` paints two faces and every world Tool frame photographed the LINKED one, so
+    // the design's own idiom could be inverted — the healthy state drawn dashed and unfilled,
+    // which is the design's BROKEN state — and no frame could show it. The repair makes the
+    // linked tile solid and filled and gives the dashed edge back to the unlinked prompt in the
+    // danger ink, and half of that repair is unphotographable without this case.
+    //
+    // THE STATE IS ONE THE MIGRATION PRODUCES, not a synthetic. `worldScopeEntityGrouping`
+    // records that a definition with no source references of its own becomes a world entity
+    // flagged unlinked, and `lab-tool-unlinked` is that record in the lab corpus — already
+    // seeded, already listed by the catalogue case, and until now never opened.
+    steps: [
+      { selector: '#manager-world-nav-tool-catalogue' },
+      {
+        selector:
+          '[data-scoped-list-row="lab-tool-unlinked"] [data-scoped-list-action="open-entry"]',
+      },
+    ],
+    expectView: 'world-tool-entry',
+    expectSelector: '[data-world-tool-entry-card="linked-item"]',
+    // BOTH HALVES OF THE UNLINKED FACE, inside the card that owns them: the drop prompt itself
+    // and the sentence that says what the record has without an Item. A frame proving only the
+    // card would pass on a screen that had fallen back to the linked tile with an empty name.
+    expectContained: [
+      {
+        container: '[data-world-tool-entry-card="linked-item"]',
+        target: '[data-item-drop-zone="tool-source"]',
+      },
+      {
+        container: '[data-world-tool-entry-card="linked-item"]',
+        target: '[data-world-tool-entry-unlinked]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
+    ],
+  }),
+  managerCase({
     id: 'world-tool-entry-requirements',
     label: 'Manager — World Tool entry, Requirements',
     reaches: 'beyond',
@@ -6488,9 +6534,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
+    // THE CARD ITSELF IS CLAIMED HERE (issue 1373, maintainer round 2). This is the only frame
+    // in the registry that photographs the replacement tile at SYSTEM scope, and it claimed the
+    // tab that mounts the card rather than the card — so a change confined to
+    // `ToolReplacementTarget` published the world entry's frame and left the system one stale.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolReplacementTarget\.svelte$/,
     ],
   }),
   managerCase({

@@ -1364,10 +1364,12 @@
             ABOVE the tab strip, on every tab including the ones it says nothing about — puts
             the condition away from the thing it conditions.
           -->
-          <!-- A CARD, like everything else in this stack. It was the ONE non-card element in a
-               column of cards — a tinted full-width band with its own edge treatment — so it read
-               as a page banner rather than as the first statement of the tab. It keeps the INFO
-               accent, on the leading edge alone, because what it says is authored elsewhere. -->
+          <!-- IT IS THE DESIGN'S TINTED INFO BAND (`proto:2114`), not a neutral card with an
+               accent edge. A maintainer ruling in issue 1373's second round took the design over
+               the earlier reduction; the scoped rule for `.manager-world-tool-entry-mode` carries
+               the ruling and the values it restores. It still sits INSIDE the Breakage tab rather
+               than above the tab strip, which is the part of that revision the ruling leaves
+               standing: the band conditions the control under it and belongs beside it. -->
           <div
             class="manager-world-tool-entry-card manager-world-tool-entry-mode"
             data-world-tool-entry-break-mode
@@ -1877,18 +1879,104 @@
     min-width: 0;
   }
 
+  /* ── THE LINKED TILE IS SOLID AND FILLED; DASHED MEANS UNLINKED ────────────────────
+     (issue 1373, maintainer round 2, E1.) The shipped `ItemDropZone` paints ONE box for both of
+     its faces — a dashed edge on a faint overlay — so a healthy link wore the design's broken
+     state. `proto:2089` draws the LINKED tile `display: flex; align-items: center; gap: 12px;
+     padding: 12px 13px; border: 1px solid var(--border); border-radius: 11px; background:
+     var(--surface-soft)`, and reserves the dashed edge for the UNLINKED prompt at `proto:2098`,
+     where it is `1.5px dashed var(--danger-border)` with a danger-tinted glyph and sentence.
+
+     `:global()` BECAUSE THE PRIMITIVE WRITES THIS MARKUP. `ItemDropZone` never carries this
+     file's scoping hash, so the scoped form would compile to a selector matching nothing — the
+     trap this epic has hit repeatedly. It is anchored on the card THIS file writes, so the reach
+     is the world Tool entry's own source tile and no other consumer of the primitive: the
+     recipe item, essence, check-macro and tool-create zones are untouched, which is why the
+     primitive itself is not edited.
+
+     Specificity is (0,6,0) at its deepest against the sheet's (0,2,0), so nothing here depends
+     on injection order.
+
+     12 and 13 both round to `--fab-space-3` on the 4px scale; the 11px radius is a geometry
+     value with no token and is the design's exactly. `min-height` drops to 0 because the
+     primitive's 70px floor is taller than the design's 12 + 44 + 12 tile and left the name
+     floating above centre. */
+  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
+    > :global(.manager-item-drop-zone.is-linked) {
+    gap: var(--fab-space-3);
+    min-height: 0;
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 11px;
+    background: var(--fab-surface-soft);
+  }
+
+  /* THE UNLINKED FACE KEEPS THE DASH AND GAINS THE DANGER INK. `2px` rather than the design's
+     1.5: a fractional border rounds per device pixel ratio and reads as a hairline at 1x, which
+     is the same call `ToolReplacementTarget`'s empty drop zone already made, so the two dashed
+     prompts on this screen are one weight. */
+  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
+    > :global(.manager-item-drop-zone:not(.is-linked)) {
+    border: 2px dashed var(--fab-danger-border);
+    background: transparent;
+  }
+
+  /* A BARE DANGER GLYPH, NOT A FILLED TILE (`proto:2099`). The primitive's 44px `--fab-bg-3`
+     square is the mount for a linked Item's ART; with no Item there is no art, and the square
+     reads as a picture that failed to load. */
+  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
+    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-icon) {
+    color: var(--fab-danger-text);
+    background: transparent;
+  }
+
+  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
+    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-copy strong),
+  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
+    :global(.manager-item-drop-zone:not(.is-linked) .manager-item-drop-zone-copy small) {
+    color: var(--fab-danger-text);
+  }
+
+  /* THE UNLINK IS A DESTRUCTIVE CONTROL AND IS DRAWN AS ONE. `proto:2093` states
+     `border: 1px solid var(--danger-border); background: var(--danger-soft); color:
+     var(--danger-text); border-radius: 8px; font-size: 11px`, over a 32px box. The shipped
+     `IconButton.is-danger` carries the danger EDGE and INK but leaves the resting fill neutral,
+     so the one destructive action on the Overview tab read as an ordinary icon button.
+
+     30px, NOT the design's 32: `openspec/specs/design-system/spec.md` retires 32 from the
+     control-height ladder, and `control-height-ladder.test.js` fails on it. 30 is the adjacent
+     rung and is also what the replacement tile's unlink takes, so the screen's two unlink
+     controls are one size. */
+  .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
+    :global(.manager-item-drop-zone-actions .manager-icon-button) {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--fab-danger-soft);
+    font-size: 0.68rem;
+  }
+
   /* THE LINKED ITEM'S OWN DESCRIPTION, in a bordered read-only box - the design's own treatment,
      and the same one `ToolOverviewTab` used at system scope before this capability moved here.
      It is a surface rather than a paragraph because it states another document's text, and the
-     edge is what says a GM cannot type in it. */
+     edge is what says a GM cannot type in it.
+
+     MEASURED AGAINST `proto:2094` (issue 1373, round 2): `padding: 12px 13px; background:
+     var(--bg1); border: 1px solid var(--border); border-radius: 10px; font: 400 11px/1.55
+     var(--sans); color: var(--muted)`. The padding was `--fab-space-2` — 8px against the
+     design's 12 — and the leading was 1.4 against 1.55. The rung is `--fab-bg-0`: this theme's
+     ramp is shifted one step against the design's, whose `--bg1` is our `--fab-bg-0`, so the box
+     sits one rung BELOW the card rather than on the same `--fab-surface-soft` as the tile above
+     it, which is what makes the two boxes read as two different kinds of thing. */
   .manager-world-tool-entry-source-description {
-    padding: var(--fab-space-2);
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 10px;
-    background: var(--fab-surface-soft);
+    background: var(--fab-bg-0);
     color: var(--fab-text-muted);
     font-size: 0.68rem;
-    line-height: 1.4;
+    line-height: 1.55;
     min-width: 0;
     overflow-wrap: break-word;
   }
@@ -2002,24 +2090,40 @@
     border-color: var(--fab-danger-border);
   }
 
-  /* INFORMATION, NOT A WELL. This band states a value authored on another screen, and the
-     design tints it as information rather than recessing it — `--info-soft` over
-     `--info-border` in its own markup. It used to be `--fab-overlay-dark-08`, which read as
-     a fourth grey surface saying nothing about why the band is there. */
-  /* IT WEARS THE CARD BOX AND OVERRIDES ONLY THE AXIS AND THE ACCENT, exactly as the master
-     switch and the danger card do. The INFO colour survives as a leading edge rather than as a
-     full tint: what the band says is authored on another screen, which is worth marking, and a
-     whole tinted surface in a stack of neutral cards marks it as a different KIND of thing. */
+  /* ── THE WORLD BREAKAGE DEFAULT BAND, FULLY TINTED ───────────────────────────────
+     MAINTAINER RULING (issue 1373, round 2): the design wins over the earlier reduction.
+
+     An earlier revision kept the INFO colour as a 3px leading EDGE and let the band wear the
+     neutral card fill, on the argument that a tinted surface in a stack of neutral cards marks
+     the band as a different KIND of thing. That argument has been overruled and the ruling is
+     recorded here rather than the reasoning it replaced, so the next reader meets the current
+     decision instead of the superseded one.
+
+     `proto:2114` states the band whole: `display: flex; align-items: center; gap: 11px;
+     padding: 12px 14px; background: var(--info-soft); border: 1px solid var(--info-border);
+     border-radius: 11px`. `--info-soft`, `--info-border` and `--info` are NOT ramp tokens, so
+     they map 1:1 onto ours; only the background ramp is shifted a rung and nothing here reads
+     it. 11 and 14 have no token and round to `--fab-space-3` on the 4px scale, which is also
+     the 12 the design states for the vertical padding, so the box takes one value.
+
+     THE SYSTEM SCOPE ALREADY DRAWS IT THIS WAY — `.manager-tool-authority-readonly` in
+     `styles/fabricate.css` has carried `--fab-info-soft` over `--fab-info-border` since the
+     band shipped — so this restores the two scopes to one treatment as well as to the design. */
   .manager-world-tool-entry-mode {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--fab-space-2);
-    border-left: 3px solid var(--fab-info-border);
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
+    border-color: var(--fab-info-border);
+    border-radius: 11px;
+    background: var(--fab-info-soft);
   }
 
+  /* `font-size: 12px` at `proto:2115`, which is 0.75rem against the 16px root. */
   .manager-world-tool-entry-mode i {
     color: var(--fab-info);
+    font-size: 0.75rem;
   }
 
   .manager-world-tool-entry-mode-copy {
@@ -2029,9 +2133,20 @@
     min-width: 0;
   }
 
+  /* The mode label: `600 12.5px var(--sans); color: var(--text)` (`proto:2116`), which is
+     0.78rem — the same size the master switch's own title takes two cards down. */
+  .manager-world-tool-entry-mode-copy strong {
+    color: var(--fab-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  /* `margin-left: auto; max-width: 180px; text-align: right` at `proto:2117`. 180px is
+     11.25rem, and the cap was 18rem — half again as wide as the design's, which let the note
+     take the room the mode label is meant to have. */
   .manager-world-tool-entry-mode-note {
     margin: 0 0 0 auto;
-    max-width: 18rem;
+    max-width: 11.25rem;
     font-size: 0.62rem;
     text-align: right;
   }

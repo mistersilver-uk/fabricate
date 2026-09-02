@@ -25,6 +25,35 @@
   on selection would make that assertion unsatisfiable, and it is also the better control — the
   design's own filled tile offers unlink-then-search where one click should re-point it.
 
+  == AND THE TILE IS A TILE, NOT A SELECT (issue 1373, maintainer round 2, E2) =================
+  The filled face shipped as a full-width select — a bordered `manager-button` spanning the
+  card with a chevron at its right edge, the unlink OUTSIDE it, and the source line in the
+  proportional face UNDER the whole row. `proto:2205`-`2208` draws something else entirely and
+  the difference is not cosmetic: it is `display: flex; align-items: center; gap: 11px;
+  padding: 11px 12px; border-radius: 10px; background: var(--surface-soft); border: 1px solid
+  var(--border)` holding the chip glyph, then ONE block whose first line is the name at
+  `600 12.5px var(--sans)` and whose second is the SOURCE at `400 9.5px var(--mono);
+  color: var(--subtle); margin-top: 2px`, ellipsised inside the tile, then a 30x30 unlink at
+  `border-radius: 8px` in the danger treatment. No chevron anywhere.
+
+  THE HOOK SURVIVES THE RESHAPE, which is the whole reason the contract above is stated. The
+  trigger is now the tile's chip-and-copy region rather than a select: it still carries
+  `.manager-tool-replacement-component-trigger`, it still contains the chosen Component's name,
+  and it is still the topmost element at its own centre point, so the smoke's click, its
+  `assertPointerTarget` and its `textContent` assertion all read the same control they always
+  did. The smoke was not changed.
+
+  THE UNLINK IS A SIBLING OF THE TRIGGER, NOT A CHILD OF IT. A `<button>` inside a `<button>`
+  is the nested-button trap this epic has already hit — the browser drops the inner control and
+  the outer one swallows its clicks — so the TILE is the flex row that carries the design's
+  border, fill and padding, and the trigger is the chromeless region inside it. What a GM sees
+  is the design's tile; what the DOM has is two sibling controls.
+
+  THE SOURCE LINE MOVED INSIDE THE TRIGGER, through `SearchablePopover`'s `triggerMeta` — the
+  trigger-side twin of the `meta` its OPTIONS have carried since issue 1010, added for this and
+  empty at every other call site. Rendering it outside the trigger was the only alternative, and
+  it puts the address under the CHIP rather than under the name it qualifies.
+
   == THE DROP ZONE RESOLVES PURELY, OR IT WRITES NOTHING =======================================
   Both Tool editors are leaves with no `game`: the mounted suites compile them with no Foundry
   global at all. So a drop is answered against the OPTION LIST the caller already passed, by
@@ -111,34 +140,33 @@
 
   {#if selected}
     <div class="manager-tool-replacement-tile" data-tool-replacement-tile={selected.id}>
-      <div class="manager-tool-replacement-tile-copy">
-        <SearchablePopover
-          options={pickerOptions}
-          value={selected.id}
-          {disabled}
-          triggerClass="manager-button manager-tool-replacement-component-trigger"
-          triggerIcon="fas fa-cube"
-          triggerImg={selected.img || ''}
-          triggerLabel={selected.name}
-          valueClass="manager-tool-replacement-component-name"
-          triggerAriaLabel={text(
-            'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
-            'Choose component'
-          )}
-          dialogAriaLabel={text(
-            'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
-            'Choose component'
-          )}
-          searchPlaceholder={text(
-            'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-            'Search components...'
-          )}
-          {onChoose}
-        />
-        {#if sourceText}
-          <p class="manager-tool-replacement-source" data-tool-replacement-source>{sourceText}</p>
-        {/if}
-      </div>
+      <SearchablePopover
+        options={pickerOptions}
+        value={selected.id}
+        {disabled}
+        showChevron={false}
+        pickerClass="manager-tool-replacement-picker"
+        triggerClass="manager-button manager-tool-replacement-component-trigger"
+        triggerIcon="fas fa-cube"
+        triggerImg={selected.img || ''}
+        triggerLabel={selected.name}
+        triggerMeta={sourceText}
+        triggerData={{ 'data-tool-replacement-source': sourceText || undefined }}
+        valueClass="manager-tool-replacement-component-name"
+        triggerAriaLabel={text(
+          'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
+          'Choose component'
+        )}
+        dialogAriaLabel={text(
+          'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
+          'Choose component'
+        )}
+        searchPlaceholder={text(
+          'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+          'Search components...'
+        )}
+        {onChoose}
+      />
       <IconButton
         class="is-danger"
         {disabled}
@@ -175,7 +203,12 @@
       ondragleave={() => (dragOver = false)}
       ondrop={handleDrop}
     >
-      <i class="fas fa-arrow-down-to-bracket" aria-hidden="true"></i>
+      <!-- `fa-download`, NOT the arrow-into-tray name the design's own markup uses: that one is
+           Font Awesome PRO, and `iconSourceLicensing.test.js` fails the build on any Pro name
+           appearing anywhere in a shipped file, comments included. This is the glyph the shipped
+           `ItemDropZone` already draws in ITS empty face, so the two drop targets on these
+           screens carry one mark. -->
+      <i class="fas fa-download" aria-hidden="true"></i>
       <span class="manager-tool-replacement-drop-label">
         {text(
           'FABRICATE.Admin.Manager.Tools.Editor.ReplacementDropLabel',
@@ -186,6 +219,8 @@
         options={pickerOptions}
         value=""
         {disabled}
+        showChevron={false}
+        pickerClass="manager-tool-replacement-picker"
         triggerClass="manager-button manager-tool-replacement-component-trigger"
         triggerIcon="fas fa-magnifying-glass"
         triggerLabel={text(
@@ -238,37 +273,98 @@
     line-height: 1.5;
   }
 
-  /* THE FILLED FACE: a name over a source, and a 30px unlink centred against both at the right
-     — `proto:2207` states 30px for that control exactly.
+  /* ── THE FILLED FACE IS A TILE (issue 1373, maintainer round 2, E2) ──────────────────
+     `proto:2205`: `display: flex; align-items: center; gap: 11px; padding: 11px 12px;
+     border-radius: 10px; background: var(--surface-soft); border: 1px solid var(--border)`.
+     11 and 12 both round to `--fab-space-3` on the 4px scale, and the 10px radius is the
+     design's exactly.
 
-     A FLEX ROW AROUND A FLEX COLUMN, NOT A TWO-BY-TWO GRID. The grid form is the natural
-     reading of the design and it does not survive contact with `SearchablePopover`: the picker
-     is a child this template does not write, so it cannot be given an explicit grid area
-     without a `:global()` rule per participant, and an unlink placed by row alone auto-places
-     into whichever column the picker left — measured, it landed to the LEFT of the trigger.
-     Nesting the two text lines makes the placement structural instead of positional. */
+     THE BOX IS ON THE ROW, NOT ON THE TRIGGER. The trigger is one of the row's two children
+     and the unlink is the other, so the border and fill a GM reads as "the tile" belong to
+     the element that contains both. That is also what keeps the unlink out of the trigger
+     button; see the file header. */
   .manager-tool-replacement-tile {
     display: flex;
     align-items: center;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-3);
     min-width: 0;
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 10px;
+    background: var(--fab-surface-soft);
   }
 
-  .manager-tool-replacement-tile-copy {
-    display: flex;
+  /* ── AND THE TRIGGER IS CHROMELESS INSIDE IT ────────────────────────────────
+     `styles/fabricate.css` widens this trigger to `width: 100%` inside
+     `.manager-tool-replacement-card` and gives it the shared component-picker box — which is
+     what drew the select. Those rules are (0,3,0); anchoring each rule below on TWO classes
+     this component writes puts it at (0,5,0) or deeper, so nothing here depends on which
+     stylesheet is injected last. `:global()` is required because `SearchablePopover` writes
+     the picker root, the button and the portrait, and none of them carries this file's hash.
+
+     `manager-button` STAYS on the trigger. Stripping it would hand the control back to
+     Foundry's own `.application button` rule, whose fixed height crops a two-line label —
+     the trap this repository has already hit on card action buttons. The primitive's own
+     reset is kept and only the box is neutralised. */
+  .manager-tool-replacement
+    .manager-tool-replacement-tile
+    > :global(.manager-tool-replacement-picker) {
     flex: 1 1 auto;
-    flex-direction: column;
-    gap: var(--fab-space-1);
+    width: auto;
     min-width: 0;
   }
 
-  .manager-tool-replacement-source {
-    margin: 0;
-    color: var(--fab-text-subtle);
-    font-size: 0.58rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .manager-tool-replacement
+    .manager-tool-replacement-tile
+    :global(.manager-tool-replacement-component-trigger) {
+    display: flex;
+    gap: var(--fab-space-3);
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  /* The chip glyph: `34px`, radius 9 (`replChip` in the design's own state object). The shared
+     component-picker rule sizes it at 24px, which is a select's leading icon rather than a
+     tile's mount. 34 is a published control-height rung, so nothing is rounded here. */
+  .manager-tool-replacement
+    .manager-tool-replacement-tile
+    :global(.manager-tool-replacement-component-trigger .manager-travel-portrait) {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  /* The name: `600 12.5px var(--sans); color: var(--text)` (`proto:2207`), which is 0.78rem
+     against the 16px root. The source line under it is `SearchablePopover`'s own
+     `triggerMeta` and takes its mono, subtle, ellipsised treatment from the primitive. */
+  .manager-tool-replacement
+    .manager-tool-replacement-tile
+    :global(.manager-tool-replacement-component-name) {
+    color: var(--fab-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  /* THE UNLINK, in the same danger treatment as the Overview tab's source unlink and at the
+     design's own 30px (`proto:2208`: `width: 30px; height: 30px; border-radius: 8px; border:
+     1px solid var(--danger-border); background: var(--danger-soft); color: var(--danger-text);
+     font-size: 11px`). `IconButton.is-danger` carries the edge and the ink but leaves the
+     resting fill neutral, so the fill is what this adds. */
+  .manager-tool-replacement .manager-tool-replacement-tile > :global(.manager-icon-button) {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--fab-danger-soft);
+    font-size: 0.68rem;
   }
 
   /* THE EMPTY FACE: `proto:2216`'s dashed zone — `padding:16px 12px`, `radius:10px`, a
@@ -302,7 +398,49 @@
 
   .manager-tool-replacement-drop-label {
     color: var(--fab-text-subtle);
-    font-size: 0.62rem;
+    font-size: 0.66rem;
     font-weight: 500;
+  }
+
+  /* THE SEARCH AFFORDANCE IS A PILL, NOT A SECOND SELECT (issue 1373, maintainer round 2, E2).
+     `proto:2216`: `display: inline-flex; align-items: center; gap: 6px; height: 28px;
+     padding: 0 12px; border-radius: 8px; background: var(--bg1); border: 1px solid
+     var(--border-strong); font: 600 10.5px var(--sans); color: var(--text2)`, with a 9px
+     magnifier and no chevron.
+
+     It rendered full width with a chevron, because `styles/fabricate.css` widens every
+     `.manager-tool-replacement-component-trigger` inside this card to `width: 100%` — the same
+     rule that made the FILLED face a select. Both faces are corrected together; the rules are
+     anchored on two classes this component writes, so they sit at (0,4,0) against that rule's
+     (0,3,0). 6 is `--fab-space-chip`, the published dense unit, and 12 is `--fab-space-3`; 28 is
+     a control-height rung, so nothing here is rounded.
+
+     THE RUNG IS `--fab-bg-0`: the design's `--bg1` is this theme's `--fab-bg-0`, and the zone
+     it sits in is already `--fab-surface-soft`, so a same-rung fill would leave the pill's
+     border floating on a flat surface. */
+  .manager-tool-replacement
+    .manager-tool-replacement-drop
+    > :global(.manager-tool-replacement-picker) {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .manager-tool-replacement
+    .manager-tool-replacement-drop
+    :global(.manager-tool-replacement-component-trigger) {
+    gap: var(--fab-space-chip);
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 var(--fab-space-3);
+    border: 1px solid var(--fab-border-strong);
+    border-radius: 8px;
+    color: var(--fab-text-secondary);
+    background: var(--fab-bg-0);
+    font-size: 0.66rem;
+    font-weight: 600;
   }
 </style>

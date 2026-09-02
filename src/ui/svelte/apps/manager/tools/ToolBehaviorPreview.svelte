@@ -410,7 +410,7 @@
     </p>
   </section>
 
-  <p class="manager-kicker">
+  <p class="manager-kicker manager-tool-preview-kicker">
     <i class="fas fa-user" aria-hidden="true"></i>{text(
       'FABRICATE.Admin.Manager.Tools.Editor.PreviewAsKicker',
       'Preview as'
@@ -499,6 +499,20 @@
     border-style: dashed;
     border-color: var(--fab-border-strong);
     background: transparent;
+  }
+
+  /* THE GLYPH IS NOT PART OF THE WORD (issue 1373, maintainer round 2, E5). `manager-kicker`
+     is a block with no `display: flex`, so an `<i>` immediately followed by the label ran the
+     person glyph straight into the `P` of `PREVIEW AS` with no space at all. `proto:2436`
+     states `margin-right: 6px` on that exact glyph, and `--fab-space-chip` IS 6px — the
+     published dense optical unit for icon-and-label gaps — so this is the design's value
+     through a token rather than a literal.
+
+     A MARGIN ON THE GLYPH rather than `display: flex; gap` on the paragraph: the kicker is a
+     shipped class used in thirty other places as a block, and turning one instance into a flex
+     container changes how its own text wraps as well as where the glyph sits. */
+  .manager-tool-preview-kicker > i {
+    margin-right: var(--fab-space-chip);
   }
 
   /* `Pagination` renders its own `<section>`, so the sizing has to be stated from this side of

@@ -1304,6 +1304,65 @@ describe('Tool Studio editor (mounted)', () => {
     }
   });
 
+  // ── E3 AT SYSTEM SCOPE (issue 1373, maintainer round 2) ─────────────────────────────────
+  //
+  // The tab is shared with the world entry and gains the design's heading anatomy at BOTH
+  // scopes: one card, an eyebrow over a sentence-case title, and a rule between the sections.
+  //
+  // WHAT DOES NOT MOVE HERE is the enable switch. The world entry puts it on the header row,
+  // where the design draws it; a system card's header row is already spent on the INHERIT
+  // switch, which is a different question wearing the same track, so the enable switch stays as
+  // the first row of the body. This case is the record of that divergence — without it, a later
+  // author reading the world frame would "fix" the system one into two identical switches a
+  // line apart.
+  it('heads both sections with an eyebrow inside ONE card, and keeps the system enable row', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+    const card = root.querySelector('.manager-tool-requirements-card');
+    assert.ok(Boolean(card), 'the tab is one card at system scope too');
+    assert.deepEqual(
+      [...card.querySelectorAll('[data-tool-rule-card]')].map(
+        (section) => section.dataset.toolRuleCard
+      ),
+      ['prerequisites', 'bonus']
+    );
+    assert.deepEqual(
+      [...card.querySelectorAll('[data-tool-rule-eyebrow]')].map((node) =>
+        node.textContent.trim()
+      ),
+      ['Prerequisites', 'Bonus'],
+      'the eyebrow is the short word at this scope as well'
+    );
+    assert.deepEqual(
+      [...card.querySelectorAll('.manager-tool-rule-card-title h3')].map((node) =>
+        node.textContent.trim()
+      ),
+      ['Character prerequisites', 'Bonus to the check'],
+      'and the title is the sentence'
+    );
+
+    // THE HEADER ROW'S CONTROL IS THE INHERIT SWITCH, and the enable switch is in the body.
+    for (const [section, hook] of [
+      ['prerequisites', 'data-tool-prerequisites-enabled'],
+      ['bonus', 'data-tool-bonus-enabled'],
+    ]) {
+      const rule = card.querySelector(`[data-tool-rule-card="${section}"]`);
+      assert.ok(
+        Boolean(rule.querySelector(`[data-scoped-inherit-toggle="${section}"]`)),
+        'the inheritance switch keeps the head'
+      );
+      const enable = rule.querySelector(`[${hook}]`);
+      assert.ok(Boolean(enable), 'and the section still has its own enable switch');
+      assert.ok(
+        !enable.closest('.manager-tool-rule-card-head'),
+        'which stays in the body rather than joining a second track on the head'
+      );
+      assert.ok(
+        Boolean(enable.closest('.manager-tool-setting-row')),
+        'as the first row of it'
+      );
+    }
+  });
+
   it('authors prerequisite AND gates, gate mode, and a hint-led bonus expression', async () => {
     const patches = [];
     const root = await harness.mount(
