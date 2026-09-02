@@ -27,11 +27,19 @@
  *
  * WHAT IT MAY NOT IMPORT, AND WHY
  * -------------------------------
- * `knobs.js` only. It imports nothing at all, precisely so both consumers can run it — the lab in
- * Chromium against real snippets, this gate under `node --test` with no DOM in reach. `model.js`
- * needs a JSON import attribute and `importers.js` needs `import.meta.glob`, so both are Vite-only;
- * `fillers.js` builds Svelte snippets. Everything else this gate needs is read through `node:fs`,
- * which is the same set of bytes the lab reads and therefore not a second record of it.
+ * `knobs.js` and `fillers.js`. `knobs.js` imports nothing at all and `fillers.js` imports only
+ * `createRawSnippet`, which builds a snippet from a render function and touches no DOM until
+ * something renders it — so both load under `node --test` with no window in reach, and this gate
+ * compares the SAME objects the lab resolves against rather than a reading of their source.
+ * `model.js` needs a JSON import attribute and `importers.js` needs `import.meta.glob`, so both are
+ * Vite-only. Everything else this gate needs is read through `node:fs`, which is the same set of
+ * bytes the lab reads and therefore not a second record of it.
+ *
+ * THE FILLER RULE USED TO SCRAPE `fillers.js` AS TEXT, and it is the reason that paragraph is
+ * worth stating precisely: the ids were read out of a named object literal, so renaming that
+ * literal made the reader answer with an empty set — under which "every filler a catalogue row
+ * selects exists" is true of every catalogue. The aliveness assertion is what turned that into a
+ * named failure, and it is why the import is the repair rather than a better regular expression.
  *
  * `parseDesignLibrary` is called ONCE, at module scope. It builds and closes a happy-dom `Window`
  * per call, and this file would otherwise make one per test — the shape `npm test` runs out of heap
@@ -62,6 +70,11 @@ import { fileURLToPath } from 'node:url';
 import {
   CATALOGUE_DIRECTORY,
   CATALOGUE_README,
+  ERROR_ATTRIBUTE,
+  MOUNTED_ATTRIBUTE,
+  MOUNT_ALL_QUERY,
+  READY_ATTRIBUTE,
+  SPECIMEN_ATTRIBUTE,
   catalogueEntries,
   catalogueFiles,
   cataloguePaths,
@@ -77,6 +90,14 @@ import {
   readDesignLibrary,
 } from './helpers/designLibrary.js';
 import { declaredPropNames } from './helpers/sveltePropsDeclaration.js';
+import {
+  COMPONENT_FILLER_IDS,
+  FILLER_IDS,
+  FILLER_MARKUP,
+  RAW_FILLERS,
+  describeFiller,
+  fillerIds,
+} from './view-lab/primitives/fillers.js';
 import {
   accountedProps,
   buildProps,
@@ -160,6 +181,22 @@ function where(entry) {
  * @returns {number} negative, zero or positive per the `Array#sort` contract
  */
 const byCodePoint = (left, right) => (left < right ? -1 : Number(left > right));
+
+/**
+ * One side of a set equality: what `expected` holds that `present` does not.
+ *
+ * Returned as an array rather than asserted on, so the failure names the ids that DIVERGE instead
+ * of printing two whole sets and leaving the reader to diff them — and so the same comparison can
+ * be run in both directions, which is the only way a message can say which side is short.
+ *
+ * @param {Iterable<string>} present The side being checked.
+ * @param {Iterable<string>} expected The side it is checked against.
+ * @returns {string[]} The difference, deduplicated, in code-point order.
+ */
+function missingFrom(present, expected) {
+  const have = new Set(present);
+  return [...new Set(expected)].filter((id) => !have.has(id)).sort(byCodePoint);
+}
 
 /** Component source text, read at most once per path. */
 const sourceCache = new Map();
@@ -596,44 +633,69 @@ test('expandMatrix returns at least one cell per story and varies what it names'
 // The fillers
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/** `fillers.js` builds Svelte snippets at module scope, so it is READ rather than imported. */
-const FILLERS_SOURCE = readFileSync(
-  path.join(REPO_ROOT, 'tests/view-lab/primitives/fillers.js'),
-  'utf8'
-);
-
-/** `knobs.js` is imported for its functions; its filler prose is read as text. */
-const KNOBS_SOURCE = readFileSync(
-  path.join(REPO_ROOT, 'tests/view-lab/primitives/knobs.js'),
-  'utf8'
-);
-
-/** The filler ids, taken from the literal the lab itself resolves against. */
-const FILLER_IDS = objectLiteralKeys(
-  FILLERS_SOURCE.slice(FILLERS_SOURCE.indexOf('export const SNIPPET_FILLERS'))
-);
-
 test('the filler ids and the ids the invocation describes are one set', () => {
+  // THE ANTI-VACUITY ANCHOR for both filler rules. Each assertion below is a set comparison and a
+  // set comparison passes over two empty sets — including the rule underneath this one, which
+  // would call every catalogue row correct if the ids read as nothing. That is not hypothetical:
+  // the reader this replaces scraped the ids out of `fillers.js` by name, and answered with an
+  // empty set the moment the literal was renamed.
   assert.ok(FILLER_IDS.length > 3, `read ${FILLER_IDS.length} filler ids, so the reader is broken`);
   assert.equal(new Set(FILLER_IDS).size, FILLER_IDS.length, 'a filler id is declared twice');
-  assert.ok(
-    FILLERS_SOURCE.includes('Object.keys(SNIPPET_FILLERS)'),
-    '`fillerIds()` no longer derives from `SNIPPET_FILLERS`. A typed list is a second record of ' +
-      'the same set, and the failure of the two to agree is silent: a knob offers an option that ' +
-      'resolves to no snippet, and `buildProps` OMITS the prop rather than reporting it.'
+
+  // `FILLER_IDS` is the one place the set is enumerated, so it is the side every other half is
+  // compared against rather than a fourth record to keep in step with three others.
+  const supplied = [...Object.keys(RAW_FILLERS), ...COMPONENT_FILLER_IDS];
+  assert.deepEqual(
+    missingFrom(supplied, FILLER_IDS),
+    [],
+    '`FILLER_IDS` enumerates a filler that neither `RAW_FILLERS` nor `COMPONENT_FILLER_IDS` ' +
+      'supplies. `fillerIds()` offers it as a knob option, `assembleFillers` resolves it to ' +
+      'nothing, and `buildProps` OMITS the snippet prop — so the slot renders empty and reads as ' +
+      'a component that draws nothing there.'
   );
-  // `describeFiller` in `knobs.js` renders a filler into the generated invocation by NAME. It is a
-  // hand-maintained mirror of the ids above, so it rots the moment one is renamed — and it rots
-  // silently, because an unrecognised id falls through to the default branch and prints text.
-  const described = [...KNOBS_SOURCE.matchAll(/id === '([^']+)'/g)].map((match) => match[1]);
-  assert.ok(described.length > 0, 'the invocation describes no filler by id; the mirror moved');
-  for (const id of described) {
-    assert.ok(
-      FILLER_IDS.includes(id),
-      `the invocation renderer special-cases the filler \`${id}\`, which \`fillers.js\` no longer ` +
-        `declares. Its ids are: ${FILLER_IDS.join(', ')}.`
-    );
+  assert.deepEqual(
+    missingFrom(FILLER_IDS, supplied),
+    [],
+    '`RAW_FILLERS` declares a snippet `FILLER_IDS` does not enumerate. It is unreachable: no ' +
+      'knob offers it, `assembleFillers` never checks for it, and `COMPONENT_FILLER_IDS` is ' +
+      'derived by SUBTRACTING the raw half, so an id only the raw half knows about is silently ' +
+      'excluded from the half `Fillers.svelte` is required to cover.'
+  );
+
+  const described = Object.keys(FILLER_MARKUP);
+  assert.deepEqual(
+    missingFrom(described, FILLER_IDS),
+    [],
+    '`FILLER_MARKUP` describes no markup for a filler the lab offers. `describeFiller` falls ' +
+      'through to the id itself, so the generated invocation — whose whole promise is that it ' +
+      'can be pasted and compile — prints a bare id where the call site would write markup.'
+  );
+  assert.deepEqual(
+    missingFrom(FILLER_IDS, described),
+    [],
+    '`FILLER_MARKUP` describes a filler that does not exist. Nothing resolves it, so the entry ' +
+      'is either a rename that was applied to one half of the file, or markup for a snippet the ' +
+      'lab cannot render.'
+  );
+
+  // The seam itself, not just the map behind it. `renderInvocation` takes `describeFiller` as a
+  // parameter defaulting to the identity function, so the browser's answer and this gate's are the
+  // same function only if this one is exercised.
+  for (const id of FILLER_IDS) {
+    assert.equal(describeFiller(id), FILLER_MARKUP[id], `describeFiller(${id})`);
   }
+  assert.equal(
+    describeFiller('no-such-filler'),
+    'no-such-filler',
+    "an unknown id must come back as ITSELF. Returning another filler's markup would report the " +
+      'fault as a different filler, in the one output on the page meant to be pasted somewhere.'
+  );
+  assert.deepEqual(
+    fillerIds(),
+    [...FILLER_IDS],
+    '`fillerIds()` is what a snippet knob with no explicit option list offers, so it is the set ' +
+      'the page actually presents'
+  );
 });
 
 test('every filler a catalogue row selects exists', () => {
@@ -903,4 +965,99 @@ test('the mounted-set comparison catches a count and an identity disagreement', 
     'a page that carries the specimen roots and reports zero has a broken counter, which is the ' +
       'attribute the whole smoke is decided on'
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// The attribute contract, which is the whole interface between the page and the smoke
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/** The half of the contract the smoke owns. Its attribute names are what the run is decided on. */
+const SMOKE_PATH = 'scripts/lib/primitiveLabSmoke.js';
+
+/**
+ * The half the PAGE owns: the two files that write the attributes, read as text.
+ *
+ * Read rather than imported, and that is not a preference. `mount.js` boots the lab on import and
+ * `Plinth.svelte` needs compiling, so neither can be loaded here — which is exactly the condition
+ * under which a hand-maintained mirror of strings goes unchecked. The bytes are the same bytes
+ * Vite serves, so reading them is not a second record of the contract.
+ */
+const PAGE_SOURCES = new Map(
+  ['tests/view-lab/primitives/mount.js', 'tests/view-lab/primitives/Plinth.svelte'].map((file) => [
+    file,
+    readFileSync(path.join(REPO_ROOT, file), 'utf8'),
+  ])
+);
+
+/**
+ * The page files that WRITE an attribute, as opposed to the ones that merely mention it.
+ *
+ * THE DISTINCTION IS MEASURED, not fastidious. The first draft of this rule asked whether the
+ * source `includes` the name at all — and renaming `READY_ATTRIBUTE` in `mount.js` left it passing,
+ * because both files document these attributes in prose and the docblock still spelled the old
+ * name. A rule that a stale comment can satisfy is a rule that reports the rename it exists to
+ * catch as agreement.
+ *
+ * So only the two forms that actually set an attribute count: a quoted string literal, which is how
+ * `mount.js` names the three it puts on `<body>`, and `name={…}`, which is how `Plinth.svelte`
+ * writes the specimen path onto the plinth. Prose says `` `name` `` or `name=""`, and neither of
+ * those is either of these.
+ *
+ * @param {string} attribute An attribute name.
+ * @returns {string[]} The page files that set it.
+ */
+function writersOf(attribute) {
+  return [...PAGE_SOURCES]
+    .filter(([, source]) => source.includes(`'${attribute}'`) || source.includes(`${attribute}={`))
+    .map(([file]) => file);
+}
+
+test('every attribute the smoke decides on is written by the page', () => {
+  // WITHOUT THIS RULE nothing under `tests/` names these attributes at all, and the only thing
+  // that compares the two halves is `npm run lab:check` — which is not a CI gate. A rename of
+  // either side then reads as a lab that never becomes ready: the smoke waits for an attribute
+  // nobody sets, times out, and reports it as a page that failed to mount.
+  const smokeSource = readFileSync(path.join(REPO_ROOT, SMOKE_PATH), 'utf8');
+  const declared = [
+    ...new Set([...smokeSource.matchAll(/'(data-primitive-lab-[a-z-]+)'/g)].map((m) => m[1])),
+  ].sort(byCodePoint);
+  // The scan is DERIVED rather than typed, so a fifth attribute is covered the day it is added —
+  // but a derived scan that matches nothing passes the loop below perfectly, so it is anchored
+  // against the four names this file imports by name and would fail to link without.
+  assert.deepEqual(
+    missingFrom(declared, [
+      ERROR_ATTRIBUTE,
+      MOUNTED_ATTRIBUTE,
+      READY_ATTRIBUTE,
+      SPECIMEN_ATTRIBUTE,
+    ]),
+    [],
+    `the scan over ${SMOKE_PATH} found ${declared.length} attribute literal(s) and missed one the ` +
+      'module exports, so the scanner is broken and the rule below has almost no domain'
+  );
+
+  for (const attribute of declared) {
+    assert.ok(
+      writersOf(attribute).length > 0,
+      `${SMOKE_PATH} decides the run on \`${attribute}\` and neither ` +
+        `${[...PAGE_SOURCES.keys()].join(' nor ')} SETS it. The smoke polls for it, the page ` +
+        'never writes it, and the timeout is reported as a lab that failed to mount rather than ' +
+        'as two halves of one contract that stopped spelling it the same way.'
+    );
+  }
+
+  // `MOUNT_ALL_QUERY` is the one part of the contract that is not an attribute: the smoke
+  // NAVIGATES with it, and `requireSupportedMountMode` REFUSES any value it does not know. So a
+  // rename on either side does not degrade — it throws on boot, before a single specimen mounts.
+  const [parameter, value, ...extra] = MOUNT_ALL_QUERY.split('=');
+  assert.deepEqual(extra, [], `${MOUNT_ALL_QUERY} is not one \`parameter=value\` pair`);
+  const mountSource = PAGE_SOURCES.get('tests/view-lab/primitives/mount.js');
+  for (const half of [parameter, value]) {
+    assert.ok(
+      mountSource.includes(`'${half}'`),
+      `the smoke navigates with \`?${MOUNT_ALL_QUERY}\` and \`mount.js\` declares no ` +
+        `\`'${half}'\`. Its mount-mode check refuses every value but the one it names, so the ` +
+        'page throws on boot and the whole run fails as a page error.'
+    );
+  }
 });
