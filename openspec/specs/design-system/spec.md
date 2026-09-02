@@ -225,6 +225,17 @@ A spinner alone is insufficient because Foundry's bundled Font Awesome disables 
 Motion is limited to a 140ms ease on a control state change, and nothing else animates.
 Under `prefers-reduced-motion: reduce` every transition and animation is removed, and any state that animated MUST remain readable when it does not.
 
+A SELECTED face is a FILL and an EDGE.
+A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
+So a selected row takes `--fab-surface-active` behind `--fab-accent-border`, and the `--fab-accent-soft` fill under a 3px inset accent bar belongs to a radio card group, whose one answer the bar is naming.
+Joining a multi-select row to a radio card's selected treatment is the shape this rule exists to prevent, and it is cheap to reach because the two rows are otherwise near-identical.
+
+#### Scenario: A multi-select list marks the rows a GM has chosen
+
+- **WHEN** a list lets more than one row be selected at once
+- **THEN** each selected row takes a tinted fill and an accent border
+- **AND** it draws no leading inset bar, whatever a single-select list beside it draws
+
 #### Scenario: A control enters a pending state
 
 - **WHEN** a control begins an operation that takes perceptible time

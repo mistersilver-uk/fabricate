@@ -163,6 +163,9 @@ const EXPECTED_OVERRIDE_KEYS = [
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
   // Its override names the one frame that draws the capped reading.
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
+  // — and neither representative frame draws it. Its override names the one frame that does.
+  'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
@@ -233,7 +236,8 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * Each later primitive extraction in this programme removes its own entry, and the only accepted
  * edit is a REMOVAL. `ModifierPillSelect` left it that way at issue 1458, when its add menu became
  * a `SearchablePopover` and the at-cap trigger treatment it was left holding acquired an override
- * naming the one frame that draws it.
+ * naming the one frame that draws it. `SelectionCheckbox` left it at issue 1373's round 5, when
+ * the Tool Studio's prerequisite list gained a frame and with it the `sm` size's only rendering.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -257,7 +261,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
-  'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
 ];
 

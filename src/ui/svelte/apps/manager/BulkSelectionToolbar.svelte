@@ -131,7 +131,7 @@
     // it argues against splitting a single ruling.
     //
     // A STRING, following the shipped idiom rather than inventing one: `Chip`, `Callout`,
-    // `ChecklistCardRow`, `ComplicationEffectRow` and `ArmedDangerButton` all take "which Font
+    // `ModifierLibraryRow`, `ComplicationEffectRow` and `ArmedDangerButton` all take "which Font
     // Awesome classes does this leading glyph draw" as a string prop. The default is today's
     // markup EXACTLY, so the Component, Recipe and Essence Studios are byte-identical — including
     // the hand-copied `<i class="fas fa-layer-group">` in their two font-size fixtures.

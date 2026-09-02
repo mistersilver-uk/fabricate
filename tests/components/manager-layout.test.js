@@ -5609,6 +5609,17 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     //
     // The Tool Studio checklist row's hand-rolled check box, now `SelectionCheckbox`.
     'manager-checklist-card-check',
+    // The fourth block (issue 1373, round 5): the Tool Studio's checklist ROW itself, with its
+    // icon and copy cells. `proto:4741` states the reference's prerequisite row identically to
+    // `proto:4752`'s bonus row, so the maintainer ruled the prerequisite list onto the SAME
+    // `ModifierLibraryRow` the bonus list already draws — and `ChecklistCardRow.svelte`, whose
+    // only caller that list was, went with it. The names are ratcheted for the reason the third
+    // block records: a retired row left in the sheet is a fourth row waiting to be copied.
+    'manager-checklist-card-row',
+    'manager-checklist-card-icon',
+    'manager-checklist-card-copy',
+    // And the hand-rolled box it used before issue 772, dead in the sheet ever since.
+    'manager-tool-prerequisite-check',
     // The component editor's hand-rolled tag pill, now `Chip tone="tag"`.
     //
     // The CONTAINER is retired with it, and that is not tidiness: this assertion is a bare
@@ -7451,27 +7462,47 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
 // had NO metrics at all — a silent failure, since every class selector would still resolve. So
 // the two anchors JOIN one block per cell rather than the Tool route authoring a second copy.
 test('the modifier library row is one block per cell, reaching both screens that draw it', () => {
+  // THE GLYPH LEFT THIS LIST AT ROUND 6, and deliberately. `proto:2332` draws the prerequisite
+  // row's glyph BARE - `font-size:11px; color:var(--accent); flex:0 0 auto` and no box at all -
+  // where `proto:2363` gives the bonus row the 26px tile this block states. The tile is not
+  // suppressed by a rule resetting five properties; the block simply stops naming the one route
+  // that does not draw one, and the bare face is stated once, on the ROW's own variant class, in
+  // `the leading-control variant carries the reference bare glyph` below.
   const CELLS = [
     'manager-modifier-readonly-row',
-    'manager-modifier-readonly-glyph',
     'manager-modifier-readonly-label',
     'manager-modifier-readonly-expression',
   ];
   for (const cell of CELLS) {
+    // THREE ANCHORS SINCE ISSUE 1373's ROUND 5. The Tool tab's PREREQUISITE list joined the
+    // bonus list on this row: `proto:4741` and `proto:4752` state the two lists' rows byte for
+    // byte identically, so the reference draws ONE row where our tab drew two.
     assert.ok(
       css.includes(
         `.fabricate-manager .manager-checks-card .${cell},\n` +
+          `.fabricate-manager .manager-tool-prerequisite-list .${cell},\n` +
           `.fabricate-manager .manager-tool-bonus-list .${cell} {`
       ),
-      `${cell} must be ONE joined block naming both routes, not a second copy for the Tool tab`
+      `${cell} must be ONE joined block naming all three routes, not a copy per Tool list`
     );
     // The non-vacuity half: a second declaring block would satisfy the join above and still
-    // let the two screens drift, so each cell is declared exactly twice in the file — once in
-    // the joined selector, once nowhere else.
+    // let the two screens drift, so each cell is declared exactly once OUTSIDE a variant — in
+    // the joined selector, and nowhere else.
+    //
+    // A VARIANT BLOCK IS EXEMPT, and by NAME rather than by pattern. Round 6 gave the row two
+    // declared variants, and `is-text-stacked` restates the expression cell's `flex` for a
+    // COLUMN context the joined value was not written for. That is an extension of the one
+    // owner rather than a second one, and it is reachable only from a row that asked for it.
+    // Exempting the two variant classes and nothing else is what keeps a plain copy on a
+    // third route failing here exactly as it did before.
+    const declaringLines = css
+      .split('\n')
+      .filter((line) => line.trimEnd().endsWith(`.${cell} {`))
+      .filter((line) => !/is-text-stacked|is-control-leading/.test(line));
     assert.equal(
-      (css.match(new RegExp(`\\.${cell} \\{`, 'g')) || []).length,
+      declaringLines.length,
       1,
-      `${cell} must be declared exactly once`
+      `${cell} must be declared exactly once outside the row's declared variants`
     );
   }
   // AND THE PICK CONTROL IS THE MANAGER'S SHIPPED RADIO, joined the same way. Foundry's core
@@ -7494,6 +7525,234 @@ test('the modifier library row is one block per cell, reaching both screens that
     false,
     'the themed radio stays scoped to the surfaces that opt into it, never radios globally'
   );
+});
+
+// ── ONE ROW, TWO DECLARED VARIANTS, AND BOTH TRAVEL WITH THE PRIMITIVE (round 6) ────────────
+//
+// Round 5 put both Tool lists on this row and RECORDED two deviations from the reference rather
+// than reproducing them. The maintainer's round-6 ruling is that the reference's two rows
+// genuinely differ in exactly those two ways, and that the answer is declared variants on ONE
+// component — not two components, and not one shape forced on both:
+//
+//   `proto:2331`-`2333`  control FIRST, glyph BARE at 11px, label stacked over the expression
+//   `proto:2361`-`2364`  no leading control, label and expression INLINE, dot trailing
+//
+// Both variants are stated on the ROW's own class rather than on a route container, and that is
+// what makes them the primitive's rather than the Tool tab's: a fourth caller opting in gets the
+// rendering with the prop. A `.manager-tool-prerequisite-list`-anchored copy renders identically
+// today and gives that caller nothing, so the rooting is asserted rather than left to reading.
+test('the leading-control variant carries the reference bare glyph', () => {
+  // The TILE keeps two anchors — the two routes that still draw one.
+  const tile =
+    '.fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph,\n' +
+    '.fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-glyph {';
+  assert.ok(css.includes(tile), 'the glyph tile is one block naming the two routes that draw it');
+  assert.equal(
+    css.includes('.manager-tool-prerequisite-list .manager-modifier-readonly-glyph'),
+    false,
+    'and `proto:2332` draws that row bare, so the tile block does not reach it at all'
+  );
+
+  const bare =
+    '.fabricate-manager .manager-modifier-readonly-row.is-control-leading > ' +
+    '.manager-modifier-readonly-glyph {';
+  assert.ok(
+    css.includes(bare),
+    "the bare glyph is stated once, on the row's own variant class, so it travels with the row"
+  );
+  const bareDeclarations = css.slice(css.indexOf(bare) + bare.length).split('}')[0];
+  assert.match(bareDeclarations, /font-size: 11px/, '`proto:2332`');
+  assert.match(bareDeclarations, /color: var\(--fab-accent\)/, 'and its accent ink');
+  // The non-vacuity half. A bare glyph reached by RESETTING the tile is the same five properties
+  // written twice in opposite directions, and the next property added to the tile would leak
+  // straight through it. The variant states what the glyph IS.
+  for (const reset of ['width:', 'height:', 'border-radius:', 'background:']) {
+    assert.equal(
+      bareDeclarations.includes(reset),
+      false,
+      `the bare face states what it is, never what the tile is not (${reset})`
+    );
+  }
+});
+
+test('the stacked-text variant is the row own, not the Tool tab', () => {
+  const stack =
+    '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked > ' +
+    '.manager-modifier-readonly-text {';
+  assert.ok(css.includes(stack), "the text block is stated on the row's own variant class");
+  const stackDeclarations = css.slice(css.indexOf(stack) + stack.length).split('}')[0];
+  assert.match(stackDeclarations, /flex-direction: column/, '`proto:2333` sets name over value');
+  assert.match(stackDeclarations, /min-width: 0/, 'so a long expression ellipses inside the row');
+
+  // The expression cell is `flex: 1 1 0` in the INLINE row, which is what puts a trailing control
+  // against the row's right edge with no auto margin. Left alone inside a COLUMN that same
+  // declaration grows it to the row's height, so the variant restates it — at (0,4,0) against the
+  // joined cell's (0,3,0) rather than relying on source order, because the blocks are far apart.
+  const expression =
+    '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked ' +
+    '.manager-modifier-readonly-expression {';
+  assert.ok(css.includes(expression), 'and the expression cell is re-stated for the column');
+  const expressionDeclarations = css
+    .slice(css.indexOf(expression) + expression.length)
+    .split('}')[0];
+  assert.match(expressionDeclarations, /flex: 0 0 auto/, "it does not grow to the row's height");
+  assert.match(
+    expressionDeclarations,
+    /margin-top: var\(--fab-space-2xs\)/,
+    "`proto:2333`'s 2px, taken from the published scale rather than written as a literal"
+  );
+
+  // AND NEITHER VARIANT IS GATED ON A ROUTE. This is the assertion that keeps them the row's.
+  for (const variant of ['is-control-leading', 'is-text-stacked']) {
+    for (const line of css.split('\n').filter((row) => row.includes(variant))) {
+      assert.equal(
+        /manager-tool-[a-z]+-list|manager-checks-card/.test(line),
+        false,
+        `the ${variant} variant must not be gated on a route container: ${line.trim()}`
+      );
+    }
+  }
+});
+
+// ── THE TWO PICK ROWS SHARE ONE SELECTED FACE, AT THE REFERENCE'S OWN TOKENS (round 5) ─────
+//
+// `proto:4741` and `proto:4752` are the same string: `background: bg1 | surface-active` and
+// `border: 1px solid (border | accent-border)`. Round 4 gave the bonus row the manager's OPTION
+// treatment instead, by joining `.manager-resolution-option.is-active` — which paints
+// `--fab-accent-soft` behind a 3px inset accent BAR at the row's leading edge. That bar is a
+// radio-card affordance, and it is doubly wrong on a checkbox list where several rows are active
+// at once and a leading bar reads as "this is the chosen one".
+//
+// So the two rows take one joined block at the reference's tokens. The RADIO reset stays joined
+// to the option treatment above, because that is Foundry's native-control chrome and is
+// genuinely shared; only the row's own fill and edge move.
+test('the Tool pick rows share one selected face, at the reference tokens', () => {
+  const restingRow =
+    '.fabricate-manager .manager-tool-prerequisite-row,\n' +
+    '.fabricate-manager .manager-tool-bonus-row {';
+  assert.ok(css.includes(restingRow), 'the two Tool pick rows are one block, not two copies');
+  const activeRow =
+    '.fabricate-manager .manager-tool-prerequisite-row.is-active,\n' +
+    '.fabricate-manager .manager-tool-bonus-row.is-active {';
+  assert.ok(css.includes(activeRow), 'and so is their selected face');
+  const activeBlock = css.slice(css.indexOf(activeRow) + activeRow.length);
+  const declarations = activeBlock.slice(0, activeBlock.indexOf('}'));
+  assert.match(
+    declarations,
+    /background: var\(--fab-surface-active\)/,
+    '`proto:4741` fills a selected row with `--surface-active`'
+  );
+  assert.match(
+    declarations,
+    /border-color: var\(--fab-accent-border\)/,
+    'and edges it with `--accent-border`'
+  );
+  assert.equal(
+    /box-shadow/.test(declarations),
+    false,
+    'and draws no inset bar: the reference states a fill and an edge and nothing else'
+  );
+  // The non-vacuity half. The bonus row must no longer ride the option treatment's own selected
+  // block, or the block above would be a second declaration deciding nothing but source order.
+  assert.equal(
+    /\.manager-resolution-option\.is-active,\n\.fabricate-manager \.manager-tool-bonus-row\.is-active/.test(
+      css
+    ),
+    false,
+    'and no longer joins the option-card treatment for it'
+  );
+});
+
+// ── THE SELECTION BOX IS THE REFERENCE'S, NOT A 14px TICK IN AN 18px SQUARE (round 5) ──────
+//
+// `proto:4740` states the prerequisite box exactly: `width:16px; height:16px; border-radius:5px;
+// font-size:8px; color:var(--on-accent)`, over `background: transparent | var(--accent)` and
+// `border: 1px solid (--border-strong | --accent)`, with `fa-solid fa-check` drawn only when
+// checked. The shipped `sm` size declared NO font-size at all, so its tick inherited the row's
+// 14px into an 18px box and touched all four edges.
+//
+// READ OUT OF THE COMPONENT, not the sheet: `SelectionCheckbox` owns its appearance in its own
+// scoped block, and `styles/fabricate.css` is imported at `layer(modules)` while that block is
+// injected unlayered — so a sheet rule aimed at these properties would be emitted, would match,
+// and would have its declarations discarded with no gate objecting.
+test('the small selection box is the reference box', () => {
+  const { css: selectionCss } = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/components/SelectionCheckbox.svelte')
+  );
+  const flat = selectionCss.replace(/\.svelte-[a-z0-9]+/g, '');
+  const start = flat.indexOf('.fab-selection-check.is-sm {');
+  assert.ok(start >= 0, 'the small size keeps a block of its own');
+  const smDeclarations = flat.slice(start, flat.indexOf('}', start));
+  assert.match(smDeclarations, /width: 16px/, '`proto:4740` sizes the box at 16px');
+  assert.match(smDeclarations, /height: 16px/);
+  assert.match(smDeclarations, /border-radius: 5px/);
+  assert.match(
+    smDeclarations,
+    /font-size: 8px/,
+    'and states the tick size, which the inherited 14px overflowed'
+  );
+  // The checked ink is the reference's `--on-accent`, stated for THIS size rather than for every
+  // size: `md` and `lg` are the toolbar and browser boxes, whose own frames measured
+  // `--fab-bg-1`, and re-inking those is a different screen's change.
+  const onAccentStart = flat.indexOf('.fab-selection-check.is-sm.is-checked {');
+  assert.ok(onAccentStart >= 0, 'the small box states its own checked ink');
+  assert.match(
+    flat.slice(onAccentStart, flat.indexOf('}', onAccentStart)),
+    /color: var\(--fab-on-accent\)/,
+    'which is the reference ink for a tick on an accent fill'
+  );
+});
+
+// ── THE REQUIREMENTS CARD HEAD IS THE REFERENCE'S EYEBROW, NOT `.manager-kicker` (round 5) ──
+//
+// `proto:2324` states every section eyebrow on this tab as `font: 700 8.5px var(--sans);
+// letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`. The shared
+// `.manager-kicker` is `0.72rem` — 11.52px, 35% over — with NO tracking and the MUTED ink, so
+// the two section heads read as small headings rather than as the quiet rules they are.
+//
+// NARROWED IN THE CARD, never on the shared class: `.manager-kicker` has callers on every other
+// manager screen and their own reference frames measured them. This is the treatment
+// `ToolBrowserInspector.svelte` already applies to the Tool inspector rail and
+// `styles/fabricate.css:3316` to the Checks rail — a third site, stated the same way.
+//
+// The cascade happens to favour a scoped rule here (the sheet is layered, this block is not),
+// but the assertion reads the COMPILED scoped CSS rather than the source, so what it pins is
+// what Svelte emits.
+test('the Tool rule card eyebrow carries the reference type, not the shared kicker size', () => {
+  const { css: cardCss } = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte')
+  );
+  const flat = cardCss.replace(/\.svelte-[a-z0-9]+/g, '');
+  const start = flat.indexOf('.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow');
+  assert.ok(start >= 0, 'the eyebrow keeps a block of its own');
+  const declarations = flat.slice(start, flat.indexOf('}', start));
+  assert.match(declarations, /font-size: 8\.5px/, '`proto:2324` sets the eyebrow at 8.5px');
+  assert.match(declarations, /letter-spacing: 0\.11em/, 'and tracks it at .11em');
+  assert.match(
+    declarations,
+    /color: var\(--fab-text-subtle\)/,
+    'and inks it `--subtle`, one rung quieter than the muted the shared class gives'
+  );
+  assert.equal(
+    css.includes('.fabricate-manager .manager-kicker {\n  margin: 0 0 var(--fab-space-2xs);'),
+    true,
+    'and the shared kicker is untouched for every other screen that draws one'
+  );
+
+  // AND THE ONE EYEBROW INSIDE THE CARD BODY TAKES THE SAME TREATMENT. `proto:2356` states the
+  // bonus list's `World modifiers` label with the SAME string `proto:2324` states the two
+  // section eyebrows with, so narrowing only the head would put two uppercase micro-labels at
+  // two sizes inside one card — a worse reading than the one this repair started from.
+  const { css: tabCss } = scopedComponentCss(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte')
+  );
+  const tabFlat = tabCss.replace(/\.svelte-[a-z0-9]+/g, '');
+  const kickerStart = tabFlat.indexOf('.manager-tool-bonus-kicker {');
+  assert.ok(kickerStart >= 0, 'the bonus eyebrow keeps a block of its own');
+  const kickerDeclarations = tabFlat.slice(kickerStart, tabFlat.indexOf('}', kickerStart));
+  assert.match(kickerDeclarations, /font-size: 8\.5px/);
+  assert.match(kickerDeclarations, /letter-spacing: 0\.11em/);
+  assert.match(kickerDeclarations, /color: var\(--fab-text-subtle\)/);
 });
 
 test('the locked activation indicator offers no hover affordance', async () => {

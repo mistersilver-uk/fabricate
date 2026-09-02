@@ -6477,7 +6477,11 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     'Strength 13 or higher',
     'Trained in Arcana',
   ];
-  const visiblePrerequisiteNames = await editor.locator('[data-tool-prerequisite-row] strong').allTextContents();
+  // The row's NAME cell. It was a `<strong>` inside the retired `ChecklistCardRow`; since issue
+  // 1373's round 5 the prerequisite list draws the shared `ModifierLibraryRow`, whose name cell
+  // is `.manager-modifier-readonly-label`. A stale selector here matches nothing and the walk
+  // fails on an empty array, which reads as a data fault rather than a selector one.
+  const visiblePrerequisiteNames = await editor.locator('[data-tool-prerequisite-row] .manager-modifier-readonly-label').allTextContents();
   if (JSON.stringify(visiblePrerequisiteNames) !== JSON.stringify(expectedPrerequisiteNames)) {
     throw new Error(`Tool Studio parity prerequisite order drifted: ${JSON.stringify(visiblePrerequisiteNames)}`);
   }

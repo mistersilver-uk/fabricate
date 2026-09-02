@@ -3,16 +3,18 @@
   The manager's ONE selection control: a square custom box with a checked, unchecked and
   indeterminate state, at the sizes its host row needs (issue 772).
 
-  It exists because the Tool Studio's requirements tab already SHIPS this treatment —
+  It exists because the Tool Studio's requirements tab already SHIPPED this treatment —
   `ChecklistCardRow` hand-rolled a visually-hidden `<input type="checkbox">` plus a
   `.manager-checklist-card-check` box against the global sheet — and the component
-  browser's new multi-select needs the same control one screen away. A shared CSS class
+  browser's new multi-select needs the same control one screen away. That row is itself gone
+  since issue 1373's round 5, when the prerequisite list it drew was ruled onto the shared
+  `ModifierLibraryRow`; this primitive is the control that list trails, at the `sm` size. A shared CSS class
   that every site hand-rolls markup against does not satisfy the reuse rule
   (`openspec/specs/ui-integration/spec.md` §Shared product UI primitives), and a primitive
   that coexists with an unconverted duplicate has ADDED a variant rather than removed one.
   So the check-box leaf was extracted here and `ChecklistCardRow` was converted onto it in
-  the same change; its global rules are gone and its class names are ratcheted in
-  `tests/components/manager-layout.test.js`.
+  the same change; its global rules are gone and its class names — the row's own among them,
+  since round 5 — are ratcheted in `tests/components/manager-layout.test.js`.
 
   A host-supplied `<input type="checkbox">` wearing Foundry's default control chrome is a
   SECOND selection design, not a cheaper version of this one.
@@ -108,10 +110,11 @@
      computed-value time, and the colour silently falls back to inheritance. Nothing fails; it
      just looks wrong. `Chip.svelte` records the same rule for the same reason.
 
-     These are the same three tokens the converted Tool Studio box resolved to, so `sm`
-     renders pixel-identically to the box it replaced. `--fab-on-accent` is NOT the checked
-     glyph colour: it differs from `--fab-bg-1` in every theme and would re-colour the
-     shipped Tool Studio.
+     `md` and `lg` carry the same three tokens the converted Tool Studio box resolved to.
+     `sm` no longer does: `proto:4740` states the Tool Studio's own box as `color:
+     var(--on-accent)` over `background: var(--accent)`, and issue 1373's round 5 moved that
+     size onto the reference (see its block below). The other two sizes keep `--fab-bg-1`,
+     which their own frames measured, so re-inking them stays a different screen's change.
 
      Svelte compiles these to `.fab-selection-check.svelte-<hash>` and `css: 'injected'`
      puts the block in `document.head` UNLAYERED, so it beats Foundry core's layered
@@ -163,12 +166,22 @@
 
   /* ── The size ladder. Each entry is stated, none is computed from another. ────────── */
 
-  /* The shipped Tool Studio checklist box. It carries NO fill and NO font-size, because
-     it carried neither before the extraction and this size must render byte-identically. */
+  /* THE TOOL STUDIO'S PREREQUISITE BOX, at the reference's own figures (issue 1373, round 5).
+     `proto:4740`: `width:16px; height:16px; border-radius:5px; font-size:8px;
+     color:var(--on-accent)` over `background: transparent | var(--accent)` and `border: 1px
+     solid (--border-strong | --accent)`.
+
+     THE FONT SIZE IS THE REPAIR THAT MATTERS. This size declared none at all — it carried none
+     before the extraction and the extraction's contract was to render byte-identically — so the
+     tick INHERITED the row's 14px into an 18px box and touched all four edges. A tick that fills
+     its box reads as a filled square rather than as a mark, which is what the maintainer saw
+     beside the reference. It carries no fill still: the unchecked box is a hollow ring on the
+     border token, exactly as `proto:4740` draws it. */
   .fab-selection-check.is-sm {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     border-radius: 5px;
+    font-size: 8px;
   }
 
   /* The page-selection box in a toolbar row. */
@@ -197,6 +210,16 @@
     border-color: var(--fab-accent);
     background: var(--fab-accent);
     color: var(--fab-bg-1);
+  }
+
+  /* The small box's checked ink is `--on-accent` (`proto:4740`), which is what a tick sitting
+     ON the accent fill is specified in. Stated for this size alone rather than on the state
+     above: `md` and `lg` are the toolbar and browser boxes, and `--fab-on-accent` differs from
+     `--fab-bg-1` in every theme, so widening it would re-colour two screens this change did not
+     measure. Placed after the state block so it wins on source order at equal specificity —
+     both are (0,3,0). */
+  .fab-selection-check.is-sm.is-checked {
+    color: var(--fab-on-accent);
   }
 
   /* Indeterminate is "some of these", so it reads as an accent HINT rather than a filled

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -3353,6 +3353,162 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(
       !/<RadioCardGroup[^>]*?tool-bonus-modifier/s.test(toolRequirementsSource),
       'the bonus list should render no option-card group'
+    );
+
+    // ── AND SO IS THE PREREQUISITE LIST DIRECTLY ABOVE IT (issue 1373, maintainer round 5) ─
+    //
+    // `proto:4741` gives the design's prerequisite row
+    // `display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px;
+    // background: bg1|surface-active; border: 1px solid (border|accent-border)` — which is
+    // `proto:4752`'s bonus row byte for byte. The two lists ARE one row in the reference, and
+    // ours drew them as two: `ChecklistCardRow` above, `ModifierLibraryRow` below, with
+    // different metrics, a different fill and a different selected treatment.
+    //
+    // ASSERTED AS ONE COMPONENT WITH THREE CALLERS, for the reason the bonus assertion above
+    // records: a class-only assertion is satisfied by a third copy of the markup, and a third
+    // modifier row is precisely what the ruling forbids.
+    assert.equal(
+      (toolRequirementsSource.match(/<ModifierLibraryRow/g) || []).length,
+      2,
+      'BOTH lists on this tab draw the shared modifier row — the prerequisites and the bonus'
+    );
+    assert.ok(
+      toolRequirementsSource.includes("'data-tool-prerequisite-row': option.id"),
+      'each prerequisite row names the entry it stands for, so a frame can select one'
+    );
+    // The IMPORT and the ELEMENT, not the name: the tab's docblock records the ruling that
+    // retired that row, and an assertion that reds on a historical note is an assertion that
+    // gets satisfied by deleting the explanation.
+    assert.ok(
+      !/import ChecklistCardRow|<ChecklistCardRow/.test(toolRequirementsSource),
+      'the bespoke checklist row is gone from the tab, not merely unused beside the shared one'
+    );
+    assert.ok(
+      !existsSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/ChecklistCardRow.svelte')),
+      'and the orphaned component is REMOVED — its only caller was this list, and a component ' +
+        'left standing with no caller is how a fourth row comes back by copy'
+    );
+    // THE TRAILING CONTROL IS A REAL CHECKBOX, through the manager's one selection primitive.
+    // A multi-select list needs a checkbox per row with a label; the bonus list's radio would
+    // make the set single-select, and a `role="checkbox"` wrapper would be the nested-control
+    // trap the row's own header records.
+    assert.ok(
+      toolRequirementsSource.includes('<SelectionCheckbox'),
+      'the prerequisite row trails the shared selection checkbox'
+    );
+    assert.ok(
+      /<SelectionCheckbox[^>]*wrapper="contents"/s.test(toolRequirementsSource),
+      'in `contents` mode, because the row host is already a <label> and labels may not nest'
+    );
+
+    // ── TWO HEADINGS THE DESIGN DOES NOT DRAW (issue 1373, maintainer round 5) ────────────
+    //
+    // `proto:2326` goes from the section header row STRAIGHT to the list at `proto:2328`: there
+    // is no eyebrow between them. And `proto:2334` is a single muted sentence — "All selected
+    // prerequisites are required (AND). When a character fails them:" — immediately followed by
+    // the two-column grid at `proto:2336`, where ours split one sentence into a statement plus a
+    // second uppercase eyebrow above the pair.
+    assert.ok(
+      !toolRequirementsSource.includes('WhichPrerequisites'),
+      'no `WHICH PREREQUISITES` eyebrow: the design heads the list with nothing'
+    );
+    assert.ok(
+      !toolRequirementsSource.includes('legendVisible'),
+      'and no `WHEN PREREQUISITES FAIL` eyebrow: the gate pair is introduced by the sentence ' +
+        'above it, so un-hiding its legend would print the heading the design merged away'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Tools.Editor.WhichPrerequisites,
+      undefined,
+      'the retired eyebrow key is removed, not left for a future caller to re-render'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Tools.Editor.RequiredAll,
+      'All selected prerequisites are required (AND). When a character fails them:',
+      '`proto:2334` states the AND rule and introduces the gate pair in ONE sentence'
+    );
+    // ── THE ROW'S TWO VARIANTS ARE DECLARED, DEFAULTED AND NAMED FOR WHAT THEY MEAN ──────
+    // (issue 1373, maintainer round 6.)
+    //
+    // Round 5 recorded two DEVIATIONS from the reference on this row: `proto:2331` leads with the
+    // box where ours trailed it, and `proto:2333` stacks the name over the expression where ours
+    // set them on one line. The argument for recording rather than fixing them was that a row
+    // serving both lists would be "two rows wearing one name" — which holds against a single
+    // fixed shape and not against declared variants, the answer this epic already reached for a
+    // different primitive.
+    //
+    // So the row takes two props, both defaulted to the shipped rendering. NAMED FOR WHAT THEY
+    // MEAN: `controlPlacement` and `textLayout` describe the row, where a `variant="prerequisite"`
+    // would describe a CALLER and would have to grow a value per screen that ever adopts it.
+    const modifierRowSource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte'),
+      'utf8'
+    );
+    assert.match(
+      modifierRowSource,
+      /controlPlacement = 'trailing'/,
+      "the control slot defaults to the shipped trailing edge, so today's callers are unmoved"
+    );
+    assert.match(
+      modifierRowSource,
+      /textLayout = 'inline'/,
+      'and the text defaults to one line, for the same reason'
+    );
+    // The names are the row's own vocabulary. A caller-named variant is the failure this ruling
+    // rejects by name, so it is asserted rather than left to review.
+    for (const callerName of ['prerequisite', 'bonus', 'checks', 'catalogue']) {
+      assert.equal(
+        new RegExp(`variant\\s*=\\s*'${callerName}'|'${callerName}'\\s*=>`, 'i').test(
+          modifierRowSource
+        ),
+        false,
+        `the row must not name a variant after its caller (${callerName})`
+      );
+    }
+    // AND THE PREREQUISITE LIST IS THE ONE THAT OPTS IN. The bonus list one section below and
+    // the Checks Studio one screen away both pass NEITHER, which is what makes the defaults
+    // load-bearing rather than decorative.
+    // READ OFF THE ELEMENTS, not off the file. The tab's own docblock names both props in prose,
+    // so a raw count of the attribute text counts the explanation as a call site.
+    const modifierRowTags = toolRequirementsSource.match(/<ModifierLibraryRow[^>]*>/g) || [];
+    assert.equal(modifierRowTags.length, 2, 'the tab draws the shared row twice');
+    const optedIn = modifierRowTags.filter((tag) => /controlPlacement|textLayout/.test(tag));
+    assert.equal(
+      optedIn.length,
+      1,
+      'and only ONE of the two opts in — the bonus list keeps the shipped face'
+    );
+    assert.match(optedIn[0], /controlPlacement="leading"/, '`proto:2331` puts the checkbox first');
+    assert.match(
+      optedIn[0],
+      /textLayout="stacked"/,
+      '`proto:2333` sets the name over the expression'
+    );
+    assert.match(
+      optedIn[0],
+      /data-tool-prerequisite-row/,
+      'and it is the PREREQUISITE list, not the bonus list, that took them'
+    );
+    assert.equal(
+      /controlPlacement|textLayout/.test(craftingModifierCatalogueSource),
+      false,
+      'the Checks Studio caller is untouched: it passes neither prop and renders as it shipped'
+    );
+
+    // The gate group keeps its accessible name — the heading is hidden, not deleted.
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Tools.Editor.GateMode,
+      'When prerequisites fail',
+      'the gate group keeps a legend for a screen reader even though nothing paints it'
+    );
+    // AND THE EMPTY LIBRARY NAMES ITS ROUTE, exactly as the bonus section below states its own.
+    // At SYSTEM scope the card head is spent on the inherit row, so the section's subtitle —
+    // the only other place the route is written — does not render at all there.
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites,
+      'No character prerequisites are defined in this world yet. They are defined under World, ' +
+        'Rules and resources.',
+      'the two absences on this tab read the same way, route included'
     );
     // AND BOTH CALLERS MUST PASS THE ROSTER. A prop declared and not passed renders an empty
     // library that reads as "this world has none" — and it also subscribes the whole spread
