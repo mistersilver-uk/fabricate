@@ -150,6 +150,12 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+  // Issue 1475: the player window's shared top bar, and the FIRST entry on this list whose
+  // override names a player frame. Converting its actor picker onto `SearchablePopover` moved the
+  // whole of what changed into the OPEN panel, and both representative frames draw the picker
+  // closed — `fabricate-app-shell` is one of them and renders the bar itself, so the closed trigger
+  // was never the gap. Its override names `player-actor-picker`.
+  'src/ui/svelte/components/ActorSelectTopBar.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
@@ -222,16 +228,18 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * frame "renders" a stylesheet or a label module and the representative pair is the honest evidence
  * for them.
  *
- * Five entries are `NOT_A_PRIMITIVE` rows rather than members: `ActorSelectTopBar`, `DropZone`,
- * `ImagePathPicker`, `ManagerColorPicker` and `RowDisclosure`. They are here because the routing
- * question is "what does the pattern match", and the pattern matches them — which is precisely the
- * defect issue 1378 names, that a directory cannot tell a primitive from a component that merely
- * lives in it. Two of them are dead code and can leave this list by being deleted.
+ * Four entries are `NOT_A_PRIMITIVE` rows rather than members: `DropZone`, `ImagePathPicker`,
+ * `ManagerColorPicker` and `RowDisclosure`. They are here because the routing question is "what
+ * does the pattern match", and the pattern matches them — which is precisely the defect issue 1378
+ * names, that a directory cannot tell a primitive from a component that merely lives in it. Two of
+ * them are dead code and can leave this list by being deleted.
  *
  * Each later primitive extraction in this programme removes its own entry, and the only accepted
  * edit is a REMOVAL. `ModifierPillSelect` left it that way at issue 1458, when its add menu became
  * a `SearchablePopover` and the at-cap trigger treatment it was left holding acquired an override
- * naming the one frame that draws it.
+ * naming the one frame that draws it. `ActorSelectTopBar` left it the same way at issue 1475, and
+ * it is the first to leave WITHOUT becoming or extracting a primitive: it stays a
+ * `NOT_A_PRIMITIVE` row, and what earned it a frame is ADOPTING one.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
@@ -245,7 +253,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
-  'src/ui/svelte/components/ActorSelectTopBar.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',

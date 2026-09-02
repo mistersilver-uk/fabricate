@@ -673,7 +673,9 @@
         "Stamina": "Stamina",
         "SearchPlaceholder": "Search characters…",
         "SearchLabel": "Search characters",
+        "NoActorsTitle": "No selectable characters",
         "NoActors": "No selectable characters. Only actors of a player-character type appear in this bar — if yours is missing, ask your GM to add its actor type in Fabricate's module settings. Fabricate does not block the other actors you own, but they cannot be picked here until that type is added.",
+        "NoMatches": "No character matches your search.",
         "DialogLabel": "Select a character",
         "TimeOfDay": {
           "Label": "Time of day",

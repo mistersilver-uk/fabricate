@@ -160,7 +160,7 @@ export function isExemptSpacingPixels(pixels) {
  * The headline. Pinned exactly rather than derived, so a hand edit to one row's count that
  * forgets this number fails rather than quietly re-baselining.
  */
-export const KNOWN_RAW_SPACING_TOTAL = 932;
+export const KNOWN_RAW_SPACING_TOTAL = 923;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -192,7 +192,7 @@ const ROWS = JSON.parse(
 /**
  * The baseline as parsed rows.
  *
- * The key is (file, property, value), not file: `styles/fabricate.css` holds 176 of the 932, so
+ * The key is (file, property, value), not file: `styles/fabricate.css` holds 176 of the 923, so
  * a per-file count would absorb a swap inside it entirely — turn an 8 into a 9 there and the
  * number does not move. `control-height-known-literals.js` made the same choice for the same
  * reason, and `manager-button-source-contract.test.js` before it.
