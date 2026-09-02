@@ -8701,7 +8701,7 @@
    three-column combo (preview / label / caret); exactly as `.manager-condition-add` and
    `.manager-condition-pill` do for the gathering icon fields, the host re-shapes the
    `icon-only` trigger into its own tile. The class pair sits at (0,3,0) so it beats the
-   base `.fabricate-manager .essence-icon-picker-trigger` block, which is declared later
+   base `.fabricate-icon-picker .essence-icon-picker-trigger` block, which is declared later
    in this file and would otherwise win on source order alone. */
 .fabricate-manager .manager-vocabulary-icon-picker {
   position: relative;
@@ -9067,16 +9067,49 @@
   min-width: 0;
 }
 
-.fabricate-manager .essence-icon-picker,
-.fabricate-manager .essence-source-selector {
+/* ---------------------------------------------------------------------------
+   THE ICON AND SOURCE PICKERS' OWN ROOTS (issue 1470)
+
+   `fabricate-icon-picker` / `fabricate-icon-picker-popover` and
+   `fabricate-source-picker` / `fabricate-source-picker-popover` are NAMESPACE
+   roots written by `components/IconPicker.svelte` and
+   `components/EssenceSourceSelector.svelte` themselves — one on the element the
+   component owns, one on the panel it portals out of it.
+
+   Every rule below used to hang off `.fabricate-manager`. Both components live
+   in `src/ui/svelte/components/`, the shared directory whose premise is that a
+   component there works wherever it is mounted, and neither could: issue 1466
+   gave them a resolved portal host, and the panel then landed in the right host
+   and still drew `position: static`, because the rule that positions it could
+   not reach outside the manager. The rest of the family failed the same way one
+   step further in — an unstyled search field and unstyled option rows.
+
+   The root could not simply be DELETED: this sheet is loaded page-wide into the
+   Foundry document and `tests/styles-namespacing.test.js` requires every
+   selector to begin with `.fabricate`. So it is replaced by a root the COMPONENT
+   emits. One class for one class, in place, so no specificity and no source
+   position moved.
+
+   TWO roots rather than one because a PORTALED NODE KEEPS ITS CLASSES AND LOSES
+   ITS ANCESTORS. `.essence-icon-picker-preview` is the one rule that needs both:
+   the chip is painted once in the trigger, which stays inside the picker, and
+   once per option row, which travels with the panel.
+
+   A rule whose ancestor is a CALLER'S container keeps `.fabricate-manager` — it
+   is the manager's override of the manager's own markup and can only ever match
+   there. `tests/components/searchable-popover-area-scope.test.js` holds the
+   distinction for all four shared pickers.
+   --------------------------------------------------------------------------- */
+.fabricate-icon-picker.essence-icon-picker,
+.fabricate-source-picker.essence-source-selector {
   min-width: 0;
 }
 
-.fabricate-manager .essence-icon-picker-trigger,
-.fabricate-manager .essence-icon-picker-option,
-.fabricate-manager .essence-source-trigger,
-.fabricate-manager .essence-source-clear,
-.fabricate-manager .essence-source-picker-option {
+.fabricate-icon-picker .essence-icon-picker-trigger,
+.fabricate-icon-picker-popover .essence-icon-picker-option,
+.fabricate-source-picker .essence-source-trigger,
+.fabricate-source-picker .essence-source-clear,
+.fabricate-source-picker-popover .essence-source-picker-option {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--fab-border);
@@ -9085,7 +9118,7 @@
   background: var(--fab-overlay-light-06);
 }
 
-.fabricate-manager .essence-icon-picker-trigger {
+.fabricate-icon-picker .essence-icon-picker-trigger {
   display: inline-grid;
   grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr) 16px;
   align-items: center;
@@ -9096,14 +9129,15 @@
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
-.fabricate-manager .essence-icon-picker-trigger-label {
+.fabricate-icon-picker .essence-icon-picker-trigger-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fabricate-manager .essence-icon-picker-preview {
+.fabricate-icon-picker .essence-icon-picker-preview,
+.fabricate-icon-picker-popover .essence-icon-picker-preview {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -9114,12 +9148,12 @@
   background: var(--fab-overlay-dark-16);
 }
 
-.fabricate-manager .essence-source-selector-shell {
+.fabricate-source-picker .essence-source-selector-shell {
   position: relative;
   min-width: 0;
 }
 
-.fabricate-manager .essence-source-trigger {
+.fabricate-source-picker .essence-source-trigger {
   position: relative;
   display: grid;
   place-items: center;
@@ -9138,18 +9172,18 @@
   border-style: dashed;
 }
 
-.fabricate-manager .essence-source-trigger.has-value {
+.fabricate-source-picker .essence-source-trigger.has-value {
   padding: 0;
 }
 
-.fabricate-manager .essence-source-trigger-image,
-.fabricate-manager .essence-source-picker-option img {
+.fabricate-source-picker .essence-source-trigger-image,
+.fabricate-source-picker-popover .essence-source-picker-option img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.fabricate-manager .essence-source-trigger-empty {
+.fabricate-source-picker .essence-source-trigger-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -9170,7 +9204,7 @@
   font-size: 1.25rem;
 }
 
-.fabricate-manager .essence-source-trigger-corner {
+.fabricate-source-picker .essence-source-trigger-corner {
   position: absolute;
   right: 6px;
   bottom: 6px;
@@ -9182,7 +9216,7 @@
   background: var(--fab-overlay-dark-48);
 }
 
-.fabricate-manager .essence-source-clear {
+.fabricate-source-picker .essence-source-clear {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -9193,13 +9227,13 @@
   padding: 0;
 }
 
-.fabricate-manager .essence-source-selector-shell.drop-active .essence-source-trigger {
+.fabricate-source-picker .essence-source-selector-shell.drop-active .essence-source-trigger {
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .essence-icon-picker-popover,
-.fabricate-manager .essence-source-picker-popover {
+.fabricate-icon-picker-popover.essence-icon-picker-popover,
+.fabricate-source-picker-popover.essence-source-picker-popover {
   position: absolute;
   z-index: 120;
   display: flex;
@@ -9222,8 +9256,8 @@
   overflow: hidden;
 }
 
-.fabricate-manager .essence-icon-picker-search input,
-.fabricate-manager .essence-source-picker-search input {
+.fabricate-icon-picker-popover .essence-icon-picker-search input,
+.fabricate-source-picker-popover .essence-source-picker-search input {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -9234,19 +9268,19 @@
   background: var(--fab-bg-1);
 }
 
-.fabricate-manager .essence-icon-picker-options,
-.fabricate-manager .essence-source-picker-grid {
+.fabricate-icon-picker-popover .essence-icon-picker-options,
+.fabricate-source-picker-popover .essence-source-picker-grid {
   display: grid;
   gap: var(--fab-space-chip);
   min-height: 0;
   overflow: auto;
 }
 
-.fabricate-manager .essence-source-picker-grid {
+.fabricate-source-picker-popover .essence-source-picker-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.fabricate-manager .essence-icon-picker-option {
+.fabricate-icon-picker-popover .essence-icon-picker-option {
   display: grid;
   grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -9260,11 +9294,11 @@
 /* The pinned resolved row sits directly above the alphabetical list, as a sibling `role="option"`
    so the listbox keeps a flat option tree. The extra gap is what separates the two groups; the
    `.selected` rule below already gives it the selected surface. */
-.fabricate-manager .essence-icon-picker-option.pinned {
+.fabricate-icon-picker-popover .essence-icon-picker-option.pinned {
   margin-bottom: var(--fab-space-2);
 }
 
-.fabricate-manager .essence-source-picker-option {
+.fabricate-source-picker-popover .essence-source-picker-option {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -9275,26 +9309,26 @@
   text-align: left;
 }
 
-.fabricate-manager .essence-source-picker-option img {
+.fabricate-source-picker-popover .essence-source-picker-option img {
   width: 34px;
   height: 34px;
   border-radius: 5px;
 }
 
-.fabricate-manager .essence-icon-picker-option span:last-child,
-.fabricate-manager .essence-source-picker-option span {
+.fabricate-icon-picker-popover .essence-icon-picker-option span:last-child,
+.fabricate-source-picker-popover .essence-source-picker-option span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fabricate-manager .essence-icon-picker-option.selected,
-.fabricate-manager .essence-source-picker-option.selected,
-.fabricate-manager .essence-icon-picker-option:hover,
-.fabricate-manager .essence-source-picker-option:hover,
-.fabricate-manager .essence-icon-picker-option:focus-visible,
-.fabricate-manager .essence-source-picker-option:focus-visible {
+.fabricate-icon-picker-popover .essence-icon-picker-option.selected,
+.fabricate-source-picker-popover .essence-source-picker-option.selected,
+.fabricate-icon-picker-popover .essence-icon-picker-option:hover,
+.fabricate-source-picker-popover .essence-source-picker-option:hover,
+.fabricate-icon-picker-popover .essence-icon-picker-option:focus-visible,
+.fabricate-source-picker-popover .essence-source-picker-option:focus-visible {
   border-color: var(--fab-border-strong);
   background: var(--fab-success-soft);
 }
@@ -16638,7 +16672,23 @@
   overflow: visible;
 }
 
-.fabricate-manager .manager-color-swatch {
+/* ---------------------------------------------------------------------------
+   THE COLOUR PICKER'S OWN ROOTS (issue 1470)
+
+   `fabricate-color-picker` is written by `components/ManagerColorPicker.svelte`
+   and `fabricate-color-picker-popover` by `components/ManagerColorPopover.svelte`.
+   Two components, one root class each rather than two apiece: the picker portals
+   nothing (its panel IS the other component), and the popover's root element is
+   itself the portaled panel, so root and panel are the same node.
+
+   That split is why `.manager-color-swatch` is the one rule here written at both
+   roots. The swatch is painted by BOTH components — once in the picker's trigger
+   and once in every preset cell of the popover — and after the portal those two
+   live in different subtrees. See the essence-picker header above for why the
+   `.fabricate-manager` root could not simply be deleted.
+   --------------------------------------------------------------------------- */
+.fabricate-color-picker .manager-color-swatch,
+.fabricate-color-picker-popover .manager-color-swatch {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -16664,7 +16714,7 @@
   background: transparent;
 }
 
-.fabricate-manager .manager-color-picker {
+.fabricate-color-picker.manager-color-picker {
   position: relative;
   display: inline-block;
   min-width: 0;
@@ -16688,8 +16738,8 @@
   font-size: 0.8rem;
 }
 
-.fabricate-manager .manager-color-picker-trigger,
-.fabricate-manager .manager-color-preset {
+.fabricate-color-picker .manager-color-picker-trigger,
+.fabricate-color-picker-popover .manager-color-preset {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -16709,15 +16759,15 @@
   background: var(--fab-overlay-light-06);
 }
 
-.fabricate-manager .manager-color-picker-trigger:hover,
-.fabricate-manager .manager-color-picker-trigger:focus-visible,
-.fabricate-manager .manager-color-preset:hover,
-.fabricate-manager .manager-color-preset:focus-visible {
+.fabricate-color-picker .manager-color-picker-trigger:hover,
+.fabricate-color-picker .manager-color-picker-trigger:focus-visible,
+.fabricate-color-picker-popover .manager-color-preset:hover,
+.fabricate-color-picker-popover .manager-color-preset:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 1px;
 }
 
-.fabricate-manager .manager-color-picker-popover {
+.fabricate-color-picker-popover.manager-color-picker-popover {
   position: absolute;
   box-sizing: border-box;
   z-index: 120;
@@ -16731,22 +16781,22 @@
   box-shadow: var(--fab-shadow-lg);
 }
 
-.fabricate-manager .manager-color-preset-grid {
+.fabricate-color-picker-popover .manager-color-preset-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--fab-space-chip);
 }
 
-.fabricate-manager .manager-color-preset {
+.fabricate-color-picker-popover .manager-color-preset {
   aspect-ratio: 1;
   border: 1px solid var(--fab-border);
 }
 
-.fabricate-manager .manager-color-preset.is-selected {
+.fabricate-color-picker-popover .manager-color-preset.is-selected {
   border-color: var(--fab-accent);
 }
 
-.fabricate-manager .manager-color-custom {
+.fabricate-color-picker-popover .manager-color-custom {
   display: grid;
   gap: var(--fab-space-1);
   color: var(--fab-text);
@@ -16754,12 +16804,27 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-color-custom input {
+/* The hex field paints its OWN chrome (issue 1470), which is the one place this family needed a
+   declaration rather than a new root. Inside the manager the chrome came from the area baseline
+   `.fabricate-manager input:not([type])` at line 1547 — Foundry cores every `input` globally, and
+   that rule is what keeps the manager's free-text controls off Foundry's purple default. A shared
+   primitive cannot rely on it: portalled into the player window the field reverted to a 2px inset
+   UA border on grey, measured. The six values below are exactly what that baseline computes here
+   (`border-radius: 9px` is its own literal), so the manager's rendering is unchanged and the
+   popover is now self-sufficient — which is what `SearchablePopover`'s and the icon/source
+   pickers' own search inputs already were. */
+.fabricate-color-picker-popover .manager-color-custom input {
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
   min-width: 0;
   min-height: 28px;
   height: 28px;
   padding: 0 var(--fab-space-chip);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
   font-size: 0.76rem;
 }
 

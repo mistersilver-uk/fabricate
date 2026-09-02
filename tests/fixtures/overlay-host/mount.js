@@ -14,14 +14,17 @@
  *   ?host=app       `.fabricate-app`, the player window's ApplicationV2 frame
  *   ?host=none      a positioned container inside NO application root
  *
- * `?component=` picks `popover` (SearchablePopover) or `icon` (IconPicker).
+ * `?component=` picks `popover` (SearchablePopover), `icon` (IconPicker), `source`
+ * (EssenceSourceSelector) or `color` (ManagerColorPicker).
  * `?frameLeft=` / `?frameTop=` place the window, so the test can assert against a host whose
  * origin is far from the viewport's — which is the entire discriminating fact. With the frame at
  * the origin every arrangement looks identical.
  */
 import { mount } from 'svelte';
 
+import EssenceSourceSelector from '../../../src/ui/svelte/components/EssenceSourceSelector.svelte';
 import IconPicker from '../../../src/ui/svelte/components/IconPicker.svelte';
+import ManagerColorPicker from '../../../src/ui/svelte/components/ManagerColorPicker.svelte';
 import SearchablePopover from '../../../src/ui/svelte/apps/manager/SearchablePopover.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
@@ -102,15 +105,31 @@ target.append(element('div', 'fixture-spacer', { height: '90px' }));
 const mountPoint = element('div', 'fixture-mount');
 target.append(mountPoint);
 
-if (componentKind === 'icon') {
-  mount(IconPicker, {
-    target: mountPoint,
-    props: { value: 'fas fa-fire', buttonTitle: 'Choose an icon' },
-  });
-} else {
-  mount(SearchablePopover, {
-    target: mountPoint,
-    props: {
+/**
+ * The four overlay components this fixture can mount, by `?component=`.
+ *
+ * All three of the `src/ui/svelte/components/` pickers are here rather than only `IconPicker`
+ * (issue 1470), because the CSS half of the defect is PER FAMILY: each carries its own class
+ * family and its own namespace roots, so one of them positioning correctly outside the manager
+ * says nothing about the other two.
+ */
+const COMPONENTS = {
+  icon: [IconPicker, { value: 'fas fa-fire', buttonTitle: 'Choose an icon' }],
+  source: [
+    EssenceSourceSelector,
+    {
+      items: [
+        { id: 'alpha', name: 'Alpha', img: 'icons/svg/item-bag.svg' },
+        { id: 'beta', name: 'Beta', img: 'icons/svg/item-bag.svg' },
+      ],
+      value: null,
+      onChange: () => {},
+    },
+  ],
+  color: [ManagerColorPicker, { colorToken: 'sage', buttonTitle: 'Choose a colour' }],
+  popover: [
+    SearchablePopover,
+    {
       options: [
         { id: 'alpha', label: 'Alpha' },
         { id: 'beta', label: 'Beta' },
@@ -121,7 +140,10 @@ if (componentKind === 'icon') {
       triggerLabel: 'Alpha',
       onChoose: () => {},
     },
-  });
-}
+  ],
+};
+
+const [Component, props] = COMPONENTS[componentKind] ?? COMPONENTS.popover;
+mount(Component, { target: mountPoint, props });
 
 globalThis.__overlayHostFixtureReady = true;
