@@ -24715,6 +24715,42 @@
   font-size: 12px;
 }
 
+/* ── THE FOOTER'S TWO STATES CARRY DIFFERENT WEIGHT (issue 1373 parity round) ────────────────
+   `proto:4897` states them apart. A MEMBER's action gets a solid fill with reversed text; the
+   action on a Tool this system has no rules for gets `border: 1px solid var(--success-border);
+   background: var(--success-soft); color: var(--success)` - a tint over the aside, carrying its
+   own hue as the foreground rather than reversing out of it. Both were painting as the same
+   solid slab, so the one control that changes meaning between the two panels stopped saying so:
+   `Add {tool} to {system}` writes a record that does not exist yet, and `Edit rules in {system}`
+   navigates to one that does.
+
+   THE GREEN RULING IS SATISFIED BY THIS RATHER THAN STRAINED BY IT. The standing ruling keeps
+   our primaries on the success tone where the design uses its accent — so the MEMBER's solid
+   green stays, and it is the recorded deviation. The design's NON-member treatment is already
+   green, and its success family is byte-identical to ours (same hue, same 16% soft, same 56%
+   border), so this half is the design's own value taken verbatim. Nothing here moves toward the
+   accent in either state.
+
+   `:not(:disabled)` because this is resting paint, per the invariant the `.manager-button
+   :disabled` block records. The hover rule below is required rather than decorative: the primary
+   role's own hover is (0,5,0) and this rule ties it, so without a companion the non-member CTA
+   would lose its pointer feedback to source order. */
+.fabricate-manager[data-manager-view="tools"]
+  .manager-tool-inspector-foot
+  [data-tool-inspector-add]:not(:disabled) {
+  border-color: var(--fab-success-border);
+  color: var(--fab-success);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager[data-manager-view="tools"]
+  .manager-tool-inspector-foot
+  [data-tool-inspector-add]:not(:disabled):hover {
+  border-color: var(--fab-success);
+  color: var(--fab-success);
+  background: var(--fab-success-soft);
+}
+
 /* LAYOUT CONTEXT ONLY for the shared `EmptyState` primitive. The appearance (dashed panel,
    tile, type scale) belongs to `EmptyState.svelte`'s scoped block, and the per-screen 2rem
    glyph / 1.2rem title exception that used to live here is gone — a primitive with a

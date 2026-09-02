@@ -491,9 +491,25 @@
      that inset is stated as a scale token in `styles/fabricate.css` and repeated here as the
      same token rather than as a second raw number. 13px and 17px take the scale's nearest
      steps, 12 and 16. */
+  /* THE INSET COMPENSATES FOR THE NEGATIVE MARGIN; IT DOES NOT CANCEL ITSELF.
+
+     A sticky element is pinned by its MARGIN box, not its border box. `margin-bottom` here is
+     negative so the band's border box can reach past the aside's own 16px inset and rule the
+     column edge to edge - which pulls the margin box's bottom 16px ABOVE the painted one. With
+     `bottom: 0` the browser therefore parked the margin box on the scrollport's bottom edge and
+     left the band itself 16px short, so scrolled content went on rendering underneath it inside
+     the aside. Measured, not reasoned: 16px of an inheritance row below the band, and a hit test
+     two pixels above the column's bottom returning the aside rather than the band.
+
+     The matching negative inset moves the constraint edge down by the same amount. Dropping the
+     margin and keeping the inset is NOT the same repair and was measured too: without the
+     negative margin the band cannot reach past its containing block's content edge at all, so a
+     SHORT panel goes back to showing a strip of aside beneath it. Only this pair is flush in
+     both cases, which is what the two band tests in
+     `tests/components/tool-rules-list-parity.test.js` pin. */
   .manager-tool-inspector-foot {
     position: sticky;
-    bottom: 0;
+    bottom: calc(-1 * var(--fab-space-4));
     margin: auto calc(-1 * var(--fab-space-4)) calc(-1 * var(--fab-space-4));
     min-width: 0;
     padding: var(--fab-space-3) var(--fab-space-4);

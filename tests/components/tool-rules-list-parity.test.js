@@ -253,6 +253,23 @@ after(async () => {
 });
 
 /**
+ * Render the inspector column at a bounded height and hand back a reader over it.
+ *
+ * @param {number} sections how many inheritance rows to draw
+ * @param {string} footState `member` or `absent`
+ * @returns {Promise<{page: import('playwright').Page, close: () => Promise<void>}>}
+ */
+async function renderColumn(sections, footState) {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  await page.setContent(documentFor(inspectorColumn(sections, footState)));
+  return { page, close: () => context.close() };
+}
+
+/**
  * Render the screen once and hand back a reader over it.
  *
  * @returns {Promise<{page: import('playwright').Page, close: () => Promise<void>}>}
@@ -317,6 +334,82 @@ const READ_TOKENS = (names) =>
       return [token, value];
     })
   );
+
+/**
+ * The inspector column alone, at a bounded height so it genuinely scrolls.
+ *
+ * THE HEIGHT IS EXPLICIT AND THE LIST FIXTURE'S IS NOT, deliberately. In the product the body
+ * grid takes its row height from the manager shell, which this file does not build; without a
+ * bound the aside simply grows and its scroll height equals its client height, so a sticky band
+ * is never asked the question this fixture exists to ask. Measured on the first attempt: the
+ * aside came out 763px tall inside a 720px viewport, never scrolled, and the band's offset
+ * defect still reproduced - but from its natural flow position rather than its stuck one, which
+ * is a different question with the same answer and no way to tell them apart.
+ *
+ * @param {number} sections how many inheritance rows to draw
+ * @param {string} footState `member` or `absent`
+ * @returns {string} the fixture markup
+ */
+function inspectorColumn(sections, footState) {
+  const rows = Array.from(
+    { length: sections },
+    (unused, index) =>
+      `<div class="manager-tool-inspector-inherit-row" data-probe="inherit-${index}">` +
+      `<span>Section ${index}</span><span class="manager-chip is-info">Inherited</span></div>`
+  ).join('');
+  const foot =
+    footState === 'member'
+      ? `<button type="button" class="manager-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
+      : `<button type="button" class="manager-button fab-manager-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
+  return `
+<div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="tools">
+  <div class="manager-body" style="display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; height: 600px">
+    <nav class="manager-rail"></nav>
+    <main class="manager-main manager-tools-main"></main>
+    <aside class="manager-inspector" style="min-height: 0" data-probe="aside">
+      <section class="manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+        <p class="manager-kicker manager-tool-inspector-kicker">Selected tool</p>
+        <div class="manager-tool-inspector-inheritance">${rows}</div>
+        <div class="manager-tool-inspector-routes">
+          <button type="button" class="manager-button fab-manager-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
+        </div>
+        <div class="manager-tool-inspector-foot" data-probe="foot">${foot}</div>
+      </section>
+    </aside>
+  </div>
+</div>`;
+}
+
+/**
+ * Scroll the inspector to its end and report where the pinned band actually lands.
+ *
+ * IT READS THE PAINTED EDGE AND A HIT TEST, not the sticky constraint. A band whose margin box
+ * is pinned correctly can still paint short of the column's bottom edge - which is exactly the
+ * defect this measures - so geometry alone would not settle it, and `elementFromPoint` a few
+ * pixels above the aside's own bottom names whatever is really on top there.
+ */
+const READ_PINNED_BAND = () => {
+  const aside = document.querySelector('[data-probe="aside"]');
+  const foot = document.querySelector('[data-probe="foot"]');
+  aside.scrollTop = aside.scrollHeight;
+  const asideBox = aside.getBoundingClientRect();
+  const footBox = foot.getBoundingClientRect();
+  const topmostAt = (above) => {
+    const element = document.elementFromPoint(
+      asideBox.left + asideBox.width / 2,
+      asideBox.bottom - above
+    );
+    if (!element) return 'none';
+    return element.closest('[data-probe="foot"]') ? 'foot' : element.className.split(' ')[0];
+  };
+  return {
+    scrolls: aside.scrollHeight > aside.clientHeight,
+    gapBelowBand: Math.round(asideBox.bottom - footBox.bottom),
+    bandTopFromAsideTop: Math.round(footBox.top - asideBox.top),
+    asideHeight: Math.round(asideBox.height),
+    hits: [2, 8, 14].map((above) => topmostAt(above)),
+  };
+};
 
 test('the fixture layers the sheet the way Foundry does, or it proves nothing', async () => {
   // THE NON-VACUITY CHECK FOR THIS WHOLE FILE. Every measurement below rests on one claim:
@@ -508,6 +601,114 @@ test('the Tool Rules inspector sits one rung above its pane and states the desig
     assert.equal(measured.primary.height, 34, 'proto:4897 height, on the ladder');
     assert.equal(measured.primary.borderRadius, '9px', 'proto:4897 radius');
     assert.equal(measured.primary.fontSize, '12px', 'proto:4897 label size');
+  } finally {
+    await close();
+  }
+});
+
+test('the pinned inspector band paints flush with the bottom of its column', async () => {
+  // S1. `proto:2578` puts the footer OUTSIDE the scroller as a `flex: 0 0 auto` track, so the
+  // design's band owns the column's bottom edge outright. Ours is sticky inside the scroller - a
+  // deliberate departure, because the aside is a single scrolling element and turning it into a
+  // two-track column would re-home its overflow, its inset and the no-selection empty state that
+  // shares it. A departure is only honest if the rendered result is the same.
+  //
+  // IT WAS NOT. The band carries a negative bottom margin so its border box can reach past the
+  // aside's own inset, and a sticky element is pinned by its MARGIN box rather than its border
+  // box - so a negative bottom margin displaces the pinned edge upward by its own magnitude and
+  // the painted edge lands that far short. It does not cancel itself. Measured in this fixture:
+  // 16px of scrolled inheritance row rendering below the band, inside the aside.
+  //
+  // The remedy is the matching sticky inset, which moves the constraint edge down by the same
+  // amount. Dropping the negative margin and keeping the inset is NOT equivalent, and the
+  // short-panel case below is what rejects it: with no negative margin the band cannot reach
+  // past its containing block's content edge at all, so a short panel goes straight back to
+  // leaving a strip of aside beneath it. Both were measured; only this pair is flush in both.
+  const { page, close } = await renderColumn(14, 'member');
+  try {
+    const band = await page.evaluate(READ_PINNED_BAND);
+
+    assert.ok(band.scrolls, 'the fixture must actually overflow, or it asks nothing');
+    assert.equal(band.gapBelowBand, 0, 'the band paints flush with the column bottom');
+    assert.deepEqual(
+      band.hits,
+      ['foot', 'foot', 'foot'],
+      'nothing renders beneath the band; a hit test at the column bottom finds only the band'
+    );
+  } finally {
+    await close();
+  }
+});
+
+test('a short inspector leaves the space above the band, not below it', async () => {
+  // The other half of `proto:2578`, and the half a sticky offset can get wrong in the opposite
+  // direction. The design's footer is a flex track, so a short panel simply leaves empty column
+  // between the last card and the band - `tmp/proto/tool-rules.png` shows a tall gap above the
+  // non-member CTA. `margin-top: auto` is what reproduces that here, and it has to keep doing so
+  // once the sticky inset is negative: an offset that pushed the band clear of its containing
+  // block would float it, and a panel with nothing to scroll is where that would show.
+  const { page, close } = await renderColumn(1, 'absent');
+  try {
+    const band = await page.evaluate(READ_PINNED_BAND);
+
+    assert.equal(band.scrolls, false, 'a one-row panel must not overflow, or this proves nothing');
+    assert.equal(band.gapBelowBand, 0, 'the band still owns the column bottom');
+    assert.ok(
+      band.bandTopFromAsideTop > band.asideHeight / 2,
+      `the band sits in the lower half of an empty column, not mid-column at ${band.bandTopFromAsideTop}px`
+    );
+  } finally {
+    await close();
+  }
+});
+
+test('the inspector CTA keeps the reference emphasis split between its two states', async () => {
+  // S2. `proto:4897` gives the footer's two states different weights: a member gets a SOLID fill
+  // with reversed text, and a Tool this system has no rules for gets a soft tint carrying the
+  // same hue as its foreground. Ours painted both as the identical solid slab, so the one control
+  // that changes meaning between the two panels stopped saying so.
+  //
+  // THE GREEN RULING IS SATISFIED BY THIS RATHER THAN STRAINED BY IT. The maintainer ruled that
+  // our primaries hold the success tone where the design uses its accent; the design's NON-member
+  // treatment is already green, and its whole success family is byte-identical to ours - same
+  // hue, same 16% soft, same 56% border. So the member's solid green stays as the recorded
+  // deviation and the non-member takes the design's own value, and nothing moves toward the
+  // accent in either state.
+  const solid = await renderColumn(1, 'member');
+  let member;
+  try {
+    member = await solid.page.evaluate(() => {
+      const style = getComputedStyle(document.querySelector('[data-probe="cta-member"]'));
+      return { color: style.color, background: style.backgroundColor };
+    });
+  } finally {
+    await solid.close();
+  }
+
+  const { page, close } = await renderColumn(1, 'absent');
+  try {
+    const measured = await page.evaluate(READ_PROBES);
+    const tokens = await page.evaluate(READ_TOKENS, [
+      '--fab-success',
+      '--fab-success-soft',
+      '--fab-success-border',
+    ]);
+    const absent = measured['cta-absent'];
+
+    assert.equal(absent.color, tokens['--fab-success'], 'proto:4897 non-member ink');
+    assert.equal(absent.background, tokens['--fab-success-soft'], 'proto:4897 non-member fill');
+    assert.equal(
+      absent.borderTopColor,
+      tokens['--fab-success-border'],
+      'proto:4897 non-member edge'
+    );
+
+    // The split itself, asserted as a DIFFERENCE and not only as two absolute values: two rules
+    // can each be right about their own state and still be written so that one never applies.
+    assert.notEqual(absent.background, member.background, 'the two states differ in fill');
+    assert.notEqual(absent.color, member.color, 'and in foreground');
+    // And the member keeps the ruling's solid green, so this is not a repaint of both.
+    assert.equal(member.background, tokens['--fab-success'], 'the member CTA stays a solid slab');
   } finally {
     await close();
   }
