@@ -130,7 +130,7 @@
       "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
       "library": "<SearchPopover>",
       "evidence": "broad",
-      "why": "`library.html:764` — \"One panel for picking anything from a catalogue\". 20 callers over 24 call sites as issue 1458 lands, up from 16: three hand-rolled trigger-plus-listbox add menus (`GatheringEventEditView`, `GatheringTaskEditView`, `ModifierPillSelect`) and the recipe item editor’s Link-recipe menu converted onto it. That change also gave it the `triggerHasPopup` capability, which absorbs the one axis the ten hand-rolled popovers disagreed on — four announced `aria-haspopup=\"dialog\"` and four `listbox`, and the split tracked whether the panel rendered a query field. Carries a THREE-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because it now has three deliberate presentations (inline-search trigger, value-bearing trigger with the search row, and the search-less option list) and neither representative frame opens a popover at all. Its class family is `.manager-travel-*`, 113 rules in `styles/fabricate.css` and every one scoped under `.fabricate-manager` — a legacy World › Travel name this conversion knowingly concentrates rather than renames, so the rename that follows is a one-file edit plus the sheet. That scoping is also why the two PLAYER-app popovers did not convert; see their rows in {@link NOT_A_PRIMITIVE}."
+      "why": "`library.html:764` — \"One panel for picking anything from a catalogue\". 20 callers over 24 call sites as issue 1458 lands, up from 16: three hand-rolled trigger-plus-listbox add menus (`GatheringEventEditView`, `GatheringTaskEditView`, `ModifierPillSelect`) and the recipe item editor’s Link-recipe menu converted onto it. That change also gave it the `triggerHasPopup` capability, which absorbs the one axis the ten hand-rolled popovers disagreed on — four announced `aria-haspopup=\"dialog\"` and four `listbox`, and the split tracked whether the panel rendered a query field. Carries a THREE-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because it now has three deliberate presentations (inline-search trigger, value-bearing trigger with the search row, and the search-less option list) and neither representative frame opens a popover at all. Its class family is still the legacy World › Travel name `.manager-travel-*`, which this conversion knowingly concentrates rather than renames, so the rename that follows is a one-file edit plus the sheet. The SCOPING half of that sentence is withdrawn at issue 1472 and written out rather than deleted: it claimed 113 rules in that family and every one of them under `.fabricate-manager`, which was true of the sheet the plan was drafted against and false of the sheet it merged into — issue 1464 re-rooted the family thirteen minutes before the first row repeating it landed, and nothing re-measured. The family is 62 `.manager-travel-*` rules in `styles/fabricate.css`: 25 `.manager-travel-*` rules under `.fabricate-picker` in `styles/fabricate.css`, which are the primitive’s own on its own namespace root, and 37 `.manager-travel-*` rules under `.fabricate-manager` in `styles/fabricate.css`, which are the World › Travel SCREEN plus manager callers’ overrides of their own trigger sites. Those three figures are re-derived from the stylesheet by `tests/design-system-coverage.test.js` rather than asserted, which is exactly what the sentence they replace lacked. The scoping is therefore no longer a reason anything cannot convert, and the two PLAYER-app rows in {@link NOT_A_PRIMITIVE} no longer rest on it."
     },
     {
       "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
@@ -279,24 +279,6 @@
   ],
   "notAPrimitive": [
     {
-      "path": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
-      "library": null,
-      "evidence": "targeted",
-      "callers": [
-        "src/ui/svelte/components/ActorSelectTopBar.svelte"
-      ],
-      "why": "ONE caller, `src/ui/svelte/components/ActorSelectTopBar.svelte`. Recorded because issue 1458 adjudicated its editor popover (`:134`, `:138`) against `SearchablePopover` and found TWO independent disqualifiers, either of which is sufficient. (1) It renders in the PLAYER window under `.fabricate-app-shell`, and all 113 `.manager-travel-*` rules in `styles/fabricate.css` are scoped under `.fabricate-manager` — the panel would portal to a host that is not there and draw completely unstyled. (2) It is a MULTI-SELECT checklist rather than a picker: `toggleAvailable` toggles membership, the popover stays open across choices, and `aria-selected` is true on every chosen actor at once, while `SearchablePopover` has a single `value` and closes on `choose`. Converting it would take four clicks to add four source actors and would tell assistive technology that one option is selected when four are. Its 28 scoped rules carry NO silent-mode trigger — measured, against the file’s own AST — so they would have pruned and warned rather than dying quietly; that is the one at-risk file in the candidate set where the recorded silencing condition does not hold."
-    },
-    {
-      "path": "src/ui/svelte/apps/manager/RollDataExpressionInput.svelte",
-      "library": "<ExprInput>",
-      "evidence": "targeted",
-      "callers": [
-        "src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte"
-      ],
-      "why": "DEMOTED at issue 1373, not adjudicated against anything. It cleared the two-caller bar on the Tool check bonus and `WorldModifiersTab`; the bonus stopped authoring a raw expression when the maintainer ruled that a Tool takes its modifiers FROM the world library rather than by typing one, so the picker became `ModifierLibraryRow` and this input lost that caller. The behaviour the original entry credits - cursor insertion and an actor resolver - is unchanged and still unowned elsewhere, so this is a membership fact about caller count, not a judgement that it stopped being well built. Its `sigil` branch has no caller either, since `WorldModifiersTab` passes `sigil={false}`; removing that branch is owed as its own change. One caller: `src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte`."
-    },
-    {
       "path": "src/ui/svelte/apps/manager/SystemOverviewView.svelte",
       "library": null,
       "evidence": "targeted",
@@ -324,22 +306,13 @@
       "why": "ADJUDICATED against `EditorValidationSurface` at issue 1444 and ruled a DIFFERENT SURFACE rather than an unconverted one, so the next audit does not re-propose it. Measured: it renders `.manager-environment-card`, `.manager-environment-check-list` and `.manager-environment-issue-list`, carries no status medallion, no counts rail and no grouped row stack, and expresses severity through `Chip` (`:140`) rather than a `manager-recipe-val-pill`. It writes zero `manager-recipe-val-*` and zero `manager-recipe-rail-*` tokens, and each of its three classes appears in exactly one file. Converting it would be a visual REDESIGN of the environment editor, not an adoption. One caller: `src/ui/svelte/apps/manager/EnvironmentEditView.svelte`."
     },
     {
-      "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
-      "library": null,
-      "evidence": "targeted",
-      "callers": [
-        "src/ui/svelte/apps/manager/RecipeItemEditor.svelte"
-      ],
-      "why": "ONE caller, `src/ui/svelte/apps/manager/RecipeItemEditor.svelte`, and it is a route tab rather than a candidate primitive. The caller recorded here until issue 1446 was `recipe-item/RecipeItemEditorTabs.svelte`, a real sibling that imports `EditorTabs` and does not import this tab at all: the COUNT was right and the FILE was wrong, which is the half of the drift a count check on its own cannot see. It is recorded because issue 1458 adjudicated the two `role=\"listbox\"` SITES inside it (`:531`, `:631`) against `SearchablePopover` and ruled them a DIFFERENT WIDGET, which is a decision a later audit would otherwise re-propose from the same grep. They are typeahead COMBOBOXES: neither has a trigger button at all, the suggestion list hangs off an `<input>` whose `aria-expanded={suggestions.length > 0}` (`:537`, `:637`) is driven by the query rather than by a control, and the input IS the field rather than a filter over a panel. `SearchablePopover` opens a panel FROM a trigger; a combobox has no closed state to open from. `manager-filter-bar-source-contract.test.js` already records the same verdict for the three `.manager-search` comboboxes, from the other side. The file carries 30 scoped rules and a silent-mode trigger (`<i class={expr}>`), so a conversion would have been the highest-risk one in the candidate set as well as the wrongest."
-    },
-    {
       "path": "src/ui/svelte/components/ActorSelectTopBar.svelte",
       "library": null,
       "evidence": "broad",
       "callers": [
         "src/ui/svelte/apps/FabricateAppRoot.svelte"
       ],
-      "why": "ONE caller, `src/ui/svelte/apps/FabricateAppRoot.svelte`. At 594 lines it is a screen region rather than a primitive; `<AppTitleBar>` (`library.html:960`) specifies the strip above the page header and nav rail, and whether this is an implementation of it has not been adjudicated. Its actor picker is ALSO an adjudicated non-conversion as of issue 1458, and the reason is structural rather than editorial: it is a genuine single-select searchable popover, but it renders in the PLAYER window under `.fabricate-app-shell`, and all 113 `.manager-travel-*` rules in `styles/fabricate.css` are scoped under `.fabricate-manager`. Converting it would portal to a host that is not there and render the panel entirely unstyled. Unscoping that family IS the deferred rename, and doing it here is what the \"convert first, rename later\" ordering exists to avoid; the picker converts with the rename, not before it."
+      "why": "ONE caller, `src/ui/svelte/apps/FabricateAppRoot.svelte`. This is an UNADJUDICATED SCREEN REGION and not a candidate that cannot work as a primitive, and as of issue 1472 that is the whole of the row: at 594 lines it is a screen region rather than a primitive, and `<AppTitleBar>` (`library.html:965`) specifies the strip above the page header and nav rail, but whether this bar implements that entry has never been decided. Both are open questions rather than objections, so a re-proposal here is answered by adjudicating the correspondence — a design ruling, not a measurement. The row’s SECOND reason, a structural non-conversion recorded against its actor picker at issue 1458, is WITHDRAWN, and is written out rather than deleted because a row that quietly loses an argument is how this register drifted in the first place. It said the picker renders in the PLAYER window under `.fabricate-app-shell` while all 113 rules in the `.manager-travel-*` family were scoped under `.fabricate-manager`, so converting it would portal to a host that is not there and render the panel entirely unstyled. Neither half survives. Issue 1466 replaced the hard-coded `closest()` on `.fabricate-manager` with `resolveOverlayHost`, whose root set carries `fabricate-app`, and `tests/components/overlay-portal-host-position.test.js` measures a `SearchablePopover` landing at its trigger inside the player window. Issue 1464 re-rooted the primitive’s own family at `.fabricate-picker`, so the 37 `.manager-travel-*` rules under `.fabricate-manager` in `styles/fabricate.css` that remain are the World › Travel screen plus manager callers’ overrides; four of those DO name a class the primitive writes, and all four are anchored on a manager-only container — `.manager-salvage-component-trigger`, `.manager-tool-replacement-card`, `.manager-map-link-picker-cell`, `.manager-recipe-or-popover` — that the player window never renders. The picker itself measures as a single-select searchable popover: one `role=\"listbox\"`, `aria-selected` on `store.selectedActorId` alone, a query field and close-on-choose. So nothing recorded here blocks its conversion any more, and converting it is deliberately NOT done at issue 1472, which corrected the record and changed no markup: this row judges the BAR, and the picker inside it is a change of its own."
     },
     {
       "path": "src/ui/svelte/components/DropZone.svelte",
@@ -372,6 +345,33 @@
         "src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte"
       ],
       "why": "ONE caller, `src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte`. Named at `library.html:941`, so it is specified and shipped and still below the entry bar. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js:83` for a reason the caller count cannot express — omitting it there HANGS a mounted tree — which is why that list is not derived from this manifest."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "callers": [
+        "src/ui/svelte/apps/manager/RecipeItemEditor.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/apps/manager/RecipeItemEditor.svelte`, and it is a route tab rather than a candidate primitive. The caller recorded here until issue 1446 was `recipe-item/RecipeItemEditorTabs.svelte`, a real sibling that imports `EditorTabs` and does not import this tab at all: the COUNT was right and the FILE was wrong, which is the half of the drift a count check on its own cannot see. It is recorded because issue 1458 adjudicated the two `role=\"listbox\"` SITES inside it (`:531`, `:631`) against `SearchablePopover` and ruled them a DIFFERENT WIDGET, which is a decision a later audit would otherwise re-propose from the same grep. They are typeahead COMBOBOXES: neither has a trigger button at all, the suggestion list hangs off an `<input>` whose `aria-expanded={suggestions.length > 0}` (`:537`, `:637`) is driven by the query rather than by a control, and the input IS the field rather than a filter over a panel. `SearchablePopover` opens a panel FROM a trigger; a combobox has no closed state to open from. `manager-filter-bar-source-contract.test.js` already records the same verdict for the three `.manager-search` comboboxes, from the other side. The file carries 30 scoped rules and a silent-mode trigger (`<i class={expr}>`), so a conversion would have been the highest-risk one in the candidate set as well as the wrongest."
+    },
+    {
+      "path": "src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte",
+      "library": null,
+      "evidence": "targeted",
+      "callers": [
+        "src/ui/svelte/components/ActorSelectTopBar.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/components/ActorSelectTopBar.svelte`. Recorded because issue 1458 adjudicated its editor popover (`:134`, `:138`) against `SearchablePopover` and found TWO independent disqualifiers, either of which is sufficient. (1) IS WITHDRAWN at issue 1472, and is written out rather than deleted because a row that quietly loses an argument is how this register drifted: it said the panel renders in the PLAYER window under `.fabricate-app-shell` while all 113 rules in the `.manager-travel-*` family were scoped under `.fabricate-manager`, so it would portal to a host that is not there and draw completely unstyled. Issue 1466 put `fabricate-app` into `resolveOverlayHost`’s root set and issue 1464 re-rooted the primitive’s family at `.fabricate-picker`; the `components/ActorSelectTopBar` row carries the measurement. (2) STANDS ENTIRELY ON ITS OWN, and is why this row is still here. It is a MULTI-SELECT checklist rather than a picker: `toggleAvailable` toggles membership, the popover stays open across choices, and `aria-selected` is true on every chosen actor at once, while `SearchablePopover` has a single `value` and closes on `choose`. It also has NO search field at all — the file renders no `<input>` — against a primitive whose panel is built around one. Converting it would take four clicks to add four source actors and would tell assistive technology that one option is selected when four are, so a conversion needs a multi-select mode on the primitive, which is a design question this row does not settle. Its 28 scoped rules carry NO silent-mode trigger — measured, against the file’s own AST — so they would have pruned and warned rather than dying quietly; that is the one at-risk file in the candidate set where the recorded silencing condition does not hold."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/RollDataExpressionInput.svelte",
+      "library": "<ExprInput>",
+      "evidence": "targeted",
+      "callers": [
+        "src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte"
+      ],
+      "why": "DEMOTED at issue 1373, not adjudicated against anything. It cleared the two-caller bar on the Tool check bonus and `WorldModifiersTab`; the bonus stopped authoring a raw expression when the maintainer ruled that a Tool takes its modifiers FROM the world library rather than by typing one, so the picker became `ModifierLibraryRow` and this input lost that caller. The behaviour the original entry credits - cursor insertion and an actor resolver - is unchanged and still unowned elsewhere, so this is a membership fact about caller count, not a judgement that it stopped being well built. Its `sigil` branch has no caller either, since `WorldModifiersTab` passes `sigil={false}`; removing that branch is owed as its own change. One caller: `src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte`."
     }
   ],
   "ruledOut": [

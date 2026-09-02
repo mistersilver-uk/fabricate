@@ -155,9 +155,12 @@
   });
 </script>
 
+<!-- `fabricate-source-picker` / `fabricate-source-picker-popover` are this primitive's own NAMESPACE
+     roots (issue 1470): one on the element it owns, one on the panel it portals out of it. See
+     `IconPicker` for the reasoning; the two components share every rule in the sheet. -->
 <div
   bind:this={selectorRoot}
-  class="essence-source-selector"
+  class="fabricate-source-picker essence-source-selector"
   use:dismissOnOutsideClick={{
     enabled: pickerOpen,
     onDismiss: closePicker,
@@ -214,7 +217,7 @@
   {#if pickerOpen}
     <div
       bind:this={popoverRoot}
-      class="essence-source-picker-popover"
+      class="fabricate-source-picker-popover essence-source-picker-popover"
       style={popoverStyle}
       role="dialog"
       aria-label={localize('FABRICATE.Admin.Features.Essences.SourcePickerLabel')}
