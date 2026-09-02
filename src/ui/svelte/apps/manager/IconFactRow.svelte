@@ -43,6 +43,16 @@
      rendered value of ONE named fact.
    - dataAttr / dataValue: an optional test/screenshot hook on the row itself.
    - tile: draw the glyph inside the reference's bordered rounded square. See above.
+   - density: `'default'` (what shipped, the behaviour preview's own well) or `'rule'` — the
+     reference's EFFECTIVE-RULES inset on the two Tool inspector rails. `proto:2559-2562`
+     states it: `gap: 10px; padding: 10px 11px; background: var(--bg1); border-radius: 10px`,
+     with a `600 11.5px` title over a `400 9.5px` subtitle in the subtle ink. Five of those six
+     differ from the default, and the fill differs by a RUNG rather than by a value — the
+     design recesses this inset below the aside that holds it, and the default row raises it.
+     It is a variant on the primitive rather than a caller override for the same reason `tile`
+     is opt-in, and here that reason is enforced: `manager-layout.test.js` fails on the
+     `manager-icon-fact-row` token appearing in any manager `.svelte` but this one, so a
+     caller's `:global(...)` override is not available to be reached for.
    - tone: the glyph's colour family — `accent` (default) or `info`. `info` is the reference's
      mark for a value that came from SOMEWHERE ELSE: the rules editor's inherited-value inset
      paints its globe in a cooler informational hue precisely so it does not read as one more
@@ -62,6 +72,7 @@
     dataAttr = '',
     dataValue = '',
     tile = false,
+    density = 'default',
     tone = 'accent',
   } = $props();
 
@@ -75,6 +86,7 @@
   class="manager-icon-fact-row"
   class:is-glyphless={!icon}
   class:is-tiled={tile}
+  class:is-rule={density === 'rule'}
   class:is-info={tone === 'info'}
   {...hookAttributes}
 >
@@ -165,5 +177,36 @@
     color: var(--fab-text-muted);
     font-size: 0.64rem;
     line-height: 1.3;
+  }
+
+  /* ── THE `rule` DENSITY (issue 1373) ─────────────────────────────────────────────────
+     The reference's effective-rules inset, from `proto:2559-2562`. Written after every rule
+     above so the four declarations it restates win on source order at equal specificity.
+
+     THE FILL IS THE HALF THAT IS NOT A TWEAK. The design paints this inset `--bg1` inside an
+     aside painted `--bg2` — a rung DOWN, so the well recesses. Our background ramp is shifted
+     one rung against the design's, so the design's `--bg1` is `--fab-bg-0` here. The default
+     row's `--fab-bg-1` is what the aside itself now wears, which would leave the inset level
+     with its own container; before the aside was restored to its rung it was a step ABOVE it,
+     so the recess read as a raised card.
+
+     `10px` and `11px` have no step on the 4px spacing scale, so the gap and the inset take
+     the nearest, 12. The 28px tile and its 8px corner are unchanged: those two were already
+     exact against `proto:4762`. */
+  .manager-icon-fact-row.is-rule {
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
+    border-radius: 10px;
+    background: var(--fab-bg-0);
+  }
+
+  .manager-icon-fact-row.is-rule strong {
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+
+  .manager-icon-fact-row.is-rule small {
+    color: var(--fab-text-subtle);
+    font-size: 9.5px;
   }
 </style>

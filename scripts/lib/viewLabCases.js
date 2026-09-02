@@ -6339,6 +6339,191 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // FILTERED TO NOTHING (issue 1373), and the state that let a whole hero panel ship green.
+    //
+    // No case in this registry has ever typed a query into this list, so the `filteredTools
+    // .length === 0` branch was drawn by nothing. What shipped there passed an `icon` and a
+    // `title` and no `filtered`, which took `EmptyState`'s CENTRAL hero treatment - a 44px
+    // inset, a 46px glyph tile and a 13px serif heading - where the reference draws one dashed
+    // box around a single 11.5px sentence. Every parity pass on this screen had reported the
+    // list complete.
+    //
+    // WHAT IT CATCHES. The panel's whole composition (no icon, no title, one sentence), the
+    // dashed-box geometry the `filtered` variant now states from `proto:2545`, and the copy -
+    // which names the FILTER rather than the search, because three controls narrow this list
+    // and only one of them is the query.
+    //
+    // The query is deliberately a string no fixture Tool can contain, rather than a plausible
+    // one: a case that reaches its state only while the fixture happens not to hold a matching
+    // name is a case that silently stops testing the moment a Tool is added.
+    id: 'manager-tool-rules-filtered-empty-1280x720',
+    label: 'Manager — Tool rules filtered to nothing 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-manager-tools-search] input', fill: 'qqzzxx' },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-library-filtered-empty]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Tool/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+    ],
+  }),
+  managerCase({
+    // THE `Overriding` MEMBERSHIP FILTER (issue 1373).
+    //
+    // Three segments narrow this list and only two of them were ever drawn: every case that
+    // touches the filter clicks `all`, so the third branch of `filteredRows` - the one that
+    // keeps a row only when its world join reports an overridden section - was unphotographed
+    // end to end, including the toolbar state that says which segment is live.
+    //
+    // WHAT IT CATCHES. The selected segment's own paint on the third position; the row set the
+    // branch produces; and the per-row `Overrides ...` sentence, which is the only thing on the
+    // screen that can disagree with the filter that selected the row.
+    id: 'manager-tool-rules-overriding-filter-1280x720',
+    label: 'Manager — Tool rules filtered to overriding 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="over"]' },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-membership-filter="over"] [data-tool-membership-option="over"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Tool/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+    ],
+  }),
+  managerCase({
+    // THE SORT ROW, DRIVEN (issue 1373).
+    //
+    // `SORT BY [Name] [Asc]` has only ever been photographed at its defaults, so neither the
+    // flipped glyph and label of the direction toggle nor the membership-first ordering of the
+    // `In this system` key was drawn by any frame. Both are a control's ONLY changed state:
+    // the toggle swaps its icon and its word together, and a swap that changed one and not the
+    // other would look correct in every existing frame.
+    //
+    // TWO VERBS, because the two halves of the row are two different controls: `select` on the
+    // native key picker and a click on the direction button. The order matters only in that
+    // both are applied before the frame, and the resulting list is sorted by membership,
+    // descending - the exact ordering no other case produces.
+    id: 'manager-tool-rules-sorted-desc-1280x720',
+    label: 'Manager — Tool rules sorted by membership descending 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+      { selector: '.manager-tools-sort-select', select: 'state' },
+      { selector: '.manager-tools-sort-direction' },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-sort-direction="desc"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Tool/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+    ],
+  }),
+  managerCase({
+    // A SELECTED ROW UNDER THE POINTER (issue 1373), which is how a live cascade defect stayed
+    // invisible through three parity passes.
+    //
+    // `[data-manager-view='tools'] .manager-tools-row:hover` was (0,4,0) and the selected-row
+    // rule is (0,3,1), so hover won: crossing the row a GM had just chosen repainted it from
+    // the accent fill to the pane's next rung and took the selection marking away. Nothing in
+    // the registry could report it, because no frame had a pointer resting on a row.
+    //
+    // THE LAST STEP IS THE HOVER, and it is a click rather than a verb of its own. Playwright's
+    // click moves the virtual mouse to the element's centre and LEAVES IT THERE - nothing in
+    // the runner moves it again, and `frame.screenshot()` does not - so the element a case
+    // clicks last is the element the frame photographs hovered. Every existing frame in this
+    // registry already carries that state on whatever it clicked last; this is the first case
+    // that depends on it, so it is stated rather than assumed. Adding a `hover` verb to the
+    // runner would say it more plainly, at the cost of making `view-lab-screenshots.mjs` a
+    // changed file and therefore selecting a full surface-coverage capture on every future
+    // touch of it.
+    //
+    // It clicks the LAST row, not the first: the first is already selected by the view's own
+    // auto-select on mount, so clicking it would prove nothing about a selection made under a
+    // pointer that stayed put.
+    //
+    // AND THE ASSERTION CARRIES `:hover`, which is what stops this case being vacuous. The frame
+    // it publishes is, by design, indistinguishable from the resting one — that IS the repair —
+    // so a case that only asserted `.is-selected` would go on passing if the pointer stopped
+    // arriving, and would then publish a resting frame as evidence of a hovered state.
+    // `document.querySelector` evaluates `:hover` against the real pointer, so the runner's own
+    // presence check is the proof.
+    id: 'manager-tool-rules-row-hovered-1280x720',
+    label: 'Manager — Tool rules selected row under the pointer 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="sm-tool-hammer"] .manager-tools-select-target',
+      },
+    ],
+    expectView: 'tools',
+    expectSelector: '.manager-tools-row[data-manager-tool-id="sm-tool-hammer"].is-selected:hover',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Tool/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+    ],
+  }),
+  managerCase({
+    // THE BREAKAGE-MODE CARD'S OVERRIDDEN FACE (issue 1373).
+    //
+    // The card renders one of three source states at a time and every frame in this registry
+    // shows the same one: the lab world authors a world break mode, no lab system authors its
+    // own, so `breakageSource` is `world` and the pill reads `World default` everywhere. The
+    // `system` state - the amber `Overridden here` pill beside a THIRD selected segment - was
+    // reachable by one click and drawn by nothing.
+    //
+    // WHAT IT CATCHES. The tri-state's selected-segment paint on a position no other frame
+    // uses; the warning-toned pill; and the knock-on the whole list takes, since a check-driven
+    // authority re-labels every row's breakage chip.
+    //
+    // THE THIRD STATE, `Fabricate default`, IS NOT REACHABLE HERE and is deliberately not
+    // faked. It requires the WORLD to have authored no break mode at all, and the lab world
+    // authors one on purpose so that the World breakage card has a selected segment to draw.
+    // One world corpus serves every frame, so the two states are mutually exclusive by
+    // construction rather than by omission; `world-scope-tool-breakage-authority.test.js`
+    // covers that branch of `breakModeSourcePill` instead.
+    id: 'manager-tool-rules-breakage-overridden-1280x720',
+    label: 'Manager — Tool rules breakage mode overridden here 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-authority-segment="checkDriven"]' },
+    ],
+    expectView: 'tools',
+    expectSelector: '[data-tool-authority-pill="system"]',
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Tool/,
+      /^src\/ui\/svelte\/apps\/manager\/tools\//,
+    ],
+  }),
+  managerCase({
     // THE EDITOR'S RAIL, SCROLLED (issue 1373).
     //
     // The rail has five regions and every editor frame in this registry photographs the first

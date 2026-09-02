@@ -70,8 +70,13 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * `min-height: 32px` each. The debt was PAID DOWN by deletion rather than by moving a control
  * onto a rung, so it is banked here and on the `styles/fabricate.css | min-height | 32` row
  * rather than left as a slot the next author could fill for free.
+ *
+ * It was 84 until issue 1373's Tool Rules parity pass, which moved the system Tool Rules search
+ * field off `height: 36px` and onto the ladder's 30 — the rung nearest the design's own 32,
+ * which is itself retired. That is the ordinary way this number should fall: a control moved
+ * onto a rung, banked here on the `styles/fabricate.css | height | 36` row.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 84;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 83;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -130,7 +135,7 @@ const ROWS = Object.freeze([
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte | min-height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/components/Stepper.svelte | height | 36 | 1 | var(--fab-stepper-fill-height, 36px) => 36px',
   'styles/fabricate.css | height | 32 | 5 | 32px => 32px',
-  'styles/fabricate.css | height | 36 | 15 | 36px => 36px',
+  'styles/fabricate.css | height | 36 | 14 | 36px => 36px',
   'styles/fabricate.css | height | 40 | 7 | 40px => 40px',
   'styles/fabricate.css | min-height | 32 | 9 | 32px => 32px',
   'styles/fabricate.css | min-height | 36 | 8 | 36px => 36px',

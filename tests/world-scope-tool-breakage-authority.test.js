@@ -273,3 +273,44 @@ test('the normalizer flip is absence-preserving and keeps a recognised token', a
     );
   }
 });
+
+test('the source pill names all three layers, including the one no frame can reach', async () => {
+  // THE UNPHOTOGRAPHABLE BRANCH (issue 1373). The system Tool Rules card draws one of three
+  // source states at a time and the View Lab can reach only two of them: the lab world authors
+  // a world break mode - deliberately, so the World breakage card has a selected segment to
+  // draw - so `default` requires a world that has authored nothing, which one shared corpus
+  // cannot be and not be at once. `manager-tool-rules-breakage-overridden-1280x720` photographs
+  // the `system` state and points here for this one.
+  //
+  // The three answers differ in TONE as well as in wording, and the tone is the part a reader
+  // acts on: an amber pill says this system has departed from the world, and an informational
+  // one says it has not. A branch that returned the right words in the wrong tone would read as
+  // a defect in a system that has none.
+  const { breakModeSourcePill } = await import(
+    '../src/ui/svelte/apps/manager/scoped/worldToolStudio.js'
+  );
+  const text = (key, fallback) => fallback;
+
+  assert.deepEqual(breakModeSourcePill('system', text), {
+    state: 'system',
+    tone: 'warning',
+    label: 'Overridden here',
+  });
+  assert.deepEqual(breakModeSourcePill('world', text), {
+    state: 'world',
+    tone: 'info',
+    label: 'World default',
+  });
+  // `Fabricate default`, never `World default`: naming the world here would credit it with a
+  // choice it did not make, which is the distinction this three-state pill exists for.
+  assert.deepEqual(breakModeSourcePill('default', text), {
+    state: 'default',
+    tone: 'info',
+    label: 'Fabricate default',
+  });
+  assert.deepEqual(
+    breakModeSourcePill(undefined, text),
+    breakModeSourcePill('default', text),
+    'an absent source is the unauthored one, not an unrecognised fourth state'
+  );
+});

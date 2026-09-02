@@ -224,6 +224,7 @@
           title={fact.title}
           subtitle={fact.subtitle}
           tile
+          density="rule"
           dataAttr="data-tool-inspector-rule"
           dataValue={fact.id}
         />
@@ -273,16 +274,6 @@
       is that this system has no rules for the Tool yet.
     -->
     <div class="manager-tool-inspector-routes">
-      {#if row}
-        <ManagerButton
-          role="primary"
-          fullWidth
-          data-tool-inspector-edit={row.id}
-          onclick={() => onEdit(row.id)}
-        >
-          {text('FABRICATE.Admin.Manager.Tools.EditRules', 'Edit rules')}
-        </ManagerButton>
-      {/if}
       <ManagerButton
         fullWidth
         data-tool-inspector-edit-world={subjectId}
@@ -292,10 +283,44 @@
         <span>{text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}</span>
       </ManagerButton>
     </div>
-    {#if !row}
-      <!-- `margin-top: auto` rather than a sticky footer, so a short panel does not float the
-           button halfway up an empty column. -->
-      <div class="manager-tool-inspector-foot">
+    <!--
+      THE PANEL'S ONE TERMINAL ACTION, IN THE BAND THE DESIGN PINS IT TO (issue 1373).
+
+      `proto:2578` is a footer OUTSIDE the scrolling column - `flex: 0 0 auto; padding: 13px
+      17px; border-top: 1px solid var(--border)` - holding one primary button, and it is there
+      for BOTH membership states: `proto:4896` labels it `Edit rules in {system}` for a member
+      and `Add {tool} to {system}` for a Tool this system has no rules for. What shipped put the
+      member's primary in the SCROLL FLOW, above the secondary, with no band and no rule; only
+      the non-member's was pinned, and its band had neither the top border nor the full-bleed
+      inset. So the panel's most important control moved position, emphasis and neighbours
+      depending on which Tool was selected.
+
+      `position: sticky` rather than a second flex track, because the aside itself is the
+      scroller - see the note in the style block. The visual result is the design's: a band on
+      the column's bottom edge, ruled off from the content that scrolls under it.
+
+      THE MEMBER LABEL NAMES THE SYSTEM. `Edit rules` alone was ambiguous on the one screen
+      where a Tool has rules in several systems at once and this panel is showing exactly one of
+      them. It falls back to the bare verb when there is no system name to interpolate, which is
+      what an isolated mount of this component has.
+    -->
+    <div class="manager-tool-inspector-foot">
+      {#if row}
+        <ManagerButton
+          role="primary"
+          fullWidth
+          data-tool-inspector-edit={row.id}
+          onclick={() => onEdit(row.id)}
+        >
+          {systemName
+            ? formattedText(
+                'FABRICATE.Admin.Manager.Tools.EditRulesInNamedSystem',
+                { system: systemName },
+                'Edit rules in {system}'
+              )
+            : text('FABRICATE.Admin.Manager.Tools.EditRules', 'Edit rules')}
+        </ManagerButton>
+      {:else}
         <ManagerButton
           role="primary"
           fullWidth
@@ -308,8 +333,8 @@
             'Add {tool} to {system}'
           )}
         </ManagerButton>
-      </div>
-    {/if}
+      {/if}
+    </div>
   </InspectorCard>
 {:else}
   <!-- The inspector's no-selection state is the shared primitive at the sidebar scale.
@@ -338,11 +363,35 @@
      four-heading `.manager-tool-inspector-sections` grid this replaces is no longer
      rendered by anything. */
   /* THE PANEL'S OWN HEAD, spanning the column above the medallion rather than sitting in the
-     copy cell beside it. `.manager-kicker` fully specifies the type; this adds only the
-     placement. */
-  .manager-tool-inspector-kicker {
+     copy cell beside it.
+
+     -- AND ITS TYPE, WHICH `.manager-kicker` GETS WRONG FOR THIS RAIL (issue 1373) --------
+     `proto:2550`, `:2556` and `:2566` state every kicker in this panel identically:
+     `font: 700 8.5px var(--sans); letter-spacing: .11em; text-transform: uppercase; color:
+     var(--subtle)`. The shared `.manager-kicker` is 0.72rem - 11.52px, 35% over - with NO
+     tracking at all and the muted ink, so three section heads read as small headings rather
+     than as the quiet rules they are. Nothing narrowed it for this screen: this block set only
+     margin and min-width, and the sheet's section-kicker rule set only margin.
+
+     The Checks Studio rail already does exactly this, at `styles/fabricate.css:3316`, and for
+     the same reason: the Tool Studio owns the STRUCTURE (a flat uppercase head with cards
+     directly beneath) and the reference owns the metrics. This states the reference's own
+     figures for this rail rather than borrowing that rail's 9px/.14em, which is its own
+     frame's measurement and not this one's.
+
+     Written here rather than route-scoped in the global sheet because these two classes are
+     this component's own markup, so the rules carry its scoping hash and cannot leak - and
+     because the sheet is layered while this block is not, so a global rule would lose to
+     nothing today and to the next scoped declaration tomorrow. */
+  .manager-tool-inspector-kicker,
+  .manager-tool-inspector-section-kicker {
     margin: 0;
     min-width: 0;
+    color: var(--fab-text-subtle);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
   }
 
   .manager-tool-inspector-rules {
@@ -360,22 +409,37 @@
     min-width: 0;
   }
 
+  /* `proto:2569-2571`: `gap: 9px; padding: 9px 11px; background: var(--bg1); border: 1px solid
+     var(--border); border-radius: 9px`, with the state pill `flex: 0 0 auto` IMMEDIATELY AFTER
+     the label rather than thrown to the far edge.
+
+     `space-between` was the defect. In a 340px column it put ten or twelve characters of label
+     against the left edge and a five-character pill against the right, with a hand's width of
+     nothing between them, so four rows read as a table with a missing middle column instead of
+     as four labelled facts.
+
+     THE FILL IS A RUNG DOWN, NOT UP. The design's `--bg1` is our `--fab-bg-0` - the background
+     ramp is shifted one rung between the two token sets - and the aside above it is
+     `--fab-bg-1`, so the inset recesses. It had been painted the same value as its own
+     container, which is the same inversion `IconFactRow`'s `rule` density corrects.
+
+     9px and 11px have no step on the 4px spacing scale and take their nearest, 8 and 12. */
   .manager-tool-inspector-inherit-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--fab-space-2);
     min-width: 0;
-    padding: var(--fab-space-chip) var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
-    background: var(--fab-bg-1);
+    background: var(--fab-bg-0);
   }
 
+  /* `proto:2570`: `font: 600 11.5px var(--sans)`. */
   .manager-tool-inspector-inherit-row > span {
     min-width: 0;
     color: var(--fab-text);
-    font-size: 0.72rem;
+    font-size: 11.5px;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -411,8 +475,45 @@
     min-width: 0;
   }
 
+  /* `proto:2578`: `flex: 0 0 auto; padding: 13px 17px; border-top: 1px solid var(--border)`.
+
+     STICKY RATHER THAN A SECOND FLEX TRACK, and that is a constraint rather than a preference.
+     The design's aside is a two-track column - a scroller plus a footer - while ours is a
+     single scrolling element with the panel inside it, and turning that inside out would mean
+     re-homing the aside's overflow, its padding and the no-selection empty state that shares
+     it. Sticky reaches the same rendered result from the shape we have: the band sits at the
+     bottom of the column, ruled off, with the panel scrolling under it. `margin-top: auto`
+     keeps it at the foot of a SHORT panel too, where there is nothing to scroll and a sticky
+     offset alone would leave it floating under the last card.
+
+     The negative side margins are the design's full-bleed band: they cancel the aside's own
+     16px inset so the rule spans the column rather than stopping short of it, which is why
+     that inset is stated as a scale token in `styles/fabricate.css` and repeated here as the
+     same token rather than as a second raw number. 13px and 17px take the scale's nearest
+     steps, 12 and 16. */
+  /* THE INSET COMPENSATES FOR THE NEGATIVE MARGIN; IT DOES NOT CANCEL ITSELF.
+
+     A sticky element is pinned by its MARGIN box, not its border box. `margin-bottom` here is
+     negative so the band's border box can reach past the aside's own 16px inset and rule the
+     column edge to edge - which pulls the margin box's bottom 16px ABOVE the painted one. With
+     `bottom: 0` the browser therefore parked the margin box on the scrollport's bottom edge and
+     left the band itself 16px short, so scrolled content went on rendering underneath it inside
+     the aside. Measured, not reasoned: 16px of an inheritance row below the band, and a hit test
+     two pixels above the column's bottom returning the aside rather than the band.
+
+     The matching negative inset moves the constraint edge down by the same amount. Dropping the
+     margin and keeping the inset is NOT the same repair and was measured too: without the
+     negative margin the band cannot reach past its containing block's content edge at all, so a
+     SHORT panel goes back to showing a strip of aside beneath it. Only this pair is flush in
+     both cases, which is what the two band tests in
+     `tests/components/tool-rules-list-parity.test.js` pin. */
   .manager-tool-inspector-foot {
-    margin-top: auto;
+    position: sticky;
+    bottom: calc(-1 * var(--fab-space-4));
+    margin: auto calc(-1 * var(--fab-space-4)) calc(-1 * var(--fab-space-4));
     min-width: 0;
+    padding: var(--fab-space-3) var(--fab-space-4);
+    border-top: 1px solid var(--fab-border);
+    background: var(--fab-bg-1);
   }
 </style>
