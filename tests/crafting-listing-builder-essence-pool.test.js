@@ -40,9 +40,8 @@ const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { CraftingListingBuilder } = await import('../src/systems/CraftingListingBuilder.js');
-const { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } = await import(
-  '../src/systems/stepRecipeView.js'
-);
+const { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } =
+  await import('../src/systems/stepRecipeView.js');
 
 const MAIN_SOURCE = readFileSync(
   resolve(dirname(fileURLToPath(import.meta.url)), '../src/main.js'),
@@ -77,7 +76,12 @@ function forgeSystem() {
     resolutionMode: 'simple',
     features: { essences: true, multiStepRecipes: true, craftingChecks: false },
     requirements: { time: { enabled: true } },
-    craftingCheck: { enabled: false, simple: { rollFormula: '', dc: 10 }, routed: {}, progressive: {} },
+    craftingCheck: {
+      enabled: false,
+      simple: { rollFormula: '', dc: 10 },
+      routed: {},
+      progressive: {},
+    },
     components: [{ id: 'c-plank', name: 'Plank' }],
     essenceDefinitions: [EMBER_ESSENCE],
   };
@@ -98,7 +102,12 @@ function forgeRecipe() {
           {
             id: 'set-1',
             ingredientGroups: [
-              { id: 'g-ember', options: [{ quantity: 1, match: { type: 'essence', essenceId: 'ember', amount: 2 } }] },
+              {
+                id: 'g-ember',
+                options: [
+                  { quantity: 1, match: { type: 'essence', essenceId: 'ember', amount: 2 } },
+                ],
+              },
             ],
           },
         ],
@@ -119,7 +128,11 @@ function runManagerAt(run) {
   return { findActiveRunForRecipe: () => run };
 }
 
-function buildRecipeModel({ recipe = forgeRecipe(), craftingRunManager = null, access = null } = {}) {
+function buildRecipeModel({
+  recipe = forgeRecipe(),
+  craftingRunManager = null,
+  access = null,
+} = {}) {
   const system = forgeSystem();
   const craftingSystemManager = {
     getSystem: (id) => (id === system.id ? system : null),
@@ -333,7 +346,10 @@ test('the extracted seam re-evaluates a stepped recipe set with option overrides
   const craftingSystemManager = { getSystem: (id) => (id === system.id ? system : null) };
   globalThis.game = {
     user: { isGM: true },
-    fabricate: { getCraftingSystemManager: () => craftingSystemManager, getResolutionModeService: () => null },
+    fabricate: {
+      getCraftingSystemManager: () => craftingSystemManager,
+      getResolutionModeService: () => null,
+    },
     time: { worldTime: 0 },
   };
   const recipe = forgeRecipe();
@@ -366,7 +382,10 @@ test('a supplied allocation flows through the same seam and steers the pool', ()
   const craftingSystemManager = { getSystem: (id) => (id === system.id ? system : null) };
   globalThis.game = {
     user: { isGM: true },
-    fabricate: { getCraftingSystemManager: () => craftingSystemManager, getResolutionModeService: () => null },
+    fabricate: {
+      getCraftingSystemManager: () => craftingSystemManager,
+      getResolutionModeService: () => null,
+    },
     time: { worldTime: 0 },
   };
   const recipe = forgeRecipe();
@@ -400,7 +419,10 @@ test('src/main.js resolves evaluateSelectedSet through the execution steps', () 
   );
   assert.ok(body.includes('getExecutionSteps?.(recipe)'), 'the steps are the resolution source');
   assert.ok(body.includes('activeRunStepState('), 'the active step decides when stepId is absent');
-  assert.ok(body.includes('buildStepRecipeView(recipe, resolved.step)'), 'the step tool union applies');
+  assert.ok(
+    body.includes('buildStepRecipeView(recipe, resolved.step)'),
+    'the step tool union applies'
+  );
   assert.ok(body.includes('essenceAllocation,'), 'the allocation is threaded to craftability');
   assert.ok(
     !body.includes('recipe.ingredientSets.find'),

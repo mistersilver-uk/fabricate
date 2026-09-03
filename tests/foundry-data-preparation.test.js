@@ -119,12 +119,7 @@ for (const status of ['paused', 'restarting']) {
     });
 
     assert.equal(cachedContainerStatus, 'exited');
-    assert.deepEqual(events, [
-      `inspect:${status}`,
-      `stop:${status}`,
-      'inspect:exited',
-      'setup',
-    ]);
+    assert.deepEqual(events, [`inspect:${status}`, `stop:${status}`, 'inspect:exited', 'setup']);
   });
 }
 

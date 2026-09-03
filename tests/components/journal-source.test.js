@@ -29,25 +29,49 @@ function resolveLangKey(key) {
 
 describe('FabricateAppRoot Journal wiring', () => {
   it('renders JournalView on the journal tab (every tab now routes to a real view)', () => {
-    assert.ok(rootSource.includes("import JournalView from './journal/JournalView.svelte'"), 'imports JournalView');
+    assert.ok(
+      rootSource.includes("import JournalView from './journal/JournalView.svelte'"),
+      'imports JournalView'
+    );
     // `tab.tabId`, not `tab.id`: a rail entry is addressed by its ROUTE KEY since issue 1198
     // and carries the bare tab id separately, so a Core branch reads the bare id.
     assert.ok(rootSource.includes("tab.tabId === 'journal'"), 'branches on the journal tab');
-    assert.ok(rootSource.includes('<JournalView {services} />'), 'renders JournalView with services');
-    assert.ok(!rootSource.includes('fabricate-app-placeholder'), 'the coming-soon placeholder is gone now the alchemy tab is implemented');
+    assert.ok(
+      rootSource.includes('<JournalView {services} />'),
+      'renders JournalView with services'
+    );
+    assert.ok(
+      !rootSource.includes('fabricate-app-placeholder'),
+      'the coming-soon placeholder is gone now the alchemy tab is implemented'
+    );
   });
 
   it('feeds an active-run count badge from the shared store navCount', () => {
-    assert.ok(rootSource.includes('services?.journal?.navCount'), 'badge count comes from the store navCount getter');
-    assert.ok(rootSource.includes('fabricate-app-nav-count'), 'badge element uses the namespaced class');
-    assert.ok(rootSource.includes('{#if tab.count > 0}'), 'badge only renders for a positive count');
+    assert.ok(
+      rootSource.includes('services?.journal?.navCount'),
+      'badge count comes from the store navCount getter'
+    );
+    assert.ok(
+      rootSource.includes('fabricate-app-nav-count'),
+      'badge element uses the namespaced class'
+    );
+    assert.ok(
+      rootSource.includes('{#if tab.count > 0}'),
+      'badge only renders for a positive count'
+    );
   });
 
   it('registers shell-level Journal refresh so the badge stays fresh while the tab is closed', () => {
     assert.ok(rootSource.includes('subscribeWorldTime'), 'shell subscribes to world-time changes');
     assert.ok(rootSource.includes('subscribeSceneChange'), 'shell subscribes to scene changes');
-    assert.ok(rootSource.includes('services?.journal?.load?.(true)'), 'shell quietly re-loads on those events');
-    assert.ok(rootSource.includes('!store.loadedOnce'), 'shell guards its one-time initial load via loadedOnce');
+    assert.ok(
+      rootSource.includes('services?.journal?.load?.(true)'),
+      'shell quietly re-loads on those events'
+    );
+    assert.ok(
+      rootSource.includes('!store.loadedOnce'),
+      'shell guards its one-time initial load via loadedOnce'
+    );
   });
 });
 
@@ -60,13 +84,18 @@ describe('JournalView layout + effects', () => {
 
     assert.ok(viewSource.includes('grid-template-columns:'), 'declares an explicit column track');
     assert.ok(viewSource.includes('container-type: inline-size;'), 'establishes a size container');
-    assert.ok(viewSource.includes('container-name: fabricate-journal;'), 'names the journal container');
+    assert.ok(
+      viewSource.includes('container-name: fabricate-journal;'),
+      'names the journal container'
+    );
     assert.ok(
       viewSource.includes(narrowBreakpoint),
       'uses the shared reachable 960px narrow breakpoint'
     );
     assert.ok(
-      viewSource.slice(viewSource.indexOf(narrowBreakpoint)).includes('grid-template-columns: 1fr;'),
+      viewSource
+        .slice(viewSource.indexOf(narrowBreakpoint))
+        .includes('grid-template-columns: 1fr;'),
       'reflows to a single column at the narrow breakpoint'
     );
     assert.match(
@@ -86,10 +115,19 @@ describe('JournalView layout + effects', () => {
   });
 
   it('hosts the re-fetch effects (actor change, scene, world-time tick)', () => {
-    assert.ok(viewSource.includes('subscribeSceneChange(() => journal?.load?.(true))'), 'scene-change quiet reload');
+    assert.ok(
+      viewSource.includes('subscribeSceneChange(() => journal?.load?.(true))'),
+      'scene-change quiet reload'
+    );
     assert.ok(viewSource.includes('subscribeWorldTime('), 'world-time subscription present');
-    assert.ok(viewSource.includes('journal?.tickWorldTime?.()'), 'ticks world time so countdowns recompute');
-    assert.ok(viewSource.includes('services?.actorBar?.selectedActorId'), 'tracks the selected actor');
+    assert.ok(
+      viewSource.includes('journal?.tickWorldTime?.()'),
+      'ticks world time so countdowns recompute'
+    );
+    assert.ok(
+      viewSource.includes('services?.actorBar?.selectedActorId'),
+      'tracks the selected actor'
+    );
   });
 });
 
@@ -105,8 +143,15 @@ describe('Journal status vocabulary + actions', () => {
 
   it('derives Trigger readiness from the time gate, never from run.status', () => {
     assert.ok(actionsSource.includes('availableAt <= now'), 'readiness is availableAt <= now');
-    assert.equal(actionsSource.includes('run.status'), false, 'never reads run.status for readiness');
-    assert.ok(actionsSource.includes('fabricate-app-primary-button'), 'uses the global primary button class');
+    assert.equal(
+      actionsSource.includes('run.status'),
+      false,
+      'never reads run.status for readiness'
+    );
+    assert.ok(
+      actionsSource.includes('fabricate-app-primary-button'),
+      'uses the global primary button class'
+    );
   });
 });
 
@@ -140,7 +185,10 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
 
 describe('Journal global CSS treatments', () => {
   it('adds the player-scoped green primary button overriding Foundry button chrome', () => {
-    assert.ok(cssSource.includes('.fabricate-app .fabricate-app-primary-button'), 'primary button rule present');
+    assert.ok(
+      cssSource.includes('.fabricate-app .fabricate-app-primary-button'),
+      'primary button rule present'
+    );
     assert.ok(
       cssSource.includes('background: var(--fab-success);'),
       'primary button uses the success token (no colour literal)'
@@ -149,7 +197,10 @@ describe('Journal global CSS treatments', () => {
   });
 
   it('adds the namespaced nav-count badge with no colour literals', () => {
-    assert.ok(cssSource.includes('.fabricate-app .fabricate-app-nav-count'), 'nav-count rule present');
+    assert.ok(
+      cssSource.includes('.fabricate-app .fabricate-app-nav-count'),
+      'nav-count rule present'
+    );
     assert.ok(cssSource.includes('background: var(--fab-success);'), 'badge tokenized');
   });
 });

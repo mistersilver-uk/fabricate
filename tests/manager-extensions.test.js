@@ -952,7 +952,10 @@ function documentedProperties(block) {
       }
     }
     // The name may sit on the next comment line when the type filled the first one.
-    const name = chunk.slice(index).replace(/^[\s*]+/, '').match(/^\[?([\w$]+)/);
+    const name = chunk
+      .slice(index)
+      .replace(/^[\s*]+/, '')
+      .match(/^\[?([\w$]+)/);
     if (name) names.push(name[1]);
   }
   return names;
@@ -965,10 +968,7 @@ test('every member Core puts on the mount context is documented in its typedef',
   );
   const literalStart = rootSource.indexOf('const context = Object.freeze({');
   assert.notEqual(literalStart, -1, 'the Manager root still builds one frozen mount context');
-  const literal = rootSource.slice(
-    literalStart,
-    rootSource.indexOf('\n    });', literalStart) + 1
-  );
+  const literal = rootSource.slice(literalStart, rootSource.indexOf('\n    });', literalStart) + 1);
   // `[,:]` because the literal mixes keyed members with shorthand ones (`revision`), and a
   // colon-only pattern would silently drop every shorthand member from the comparison — which
   // would be this very guard failing in the direction it exists to catch.
@@ -1008,13 +1008,7 @@ test('the typedef names what navigateToTab refuses, as its three siblings do', (
   const start = extensionsSource.indexOf('navigateToTab Take the GM to');
   assert.notEqual(start, -1, 'the navigateToTab property is still documented on the typedef');
   const paragraph = extensionsSource.slice(start, extensionsSource.indexOf('\n */', start));
-  for (const claim of [
-    'WHAT IT REFUSES',
-    'RETIRED',
-    '`false`',
-    '`TypeError`',
-    'registered',
-  ]) {
+  for (const claim of ['WHAT IT REFUSES', 'RETIRED', '`false`', '`TypeError`', 'registered']) {
     assert.ok(paragraph.includes(claim), `the member's contract still states ${claim}`);
   }
 });

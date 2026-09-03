@@ -36,7 +36,11 @@ test('listMode player → restricted', () => {
 });
 
 test('listMode teaser → global (teaserConfig untouched)', () => {
-  const system = { id: 's', recipeVisibility: { listMode: 'teaser' }, teaserConfig: { enabled: true, fragments: [{ id: 'f1' }] } };
+  const system = {
+    id: 's',
+    recipeVisibility: { listMode: 'teaser' },
+    teaserConfig: { enabled: true, fragments: [{ id: 'f1' }] },
+  };
   const out = migrateVisibilityModeEnum({ systems: [system] });
   assert.equal(out.systems[0].visibilityMode, 'global');
   assert.deepEqual(out.systems[0].teaserConfig, { enabled: true, fragments: [{ id: 'f1' }] });
@@ -51,7 +55,10 @@ test('listMode knowledge + mode learned → knowledge', () => {
 });
 
 test('listMode knowledge + mode itemOrLearned → knowledge', () => {
-  assert.equal(derive({ listMode: 'knowledge', knowledge: { mode: 'itemOrLearned' } }), 'knowledge');
+  assert.equal(
+    derive({ listMode: 'knowledge', knowledge: { mode: 'itemOrLearned' } }),
+    'knowledge'
+  );
 });
 
 test('listMode knowledge with missing/invalid mode → knowledge', () => {
@@ -81,7 +88,11 @@ test('is idempotent — a second run leaves an already-set visibilityMode untouc
 });
 
 test('an already-set visibilityMode wins over legacy fields', () => {
-  const system = { id: 's', visibilityMode: 'global', recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'item' } } };
+  const system = {
+    id: 's',
+    visibilityMode: 'global',
+    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'item' } },
+  };
   const out = migrateVisibilityModeEnum({ systems: [system] });
   assert.equal(out.systems[0].visibilityMode, 'global');
 });

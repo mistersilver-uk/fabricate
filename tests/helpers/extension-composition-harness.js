@@ -133,11 +133,7 @@ export async function captureCloseOrdering({
   try {
     const module = await vite.ssrLoadModule(modulePath);
     const ApplicationClass = module[exportName];
-    assert.equal(
-      typeof ApplicationClass,
-      'function',
-      `${modulePath} should export ${exportName}`
-    );
+    assert.equal(typeof ApplicationClass, 'function', `${modulePath} should export ${exportName}`);
     const app = new ApplicationClass();
     app._svelteComponent = {
       targetConnected: true,

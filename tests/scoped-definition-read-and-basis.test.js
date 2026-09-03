@@ -580,7 +580,10 @@ describe('the resolved-union memo', () => {
     // in-system record decides it outright while requirement 36 holds, and a world edit to it is
     // (correctly) invisible. `category` is resolved behaviour and is the world half's to move.
     const { manager, store, system } = memoFixture();
-    assert.equal(manager.resolveScopedComponents(system).find((e) => e.id === 'w1').category, 'ore');
+    assert.equal(
+      manager.resolveScopedComponents(system).find((e) => e.id === 'w1').category,
+      'ore'
+    );
 
     await store.save({
       entities: [{ id: 'w1', name: 'After' }],
@@ -793,10 +796,7 @@ describe('src/main.js construction order', () => {
     // `User#isGM` is `hasRole(ASSISTANT)` and `SETTINGS_MODIFY.defaultRole` is ASSISTANT, so an
     // `isGM` gate posts this notice once for the full GM AND once per assistant.
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    const gate = MAIN_SOURCE.lastIndexOf(
-      'game.users?.activeGM?.id === game.user?.id',
-      audit
-    );
+    const gate = MAIN_SOURCE.lastIndexOf('game.users?.activeGM?.id === game.user?.id', audit);
     assert.notEqual(gate, -1, 'the audit must sit under an active-GM gate');
     assert.ok(
       MAIN_SOURCE.slice(gate, audit).includes('{'),

@@ -61,7 +61,9 @@ function selectionOf(out, index = 0) {
 // ---------------------------------------------------------------------------
 
 test('recipe-level macroOutcome → check; macroUuid kept', () => {
-  const out = migrate({ recipes: [routedRecipe('macroOutcome', { selectionExtra: { macroUuid: 'Macro.x' } })] });
+  const out = migrate({
+    recipes: [routedRecipe('macroOutcome', { selectionExtra: { macroUuid: 'Macro.x' } })],
+  });
   const sel = selectionOf(out);
   assert.equal(sel.provider, 'check');
   assert.equal(sel.macroUuid, 'Macro.x', 'macroUuid is preserved');
@@ -69,7 +71,9 @@ test('recipe-level macroOutcome → check; macroUuid kept', () => {
 
 test('recipe-level rollTableOutcome → check; rollTableUuid dropped', () => {
   const out = migrate({
-    recipes: [routedRecipe('rollTableOutcome', { selectionExtra: { rollTableUuid: 'RollTable.y' } })],
+    recipes: [
+      routedRecipe('rollTableOutcome', { selectionExtra: { rollTableUuid: 'RollTable.y' } }),
+    ],
   });
   const sel = selectionOf(out);
   assert.equal(sel.provider, 'check');
@@ -91,7 +95,10 @@ test('per-step resultSelection providers are rewritten and rollTableUuid dropped
       recipe('recipe-stepped', {
         steps: [
           { id: 'step-1', resultSelection: selection('macroOutcome', { macroUuid: 'Macro.s1' }) },
-          { id: 'step-2', resultSelection: selection('rollTableOutcome', { rollTableUuid: 'RollTable.s2' }) },
+          {
+            id: 'step-2',
+            resultSelection: selection('rollTableOutcome', { rollTableUuid: 'RollTable.s2' }),
+          },
         ],
       }),
     ],
@@ -109,7 +116,9 @@ test('per-step resultSelection providers are rewritten and rollTableUuid dropped
 
 test('alchemy recipe-level (no steps) macroOutcome → check', () => {
   const out = migrate({
-    recipes: [recipe('alchemy-recipe', { resultSelection: selection('macroOutcome'), alchemy: true })],
+    recipes: [
+      recipe('alchemy-recipe', { resultSelection: selection('macroOutcome'), alchemy: true }),
+    ],
   });
   const sel = selectionOf(out);
   assert.equal(sel.provider, 'check');
@@ -144,9 +153,16 @@ test('gathering task without resultSelection is left untouched', () => {
 test('recovery-warning payload collects dropped roll-table recipes/steps and stripped gathering tasks', () => {
   const out = migrate({
     recipes: [
-      recipe('recipe-rt', { resultSelection: selection('rollTableOutcome', { rollTableUuid: 'RollTable.a' }) }),
+      recipe('recipe-rt', {
+        resultSelection: selection('rollTableOutcome', { rollTableUuid: 'RollTable.a' }),
+      }),
       recipe('recipe-step-rt', {
-        steps: [{ id: 'step-rt', resultSelection: selection('rollTableOutcome', { rollTableUuid: 'RollTable.b' }) }],
+        steps: [
+          {
+            id: 'step-rt',
+            resultSelection: selection('rollTableOutcome', { rollTableUuid: 'RollTable.b' }),
+          },
+        ],
       }),
       // macroOutcome must NOT appear in the warning (lossless rewrite).
       routedRecipe('macroOutcome'),
@@ -174,13 +190,19 @@ test('recovery-warning payload collects dropped roll-table recipes/steps and str
 
 test('running twice is a no-op and reports an empty warning payload on the second pass', () => {
   const first = migrate({
-    recipes: [routedRecipe('rollTableOutcome', { selectionExtra: { rollTableUuid: 'RollTable.z' } })],
+    recipes: [
+      routedRecipe('rollTableOutcome', { selectionExtra: { rollTableUuid: 'RollTable.z' } }),
+    ],
     gatheringConfig: gatheringConfig([gatheringTask('task-1', selection('macroOutcome'))]),
   });
   const second = migrate({ recipes: first.recipes, gatheringConfig: first.gatheringConfig });
 
   assert.deepEqual(second.recipes, first.recipes, 're-run does not change recipes');
-  assert.deepEqual(second.gatheringConfig, first.gatheringConfig, 're-run does not change gatheringConfig');
+  assert.deepEqual(
+    second.gatheringConfig,
+    first.gatheringConfig,
+    're-run does not change gatheringConfig'
+  );
   assert.deepEqual(second._removedResultSelectionProviders, {
     droppedRollTableRecipes: [],
     strippedGatheringTasks: [],

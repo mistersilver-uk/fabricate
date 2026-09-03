@@ -10,19 +10,28 @@ function configFor({ events = [] } = {}) {
     systems: {
       'system-test': {
         rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
-        events
-      }
-    }
+        events,
+      },
+    },
   };
 }
 
 function environmentWithLibrary(service, system) {
-  const composed = service.composeEnvironment({
-    id: 'env-test',
-    craftingSystemId: 'system-test',
-    tasks: []
-  }, system);
-  composed.rules = { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops', rewardLimit: 99, eventLimit: 99, eventPolicy: 'successWithEvent' };
+  const composed = service.composeEnvironment(
+    {
+      id: 'env-test',
+      craftingSystemId: 'system-test',
+      tasks: [],
+    },
+    system
+  );
+  composed.rules = {
+    rewardSelectionMode: 'allDrops',
+    eventSelectionMode: 'allDrops',
+    rewardLimit: 99,
+    eventLimit: 99,
+    eventPolicy: 'successWithEvent',
+  };
   return composed;
 }
 
@@ -31,13 +40,24 @@ test('missing library modifier aborts attempt with diagnostic', async () => {
     config: configFor(),
     modifiers: [],
     rolls: [100],
-    evaluateExpression: () => 0
+    evaluateExpression: () => 0,
   });
   const env = environmentWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
-    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'gone', operator: '+' }] }] },
+    task: {
+      id: 't',
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 30,
+          characterModifiers: [{ id: 'r', modifierId: 'gone', operator: '+' }],
+        },
+      ],
+    },
     environment: env,
-    actor: { uuid: 'Actor.x' }
+    actor: { uuid: 'Actor.x' },
   });
   assert.equal(result.status, 'misconfigured');
   assert.equal(result.items.length, 0);
@@ -52,13 +72,24 @@ test('min > max aborts attempt with diagnostic', async () => {
     config: configFor(),
     modifiers: [{ id: 'str', label: 'Strength', expression: '@s' }],
     rolls: [100],
-    evaluateExpression: () => 1
+    evaluateExpression: () => 1,
   });
   const env = environmentWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
-    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+', min: 5, max: 0 }] }] },
+    task: {
+      id: 't',
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 30,
+          characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+', min: 5, max: 0 }],
+        },
+      ],
+    },
     environment: env,
-    actor: { uuid: 'Actor.x' }
+    actor: { uuid: 'Actor.x' },
   });
   assert.equal(result.status, 'misconfigured');
   assert.equal(result.diagnostics[0].code, 'INVALID_CHARACTER_MODIFIER_BOUNDS');
@@ -69,13 +100,24 @@ test('non-finite expression resolution aborts', async () => {
     config: configFor(),
     modifiers: [{ id: 'str', label: 'Strength', expression: '@s' }],
     rolls: [100],
-    evaluateExpression: () => null
+    evaluateExpression: () => null,
   });
   const env = environmentWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
-    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+' }] }] },
+    task: {
+      id: 't',
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 30,
+          characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+' }],
+        },
+      ],
+    },
     environment: env,
-    actor: { uuid: 'Actor.x' }
+    actor: { uuid: 'Actor.x' },
   });
   assert.equal(result.status, 'misconfigured');
   assert.equal(result.diagnostics[0].code, 'CHARACTER_MODIFIER_NON_FINITE');
@@ -86,13 +128,24 @@ test('expression returning NaN aborts with CHARACTER_MODIFIER_NON_FINITE', async
     config: configFor(),
     modifiers: [{ id: 'str', label: 'Strength', expression: '@s' }],
     rolls: [100],
-    evaluateExpression: () => Number.NaN
+    evaluateExpression: () => Number.NaN,
   });
   const env = environmentWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
-    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+' }] }] },
+    task: {
+      id: 't',
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 30,
+          characterModifiers: [{ id: 'r', modifierId: 'str', operator: '+' }],
+        },
+      ],
+    },
     environment: env,
-    actor: { uuid: 'Actor.x' }
+    actor: { uuid: 'Actor.x' },
   });
   assert.equal(result.status, 'misconfigured');
   assert.equal(result.diagnostics[0].code, 'CHARACTER_MODIFIER_NON_FINITE');
@@ -103,35 +156,58 @@ test('aborted attempts do not consume nodes/stamina/attempt-limit', async () => 
     config: configFor(),
     modifiers: [],
     rolls: [100],
-    evaluateExpression: () => 0
+    evaluateExpression: () => 0,
   });
   const calls = {};
   const actor = makeFakeActor();
   // Pre-seed stamina so commit would deduct it
-  await actor.setFlag('fabricate', 'gatheringState', { stamina: { 'system-test': { current: 5, max: 5, provider: 'fabricate', regenerationMode: 'manual' } } });
+  await actor.setFlag('fabricate', 'gatheringState', {
+    stamina: {
+      'system-test': { current: 5, max: 5, provider: 'fabricate', regenerationMode: 'manual' },
+    },
+  });
 
   // Configure library task with a missing modifier reference inside a system
   const config = {
     systems: {
       'system-test': {
-        tasks: [{
-          id: 'task-misconfig',
-          name: 'Misconfig Task',
-          staminaCost: 1,
-          dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 30, characterModifiers: [{ id: 'r', modifierId: 'gone', operator: '+' }] }]
-        }]
-      }
-    }
+        tasks: [
+          {
+            id: 'task-misconfig',
+            name: 'Misconfig Task',
+            staminaCost: 1,
+            dropRows: [
+              {
+                id: 'd1',
+                componentId: 'herb',
+                quantity: 1,
+                dropRate: 30,
+                characterModifiers: [{ id: 'r', modifierId: 'gone', operator: '+' }],
+              },
+            ],
+          },
+        ],
+      },
+    },
   };
-  const { service: serviceWithTask } = makeRichState({ config, rolls: [100], evaluateExpression: () => 0 });
+  const { service: serviceWithTask } = makeRichState({
+    config,
+    rolls: [100],
+    evaluateExpression: () => 0,
+  });
   const env = environment({ id: 'env-test', craftingSystemId: 'system-test', tasks: [] });
   const engine = makeEngine({
     richState: serviceWithTask,
     env,
     calls,
-    actingActor: actor
+    actingActor: actor,
   });
-  const result = await engine.startAttempt({ viewer: { id: 'u', isGM: false }, actor, environmentId: 'env-test', taskId: 'task-misconfig' });
+  const result = await engine.startAttempt({
+    viewer: { id: 'u', isGM: false },
+    actor,
+    environmentId: 'env-test',
+    taskId: 'task-misconfig',
+  });
   assert.equal(result.accepted, false, 'attempt is blocked');
   const stamina = serviceWithTask.getActorStamina(actor, 'system-test');
   assert.equal(stamina.current, 5, 'stamina was not consumed');

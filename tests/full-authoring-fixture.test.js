@@ -7,9 +7,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { buildFullAuthoringFixture, REQUIRED_FIXTURE_FEATURES } = await import(
-  './helpers/fullAuthoringFixture.js'
-);
+const { buildFullAuthoringFixture, REQUIRED_FIXTURE_FEATURES } =
+  await import('./helpers/fullAuthoringFixture.js');
 
 test('fixture: covers every required authoring feature', () => {
   const fixture = buildFullAuthoringFixture();

@@ -736,7 +736,10 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       'the GM is told what to do about it'
     );
     assert.match(
-      blockIn(sectionSource, '.fab-complication-trigger.is-unavailable > :global(.fab-complication-effect)'),
+      blockIn(
+        sectionSource,
+        '.fab-complication-trigger.is-unavailable > :global(.fab-complication-effect)'
+      ),
       /opacity:\s*0\.6/,
       '`opacity` is the chips’ own device, and the one property that composes with the row’s tone'
     );

@@ -22,7 +22,13 @@ globalThis.foundry = {
   utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}`, getProperty },
 };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
-globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [], packs: [], fabricate: {} };
+globalThis.game = {
+  user: { isGM: true, id: 'gm-user' },
+  actors: [],
+  items: [],
+  packs: [],
+  fabricate: {},
+};
 globalThis.fromUuid = async () => null;
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
@@ -30,11 +36,16 @@ const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
-const { component, componentSet, roleItem } = await import('./helpers/componentIdentityFixtures.js');
+const { component, componentSet, roleItem } =
+  await import('./helpers/componentIdentityFixtures.js');
 const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js');
 
 function buildManager(systemsById) {
-  const mgr = new CraftingSystemManager({ getRecipes: () => [], deleteRecipe: async () => {}, updateRecipe: async () => {} });
+  const mgr = new CraftingSystemManager({
+    getRecipes: () => [],
+    deleteRecipe: async () => {},
+    updateRecipe: async () => {},
+  });
   mgr.initialized = true;
   mgr.save = async () => {};
   mgr.systems = new Map(Object.entries(systemsById));
@@ -45,7 +56,10 @@ function buildManager(systemsById) {
 // duplicateSource overlaps dupComp's source ref. Both components live in one system's
 // set, with DISTINCT essences so attribution is observable.
 function conflictingIdentityFixture({ quantity } = {}) {
-  const rolesComp = component('comp-roles', { originItemUuid: 'Item.roles-src', essences: { fire: 2 } });
+  const rolesComp = component('comp-roles', {
+    originItemUuid: 'Item.roles-src',
+    essences: { fire: 2 },
+  });
   const dupComp = component('comp-dup', { originItemUuid: 'Item.dup-src', essences: { ice: 3 } });
   const item = roleItem({
     uuid: 'Item.owned',
@@ -87,7 +101,9 @@ test('A8 - craft-time: _buildEssenceContext threads recipe.craftingSystemId so e
     }),
   };
 
-  const { resolvedEssences } = engine._buildEssenceContext([{ item, quantity: 1 }], { craftingSystemId: 'sysA' });
+  const { resolvedEssences } = engine._buildEssenceContext([{ item, quantity: 1 }], {
+    craftingSystemId: 'sysA',
+  });
   assert.equal(resolvedEssences.fire, 2, 'attributed to the roles component (fire)');
   assert.equal(resolvedEssences.ice, undefined, 'NOT the duplicateSource component (ice)');
 });
@@ -100,7 +116,10 @@ test('A9a - recipe-availability: _matchAlchemySignature threads options.system.i
   const { item, components } = conflictingIdentityFixture();
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const validator = { computeSignature: () => [], expandIngredientToComponentIds: () => [] };
-  const recipe = { enabled: true, ingredientSets: [{ id: 'set-1', essences: { fire: 2 }, ingredientGroups: [] }] };
+  const recipe = {
+    enabled: true,
+    ingredientSets: [{ id: 'set-1', essences: { fire: 2 }, ingredientGroups: [] }],
+  };
   const system = { id: 'sysA', features: { essences: true } };
 
   const result = engine._matchAlchemySignature(
@@ -110,7 +129,11 @@ test('A9a - recipe-availability: _matchAlchemySignature threads options.system.i
     validator,
     { system }
   );
-  assert.equal(result.matched, true, 'the roles component supplies the fire essence the set requires');
+  assert.equal(
+    result.matched,
+    true,
+    'the roles component supplies the fire essence the set requires'
+  );
   assert.equal(result.ingredientSetId, 'set-1');
 });
 
@@ -182,16 +205,30 @@ test('A10 - award: a fresh award is NOT folded into an owned stack that resolves
 // ---------------------------------------------------------------------------
 
 test('A5 - repair writes roles[sysB].componentId for a source owned by system B only, and a non-owning system A pass never clears it (order-independent)', async () => {
-  const compA = component('comp-a', { registeredItemUuid: 'Item.a-src', originItemUuid: 'Item.a-src' });
-  const compB = component('comp-b', { registeredItemUuid: 'Item.b-src', originItemUuid: 'Item.b-src' });
+  const compA = component('comp-a', {
+    registeredItemUuid: 'Item.a-src',
+    originItemUuid: 'Item.a-src',
+  });
+  const compB = component('comp-b', {
+    registeredItemUuid: 'Item.b-src',
+    originItemUuid: 'Item.b-src',
+  });
   const sysA = componentSet('sysA', [compA]);
   const sysB = componentSet('sysB', [compB]);
 
-  for (const order of [['sysA', 'sysB'], ['sysB', 'sysA']]) {
+  for (const order of [
+    ['sysA', 'sysB'],
+    ['sysB', 'sysA'],
+  ]) {
     const worldItem = makeWorldItem({ uuid: 'Item.b-src', name: 'B Source' });
     const ordered = Object.fromEntries(order.map((id) => [id, id === 'sysA' ? sysA : sysB]));
     const mgr = buildManager(ordered);
-    globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [worldItem], packs: [] };
+    globalThis.game = {
+      user: { isGM: true, id: 'gm-user' },
+      actors: [],
+      items: [worldItem],
+      packs: [],
+    };
 
     const summary = await mgr.repairItemData({ includeCompendiums: false });
 
@@ -226,7 +263,11 @@ test('A11a - createSystem rejects a dotted system id with a clear error and acce
   );
 
   const ok = await mgr.createSystem({ id: 'abc123XYZ_-', name: 'Fine' });
-  assert.equal(ok.id, 'abc123XYZ_-', 'a randomID-shaped id is accepted unchanged (never rewritten)');
+  assert.equal(
+    ok.id,
+    'abc123XYZ_-',
+    'a randomID-shaped id is accepted unchanged (never rewritten)'
+  );
 
   globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [], packs: [] };
 });
@@ -246,7 +287,11 @@ test('B9 - autoStampComponentSources writes roles[sys].componentId, skips missin
   };
 
   const worldSource = makeWorldItem({ uuid: 'Item.world-src', name: 'World Source' });
-  const lockedSource = makeWorldItem({ uuid: 'Compendium.locked.pack.x', name: 'Locked Source', pack: 'locked.pack' });
+  const lockedSource = makeWorldItem({
+    uuid: 'Compendium.locked.pack.x',
+    name: 'Locked Source',
+    pack: 'locked.pack',
+  });
   _registry.set('Item.world-src', worldSource);
   _registry.set('Compendium.locked.pack.x', lockedSource);
 

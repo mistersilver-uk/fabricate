@@ -20,9 +20,9 @@ export function makeCraftingRun(overrides = {}) {
         primaryToolName: 'Mortar & Pestle',
         toolNames: ['Mortar & Pestle'],
         checkLabel: '1d20 vs DC 12',
-        failureText: null
+        failureText: null,
       },
-      lastCheckResult: null
+      lastCheckResult: null,
     },
     {
       stepId: 's2',
@@ -30,9 +30,15 @@ export function makeCraftingRun(overrides = {}) {
       index: 1,
       status: 'pending',
       timeGate: null,
-      detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
-      lastCheckResult: null
-    }
+      detail: {
+        requiredSeconds: null,
+        primaryToolName: null,
+        toolNames: [],
+        checkLabel: null,
+        failureText: null,
+      },
+      lastCheckResult: null,
+    },
   ];
   return {
     id: 'run-craft-1',
@@ -64,7 +70,7 @@ export function makeCraftingRun(overrides = {}) {
     createdResults: [],
     createdResultCount: 0,
     manualAdvance: true,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -100,7 +106,7 @@ export function makeGatheringRun(overrides = {}) {
     createdResults: [],
     createdResultCount: 0,
     manualAdvance: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -113,8 +119,16 @@ export function makeSucceededRun(overrides = {}) {
     names: { title: 'Healing Potion', subtitle: 'Alchemy' },
     timeGate: null,
     finishedAt: 4000,
-    createdResults: [{ componentId: 'c1', itemUuid: 'Item.x', quantity: 3, name: 'Healing Potion', img: 'icons/svg/item-bag.svg' }],
+    createdResults: [
+      {
+        componentId: 'c1',
+        itemUuid: 'Item.x',
+        quantity: 3,
+        name: 'Healing Potion',
+        img: 'icons/svg/item-bag.svg',
+      },
+    ],
     createdResultCount: 1,
-    ...overrides
+    ...overrides,
   });
 }

@@ -224,7 +224,6 @@ describe('CraftingListingBuilder — browse status per reason', () => {
     const { recipe } = buildOne({ exhausted: true }, GM);
     assert.equal(recipe.browseStatus, CRAFTING_BROWSE_STATUS.AVAILABLE);
   });
-
 });
 
 describe('CraftingListingBuilder — system blocked for recipes', () => {
@@ -309,7 +308,11 @@ describe('CraftingListingBuilder — category projection (issue 514)', () => {
       entries: [{ recipe: makeRecipe({ category: 'weapons' }), access: { reason: 'ok' } }],
     });
     assert.equal(recipe.category, 'weapons', 'custom token is the raw filter-match key');
-    assert.equal(recipe.categoryLabel, 'weapons', 'custom token is surfaced verbatim, not prettified');
+    assert.equal(
+      recipe.categoryLabel,
+      'weapons',
+      'custom token is surfaced verbatim, not prettified'
+    );
   });
 
   it('rides category + categoryLabel on the shared base so a teaser carries them too', () => {
@@ -317,13 +320,20 @@ describe('CraftingListingBuilder — category projection (issue 514)', () => {
       entries: [
         {
           recipe: makeRecipe({ category: 'potions' }),
-          access: { reason: 'teaser', teaserState: { hiddenFields: ['ingredients', 'results', 'description'] } },
+          access: {
+            reason: 'teaser',
+            teaserState: { hiddenFields: ['ingredients', 'results', 'description'] },
+          },
         },
       ],
     });
     assert.equal(recipe.redaction.redacted, true, 'the teaser is redacted');
     assert.equal(recipe.category, 'potions', 'category rides on ...base onto the teaser model');
-    assert.equal(recipe.categoryLabel, 'potions', 'categoryLabel rides on ...base onto the teaser model');
+    assert.equal(
+      recipe.categoryLabel,
+      'potions',
+      'categoryLabel rides on ...base onto the teaser model'
+    );
   });
 });
 
@@ -448,7 +458,11 @@ describe('CraftingListingBuilder — crafting check', () => {
   it('routedByCheck + fixed: DC is nulled (tiers match by value range, not DC)', () => {
     const system = makeSystem({
       resolutionMode: 'routedByCheck',
-      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12, type: 'fixed' }, progressive: {} },
+      craftingCheck: {
+        simple: {},
+        routed: { rollFormula: '1d20', dc: 12, type: 'fixed' },
+        progressive: {},
+      },
     });
     const { recipe } = buildOne({ system });
     assert.equal(recipe.check.dc, null);
@@ -457,7 +471,11 @@ describe('CraftingListingBuilder — crafting check', () => {
   it('routedByCheck + relative: DC is preserved', () => {
     const system = makeSystem({
       resolutionMode: 'routedByCheck',
-      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 12, type: 'relative' }, progressive: {} },
+      craftingCheck: {
+        simple: {},
+        routed: { rollFormula: '1d20', dc: 12, type: 'relative' },
+        progressive: {},
+      },
     });
     const { recipe } = buildOne({ system });
     assert.equal(recipe.check.dc, 12);
@@ -492,13 +510,21 @@ describe('CraftingListingBuilder — crafting check', () => {
     const disabled = makeSystem({
       craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
     });
-    assert.equal(buildOne({ system: disabled }).recipe.check.optional, true, 'checks disabled → optional');
+    assert.equal(
+      buildOne({ system: disabled }).recipe.check.optional,
+      true,
+      'checks disabled → optional'
+    );
 
     const enabled = makeSystem({
       features: { craftingChecks: true },
       craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
     });
-    assert.equal(buildOne({ system: enabled }).recipe.check.mandatory, true, 'checks enabled → required');
+    assert.equal(
+      buildOne({ system: enabled }).recipe.check.mandatory,
+      true,
+      'checks enabled → required'
+    );
   });
 
   it('alchemy checkMode=none: no check card (null)', () => {
@@ -507,7 +533,11 @@ describe('CraftingListingBuilder — crafting check', () => {
       alchemy: { checkMode: 'none' },
       craftingCheck: { simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
     });
-    assert.equal(buildOne({ system }).recipe.check, null, 'None mode surfaces no crafting-check card');
+    assert.equal(
+      buildOne({ system }).recipe.check,
+      null,
+      'None mode surfaces no crafting-check card'
+    );
   });
 
   it('alchemy checkMode=simple: mandatory pass/fail check, ungated by checksEnabled', () => {
@@ -515,7 +545,12 @@ describe('CraftingListingBuilder — crafting check', () => {
       resolutionMode: 'alchemy',
       alchemy: { checkMode: 'simple' },
       // checks disabled at the master toggle — alchemy simple is still mandatory
-      craftingCheck: { enabled: false, simple: { rollFormula: '1d20', dc: 10 }, routed: {}, progressive: {} },
+      craftingCheck: {
+        enabled: false,
+        simple: { rollFormula: '1d20', dc: 10 },
+        routed: {},
+        progressive: {},
+      },
     });
     const check = buildOne({ system }).recipe.check;
     assert.equal(check.usable, true);
@@ -612,7 +647,10 @@ describe('CraftingListingBuilder — check DC resolution (issue 778)', () => {
       entries: [{ recipe: tieredRecipe, access: { reason: 'ok' } }],
     });
     assert.equal(recipe.check.dc, 13, 'Math.trunc(13.7)');
-    assert.equal(recipe.check.dc, await engineDc(system, system.craftingCheck.simple, tieredRecipe));
+    assert.equal(
+      recipe.check.dc,
+      await engineDc(system, system.craftingCheck.simple, tieredRecipe)
+    );
   });
 
   it('simple: no checkTierId falls back to the truncated static DC', () => {
@@ -723,7 +761,11 @@ describe('CraftingListingBuilder — check DC resolution (issue 778)', () => {
       ],
     }).recipe;
     assert.equal(shown.redaction.redacted, true);
-    assert.equal(shown.check.dc, 13, 'the shown-results teaser reports the tier DC, not the static default');
+    assert.equal(
+      shown.check.dc,
+      13,
+      'the shown-results teaser reports the tier DC, not the static default'
+    );
 
     const hidden = buildOne({
       system,

@@ -35,9 +35,8 @@ installFoundryUtilsEnv();
 globalThis.game = { user: { isGM: true, name: 'GM' } };
 
 const { Ingredient, INGREDIENT_OMITTED_WHEN_DEFAULT } = await import('../src/models/Ingredient.js');
-const { IngredientSet, INGREDIENT_SET_OMITTED_WHEN_DEFAULT } = await import(
-  '../src/models/IngredientSet.js'
-);
+const { IngredientSet, INGREDIENT_SET_OMITTED_WHEN_DEFAULT } =
+  await import('../src/models/IngredientSet.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 const { ingredientSetToolsAreActive } = await import('../src/systems/toolCheckBonus.js');
 const { stripComponentsFromRecipeJson } = await import('../src/utils/recipeComponentReferences.js');
@@ -215,10 +214,10 @@ test('1135: a fully defaulted option emits EXACTLY the un-omittable field set', 
   // The table-driven guards above are both scoped BY the table, so neither can see a key
   // DELETED from it. This pins the other side of the same fact — the literal key set on the
   // wire — so growing it needs a deliberate edit here.
-  assert.deepEqual(Object.keys(minimalOption().toJSON()).sort((a, b) => a.localeCompare(b)), [
-    'match',
-    'quantity',
-  ]);
+  assert.deepEqual(
+    Object.keys(minimalOption().toJSON()).sort((a, b) => a.localeCompare(b)),
+    ['match', 'quantity']
+  );
 });
 
 test('1135: every INGREDIENT_SET_OMITTED_WHEN_DEFAULT key is a field toJSON can emit', () => {
@@ -240,10 +239,10 @@ test('1135: a fully defaulted set omits every key in the ingredient-set table', 
 });
 
 test('1135: a fully defaulted set emits EXACTLY the un-omittable field set', () => {
-  assert.deepEqual(Object.keys(minimalSet().toJSON()).sort((a, b) => a.localeCompare(b)), [
-    'id',
-    'ingredientGroups',
-  ]);
+  assert.deepEqual(
+    Object.keys(minimalSet().toJSON()).sort((a, b) => a.localeCompare(b)),
+    ['id', 'ingredientGroups']
+  );
 });
 
 test('1135: a group emits EXACTLY {id, name, options} and omits none of its own keys', () => {
@@ -253,11 +252,10 @@ test('1135: a group emits EXACTLY {id, name, options} and omits none of its own 
   // `IngredientGroup.toJSON` would be paid once per group, per set, per recipe unnoticed.
   const [group] = maximalSet().toJSON().ingredientGroups;
 
-  assert.deepEqual(Object.keys(group).sort((a, b) => a.localeCompare(b)), [
-    'id',
-    'name',
-    'options',
-  ]);
+  assert.deepEqual(
+    Object.keys(group).sort((a, b) => a.localeCompare(b)),
+    ['id', 'name', 'options']
+  );
   // An UNNAMED group emits the same three keys. Both set fixtures author a group name, so
   // without this the assertion above could not tell "no omission table" from "the fixture
   // happened to author every key" — and `name` is the one group key a future table would
@@ -268,11 +266,10 @@ test('1135: a group emits EXACTLY {id, name, options} and omits none of its own 
   }).toJSON().ingredientGroups[0];
 
   assert.equal(unnamed.name, '', 'the group name defaulted');
-  assert.deepEqual(Object.keys(unnamed).sort((a, b) => a.localeCompare(b)), [
-    'id',
-    'name',
-    'options',
-  ]);
+  assert.deepEqual(
+    Object.keys(unnamed).sort((a, b) => a.localeCompare(b)),
+    ['id', 'name', 'options']
+  );
 });
 
 test('1135: a defaulted option and set rebuild every omitted field to the omitted value', () => {
@@ -324,10 +321,10 @@ test('1135: a nested alternative is filtered by the same table as its parent opt
   const json = maximalOption().toJSON();
   const [alternative] = json.alternatives;
 
-  assert.deepEqual(Object.keys(alternative).sort((a, b) => a.localeCompare(b)), [
-    'match',
-    'quantity',
-  ]);
+  assert.deepEqual(
+    Object.keys(alternative).sort((a, b) => a.localeCompare(b)),
+    ['match', 'quantity']
+  );
   assert.ok(!('systemItemId' in alternative), 'and the duplicate is gone from the branch too');
 });
 
@@ -378,7 +375,9 @@ test('1135: an empty checkOutcomeIds is omitted from both result-group emitters'
     id: 'r-groups',
     name: 'Groups',
     metadata: METADATA,
-    resultGroups: [{ id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] }],
+    resultGroups: [
+      { id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] },
+    ],
     steps: [
       {
         id: 'step-1',
@@ -410,7 +409,9 @@ test('1135: a defaulted result group emits EXACTLY the un-omittable field set', 
     id: 'r-group-keys',
     name: 'Group Keys',
     metadata: METADATA,
-    resultGroups: [{ id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] }],
+    resultGroups: [
+      { id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] },
+    ],
     steps: [
       {
         id: 'step-1',
@@ -497,7 +498,9 @@ function groupedRecipeJson(componentIds) {
         })),
       },
     ],
-    resultGroups: [{ id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] }],
+    resultGroups: [
+      { id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] },
+    ],
   }).toJSON();
 }
 
@@ -532,7 +535,9 @@ test('1135: the component-delete cascade KEEPS a flat-authored set data', () => 
     ingredientSets: [
       { id: 'set-1', ingredients: [{ componentId: 'iron' }, { componentId: 'copper' }] },
     ],
-    resultGroups: [{ id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] }],
+    resultGroups: [
+      { id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] },
+    ],
   };
 
   const { json } = stripComponentsFromRecipeJson(flat, ['iron']);
@@ -556,7 +561,9 @@ test('1135: a flat-authored set whose every ingredient is deleted is still dropp
     name: 'Flat',
     metadata: METADATA,
     ingredientSets: [{ id: 'set-1', ingredients: [{ componentId: 'iron' }] }],
-    resultGroups: [{ id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] }],
+    resultGroups: [
+      { id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] },
+    ],
   };
 
   const { json } = stripComponentsFromRecipeJson(flat, ['iron']);
@@ -568,8 +575,12 @@ test('1135: an essence-only set survives the component cascade WITHOUT an empty 
     id: 'r-essence',
     name: 'Essence',
     metadata: METADATA,
-    ingredientSets: [{ id: 'set-1', essences: { fire: 2 }, ingredients: [{ componentId: 'iron' }] }],
-    resultGroups: [{ id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] }],
+    ingredientSets: [
+      { id: 'set-1', essences: { fire: 2 }, ingredients: [{ componentId: 'iron' }] },
+    ],
+    resultGroups: [
+      { id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] },
+    ],
   };
 
   const { json } = stripComponentsFromRecipeJson(essenceOnly, ['iron']);
@@ -595,7 +606,9 @@ test('1135: the tag cascade drops the stale mirror instead of leaving it naming 
         ],
       },
     ],
-    resultGroups: [{ id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] }],
+    resultGroups: [
+      { id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] },
+    ],
   }).toJSON();
   // A payload written before the retirement still carries the alias; the cascade must not
   // hand it forward.

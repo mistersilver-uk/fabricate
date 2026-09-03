@@ -71,7 +71,11 @@ describe('bulk selection model (issue 772) — describing the selection', () => 
     assert.equal(pageFull.count, 2);
 
     const everything = describe_(page, filtered, filtered);
-    assert.equal(everything.showSelectAllResults, false, 'the link disappears once nothing is left');
+    assert.equal(
+      everything.showSelectAllResults,
+      false,
+      'the link disappears once nothing is left'
+    );
     assert.equal(everything.count, 4);
   });
 

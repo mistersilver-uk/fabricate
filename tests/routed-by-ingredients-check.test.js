@@ -143,7 +143,10 @@ test('routedByIngredients: a forced-success trigger overrides a failing roll', a
 // ── DC resolution flows through _resolveSimpleCheckDc over the simple config ───
 
 test('routedByIngredients: a recipe tier shifts the DC (not the flat simple.dc)', async () => {
-  const { engine } = ingredientsEngine({ dc: 12, tiers: [{ id: 'tier-hard', name: 'Hard', dc: 18 }] });
+  const { engine } = ingredientsEngine({
+    dc: 12,
+    tiers: [{ id: 'tier-hard', name: 'Hard', dc: 18 }],
+  });
   stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
   const r = await runRoutedCheck(engine, { craftingSystemId: 'sys-1', checkTierId: 'tier-hard' });
   assert.equal(r.data.dc, 18, 'resolves the recipe tier DC, not the flat simple.dc');
@@ -151,7 +154,10 @@ test('routedByIngredients: a recipe tier shifts the DC (not the flat simple.dc)'
 });
 
 test('routedByIngredients: meeting the recipe-tier DC passes', async () => {
-  const { engine } = ingredientsEngine({ dc: 12, tiers: [{ id: 'tier-hard', name: 'Hard', dc: 18 }] });
+  const { engine } = ingredientsEngine({
+    dc: 12,
+    tiers: [{ id: 'tier-hard', name: 'Hard', dc: 18 }],
+  });
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
   const r = await runRoutedCheck(engine, { craftingSystemId: 'sys-1', checkTierId: 'tier-hard' });
   assert.equal(r.success, true, '18 >= 18');
@@ -165,7 +171,11 @@ test('routedByIngredients with no rollFormula is an optional no-op success (not 
     simple: defaultSimple({ rollFormula: '' }),
   });
   const r = await runRoutedCheck(engine);
-  assert.equal(r.success, true, 'the optional ingredient-routed check with no formula does not block');
+  assert.equal(
+    r.success,
+    true,
+    'the optional ingredient-routed check with no formula does not block'
+  );
   assert.equal(r.outcome, null);
 });
 

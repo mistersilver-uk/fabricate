@@ -6,7 +6,7 @@ import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
-  CRAFTING_APP_COMPILED_MODULES
+  CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { recipe } from '../helpers/crafting-fixtures.js';
 
@@ -18,7 +18,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const RUNE_MODULES = [
   'src/ui/svelte/stores/actorBarStore.svelte.js',
   'src/ui/svelte/stores/craftingSourcesStore.svelte.js',
-  'src/ui/svelte/stores/craftingStore.svelte.js'
+  'src/ui/svelte/stores/craftingStore.svelte.js',
 ];
 
 const harness = createMountedComponentHarness({
@@ -27,7 +27,7 @@ const harness = createMountedComponentHarness({
   rawModules: [...CRAFTING_APP_RAW_MODULES, 'src/ui/svelte/util/shoppingListAggregator.js'],
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
   runeModules: RUNE_MODULES,
-  componentPath: 'src/ui/svelte/apps/crafting/CraftingView.svelte'
+  componentPath: 'src/ui/svelte/apps/crafting/CraftingView.svelte',
 });
 
 let createActorBarStore;
@@ -45,13 +45,19 @@ function makeServices() {
   const services = {
     listSelectableActors: () => actors,
     getSelectedActorId: () => settings.gathering,
-    setSelectedActorId: (id) => { settings.gathering = id ?? ''; },
+    setSelectedActorId: (id) => {
+      settings.gathering = id ?? '';
+    },
     getGatheringConditions: () => null,
     listCraftingSourceActors: () => actors,
     getSelectedCraftingActorId: () => settings.crafting,
-    setSelectedCraftingActorId: (id) => { settings.crafting = id ?? ''; },
+    setSelectedCraftingActorId: (id) => {
+      settings.crafting = id ?? '';
+    },
     getCraftingComponentSourceIds: () => settings.sources,
-    setCraftingComponentSourceIds: (ids) => { settings.sources = Array.isArray(ids) ? ids : []; },
+    setCraftingComponentSourceIds: (ids) => {
+      settings.sources = Array.isArray(ids) ? ids : [];
+    },
     getRecipeManager: () => null,
     getCraftingSourceActors: () => [],
     notify: () => {},
@@ -68,13 +74,21 @@ function makeServices() {
             worldTime: 0,
             summaries: [recipe()],
             total: 1,
-            counts: { available: 1, total: 1 }
+            counts: { available: 1, total: 1 },
           }
-        : { selectedActorId: null, actor: null, componentSourceIds: [], worldTime: 0, summaries: [], total: 0, counts: { available: 0, total: 0 } };
+        : {
+            selectedActorId: null,
+            actor: null,
+            componentSourceIds: [],
+            worldTime: 0,
+            summaries: [],
+            total: 0,
+            counts: { available: 0, total: 0 },
+          };
     },
     // The DETAIL phase seam (issue 1075): the store hydrates the selected recipe's rich
     // model on demand. The fixture recipe is already a rich model, so it serves both.
-    hydrateCraftingRecipe: ({ recipeId } = {}) => (recipeId === recipe().id ? recipe() : null)
+    hydrateCraftingRecipe: ({ recipeId } = {}) => (recipeId === recipe().id ? recipe() : null),
   };
   return { services, calls, settings };
 }
@@ -97,9 +111,15 @@ async function settle() {
 describe('CraftingView ↔ actor bar wiring', () => {
   before(async () => {
     await harness.setup();
-    ({ createActorBarStore } = await harness.loadRuneModule('src/ui/svelte/stores/actorBarStore.svelte.js'));
-    ({ createCraftingSourcesStore } = await harness.loadRuneModule('src/ui/svelte/stores/craftingSourcesStore.svelte.js'));
-    ({ createCraftingStore } = await harness.loadRuneModule('src/ui/svelte/stores/craftingStore.svelte.js'));
+    ({ createActorBarStore } = await harness.loadRuneModule(
+      'src/ui/svelte/stores/actorBarStore.svelte.js'
+    ));
+    ({ createCraftingSourcesStore } = await harness.loadRuneModule(
+      'src/ui/svelte/stores/craftingSourcesStore.svelte.js'
+    ));
+    ({ createCraftingStore } = await harness.loadRuneModule(
+      'src/ui/svelte/stores/craftingStore.svelte.js'
+    ));
   });
   after(harness.teardown);
   afterEach(harness.remount);
@@ -110,7 +130,10 @@ describe('CraftingView ↔ actor bar wiring', () => {
     // no-actor (this is the pre-fix steady state).
     const target = await harness.mount({ services });
     await settle();
-    assert.ok(target.querySelector('[data-crafting-state="no-actor"]'), 'no-actor until a character is selected');
+    assert.ok(
+      target.querySelector('[data-crafting-state="no-actor"]'),
+      'no-actor until a character is selected'
+    );
     assert.equal(settings.crafting, '', 'no crafting actor persisted before a selection');
 
     // Drive the shared top bar exactly as ActorSelectTopBar does.
@@ -120,8 +143,15 @@ describe('CraftingView ↔ actor bar wiring', () => {
     const lastCall = calls.list.at(-1);
     assert.equal(lastCall.rememberedActorId, 'actor-x', 'the listing loads for the selected actor');
     assert.equal(settings.crafting, 'actor-x', 'the crafting view persisted LAST_CRAFTING_ACTOR');
-    assert.equal(target.querySelector('[data-crafting-state="no-actor"]'), null, 'leaves the no-actor state');
-    assert.ok(target.querySelector('[data-crafting-state="populated"]'), 'renders the populated layout for the selected actor');
+    assert.equal(
+      target.querySelector('[data-crafting-state="no-actor"]'),
+      null,
+      'leaves the no-actor state'
+    );
+    assert.ok(
+      target.querySelector('[data-crafting-state="populated"]'),
+      'renders the populated layout for the selected actor'
+    );
   });
 
   it('adopts a bar selection seeded before mount (persist-before-load on first render)', async () => {
@@ -132,11 +162,18 @@ describe('CraftingView ↔ actor bar wiring', () => {
     const target = await harness.mount({ services });
     await settle();
 
-    assert.equal(settings.crafting, 'actor-x', 'the seeded bar selection is persisted as the crafting actor');
+    assert.equal(
+      settings.crafting,
+      'actor-x',
+      'the seeded bar selection is persisted as the crafting actor'
+    );
     assert.ok(
       calls.list.some((call) => call.rememberedActorId === 'actor-x'),
       'the listing is fetched for the seeded actor'
     );
-    assert.ok(target.querySelector('[data-crafting-state="populated"]'), 'renders the populated layout on first render');
+    assert.ok(
+      target.querySelector('[data-crafting-state="populated"]'),
+      'renders the populated layout on first render'
+    );
   });
 });

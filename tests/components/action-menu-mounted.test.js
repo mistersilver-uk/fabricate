@@ -150,7 +150,8 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     assert.ok(!target.querySelector('[role="dialog"]'), 'no dialog');
     assert.ok(!target.querySelector('[aria-selected]'), 'nothing is selected');
     assert.ok(
-      !menu.hasAttribute('aria-activedescendant') && !trigger(target).hasAttribute('aria-activedescendant'),
+      !menu.hasAttribute('aria-activedescendant') &&
+        !trigger(target).hasAttribute('aria-activedescendant'),
       'a menu MOVES focus to its items rather than pointing at them, so nothing here points'
     );
     harness.remount();
@@ -160,7 +161,11 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     const target = await open(await harness.mount(props()));
     const forced = target.querySelector('[data-action="force-include"]');
     assert.ok(Boolean(forced), 'the per-item `data` map is stamped on the item button');
-    assert.equal(forced.getAttribute('role'), 'menuitem', 'and cannot overwrite the primitive’s own role');
+    assert.equal(
+      forced.getAttribute('role'),
+      'menuitem',
+      'and cannot overwrite the primitive’s own role'
+    );
     assert.ok(
       target.querySelector('.manager-action-menu-item.is-danger'),
       'a danger verb keeps its modifier class'

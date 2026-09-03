@@ -154,7 +154,7 @@ const popover = definePrimitiveAdoptionContract({
     'rest spread, where a bare `data-x` arrives as the boolean `true` and renders `="true"`. ' +
     'Presence selectors resolve either way, which is why the mounted suites and the smoke ' +
     'steps that use them would not catch it. The same is true of a `triggerData` entry and of ' +
-    'an option`s `data` map: spell the value `\'\'`',
+    "an option`s `data` map: spell the value `''`",
 });
 
 test('every popover names its trigger and the panel that opens', () => {

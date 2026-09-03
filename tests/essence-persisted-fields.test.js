@@ -27,12 +27,10 @@ installFoundryEnv();
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { prepareForImport } = await import('../src/systems/CraftingSystemExporter.js');
 const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
-const { resolveImportReferences, REFERENCE_KINDS } = await import(
-  '../src/systems/importReferenceResolver.js'
-);
-const { buildComponentEditorState, buildComponentEditorUpdates } = await import(
-  '../src/ui/svelte/util/componentEditor.js'
-);
+const { resolveImportReferences, REFERENCE_KINDS } =
+  await import('../src/systems/importReferenceResolver.js');
+const { buildComponentEditorState, buildComponentEditorUpdates } =
+  await import('../src/ui/svelte/util/componentEditor.js');
 
 function makeManager() {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -113,7 +111,11 @@ test('1036/7: a garbage propertyMacroUuid is dropped to null at normalization', 
 test('1036/7: the shape check stays PERMISSIVE — Item, Actor and Compendium prefixes survive', () => {
   // Deliberately not tightened to /^Macro\./: `foundry.utils.parseUuid` still resolves a
   // legacy four-segment compendium uuid, so a stricter test would reject a usable macro.
-  for (const uuid of ['Macro.abc', 'Compendium.world.macros.abc', 'Compendium.mod.pack.Macro.abc']) {
+  for (const uuid of [
+    'Macro.abc',
+    'Compendium.world.macros.abc',
+    'Compendium.mod.pack.Macro.abc',
+  ]) {
     const [definition] = normalize([{ id: 'fire', propertyMacroUuid: uuid }]);
     assert.equal(definition.propertyMacroUuid, uuid);
   }
@@ -253,7 +255,11 @@ test('1036/1: prepareForImport carries both new fields, in keep AND copy mode', 
     const prepared = prepareForImport(structuredClone(payload), mode, emptyCopyOptions());
     const [definition] = prepared.system.essenceDefinitions;
     assert.equal(definition.enabled, false, `${mode}-mode import preserves the disable`);
-    assert.equal(definition.propertyMacroUuid, 'Macro.fire', `${mode}-mode import preserves the macro`);
+    assert.equal(
+      definition.propertyMacroUuid,
+      'Macro.fire',
+      `${mode}-mode import preserves the macro`
+    );
   }
 });
 

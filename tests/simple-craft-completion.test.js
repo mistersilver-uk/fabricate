@@ -10,26 +10,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.foundry = {
-  utils: { randomID: (() => { let n = 0; return () => `rid-${++n}`; })() }
+  utils: {
+    randomID: (() => {
+      let n = 0;
+      return () => `rid-${++n}`;
+    })(),
+  },
 };
 
 globalThis.game = {
   user: { id: 'user-1', character: null },
   time: { worldTime: 1000 },
-  actors: []
+  actors: [],
 };
 
 globalThis.ui = {
   notifications: {
     info: () => {},
     warn: () => {},
-    error: () => {}
-  }
+    error: () => {},
+  },
 };
 
 globalThis.ChatMessage = {
   create: () => {},
-  getSpeaker: () => ({})
+  getSpeaker: () => ({}),
 };
 
 const { CraftingRunManager } = await import('../src/systems/CraftingRunManager.js');
@@ -39,8 +44,13 @@ function makeActor(id = 'a1') {
   return {
     id,
     uuid: `Actor.${id}`,
-    getFlag(ns, key) { return flags[key]; },
-    setFlag(ns, key, value) { flags[key] = value; return Promise.resolve(); }
+    getFlag(ns, key) {
+      return flags[key];
+    },
+    setFlag(ns, key, value) {
+      flags[key] = value;
+      return Promise.resolve();
+    },
   };
 }
 
@@ -48,7 +58,7 @@ function makeOneStepRecipe(id = 'r1') {
   return {
     id,
     craftingSystemId: 'sys1',
-    getExecutionSteps: () => [{ id: 'step-1', name: 'Mix' }]
+    getExecutionSteps: () => [{ id: 'step-1', name: 'Mix' }],
   };
 }
 
@@ -66,8 +76,11 @@ test('T-091: completeStepSuccess on one-step recipe moves run out of activeRuns'
 
   await manager.completeStepSuccess(actor, run, 0, {});
 
-  assert.equal(manager.getActiveRuns(actor).length, 0,
-    'completed run must not appear in activeRuns after completeStepSuccess');
+  assert.equal(
+    manager.getActiveRuns(actor).length,
+    0,
+    'completed run must not appear in activeRuns after completeStepSuccess'
+  );
 
   const history = manager.getRunHistory(actor);
   assert.equal(history.length, 1, 'completed run must appear in history');
@@ -96,7 +109,7 @@ test('T-091: cache returns fresh state immediately after completeRun (stale-flag
     setFlag(ns, key, value) {
       persistedContainer = value;
       return Promise.resolve();
-    }
+    },
   };
 
   // Manually poison the cache with stale data (run still inProgress) to simulate
@@ -105,7 +118,7 @@ test('T-091: cache returns fresh state immediately after completeRun (stale-flag
   // Poison: overwrite cache with a copy that still has the run as inProgress
   const staleContainer = {
     active: { [run.id]: { ...run, status: 'inProgress' } },
-    history: []
+    history: [],
   };
   manager._cache.set('a2', staleContainer);
 
@@ -114,8 +127,11 @@ test('T-091: cache returns fresh state immediately after completeRun (stale-flag
 
   // After completion, cache must reflect the completed state (run removed from active)
   const activeRuns = manager.getActiveRuns(actor);
-  assert.equal(activeRuns.length, 0,
-    'getActiveRuns must return empty after completeRun even when cache was stale before the call');
+  assert.equal(
+    activeRuns.length,
+    0,
+    'getActiveRuns must return empty after completeRun even when cache was stale before the call'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -131,5 +147,9 @@ test('T-091: invalidateCache clears per-actor cache entry', async () => {
   assert.equal(manager._cache.has('a3'), true, 'cache should be populated after createRun');
 
   manager.invalidateCache('a3');
-  assert.equal(manager._cache.has('a3'), false, 'cache entry should be cleared after invalidateCache');
+  assert.equal(
+    manager._cache.has('a3'),
+    false,
+    'cache entry should be cleared after invalidateCache'
+  );
 });

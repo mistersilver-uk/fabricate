@@ -15,8 +15,8 @@ globalThis.foundry = {
   utils: {
     randomID: () => `random-${++idCounter}`,
     getProperty: () => undefined,
-    deepClone: (obj) => JSON.parse(JSON.stringify(obj))
-  }
+    deepClone: (obj) => JSON.parse(JSON.stringify(obj)),
+  },
 };
 
 // Stub game.settings so setSetting/getSetting work without a real Foundry game
@@ -25,8 +25,11 @@ globalThis.game = {
   user: { isGM: true },
   settings: {
     get: (ns, key) => _settingsStore.get(`${ns}.${key}`),
-    set: async (ns, key, value) => { _settingsStore.set(`${ns}.${key}`, value); return value; }
-  }
+    set: async (ns, key, value) => {
+      _settingsStore.set(`${ns}.${key}`, value);
+      return value;
+    },
+  },
 };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
@@ -96,13 +99,19 @@ test('_normalizeRecipeVisibility - knowledge.mode defaults to itemOrLearned', ()
 
 test('_normalizeRecipeVisibility - knowledge.mode accepts item', () => {
   const manager = makeManager();
-  const result = manager._normalizeRecipeVisibility({ listMode: 'knowledge', knowledge: { mode: 'item' } });
+  const result = manager._normalizeRecipeVisibility({
+    listMode: 'knowledge',
+    knowledge: { mode: 'item' },
+  });
   assert.equal(result.knowledge.mode, 'item');
 });
 
 test('_normalizeRecipeVisibility - knowledge.mode accepts learned', () => {
   const manager = makeManager();
-  const result = manager._normalizeRecipeVisibility({ listMode: 'knowledge', knowledge: { mode: 'learned' } });
+  const result = manager._normalizeRecipeVisibility({
+    listMode: 'knowledge',
+    knowledge: { mode: 'learned' },
+  });
   assert.equal(result.knowledge.mode, 'learned');
 });
 
@@ -120,7 +129,7 @@ test('_normalizeRecipeVisibility - knowledge.learn.dragDropEnabled can be set fa
   const manager = makeManager();
   const result = manager._normalizeRecipeVisibility({
     listMode: 'knowledge',
-    knowledge: { learn: { dragDropEnabled: false } }
+    knowledge: { learn: { dragDropEnabled: false } },
   });
   assert.equal(result.knowledge.learn.dragDropEnabled, false);
 });
@@ -139,7 +148,7 @@ test('_normalizeSystem - preserves global listMode', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     name: 'Test',
-    recipeVisibility: { listMode: 'global' }
+    recipeVisibility: { listMode: 'global' },
   });
   assert.equal(system.recipeVisibility.listMode, 'global');
 });
@@ -148,7 +157,7 @@ test('_normalizeSystem - preserves player listMode', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     name: 'Test',
-    recipeVisibility: { listMode: 'player' }
+    recipeVisibility: { listMode: 'player' },
   });
   assert.equal(system.recipeVisibility.listMode, 'player');
 });
@@ -157,7 +166,7 @@ test('_normalizeSystem - preserves knowledge listMode', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     name: 'Test',
-    recipeVisibility: { listMode: 'knowledge' }
+    recipeVisibility: { listMode: 'knowledge' },
   });
   assert.equal(system.recipeVisibility.listMode, 'knowledge');
 });
@@ -173,13 +182,13 @@ test('updateSystem - changing listMode from knowledge to player normalises corre
     name: 'Test',
     recipeVisibility: {
       listMode: 'knowledge',
-      knowledge: { mode: 'item', learn: { consumeOnLearn: false } }
-    }
+      knowledge: { mode: 'item', learn: { consumeOnLearn: false } },
+    },
   });
   manager.systems.set('sys-1', system);
 
   const updated = await manager.updateSystem('sys-1', {
-    recipeVisibility: { listMode: 'player' }
+    recipeVisibility: { listMode: 'player' },
   });
 
   assert.equal(updated.recipeVisibility.listMode, 'player');
@@ -193,13 +202,16 @@ test('updateSystem - changing listMode from player to knowledge with mode preser
     id: 'sys-2',
     name: 'Test',
     recipeVisibility: {
-      listMode: 'player'
-    }
+      listMode: 'player',
+    },
   });
   manager.systems.set('sys-2', system);
 
   const updated = await manager.updateSystem('sys-2', {
-    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned', learn: { dragDropEnabled: false } } }
+    recipeVisibility: {
+      listMode: 'knowledge',
+      knowledge: { mode: 'learned', learn: { dragDropEnabled: false } },
+    },
   });
 
   assert.equal(updated.recipeVisibility.listMode, 'knowledge');
@@ -212,12 +224,12 @@ test('updateSystem - changing listMode from player to global results in global',
   const system = manager._normalizeSystem({
     id: 'sys-3',
     name: 'Test',
-    recipeVisibility: { listMode: 'player' }
+    recipeVisibility: { listMode: 'player' },
   });
   manager.systems.set('sys-3', system);
 
   const updated = await manager.updateSystem('sys-3', {
-    recipeVisibility: { listMode: 'global' }
+    recipeVisibility: { listMode: 'global' },
   });
 
   assert.equal(updated.recipeVisibility.listMode, 'global');
@@ -240,7 +252,7 @@ test('_normalizeRecipeVisibility - knowledge mode does not affect learn strategy
   const manager = makeManager();
   const result = manager._normalizeRecipeVisibility({
     listMode: 'knowledge',
-    knowledge: { mode: 'item' }
+    knowledge: { mode: 'item' },
   });
   // Per-item caps moved off the system-wide config; only the learn strategy remains.
   assert.equal('item' in result.knowledge, false);
@@ -255,7 +267,7 @@ test('_normalizeSystem - global mode system has recipeVisibility with correct li
   const manager = makeManager();
   const system = manager._normalizeSystem({
     name: 'Global System',
-    recipeVisibility: { listMode: 'global' }
+    recipeVisibility: { listMode: 'global' },
   });
   assert.equal(system.recipeVisibility.listMode, 'global');
   // The knowledge sub-object is always present for non-destructive switching
@@ -266,7 +278,7 @@ test('_normalizeSystem - knowledge mode system has listMode knowledge', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     name: 'Knowledge System',
-    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'item' } }
+    recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'item' } },
   });
   assert.equal(system.recipeVisibility.listMode, 'knowledge');
   assert.equal(system.recipeVisibility.knowledge.mode, 'item');

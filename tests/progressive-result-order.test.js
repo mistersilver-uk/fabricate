@@ -8,9 +8,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { progressiveOrderKey, applyPlayerResultOrder } = await import(
-  '../src/utils/progressiveResultOrder.js'
-);
+const { progressiveOrderKey, applyPlayerResultOrder } =
+  await import('../src/utils/progressiveResultOrder.js');
 
 const r = (id, extra = {}) => ({ id, ...extra });
 

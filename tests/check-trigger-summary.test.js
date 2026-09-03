@@ -76,7 +76,10 @@ test('a progressive-value condition says VALUE, not total', () => {
 test('an outcome-tier condition names its tiers, and says so when it names none', () => {
   assert.equal(
     render(
-      summariseCondition({ type: 'outcomeTier', tierIds: ['tier-a', 'tier-b'] }, { tierNames: TIER_NAMES })
+      summariseCondition(
+        { type: 'outcomeTier', tierIds: ['tier-a', 'tier-b'] },
+        { tierNames: TIER_NAMES }
+      )
     ),
     'Outcome tier is Masterwork, Ruined'
   );

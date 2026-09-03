@@ -20,7 +20,7 @@ function makeSystem(overrides = {}) {
     name: 'Test System',
     recipeVisibility: { listMode: 'teaser' },
     teaserConfig: { enabled: true, discoveryMode: 'threshold', fragments: [] },
-    ...overrides
+    ...overrides,
   });
 }
 
@@ -29,10 +29,16 @@ function makeRecipe(overrides = {}) {
     id: 'recipe-1',
     name: 'Test Recipe',
     craftingSystemId: 'sys-1',
-    teaser: { enabled: true, hiddenFields: ['ingredients', 'results', 'description'], revealThreshold: 100 },
+    teaser: {
+      enabled: true,
+      hiddenFields: ['ingredients', 'results', 'description'],
+      revealThreshold: 100,
+    },
     resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
-    ingredientSets: [{ id: 'is', ingredientGroups: [{ id: 'ig', options: [{ itemUuid: 'uuid', quantity: 1 }] }] }],
-    ...overrides
+    ingredientSets: [
+      { id: 'is', ingredientGroups: [{ id: 'ig', options: [{ itemUuid: 'uuid', quantity: 1 }] }] },
+    ],
+    ...overrides,
   });
 }
 
@@ -57,14 +63,16 @@ function makeActor(flags = {}) {
       store[k] = value;
     },
     _store: store,
-    ...flags
+    ...flags,
   };
 }
 
 function makeActorWithProgress(recipeId, progress, fragments = []) {
   const store = {};
   // Pre-populate the discoveryProgress flag
-  store['discoveryProgress'] = { [recipeId]: { progress, fragments, discoveredAt: null, manuallySet: false } };
+  store['discoveryProgress'] = {
+    [recipeId]: { progress, fragments, discoveredAt: null, manuallySet: false },
+  };
 
   return {
     id: 'actor-1',
@@ -78,7 +86,7 @@ function makeActorWithProgress(recipeId, progress, fragments = []) {
     setFlag: async (ns, key, value) => {
       const k = key.replace('fabricate.', '');
       store[k] = value;
-    }
+    },
   };
 }
 
@@ -91,10 +99,17 @@ describe('Teaser visibility - existing modes unaffected', () => {
   it('global mode returns visible:true for player', () => {
     // Under the PR-B model the flat visibilityMode is authoritative; a legacy
     // listMode 'global' migrates to visibilityMode 'global' (issue 511).
-    const system = makeSystem({ visibilityMode: 'global', recipeVisibility: { listMode: 'global' } });
+    const system = makeSystem({
+      visibilityMode: 'global',
+      recipeVisibility: { listMode: 'global' },
+    });
     const service = makeService(system);
     const recipe = makeRecipe({ teaser: { enabled: true } });
-    const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: makeActor() });
+    const access = service.evaluateRecipeAccess({
+      recipe,
+      viewer: playerViewer,
+      craftingActor: makeActor(),
+    });
     assert.equal(access.visible, true);
     assert.equal(access.craftable, true);
   });
@@ -103,7 +118,11 @@ describe('Teaser visibility - existing modes unaffected', () => {
     const system = makeSystem({ recipeVisibility: { listMode: 'player' } });
     const service = makeService(system);
     const recipe = makeRecipe({ visibility: { restricted: true, allowedUserIds: [] } });
-    const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: makeActor() });
+    const access = service.evaluateRecipeAccess({
+      recipe,
+      viewer: playerViewer,
+      craftingActor: makeActor(),
+    });
     assert.equal(access.visible, false);
   });
 });
@@ -127,7 +146,11 @@ describe('Teaser visibility - player with 0% progress', () => {
     const service = makeService(system);
     const recipe = makeRecipe();
     const actor = makeActor(); // no discoveryProgress flags
-    const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: actor });
+    const access = service.evaluateRecipeAccess({
+      recipe,
+      viewer: playerViewer,
+      craftingActor: actor,
+    });
     assert.equal(access.visible, true);
     assert.equal(access.craftable, false);
     assert.equal(access.reason, 'teaser');
@@ -143,7 +166,11 @@ describe('Teaser visibility - player with partial progress', () => {
     const service = makeService(system);
     const recipe = makeRecipe();
     const actor = makeActorWithProgress('recipe-1', 45);
-    const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: actor });
+    const access = service.evaluateRecipeAccess({
+      recipe,
+      viewer: playerViewer,
+      craftingActor: actor,
+    });
     assert.equal(access.visible, true);
     assert.equal(access.craftable, false);
     assert.equal(access.reason, 'teaser');
@@ -156,9 +183,15 @@ describe('Teaser visibility - player at 100% progress', () => {
   it('fully visible and craftable at threshold', () => {
     const system = makeSystem();
     const service = makeService(system);
-    const recipe = makeRecipe({ teaser: { enabled: true, hiddenFields: ['ingredients'], revealThreshold: 100 } });
+    const recipe = makeRecipe({
+      teaser: { enabled: true, hiddenFields: ['ingredients'], revealThreshold: 100 },
+    });
     const actor = makeActorWithProgress('recipe-1', 100);
-    const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: actor });
+    const access = service.evaluateRecipeAccess({
+      recipe,
+      viewer: playerViewer,
+      craftingActor: actor,
+    });
     assert.equal(access.visible, true);
     assert.equal(access.craftable, true);
     assert.equal(access.reason, 'teaser-discovered');
@@ -169,9 +202,15 @@ describe('Teaser visibility - recipe with teaser.enabled=false', () => {
   it('fully visible even in teaser mode when recipe opts out', () => {
     const system = makeSystem();
     const service = makeService(system);
-    const recipe = makeRecipe({ teaser: { enabled: false, hiddenFields: [], revealThreshold: 100 } });
+    const recipe = makeRecipe({
+      teaser: { enabled: false, hiddenFields: [], revealThreshold: 100 },
+    });
     const actor = makeActor();
-    const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: actor });
+    const access = service.evaluateRecipeAccess({
+      recipe,
+      viewer: playerViewer,
+      craftingActor: actor,
+    });
     assert.equal(access.visible, true);
     assert.equal(access.craftable, true);
     assert.equal(access.reason, 'ok');
@@ -182,9 +221,15 @@ describe('Teaser visibility - custom revealThreshold', () => {
   it('recipe unlocks at 50% threshold, not 100%', () => {
     const system = makeSystem();
     const service = makeService(system);
-    const recipe = makeRecipe({ teaser: { enabled: true, hiddenFields: ['description'], revealThreshold: 50 } });
+    const recipe = makeRecipe({
+      teaser: { enabled: true, hiddenFields: ['description'], revealThreshold: 50 },
+    });
     const actor = makeActorWithProgress('recipe-1', 50);
-    const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: actor });
+    const access = service.evaluateRecipeAccess({
+      recipe,
+      viewer: playerViewer,
+      craftingActor: actor,
+    });
     assert.equal(access.visible, true);
     assert.equal(access.craftable, true);
     assert.equal(access.reason, 'teaser-discovered');
@@ -193,9 +238,15 @@ describe('Teaser visibility - custom revealThreshold', () => {
   it('recipe stays as teaser below 50% threshold', () => {
     const system = makeSystem();
     const service = makeService(system);
-    const recipe = makeRecipe({ teaser: { enabled: true, hiddenFields: ['description'], revealThreshold: 50 } });
+    const recipe = makeRecipe({
+      teaser: { enabled: true, hiddenFields: ['description'], revealThreshold: 50 },
+    });
     const actor = makeActorWithProgress('recipe-1', 49);
-    const access = service.evaluateRecipeAccess({ recipe, viewer: playerViewer, craftingActor: actor });
+    const access = service.evaluateRecipeAccess({
+      recipe,
+      viewer: playerViewer,
+      craftingActor: actor,
+    });
     assert.equal(access.craftable, false);
     assert.equal(access.reason, 'teaser');
   });
@@ -223,9 +274,15 @@ describe('Teaser visibility - discoverFragment', () => {
         enabled: true,
         discoveryMode: 'fragments',
         fragments: [
-          { id: 'frag-1', name: 'Fragment', linkedItemUuid: 'uuid-item-1', recipeIds: ['recipe-1'], progressValue: 30 }
-        ]
-      }
+          {
+            id: 'frag-1',
+            name: 'Fragment',
+            linkedItemUuid: 'uuid-item-1',
+            recipeIds: ['recipe-1'],
+            progressValue: 30,
+          },
+        ],
+      },
     });
     const service = makeService(system);
     const actor = makeActor();
@@ -244,9 +301,15 @@ describe('Teaser visibility - discoverFragment', () => {
         enabled: true,
         discoveryMode: 'fragments',
         fragments: [
-          { id: 'frag-1', name: 'Fragment', linkedItemUuid: 'uuid-item-1', recipeIds: ['recipe-1', 'recipe-2'], progressValue: 25 }
-        ]
-      }
+          {
+            id: 'frag-1',
+            name: 'Fragment',
+            linkedItemUuid: 'uuid-item-1',
+            recipeIds: ['recipe-1', 'recipe-2'],
+            progressValue: 25,
+          },
+        ],
+      },
     });
     const service = makeService(system);
     const actor = makeActor();
@@ -268,9 +331,15 @@ describe('Teaser visibility - discoverFragment', () => {
         enabled: true,
         discoveryMode: 'fragments',
         fragments: [
-          { id: 'frag-1', name: 'Fragment', linkedItemUuid: 'uuid-item-1', recipeIds: ['recipe-1'], progressValue: 30 }
-        ]
-      }
+          {
+            id: 'frag-1',
+            name: 'Fragment',
+            linkedItemUuid: 'uuid-item-1',
+            recipeIds: ['recipe-1'],
+            progressValue: 30,
+          },
+        ],
+      },
     });
     const service = makeService(system);
     const actor = makeActor();
@@ -280,7 +349,7 @@ describe('Teaser visibility - discoverFragment', () => {
     // Fragment ID should appear only once in the array
     const stored = actor.getFlag('fabricate', 'fabricate.discoveryProgress');
     const fragList = stored['recipe-1'].fragments;
-    assert.equal(fragList.filter(f => f === 'frag-1').length, 1);
+    assert.equal(fragList.filter((f) => f === 'frag-1').length, 1);
     // Effective progress is still 30, not 60
     assert.equal(service._computeEffectiveProgress(actor, 'recipe-1', system), 30);
   });
@@ -291,9 +360,15 @@ describe('Teaser visibility - discoverFragment', () => {
         enabled: true,
         discoveryMode: 'fragments',
         fragments: [
-          { id: 'frag-1', name: 'Fragment', linkedItemUuid: 'uuid-item-1', recipeIds: ['recipe-1'], progressValue: 100 }
-        ]
-      }
+          {
+            id: 'frag-1',
+            name: 'Fragment',
+            linkedItemUuid: 'uuid-item-1',
+            recipeIds: ['recipe-1'],
+            progressValue: 100,
+          },
+        ],
+      },
     });
     const service = makeService(system);
     const actor = makeActor();

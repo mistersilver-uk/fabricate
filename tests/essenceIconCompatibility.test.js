@@ -16,10 +16,7 @@ import {
   FOUNDRY_ICON_DEFINITIONS,
   findCuratedIcon,
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
-import {
-  findCuratedIconRecord,
-  listCuratedIconVocabulary,
-} from '../src/utils/iconVocabulary.js';
+import { findCuratedIconRecord, listCuratedIconVocabulary } from '../src/utils/iconVocabulary.js';
 
 // A stylesheet fixture shaped like the one a Foundry 13 client actually exposes.
 //
@@ -78,9 +75,7 @@ describe('version-aware Foundry icon definitions', () => {
     ]);
     const v13 = getFoundryIconDefinitionsForMajor(13, { glyphsByName: glyphs });
 
-    assert.deepEqual(v13, [
-      { iconCode: 'gear', label: 'Gear', aliases: ['cog'] },
-    ]);
+    assert.deepEqual(v13, [{ iconCode: 'gear', label: 'Gear', aliases: ['cog'] }]);
     assert.equal(
       v13.some((definition) => definition.iconCode === 'flask'),
       false,
@@ -106,7 +101,10 @@ describe('version-aware Foundry icon definitions', () => {
     const v13 = getFoundryIconDefinitionsForMajor(13, { glyphsByName: glyphs });
     const names = v13.flatMap(({ iconCode, aliases }) => [iconCode, ...aliases]);
 
-    assert.deepEqual(names.filter((name) => name === 'candle-holder' || name === 'treasure-chest'), []);
+    assert.deepEqual(
+      names.filter((name) => name === 'candle-holder' || name === 'treasure-chest'),
+      []
+    );
     assert.ok(names.includes('gear'), 'the free names the client draws are still offered');
   });
 
@@ -143,25 +141,31 @@ describe('version-aware Foundry icon definitions', () => {
       ],
     };
 
-    assert.deepEqual(measureLoadedFontAwesomeGlyphs(documentObject), new Map([
-      ['cog', 'u+f013'],
-      ['gear', 'u+f013'],
-      ['flask', 'u+f0c3'],
-    ]), 'a layout rule\'s content is not a glyph: only a ::before assignment is');
+    assert.deepEqual(
+      measureLoadedFontAwesomeGlyphs(documentObject),
+      new Map([
+        ['cog', 'u+f013'],
+        ['gear', 'u+f013'],
+        ['flask', 'u+f0c3'],
+      ]),
+      "a layout rule's content is not a glyph: only a ::before assignment is"
+    );
   });
 
   // The defect this fixture exists for. A flat rules array cannot reach the rules a v13 client
   // actually serves, so the previous reader measured nothing and every picker rendered zero rows.
   it('descends the @import a layered core style emits, not just grouping rules', () => {
-    const glyphs = measureLoadedFontAwesomeGlyphs(
-      makeImportingDocument(FOUNDRY_13_CLASSIC_RULES)
-    );
+    const glyphs = measureLoadedFontAwesomeGlyphs(makeImportingDocument(FOUNDRY_13_CLASSIC_RULES));
 
-    assert.deepEqual(glyphs, new Map([
-      ['gear', 'u+f013'],
-      ['cog', 'u+f013'],
-      ['flask', 'u+f0c3'],
-    ]), 'the glyph rules live inside the imported sheet, behind `.styleSheet` rather than `.cssRules`');
+    assert.deepEqual(
+      glyphs,
+      new Map([
+        ['gear', 'u+f013'],
+        ['cog', 'u+f013'],
+        ['flask', 'u+f0c3'],
+      ]),
+      'the glyph rules live inside the imported sheet, behind `.styleSheet` rather than `.cssRules`'
+    );
   });
 
   it('descends grouping rules nested inside an imported sheet', () => {
@@ -205,7 +209,11 @@ describe('version-aware Foundry icon definitions', () => {
           ...makeImportingDocument(FOUNDRY_13_CLASSIC_RULES).styleSheets,
         ],
       }),
-      new Map([['gear', 'u+f013'], ['cog', 'u+f013'], ['flask', 'u+f0c3']]),
+      new Map([
+        ['gear', 'u+f013'],
+        ['cog', 'u+f013'],
+        ['flask', 'u+f0c3'],
+      ]),
       'an unreadable sheet costs its own rules, never the rest of the document'
     );
   });
@@ -223,9 +231,11 @@ describe('version-aware Foundry icon definitions', () => {
     );
 
     assert.equal(glyphs.get('gear'), glyphs.get('cog'), 'one drawing, one key');
-    assert.deepEqual(buildIconDefinitionsForMeasuredBundle(FOUNDRY_ICON_DEFINITIONS, glyphs), [
-      { iconCode: 'gear', label: 'Gear', aliases: ['cog'] },
-    ], 'and therefore one picker row rather than two');
+    assert.deepEqual(
+      buildIconDefinitionsForMeasuredBundle(FOUNDRY_ICON_DEFINITIONS, glyphs),
+      [{ iconCode: 'gear', label: 'Gear', aliases: ['cog'] }],
+      'and therefore one picker row rather than two'
+    );
   });
 
   // `--fa:"\30 "` is the digit zero: the trailing space TERMINATES the escape rather than
@@ -311,25 +321,32 @@ describe('an unreadable or unparsed bundle never empties a picker', () => {
 // directly published names an older client cannot draw, contradicting what every picker offers.
 describe('the published vocabulary answers for the client that asked', () => {
   it('lists and resolves the measured vocabulary, not the committed catalogue', () => {
-    withDocument(makeImportingDocument([
-      makeRule('.fa-gear,.fa-cog', { '--fa': '"\\f013"', '--fa--fa': '"\\f013"' }),
-    ]), () => {
-      assert.deepEqual(
-        listCuratedIconVocabulary(),
-        [{ iconCode: 'gear', label: 'Gear', aliases: ['cog'] }],
-        'the published list is the set this client can draw'
-      );
-      assert.deepEqual(findCuratedIconRecord('cog'), {
-        iconCode: 'gear',
-        label: 'Gear',
-        aliases: ['cog'],
-      }, 'an alias still resolves to the row that draws it');
-      assert.equal(
-        findCuratedIconRecord('flask'),
-        null,
-        'and a catalogue name this bundle does not declare resolves to nothing, as the picker offers nothing'
-      );
-    });
+    withDocument(
+      makeImportingDocument([
+        makeRule('.fa-gear,.fa-cog', { '--fa': '"\\f013"', '--fa--fa': '"\\f013"' }),
+      ]),
+      () => {
+        assert.deepEqual(
+          listCuratedIconVocabulary(),
+          [{ iconCode: 'gear', label: 'Gear', aliases: ['cog'] }],
+          'the published list is the set this client can draw'
+        );
+        assert.deepEqual(
+          findCuratedIconRecord('cog'),
+          {
+            iconCode: 'gear',
+            label: 'Gear',
+            aliases: ['cog'],
+          },
+          'an alias still resolves to the row that draws it'
+        );
+        assert.equal(
+          findCuratedIconRecord('flask'),
+          null,
+          'and a catalogue name this bundle does not declare resolves to nothing, as the picker offers nothing'
+        );
+      }
+    );
   });
 });
 
@@ -459,6 +476,9 @@ describe('icon search ranks the row a GM named above the rows that mention it', 
       'the weight is a FIELD, and nothing searches it: the picker reads `variant`'
     );
     assert.deepEqual(filteredNames('solid'), []);
-    assert.ok(options.every((option) => option.variant === 'solid'), 'the weight is still reported');
+    assert.ok(
+      options.every((option) => option.variant === 'solid'),
+      'the weight is still reported'
+    );
   });
 });

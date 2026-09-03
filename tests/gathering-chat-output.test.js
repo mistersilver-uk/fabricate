@@ -20,7 +20,9 @@ function resetChat({ throwOnCreate = false } = {}) {
       chatCreated.push(data);
       return Promise.resolve({ id: `msg-${chatCreated.length}` });
     },
-    getSpeaker({ actor } = {}) { return { alias: actor?.name || 'Unknown' }; }
+    getSpeaker({ actor } = {}) {
+      return { alias: actor?.name || 'Unknown' };
+    },
   };
 }
 
@@ -28,12 +30,12 @@ globalThis.game = { user: { id: 'user-1' } };
 
 const COMPONENTS = [
   { id: 'comp-herb', name: 'Herb', img: 'icons/herb.png' },
-  { id: 'comp-sickle', name: 'Worn Sickle', img: 'icons/sickle.png' }
+  { id: 'comp-sickle', name: 'Worn Sickle', img: 'icons/sickle.png' },
 ];
 
 function buildEngine() {
   return new GatheringEngine({
-    systemManager: { getItems: () => COMPONENTS }
+    systemManager: { getItems: () => COMPONENTS },
   });
 }
 
@@ -50,14 +52,14 @@ function buildArgs(overrides = {}) {
     createdResults: [{ actorUuid: 'Actor.aria', itemUuid: 'Item.h1', quantity: 2 }],
     usedTools: [
       { componentId: 'comp-sickle', broken: true, itemRef: { itemUuid: 'Item.s1' } },
-      { componentId: 'comp-herb', broken: false }
+      { componentId: 'comp-herb', broken: false },
     ],
     checkResult: {
       items: [{ id: 'r1', componentId: 'comp-herb', itemUuid: 'Item.h1', quantity: 2 }],
-      events: [{ name: 'Thornpatch', img: 'icons/thorn.png' }]
+      events: [{ name: 'Thornpatch', img: 'icons/thorn.png' }],
     },
     run: { economyEvidence: { stamina: { spent: 5 }, node: { remaining: 2 } } },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -134,11 +136,11 @@ async function startBlind(engine, { revealedTaskIds = null } = {}) {
     run: {
       id: 'run-1',
       status: 'succeeded',
-      economyEvidence: { stamina: { spent: 5 }, node: { remaining: 2 } }
+      economyEvidence: { stamina: { spent: 5 }, node: { remaining: 2 } },
     },
     createdResults: [{ actorUuid: 'Actor.aria', componentId: 'comp-herb', quantity: 2 }],
     usedTools: [],
-    checkResult: { items: [], events: [] }
+    checkResult: { items: [], events: [] },
   });
 }
 
@@ -191,7 +193,10 @@ test('_terminalStart posts chat output for transparent tasks', async () => {
     run: { id: 'run-1', status: 'succeeded', economyEvidence: { node: { remaining: 1 } } },
     createdResults: [{ actorUuid: 'Actor.aria', itemUuid: 'Item.h1', quantity: 1 }],
     usedTools: [],
-    checkResult: { items: [{ componentId: 'comp-herb', itemUuid: 'Item.h1', quantity: 1 }], events: [] }
+    checkResult: {
+      items: [{ componentId: 'comp-herb', itemUuid: 'Item.h1', quantity: 1 }],
+      events: [],
+    },
   });
   assert.equal(chatCreated.length, 1, 'transparent task posts one chat card');
   assert.ok(chatCreated[0].content.includes('Herb'), 'component resolved');
@@ -215,10 +220,7 @@ test('a succeeded attempt that awarded nothing posts an explicit empty-results c
   const { content } = chatCreated[0];
   assert.ok(content.includes('fabricate-gather-chat--empty'), 'the empty state modifier is used');
   assert.ok(content.includes('fabricate-gather-chat__empty'), 'the empty-state line is rendered');
-  assert.ok(
-    !/fabricate-gather-chat__item/.test(content),
-    'no phantom result rows are rendered'
-  );
+  assert.ok(!/fabricate-gather-chat__item/.test(content), 'no phantom result rows are rendered');
 });
 
 test('an empty-results success still reports the economy it spent', async () => {
@@ -274,7 +276,7 @@ function buildD100Engine({ revealedTaskIds = null } = {}) {
       calls.push(args);
       return Promise.resolve({ status: 'succeeded', items: [], events: [] });
     },
-    ...(revealedTaskIds ? { listRevealedTaskIds: () => revealedTaskIds } : {})
+    ...(revealedTaskIds ? { listRevealedTaskIds: () => revealedTaskIds } : {}),
   };
   return { engine, calls };
 }
@@ -286,7 +288,7 @@ function d100Args(selectionMode) {
     system: buildSystem(true),
     environment: { id: 'env-1', selectionMode },
     task: { id: 'task-1', name: 'Forage Herbs' },
-    interactive: false
+    interactive: false,
   };
 }
 

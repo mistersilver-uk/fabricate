@@ -32,7 +32,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  * "let's just commit the stylesheet so CI works" — is caught, not only one left in the cache.
  */
 const FORBIDDEN_TRACKED_PATTERNS = [
-  { pattern: /(^|\/)foundry2(\.min)?\.css$/i, why: "Foundry core stylesheet" },
+  { pattern: /(^|\/)foundry2(\.min)?\.css$/i, why: 'Foundry core stylesheet' },
   { pattern: /(^|\/)fa-[a-z0-9-]+\.(woff2?|ttf|eot|otf)$/i, why: 'Font Awesome Pro webfont' },
   { pattern: /(^|\/)signika[a-z0-9-]*\.(woff2?|ttf|otf)$/i, why: 'Foundry-bundled Signika' },
   { pattern: /(^|\/)modesto-condensed[a-z0-9-]*\.(woff2?|ttf|otf)$/i, why: 'Modesto Condensed' },

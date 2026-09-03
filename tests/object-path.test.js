@@ -61,7 +61,10 @@ describe('getByPath', () => {
 
 describe('hasByPath', () => {
   it('reports PRESENCE, including a key explicitly holding undefined', () => {
-    assert.equal(hasByPath({ flags: { fabricate: { runs: undefined } } }, 'flags.fabricate.runs'), true);
+    assert.equal(
+      hasByPath({ flags: { fabricate: { runs: undefined } } }, 'flags.fabricate.runs'),
+      true
+    );
     assert.equal(hasByPath({ flags: { fabricate: {} } }, 'flags.fabricate.runs'), false);
   });
 

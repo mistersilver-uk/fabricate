@@ -27,7 +27,8 @@ const cssSource = read('../../styles/fabricate.css');
 describe('Fabricate app wiring for the gathering tab', () => {
   it('exposes listGatheringForActor and passes services down', () => {
     assert.ok(
-      appSource.includes('game?.fabricate?.listGatheringForActor?.({') && appSource.includes('presentTools: presentTools(),'),
+      appSource.includes('game?.fabricate?.listGatheringForActor?.({') &&
+        appSource.includes('presentTools: presentTools(),'),
       'app should add the listGatheringForActor service threading the system-scoped active canvas tool'
     );
     assert.equal(
@@ -36,7 +37,9 @@ describe('Fabricate app wiring for the gathering tab', () => {
       'the per-attempt node-state override seam is removed; listing reads the env node directly'
     );
     assert.ok(
-      appSource.includes('getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null'),
+      appSource.includes(
+        'getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null'
+      ),
       'app should add the getGatheringDropBreakdown service'
     );
     assert.ok(appSource.includes('services: this._services'), 'app should pass the services prop');
@@ -48,29 +51,47 @@ describe('Fabricate app wiring for the gathering tab', () => {
       'app should expose getActiveCanvasTool through the services bag'
     );
     assert.ok(
-      appSource.includes('game?.fabricate?.startGatheringAttempt?.({') && appSource.includes('presentTools: presentTools(),'),
+      appSource.includes('game?.fabricate?.startGatheringAttempt?.({') &&
+        appSource.includes('presentTools: presentTools(),'),
       'startGatheringAttempt should carry the derived system-scoped presentTools'
     );
   });
 
   it('renders GatheringView on the gathering tab (every tab now routes to a real view)', () => {
-    assert.ok(rootSource.includes("import GatheringView from './gathering/GatheringView.svelte'"), 'root should import GatheringView');
+    assert.ok(
+      rootSource.includes("import GatheringView from './gathering/GatheringView.svelte'"),
+      'root should import GatheringView'
+    );
     assert.ok(rootSource.includes('services = null'), 'root should accept a services prop');
     // `tab.tabId`, not `tab.id`: a rail entry is addressed by its ROUTE KEY since issue 1198
     // and carries the bare tab id separately, so a Core branch reads the bare id.
-    assert.ok(rootSource.includes("tab.tabId === 'gathering'"), 'root should branch on the gathering tab');
-    assert.ok(rootSource.includes('<GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />'), 'root should render GatheringView with services + the scoped env/task');
-    assert.ok(!rootSource.includes('fabricate-app-placeholder'), 'the coming-soon placeholder is gone now the alchemy tab is implemented');
+    assert.ok(
+      rootSource.includes("tab.tabId === 'gathering'"),
+      'root should branch on the gathering tab'
+    );
+    assert.ok(
+      rootSource.includes('<GatheringView {services} {scopedEnvironmentId} {scopedTaskId} />'),
+      'root should render GatheringView with services + the scoped env/task'
+    );
+    assert.ok(
+      !rootSource.includes('fabricate-app-placeholder'),
+      'the coming-soon placeholder is gone now the alchemy tab is implemented'
+    );
   });
 });
 
 describe('GatheringView 3-column layout and states', () => {
   it('renders a 3-column grid with the center column larger', () => {
     assert.ok(
-      viewSource.includes('grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr)'),
+      viewSource.includes(
+        'grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr)'
+      ),
       'grid should use the planned column template with a non-zero centre-column minimum'
     );
-    assert.ok(viewSource.includes('gap: var(--fab-space-4)'), 'grid should use the base spacing token gap');
+    assert.ok(
+      viewSource.includes('gap: var(--fab-space-4)'),
+      'grid should use the base spacing token gap'
+    );
     assert.ok(viewSource.includes('gathering-view-column-left'), 'left column present');
     assert.ok(viewSource.includes('gathering-view-column-center'), 'center column present');
     assert.ok(viewSource.includes('gathering-view-column-right'), 'right column present');
@@ -130,33 +151,60 @@ describe('GatheringView 3-column layout and states', () => {
       false,
       'the app must not put minWidth in the non-extensible position option (V13 throws "object is not extensible")'
     );
-    assert.ok(appSource.includes('MIN_WINDOW_WIDTH = 1024'), 'the app should define the minimum window width derived from the column minimums');
-    assert.ok(appSource.includes('MIN_WINDOW_HEIGHT = 640'), 'the app should define the minimum window height');
-    assert.ok(appSource.includes('_updatePosition(position)'), 'the app should clamp the min size in _updatePosition, the V13 hook applied by setPosition and drag-resize');
-    assert.ok(appSource.includes('super._updatePosition(position)'), 'the clamp should resolve the base position first, then floor it');
     assert.ok(
-      appSource.includes('Math.max(result.width, SvelteFabricateApp.MIN_WINDOW_WIDTH)')
-        && appSource.includes('Math.max(result.height, SvelteFabricateApp.MIN_WINDOW_HEIGHT)'),
+      appSource.includes('MIN_WINDOW_WIDTH = 1024'),
+      'the app should define the minimum window width derived from the column minimums'
+    );
+    assert.ok(
+      appSource.includes('MIN_WINDOW_HEIGHT = 640'),
+      'the app should define the minimum window height'
+    );
+    assert.ok(
+      appSource.includes('_updatePosition(position)'),
+      'the app should clamp the min size in _updatePosition, the V13 hook applied by setPosition and drag-resize'
+    );
+    assert.ok(
+      appSource.includes('super._updatePosition(position)'),
+      'the clamp should resolve the base position first, then floor it'
+    );
+    assert.ok(
+      appSource.includes('Math.max(result.width, SvelteFabricateApp.MIN_WINDOW_WIDTH)') &&
+        appSource.includes('Math.max(result.height, SvelteFabricateApp.MIN_WINDOW_HEIGHT)'),
       'the clamp should floor both width and height at the configured minimum'
     );
     // The drag-resize floor lives on the app root in the global stylesheet.
-    assert.ok(cssSource.includes('min-width: 1024px;'), 'the app root CSS should floor the window width');
-    assert.ok(cssSource.includes('min-height: 640px;'), 'the app root CSS should floor the window height');
+    assert.ok(
+      cssSource.includes('min-width: 1024px;'),
+      'the app root CSS should floor the window width'
+    );
+    assert.ok(
+      cssSource.includes('min-height: 640px;'),
+      'the app root CSS should floor the window height'
+    );
   });
 
   it('localizes the loading, error, and empty states', () => {
     assert.ok(viewSource.includes('FABRICATE.App.Gathering.Loading'), 'loading copy localized');
     assert.ok(viewSource.includes('FABRICATE.App.Gathering.Error'), 'error copy localized');
-    assert.ok(viewSource.includes('FABRICATE.App.Gathering.Environments.Empty'), 'empty copy localized');
+    assert.ok(
+      viewSource.includes('FABRICATE.App.Gathering.Environments.Empty'),
+      'empty copy localized'
+    );
   });
 
   it('treats a missing actor or no environments as the empty state', () => {
     assert.ok(viewSource.includes('listing?.selectedActorId'), 'no-actor collapses to empty');
-    assert.ok(viewSource.includes('environments.length === 0'), 'no environments collapses to empty');
+    assert.ok(
+      viewSource.includes('environments.length === 0'),
+      'no environments collapses to empty'
+    );
   });
 
   it('fetches via the injected service and owns the selection', () => {
-    assert.ok(viewSource.includes('services?.listGatheringForActor?.'), 'view fetches via the service');
+    assert.ok(
+      viewSource.includes('services?.listGatheringForActor?.'),
+      'view fetches via the service'
+    );
     assert.ok(viewSource.includes('let selectedId = $state(null)'), 'view owns selectedId');
   });
 });
@@ -164,23 +212,39 @@ describe('GatheringView 3-column layout and states', () => {
 describe('GatheringEnvironmentList labeled region', () => {
   it('is a labeled region (not a tablist) with title and hint', () => {
     assert.ok(listSource.includes('aria-labelledby={titleId}'), 'region labeled by its title');
-    assert.ok(listSource.includes('FABRICATE.App.Gathering.Environments.Title'), 'region title localized');
-    assert.ok(listSource.includes('FABRICATE.App.Gathering.Environments.Hint'), 'region hint localized');
+    assert.ok(
+      listSource.includes('FABRICATE.App.Gathering.Environments.Title'),
+      'region title localized'
+    );
+    assert.ok(
+      listSource.includes('FABRICATE.App.Gathering.Environments.Hint'),
+      'region hint localized'
+    );
     assert.equal(listSource.includes('role="tablist"'), false, 'must not be a tablist');
   });
 
   it('renders a role=list with available-before-locked ordering and clamps width', () => {
     assert.ok(listSource.includes('role="list"'), 'card container is a list');
-    assert.ok(listSource.includes("environment?.locked !== true"), 'available environments first');
-    assert.ok(listSource.includes("environment?.locked === true"), 'locked environments after');
+    assert.ok(listSource.includes('environment?.locked !== true'), 'available environments first');
+    assert.ok(listSource.includes('environment?.locked === true'), 'locked environments after');
     assert.ok(listSource.includes('min-width: 0'), 'inner scroll clamps width');
     assert.ok(listSource.includes('overflow: hidden'), 'inner scroll hides horizontal overflow');
   });
 
   it('reserves a scrollbar gutter with whitespace so the layout does not shift', () => {
-    assert.ok(listSource.includes('scrollbar-gutter: stable'), 'scroll reserves a stable scrollbar gutter');
-    assert.ok(listSource.includes('padding-right: var(--fab-space-2)'), 'scroll padding-right uses the base spacing token');
-    assert.equal(listSource.includes('padding-right: 2px'), false, 'the old 2px padding-right is gone');
+    assert.ok(
+      listSource.includes('scrollbar-gutter: stable'),
+      'scroll reserves a stable scrollbar gutter'
+    );
+    assert.ok(
+      listSource.includes('padding-right: var(--fab-space-2)'),
+      'scroll padding-right uses the base spacing token'
+    );
+    assert.equal(
+      listSource.includes('padding-right: 2px'),
+      false,
+      'the old 2px padding-right is gone'
+    );
   });
 
   it('renders a base-token search box wired to the localized placeholder/label', () => {
@@ -189,16 +253,24 @@ describe('GatheringEnvironmentList labeled region', () => {
     assert.ok(listSource.includes('bind:value={searchTerm}'), 'search input binds to searchTerm');
     assert.ok(listSource.includes("let searchTerm = $state('')"), 'searchTerm is rune state');
     assert.ok(
-      listSource.includes("const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase())"),
+      listSource.includes('const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase())'),
       'normalizedSearchTerm derives the lowercased trimmed term'
     );
-    assert.ok(listSource.includes('FABRICATE.App.Gathering.Environments.SearchPlaceholder'), 'placeholder localized');
-    assert.ok(listSource.includes('FABRICATE.App.Gathering.Environments.SearchLabel'), 'aria-label localized');
+    assert.ok(
+      listSource.includes('FABRICATE.App.Gathering.Environments.SearchPlaceholder'),
+      'placeholder localized'
+    );
+    assert.ok(
+      listSource.includes('FABRICATE.App.Gathering.Environments.SearchLabel'),
+      'aria-label localized'
+    );
   });
 
   it('filters the ordered list by a case-insensitive name+description substring match', () => {
     assert.ok(
-      /`\$\{environment\?\.name \?\? ''\} \$\{environment\?\.description \?\? ''\}`\s*\.toLowerCase\(\)\s*\.includes\(normalizedSearchTerm\)/.test(listSource),
+      /`\$\{environment\?\.name \?\? ''\} \$\{environment\?\.description \?\? ''\}`\s*\.toLowerCase\(\)\s*\.includes\(normalizedSearchTerm\)/.test(
+        listSource
+      ),
       'filter matches name + description case-insensitively'
     );
   });
@@ -209,15 +281,25 @@ describe('GatheringEnvironmentList labeled region', () => {
       'list imports the shared Pagination component'
     );
     assert.ok(listSource.includes('let pageSize = $state(6)'), 'pageSize defaults to 6');
-    assert.ok(listSource.includes('const pageSizeOptions = [6, 9, 12]'), 'pageSizeOptions are [6, 9, 12]');
-    assert.ok(listSource.includes('let pageIndex = $state(0)'), 'pageIndex defaults to 0');
-    assert.ok(listSource.includes('totalCount={visible.length}'), 'pagination total is the post-toggle visible count');
     assert.ok(
-      listSource.includes('paginated = $derived(visible.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize))'),
+      listSource.includes('const pageSizeOptions = [6, 9, 12]'),
+      'pageSizeOptions are [6, 9, 12]'
+    );
+    assert.ok(listSource.includes('let pageIndex = $state(0)'), 'pageIndex defaults to 0');
+    assert.ok(
+      listSource.includes('totalCount={visible.length}'),
+      'pagination total is the post-toggle visible count'
+    );
+    assert.ok(
+      listSource.includes(
+        'paginated = $derived(visible.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize))'
+      ),
       'paginated slices the post-toggle visible list by page'
     );
     assert.ok(
-      listSource.includes('if (pageIndex > 0 && pageIndex * pageSize >= visible.length) pageIndex = 0'),
+      listSource.includes(
+        'if (pageIndex > 0 && pageIndex * pageSize >= visible.length) pageIndex = 0'
+      ),
       'page resets to 0 when the visible set shrinks'
     );
   });
@@ -227,8 +309,14 @@ describe('GatheringEnvironmentList labeled region', () => {
       listSource.includes(':global(.manager-pagination)'),
       'list themes the manager-pagination markup in the player scope'
     );
-    assert.ok(listSource.includes(':global(.manager-icon-button)'), 'list themes the pagination nav buttons');
-    assert.ok(listSource.includes('FABRICATE.App.Gathering.Environments.NoMatches'), 'no-match copy localized');
+    assert.ok(
+      listSource.includes(':global(.manager-icon-button)'),
+      'list themes the pagination nav buttons'
+    );
+    assert.ok(
+      listSource.includes('FABRICATE.App.Gathering.Environments.NoMatches'),
+      'no-match copy localized'
+    );
   });
 });
 
@@ -245,20 +333,33 @@ describe('EnvironmentCard markup contracts', () => {
       cardSource.includes("blind && revealPolicy !== 'never'"),
       'discovered suffix is gated by blind + reveal policy'
     );
-    assert.ok(cardSource.includes('FABRICATE.App.Gathering.Environments.Discovered'), 'discovered label localized');
-    assert.ok(cardSource.includes('aria-label={discoveredLabel}'), 'discovered suffix has an accessible label');
+    assert.ok(
+      cardSource.includes('FABRICATE.App.Gathering.Environments.Discovered'),
+      'discovered label localized'
+    );
+    assert.ok(
+      cardSource.includes('aria-label={discoveredLabel}'),
+      'discovered suffix has an accessible label'
+    );
   });
 
   it('renders biome chips with per-chip color tokens and color-mix base styling', () => {
     // The per-chip --fab-chip-color declaration now comes from the shared
     // gatheringFormat.biomeChipStyle helper rather than an inline copy.
     assert.ok(
-      cardSource.includes("import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js'"),
+      cardSource.includes(
+        "import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js'"
+      ),
       'card imports the shared biomeChipStyle helper'
     );
-    assert.ok(cardSource.includes('style={biomeChipStyle(tag)}'), 'each chip sets its style via biomeChipStyle');
     assert.ok(
-      cardSource.includes('color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-surface-raised))'),
+      cardSource.includes('style={biomeChipStyle(tag)}'),
+      'each chip sets its style via biomeChipStyle'
+    );
+    assert.ok(
+      cardSource.includes(
+        'color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-surface-raised))'
+      ),
       'chip background uses color-mix'
     );
     assert.ok(
@@ -269,23 +370,32 @@ describe('EnvironmentCard markup contracts', () => {
 
   it('shows the blind mask icon + chip and the lock icon + label', () => {
     assert.ok(cardSource.includes('fas fa-mask'), 'blind mask icon');
-    assert.ok(cardSource.includes('FABRICATE.App.Gathering.Environments.BlindChip'), 'blind chip localized');
+    assert.ok(
+      cardSource.includes('FABRICATE.App.Gathering.Environments.BlindChip'),
+      'blind chip localized'
+    );
     assert.ok(cardSource.includes('fas fa-lock'), 'lock icon');
-    assert.ok(cardSource.includes('FABRICATE.App.Gathering.Environments.LockedAria'), 'locked accessible label');
+    assert.ok(
+      cardSource.includes('FABRICATE.App.Gathering.Environments.LockedAria'),
+      'locked accessible label'
+    );
   });
 
   it('renders locked cards as non-focusable listitems and available cards as buttons', () => {
     assert.ok(cardSource.includes('role="listitem"'), 'locked card is a listitem');
     assert.ok(cardSource.includes('<button'), 'available card is a button');
-    assert.ok(cardSource.includes('filter: saturate(0.65) brightness(0.85)'), 'image-only desaturation on locked');
-    assert.ok(cardSource.includes('background: var(--fab-success-soft)'), 'selected look uses success-soft');
+    assert.ok(
+      cardSource.includes('filter: saturate(0.65) brightness(0.85)'),
+      'image-only desaturation on locked'
+    );
+    assert.ok(
+      cardSource.includes('background: var(--fab-success-soft)'),
+      'selected look uses success-soft'
+    );
   });
 
   it('gives the selected card a full accent border outline (not a focus-killed box-shadow)', () => {
-    assert.ok(
-      cardSource.includes('.gathering-env-card.is-selected {'),
-      'selected rule exists'
-    );
+    assert.ok(cardSource.includes('.gathering-env-card.is-selected {'), 'selected rule exists');
     assert.ok(
       cardSource.includes('border-color: var(--fab-accent)'),
       'selected card gets an accent-coloured border outline'
@@ -300,10 +410,22 @@ describe('EnvironmentCard markup contracts', () => {
   });
 
   it('resets the available <button> so Foundry button chrome cannot crop content or padding', () => {
-    assert.ok(cardSource.includes('.gathering-env-card.is-available {'), 'available button rule exists');
-    assert.ok(cardSource.includes('height: auto'), 'button height is reset to auto so the description is not cropped');
-    assert.ok(cardSource.includes('overflow: visible'), 'button overflow is reset so the description is not clipped');
-    assert.ok(cardSource.includes('justify-content: flex-start'), 'button content is top-anchored like the locked div');
+    assert.ok(
+      cardSource.includes('.gathering-env-card.is-available {'),
+      'available button rule exists'
+    );
+    assert.ok(
+      cardSource.includes('height: auto'),
+      'button height is reset to auto so the description is not cropped'
+    );
+    assert.ok(
+      cardSource.includes('overflow: visible'),
+      'button overflow is reset so the description is not clipped'
+    );
+    assert.ok(
+      cardSource.includes('justify-content: flex-start'),
+      'button content is top-anchored like the locked div'
+    );
   });
 
   it('scopes the hover background so it does not wipe the selection look', () => {
@@ -320,7 +442,10 @@ describe('EnvironmentCard markup contracts', () => {
 
   it('renders the lock as an overlay over the thumbnail, not a separate chip', () => {
     assert.ok(cardSource.includes('gathering-env-card-thumb-wrap'), 'thumb has a relative wrapper');
-    assert.ok(cardSource.includes('gathering-env-card-lock-overlay'), 'lock overlay element present');
+    assert.ok(
+      cardSource.includes('gathering-env-card-lock-overlay'),
+      'lock overlay element present'
+    );
     assert.ok(
       cardSource.includes('background: var(--fab-overlay-dark-48)'),
       'lock overlay scrim uses the theme-aware dark overlay token'
@@ -348,7 +473,10 @@ describe('EnvironmentCard markup contracts', () => {
 
   it('puts the blind/event pills in a header bar above the main row, divided by a soft line', () => {
     // Scope ordering to the markup (the top doc-comment also names these classes).
-    const markup = cardSource.slice(cardSource.indexOf('{#snippet identity()}'), cardSource.indexOf('<style>'));
+    const markup = cardSource.slice(
+      cardSource.indexOf('{#snippet identity()}'),
+      cardSource.indexOf('<style>')
+    );
     const headerIdx = markup.indexOf('gathering-env-card-header');
     const mainIdx = markup.indexOf('gathering-env-card-main');
     const blindIdx = markup.indexOf('gathering-env-card-blind"');
@@ -361,10 +489,19 @@ describe('EnvironmentCard markup contracts', () => {
     assert.ok(blindIdx < eventIdx, 'event chip is to the right of the blind chip');
     // The header is a short, full-bleed bar separated from the body by a divider.
     const headerBlock = cardSource.slice(cardSource.indexOf('.gathering-env-card-header {'));
-    assert.ok(/border-bottom:\s*1px solid var\(--fab-border\)/.test(headerBlock), 'header has the soft divider line');
-    assert.ok(/margin:\s*-10px -10px 0/.test(headerBlock), 'header is full-bleed (negative margins reach the card edges)');
+    assert.ok(
+      /border-bottom:\s*1px solid var\(--fab-border\)/.test(headerBlock),
+      'header has the soft divider line'
+    );
+    assert.ok(
+      /margin:\s*-10px -10px 0/.test(headerBlock),
+      'header is full-bleed (negative margins reach the card edges)'
+    );
     // The event chip now shows its level name, not just the icon.
-    assert.ok(cardSource.includes('gathering-env-card-event-label'), 'event chip renders a level-name label');
+    assert.ok(
+      cardSource.includes('gathering-env-card-event-label'),
+      'event chip renders a level-name label'
+    );
   });
 
   it('uses base tokens only (no area-scoped --fab-manager-* properties)', () => {
@@ -373,9 +510,21 @@ describe('EnvironmentCard markup contracts', () => {
     // property is out of scope: the declaration is invalid at computed-value time and the
     // value silently falls back to inheritance (issue 1399 retargeted this from the
     // retired manager alias generation, which no longer exists to name).
-    assert.equal(cardSource.includes('--fab-manager-'), false, 'no area-scoped properties in the player card');
-    assert.equal(listSource.includes('--fab-manager-'), false, 'no area-scoped properties in the list');
-    assert.equal(viewSource.includes('--fab-manager-'), false, 'no area-scoped properties in the view');
+    assert.equal(
+      cardSource.includes('--fab-manager-'),
+      false,
+      'no area-scoped properties in the player card'
+    );
+    assert.equal(
+      listSource.includes('--fab-manager-'),
+      false,
+      'no area-scoped properties in the list'
+    );
+    assert.equal(
+      viewSource.includes('--fab-manager-'),
+      false,
+      'no area-scoped properties in the view'
+    );
   });
 
   it('pins each card slot so the bottom card is not squashed by flex-shrink', () => {

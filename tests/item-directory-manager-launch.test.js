@@ -22,7 +22,10 @@ test('Items Directory manager action launches the v2 manager through the lazy lo
   const buttonSource = source.slice(buttonStart, buttonEnd);
 
   // Issue 150: the button fires the memoized async loader and shows the resolved class.
-  assert.match(buttonSource, /loadCraftingSystemManagerAppClass\(\)\.then\(\(AppClass\) => AppClass\.show\(\)\)/);
+  assert.match(
+    buttonSource,
+    /loadCraftingSystemManagerAppClass\(\)\.then\(\(AppClass\) => AppClass\.show\(\)\)/
+  );
   assert.doesNotMatch(buttonSource, /getCraftingSystemManagerAppClass\(\)\.show\(\)/);
 });
 
@@ -34,6 +37,9 @@ test('openRecipeManager public API opens the crafting system manager through the
   const apiEnd = source.indexOf('},', apiStart);
   const apiSource = source.slice(apiStart, apiEnd);
 
-  assert.match(apiSource, /loadCraftingSystemManagerAppClass\(\)\.then\(\(AppClass\) => AppClass\.show\(\)\)/);
+  assert.match(
+    apiSource,
+    /loadCraftingSystemManagerAppClass\(\)\.then\(\(AppClass\) => AppClass\.show\(\)\)/
+  );
   assert.doesNotMatch(apiSource, /getCraftingSystemManagerAppClass\(\)\.show\(\)/);
 });

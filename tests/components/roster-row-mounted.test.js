@@ -9,8 +9,11 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-roster-row-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
-  compiledModules: ['src/ui/svelte/components/StatusToggle.svelte', 'src/ui/svelte/apps/manager/RosterRow.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/RosterRow.svelte'
+  compiledModules: [
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/apps/manager/RosterRow.svelte',
+  ],
+  componentPath: 'src/ui/svelte/apps/manager/RosterRow.svelte',
 });
 
 before(() => harness.setup());
@@ -43,7 +46,11 @@ describe('RosterRow (mounted)', () => {
 
   it('calls onToggle with the negated granted value when clicked', async () => {
     const calls = [];
-    const root = await harness.mount({ name: 'Bob', granted: false, onToggle: (v) => calls.push(v) });
+    const root = await harness.mount({
+      name: 'Bob',
+      granted: false,
+      onToggle: (v) => calls.push(v),
+    });
     root.querySelector('.manager-status-toggle').click();
     assert.deepEqual(calls, [true]);
   });
@@ -53,7 +60,7 @@ describe('RosterRow (mounted)', () => {
       name: 'Party',
       icon: 'fas fa-users',
       granted: true,
-      dataAttr: 'data-roster-row'
+      dataAttr: 'data-roster-row',
     });
     assert.ok(root.querySelector('.manager-roster-icon i.fa-users'));
     assert.ok(root.querySelector('[data-roster-row]'));

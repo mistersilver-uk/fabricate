@@ -107,26 +107,35 @@ test('a single-item drop is passthrough (unchanged one-shot import)', () => {
 
 test('a whole pack with folders opens the modal; a folderless pack is passthrough', () => {
   assert.equal(
-    classifyImportDrop({ type: 'Compendium', collection: 'world.smithing' }, deps({ pack: ITEM_PACK_WITH_FOLDERS })).plan,
+    classifyImportDrop(
+      { type: 'Compendium', collection: 'world.smithing' },
+      deps({ pack: ITEM_PACK_WITH_FOLDERS })
+    ).plan,
     'modal'
   );
   assert.equal(
-    classifyImportDrop({ type: 'Compendium', collection: 'world.flat' }, deps({ pack: ITEM_PACK_NO_FOLDERS })).plan,
+    classifyImportDrop(
+      { type: 'Compendium', collection: 'world.flat' },
+      deps({ pack: ITEM_PACK_NO_FOLDERS })
+    ).plan,
     'passthrough'
   );
 });
 
 test('a world Item folder with items opens the modal; empty / non-Item are passthrough', () => {
   assert.equal(
-    classifyImportDrop({ type: 'Folder', uuid: 'Folder.reagent' }, deps({ folder: REAL_FOLDER })).plan,
+    classifyImportDrop({ type: 'Folder', uuid: 'Folder.reagent' }, deps({ folder: REAL_FOLDER }))
+      .plan,
     'modal'
   );
   assert.equal(
-    classifyImportDrop({ type: 'Folder', uuid: 'Folder.empty' }, deps({ folder: EMPTY_FOLDER })).plan,
+    classifyImportDrop({ type: 'Folder', uuid: 'Folder.empty' }, deps({ folder: EMPTY_FOLDER }))
+      .plan,
     'passthrough'
   );
   assert.equal(
-    classifyImportDrop({ type: 'Folder', uuid: 'Folder.monsters' }, deps({ folder: ACTOR_FOLDER })).plan,
+    classifyImportDrop({ type: 'Folder', uuid: 'Folder.monsters' }, deps({ folder: ACTOR_FOLDER }))
+      .plan,
     'passthrough'
   );
 });
@@ -158,7 +167,12 @@ function buildManager() {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   manager.systems.set(
     'sys1',
-    manager._normalizeSystem({ id: 'sys1', name: 'System One', componentCategories: ['Reagent'], items: [] })
+    manager._normalizeSystem({
+      id: 'sys1',
+      name: 'System One',
+      componentCategories: ['Reagent'],
+      items: [],
+    })
   );
   manager.initialized = true;
   manager.save = async () => {};

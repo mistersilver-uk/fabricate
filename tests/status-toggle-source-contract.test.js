@@ -180,7 +180,8 @@ test('no component announces a switch as role="switch"', () => {
     [],
     '`aria-pressed` on a plain control is the house switch pattern; `role="switch"` is a second ' +
       'announcement of the same state that no assistive-technology assertion in this ' +
-      'repository expects:\n  ' + offenders.join('\n  ')
+      'repository expects:\n  ' +
+      offenders.join('\n  ')
   );
 });
 

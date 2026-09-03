@@ -129,9 +129,9 @@ describe('persistence equivalence part 2 — payload differential (issue 1089)',
       failures.length === 0
         ? ''
         : `the adapter wrote something other than the manager's live corpus.\n` +
-          `first divergence at write ${failures[0].index} ("${failures[0].key}"):\n` +
-          `  expected (live map): ${failures[0].expected.slice(0, 300)}\n` +
-          `  actually written   : ${failures[0].written.slice(0, 300)}`
+            `first divergence at write ${failures[0].index} ("${failures[0].key}"):\n` +
+            `  expected (live map): ${failures[0].expected.slice(0, 300)}\n` +
+            `  actually written   : ${failures[0].written.slice(0, 300)}`
     );
   });
 

@@ -16,7 +16,7 @@ const harness = createMountedComponentHarness({
     // wires the drop listeners through the dragDrop action. Omitting either raw
     // module from the allowlist does not fail the mount — it HANGS (# cancelled).
     'src/ui/svelte/util/dropUtils.js',
-    'src/ui/svelte/actions/dragDrop.js'
+    'src/ui/svelte/actions/dragDrop.js',
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -32,9 +32,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
-    'src/ui/svelte/apps/manager/BooksScrollsView.svelte'
+    'src/ui/svelte/apps/manager/BooksScrollsView.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/BooksScrollsView.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/BooksScrollsView.svelte',
 });
 
 // Dispatch a Foundry-style drop on a node. getDragEventData (no `foundry` global in
@@ -58,11 +58,11 @@ function makeItem(overrides = {}) {
     caps: { item: { limitUses: false }, learn: { limitLearning: false } },
     recipes: [
       { id: 'r1', name: 'Smelt Copper', category: 'Smithing' },
-      { id: 'r2', name: 'Forge Rivets', category: 'Smithing' }
+      { id: 'r2', name: 'Forge Rivets', category: 'Smithing' },
     ],
     learnedByCount: 3,
     linkMissing: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -79,22 +79,46 @@ describe('BooksScrollsView (mounted)', () => {
     const root = await harness.mount({
       recipeItems: [
         makeItem(),
-        makeItem({ id: 'scroll', resolvedName: 'Scroll of Soul-Ash', derivedType: 'Scroll', recipes: [{ id: 'r9', name: 'Bind Ash', category: 'Arcana' }] }),
-        makeItem({ id: 'empty', resolvedName: 'Blank Codex', derivedType: 'Incomplete', recipes: [] })
+        makeItem({
+          id: 'scroll',
+          resolvedName: 'Scroll of Soul-Ash',
+          derivedType: 'Scroll',
+          recipes: [{ id: 'r9', name: 'Bind Ash', category: 'Arcana' }],
+        }),
+        makeItem({
+          id: 'empty',
+          resolvedName: 'Blank Codex',
+          derivedType: 'Incomplete',
+          recipes: [],
+        }),
       ],
-      visibilityMode: 'knowledge'
+      visibilityMode: 'knowledge',
     });
 
     assert.equal(root.querySelectorAll('[data-books-scrolls-item]').length, 3);
-    assert.equal(root.querySelector('[data-books-scrolls-name="primer"]').textContent.trim(), "Journeyman's Primer");
+    assert.equal(
+      root.querySelector('[data-books-scrolls-name="primer"]').textContent.trim(),
+      "Journeyman's Primer"
+    );
     // Type pill: Book (2+ recipes) is neutral, Scroll (1) is neutral, Incomplete (0) is danger.
     // A multi-recipe item names its own count in the type pill, matching the
     // Knowledge surface; a single-recipe item stays "Scroll" and an empty one
     // "Incomplete".
-    assert.equal(root.querySelector('[data-books-scrolls-type="primer"]').textContent.trim(), '2 Recipe Book');
-    assert.ok(!root.querySelector('[data-books-scrolls-type="primer"]').classList.contains('is-danger'));
-    assert.equal(root.querySelector('[data-books-scrolls-type="scroll"]').textContent.trim(), 'Scroll');
-    assert.equal(root.querySelector('[data-books-scrolls-recipe-count="primer"] span').textContent.trim(), '2 recipes');
+    assert.equal(
+      root.querySelector('[data-books-scrolls-type="primer"]').textContent.trim(),
+      '2 Recipe Book'
+    );
+    assert.ok(
+      !root.querySelector('[data-books-scrolls-type="primer"]').classList.contains('is-danger')
+    );
+    assert.equal(
+      root.querySelector('[data-books-scrolls-type="scroll"]').textContent.trim(),
+      'Scroll'
+    );
+    assert.equal(
+      root.querySelector('[data-books-scrolls-recipe-count="primer"] span').textContent.trim(),
+      '2 recipes'
+    );
 
     // A recipe item with no linked recipes reads as Incomplete (danger) and shows
     // the danger "No recipes" chip.
@@ -109,13 +133,18 @@ describe('BooksScrollsView (mounted)', () => {
   it('shows the USE chip in item mode', async () => {
     const root = await harness.mount({
       recipeItems: [makeItem({ caps: { item: { limitUses: true, maxUses: 3 }, learn: {} } })],
-      visibilityMode: 'item'
+      visibilityMode: 'item',
     });
     assert.equal(capChipText(root, 'primer'), '3 uses');
   });
 
   it('shows the LEARNING chip in knowledge mode and switches with visibilityMode', async () => {
-    const item = makeItem({ caps: { item: { limitUses: true, maxUses: 3 }, learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 1 } } });
+    const item = makeItem({
+      caps: {
+        item: { limitUses: true, maxUses: 3 },
+        learn: { limitLearning: true, learnScope: 'perInstance', learnsAllowed: 1 },
+      },
+    });
 
     const knowledge = await harness.mount({ recipeItems: [item], visibilityMode: 'knowledge' });
     assert.equal(capChipText(knowledge, 'primer'), '1 / copy');
@@ -127,15 +156,19 @@ describe('BooksScrollsView (mounted)', () => {
 
   it('renders the total-scope and free chip variants', async () => {
     const total = await harness.mount({
-      recipeItems: [makeItem({ caps: { learn: { limitLearning: true, learnScope: 'total', learnsAllowed: 4 } } })],
-      visibilityMode: 'knowledge'
+      recipeItems: [
+        makeItem({
+          caps: { learn: { limitLearning: true, learnScope: 'total', learnsAllowed: 4 } },
+        }),
+      ],
+      visibilityMode: 'knowledge',
     });
     assert.equal(capChipText(total, 'primer'), '4 total');
 
     harness.remount();
     const free = await harness.mount({
       recipeItems: [makeItem({ caps: { learn: { limitLearning: false } } })],
-      visibilityMode: 'knowledge'
+      visibilityMode: 'knowledge',
     });
     assert.equal(capChipText(free, 'primer'), 'Learn freely');
   });
@@ -147,9 +180,15 @@ describe('BooksScrollsView (mounted)', () => {
     const root = await harness.mount({
       recipeItems: [makeItem()],
       visibilityMode: 'knowledge',
-      onSelectRecipeItem: (id) => { selected = id; },
-      onOpenRecipeItem: (id) => { edited = id; },
-      onToggleEnabled: (id, enabled) => { toggled = { id, enabled }; }
+      onSelectRecipeItem: (id) => {
+        selected = id;
+      },
+      onOpenRecipeItem: (id) => {
+        edited = id;
+      },
+      onToggleEnabled: (id, enabled) => {
+        toggled = { id, enabled };
+      },
     });
 
     root.querySelector('[data-books-scrolls-select="primer"]').click();
@@ -170,11 +209,23 @@ describe('BooksScrollsView (mounted)', () => {
 
   describe('creation drop-zone (issue 844)', () => {
     it('renders the drop-zone as the creation entry point (not a create button)', async () => {
-      const root = await harness.mount({ recipeItems: [makeItem()], visibilityMode: 'item', dropEnabled: true });
+      const root = await harness.mount({
+        recipeItems: [makeItem()],
+        visibilityMode: 'item',
+        dropEnabled: true,
+      });
       const zone = root.querySelector('[data-books-scrolls-drop-zone]');
       assert.ok(zone, 'expected the creation drop-zone');
-      assert.equal(root.querySelector('[data-books-scrolls-create]'), null, 'the blank-dialog create button is gone');
-      assert.equal(root.querySelector('[data-books-scrolls-drop-error]'), null, 'no error before any drop');
+      assert.equal(
+        root.querySelector('[data-books-scrolls-create]'),
+        null,
+        'the blank-dialog create button is gone'
+      );
+      assert.equal(
+        root.querySelector('[data-books-scrolls-drop-error]'),
+        null,
+        'no error before any drop'
+      );
     });
 
     it('creates a recipe item from a dropped world Item uuid', async () => {
@@ -183,9 +234,12 @@ describe('BooksScrollsView (mounted)', () => {
         recipeItems: [],
         visibilityMode: 'item',
         dropEnabled: true,
-        onDropRecipeItem: (uuid) => dropped.push(uuid)
+        onDropRecipeItem: (uuid) => dropped.push(uuid),
       });
-      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Item', uuid: 'Item.abc123' });
+      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), {
+        type: 'Item',
+        uuid: 'Item.abc123',
+      });
       assert.deepEqual(dropped, ['Item.abc123']);
       assert.equal(root.querySelector('[data-books-scrolls-drop-error]'), null);
     });
@@ -196,9 +250,13 @@ describe('BooksScrollsView (mounted)', () => {
         recipeItems: [],
         visibilityMode: 'item',
         dropEnabled: true,
-        onDropRecipeItem: (uuid) => dropped.push(uuid)
+        onDropRecipeItem: (uuid) => dropped.push(uuid),
       });
-      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Item', pack: 'dnd5e.items', id: 'xyz789' });
+      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), {
+        type: 'Item',
+        pack: 'dnd5e.items',
+        id: 'xyz789',
+      });
       assert.deepEqual(dropped, ['Compendium.dnd5e.items.xyz789']);
     });
 
@@ -208,14 +266,19 @@ describe('BooksScrollsView (mounted)', () => {
         recipeItems: [],
         visibilityMode: 'item',
         dropEnabled: true,
-        onDropRecipeItem: (uuid) => dropped.push(uuid)
+        onDropRecipeItem: (uuid) => dropped.push(uuid),
       });
-      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Actor', uuid: 'Actor.def456' });
+      fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), {
+        type: 'Actor',
+        uuid: 'Actor.def456',
+      });
       flushSync();
       assert.deepEqual(dropped, [], 'a non-Item drop creates nothing');
       const errorNote = root.querySelector('[data-books-scrolls-drop-error]');
       assert.ok(errorNote, 'expected the inline error note');
-      assert.ok(root.querySelector('[data-books-scrolls-drop-zone]').classList.contains('is-error'));
+      assert.ok(
+        root.querySelector('[data-books-scrolls-drop-zone]').classList.contains('is-error')
+      );
     });
 
     it('surfaces an error state on an unpersisted Item drop (type Item, no uuid)', async () => {
@@ -224,22 +287,27 @@ describe('BooksScrollsView (mounted)', () => {
         recipeItems: [],
         visibilityMode: 'item',
         dropEnabled: true,
-        onDropRecipeItem: (uuid) => dropped.push(uuid)
+        onDropRecipeItem: (uuid) => dropped.push(uuid),
       });
       // An unpersisted item drag carries `{ type: 'Item' }` with no resolvable uuid.
       fireDrop(root.querySelector('[data-books-scrolls-drop-zone]'), { type: 'Item' });
       flushSync();
       assert.deepEqual(dropped, []);
-      assert.ok(root.querySelector('[data-books-scrolls-drop-error]'), 'expected the inline error note');
+      assert.ok(
+        root.querySelector('[data-books-scrolls-drop-error]'),
+        'expected the inline error note'
+      );
     });
   });
 
   it('dims disabled rows', async () => {
     const root = await harness.mount({
       recipeItems: [makeItem({ enabled: false })],
-      visibilityMode: 'knowledge'
+      visibilityMode: 'knowledge',
     });
-    assert.ok(root.querySelector('[data-books-scrolls-item="primer"]').classList.contains('is-disabled'));
+    assert.ok(
+      root.querySelector('[data-books-scrolls-item="primer"]').classList.contains('is-disabled')
+    );
   });
 
   it('renders the empty state when there are no recipe items', async () => {

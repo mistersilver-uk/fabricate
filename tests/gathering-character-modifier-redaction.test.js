@@ -11,18 +11,33 @@ function configFor({ tasks = [], events = [] } = {}) {
       'system-test': {
         rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
         tasks,
-        events
-      }
-    }
+        events,
+      },
+    },
   };
 }
 
-const STR_LIB = [{ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' }];
+const STR_LIB = [
+  {
+    id: 'strength',
+    label: 'Strength',
+    icon: 'fa-solid fa-dumbbell',
+    expression: '@abilities.str.mod',
+  },
+];
 
 const BLIND_TASK = {
   id: 'task-blind',
   name: 'Hidden Forage',
-  dropRows: [{ id: 'drop-secret', componentId: 'herb', quantity: 1, dropRate: 100, characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }] }]
+  dropRows: [
+    {
+      id: 'drop-secret',
+      componentId: 'herb',
+      quantity: 1,
+      dropRate: 100,
+      characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }],
+    },
+  ],
 };
 
 test('non-GM viewer of blind history sees only contribution number', async () => {
@@ -30,19 +45,27 @@ test('non-GM viewer of blind history sees only contribution number', async () =>
     config: configFor({ tasks: [BLIND_TASK] }),
     modifiers: STR_LIB,
     rolls: [100],
-    evaluateExpression: () => 5
+    evaluateExpression: () => 5,
   });
   const env = environment({ selectionMode: 'blind' });
   const calls = {};
   const engine = makeEngine({ richState: service, env, calls, system });
   const viewer = { id: 'u', isGM: false };
-  const result = await engine.startAttempt({ viewer, actor: DEFAULT_TEST_ACTOR, environmentId: 'env-test' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor: DEFAULT_TEST_ACTOR,
+    environmentId: 'env-test',
+  });
   assert.equal(result.accepted, true);
   const payload = calls.terminal[0].payload;
   // The snapshot should be redacted in the terminal payload
   const serialized = JSON.stringify(payload);
   assert.equal(serialized.includes('drop-secret'), false, 'row id must be redacted');
-  assert.equal(serialized.includes('@abilities.str.mod'), false, 'effective expression must be redacted');
+  assert.equal(
+    serialized.includes('@abilities.str.mod'),
+    false,
+    'effective expression must be redacted'
+  );
   assert.equal(serialized.includes('strength'), false, 'modifier id must be redacted');
   // But the numeric contribution must remain so the player sees the post-clamp number
   if (payload.characterModifierSnapshot) {
@@ -57,13 +80,17 @@ test('GM viewer sees full evidence on the same run', async () => {
     config: configFor({ tasks: [BLIND_TASK] }),
     modifiers: STR_LIB,
     rolls: [100],
-    evaluateExpression: () => 5
+    evaluateExpression: () => 5,
   });
   const env = environment({ selectionMode: 'blind' });
   const calls = {};
   const engine = makeEngine({ richState: service, env, calls, system });
   const viewer = { id: 'gm', isGM: true };
-  const result = await engine.startAttempt({ viewer, actor: DEFAULT_TEST_ACTOR, environmentId: 'env-test' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor: DEFAULT_TEST_ACTOR,
+    environmentId: 'env-test',
+  });
   assert.equal(result.accepted, true);
   const payload = calls.terminal[0].payload;
   const serialized = JSON.stringify(payload);
@@ -80,12 +107,16 @@ test('hidden row identity is redacted in blind snapshot', async () => {
     config: configFor({ tasks: [BLIND_TASK] }),
     modifiers: STR_LIB,
     rolls: [100],
-    evaluateExpression: () => 2
+    evaluateExpression: () => 2,
   });
   const env = environment({ selectionMode: 'blind' });
   const calls = {};
   const engine = makeEngine({ richState: service, env, calls, system });
-  const result = await engine.startAttempt({ viewer: { id: 'u', isGM: false }, actor: DEFAULT_TEST_ACTOR, environmentId: 'env-test' });
+  const result = await engine.startAttempt({
+    viewer: { id: 'u', isGM: false },
+    actor: DEFAULT_TEST_ACTOR,
+    environmentId: 'env-test',
+  });
   assert.equal(result.accepted, true);
   const snapshot = calls.terminal[0].payload.characterModifierSnapshot;
   if (snapshot) {

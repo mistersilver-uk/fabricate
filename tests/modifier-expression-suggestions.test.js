@@ -32,10 +32,7 @@ test('the system-specific chips carry the ACTIVE world’s roll-data paths, not 
   const dnd5e = expressionsFor('dnd5e');
   const pf2e = expressionsFor('pf2e');
 
-  assert.ok(
-    dnd5e.includes('@abilities.wis.mod'),
-    'a dnd5e world is offered the dnd5e wisdom path'
-  );
+  assert.ok(dnd5e.includes('@abilities.wis.mod'), 'a dnd5e world is offered the dnd5e wisdom path');
   assert.ok(
     pf2e.includes('@actor.system.abilities.wis.mod'),
     'a pf2e world is offered the pf2e wisdom path, which is a DIFFERENT string'
@@ -44,10 +41,7 @@ test('the system-specific chips carry the ACTIVE world’s roll-data paths, not 
     !pf2e.includes('@abilities.wis.mod'),
     'and never the dnd5e one, which resolves to nothing there'
   );
-  assert.ok(
-    !dnd5e.includes('@actor.system.abilities.wis.mod'),
-    'nor the converse'
-  );
+  assert.ok(!dnd5e.includes('@actor.system.abilities.wis.mod'), 'nor the converse');
 
   // Both worlds must also offer their own SKILL path, so the row is not one lucky ability
   // key that happens to be spelled the same way twice.

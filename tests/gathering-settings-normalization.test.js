@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 
 globalThis.foundry = {
   utils: {
-    randomID: () => `id-${Math.random().toString(36).slice(2)}`
-  }
+    randomID: () => `id-${Math.random().toString(36).slice(2)}`,
+  },
 };
 
 globalThis.game = {
@@ -12,15 +12,12 @@ globalThis.game = {
   settings: {
     register: () => {},
     get: () => undefined,
-    set: async () => undefined
-  }
+    set: async () => undefined,
+  },
 };
 
-const {
-  FABRICATE_SETTINGS_NAMESPACE,
-  SETTING_KEYS,
-  registerFabricateSettings
-} = await import('../src/config/settings.js');
+const { FABRICATE_SETTINGS_NAMESPACE, SETTING_KEYS, registerFabricateSettings } =
+  await import('../src/config/settings.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 function makeManager() {
@@ -35,14 +32,18 @@ test('registerFabricateSettings registers gathering settings with canonical scop
 
   registerFabricateSettings();
 
-  const gatheringEnvironments = registrations.find(entry => entry.key === SETTING_KEYS.GATHERING_ENVIRONMENTS);
+  const gatheringEnvironments = registrations.find(
+    (entry) => entry.key === SETTING_KEYS.GATHERING_ENVIRONMENTS
+  );
   assert.ok(gatheringEnvironments, 'gatheringEnvironments should be registered');
   assert.equal(gatheringEnvironments.namespace, FABRICATE_SETTINGS_NAMESPACE);
   assert.equal(gatheringEnvironments.definition.scope, 'world');
   assert.equal(gatheringEnvironments.definition.type, Array);
   assert.deepEqual(gatheringEnvironments.definition.default, []);
 
-  const lastGatheringActor = registrations.find(entry => entry.key === SETTING_KEYS.LAST_GATHERING_ACTOR);
+  const lastGatheringActor = registrations.find(
+    (entry) => entry.key === SETTING_KEYS.LAST_GATHERING_ACTOR
+  );
   assert.ok(lastGatheringActor, 'lastGatheringActor should be registered');
   assert.equal(lastGatheringActor.namespace, FABRICATE_SETTINGS_NAMESPACE);
   assert.equal(lastGatheringActor.definition.scope, 'client');
@@ -69,7 +70,10 @@ test('features.gathering safely normalizes absent or legacy feature objects', ()
   const manager = makeManager();
 
   assert.equal(manager._normalizeFeatures({ features: null, enableTags: true }).gathering, false);
-  assert.equal(manager._normalizeSystem({ name: 'Legacy System', enableCategories: true }).features.gathering, false);
+  assert.equal(
+    manager._normalizeSystem({ name: 'Legacy System', enableCategories: true }).features.gathering,
+    false
+  );
 });
 
 test('recipe categories and item tags normalize on despite legacy disabled flags', () => {
@@ -81,8 +85,8 @@ test('recipe categories and item tags normalize on despite legacy disabled flags
     features: {
       recipeCategories: false,
       categories: false,
-      itemTags: false
-    }
+      itemTags: false,
+    },
   });
 
   assert.equal(normalized.features.recipeCategories, true);
@@ -99,8 +103,8 @@ test('updateSystem ignores recipe category and item tag disable attempts', async
     name: 'Tags',
     features: {
       recipeCategories: false,
-      itemTags: false
-    }
+      itemTags: false,
+    },
   });
 
   assert.equal(system.features.recipeCategories, true);
@@ -112,8 +116,8 @@ test('updateSystem ignores recipe category and item tag disable attempts', async
     features: {
       recipeCategories: false,
       categories: false,
-      itemTags: false
-    }
+      itemTags: false,
+    },
   });
 
   assert.equal(updated.features.recipeCategories, true);

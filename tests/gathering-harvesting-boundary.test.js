@@ -10,9 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 
 test('harvesting has no standalone runtime, app, store, or setting surface', () => {
-  const sourceFiles = listFiles(resolve(repoRoot, 'src'))
-    .filter(path => ['.js', '.svelte'].includes(extname(path)));
-  const relativeSourcePaths = sourceFiles.map(path => relative(repoRoot, path));
+  const sourceFiles = listFiles(resolve(repoRoot, 'src')).filter((path) =>
+    ['.js', '.svelte'].includes(extname(path))
+  );
+  const relativeSourcePaths = sourceFiles.map((path) => relative(repoRoot, path));
 
   for (const path of relativeSourcePaths) {
     assert.doesNotMatch(
@@ -22,7 +23,7 @@ test('harvesting has no standalone runtime, app, store, or setting surface', () 
     );
   }
 
-  const source = sourceFiles.map(path => readFileSync(path, 'utf8')).join('\n');
+  const source = sourceFiles.map((path) => readFileSync(path, 'utf8')).join('\n');
   for (const forbidden of [
     /\bHarvestingEngine\b/,
     /\bHarvestingRunManager\b/,
@@ -35,9 +36,13 @@ test('harvesting has no standalone runtime, app, store, or setting surface', () 
     /\blistHarvestingForActor\b/,
     /\bharvestingRuns\b/,
     /\bharvestingEnvironments\b/,
-    /\blastHarvestingActor\b/
+    /\blastHarvestingActor\b/,
   ]) {
-    assert.doesNotMatch(source, forbidden, `forbidden standalone harvesting surface matched ${forbidden}`);
+    assert.doesNotMatch(
+      source,
+      forbidden,
+      `forbidden standalone harvesting surface matched ${forbidden}`
+    );
   }
 
   assert.equal(Object.hasOwn(SETTING_KEYS, 'GATHERING_ENVIRONMENTS'), true);
@@ -51,9 +56,15 @@ test('harvesting has no standalone runtime, app, store, or setting surface', () 
 });
 
 test('canonical docs keep harvesting modeled through recipes or component salvage', () => {
-  const spec = readFileSync(resolve(repoRoot, 'openspec/specs/gathering-and-harvesting/spec.md'), 'utf8');
+  const spec = readFileSync(
+    resolve(repoRoot, 'openspec/specs/gathering-and-harvesting/spec.md'),
+    'utf8'
+  );
   const domain = readFileSync(resolve(repoRoot, 'DOMAIN.md'), 'utf8');
-  const systemManager = readFileSync(resolve(repoRoot, 'src/systems/CraftingSystemManager.js'), 'utf8');
+  const systemManager = readFileSync(
+    resolve(repoRoot, 'src/systems/CraftingSystemManager.js'),
+    'utf8'
+  );
 
   assert.match(spec, /This spec does not introduce:\s*\n\s*- a standalone harvesting subsystem/);
   assert.match(spec, /A recipe whose ingredient is the harvested component\./);

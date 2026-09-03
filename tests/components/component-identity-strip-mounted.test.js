@@ -132,14 +132,12 @@ describe('ComponentIdentityStrip — source capabilities (issue 676, AC3)', () =
   it('right-click unlinks', async () => {
     const { calls, props } = track();
     const target = await harness.mount(props);
-    target
-      .querySelector('[data-component-source-linked]')
-      .dispatchEvent(
-        new target.ownerDocument.defaultView.MouseEvent('contextmenu', {
-          bubbles: true,
-          cancelable: true,
-        })
-      );
+    target.querySelector('[data-component-source-linked]').dispatchEvent(
+      new target.ownerDocument.defaultView.MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+      })
+    );
     await flushRender();
     assert.deepEqual(calls.unlinked, ['c1']);
     harness.remount();
@@ -269,7 +267,10 @@ describe('ComponentIdentityStrip — source capabilities (issue 676, AC3)', () =
   it('NEGATIVE STATE 1 — sourceMissing renders its hint and no open-sheet control', async () => {
     const { props } = track({ sourceMissing: true });
     const target = await harness.mount(props);
-    assert.ok(target.querySelector('[data-component-source-unresolved]'), 'the unresolved label renders');
+    assert.ok(
+      target.querySelector('[data-component-source-unresolved]'),
+      'the unresolved label renders'
+    );
     assert.ok(target.querySelector('[data-component-source-missing-hint]'), 'and its hint');
     assert.equal(
       target.querySelector('[data-component-edit-action="open-source"]'),
@@ -386,7 +387,12 @@ describe('ComponentIdentityStrip — source fields never enter the draft (issue 
       script.indexOf('function buildDraftSummary()')
     );
     assert.ok(buildUpdates.length > 0, 'expected to locate buildUpdates');
-    for (const emitted of ['updates.category', 'updates.tags', 'updates.essences', 'updates.salvage']) {
+    for (const emitted of [
+      'updates.category',
+      'updates.tags',
+      'updates.essences',
+      'updates.salvage',
+    ]) {
       assert.ok(buildUpdates.includes(emitted), `buildUpdates should emit ${emitted}`);
     }
     assert.ok(

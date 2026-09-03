@@ -8,13 +8,13 @@ function makeService(initialConfig) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, initialConfig]]);
   const writes = [];
   const service = new GatheringRichStateService({
-    getSetting: key => settings.get(key),
+    getSetting: (key) => settings.get(key),
     setSetting: async (key, value) => {
       settings.set(key, value);
       writes.push({ key, value });
       return value;
     },
-    settingKey: SETTING_KEYS.GATHERING_CONFIG
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
   });
   return { service, settings, writes };
 }
@@ -24,8 +24,8 @@ test('removeSystem drops the matching system entry from gatheringConfig.systems'
     conditions: { weather: 'clear', timeOfDay: 'day' },
     systems: {
       'mythwright-dnd5e': { tools: [{ id: 't1' }], tasks: [{ id: 'tk' }] },
-      'other-system': { tools: [{ id: 't2' }] }
-    }
+      'other-system': { tools: [{ id: 't2' }] },
+    },
   });
 
   const removed = await service.removeSystem('mythwright-dnd5e');
@@ -35,13 +35,16 @@ test('removeSystem drops the matching system entry from gatheringConfig.systems'
   const next = settings.get(SETTING_KEYS.GATHERING_CONFIG);
   assert.equal('mythwright-dnd5e' in next.systems, false);
   assert.ok('other-system' in next.systems, 'unrelated systems are preserved');
-  assert.deepEqual(next.conditions, { weather: 'clear', timeOfDay: 'day' },
-    'unrelated config keys are preserved');
+  assert.deepEqual(
+    next.conditions,
+    { weather: 'clear', timeOfDay: 'day' },
+    'unrelated config keys are preserved'
+  );
 });
 
 test('removeSystem is a no-op when the system is not present', async () => {
   const { service, writes } = makeService({
-    systems: { 'other-system': { tools: [] } }
+    systems: { 'other-system': { tools: [] } },
   });
 
   const removed = await service.removeSystem('missing-system');

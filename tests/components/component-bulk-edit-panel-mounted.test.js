@@ -67,14 +67,14 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
-    'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
+    'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
 });
 
 const ESSENCES = [
   { id: 'fire', name: 'Fire', icon: 'fas fa-fire' },
-  { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' }
+  { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' },
 ];
 
 /**
@@ -86,7 +86,10 @@ async function mountPanel(props = {}) {
   const state = { draft: props.draft || createComponentBulkDraft(), applies: 0, clears: 0 };
   const root = await panel.mount({
     count: 3,
-    categoryOptions: [{ name: 'Metal', count: 2 }, { name: 'general', count: 1 }],
+    categoryOptions: [
+      { name: 'Metal', count: 2 },
+      { name: 'general', count: 1 },
+    ],
     tags: ['metal', 'rune'],
     essenceDefinitions: ESSENCES,
     showEssences: true,
@@ -97,8 +100,12 @@ async function mountPanel(props = {}) {
       state.draft = next;
       await panel.setProps({ draft: next });
     },
-    onApply: () => { state.applies += 1; },
-    onClearSelection: () => { state.clears += 1; }
+    onApply: () => {
+      state.applies += 1;
+    },
+    onClearSelection: () => {
+      state.clears += 1;
+    },
   });
   return { root, state };
 }
@@ -165,8 +172,8 @@ describe('ComponentBulkEditPanel tag staging (issue 772)', () => {
     assert.match(
       chip.getAttribute('aria-label'),
       /^metal — leave unchanged\.$/,
-      'the name OPENS with the visible label (WCAG 2.5.3) then states the staged ACTION — '
-        + 'aria-pressed cannot describe three states'
+      'the name OPENS with the visible label (WCAG 2.5.3) then states the staged ACTION — ' +
+        'aria-pressed cannot describe three states'
     );
   });
 
@@ -187,8 +194,8 @@ describe('ComponentBulkEditPanel tag staging (issue 772)', () => {
     assert.match(
       root.textContent,
       /click to add · again to remove · again to leave unchanged/,
-      'the third stop is the one that UNDOES a staged remove; naming only two of three left '
-        + 'it discoverable only by clicking and watching'
+      'the third stop is the one that UNDOES a staged remove; naming only two of three left ' +
+        'it discoverable only by clicking and watching'
     );
   });
 
@@ -202,13 +209,17 @@ describe('ComponentBulkEditPanel apply enablement (issue 772)', () => {
   it('is inert with nothing staged and live the moment any axis is staged', async () => {
     const { root, state } = await mountPanel();
 
-    assert.equal(applyButton(root).disabled, true, 'a no-op Apply would report success and write nothing');
+    assert.equal(
+      applyButton(root).disabled,
+      true,
+      'a no-op Apply would report success and write nothing'
+    );
     assert.match(applyButton(root).textContent, /3/, 'and it names the exact blast radius');
 
     root.querySelector('[data-component-bulk-category]').value = 'Metal';
-    root.querySelector('[data-component-bulk-category]').dispatchEvent(
-      new globalThis.Event('change', { bubbles: true })
-    );
+    root
+      .querySelector('[data-component-bulk-category]')
+      .dispatchEvent(new globalThis.Event('change', { bubbles: true }));
     flushSync();
 
     assert.equal(applyButton(root).disabled, false);
@@ -263,8 +274,8 @@ describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
     const { root } = await mountPanel({
       essenceDefinitions: [
         { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
-        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
-      ]
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true },
+      ],
     });
 
     assert.ok(
@@ -283,8 +294,8 @@ describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
       draft: { ...draft, essencesStaged: true, essences: { fire: 3 } },
       essenceDefinitions: [
         { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
-        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
-      ]
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true },
+      ],
     });
 
     const staged = root.querySelector('[data-component-edit-essence="fire"]');
@@ -304,9 +315,9 @@ describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
       draft: { ...createComponentBulkDraft(), essencesStaged: true, essences: { earth: 1 } },
       essenceDefinitions: [
         { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
-        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true },
       ],
-      selectedCards: [{ id: 'a', essences: [{ id: 'fire', quantity: 3 }] }]
+      selectedCards: [{ id: 'a', essences: [{ id: 'fire', quantity: 3 }] }],
     });
 
     const warning = root.querySelector('[data-component-bulk-essence-warning]');
@@ -329,9 +340,15 @@ describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
     chip.click();
     flushSync();
 
-    assert.equal(state.draft.essencesStaged, true, 'a fresh, all-zero draft can stage "clear everything"');
     assert.equal(
-      root.querySelector('[data-component-bulk-essences-staged]').getAttribute('data-component-bulk-essences-staged'),
+      state.draft.essencesStaged,
+      true,
+      'a fresh, all-zero draft can stage "clear everything"'
+    );
+    assert.equal(
+      root
+        .querySelector('[data-component-bulk-essences-staged]')
+        .getAttribute('data-component-bulk-essences-staged'),
       'true'
     );
     assert.equal(applyButton(root).disabled, false, 'an all-zero staged map is a REAL edit');
@@ -346,9 +363,7 @@ describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
     assert.equal(state.draft.essences.fire, 1);
     assert.equal(state.draft.essencesStaged, true);
 
-    root
-      .querySelector('[data-component-edit-essence="fire"] [data-stepper-decrement]')
-      .click();
+    root.querySelector('[data-component-edit-essence="fire"] [data-stepper-decrement]').click();
     flushSync();
 
     assert.equal(state.draft.essences.fire, 0, 'back to zero');
@@ -358,7 +373,9 @@ describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
       'and STILL staged — this is the wipe the prototype rendered as pixel-identical to untouched'
     );
     assert.equal(
-      root.querySelector('[data-component-bulk-essences-staged]').getAttribute('data-component-bulk-essences-staged'),
+      root
+        .querySelector('[data-component-bulk-essences-staged]')
+        .getAttribute('data-component-bulk-essences-staged'),
       'true',
       'the panel says so'
     );
@@ -385,12 +402,16 @@ describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
 
     assert.equal(state.draft.difficultyStaged, true);
     assert.equal(state.draft.difficulty, 0, '0 CLEARS the value on every selected component');
-    assert.equal(root.querySelector('[data-component-bulk-difficulty]').value, '0', 'and the panel shows it');
+    assert.equal(
+      root.querySelector('[data-component-bulk-difficulty]').value,
+      '0',
+      'and the panel shows it'
+    );
 
     root.querySelector('[data-component-bulk-difficulty]').value = '14';
-    root.querySelector('[data-component-bulk-difficulty]').dispatchEvent(
-      new globalThis.Event('input', { bubbles: true })
-    );
+    root
+      .querySelector('[data-component-bulk-difficulty]')
+      .dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     flushSync();
     assert.equal(state.draft.difficulty, 14);
   });
@@ -399,7 +420,7 @@ describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
 describe('ComponentBulkEditPanel overwrite legibility (issue 772)', () => {
   const authored = [
     { id: 'a', essences: [{ id: 'fire', quantity: 3 }] },
-    { id: 'b', essences: [] }
+    { id: 'b', essences: [] },
   ];
 
   it('states the permanent overwrite hint whether or not the axis is staged', async () => {
@@ -412,9 +433,9 @@ describe('ComponentBulkEditPanel overwrite legibility (issue 772)', () => {
 
     // Staged but matching the authored value: nothing is destroyed, so no hazard strip.
     root.querySelector('[data-component-edit-essence="fire"] [data-stepper-input]').value = '3';
-    root.querySelector('[data-component-edit-essence="fire"] [data-stepper-input]').dispatchEvent(
-      new globalThis.Event('input', { bubbles: true })
-    );
+    root
+      .querySelector('[data-component-edit-essence="fire"] [data-stepper-input]')
+      .dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     flushSync();
     assert.equal(state.draft.essences.fire, 3);
     assert.ok(
@@ -427,7 +448,10 @@ describe('ComponentBulkEditPanel overwrite legibility (issue 772)', () => {
     flushSync();
 
     const warning = root.querySelector('[data-component-bulk-essence-warning]');
-    assert.ok(Boolean(warning), 'overwriting a hand-tuned value is exactly what the warning is for');
+    assert.ok(
+      Boolean(warning),
+      'overwriting a hand-tuned value is exactly what the warning is for'
+    );
     assert.match(warning.textContent, /1 of the selected components/, 'and it names the count');
   });
 
@@ -498,7 +522,7 @@ function impactOf(overrides = {}) {
     deletableIds: ['c1', 'c2', 'c3'],
     recipesRewritten: 2,
     recipesDisabled: 1,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -508,9 +532,15 @@ async function mountWithDelete(props = {}) {
   const mounted = await mountPanel({
     deleteImpact: impactOf(),
     ...props,
-    onArmDelete: () => { calls.armed += 1; },
-    onDisarmDelete: () => { calls.disarmed += 1; },
-    onDelete: (ids) => { calls.deleted.push(ids); }
+    onArmDelete: () => {
+      calls.armed += 1;
+    },
+    onDisarmDelete: () => {
+      calls.disarmed += 1;
+    },
+    onDelete: (ids) => {
+      calls.deleted.push(ids);
+    },
   });
   return { ...mounted, calls };
 }
@@ -540,7 +570,7 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
     // The commonest selection there is: components no recipe names. Two noughts under one
     // real fact is noise, and it buries the number the button acts on.
     const { root } = await mountWithDelete({
-      deleteImpact: impactOf({ recipesRewritten: 0, recipesDisabled: 0 })
+      deleteImpact: impactOf({ recipesRewritten: 0, recipesDisabled: 0 }),
     });
 
     assert.equal(
@@ -560,7 +590,7 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
     // The two rows are gated independently: rewriting recipes without disabling any is the
     // ordinary outcome, and gating them together would hide it.
     const { root } = await mountWithDelete({
-      deleteImpact: impactOf({ recipesRewritten: 2, recipesDisabled: 0 })
+      deleteImpact: impactOf({ recipesRewritten: 2, recipesDisabled: 0 }),
     });
 
     assert.equal(impactText(root, 'recipes'), '2 recipes will be rewritten.');
@@ -633,7 +663,7 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
     // Deleting 5 components, rewriting 2 recipes, disabling 1 of those two: no number is
     // derivable from another, and the disabled count is a SUBSET of the rewritten count.
     const { root } = await mountWithDelete({
-      deleteImpact: impactOf({ deletable: 5, recipesRewritten: 2, recipesDisabled: 1 })
+      deleteImpact: impactOf({ deletable: 5, recipesRewritten: 2, recipesDisabled: 1 }),
     });
 
     assert.match(impactText(root, 'components'), /5 components/);
@@ -646,7 +676,12 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
     assert.match(impactText(root, 'recipes'), /2 recipes will be rewritten/);
 
     await panel.setProps({
-      deleteImpact: impactOf({ deletable: 1, deletableIds: ['c1'], recipesRewritten: 7, recipesDisabled: 0 })
+      deleteImpact: impactOf({
+        deletable: 1,
+        deletableIds: ['c1'],
+        recipesRewritten: 7,
+        recipesDisabled: 0,
+      }),
     });
     flushSync();
 
@@ -675,7 +710,7 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
   it('hands the confirm the impact ids rather than re-deriving them', async () => {
     const { root, calls } = await mountWithDelete({
       deleteImpact: impactOf({ deletable: 2, deletableIds: ['only-a', 'only-b'] }),
-      deleteArmed: true
+      deleteArmed: true,
     });
 
     deleteButton(root).click();
@@ -689,23 +724,25 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
         deletable: 1,
         deletableIds: ['c1'],
         recipesRewritten: 1,
-        recipesDisabled: 1
-      })
+        recipesDisabled: 1,
+      }),
     });
 
     assert.match(impactText(root, 'components'), /^1 component will be deleted\./);
     assert.match(impactText(root, 'recipes'), /^1 recipe will be rewritten\./);
-    assert.ok(
-      !impactText(root, 'components').includes('1 components'),
-      'never "1 components"'
-    );
+    assert.ok(!impactText(root, 'components').includes('1 components'), 'never "1 components"');
     assert.ok(!impactText(root, 'recipes').includes('1 recipes'), 'never "1 recipes"');
     assert.match(deleteButton(root).textContent, /Delete 1 component(?!s)/);
   });
 
   it('is disabled when nothing is deletable, and while a delete is in flight', async () => {
     const { root } = await mountWithDelete({
-      deleteImpact: impactOf({ deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 })
+      deleteImpact: impactOf({
+        deletable: 0,
+        deletableIds: [],
+        recipesRewritten: 0,
+        recipesDisabled: 0,
+      }),
     });
     assert.equal(deleteButton(root).disabled, true, 'nothing to delete');
 

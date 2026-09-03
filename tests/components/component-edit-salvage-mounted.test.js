@@ -93,8 +93,10 @@ function props(overrides = {}) {
   };
 }
 
-const card = (target) => target.querySelector('[data-recipe-section="salvage-allow-player-result-reorder"]');
-const toggle = (target) => card(target).querySelector('[data-recipe-field="salvageAllowPlayerResultReorder"]');
+const card = (target) =>
+  target.querySelector('[data-recipe-section="salvage-allow-player-result-reorder"]');
+const toggle = (target) =>
+  card(target).querySelector('[data-recipe-field="salvageAllowPlayerResultReorder"]');
 // The Save button lives in the PARENT's header, gated on the dirty state this view
 // emits. `onDirtyChange(true)` is therefore literally what enables Save, and
 // `onDraftChange`'s summary carries the `updates` payload the parent persists.
@@ -123,7 +125,10 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
     // The Overview Enabled card's conditional tooltip is the only explanation a GM gets
     // for a validation-disabled switch. Named `toggleTitle` because `title` is already
     // the card heading — a collision the retrofit would otherwise hit.
-    const target = await mountCard({ toggleTitle: 'Resolve the issues on the Validation tab.', disabled: true });
+    const target = await mountCard({
+      toggleTitle: 'Resolve the issues on the Validation tab.',
+      disabled: true,
+    });
     const button = target.querySelector('button.manager-status-toggle');
     assert.equal(button.getAttribute('title'), 'Resolve the issues on the Validation tab.');
     assert.equal(button.disabled, true);
@@ -164,7 +169,10 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
 
   it('the switch carries aria-pressed and no role=switch', async () => {
     const on = await mountCard({ on: true });
-    assert.equal(on.querySelector('button.manager-status-toggle').getAttribute('aria-pressed'), 'true');
+    assert.equal(
+      on.querySelector('button.manager-status-toggle').getAttribute('aria-pressed'),
+      'true'
+    );
     cardHarness.remount();
     const off = await mountCard({ on: false });
     const button = off.querySelector('button.manager-status-toggle');
@@ -215,7 +223,11 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     // Only a `false` fixture can fail — a `true` fixture reads green through a dropped
     // default, because the default re-supplies true.
     const target = await harness.mount(
-      props({ component: { salvage: { enabled: true, allowPlayerResultReorder: false, resultGroups: RESULT_GROUPS } } })
+      props({
+        component: {
+          salvage: { enabled: true, allowPlayerResultReorder: false, resultGroups: RESULT_GROUPS },
+        },
+      })
     );
     assert.ok(card(target).classList.contains('is-off'));
     assert.equal(toggle(target).getAttribute('aria-pressed'), 'false');
@@ -299,9 +311,15 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     assert.ok(node.querySelector('.manager-recipe-status-copy > .manager-recipe-status-sub'));
     const button = node.querySelector('button.manager-status-toggle');
     assert.ok(button, 'the switch is a plain button');
-    assert.equal(button.getAttribute('role'), null, 'aria-pressed is the house pattern, not role=switch');
+    assert.equal(
+      button.getAttribute('role'),
+      null,
+      'aria-pressed is the house pattern, not role=switch'
+    );
     assert.ok(
-      button.querySelector('.manager-status-toggle-track[aria-hidden="true"] > .manager-status-toggle-knob'),
+      button.querySelector(
+        '.manager-status-toggle-track[aria-hidden="true"] > .manager-status-toggle-knob'
+      ),
       'track + knob, both aria-hidden'
     );
   });
@@ -351,7 +369,13 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
         component: {
           salvage: {
             enabled: true,
-            resultGroups: [{ id: 'grp-1', name: 'S', results: [{ id: 'res-1', componentId: 'cmp-unset', quantity: 1 }] }],
+            resultGroups: [
+              {
+                id: 'grp-1',
+                name: 'S',
+                results: [{ id: 'res-1', componentId: 'cmp-unset', quantity: 1 }],
+              },
+            ],
           },
         },
       })
@@ -538,18 +562,10 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       'a complication authored for crafting alone says nothing about a salvage stage, and ' +
         'listing it would tell the GM this yield carries a consequence it does not'
     );
-    assert.match(
-      rows[0].textContent,
-      /The spring lets go/,
-      'the row names the complication'
-    );
+    assert.match(rows[0].textContent, /The spring lets go/, 'the row names the complication');
     // The GM body is the generated TRIGGER SENTENCE — the fact a player must never be shown,
     // and the fact a GM most needs on a read-only strip.
-    assert.match(
-      rows[0].textContent,
-      /When the award is missed/,
-      'and states when it fires'
-    );
+    assert.match(rows[0].textContent, /When the award is missed/, 'and states when it fires');
     assert.match(rows[0].textContent, /rolls 2d6/, 'and what it does');
     harness.remount();
   });
@@ -681,7 +697,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     // list is built with `icon` set for exactly the art-less components.
     const target = await harness.mount(
       props({
-        componentOptions: COMPONENT_OPTIONS.map((option) => ({ ...option, img: '' }))
+        componentOptions: COMPONENT_OPTIONS.map((option) => ({ ...option, img: '' })),
       })
     );
     const trigger = target.querySelector('button.manager-salvage-component-trigger');
@@ -784,10 +800,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
 
   it('Routed mode keeps the multi-group Add group control and no Simple hint', async () => {
     const target = await harness.mount(props({ salvageResolutionMode: 'routed' }));
-    assert.ok(
-      target.querySelector('[data-add-salvage-group]'),
-      'Routed still exposes Add group'
-    );
+    assert.ok(target.querySelector('[data-add-salvage-group]'), 'Routed still exposes Add group');
     assert.equal(
       target.querySelector('[data-salvage-simple-hint]'),
       null,
@@ -806,8 +819,17 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
           salvage: {
             enabled: true,
             resultGroups: [
-              { id: 'grp-win', name: 'Scraps', results: [{ id: 'r1', componentId: 'cmp-scrap', quantity: 1 }] },
-              { id: 'grp-fail', name: 'Nothing', role: 'failure', results: [{ id: 'r2', componentId: 'cmp-dust', quantity: 1 }] },
+              {
+                id: 'grp-win',
+                name: 'Scraps',
+                results: [{ id: 'r1', componentId: 'cmp-scrap', quantity: 1 }],
+              },
+              {
+                id: 'grp-fail',
+                name: 'Nothing',
+                role: 'failure',
+                results: [{ id: 'r2', componentId: 'cmp-dust', quantity: 1 }],
+              },
             ],
           },
         },
@@ -819,7 +841,11 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       'capped at one success group even with a legacy failure group present'
     );
     const groups = target.querySelectorAll('[data-salvage-group]');
-    assert.equal(groups.length, 2, 'both the success and the reserved failure rows render (data not blanked)');
+    assert.equal(
+      groups.length,
+      2,
+      'both the success and the reserved failure rows render (data not blanked)'
+    );
     harness.remount();
   });
 });

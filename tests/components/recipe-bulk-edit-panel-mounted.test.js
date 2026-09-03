@@ -26,7 +26,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   createMountedComponentHarness,
-  SEARCHABLE_POPOVER_RAW_MODULES
+  SEARCHABLE_POPOVER_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { createRecipeBulkDraft } from '../../src/utils/recipeBulkEditModel.js';
 
@@ -47,7 +47,7 @@ const panel = createMountedComponentHarness({
     // component under test, and the shared harness's closure validator throws loudly on an
     // omission — the hand-rolled suites are the ones that hang instead.
     'src/utils/recipeBulkEditModel.js',
-    'src/utils/bulkSelectionModel.js'
+    'src/utils/bulkSelectionModel.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
@@ -69,9 +69,9 @@ const panel = createMountedComponentHarness({
     // STATIC imports of the panel, so the closure validator throws on an omission.
     'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte'
+    'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte',
 });
 
 /**
@@ -107,7 +107,7 @@ const BOOKS = [
     recipeIds: [],
     linkMissing: false,
     recipes: [],
-    learnedByCount: 0
+    learnedByCount: 0,
   },
   {
     id: 'book-forge',
@@ -118,8 +118,8 @@ const BOOKS = [
     recipeIds: [],
     linkMissing: false,
     recipes: [],
-    learnedByCount: 0
-  }
+    learnedByCount: 0,
+  },
 ];
 
 /**
@@ -134,7 +134,7 @@ const MEMBERSHIP = new Map([['book-alchemy', 2]]);
 // raw, so the "Unnamed tier (DC n)" fallback is this panel's to render.
 const TIERS = [
   { id: 'tier-easy', name: 'Easy', dc: 8 },
-  { id: 'tier-unnamed', name: '', dc: 18 }
+  { id: 'tier-unnamed', name: '', dc: 18 },
 ];
 
 const OPEN_AXIS = { available: true, reason: null };
@@ -159,8 +159,12 @@ async function mountPanel(props = {}) {
       state.draft = next;
       await panel.setProps({ draft: next });
     },
-    onApply: () => { state.applies += 1; },
-    onClearSelection: () => { state.clears += 1; }
+    onApply: () => {
+      state.applies += 1;
+    },
+    onClearSelection: () => {
+      state.clears += 1;
+    },
   });
   return { root, state };
 }
@@ -240,7 +244,7 @@ function controlName(node) {
   for (const [attribute, name] of [
     ['data-recipe-bulk-book-add', 'add'],
     ['data-recipe-bulk-book-remove', 'remove'],
-    ['data-recipe-bulk-book-clear-pick', 'clear pick']
+    ['data-recipe-bulk-book-clear-pick', 'clear pick'],
   ]) {
     if (node.hasAttribute?.(attribute)) return name;
   }
@@ -284,8 +288,8 @@ describe('RecipeBulkEditPanel book picker (issue 1010)', () => {
         option.getAttribute('data-popover-option')
       ),
       ['book-alchemy', 'book-forge'],
-      'a vocabulary built from books the selected recipes are already in would drop the '
-        + 'Forge Manual, which holds none of them — and it is the commonest Add target there is'
+      'a vocabulary built from books the selected recipes are already in would drop the ' +
+        'Forge Manual, which holds none of them — and it is the commonest Add target there is'
     );
   });
 
@@ -324,7 +328,7 @@ describe('RecipeBulkEditPanel book picker (issue 1010)', () => {
   it('names both extremes as whole sentences rather than "holds 0 of 3"', async () => {
     const { root } = await mountPanel({
       count: 3,
-      bookMembership: new Map([['book-alchemy', 3]])
+      bookMembership: new Map([['book-alchemy', 3]]),
     });
     bookTrigger(root).click();
     flushSync();
@@ -344,7 +348,10 @@ describe('RecipeBulkEditPanel book picker (issue 1010)', () => {
     bookTrigger(root).click();
     flushSync();
 
-    for (const [id, name] of [['book-alchemy', 'Alchemist Primer'], ['book-forge', 'Forge Manual']]) {
+    for (const [id, name] of [
+      ['book-alchemy', 'Alchemist Primer'],
+      ['book-forge', 'Forge Manual'],
+    ]) {
       const option = root.querySelector(`[data-popover-option="${id}"]`);
       assert.equal(
         option.querySelector('.manager-travel-option-name').textContent,
@@ -538,7 +545,7 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
   it('says "no change" for a staged op the selection has since emptied of work', async () => {
     const { root } = await mountPanel({
       draft: { ...createRecipeBulkDraft(), bookRemove: ['book-alchemy'] },
-      bookMembership: new Map()
+      bookMembership: new Map(),
     });
 
     assert.equal(stagedState(root, 'book-alchemy'), 'remove');
@@ -620,8 +627,8 @@ describe('RecipeBulkEditPanel keyboard focus (issue 1010)', () => {
     assert.equal(
       focusHolder(),
       'add',
-      "the popover's own restore correctly declines here — its trigger went with the "
-        + 'choice — so the panel has to land focus itself'
+      "the popover's own restore correctly declines here — its trigger went with the " +
+        'choice — so the panel has to land focus itself'
     );
   });
 
@@ -840,7 +847,7 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
       'Leave unchanged',
       'Default DC',
       'Easy (DC 8)',
-      'Unnamed tier (DC 18)'
+      'Unnamed tier (DC 18)',
     ]);
   });
 
@@ -852,12 +859,12 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
     ['fixed', /comes from its minimum success tier/],
     ['noCheck', /rolls no crafting check, so there are no check tiers to assign/],
     ['unrecognisedMode', /doesn't recognise this system's resolution mode/],
-    ['noTiers', /authors no tiers, so every recipe uses its default DC/]
+    ['noTiers', /authors no tiers, so every recipe uses its default DC/],
   ]) {
     it(`states the ${reason} case in place of the control`, async () => {
       const { root } = await mountPanel({
         checkTierAxis: { available: false, reason },
-        checkTierOptions: []
+        checkTierOptions: [],
       });
 
       const callout = root.querySelector('[data-recipe-bulk-check-tier-unavailable]');
@@ -867,15 +874,18 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
       assert.ok(!tierSelect(root), 'and no picker sits beside the statement');
       assert.ok(
         !/The DC these recipes roll against/.test(root.textContent),
-        'the sub-hint lives INSIDE the available branch — outside it, it would contradict '
-          + 'the Callout one line below'
+        'the sub-hint lives INSIDE the available branch — outside it, it would contradict ' +
+          'the Callout one line below'
       );
     });
   }
 
   it('states the sub-hint when the axis IS available', async () => {
     const { root } = await mountPanel();
-    assert.match(root.textContent, /The DC these recipes roll against — not the check's outcome tiers\./);
+    assert.match(
+      root.textContent,
+      /The DC these recipes roll against — not the check's outcome tiers\./
+    );
     assert.ok(!root.querySelector('[data-recipe-bulk-check-tier-unavailable]'));
   });
 });
@@ -884,7 +894,7 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
   it('goes inert rather than double-writing', async () => {
     const { root } = await mountPanel({
       applying: true,
-      draft: { ...createRecipeBulkDraft(), status: 'enable', bookAdd: ['book-alchemy'] }
+      draft: { ...createRecipeBulkDraft(), status: 'enable', bookAdd: ['book-alchemy'] },
     });
 
     assert.equal(root.querySelector('[data-recipe-bulk-category]').disabled, true);
@@ -928,11 +938,11 @@ const FULL_IMPACT = {
   recipeItemsAffected: 2,
   recipeItemIds: ['book-alchemy', 'book-forge'],
   learnersAffected: 4,
-  learnerIds: ['a1', 'a2', 'a3', 'a4']
+  learnerIds: ['a1', 'a2', 'a3', 'a4'],
 };
 
 describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
-  it('renders the card under the shell, with this studio\'s hook names', async () => {
+  it("renders the card under the shell, with this studio's hook names", async () => {
     const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
 
     assert.ok(Boolean(deleteCard(root)), 'the panel renders no delete card at all');
@@ -956,17 +966,11 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
     const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
 
     assert.match(impactRow(root, 'recipes').textContent, /3 recipes will be deleted\./);
-    assert.match(
-      impactRow(root, 'items').textContent,
-      /Will be removed from 2 books & scrolls\./
-    );
+    assert.match(impactRow(root, 'items').textContent, /Will be removed from 2 books & scrolls\./);
     assert.match(impactRow(root, 'learners').textContent, /Will be forgotten by 4 characters/);
     // The qualifier is the load-bearing half of the learners sentence: the learn slot is
     // spent by the same act the number counts.
-    assert.match(
-      impactRow(root, 'learners').textContent,
-      /spent learn slots are not given back/
-    );
+    assert.match(impactRow(root, 'learners').textContent, /spent learn slots are not given back/);
   });
 
   it('always states the permanence, which is a PROPERTY and has no count to gate it on', async () => {
@@ -981,7 +985,7 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
 
   it('omits a consequence row at zero while the subject row and the hint stay', async () => {
     const { root } = await mountPanel({
-      deleteImpact: { ...FULL_IMPACT, deletable: 1, recipeItemsAffected: 0, learnersAffected: 0 }
+      deleteImpact: { ...FULL_IMPACT, deletable: 1, recipeItemsAffected: 0, learnersAffected: 0 },
     });
 
     assert.match(impactRow(root, 'recipes').textContent, /1 recipe will be deleted\./);
@@ -998,15 +1002,12 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
         recipeItemsAffected: 1,
         recipeItemIds: ['book-alchemy'],
         learnersAffected: 1,
-        learnerIds: ['a1']
-      }
+        learnerIds: ['a1'],
+      },
     });
 
     assert.match(impactRow(root, 'recipes').textContent, /1 recipe will be deleted\./);
-    assert.match(
-      impactRow(root, 'items').textContent,
-      /Will be removed from 1 book or scroll\./
-    );
+    assert.match(impactRow(root, 'items').textContent, /Will be removed from 1 book or scroll\./);
     assert.match(impactRow(root, 'learners').textContent, /Will be forgotten by 1 character/);
     assert.match(deleteButton(root).textContent, /Delete 1 recipe/);
   });
@@ -1020,7 +1021,7 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
     const { root } = await mountPanel({
       deleteImpact: { ...FULL_IMPACT, deletable: 2, deletableIds: ['r1', 'r3'] },
       onArmDelete: () => {},
-      onDelete: (ids) => deleted.push([...ids])
+      onDelete: (ids) => deleted.push([...ids]),
     });
 
     await panel.setProps({ deleteArmed: true });
@@ -1031,7 +1032,7 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
 
   it('is inert when nothing resolves, and while a staged apply is in flight', async () => {
     const { root } = await mountPanel({
-      deleteImpact: { ...FULL_IMPACT, deletable: 0, deletableIds: [] }
+      deleteImpact: { ...FULL_IMPACT, deletable: 0, deletableIds: [] },
     });
     assert.equal(deleteButton(root).disabled, true, 'a fully stale selection deletes nothing');
 
@@ -1043,7 +1044,7 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
     );
   });
 
-  it('renders the busy face from the caller\'s own flag, not from the arm', async () => {
+  it("renders the busy face from the caller's own flag, not from the arm", async () => {
     // `deleting` is the owner's in-flight flag. Passing `armed: false` alongside it is the
     // state a real browser reaches within a frame of the write starting — disabling a focused
     // button blurs it, and `ArmedDangerButton` disarms on blur — so a busy face read off the

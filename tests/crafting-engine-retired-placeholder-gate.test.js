@@ -103,7 +103,13 @@ function installSystem(system) {
   return { engine, entered };
 }
 
-function craftingSystem({ resolutionMode, alchemyCheckMode = 'none', slot, rollFormula, features = {} }) {
+function craftingSystem({
+  resolutionMode,
+  alchemyCheckMode = 'none',
+  slot,
+  rollFormula,
+  features = {},
+}) {
   const routedTiers = {
     type: 'fixed',
     fixedOutcomes: [
@@ -118,7 +124,13 @@ function craftingSystem({ resolutionMode, alchemyCheckMode = 'none', slot, rollF
     alchemy: { checkMode: alchemyCheckMode },
     craftingCheck: {
       enabled: true,
-      [slot]: { rollFormula, dc: 15, dcMode: 'static', thresholdMode: 'meet', ...(slot === 'routed' ? routedTiers : {}) },
+      [slot]: {
+        rollFormula,
+        dc: 15,
+        dcMode: 'static',
+        thresholdMode: 'meet',
+        ...(slot === 'routed' ? routedTiers : {}),
+      },
     },
   };
 }
@@ -131,12 +143,25 @@ test('alchemy simple: an unusable formula is a MISCONFIGURATION, never an uncond
   installRoll();
   for (const [label, rollFormula] of UNUSABLE_FORMULAS) {
     const { engine, entered } = installSystem(
-      craftingSystem({ resolutionMode: 'alchemy', alchemyCheckMode: 'simple', slot: 'simple', rollFormula })
+      craftingSystem({
+        resolutionMode: 'alchemy',
+        alchemyCheckMode: 'simple',
+        slot: 'simple',
+        rollFormula,
+      })
     );
     const result = await runCheck(engine);
     assert.equal(result.success, false, label);
-    assert.equal(result.misconfigured, true, `${label}: the GM is told, and craft() aborts with zero mutation`);
-    assert.deepEqual(entered, [], `${label}: _runSimpleCheck is never entered, so nothing can pass for want of an engine`);
+    assert.equal(
+      result.misconfigured,
+      true,
+      `${label}: the GM is told, and craft() aborts with zero mutation`
+    );
+    assert.deepEqual(
+      entered,
+      [],
+      `${label}: _runSimpleCheck is never entered, so nothing can pass for want of an engine`
+    );
   }
 });
 
@@ -144,7 +169,12 @@ test('alchemy tiered: an unusable routed formula is a MISCONFIGURATION', async (
   installRoll();
   for (const [label, rollFormula] of UNUSABLE_FORMULAS) {
     const { engine, entered } = installSystem(
-      craftingSystem({ resolutionMode: 'alchemy', alchemyCheckMode: 'tiered', slot: 'routed', rollFormula })
+      craftingSystem({
+        resolutionMode: 'alchemy',
+        alchemyCheckMode: 'tiered',
+        slot: 'routed',
+        rollFormula,
+      })
     );
     const result = await runCheck(engine);
     assert.equal(result.success, false, label);
@@ -162,7 +192,11 @@ test('progressive: an unusable formula hits the required-check abort', async () 
     const result = await runCheck(engine);
     assert.equal(result.success, false, label);
     assert.equal(result.misconfigured, true, label);
-    assert.match(result.message, /progressive mode requires a configured crafting check roll formula/, label);
+    assert.match(
+      result.message,
+      /progressive mode requires a configured crafting check roll formula/,
+      label
+    );
     assert.deepEqual(entered, [], `${label}: _runProgressiveCheck is never entered`);
   }
 });
@@ -176,7 +210,11 @@ test('routedByCheck: an unusable routed formula hits the required-check abort', 
     const result = await runCheck(engine);
     assert.equal(result.success, false, label);
     assert.equal(result.misconfigured, true, label);
-    assert.match(result.message, /routedByCheck mode requires a configured crafting check roll formula/, label);
+    assert.match(
+      result.message,
+      /routedByCheck mode requires a configured crafting check roll formula/,
+      label
+    );
     assert.deepEqual(entered, [], `${label}: _runRoutedCheck is never entered`);
   }
 });
@@ -194,7 +232,11 @@ test('simple: an unusable formula is treated as NO check — a no-op success, ru
     );
     const result = await runCheck(engine);
     assert.equal(result.success, true, `${label}: the optional layer is absent, not failed`);
-    assert.equal(result.misconfigured, undefined, `${label}: an optional check is never a misconfiguration`);
+    assert.equal(
+      result.misconfigured,
+      undefined,
+      `${label}: an optional check is never a misconfiguration`
+    );
     assert.deepEqual(entered, [], `${label}: _runSimpleCheck is never entered`);
   }
 });
@@ -229,7 +271,11 @@ test('the same harness DOES enter each runner on an authored, usable formula', a
       craftingSystem({ resolutionMode, alchemyCheckMode, slot, rollFormula: '1d20', features })
     );
     await runCheck(engine);
-    assert.deepEqual(entered, [runner], `${resolutionMode}/${slot} enters ${runner} when the formula rolls`);
+    assert.deepEqual(
+      entered,
+      [runner],
+      `${resolutionMode}/${slot} enters ${runner} when the formula rolls`
+    );
   }
 });
 
@@ -258,7 +304,8 @@ function buildFakeItem(id, quantity = 1) {
     },
     async update(payload) {
       this.updateCalled = true;
-      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      if (payload['system.quantity'] !== undefined)
+        this.system.quantity = payload['system.quantity'];
     },
   };
 }

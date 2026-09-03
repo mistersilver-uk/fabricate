@@ -188,7 +188,11 @@ test('updateSystem does not run signature validation for a non-alchemy system', 
       ],
     });
 
-    assert.equal(validateSystemCalls, 0, 'signature validation is not run for a non-alchemy system');
+    assert.equal(
+      validateSystemCalls,
+      0,
+      'signature validation is not run for a non-alchemy system'
+    );
     assert.deepEqual(
       updated.components.map((c) => c.id).sort((a, b) => a.localeCompare(b)),
       ['iron', 'steel'],

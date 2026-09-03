@@ -27,10 +27,11 @@ const {
   itemResolvesToComponent,
   matchRecipeItemDefinition,
   itemMatchesRecipeItemSource,
-  findStackableMatch
+  findStackableMatch,
 } = await import('../src/utils/sourceUuid.js');
 
-const { component, componentSet, roleItem } = await import('./helpers/componentIdentityFixtures.js');
+const { component, componentSet, roleItem } =
+  await import('./helpers/componentIdentityFixtures.js');
 
 // An item-like object whose `getFlag` returns the durable recipe-item flag, mirroring
 // how getFabricateFlag normalizes 'recipeItemDefinitionId' -> 'fabricate.recipeItemDefinitionId'.
@@ -40,21 +41,21 @@ function itemWithRecipeItemFlag(definitionId, extra = {}) {
       if (scope === 'fabricate' && key === 'fabricate.recipeItemDefinitionId') return definitionId;
       return undefined;
     },
-    ...extra
+    ...extra,
   };
 }
 
 test('1 - returns _stats.compendiumSource when present (v12+ canonical field)', () => {
   const item = {
     _stats: { compendiumSource: 'Compendium.world.items.abc123' },
-    flags: {}
+    flags: {},
   };
   assert.equal(getCompendiumSourceUuid(item), 'Compendium.world.items.abc123');
 });
 
 test('2 - falls back to flags.core.sourceId when _stats.compendiumSource is absent', () => {
   const item = {
-    flags: { core: { sourceId: 'Compendium.world.items.legacy' } }
+    flags: { core: { sourceId: 'Compendium.world.items.legacy' } },
   };
   assert.equal(getCompendiumSourceUuid(item), 'Compendium.world.items.legacy');
 });
@@ -67,7 +68,7 @@ test('3 - returns null when neither field is set', () => {
 test('4 - prefers _stats.compendiumSource over flags.core.sourceId when both set', () => {
   const item = {
     _stats: { compendiumSource: 'Compendium.world.items.v12' },
-    flags: { core: { sourceId: 'Compendium.world.items.legacy' } }
+    flags: { core: { sourceId: 'Compendium.world.items.legacy' } },
   };
   assert.equal(getCompendiumSourceUuid(item), 'Compendium.world.items.v12');
 });
@@ -83,7 +84,7 @@ test('6 - returns null for undefined item', () => {
 test('7 - reads system._stats.compendiumSource as secondary v12+ location', () => {
   const item = {
     system: { _stats: { compendiumSource: 'Compendium.world.items.sys' } },
-    flags: {}
+    flags: {},
   };
   assert.equal(getCompendiumSourceUuid(item), 'Compendium.world.items.sys');
 });
@@ -96,11 +97,11 @@ test('9 - getItemSourceReferences returns item uuid and canonical source without
   const item = {
     uuid: 'Item.actor-owned-1',
     _stats: { compendiumSource: 'Compendium.world.items.iron-ore' },
-    flags: {}
+    flags: {},
   };
   assert.deepEqual(getItemSourceReferences(item), [
     'Item.actor-owned-1',
-    'Compendium.world.items.iron-ore'
+    'Compendium.world.items.iron-ore',
   ]);
 });
 
@@ -108,12 +109,12 @@ test('10 - getItemMatchUuids includes registeredItemUuid, originItemUuid, and un
   const component = {
     registeredItemUuid: 'Compendium.world.items.iron-ore-live',
     originItemUuid: 'Compendium.source.items.iron-ore',
-    aliasItemUuids: ['Compendium.world.items.iron-ore-live', 'Compendium.world.items.iron-ore-old']
+    aliasItemUuids: ['Compendium.world.items.iron-ore-live', 'Compendium.world.items.iron-ore-old'],
   };
   assert.deepEqual(getItemMatchUuids(component), [
     'Compendium.world.items.iron-ore-live',
     'Compendium.source.items.iron-ore',
-    'Compendium.world.items.iron-ore-old'
+    'Compendium.world.items.iron-ore-old',
   ]);
 });
 
@@ -121,11 +122,11 @@ test('11 - resolveComponentForItem matches canonical originItemUuid when live uu
   const item = {
     uuid: 'Item.actor-owned-2',
     _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
-    flags: {}
+    flags: {},
   };
   const ironOre = component('comp-iron', {
     registeredItemUuid: 'Compendium.world.items.iron-ore-live',
-    originItemUuid: 'Compendium.source.items.iron-ore'
+    originItemUuid: 'Compendium.source.items.iron-ore',
   });
   assert.equal(resolveComponentForItem(item, [ironOre], 'sysA'), ironOre);
 });
@@ -149,7 +150,7 @@ test('15 - getCompendiumSourceUuid stays null for a duplicate-source-only item (
   const item = {
     uuid: 'Item.actor-drag-copy',
     _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
-    flags: {}
+    flags: {},
   };
   assert.equal(getCompendiumSourceUuid(item), null);
 });
@@ -158,12 +159,12 @@ test('16 - getItemSourceReferences includes duplicateSource as a third reference
   const item = {
     uuid: 'Item.actor-drag-copy',
     _stats: { compendiumSource: 'Compendium.world.items.pick', duplicateSource: 'Item.world-pick' },
-    flags: {}
+    flags: {},
   };
   assert.deepEqual(getItemSourceReferences(item), [
     'Item.actor-drag-copy',
     'Compendium.world.items.pick',
-    'Item.world-pick'
+    'Item.world-pick',
   ]);
 });
 
@@ -171,11 +172,11 @@ test('17 - resolveComponentForItem matches a duplicate-source-only item via orig
   const item = {
     uuid: 'Item.actor-drag-copy',
     _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
-    flags: {}
+    flags: {},
   };
   const pick = component('comp-pick', {
     registeredItemUuid: 'Compendium.world.items.pick-live',
-    originItemUuid: 'Item.world-pick'
+    originItemUuid: 'Item.world-pick',
   });
   assert.equal(resolveComponentForItem(item, [pick], 'sysA'), pick);
 });
@@ -187,11 +188,11 @@ test('18 - resolveComponentForItem does NOT produce identity from an irrelevant 
     flags: { fabricate: { mythwrightId: 'mw-pick' } },
     // An unrelated third-party flag: getFabricateFlag('roles'/'componentId') must miss.
     getFlag: (scope, key) =>
-      scope === 'fabricate' && key === 'fabricate.mythwrightId' ? 'mw-pick' : undefined
+      scope === 'fabricate' && key === 'fabricate.mythwrightId' ? 'mw-pick' : undefined,
   };
   const pick = component('comp-pick', {
     registeredItemUuid: 'Compendium.world.items.pick-live',
-    originItemUuid: 'Item.world-pick'
+    originItemUuid: 'Item.world-pick',
   });
   // No roles, no legacy scalar, no overlapping raw refs ⇒ no match.
   assert.equal(resolveComponentForItem(item, [pick], 'sysA'), null);
@@ -202,7 +203,12 @@ test('19 - findStackableMatch: returns an existing quantity item sharing the sou
   const source = { uuid: 'Compendium.world.items.raw-ore' };
   const items = [
     { name: 'Sword', uuid: 'Item.sword', system: {} }, // no quantity → not stackable
-    { name: 'Raw Ore', uuid: 'Item.owned-ore', system: { quantity: 3 }, flags: { core: { sourceId: 'Compendium.world.items.raw-ore' } } }
+    {
+      name: 'Raw Ore',
+      uuid: 'Item.owned-ore',
+      system: { quantity: 3 },
+      flags: { core: { sourceId: 'Compendium.world.items.raw-ore' } },
+    },
   ];
   const match = findStackableMatch(items, source);
   assert.equal(match?.uuid, 'Item.owned-ore');
@@ -211,7 +217,12 @@ test('19 - findStackableMatch: returns an existing quantity item sharing the sou
 test('20 - findStackableMatch: no match when no item has a quantity field', () => {
   const source = { uuid: 'Compendium.world.items.raw-ore' };
   const items = [
-    { name: 'Raw Ore', uuid: 'Item.owned-ore', system: {}, flags: { core: { sourceId: 'Compendium.world.items.raw-ore' } } }
+    {
+      name: 'Raw Ore',
+      uuid: 'Item.owned-ore',
+      system: {},
+      flags: { core: { sourceId: 'Compendium.world.items.raw-ore' } },
+    },
   ];
   assert.equal(findStackableMatch(items, source), null);
 });
@@ -219,7 +230,12 @@ test('20 - findStackableMatch: no match when no item has a quantity field', () =
 test('21 - findStackableMatch: no match when source refs do not overlap', () => {
   const source = { uuid: 'Compendium.world.items.raw-ore' };
   const items = [
-    { name: 'Gemstone', uuid: 'Item.gem', system: { quantity: 1 }, flags: { core: { sourceId: 'Compendium.world.items.gemstone' } } }
+    {
+      name: 'Gemstone',
+      uuid: 'Item.gem',
+      system: { quantity: 1 },
+      flags: { core: { sourceId: 'Compendium.world.items.gemstone' } },
+    },
   ];
   assert.equal(findStackableMatch(items, source), null);
 });
@@ -243,14 +259,14 @@ test('A2 - findStackableMatch does NOT fold an award into a candidate resolving 
     uuid: 'Item.owned-b',
     duplicateSource: 'Item.award-src',
     roles: { sysA: { componentId: 'comp-b' } },
-    quantity: 4
+    quantity: 4,
   });
 
   // Foundry-Item award source resolving to compA. Trap: its Foundry .id collides with
   // the candidate's claimed id (comp-b) — that is NOT identity agreement.
   const itemSource = roleItem({
     uuid: 'Item.award-src',
-    roles: { sysA: { componentId: 'comp-a' } }
+    roles: { sysA: { componentId: 'comp-a' } },
   });
   itemSource.id = 'comp-b';
   assert.equal(findStackableMatch([candidate], itemSource, components, 'sysA'), null);
@@ -267,7 +283,7 @@ test('B3 - findStackableMatch still stacks on a shared raw ref when identities a
     uuid: 'Item.owned-a',
     compendiumSource: 'Item.a-src',
     roles: { sysA: { componentId: 'comp-a' } },
-    quantity: 2
+    quantity: 2,
   });
   assert.equal(findStackableMatch([agreeing], compA, components, 'sysA'), agreeing);
 
@@ -277,7 +293,7 @@ test('B3 - findStackableMatch still stacks on a shared raw ref when identities a
     uuid: 'Item.owned-flagless',
     _stats: { duplicateSource: 'Item.a-src' },
     flags: {},
-    system: { quantity: 3 }
+    system: { quantity: 3 },
   };
   const itemSource = roleItem({ uuid: 'Item.a-src', roles: { sysA: { componentId: 'comp-a' } } });
   assert.equal(findStackableMatch([flagless], itemSource, components, 'sysA'), flagless);
@@ -291,7 +307,7 @@ test('B4 - findStackableMatch does NOT stack a correct-identity candidate with z
     uuid: 'Item.owned-a',
     compendiumSource: 'Item.unrelated',
     roles: { sysA: { componentId: 'comp-a' } },
-    quantity: 2
+    quantity: 2,
   });
   const itemSource = roleItem({ uuid: 'Item.a-src', roles: { sysA: { componentId: 'comp-a' } } });
   assert.equal(findStackableMatch([candidate], itemSource, [compA], 'sysA'), null);
@@ -301,11 +317,11 @@ test('23 - getItemIdentityReferences returns uuid and compendium source, EXCLUDI
   const item = {
     uuid: 'Item.actor-drag-copy',
     _stats: { compendiumSource: 'Compendium.world.items.pick', duplicateSource: 'Item.world-pick' },
-    flags: {}
+    flags: {},
   };
   assert.deepEqual(getItemIdentityReferences(item), [
     'Item.actor-drag-copy',
-    'Compendium.world.items.pick'
+    'Compendium.world.items.pick',
   ]);
 });
 
@@ -314,7 +330,7 @@ test('24 - getItemIdentityReferences for a clone with no compendium source retur
   const item = {
     uuid: 'Item.talonvine',
     _stats: { compendiumSource: null, duplicateSource: 'Item.moonsilver-weed' },
-    flags: {}
+    flags: {},
   };
   assert.deepEqual(getItemIdentityReferences(item), ['Item.talonvine']);
 });
@@ -323,11 +339,11 @@ test('25 - getItemIdentityReferences still includes the compendium source (parit
   const item = {
     uuid: 'Item.actor-owned-1',
     _stats: { compendiumSource: 'Compendium.world.items.iron-ore' },
-    flags: {}
+    flags: {},
   };
   assert.deepEqual(getItemIdentityReferences(item), [
     'Item.actor-owned-1',
-    'Compendium.world.items.iron-ore'
+    'Compendium.world.items.iron-ore',
   ]);
 });
 
@@ -347,11 +363,11 @@ test('27 - resolveComponentForItem matches on the legacy scalar flags.fabricate.
   const item = roleItem({
     uuid: 'Item.actor-templated',
     duplicateSource: 'Item.some-template',
-    componentId: 'comp-abc'
+    componentId: 'comp-abc',
   });
   const abc = component('comp-abc', {
     registeredItemUuid: 'Item.component-source',
-    originItemUuid: 'Item.component-source'
+    originItemUuid: 'Item.component-source',
   });
   assert.equal(resolveComponentForItem(item, [abc], 'sysA'), abc);
 });
@@ -365,7 +381,7 @@ test('A1 - within-system exclusivity: a roles-flagged item whose duplicateSource
   const item = roleItem({
     uuid: 'Item.actor-templated',
     duplicateSource: 'Item.y-src', // overlaps sibling Y's source ref
-    roles: { sysA: { componentId: 'comp-x' } }
+    roles: { sysA: { componentId: 'comp-x' } },
   });
   assert.equal(resolveComponentForItem(item, [compX, compY], 'sysA'), compX);
   assert.equal(itemResolvesToComponent(item, compY, [compX, compY], 'sysA'), false);
@@ -378,7 +394,7 @@ test('A0-map - roles map is the sole identity: refs decoupled from the flagged c
   const item = roleItem({
     uuid: 'Item.decoupled',
     compendiumSource: 'Item.unrelated',
-    roles: { sysA: { componentId: 'comp-a' } }
+    roles: { sysA: { componentId: 'comp-a' } },
   });
   assert.equal(resolveComponentForItem(item, [compA], 'sysA'), compA);
 });
@@ -391,7 +407,7 @@ test('A4 - read-side cross-system: one source registered in two systems resolves
   const item = roleItem({
     uuid: 'Item.shared-source',
     compendiumSource: 'Item.unrelated',
-    roles: { sysA: { componentId: 'comp-a' }, sysB: { componentId: 'comp-b' } }
+    roles: { sysA: { componentId: 'comp-a' }, sysB: { componentId: 'comp-b' } },
   });
   assert.equal(resolveComponentForItem(item, sysA.components, sysA.id).id, 'comp-a');
   assert.equal(resolveComponentForItem(item, sysB.components, sysB.id).id, 'comp-b');
@@ -407,7 +423,7 @@ test('A6 - systemId keying defeats copy-import id-collision: same component id i
   const item = roleItem({
     uuid: 'Item.decoupled',
     compendiumSource: 'Item.unrelated',
-    roles: { sysA: { componentId: 'comp-5' } }
+    roles: { sysA: { componentId: 'comp-5' } },
   });
   assert.equal(resolveComponentForItem(item, sysA.components, 'sysA'), sysA.components[0]);
   assert.equal(resolveComponentForItem(item, sysB.components, 'sysB'), null);
@@ -428,7 +444,7 @@ test('B5 - hygiene tier: an empty or nullish roles[sys] never yields identity, e
   const emptyRoles = roleItem({ uuid: 'Item.mid-restamp', roles: { sysA: {} } });
   const nullComponentId = roleItem({
     uuid: 'Item.mid-restamp',
-    roles: { sysA: { componentId: null } }
+    roles: { sysA: { componentId: null } },
   });
   assert.equal(resolveComponentForItem(emptyRoles, [nullishIdComp], 'sysA'), null);
   assert.equal(resolveComponentForItem(nullComponentId, [nullishIdComp], 'sysA'), null);
@@ -441,7 +457,7 @@ test('B6 - scalar multi-system (anti-pairwise guard): item IS compA, legacy scal
   const item = roleItem({
     uuid: 'Item.owned',
     compendiumSource: 'Item.a-src', // raw ref overlaps compA
-    componentId: 'comp-b' // legacy scalar names a component absent from sysA's set
+    componentId: 'comp-b', // legacy scalar names a component absent from sysA's set
   });
   // Scalar comp-b names nothing in [compA] ⇒ fall through to raw refs ⇒ compA.
   assert.equal(resolveComponentForItem(item, [compA], 'sysA'), compA);
@@ -454,7 +470,7 @@ test('B8 - three-system + stale-entry boundary: a claimed id absent from the set
   const thirdSystemClaim = roleItem({
     uuid: 'Item.owned',
     compendiumSource: 'Item.a-src',
-    roles: { sysC: { componentId: 'comp-3' } }
+    roles: { sysC: { componentId: 'comp-3' } },
   });
   assert.equal(resolveComponentForItem(thirdSystemClaim, [compA], 'sysA'), compA);
   // A stale roles entry for a dead system, queried against a live system's set with no
@@ -462,7 +478,7 @@ test('B8 - three-system + stale-entry boundary: a claimed id absent from the set
   const staleOnly = roleItem({
     uuid: 'Item.stale',
     compendiumSource: 'Item.unrelated',
-    roles: { deadSys: { componentId: 'comp-x' } }
+    roles: { deadSys: { componentId: 'comp-x' } },
   });
   assert.equal(resolveComponentForItem(staleOnly, [compA], 'sysA'), null);
 });
@@ -485,7 +501,7 @@ test('A11b - an unsafe (dotted) systemId skips the roles tier and still resolves
   const unsafeItem = roleItem({
     uuid: 'Item.unsafe',
     duplicateSource: 'Item.dup-src', // raw-ref overlaps compDup
-    roles: { 'my.system': { componentId: 'comp-roles' } }
+    roles: { 'my.system': { componentId: 'comp-roles' } },
   });
   assert.equal(resolveComponentForItem(unsafeItem, components, 'my.system'), compDup);
 });
@@ -494,26 +510,51 @@ test('A11b - an unsafe (dotted) systemId skips the roles tier and still resolves
 // matchRecipeItemDefinition — four-tier precedence, no fall-through, union refs
 // ---------------------------------------------------------------------------
 
-const BOOK_DEF = { id: 'def-book', registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book', aliasItemUuids: [] };
+const BOOK_DEF = {
+  id: 'def-book',
+  registeredItemUuid: 'Item.book',
+  originItemUuid: 'Compendium.mod.book',
+  aliasItemUuids: [],
+};
 
 test('29 - matchRecipeItemDefinition: tier 1 (durable flag) wins even when source uuids point elsewhere', () => {
   const item = itemWithRecipeItemFlag('def-book', { uuid: 'Item.unrelated', _stats: {} });
-  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'identity' });
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), {
+    definition: BOOK_DEF,
+    tier: 'identity',
+  });
 });
 
 test('30 - matchRecipeItemDefinition: tier 2 (own uuid) matches registeredItemUuid via the union', () => {
   const item = { uuid: 'Item.book', _stats: {}, getFlag: () => undefined };
-  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'uuid' });
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), {
+    definition: BOOK_DEF,
+    tier: 'uuid',
+  });
 });
 
 test('31 - matchRecipeItemDefinition: tier 3 (compendium source) matches originItemUuid', () => {
-  const item = { uuid: 'Item.copy', _stats: { compendiumSource: 'Compendium.mod.book' }, getFlag: () => undefined };
-  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'compendium' });
+  const item = {
+    uuid: 'Item.copy',
+    _stats: { compendiumSource: 'Compendium.mod.book' },
+    getFlag: () => undefined,
+  };
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), {
+    definition: BOOK_DEF,
+    tier: 'compendium',
+  });
 });
 
 test('32 - matchRecipeItemDefinition: tier 4 (duplicate source) is the last resort', () => {
-  const item = { uuid: 'Item.copy', _stats: { duplicateSource: 'Item.book' }, getFlag: () => undefined };
-  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: BOOK_DEF, tier: 'duplicate' });
+  const item = {
+    uuid: 'Item.copy',
+    _stats: { duplicateSource: 'Item.book' },
+    getFlag: () => undefined,
+  };
+  assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), {
+    definition: BOOK_DEF,
+    tier: 'duplicate',
+  });
 });
 
 test('33 - matchRecipeItemDefinition: no fall-through — a flag match to one def never falls to a uuid match on another', () => {
@@ -521,12 +562,23 @@ test('33 - matchRecipeItemDefinition: no fall-through — a flag match to one de
   const bySource = { id: 'def-src', registeredItemUuid: 'Item.book', originItemUuid: 'Item.book' };
   const item = itemWithRecipeItemFlag('def-flag', { uuid: 'Item.book', _stats: {} });
   // Tier 1 resolves def-flag; it must NOT fall through to the tier-2 uuid match on def-src.
-  assert.deepEqual(matchRecipeItemDefinition(item, [flagged, bySource]), { definition: flagged, tier: 'identity' });
+  assert.deepEqual(matchRecipeItemDefinition(item, [flagged, bySource]), {
+    definition: flagged,
+    tier: 'identity',
+  });
 });
 
 test('34 - matchRecipeItemDefinition: union resolves BOTH drag routes of a compendium-imported book', () => {
-  const fromCompendium = { uuid: 'Item.a', _stats: { compendiumSource: 'Compendium.mod.book' }, getFlag: () => undefined };
-  const fromWorldItem = { uuid: 'Item.b', _stats: { compendiumSource: 'Compendium.mod.book', duplicateSource: 'Item.book' }, getFlag: () => undefined };
+  const fromCompendium = {
+    uuid: 'Item.a',
+    _stats: { compendiumSource: 'Compendium.mod.book' },
+    getFlag: () => undefined,
+  };
+  const fromWorldItem = {
+    uuid: 'Item.b',
+    _stats: { compendiumSource: 'Compendium.mod.book', duplicateSource: 'Item.book' },
+    getFlag: () => undefined,
+  };
   assert.equal(matchRecipeItemDefinition(fromCompendium, [BOOK_DEF]).definition, BOOK_DEF);
   assert.equal(matchRecipeItemDefinition(fromWorldItem, [BOOK_DEF]).definition, BOOK_DEF);
 });
@@ -534,7 +586,11 @@ test('34 - matchRecipeItemDefinition: union resolves BOTH drag routes of a compe
 // False-positive guards (companions to tests 16-17, 19-22 which only assert true-positives).
 
 test('35 - matchRecipeItemDefinition: an item sharing NO ref returns no match', () => {
-  const item = { uuid: 'Item.other', _stats: { compendiumSource: 'Compendium.mod.other', duplicateSource: 'Item.other' }, getFlag: () => undefined };
+  const item = {
+    uuid: 'Item.other',
+    _stats: { compendiumSource: 'Compendium.mod.other', duplicateSource: 'Item.other' },
+    getFlag: () => undefined,
+  };
   assert.deepEqual(matchRecipeItemDefinition(item, [BOOK_DEF]), { definition: null, tier: null });
   assert.equal(itemMatchesRecipeItemSource(item, [BOOK_DEF]), false);
 });
@@ -545,7 +601,10 @@ test('36 - matchRecipeItemDefinition: a non-matching durable flag does NOT match
 });
 
 test('37 - matchRecipeItemDefinition: empty definitions, null item, and blank refs never match', () => {
-  assert.deepEqual(matchRecipeItemDefinition({ uuid: 'Item.book', getFlag: () => undefined }, []), { definition: null, tier: null });
+  assert.deepEqual(matchRecipeItemDefinition({ uuid: 'Item.book', getFlag: () => undefined }, []), {
+    definition: null,
+    tier: null,
+  });
   assert.deepEqual(matchRecipeItemDefinition(null, [BOOK_DEF]), { definition: null, tier: null });
   const blankDef = { id: 'blank', originItemUuid: '  ' };
   const item = { uuid: '', _stats: {}, getFlag: () => undefined };
@@ -553,7 +612,11 @@ test('37 - matchRecipeItemDefinition: empty definitions, null item, and blank re
 });
 
 test('38 - getItemMatchUuids unions registeredItemUuid, originItemUuid, and fallbacks like the component helper', () => {
-  const def = { registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book', aliasItemUuids: ['Item.old', 'Item.book'] };
+  const def = {
+    registeredItemUuid: 'Item.book',
+    originItemUuid: 'Compendium.mod.book',
+    aliasItemUuids: ['Item.old', 'Item.book'],
+  };
   assert.deepEqual(getItemMatchUuids(def), ['Item.book', 'Compendium.mod.book', 'Item.old']);
 });
 

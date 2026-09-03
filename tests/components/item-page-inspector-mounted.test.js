@@ -18,9 +18,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
-    'src/ui/svelte/apps/manager/ItemPageInspector.svelte'
+    'src/ui/svelte/apps/manager/ItemPageInspector.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte',
 });
 
 function makeItem(overrides = {}) {
@@ -31,17 +31,20 @@ function makeItem(overrides = {}) {
     derivedType: 'Book',
     description: 'Starter recipes for every apprentice.',
     enabled: true,
-    caps: { item: { limitUses: true, maxUses: 4 }, learn: { limitLearning: true, learningMode: 'once' } },
+    caps: {
+      item: { limitUses: true, maxUses: 4 },
+      learn: { limitLearning: true, learningMode: 'once' },
+    },
     recipes: [
       { id: 'r1', name: 'Smelt Copper', category: 'Smithing' },
       { id: 'r2', name: 'Forge Rivets', category: 'Smithing' },
       { id: 'r3', name: 'Basic Whetstone', category: 'Smithing' },
       { id: 'r4', name: 'Mend Tool', category: 'Smithing' },
-      { id: 'r5', name: 'Render Tallow', category: 'Alchemy' }
+      { id: 'r5', name: 'Render Tallow', category: 'Alchemy' },
     ],
     learnedByCount: 6,
     linkMissing: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -59,17 +62,26 @@ describe('ItemPageInspector (mounted)', () => {
 
     harness.remount();
     const knowledge = await harness.mount({ item: makeItem(), visibilityMode: 'knowledge' });
-    assert.equal(knowledge.querySelector('[data-item-page-mid-label]').textContent.trim(), 'Learning');
+    assert.equal(
+      knowledge.querySelector('[data-item-page-mid-label]').textContent.trim(),
+      'Learning'
+    );
     assert.equal(knowledge.querySelector('[data-item-page-mid-value]').textContent.trim(), '1×');
   });
 
   it('renders the name, type, description, and a "recipes inside" preview with a +N more line', async () => {
     const root = await harness.mount({ item: makeItem(), visibilityMode: 'knowledge' });
-    assert.equal(root.querySelector('[data-item-page-name]').textContent.trim(), "Journeyman's Primer");
+    assert.equal(
+      root.querySelector('[data-item-page-name]').textContent.trim(),
+      "Journeyman's Primer"
+    );
     // The pill names the recipe count for a multi-recipe item (5 in this fixture),
     // matching the Books & Scrolls library row and the Knowledge surface.
     assert.equal(root.querySelector('[data-item-page-type]').textContent.trim(), '5 Recipe Book');
-    assert.equal(root.querySelector('[data-item-page-desc]').textContent.trim(), 'Starter recipes for every apprentice.');
+    assert.equal(
+      root.querySelector('[data-item-page-desc]').textContent.trim(),
+      'Starter recipes for every apprentice.'
+    );
 
     // Only the first three recipes preview; the rest collapse into "+2 more".
     assert.equal(root.querySelectorAll('[data-item-page-recipe]').length, 3);
@@ -79,7 +91,7 @@ describe('ItemPageInspector (mounted)', () => {
   it('marks a recipe item with no linked recipes as an Incomplete (danger) type', async () => {
     const root = await harness.mount({
       item: makeItem({ derivedType: 'Incomplete', recipes: [] }),
-      visibilityMode: 'knowledge'
+      visibilityMode: 'knowledge',
     });
     const typePill = root.querySelector('[data-item-page-type]');
     assert.equal(typePill.textContent.trim(), 'Incomplete');
@@ -94,9 +106,15 @@ describe('ItemPageInspector (mounted)', () => {
     const root = await harness.mount({
       item: makeItem({ caps: { item: { limitUses: false }, learn: { limitLearning: false } } }),
       visibilityMode: 'item',
-      onOpenRecipeItem: (id) => { edited = id; },
-      onToggleEnabled: (id, enabled) => { toggled = { id, enabled }; },
-      onToggleQuickLimit: (id, limited) => { quickLimit = { id, limited }; }
+      onOpenRecipeItem: (id) => {
+        edited = id;
+      },
+      onToggleEnabled: (id, enabled) => {
+        toggled = { id, enabled };
+      },
+      onToggleQuickLimit: (id, limited) => {
+        quickLimit = { id, limited };
+      },
     });
 
     root.querySelector('[data-item-page-edit]').click();
@@ -119,7 +137,7 @@ describe('ItemPageInspector (mounted)', () => {
   it('reads the unlimited use value as the infinity glyph', async () => {
     const root = await harness.mount({
       item: makeItem({ caps: { item: { limitUses: false }, learn: {} } }),
-      visibilityMode: 'item'
+      visibilityMode: 'item',
     });
     assert.equal(root.querySelector('[data-item-page-mid-value]').textContent.trim(), '∞');
   });

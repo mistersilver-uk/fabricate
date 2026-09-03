@@ -111,11 +111,7 @@ test('the two alchemy check shapes state OPPOSITE check facts', () => {
     'Required',
     'alchemy tiered routes result groups by outcome tier and cannot resolve without a roll'
   );
-  assert.doesNotMatch(
-    simple.body.fallback,
-    /mandator/i,
-    'and its explanation must not either'
-  );
+  assert.doesNotMatch(simple.body.fallback, /mandator/i, 'and its explanation must not either');
 });
 
 test('the alchemy OFF state is not a callout at all', () => {

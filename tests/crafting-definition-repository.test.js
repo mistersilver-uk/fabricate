@@ -145,7 +145,9 @@ describe('no production code outside the adapter touches the definition setting 
   it('actually fires on the shape it forbids, in both spellings', () => {
     // A "must print nothing" gate is worthless until you have watched it print something.
     // Both of these are real pre-seam lines from the two managers and the migration runner.
-    assert.ok(KEY_ACCESS.test(stripComments('const saved = getSetting(SETTING_KEYS.RECIPES) || [];')));
+    assert.ok(
+      KEY_ACCESS.test(stripComments('const saved = getSetting(SETTING_KEYS.RECIPES) || [];'))
+    );
     assert.ok(
       KEY_ACCESS.test(stripComments('await setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, payload);'))
     );
@@ -157,7 +159,9 @@ describe('no production code outside the adapter touches the definition setting 
 
   it('does not fire on prose or on an unrelated setting key', () => {
     assert.ok(
-      !KEY_ACCESS.test(stripComments('// getSetting(SETTING_KEYS.RECIPES) used to live here\nconst x = 1;')),
+      !KEY_ACCESS.test(
+        stripComments('// getSetting(SETTING_KEYS.RECIPES) used to live here\nconst x = 1;')
+      ),
       'comments are stripped before matching, so documenting the retired shape is safe'
     );
     assert.ok(!KEY_ACCESS.test(stripComments('getSetting(SETTING_KEYS.THEME);')));
@@ -184,7 +188,11 @@ describe('the repository is injectable and countable without patching globals', 
       ['put:r1', 'put:r1', 'delete:r1'],
       'each single-record mutation names the record it changed — the baseline #1080 must improve on'
     );
-    assert.equal(counting.counts.putAll, 0, 'no whole-corpus write is issued for a single mutation');
+    assert.equal(
+      counting.counts.putAll,
+      0,
+      'no whole-corpus write is issued for a single mutation'
+    );
   });
 
   it('persist:false defers to exactly one whole-corpus write', async () => {
@@ -308,7 +316,10 @@ describe('the settings adapter', () => {
 
   it('still lets the server refuse a non-GM write', async () => {
     const { seam, repository } = makeAdapter({ isGM: false });
-    await assert.rejects(repository.put({ id: 'a', name: 'A' }), /lacks permission to update Setting/);
+    await assert.rejects(
+      repository.put({ id: 'a', name: 'A' }),
+      /lacks permission to update Setting/
+    );
     assert.deepEqual(seam.refused, ['recipes'], 'world-scope authority is unchanged by the seam');
     assert.equal(seam.writes.length, 0);
   });
@@ -391,7 +402,10 @@ describe('the abstract contract', () => {
     await assert.rejects(bare.put({}), /must implement put/);
     await assert.rejects(bare.delete('x'), /must implement delete\(x\)/);
     await assert.rejects(bare.putAll([]), /must implement putAll/);
-    await assert.rejects(bare.runBatch(() => {}), /must implement runBatch/);
+    await assert.rejects(
+      bare.runBatch(() => {}),
+      /must implement runBatch/
+    );
   });
 
   it('treats readReplicatedSnapshot as optional, defaulting to unsupported', () => {

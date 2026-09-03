@@ -46,8 +46,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
         type: 'weapon',
         img: 'icons/longsword.webp',
         uuid: 'Compendium.dnd5e.items.longsword',
-        toObject: () => ({ system: { quantity: 1 }, flags: {} })
-      }
+        toObject: () => ({ system: { quantity: 1 }, flags: {} }),
+      },
     });
 
     assert.equal(payload.folder, 'folder-id');
@@ -74,9 +74,9 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
           aliasItemUuids: ['Compendium.dnd5e.items.old-longsword'],
           _stats: { compendiumSource: 'Compendium.dnd5e.items.longsword' },
           system: { quantity: 1 },
-          flags: { core: { sourceId: 'Compendium.dnd5e.items.longsword' } }
-        })
-      }
+          flags: { core: { sourceId: 'Compendium.dnd5e.items.longsword' } },
+        }),
+      },
     });
 
     assert.equal(payload.name, 'Fine Longsword');
@@ -85,7 +85,10 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(payload.registeredItemUuid, undefined);
     assert.equal(payload.originItemUuid, undefined);
     assert.equal(payload.aliasItemUuids, undefined);
-    assert.equal(payload.flags.fabricate.mythwrightBaseSourceId, 'Compendium.dnd5e.items.longsword');
+    assert.equal(
+      payload.flags.fabricate.mythwrightBaseSourceId,
+      'Compendium.dnd5e.items.longsword'
+    );
   });
 
   it('builds quality variant components without SRD matching identity', () => {
@@ -96,11 +99,11 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
         name: 'Fine Longsword',
         img: 'icons/longsword.webp',
         uuid: 'Item.world-fine-longsword',
-        flags: { core: { sourceId: 'Compendium.dnd5e.items.longsword' } }
+        flags: { core: { sourceId: 'Compendium.dnd5e.items.longsword' } },
       },
       {
         preserveSourceIdentity: false,
-        mythwrightBaseSourceId: 'Compendium.dnd5e.items.longsword'
+        mythwrightBaseSourceId: 'Compendium.dnd5e.items.longsword',
       }
     );
 
@@ -118,7 +121,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       id: 'keep-fine',
       name: 'Fine Longsword',
       folder: qualityFolder.id,
-      flags: { fabricate: { mythwrightId: 'weapon-fine-longsword' } }
+      flags: { fabricate: { mythwrightId: 'weapon-fine-longsword' } },
     };
     const stale = {
       id: 'stale-fine',
@@ -126,16 +129,20 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       folder: qualityFolder.id,
       flags: {
         core: { sourceId: 'Compendium.dnd5e.items.longsword' },
-        fabricate: { mythwrightId: 'weapon-fine-longsword' }
+        fabricate: { mythwrightId: 'weapon-fine-longsword' },
       },
-      delete: async () => { deleted.push('stale-fine'); }
+      delete: async () => {
+        deleted.push('stale-fine');
+      },
     };
     const unrelated = {
       id: 'user-copy',
       name: 'Longsword',
       folder: qualityFolder.id,
       flags: { core: { sourceId: 'Compendium.dnd5e.items.longsword' } },
-      delete: async () => { deleted.push('user-copy'); }
+      delete: async () => {
+        deleted.push('user-copy');
+      },
     };
     globalThis.game.items = [kept, stale, unrelated];
 
@@ -160,14 +167,18 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       name: 'Mythic Longsword',
       folder: qualityFolder.id,
       flags: { fabricate: { mythwrightId: 'weapon-mythic-longsword' } },
-      delete: async () => { deleted.push('old-mythic'); }
+      delete: async () => {
+        deleted.push('old-mythic');
+      },
     };
     const relic = {
       id: 'relic-copy',
       name: 'Mythwright Mythic Longsword',
       folder: 'relic-folder',
       flags: { fabricate: { mythwrightId: 'relic-mythic-longsword' } },
-      delete: async () => { deleted.push('relic-copy'); }
+      delete: async () => {
+        deleted.push('relic-copy');
+      },
     };
     globalThis.game.items = [obsolete, relic];
 
@@ -187,11 +198,14 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     const safe = new Set(helper.APPROVED_MYTHWRIGHT_ICON_PATHS);
 
     assert.ok(safe.has('icons/svg/item-bag.svg'));
-    assert.equal(helper.sanitizeIconPath('icons/not-guaranteed/missing.webp'), 'icons/svg/item-bag.svg');
+    assert.equal(
+      helper.sanitizeIconPath('icons/not-guaranteed/missing.webp'),
+      'icons/svg/item-bag.svg'
+    );
     assert.equal(helper.sanitizeIconPath('icons/svg/item-bag.svg'), 'icons/svg/item-bag.svg');
   });
 
-  it('uses only valid Foundry core icon paths for Mythwright-authored icons', t => {
+  it('uses only valid Foundry core icon paths for Mythwright-authored icons', (t) => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
 
     // Cheap shape-check: runs everywhere (CI included). Catches typos and
@@ -208,36 +222,43 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     // still runs.
     const iconManifestUrl = new URL('../tmp/fvtt-icon-paths.md', import.meta.url);
     if (!existsSync(iconManifestUrl)) {
-      t.skip('tmp/fvtt-icon-paths.md not present — regenerate locally from a running Foundry to validate against the live icon set');
+      t.skip(
+        'tmp/fvtt-icon-paths.md not present — regenerate locally from a running Foundry to validate against the live icon set'
+      );
       return;
     }
 
     const foundryIconPaths = new Set(
       readFileSync(iconManifestUrl, 'utf8')
         .split(/\r?\n/)
-        .map(path => path.trim())
+        .map((path) => path.trim())
         .filter(Boolean)
     );
 
     for (const iconPath of helper.APPROVED_MYTHWRIGHT_ICON_PATHS) {
-      assert.ok(foundryIconPaths.has(iconPath), `${iconPath} should exist in tmp/fvtt-icon-paths.md`);
+      assert.ok(
+        foundryIconPaths.has(iconPath),
+        `${iconPath} should exist in tmp/fvtt-icon-paths.md`
+      );
     }
   });
 
   it('discovers SRD items by normalized name from DnD5e item packs', async () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
-    const packs = [{
-      metadata: { packageName: 'dnd5e', type: 'Item' },
-      documentName: 'Item',
-      getDocuments: async () => [
-        { name: 'Longsword', type: 'weapon', uuid: 'Compendium.dnd5e.items.longsword' },
-        { name: 'Chain Mail', type: 'equipment', uuid: 'Compendium.dnd5e.items.chainmail' },
-        { name: 'Unrelated Spell', type: 'spell', uuid: 'Compendium.dnd5e.spells.foo' }
-      ]
-    }];
+    const packs = [
+      {
+        metadata: { packageName: 'dnd5e', type: 'Item' },
+        documentName: 'Item',
+        getDocuments: async () => [
+          { name: 'Longsword', type: 'weapon', uuid: 'Compendium.dnd5e.items.longsword' },
+          { name: 'Chain Mail', type: 'equipment', uuid: 'Compendium.dnd5e.items.chainmail' },
+          { name: 'Unrelated Spell', type: 'spell', uuid: 'Compendium.dnd5e.spells.foo' },
+        ],
+      },
+    ];
 
     const result = await helper.discoverSrdItems(packs);
-    const names = result.resolved.map(entry => entry.name);
+    const names = result.resolved.map((entry) => entry.name);
 
     assert.ok(names.includes('Longsword'));
     assert.ok(names.includes('Chain Mail'));
@@ -246,10 +267,15 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
 
   it('pins Mythwright SRD equipment to the DnD5e 2024 Equipment compendium UUIDs', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
-    const byName = new Map(helper.DND5E_EQUIPMENT24_SRD_ITEMS.map(([, name, uuid]) => [name, uuid]));
+    const byName = new Map(
+      helper.DND5E_EQUIPMENT24_SRD_ITEMS.map(([, name, uuid]) => [name, uuid])
+    );
 
     assert.equal(byName.get('Longsword'), 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
-    assert.equal(byName.get('Light Crossbow'), 'Compendium.dnd5e.equipment24.Item.phbwepLightCross');
+    assert.equal(
+      byName.get('Light Crossbow'),
+      'Compendium.dnd5e.equipment24.Item.phbwepLightCross'
+    );
     assert.equal(byName.get('Plate Armor'), 'Compendium.dnd5e.equipment24.Item.phbarmPlateArmor');
     assert.equal(byName.get('Shield'), 'Compendium.dnd5e.equipment24.Item.phbarmShield0000');
   });
@@ -260,23 +286,23 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     const resolvedById = {
       name: 'Longsword',
       type: 'weapon',
-      uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0'
+      uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0',
     };
     const pack = {
       collection: 'dnd5e.equipment24',
       metadata: { packageName: 'dnd5e', type: 'Item' },
       documentName: 'Item',
-      getDocument: async id => id === 'phbwepLongsword0' ? resolvedById : null,
+      getDocument: async (id) => (id === 'phbwepLongsword0' ? resolvedById : null),
       getDocuments: async () => [
-        { name: 'Longsword', type: 'weapon', uuid: 'Compendium.dnd5e.items.legacy-longsword' }
-      ]
+        { name: 'Longsword', type: 'weapon', uuid: 'Compendium.dnd5e.items.legacy-longsword' },
+      ],
     };
     const packs = [pack];
-    packs.get = id => id === 'dnd5e.equipment24' ? pack : null;
+    packs.get = (id) => (id === 'dnd5e.equipment24' ? pack : null);
     globalThis.game = { ...originalGame, packs };
 
     const result = await helper.discoverSrdItems(packs);
-    const longsword = result.resolved.find(entry => entry.name === 'Longsword');
+    const longsword = result.resolved.find((entry) => entry.name === 'Longsword');
 
     assert.equal(longsword.item.uuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
     globalThis.game = originalGame;
@@ -290,10 +316,13 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       img: 'icons/longsword.webp',
       uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0',
       system: { description: { value: '<p>A standard SRD longsword.</p>' } },
-      toObject: () => ({ system: { description: { value: '<p>A standard SRD longsword.</p>' } } })
+      toObject: () => ({ system: { description: { value: '<p>A standard SRD longsword.</p>' } } }),
     });
 
-    assert.equal(component.registeredItemUuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
+    assert.equal(
+      component.registeredItemUuid,
+      'Compendium.dnd5e.equipment24.Item.phbwepLongsword0'
+    );
     assert.equal(component.originItemUuid, 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0');
     assert.equal(component.name, 'Longsword');
     assert.match(component.description, /standard SRD longsword/);
@@ -302,43 +331,54 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
   it('builds deterministic multi-step SRD recipes with a check finishing step', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const target = { name: 'Longsword', type: 'weapon', item: { img: 'icons/longsword.webp' } };
-    const recipe = helper.buildRecipeForSrd(target, new Map([
-      ['weapon-longsword', { id: 'weapon-longsword' }]
-    ]));
+    const recipe = helper.buildRecipeForSrd(
+      target,
+      new Map([['weapon-longsword', { id: 'weapon-longsword' }]])
+    );
 
     assert.equal(recipe.id, 'mythwright-craft-longsword');
     assert.equal(recipe.category, 'Weapons');
     assert.deepEqual(recipe.tags, []);
     assert.equal(recipe.steps.length, 4);
     assert.equal(recipe.steps.at(-1).resultSelection.provider, 'check');
-    assert.ok(recipe.steps.every(step =>
-      step.ingredientSets.every(set =>
-        set.ingredientGroups.every(group =>
-          group.options.every(option => option.match.type === 'component')
+    assert.ok(
+      recipe.steps.every((step) =>
+        step.ingredientSets.every((set) =>
+          set.ingredientGroups.every((group) =>
+            group.options.every((option) => option.match.type === 'component')
+          )
         )
       )
-    ));
-    assert.deepEqual(recipe.steps.at(-1).resultGroups.map(group => group.name), [
-      'Flawed', 'Standard', 'Fine', 'Masterwork'
-    ]);
-    assert.deepEqual(recipe.steps.at(-1).resultGroups.map(group => group.results[0].componentId), [
-      'weapon-flawed-longsword',
-      'weapon-longsword',
-      'weapon-fine-longsword',
-      'weapon-masterwork-longsword'
-    ]);
+    );
+    assert.deepEqual(
+      recipe.steps.at(-1).resultGroups.map((group) => group.name),
+      ['Flawed', 'Standard', 'Fine', 'Masterwork']
+    );
+    assert.deepEqual(
+      recipe.steps.at(-1).resultGroups.map((group) => group.results[0].componentId),
+      [
+        'weapon-flawed-longsword',
+        'weapon-longsword',
+        'weapon-fine-longsword',
+        'weapon-masterwork-longsword',
+      ]
+    );
   });
 
   it('keeps Mythic outcomes available for bespoke relic recipes', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
-    const recipe = helper.buildRelicRecipe('relic-mythic-longsword', 'Mythwright Mythic Longsword', 'ember');
+    const recipe = helper.buildRelicRecipe(
+      'relic-mythic-longsword',
+      'Mythwright Mythic Longsword',
+      'ember'
+    );
 
     assert.equal(recipe.category, 'Relics');
     assert.equal(recipe.img, 'icons/weapons/swords/greatsword-blue.webp');
     assert.match(recipe.description, /awakening Mythwright Mythic Longsword/);
     assert.match(recipe.description, /artefact worthy of legend/);
     assert.deepEqual(recipe.tags, []);
-    assert.ok(recipe.steps.at(-1).resultGroups.some(group => group.name === 'Mythic'));
+    assert.ok(recipe.steps.at(-1).resultGroups.some((group) => group.name === 'Mythic'));
   });
 
   it('does not emit generated tags when no Mythwright recipe uses tag ingredients', () => {
@@ -349,7 +389,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       { name: 'Fine Longsword' },
       {
         srdQualityIds: new Set(['weapon-fine-longsword']),
-        srdQualityTypes: new Map([['weapon-fine-longsword', 'weapon']])
+        srdQualityTypes: new Map([['weapon-fine-longsword', 'weapon']]),
       }
     );
 
@@ -361,10 +401,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const payload = helper.buildSystemPayload({
       macroUuid: 'Macro.mythwright-check',
-      worldItems: new Map([
-        ['ember', { uuid: 'Item.ember-essence' }]
-      ]),
-      components: [{ id: 'raw-ore', name: 'Raw Ore' }]
+      worldItems: new Map([['ember', { uuid: 'Item.ember-essence' }]]),
+      components: [{ id: 'raw-ore', name: 'Raw Ore' }],
     });
 
     assert.equal(
@@ -373,8 +411,14 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     );
     assert.equal(payload.craftingCheck.macroUuid, 'Macro.mythwright-check');
     assert.equal(payload.salvageCraftingCheck.macroUuid, 'Macro.mythwright-check');
-    assert.equal(payload.essenceDefinitions.find(essence => essence.id === 'ember').sourceItemUuid, 'Item.ember-essence');
-    assert.match(payload.essenceDefinitions.find(essence => essence.id === 'ember').description, /cinder-bright essence/);
+    assert.equal(
+      payload.essenceDefinitions.find((essence) => essence.id === 'ember').sourceItemUuid,
+      'Item.ember-essence'
+    );
+    assert.match(
+      payload.essenceDefinitions.find((essence) => essence.id === 'ember').description,
+      /cinder-bright essence/
+    );
     assert.deepEqual(payload.components, [{ id: 'raw-ore', name: 'Raw Ore' }]);
   });
 
@@ -392,19 +436,26 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
             recipes: { imported: 3, skipped: 1, errors: [] },
             collisions: [
               { type: 'system', resolution: 'overwritten' },
-              { type: 'recipe', resolution: 'overwritten' }
-            ]
+              { type: 'recipe', resolution: 'overwritten' },
+            ],
           };
-        }
-      }
+        },
+      },
     };
 
     try {
       const payload = helper.buildImportPayload({
-        systemPayload: { id: helper.SYSTEM_ID, name: 'Mythwright', components: [{ id: 'raw-ore' }] },
-        recipes: [{ id: 'recipe-a', name: 'Recipe A' }]
+        systemPayload: {
+          id: helper.SYSTEM_ID,
+          name: 'Mythwright',
+          components: [{ id: 'raw-ore' }],
+        },
+        recipes: [{ id: 'recipe-a', name: 'Recipe A' }],
       });
-      const summary = { system: 'skipped', recipes: { created: 0, updated: 0, skipped: 0, errors: 0 } };
+      const summary = {
+        system: 'skipped',
+        recipes: { created: 0, updated: 0, skipped: 0, errors: 0 },
+      };
 
       await helper.importMythwrightPayload(payload, summary);
 
@@ -438,7 +489,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       baseName: 'Shortsword',
       type: 'weapon',
       essenceId: 'ember',
-      damageType: 'fire'
+      damageType: 'fire',
     });
     const environment = helper.buildEnvironment('mythwright-mines', 'Mines', 'hazardous', []);
 
@@ -459,23 +510,38 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       id: 'raw-ore',
       name: 'Raw Ore',
       folder: { id: 'folder-a' },
-      img: 'icons/commodities/stone/ore-pile-grey.webp'
+      img: 'icons/commodities/stone/ore-pile-grey.webp',
     });
-    const component = helper.componentFromItem('raw-ore', {
-      name: 'Raw Ore',
-      img: payload.img,
-      system: payload.system
-    }, { preserveSourceIdentity: false });
+    const component = helper.componentFromItem(
+      'raw-ore',
+      {
+        name: 'Raw Ore',
+        img: payload.img,
+        system: payload.system,
+      },
+      { preserveSourceIdentity: false }
+    );
 
     assert.match(payload.system.description.value, /Unrefined ore/);
     assert.match(component.description, /Unrefined ore/);
-    assert.match(helper.mythwrightItemDescription('ember', 'Ember Essence'), /cinder-bright essence/);
+    assert.match(
+      helper.mythwrightItemDescription('ember', 'Ember Essence'),
+      /cinder-bright essence/
+    );
   });
 
   it('builds elemental weapon payloads without SRD identity and with elemental damage metadata', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const payload = helper.elementalVariantPayload(
-      { id: 'weapon-ember-shortsword', name: 'Ember Shortsword', baseName: 'Shortsword', type: 'weapon', essenceId: 'ember', damageType: 'fire', img: 'icons/weapons/swords/shortsword-guard-gold-red.webp' },
+      {
+        id: 'weapon-ember-shortsword',
+        name: 'Ember Shortsword',
+        baseName: 'Shortsword',
+        type: 'weapon',
+        essenceId: 'ember',
+        damageType: 'fire',
+        img: 'icons/weapons/swords/shortsword-guard-gold-red.webp',
+      },
       {
         name: 'Shortsword',
         type: 'weapon',
@@ -484,8 +550,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
         toObject: () => ({
           _stats: { compendiumSource: 'Compendium.dnd5e.items.shortsword' },
           system: { quantity: 1, damage: { parts: [['1d6', 'piercing']] } },
-          flags: { core: { sourceId: 'Compendium.dnd5e.items.shortsword' } }
-        })
+          flags: { core: { sourceId: 'Compendium.dnd5e.items.shortsword' } },
+        }),
       },
       { id: 'elemental-folder' }
     );
@@ -494,7 +560,10 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.equal(payload.img, 'icons/weapons/swords/shortsword-guard-gold-red.webp');
     assert.equal(payload.flags.core, undefined);
     assert.equal(payload._stats, undefined);
-    assert.equal(payload.flags.fabricate.mythwrightBaseSourceId, 'Compendium.dnd5e.items.shortsword');
+    assert.equal(
+      payload.flags.fabricate.mythwrightBaseSourceId,
+      'Compendium.dnd5e.items.shortsword'
+    );
     assert.equal(payload.flags.fabricate.elemental.essenceId, 'ember');
     assert.equal(payload.flags.fabricate.elemental.damageType, 'fire');
     assert.equal(payload.flags.fabricate.elemental.damageApplied, true);
@@ -503,11 +572,22 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
 
   it('builds tiered elemental weapon payloads with stable standard identity and scaled damage', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
-    const definition = { id: 'weapon-ember-shortsword', name: 'Ember Shortsword', baseName: 'Shortsword', type: 'weapon', essenceId: 'ember', damageType: 'fire', img: 'icons/weapons/swords/shortsword-guard-gold-red.webp' };
+    const definition = {
+      id: 'weapon-ember-shortsword',
+      name: 'Ember Shortsword',
+      baseName: 'Shortsword',
+      type: 'weapon',
+      essenceId: 'ember',
+      damageType: 'fire',
+      img: 'icons/weapons/swords/shortsword-guard-gold-red.webp',
+    };
     const variants = helper.elementalQualityVariantDefinitions(definition);
-    const mythic = variants.find(variant => variant.quality.id === 'mythic');
+    const mythic = variants.find((variant) => variant.quality.id === 'mythic');
 
-    assert.equal(variants.find(variant => variant.quality.id === 'standard').id, 'weapon-ember-shortsword');
+    assert.equal(
+      variants.find((variant) => variant.quality.id === 'standard').id,
+      'weapon-ember-shortsword'
+    );
     assert.equal(mythic.id, 'weapon-ember-mythic-shortsword');
     assert.equal(mythic.name, 'Mythic Ember Shortsword');
 
@@ -520,8 +600,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
         uuid: 'Compendium.dnd5e.items.shortsword',
         toObject: () => ({
           system: { quantity: 1, damage: { parts: [['1d6', 'piercing']] } },
-          flags: { core: { sourceId: 'Compendium.dnd5e.items.shortsword' } }
-        })
+          flags: { core: { sourceId: 'Compendium.dnd5e.items.shortsword' } },
+        }),
       },
       { id: 'elemental-folder' }
     );
@@ -535,7 +615,14 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
   it('builds elemental armour payloads without SRD identity and with resistance metadata', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const payload = helper.elementalVariantPayload(
-      { id: 'armor-dragon-scale-mail', name: 'Dragon Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'dragon', resistanceType: 'fire' },
+      {
+        id: 'armor-dragon-scale-mail',
+        name: 'Dragon Scale Mail',
+        baseName: 'Scale Mail',
+        type: 'armor',
+        essenceId: 'dragon',
+        resistanceType: 'fire',
+      },
       {
         name: 'Scale Mail',
         type: 'equipment',
@@ -546,8 +633,8 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
           originItemUuid: 'Compendium.dnd5e.items.scale-mail',
           system: { quantity: 1, description: { value: '<p>Base armour.</p>' } },
           flags: { core: { sourceId: 'Compendium.dnd5e.items.scale-mail' } },
-          _stats: { compendiumSource: 'Compendium.dnd5e.items.scale-mail' }
-        })
+          _stats: { compendiumSource: 'Compendium.dnd5e.items.scale-mail' },
+        }),
       },
       { id: 'elemental-folder' }
     );
@@ -564,9 +651,19 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
 
   it('builds tiered elemental armour payloads with resistance and AC scaling', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
-    const definition = { id: 'armor-dragon-scale-mail', name: 'Dragon Scale Mail', baseName: 'Scale Mail', type: 'armor', essenceId: 'dragon', resistanceType: 'fire', img: 'icons/equipment/chest/breastplate-scale-grey.webp' };
+    const definition = {
+      id: 'armor-dragon-scale-mail',
+      name: 'Dragon Scale Mail',
+      baseName: 'Scale Mail',
+      type: 'armor',
+      essenceId: 'dragon',
+      resistanceType: 'fire',
+      img: 'icons/equipment/chest/breastplate-scale-grey.webp',
+    };
     const [flawed] = helper.elementalQualityVariantDefinitions(definition);
-    const mythic = helper.elementalQualityVariantDefinitions(definition).find(variant => variant.quality.id === 'mythic');
+    const mythic = helper
+      .elementalQualityVariantDefinitions(definition)
+      .find((variant) => variant.quality.id === 'mythic');
 
     const source = {
       name: 'Scale Mail',
@@ -575,18 +672,25 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       uuid: 'Compendium.dnd5e.items.scale-mail',
       toObject: () => ({
         system: { quantity: 1, description: { value: '<p>Base armour.</p>' } },
-        flags: { core: { sourceId: 'Compendium.dnd5e.items.scale-mail' } }
-      })
+        flags: { core: { sourceId: 'Compendium.dnd5e.items.scale-mail' } },
+      }),
     };
-    const flawedPayload = helper.elementalVariantPayload(flawed, source, { id: 'elemental-folder' });
-    const mythicPayload = helper.elementalVariantPayload(mythic, source, { id: 'elemental-folder' });
+    const flawedPayload = helper.elementalVariantPayload(flawed, source, {
+      id: 'elemental-folder',
+    });
+    const mythicPayload = helper.elementalVariantPayload(mythic, source, {
+      id: 'elemental-folder',
+    });
 
     assert.equal(flawedPayload.flags.fabricate.elemental.quality, 'flawed');
     assert.match(flawedPayload.system.description.value, /grants no reliable resistance/);
     assert.deepEqual(flawedPayload.effects, []);
     assert.equal(mythicPayload.flags.fabricate.elemental.quality, 'mythic');
     assert.equal(mythicPayload.flags.fabricate.elemental.acBonus, 3);
-    assert.match(mythicPayload.system.description.value, /resistance to fire damage and a \+3 bonus to AC/);
+    assert.match(
+      mythicPayload.system.description.value,
+      /resistance to fire damage and a \+3 bonus to AC/
+    );
     assert.equal(mythicPayload.effects[0].changes[0].key, 'system.traits.dr.value');
     assert.equal(mythicPayload.effects[1].changes[0].key, 'system.attributes.ac.bonus');
     assert.equal(mythicPayload.effects[1].changes[0].value, '3');
@@ -594,7 +698,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
 
   it('expands curated elemental variants across additional weapon and armour types', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
-    const ids = new Set(helper.ELEMENTAL_VARIANTS.map(variant => variant.id));
+    const ids = new Set(helper.ELEMENTAL_VARIANTS.map((variant) => variant.id));
 
     assert.ok(ids.has('weapon-ember-battleaxe'));
     assert.ok(ids.has('weapon-frost-spear'));
@@ -619,7 +723,7 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
       type: 'weapon',
       essenceId: 'ember',
       damageType: 'fire',
-      img: 'icons/weapons/swords/shortsword-guard-gold-red.webp'
+      img: 'icons/weapons/swords/shortsword-guard-gold-red.webp',
     });
     const set = recipe.steps[0].ingredientSets[0];
 
@@ -629,48 +733,62 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.deepEqual(recipe.tags, []);
     assert.equal(recipe.resultSelection.provider, 'check');
     assert.equal(recipe.steps[0].resultSelection.provider, 'check');
-    assert.ok(set.ingredientGroups.every(group =>
-      group.options.every(option => option.match.type === 'component')
-    ));
+    assert.ok(
+      set.ingredientGroups.every((group) =>
+        group.options.every((option) => option.match.type === 'component')
+      )
+    );
     assert.equal(set.essences.ember, 1);
-    assert.deepEqual(recipe.steps[0].resultGroups.map(group => group.name), [
-      'Flawed', 'Standard', 'Fine', 'Masterwork', 'Mythic'
-    ]);
-    assert.deepEqual(recipe.steps[0].resultGroups.map(group => group.results[0].componentId), [
-      'weapon-ember-flawed-shortsword',
-      'weapon-ember-shortsword',
-      'weapon-ember-fine-shortsword',
-      'weapon-ember-masterwork-shortsword',
-      'weapon-ember-mythic-shortsword'
-    ]);
+    assert.deepEqual(
+      recipe.steps[0].resultGroups.map((group) => group.name),
+      ['Flawed', 'Standard', 'Fine', 'Masterwork', 'Mythic']
+    );
+    assert.deepEqual(
+      recipe.steps[0].resultGroups.map((group) => group.results[0].componentId),
+      [
+        'weapon-ember-flawed-shortsword',
+        'weapon-ember-shortsword',
+        'weapon-ember-fine-shortsword',
+        'weapon-ember-masterwork-shortsword',
+        'weapon-ember-mythic-shortsword',
+      ]
+    );
   });
 
   it('seeds deterministic Mythwright gathering tools with broken replacements', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const tools = helper.buildGatheringTools();
 
-    assert.deepEqual(tools.map(tool => tool.id), [
-      'mythwright-tool-mining-pick',
-      'mythwright-tool-wood-axe',
-      'mythwright-tool-skinning-knife',
-      'mythwright-tool-delver-kit',
-      'mythwright-tool-planar-binding-rod',
-      'mythwright-tool-dragon-tongs'
-    ]);
-    assert.ok(tools.every(tool => tool.breakage.mode === 'breakageChance'));
-    assert.ok(tools.every(tool => tool.onBreak.mode === 'replaceWith'));
+    assert.deepEqual(
+      tools.map((tool) => tool.id),
+      [
+        'mythwright-tool-mining-pick',
+        'mythwright-tool-wood-axe',
+        'mythwright-tool-skinning-knife',
+        'mythwright-tool-delver-kit',
+        'mythwright-tool-planar-binding-rod',
+        'mythwright-tool-dragon-tongs',
+      ]
+    );
+    assert.ok(tools.every((tool) => tool.breakage.mode === 'breakageChance'));
+    assert.ok(tools.every((tool) => tool.onBreak.mode === 'replaceWith'));
     assert.equal(
-      tools.find(tool => tool.id === 'mythwright-tool-mining-pick').onBreak.replacementComponentId,
+      tools.find((tool) => tool.id === 'mythwright-tool-mining-pick').onBreak
+        .replacementComponentId,
       'broken-tool-mining-pick'
     );
-    assert.ok(helper.APPROVED_MYTHWRIGHT_ICON_PATHS.includes('icons/tools/hand/pickaxe-steel-white.webp'));
+    assert.ok(
+      helper.APPROVED_MYTHWRIGHT_ICON_PATHS.includes('icons/tools/hand/pickaxe-steel-white.webp')
+    );
   });
 
   it('builds repair recipes that consume broken tools and matching Mythwright materials', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const recipes = helper.buildToolRepairRecipes();
-    const pick = recipes.find(recipe => recipe.id === 'mythwright-repair-mining-pick');
-    const components = pick.steps[0].ingredientSets[0].ingredientGroups.map(group => group.options[0].componentId);
+    const pick = recipes.find((recipe) => recipe.id === 'mythwright-repair-mining-pick');
+    const components = pick.steps[0].ingredientSets[0].ingredientGroups.map(
+      (group) => group.options[0].componentId
+    );
 
     assert.equal(pick.category, 'Tools');
     assert.deepEqual(components, ['broken-tool-mining-pick', 'iron-ingot', 'hardwood']);
@@ -681,14 +799,42 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const tasks = helper.buildGatheringTasks({
       srdByName: new Map([
-        [helper.normalizeName('War Pick'), { type: 'weapon', name: 'War Pick', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepWarPick000' } }],
-        [helper.normalizeName('Longsword'), { type: 'weapon', name: 'Longsword', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0' } }],
-        [helper.normalizeName('Leather Armor'), { type: 'armor', name: 'Leather Armor', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmLeatherArm' } }],
-        [helper.normalizeName('Shield'), { type: 'armor', name: 'Shield', item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmShield0000' } }]
-      ])
+        [
+          helper.normalizeName('War Pick'),
+          {
+            type: 'weapon',
+            name: 'War Pick',
+            item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepWarPick000' },
+          },
+        ],
+        [
+          helper.normalizeName('Longsword'),
+          {
+            type: 'weapon',
+            name: 'Longsword',
+            item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbwepLongsword0' },
+          },
+        ],
+        [
+          helper.normalizeName('Leather Armor'),
+          {
+            type: 'armor',
+            name: 'Leather Armor',
+            item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmLeatherArm' },
+          },
+        ],
+        [
+          helper.normalizeName('Shield'),
+          {
+            type: 'armor',
+            name: 'Shield',
+            item: { uuid: 'Compendium.dnd5e.equipment24.Item.phbarmShield0000' },
+          },
+        ],
+      ]),
     });
-    const byId = new Map(tasks.map(task => [task.id, task]));
-    const rowNames = tasks.flatMap(task => task.dropRows.map(row => row.name));
+    const byId = new Map(tasks.map((task) => [task.id, task]));
+    const rowNames = tasks.flatMap((task) => task.dropRows.map((row) => row.name));
     const safeIcons = new Set(helper.APPROVED_MYTHWRIGHT_ICON_PATHS);
 
     assert.equal(byId.get('mine-ore').name, 'Extract Ore');
@@ -698,24 +844,35 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     assert.deepEqual(byId.get('mine-ore').toolIds, ['mythwright-tool-mining-pick']);
     assert.deepEqual(byId.get('battlefield-salvage').toolIds, [
       'mythwright-tool-delver-kit',
-      'mythwright-tool-skinning-knife'
+      'mythwright-tool-skinning-knife',
     ]);
-    assert.ok(tasks.every(task => task.img && task.img !== 'icons/svg/item-bag.svg'));
-    assert.ok(tasks.every(task => safeIcons.has(task.img)));
-    assert.ok(tasks.every(task => task.dropRows.length > 0));
-    assert.ok(tasks.every(task => task.dropRows.every(row => row.componentId || row.itemUuid)));
-    assert.equal(rowNames.some(name => /^(Found|Recovered|Buried|Preserved)\b/.test(name)), false);
+    assert.ok(tasks.every((task) => task.img && task.img !== 'icons/svg/item-bag.svg'));
+    assert.ok(tasks.every((task) => safeIcons.has(task.img)));
+    assert.ok(tasks.every((task) => task.dropRows.length > 0));
+    assert.ok(tasks.every((task) => task.dropRows.every((row) => row.componentId || row.itemUuid)));
+    assert.equal(
+      rowNames.some((name) => /^(Found|Recovered|Buried|Preserved)\b/.test(name)),
+      false
+    );
     assert.ok(rowNames.includes('Leather Armor'));
-    assert.deepEqual(byId.get('mine-ore').dropRows.find(row => row.name === 'War Pick'), {
-      id: 'mine-ore-war-pick',
-      name: 'War Pick',
-      quantity: 1,
-      dropRate: 8,
-      enabled: true,
-      componentId: 'weapon-war-pick'
-    });
-    assert.ok(byId.get('battlefield-salvage').dropRows.some(row => row.componentId === 'weapon-longsword'));
-    assert.equal(tasks.some(task => task.dropRows.some(row => row.itemUuid)), false);
+    assert.deepEqual(
+      byId.get('mine-ore').dropRows.find((row) => row.name === 'War Pick'),
+      {
+        id: 'mine-ore-war-pick',
+        name: 'War Pick',
+        quantity: 1,
+        dropRate: 8,
+        enabled: true,
+        componentId: 'weapon-war-pick',
+      }
+    );
+    assert.ok(
+      byId.get('battlefield-salvage').dropRows.some((row) => row.componentId === 'weapon-longsword')
+    );
+    assert.equal(
+      tasks.some((task) => task.dropRows.some((row) => row.itemUuid)),
+      false
+    );
   });
 
   it('omits and reports Mythwright optional SRD gathering rewards that cannot become components', () => {
@@ -723,15 +880,20 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
     const unresolvedDrops = [];
     const tasks = helper.buildGatheringTasks({ srdByName: new Map(), unresolvedDrops });
 
-    assert.equal(tasks.some(task => task.dropRows.some(row => row.name === 'War Pick')), false);
-    assert.ok(unresolvedDrops.some(row => row.id === 'mine-ore-war-pick' && row.itemName === 'War Pick'));
+    assert.equal(
+      tasks.some((task) => task.dropRows.some((row) => row.name === 'War Pick')),
+      false
+    );
+    assert.ok(
+      unresolvedDrops.some((row) => row.id === 'mine-ore-war-pick' && row.itemName === 'War Pick')
+    );
   });
 
   it('builds Mythwright environments that compose gathering task-library records', () => {
     const helper = globalThis.MythwrightDnd5eBootstrap;
     const environment = helper.buildEnvironment('mythwright-wilds', 'Wilds', 'safe', [
       { id: 'wild-hardwood' },
-      { id: 'wild-hide' }
+      { id: 'wild-hide' },
     ]);
 
     assert.deepEqual(environment.tasks, []);
@@ -747,39 +909,43 @@ describe('Mythwright DnD5e bootstrap helpers', () => {
         'mythwright-dnd5e': {
           tools: [{ id: 'existing-tool', componentId: 'old-tool' }],
           tasks: [{ id: 'mine-ore', name: 'Old Mine Task' }],
-          rules: { rewardSelectionMode: 'allDrops' }
-        }
-      }
+          rules: { rewardSelectionMode: 'allDrops' },
+        },
+      },
     };
     globalThis.game = {
       ...originalGame,
       settings: {
-        get: (_namespace, key) => key === 'gatheringConfig' ? config : undefined,
+        get: (_namespace, key) => (key === 'gatheringConfig' ? config : undefined),
         set: async (_namespace, key, value) => {
           if (key === 'gatheringConfig') config = value;
           writes.push({ key, value });
           return value;
-        }
-      }
+        },
+      },
     };
 
     await helper.seedGatheringConfig({
       tools: helper.buildGatheringTools(),
-      tasks: helper.buildGatheringTasks()
+      tasks: helper.buildGatheringTasks(),
     });
 
     const systemConfig = config.systems['mythwright-dnd5e'];
     assert.equal(writes.at(-1).key, 'gatheringConfig');
-    assert.ok(systemConfig.tools.some(tool => tool.id === 'existing-tool'));
+    assert.ok(systemConfig.tools.some((tool) => tool.id === 'existing-tool'));
     assert.equal(
-      systemConfig.tools.find(tool => tool.id === 'mythwright-tool-mining-pick').componentId,
+      systemConfig.tools.find((tool) => tool.id === 'mythwright-tool-mining-pick').componentId,
       'tool-mining-pick'
     );
     assert.notEqual(
-      systemConfig.tasks.find(task => task.id === 'mine-ore').name,
+      systemConfig.tasks.find((task) => task.id === 'mine-ore').name,
       'Old Mine Task'
     );
-    assert.ok(systemConfig.tasks.find(task => task.id === 'mine-ore').toolIds.includes('mythwright-tool-mining-pick'));
+    assert.ok(
+      systemConfig.tasks
+        .find((task) => task.id === 'mine-ore')
+        .toolIds.includes('mythwright-tool-mining-pick')
+    );
     globalThis.game = originalGame;
   });
 });

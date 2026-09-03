@@ -165,7 +165,11 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     assert.equal(asList.enabled, 'false');
     assert.equal(asList.disabledWord, true, 'icon + word, always — never dimming alone');
     assert.deepEqual(asList.capabilities, ['effects', 'macro']);
-    assert.deepEqual(asList.capabilityStates, ['ok', 'ok'], 'a resolving source is not warned about');
+    assert.deepEqual(
+      asList.capabilityStates,
+      ['ok', 'ok'],
+      'a resolving source is not warned about'
+    );
     assert.equal(asList.colour, 'lavender', 'the tinted tile carries the colour');
     assert.equal(asList.colourChip, false, 'and no chip restates it as a word');
     assert.match(asList.components, /2/, 'the component count renders plainly, no padlock');
@@ -187,10 +191,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       root.querySelector('[data-essence-edit="aether"]'),
       'the grid card footer carries the edit pencil'
     );
-    assert.ok(
-      root.querySelector('[data-essence-toggle="aether"]'),
-      'and the enable switch'
-    );
+    assert.ok(root.querySelector('[data-essence-toggle="aether"]'), 'and the enable switch');
     assert.ok(
       root.querySelector('[data-essence-select="aether"]'),
       'and it keeps the selection box, because bulk selection is how a card is acted on'
@@ -258,7 +259,11 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       entityType: 'essence',
       enableable: true,
       entries: [
-        { id: 'aether', entity: { name: 'Aether' }, systems: [{ systemId: 'sys-1', member: true }] },
+        {
+          id: 'aether',
+          entity: { name: 'Aether' },
+          systems: [{ systemId: 'sys-1', member: true }],
+        },
         { id: 'water', entity: { name: 'Water' }, systems: [{ systemId: 'sys-1', member: true }] },
       ],
     };
@@ -471,7 +476,9 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
   it('reports the enable toggle without writing anything itself', async () => {
     const toggles = [];
     const root = await harness.mount(
-      props([CONFIGURED_DISABLED], { onToggleEssenceEnabled: (id, next) => toggles.push([id, next]) })
+      props([CONFIGURED_DISABLED], {
+        onToggleEssenceEnabled: (id, next) => toggles.push([id, next]),
+      })
     );
 
     root.querySelector('[data-essence-toggle="aether"]').click();

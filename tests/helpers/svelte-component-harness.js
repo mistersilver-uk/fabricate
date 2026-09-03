@@ -1,7 +1,15 @@
 // Shared harness for mounted Svelte component tests. Compiling each `.svelte`
 // into a temp dir and rewriting its client imports is identical across every
 // component test, so it lives here rather than being copy-pasted per file.
-import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -11,7 +19,8 @@ import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
 import { rewriteClientImports } from './rewriteClientImports.js';
 
-const STATIC_IMPORT_PATTERN = /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+const STATIC_IMPORT_PATTERN =
+  /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
 
 function toRepoPath(repoRoot, absolutePath) {
   return relative(repoRoot, absolutePath).replaceAll('\\', '/');
@@ -25,7 +34,7 @@ function resolveLocalModule(repoRoot, importerPath, specifier) {
     `${absolutePath}.svelte`,
     `${absolutePath}.svelte.js`,
     join(absolutePath, 'index.js'),
-    join(absolutePath, 'index.svelte')
+    join(absolutePath, 'index.svelte'),
   ];
   const match = candidates.find((candidate) => existsSync(candidate));
   return match ? toRepoPath(repoRoot, match) : null;
@@ -41,13 +50,24 @@ function formatImporterChain(importerChain) {
   return importerChain.join(' -> ');
 }
 
-function validateMountedComponentDependencies({ repoRoot, rawModules, runeModules, compiledModules, componentPath }) {
-  const declaredModules = new Set([...rawModules, ...runeModules, ...compiledModules, componentPath]);
+function validateMountedComponentDependencies({
+  repoRoot,
+  rawModules,
+  runeModules,
+  compiledModules,
+  componentPath,
+}) {
+  const declaredModules = new Set([
+    ...rawModules,
+    ...runeModules,
+    ...compiledModules,
+    componentPath,
+  ]);
   const pending = [
     ...[...declaredModules]
       .filter((modulePath) => modulePath !== componentPath)
       .map((modulePath) => ({ modulePath, importerChain: [modulePath] })),
-    { modulePath: componentPath, importerChain: [componentPath] }
+    { modulePath: componentPath, importerChain: [componentPath] },
   ];
   const visited = new Set();
   const missing = [];
@@ -84,7 +104,9 @@ function validateMountedComponentDependencies({ repoRoot, rawModules, runeModule
   }
 
   if (missing.length > 0) {
-    throw new Error(`Mounted Svelte harness dependency closure is incomplete:\n- ${missing.join('\n- ')}`);
+    throw new Error(
+      `Mounted Svelte harness dependency closure is incomplete:\n- ${missing.join('\n- ')}`
+    );
   }
 }
 
@@ -121,21 +143,22 @@ export { rewriteClientImports };
  */
 export function assertClientSvelteReactivity() {
   const packagePath = fileURLToPath(import.meta.resolve('svelte/package.json'));
-  const browserTarget = JSON.parse(readFileSync(packagePath, 'utf8')).exports?.['./reactivity']?.browser;
+  const browserTarget = JSON.parse(readFileSync(packagePath, 'utf8')).exports?.['./reactivity']
+    ?.browser;
   if (!browserTarget) {
     throw new Error(
-      "The installed Svelte no longer declares a 'browser' condition for 'svelte/reactivity'; "
-        + 'the vacuous-pass guard in tests/helpers/svelte-component-harness.js needs updating.'
+      "The installed Svelte no longer declares a 'browser' condition for 'svelte/reactivity'; " +
+        'the vacuous-pass guard in tests/helpers/svelte-component-harness.js needs updating.'
     );
   }
   const expected = resolve(dirname(packagePath), browserTarget);
   const actual = fileURLToPath(import.meta.resolve('svelte/reactivity'));
   if (actual !== expected) {
     throw new Error(
-      `'svelte/reactivity' resolved to ${actual}, not the client build ${expected}. `
-        + 'Without the browser export condition, SvelteSet IS globalThis.Set and every '
-        + 'reactivity assertion passes vacuously. Run the suite via `npm test` (which passes '
-        + '--conditions=browser), or add --conditions=browser to a bare `node --test` run.'
+      `'svelte/reactivity' resolved to ${actual}, not the client build ${expected}. ` +
+        'Without the browser export condition, SvelteSet IS globalThis.Set and every ' +
+        'reactivity assertion passes vacuously. Run the suite via `npm test` (which passes ' +
+        '--conditions=browser), or add --conditions=browser to a bare `node --test` run.'
     );
   }
 }
@@ -150,13 +173,13 @@ export function installComponentTestGlobals() {
   globalThis.Comment = document.createComment('').constructor;
   const labels = {
     'FABRICATE.App.Crafting.Detail.Duration': 'Duration',
-    'FABRICATE.App.Crafting.Detail.TotalDuration': 'Total duration'
+    'FABRICATE.App.Crafting.Detail.TotalDuration': 'Total duration',
   };
   globalThis.game = {
     i18n: {
       localize: (key) => labels[key] ?? key,
-      format: (key, data) => `${key}:${JSON.stringify(data)}`
-    }
+      format: (key, data) => `${key}:${JSON.stringify(data)}`,
+    },
   };
 }
 
@@ -171,7 +194,12 @@ export function installComponentTestGlobals() {
 export function createSvelteCompiler(repoRoot, getTempRoot) {
   function writeCompiledSvelte(sourcePath) {
     const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-    const compiled = compile(source, { filename: sourcePath, generate: 'client', dev: true, css: 'injected' });
+    const compiled = compile(source, {
+      filename: sourcePath,
+      generate: 'client',
+      dev: true,
+      css: 'injected',
+    });
     const destination = join(getTempRoot(), `${sourcePath}.js`);
     mkdirSync(dirname(destination), { recursive: true });
     writeFileSync(destination, rewriteClientImports(compiled.js.code));
@@ -208,7 +236,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/actions/anchoredPopover.js',
-  'src/ui/svelte/util/overlayBounds.js'
+  'src/ui/svelte/util/overlayBounds.js',
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
@@ -342,7 +370,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/scopedDefinitionStore.js',
   'src/systems/scopedDefinitions.js',
   'src/migration/worldScopeEntityGrouping.js',
-  'src/ui/svelte/actions/dismissOnOutsideClick.js'
+  'src/ui/svelte/actions/dismissOnOutsideClick.js',
 ]);
 
 // Every transitive `.svelte` module in the player Crafting tab tree (plus the
@@ -411,7 +439,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
-  'src/ui/svelte/apps/crafting/CraftingView.svelte'
+  'src/ui/svelte/apps/crafting/CraftingView.svelte',
 ]);
 
 /**
@@ -432,16 +460,33 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
  *   component whose production host is not the manager (see `mount()` below)
  * @returns {{ setup: () => Promise<void>, teardown: () => void, mount: (props?: object) => Promise<HTMLElement>, setProps: (props: object) => Promise<HTMLElement>, remount: () => void, readonly target: HTMLElement|null }}
  */
-export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath, rootClass = 'fabricate-manager' }) {
+export function createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix,
+  rawModules = [],
+  compiledModules = [],
+  runeModules = [],
+  componentPath,
+  rootClass = 'fabricate-manager',
+}) {
   let tempRoot = null;
   let mounted = null;
   let target = null;
   let Component = null;
-  const { writeCompiledSvelte, writeRawModule, writeCompiledModule } = createSvelteCompiler(repoRoot, () => tempRoot);
+  const { writeCompiledSvelte, writeRawModule, writeCompiledModule } = createSvelteCompiler(
+    repoRoot,
+    () => tempRoot
+  );
 
   return {
     async setup() {
-      validateMountedComponentDependencies({ repoRoot, rawModules, runeModules, compiledModules, componentPath });
+      validateMountedComponentDependencies({
+        repoRoot,
+        rawModules,
+        runeModules,
+        compiledModules,
+        componentPath,
+      });
       setupDOM();
       installComponentTestGlobals();
       tempRoot = mkdtempSync(join(tmpdir(), tmpPrefix));
@@ -459,10 +504,19 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       return import(pathToFileURL(join(tempRoot, `${modulePath}.js`)).href);
     },
     teardown() {
-      if (mounted) { mounted.$destroy(); mounted = null; }
-      if (target) { target.remove(); target = null; }
+      if (mounted) {
+        mounted.$destroy();
+        mounted = null;
+      }
+      if (target) {
+        target.remove();
+        target = null;
+      }
       teardownDOM();
-      if (tempRoot) { rmSync(tempRoot, { recursive: true, force: true }); tempRoot = null; }
+      if (tempRoot) {
+        rmSync(tempRoot, { recursive: true, force: true });
+        tempRoot = null;
+      }
     },
     async mount(props = {}) {
       // Cross a macrotask boundary BEFORE building the next tree. Happy DOM memoizes
@@ -514,14 +568,24 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       return target;
     },
     remount() {
-      if (mounted) { mounted.$destroy(); mounted = null; }
-      if (target) { target.remove(); target = null; }
+      if (mounted) {
+        mounted.$destroy();
+        mounted = null;
+      }
+      if (target) {
+        target.remove();
+        target = null;
+      }
     },
-    get target() { return target; },
+    get target() {
+      return target;
+    },
     // The mounted instance, so a suite can call a component's `export function` — the seam an
     // application shell reaches for when it must act while the mount target is still
     // connected (`disposeBeforeRemoval`). Reading it off `target` is impossible, so without
     // this a suite proving that contract would have to re-inline the whole mount boilerplate.
-    get component() { return mounted; }
+    get component() {
+      return mounted;
+    },
   };
 }

@@ -4,10 +4,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import {
-  collectDocSourceFiles,
-  readDocsScreenshotMap,
-} from '../scripts/lib/docsScreenshotMap.js';
+import { collectDocSourceFiles, readDocsScreenshotMap } from '../scripts/lib/docsScreenshotMap.js';
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,10 +46,10 @@ const IGNORED_DOCS_DIRS = new Set([
 // the map test still claims them too — and a file both tests believe the other
 // is checking is a file neither is.
 const screenshotEntries = await readdir(screenshotsDir, { withFileTypes: true });
-const isGeneratedFrame = entry => entry.isFile() && extname(entry.name).toLowerCase() === '.webp';
+const isGeneratedFrame = (entry) => entry.isFile() && extname(entry.name).toLowerCase() === '.webp';
 const screenshotFiles = screenshotEntries
   .filter(isGeneratedFrame)
-  .map(entry => entry.name)
+  .map((entry) => entry.name)
   .sort((a, b) => a.localeCompare(b, 'en'));
 
 // Everything in the flat directory that the `.webp` filter above drops.
@@ -65,8 +62,8 @@ const screenshotFiles = screenshotEntries
 // filter's meaning ("a generated frame is a .webp file") rather than widening it.
 const OTHER_TESTS_OWN = ['lab/'];
 const unownedEntries = screenshotEntries
-  .filter(entry => !isGeneratedFrame(entry))
-  .map(entry => (entry.isDirectory() ? `${entry.name}/` : entry.name))
+  .filter((entry) => !isGeneratedFrame(entry))
+  .map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
   .sort((a, b) => a.localeCompare(b, 'en'));
 
 const screenshotMap = await readDocsScreenshotMap(root);
@@ -87,7 +84,7 @@ for (const file of docFiles) {
 // reaching docs/img/screenshots/ is always a deliberate curation — this keeps
 // that set honest. See CONTRIBUTING.md for the curation workflow.
 test('every committed docs screenshot is referenced by an authored docs page', () => {
-  const orphans = screenshotFiles.filter(file => !referenced.has(file));
+  const orphans = screenshotFiles.filter((file) => !referenced.has(file));
   assert.deepEqual(
     orphans,
     [],
@@ -97,7 +94,9 @@ test('every committed docs screenshot is referenced by an authored docs page', (
 
 test('every docs screenshot reference resolves to a committed file', () => {
   const present = new Set(screenshotFiles);
-  const dangling = [...referenced].filter(file => !present.has(file)).sort((a, b) => a.localeCompare(b, 'en'));
+  const dangling = [...referenced]
+    .filter((file) => !present.has(file))
+    .sort((a, b) => a.localeCompare(b, 'en'));
   assert.deepEqual(
     dangling,
     [],
@@ -154,7 +153,9 @@ test('the hand-curated population is exactly the enumerated non-view set', () =>
       'something the renderer has no route for — add it to NOT_AN_APPLICATION_VIEW with the reason'
   );
 
-  const unexplained = enumerated.filter(file => (NOT_AN_APPLICATION_VIEW.get(file) ?? '').trim().length < 40);
+  const unexplained = enumerated.filter(
+    (file) => (NOT_AN_APPLICATION_VIEW.get(file) ?? '').trim().length < 40
+  );
   assert.deepEqual(
     unexplained,
     [],
@@ -164,10 +165,10 @@ test('the hand-curated population is exactly the enumerated non-view set', () =>
 });
 
 test('no exempt frame collides with a generated case or the generated map', () => {
-  const caseIds = new Set(VIEW_LAB_CASES.map(viewCase => viewCase.id));
+  const caseIds = new Set(VIEW_LAB_CASES.map((viewCase) => viewCase.id));
   const namesACase = [...NOT_AN_APPLICATION_VIEW.keys()]
-    .map(file => basename(file, '.webp'))
-    .filter(stem => caseIds.has(stem));
+    .map((file) => basename(file, '.webp'))
+    .filter((stem) => caseIds.has(stem));
   assert.deepEqual(
     namesACase,
     [],
@@ -176,10 +177,10 @@ test('no exempt frame collides with a generated case or the generated map', () =
       'every other generated frame'
   );
 
-  const mapped = new Set(screenshotMap.screenshots.map(entry => entry.case));
+  const mapped = new Set(screenshotMap.screenshots.map((entry) => entry.case));
   const alsoGenerated = [...NOT_AN_APPLICATION_VIEW.keys()]
-    .map(file => basename(file, '.webp'))
-    .filter(stem => mapped.has(stem));
+    .map((file) => basename(file, '.webp'))
+    .filter((stem) => mapped.has(stem));
   assert.deepEqual(
     alsoGenerated,
     [],

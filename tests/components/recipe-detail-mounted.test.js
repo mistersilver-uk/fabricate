@@ -163,7 +163,9 @@ describe('RecipeDetail mounted behavior', () => {
       }),
     });
 
-    const tiles = target.querySelectorAll('[data-recipe-section="requirement-rail"] [data-requirement-slot]');
+    const tiles = target.querySelectorAll(
+      '[data-recipe-section="requirement-rail"] [data-requirement-slot]'
+    );
     assert.equal(tiles.length, 2, 'one rail slot per ingredient');
 
     const [sufficient, short] = tiles;
@@ -215,13 +217,29 @@ describe('RecipeDetail mounted behavior', () => {
           },
         ],
         essenceStates: [
-          { type: 'aether', name: 'Aether', icon: 'fa-regular fa-star', need: 1, have: 1, satisfied: true },
-          { type: 'void', name: 'Void', icon: 'not-a-font-awesome-icon', need: 1, have: 0, satisfied: false },
+          {
+            type: 'aether',
+            name: 'Aether',
+            icon: 'fa-regular fa-star',
+            need: 1,
+            have: 1,
+            satisfied: true,
+          },
+          {
+            type: 'void',
+            name: 'Void',
+            icon: 'not-a-font-awesome-icon',
+            need: 1,
+            have: 0,
+            satisfied: false,
+          },
         ],
       }),
     });
 
-    const tiles = target.querySelectorAll('[data-recipe-section="requirement-rail"] [data-requirement-slot]');
+    const tiles = target.querySelectorAll(
+      '[data-recipe-section="requirement-rail"] [data-requirement-slot]'
+    );
     const essenceGlyph = tiles[0].querySelector('.requirement-slot-glyph i');
     assert.ok(essenceGlyph, 'first-class essence renders an authored glyph, not an image');
     assert.ok(essenceGlyph.classList.contains('fa-heart'));
@@ -229,14 +247,20 @@ describe('RecipeDetail mounted behavior', () => {
     // `delivered`, never `have`: the essence branch upstream stopped answering the
     // have question, so a `have` read would print 0/2 on a partly funded tile.
     assert.equal(tiles[0].querySelector('.requirement-slot-pip').textContent.trim(), '1/2');
-    assert.equal(tiles[1].querySelector('.crafting-thumb img').getAttribute('src'), 'icons/iron.webp');
+    assert.equal(
+      tiles[1].querySelector('.crafting-thumb img').getAttribute('src'),
+      'icons/iron.webp'
+    );
 
     const legacyIcons = target.querySelectorAll(
       '[data-io-group="essences"] .crafting-io-essence-icon'
     );
     assert.ok(legacyIcons[0].classList.contains('far'), 'legacy icon prefix is normalized');
     assert.ok(legacyIcons[0].classList.contains('fa-star'), 'authored legacy glyph renders');
-    assert.ok(legacyIcons[1].classList.contains('fa-mortar-pestle'), 'unusable legacy icon falls back');
+    assert.ok(
+      legacyIcons[1].classList.contains('fa-mortar-pestle'),
+      'unusable legacy icon falls back'
+    );
     assert.match(target.querySelector('[data-io-group="essences"]').textContent, /Aether/);
     assert.match(target.querySelector('[data-io-group="essences"]').textContent, /Void/);
   });
@@ -346,7 +370,12 @@ describe('RecipeDetail mounted behavior', () => {
         modeToken: 'routedByIngredients',
         modeLabel: 'Routed by ingredients',
         defaultSetId: 'set-a',
-        result: { items: [{ name: 'STALE default', img: null, qty: 9 }], time: null, timeLabel: null, xp: null },
+        result: {
+          items: [{ name: 'STALE default', img: null, qty: 9 }],
+          time: null,
+          timeLabel: null,
+          xp: null,
+        },
         ingredientSets: [
           {
             id: 'set-a',
@@ -364,7 +393,9 @@ describe('RecipeDetail mounted behavior', () => {
       });
 
     const outputName = (target) =>
-      target.querySelector('[data-io-group="outputs"] .crafting-io-output-name')?.textContent.trim();
+      target
+        .querySelector('[data-io-group="outputs"] .crafting-io-output-name')
+        ?.textContent.trim();
 
     const targetA = await harness.mount({ recipe: routed(), selectedSetId: 'set-a' });
     assert.equal(outputName(targetA), 'Iron Boss', 'Produces follows the selected route (set-a)');
@@ -570,7 +601,7 @@ describe('RecipeDetail mounted behavior', () => {
       recipe: fixture,
       selectedSetId: fixture.defaultSetId,
       craftability: fixture.ingredientSets[0].craftability,
-      steps: fixture.steps
+      steps: fixture.steps,
     });
 
     // The multi-step hint strip renders at the top of the step list.
@@ -640,7 +671,7 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: fixture.ingredientSets[0].craftability,
       steps: fixture.steps,
       activeStepId: fixture.activeStepId,
-      rail: { openSlotId: 'essence-pool', chosenGroupIds: [] }
+      rail: { openSlotId: 'essence-pool', chosenGroupIds: [] },
     });
 
     const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
@@ -678,7 +709,7 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: recomputed,
       steps: fixture.steps,
       activeStepId: fixture.activeStepId,
-      rail: {}
+      rail: {},
     });
     const steps = target.querySelectorAll('[data-recipe-section="steps"] ol > [data-recipe-step]');
     // The step projection authors TWO essence requirements; the store's re-evaluated
@@ -697,7 +728,7 @@ describe('RecipeDetail mounted behavior', () => {
       recipe: fixture,
       selectedSetId: fixture.defaultSetId,
       craftability: fixture.ingredientSets[0].craftability,
-      steps: []
+      steps: [],
     });
     assert.equal(
       target.querySelector('[data-recipe-section="steps"]'),
@@ -721,9 +752,7 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: timed.ingredientSets[0].craftability,
     });
 
-    const chip = target.querySelector(
-      '.crafting-detail-header-meta [data-recipe-duration]'
-    );
+    const chip = target.querySelector('.crafting-detail-header-meta [data-recipe-duration]');
     assert.ok(chip, 'the pre-craft duration chip renders for a timed recipe');
     // Largest-unit-first compact formatting (mirrors the manager Overview).
     assert.equal(chip.textContent.replace(/\s+/g, ' ').trim(), 'Duration: 2 hr 30 min');

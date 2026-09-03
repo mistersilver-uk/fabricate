@@ -29,9 +29,7 @@ export function declaredPropNames(source) {
   // systemId" contains three. A comma inside a comment then splits one entry into four, and the
   // fragments are read as prop names. Removing them from the whole body first makes the depth
   // walk see only code.
-  const body = source
-    .slice(start + 'let {'.length, end)
-    .replace(/\/\/[^\n]*/g, '');
+  const body = source.slice(start + 'let {'.length, end).replace(/\/\/[^\n]*/g, '');
   const names = [];
   let depth = 0;
   let current = '';

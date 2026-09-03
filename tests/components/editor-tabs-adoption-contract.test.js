@@ -112,10 +112,7 @@ definePrimitiveAdoptionContract({
   detectorFixture: {
     source: DETECTOR_FIXTURE,
     expected: 2,
-    lowered: [
-      '<button class="manager-editor-tab-button">',
-      '<button class="manager-tab-pill">',
-    ],
+    lowered: ['<button class="manager-editor-tab-button">', '<button class="manager-tab-pill">'],
     loweredExpected: 1,
   },
   // `activePanelOnly` and `danger` are declared `= false` props, so `<EditorTabs danger>` sets a
@@ -149,14 +146,17 @@ function rawManagerTablists() {
   const found = [];
   for (const [file, source] of Object.entries(SOURCES)) {
     if (!file.startsWith(MANAGER_DIRECTORY)) continue;
-    walkTemplate(parse(source, { modern: true, filename: join(repoRoot, file) }).fragment, (node) => {
-      if (node.type === 'Component') return;
-      const role = (node.attributes ?? []).find(
-        (attribute) => attribute.type === 'Attribute' && attribute.name === 'role'
-      );
-      if (!role) return;
-      if (/role=["']tablist["']/.test(source.slice(role.start, role.end))) found.push(file);
-    });
+    walkTemplate(
+      parse(source, { modern: true, filename: join(repoRoot, file) }).fragment,
+      (node) => {
+        if (node.type === 'Component') return;
+        const role = (node.attributes ?? []).find(
+          (attribute) => attribute.type === 'Attribute' && attribute.name === 'role'
+        );
+        if (!role) return;
+        if (/role=["']tablist["']/.test(source.slice(role.start, role.end))) found.push(file);
+      }
+    );
   }
   // CODE POINT, never `localeCompare`. This list is compared by EQUALITY against a pinned one,
   // and `scripts/lib/designSystemPrimitives.js` records why that matters: `localeCompare` is
@@ -225,16 +225,19 @@ test('every manager tablist element is a div, so no implicit landmark is overrid
   const hosts = [];
   for (const [file, source] of Object.entries(SOURCES)) {
     if (!file.startsWith(MANAGER_DIRECTORY)) continue;
-    walkTemplate(parse(source, { modern: true, filename: join(repoRoot, file) }).fragment, (node) => {
-      if (node.type === 'Component') return;
-      const role = (node.attributes ?? []).find(
-        (attribute) => attribute.type === 'Attribute' && attribute.name === 'role'
-      );
-      if (!role) return;
-      if (/role=["']tablist["']/.test(source.slice(role.start, role.end))) {
-        hosts.push(`${file} <${node.name}>`);
+    walkTemplate(
+      parse(source, { modern: true, filename: join(repoRoot, file) }).fragment,
+      (node) => {
+        if (node.type === 'Component') return;
+        const role = (node.attributes ?? []).find(
+          (attribute) => attribute.type === 'Attribute' && attribute.name === 'role'
+        );
+        if (!role) return;
+        if (/role=["']tablist["']/.test(source.slice(role.start, role.end))) {
+          hosts.push(`${file} <${node.name}>`);
+        }
       }
-    });
+    );
   }
   assert.ok(hosts.length > 0, 'no tablist host was found, so this clause has no domain');
   assert.deepEqual(

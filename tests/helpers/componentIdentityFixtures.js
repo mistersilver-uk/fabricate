@@ -54,7 +54,13 @@ export function componentSet(id, components) {
  * @returns {object}
  */
 export function tool(id, refs = {}) {
-  const { registeredItemUuid = null, originItemUuid = null, aliasItemUuids = [], componentId, name } = refs;
+  const {
+    registeredItemUuid = null,
+    originItemUuid = null,
+    aliasItemUuids = [],
+    componentId,
+    name,
+  } = refs;
   const built = { id, registeredItemUuid, originItemUuid, aliasItemUuids };
   if (componentId !== undefined) built.componentId = componentId;
   if (name !== undefined) built.name = name;

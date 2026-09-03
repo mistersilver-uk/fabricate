@@ -95,14 +95,20 @@ test('a plain roll surfaces the total as the numeric value', async () => {
   assert.equal(result.outcome, null);
   assert.equal(result.value, 8, 'the value equals the roll total');
   assert.equal(result.data.total, 8);
-  assert.equal(result.data.breakTools, undefined, 'a plain progressive roll surfaces no breakTools');
+  assert.equal(
+    result.data.breakTools,
+    undefined,
+    'a plain progressive roll surfaces no breakTools'
+  );
 });
 
 // ── Forced-outcome triggers force award-all / award-none ─────────────────────
 
 test('a success trigger forces value MAX_SAFE_INTEGER (award all)', async () => {
   const { engine } = makeEngine({
-    progressive: defaultProgressive(breakage(totalTrigger({ groupId: 0, value: 12, outcome: 'success', breakTools: true }))),
+    progressive: defaultProgressive(
+      breakage(totalTrigger({ groupId: 0, value: 12, outcome: 'success', breakTools: true }))
+    ),
   });
   stubRoll(12, [{ number: 2, faces: 6, total: 12 }]);
   const result = await run(engine);
@@ -112,7 +118,9 @@ test('a success trigger forces value MAX_SAFE_INTEGER (award all)', async () => 
 
 test('a failure trigger forces value 0 (award nothing)', async () => {
   const { engine } = makeEngine({
-    progressive: defaultProgressive(breakage(totalTrigger({ groupId: 0, value: 2, outcome: 'failure' }))),
+    progressive: defaultProgressive(
+      breakage(totalTrigger({ groupId: 0, value: 2, outcome: 'failure' }))
+    ),
   });
   // A high total (10) would normally award plenty; the failure trigger overrides it.
   stubRoll(10, [{ number: 2, faces: 6, total: 2 }]);
@@ -141,7 +149,9 @@ test('a matching forced failure takes precedence over a matching forced success'
 
 test('a non-matching trigger leaves the rolled total as the value', async () => {
   const { engine } = makeEngine({
-    progressive: defaultProgressive(breakage(totalTrigger({ groupId: 0, value: 12, outcome: 'success' }))),
+    progressive: defaultProgressive(
+      breakage(totalTrigger({ groupId: 0, value: 12, outcome: 'success' }))
+    ),
   });
   stubRoll(7, [{ number: 2, faces: 6, total: 7 }]);
   const result = await run(engine);
@@ -206,17 +216,47 @@ test('checkDriven progressive: a progressiveValue trigger fires while a rollTota
   const r = await run(engine);
   // progressiveValue targets the awarded MAX; rollTotal targets the raw 1. Both
   // break-tools triggers, so only the one whose condition matches force-breaks.
-  const progTrigger = { triggers: [{ id: 'pv', breakTools: true, condition: { type: 'progressiveValue', operator: '>=', value: 1000 } }] };
-  const rollTrigger = { triggers: [{ id: 'rt', breakTools: true, condition: { type: 'rollTotal', operator: '>=', value: 1000 } }] };
+  const progTrigger = {
+    triggers: [
+      {
+        id: 'pv',
+        breakTools: true,
+        condition: { type: 'progressiveValue', operator: '>=', value: 1000 },
+      },
+    ],
+  };
+  const rollTrigger = {
+    triggers: [
+      { id: 'rt', breakTools: true, condition: { type: 'rollTotal', operator: '>=', value: 1000 } },
+    ],
+  };
   const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
-  assert.equal(evaluateCheckBreakage({ checkBreakage: progTrigger, checkResult: r }).forceBreak, true);
-  assert.equal(evaluateCheckBreakage({ checkBreakage: rollTrigger, checkResult: r }).forceBreak, false);
+  assert.equal(
+    evaluateCheckBreakage({ checkBreakage: progTrigger, checkResult: r }).forceBreak,
+    true
+  );
+  assert.equal(
+    evaluateCheckBreakage({ checkBreakage: rollTrigger, checkResult: r }).forceBreak,
+    false
+  );
 });
 
 test('checkDriven progressive: surfaces data.diceGroups for the DSL', async () => {
-  const { engine, system } = makeEngine({ progressive: defaultProgressive({ rollFormula: '2d6' }) });
+  const { engine, system } = makeEngine({
+    progressive: defaultProgressive({ rollFormula: '2d6' }),
+  });
   system.toolBreakage = { authority: 'checkDriven' };
-  stubRoll(7, [{ number: 2, faces: 6, total: 7, results: [{ result: 3, active: true }, { result: 4, active: true }] }]);
+  stubRoll(7, [
+    {
+      number: 2,
+      faces: 6,
+      total: 7,
+      results: [
+        { result: 3, active: true },
+        { result: 4, active: true },
+      ],
+    },
+  ]);
   const r = await run(engine);
   assert.deepEqual(r.data.diceGroups, [{ groupId: 0, group: '2d6', sum: 7, results: [3, 4] }]);
 });
@@ -282,7 +322,12 @@ function progressiveCraftWorld({
     },
     components: [
       { id: 'c-iron', name: 'Iron Ingot', difficulty: 4, complications: complicationsIron },
-      { id: 'c-mithril', name: 'Mithril Plate', difficulty: 20, complications: complicationsMithril },
+      {
+        id: 'c-mithril',
+        name: 'Mithril Plate',
+        difficulty: 20,
+        complications: complicationsMithril,
+      },
     ],
   };
   const item = {
@@ -340,7 +385,13 @@ function progressiveCraftWorld({
   });
   engine._createSingleResult = async () => null;
 
-  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  const writer = {
+    calls: [],
+    deliver(args) {
+      this.calls.push(args);
+      return true;
+    },
+  };
   engine.installComplicationDelivery({ writer });
   let fireRequests = 0;
   const realFire = engine._fireComponentComplications.bind(engine);
@@ -606,7 +657,11 @@ function chainStep(index, ingredientSet, componentId) {
     name: `Step ${index + 1}`,
     ingredientSets: [ingredientSet],
     resultGroups: [
-      { id: `rg-${index + 1}`, name: `Output ${index + 1}`, results: [{ id: `r-${index + 1}`, componentId }] },
+      {
+        id: `rg-${index + 1}`,
+        name: `Output ${index + 1}`,
+        results: [{ id: `r-${index + 1}`, componentId }],
+      },
     ],
     toolIds: [],
     outcomeRouting: null,
@@ -696,7 +751,13 @@ function collapsedChainWorld({ stepCount = 3 } = {}) {
   });
   engine._createSingleResult = async () => null;
 
-  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  const writer = {
+    calls: [],
+    deliver(args) {
+      this.calls.push(args);
+      return true;
+    },
+  };
   engine.installComplicationDelivery({ writer });
   let fireRequests = 0;
   const realFire = engine._fireComponentComplications.bind(engine);

@@ -116,7 +116,10 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
   it('reads the average with every character value taken as zero', async () => {
     const target = await harness.mount({ rollFormula: '1d20 + @abilities.int.mod + 2' });
     // 1d20 averages 10.5, the roll-data term is taken as 0, and the flat +2 is exact.
-    assert.equal(target.querySelector('[data-check-formula-average]').dataset.checkFormulaAverage, '12.5');
+    assert.equal(
+      target.querySelector('[data-check-formula-average]').dataset.checkFormulaAverage,
+      '12.5'
+    );
   });
 
   it('withholds the average rather than guessing one it cannot reduce', async () => {
@@ -163,7 +166,10 @@ describe('a suggestion chip appends its term when CLICKED', () => {
 
   it('yields the term alone when the formula is empty, never a leading +', async () => {
     const emitted = [];
-    const target = await harness.mount({ rollFormula: '', onChange: (patch) => emitted.push(patch) });
+    const target = await harness.mount({
+      rollFormula: '',
+      onChange: (patch) => emitted.push(patch),
+    });
     const chip = target.querySelector('[data-check-formula-token]');
     chip.click();
     assert.equal(emitted.at(-1).rollFormula, chip.dataset.checkFormulaToken);

@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_GATHERING_ENVIRONMENT_IMG,
   DEFAULT_GATHERING_EVENT_IMG,
-  DEFAULT_GATHERING_TASK_IMG
+  DEFAULT_GATHERING_TASK_IMG,
 } from '../src/gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG as REEXPORTED_TASK_IMG } from '../src/ui/gatheringTaskDefaults.js';
 
@@ -36,10 +36,7 @@ describe('gatheringImageDefaults constant values', () => {
       DEFAULT_GATHERING_TASK_IMG,
       'icons/containers/bags/pouch-leather-brown-green.webp'
     );
-    assert.equal(
-      DEFAULT_GATHERING_EVENT_IMG,
-      'icons/magic/time/day-night-sunset-sunrise.webp'
-    );
+    assert.equal(DEFAULT_GATHERING_EVENT_IMG, 'icons/magic/time/day-night-sunset-sunrise.webp');
   });
 
   it('exposes the task default through the ui re-export (one source of truth)', () => {
@@ -74,14 +71,14 @@ describe('gathering default-image fallback sites use the shared constants', () =
     'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte',
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    'src/ui/svelte/apps/gathering/EnvironmentCard.svelte'
+    'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
   ];
   const taskConsumers = [
     'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
     'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'src/ui/svelte/apps/gathering/GatheringTaskRow.svelte',
-    'src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte'
+    'src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte',
   ];
   const eventConsumers = [
     'src/ui/svelte/apps/manager/GatheringEventEditView.svelte',
@@ -89,14 +86,18 @@ describe('gathering default-image fallback sites use the shared constants', () =
     'src/ui/svelte/apps/gathering/GatheringEventRow.svelte',
     'src/ui/svelte/apps/gathering/GatheringEventDetail.svelte',
     'src/systems/GatheringEngine.js',
-    'src/systems/GatheringChatCard.js'
+    'src/systems/GatheringChatCard.js',
   ];
 
   for (const relPath of environmentConsumers) {
     it(`${relPath} imports DEFAULT_GATHERING_ENVIRONMENT_IMG`, () => {
       const source = read(relPath);
       assert.ok(source.includes('DEFAULT_GATHERING_ENVIRONMENT_IMG'), 'imports the constant');
-      assert.equal(source.includes("'icons/svg/direction.svg'"), false, 'no direction-SVG env literal');
+      assert.equal(
+        source.includes("'icons/svg/direction.svg'"),
+        false,
+        'no direction-SVG env literal'
+      );
     });
   }
 
@@ -117,16 +118,24 @@ describe('gathering default-image fallback sites use the shared constants', () =
   it('the player environment card falls back to the shared default, not the door-closed SVG', () => {
     const source = read('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     assert.ok(source.includes('DEFAULT_GATHERING_ENVIRONMENT_IMG'), 'uses the shared env default');
-    assert.equal(source.includes("'icons/svg/door-closed.svg'"), false, 'door-closed literal removed');
+    assert.equal(
+      source.includes("'icons/svg/door-closed.svg'"),
+      false,
+      'door-closed literal removed'
+    );
   });
 
   it('the gathering player event row/detail no longer embed the mystery-man literal', () => {
     for (const relPath of [
       'src/ui/svelte/apps/gathering/GatheringEventRow.svelte',
-      'src/ui/svelte/apps/gathering/GatheringEventDetail.svelte'
+      'src/ui/svelte/apps/gathering/GatheringEventDetail.svelte',
     ]) {
       const source = read(relPath);
-      assert.equal(source.includes("'icons/svg/mystery-man.svg'"), false, `${relPath} mystery-man literal removed`);
+      assert.equal(
+        source.includes("'icons/svg/mystery-man.svg'"),
+        false,
+        `${relPath} mystery-man literal removed`
+      );
     }
   });
 });

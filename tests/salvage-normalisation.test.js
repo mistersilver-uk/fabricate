@@ -11,8 +11,8 @@ let idCounter = 0;
 globalThis.foundry = {
   utils: {
     randomID: () => `random-${++idCounter}`,
-    getProperty: () => undefined
-  }
+    getProperty: () => undefined,
+  },
 };
 // Public write methods (`createItem`/`updateItem`/`replaceItemSource`) assert GM.
 globalThis.game = { user: { isGM: true } };
@@ -52,7 +52,7 @@ test('features.salvage honors an explicit false (salvage is optional)', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
-    features: { salvage: false }
+    features: { salvage: false },
   });
   assert.equal(system.features.salvage, false);
 });
@@ -105,8 +105,8 @@ test('salvageCraftingCheck drops the deprecated check-source fields', () => {
       enabled: false,
       macroUuid: 'Macro.abc123',
       successMacroUuid: 'Macro.success',
-      failureMacroUuid: 'Macro.fail'
-    }
+      failureMacroUuid: 'Macro.fail',
+    },
   });
   const check = system.salvageCraftingCheck;
 
@@ -122,8 +122,8 @@ test('salvageCraftingCheck.consumption.consumeComponentOnFail can be set to fals
   const system = manager._normalizeSystem({
     id: 'sys-1',
     salvageCraftingCheck: {
-      consumption: { consumeComponentOnFail: false }
-    }
+      consumption: { consumeComponentOnFail: false },
+    },
   });
   assert.equal(system.salvageCraftingCheck.consumption.consumeComponentOnFail, false);
 });
@@ -151,7 +151,7 @@ test('component salvage config is preserved even when features.salvage is off (n
     // Salvage off: the feature is disabled, but the component still carries its
     // (inert) salvage config so re-enabling restores it.
     features: { salvage: false },
-    components: [{ id: 'comp-1', name: 'Iron Ore' }]
+    components: [{ id: 'comp-1', name: 'Iron Ore' }],
   });
   const component = system.components[0];
   assert.equal(system.features.salvage, false);
@@ -163,10 +163,13 @@ test('when features.salvage is true and component has no salvage data, defaults 
   const system = manager._normalizeSystem({
     id: 'sys-1',
     features: { salvage: true },
-    components: [{ id: 'comp-1', name: 'Iron Ore' }]
+    components: [{ id: 'comp-1', name: 'Iron Ore' }],
   });
   const component = system.components[0];
-  assert.ok(Object.prototype.hasOwnProperty.call(component, 'salvage'), 'salvage key should be present');
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(component, 'salvage'),
+    'salvage key should be present'
+  );
   assert.equal(component.salvage.enabled, false);
   assert.equal(component.salvage.ingredientQuantity, 1);
   assert.deepEqual(component.salvage.toolIds, []);
@@ -178,20 +181,24 @@ test('salvage data is normalised: enabled, ingredientQuantity, toolIds, resultGr
   const system = manager._normalizeSystem({
     id: 'sys-1',
     features: { salvage: true },
-    components: [{
-      id: 'comp-1',
-      name: 'Iron Ore',
-      salvage: {
-        enabled: true,
-        ingredientQuantity: 3,
-        toolIds: ['tool-1'],
-        resultGroups: [{
-          id: 'rg-1',
-          name: 'Iron Scraps',
-          results: [{ id: 'r-1', componentId: 'scrap-1', quantity: 2 }]
-        }]
-      }
-    }]
+    components: [
+      {
+        id: 'comp-1',
+        name: 'Iron Ore',
+        salvage: {
+          enabled: true,
+          ingredientQuantity: 3,
+          toolIds: ['tool-1'],
+          resultGroups: [
+            {
+              id: 'rg-1',
+              name: 'Iron Scraps',
+              results: [{ id: 'r-1', componentId: 'scrap-1', quantity: 2 }],
+            },
+          ],
+        },
+      },
+    ],
   });
   const { salvage } = system.components[0];
   assert.equal(salvage.enabled, true);
@@ -208,7 +215,7 @@ test('invalid ingredientQuantity (0, negative, non-numeric) defaults to 1', () =
     const system = manager._normalizeSystem({
       id: 'sys-1',
       features: { salvage: true },
-      components: [{ id: 'c', name: 'Item', salvage: { ingredientQuantity: qty } }]
+      components: [{ id: 'c', name: 'Item', salvage: { ingredientQuantity: qty } }],
     });
     assert.equal(
       system.components[0].salvage.ingredientQuantity,
@@ -223,13 +230,15 @@ test('salvage toolIds are normalised to trimmed, non-empty, deduped strings', ()
   const system = manager._normalizeSystem({
     id: 'sys-1',
     features: { salvage: true },
-    components: [{
-      id: 'comp-1',
-      name: 'Item',
-      salvage: {
-        toolIds: ['tool-a', '  tool-b  ', '', 'tool-a', null]
-      }
-    }]
+    components: [
+      {
+        id: 'comp-1',
+        name: 'Item',
+        salvage: {
+          toolIds: ['tool-a', '  tool-b  ', '', 'tool-a', null],
+        },
+      },
+    ],
   });
   const { toolIds } = system.components[0].salvage;
   assert.deepEqual(toolIds, ['tool-a', 'tool-b']);
@@ -240,20 +249,24 @@ test('salvage resultGroups normalises id, name, and nested results with componen
   const system = manager._normalizeSystem({
     id: 'sys-1',
     features: { salvage: true },
-    components: [{
-      id: 'comp-1',
-      name: 'Item',
-      salvage: {
-        resultGroups: [{
-          id: 'rg-1',
-          name: 'Scrap Pile',
-          results: [
-            { id: 'r-1', componentId: 'scrap-a', quantity: 2 },
-            { id: 'r-2', systemItemId: 'scrap-b', quantity: 1 }
-          ]
-        }]
-      }
-    }]
+    components: [
+      {
+        id: 'comp-1',
+        name: 'Item',
+        salvage: {
+          resultGroups: [
+            {
+              id: 'rg-1',
+              name: 'Scrap Pile',
+              results: [
+                { id: 'r-1', componentId: 'scrap-a', quantity: 2 },
+                { id: 'r-2', systemItemId: 'scrap-b', quantity: 1 },
+              ],
+            },
+          ],
+        },
+      },
+    ],
   });
   const [group] = system.components[0].salvage.resultGroups;
   assert.equal(group.id, 'rg-1');
@@ -273,7 +286,7 @@ test('empty salvage object on component produces defaults', () => {
   const system = manager._normalizeSystem({
     id: 'sys-1',
     features: { salvage: true },
-    components: [{ id: 'c', name: 'Item', salvage: {} }]
+    components: [{ id: 'c', name: 'Item', salvage: {} }],
   });
   const { salvage } = system.components[0];
   assert.equal(salvage.enabled, false);
@@ -286,7 +299,7 @@ test('salvageResolutionMode "mapped" is rejected and falls back to "simple"', ()
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
-    salvageResolutionMode: 'mapped'
+    salvageResolutionMode: 'mapped',
   });
   assert.equal(system.salvageResolutionMode, 'simple');
 });
@@ -295,7 +308,7 @@ test('salvageResolutionMode "alchemy" is rejected and falls back to "simple"', (
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
-    salvageResolutionMode: 'alchemy'
+    salvageResolutionMode: 'alchemy',
   });
   assert.equal(system.salvageResolutionMode, 'simple');
 });
@@ -305,13 +318,15 @@ test('outcomeRouting is preserved in salvage sub-object when provided', () => {
   const system = manager._normalizeSystem({
     id: 'sys-1',
     features: { salvage: true },
-    components: [{
-      id: 'c',
-      name: 'Item',
-      salvage: {
-        outcomeRouting: { high: 'rg-gold', low: 'rg-iron' }
-      }
-    }]
+    components: [
+      {
+        id: 'c',
+        name: 'Item',
+        salvage: {
+          outcomeRouting: { high: 'rg-gold', low: 'rg-iron' },
+        },
+      },
+    ],
   });
   const { salvage } = system.components[0];
   assert.deepEqual(salvage.outcomeRouting, { high: 'rg-gold', low: 'rg-iron' });
@@ -327,35 +342,37 @@ test('full round-trip: system with salvage enabled, component with full salvage 
     salvageCraftingCheck: {
       consumption: {
         consumeComponentOnFail: false,
-        breakToolsOnFail: true
+        breakToolsOnFail: true,
       },
       outcomes: ['critical', 'pass', 'fail'],
-      progressive: { awardMode: 'partial', allowPlayerReorder: true }
+      progressive: { awardMode: 'partial', allowPlayerReorder: true },
     },
-    components: [{
-      id: 'comp-full',
-      name: 'Dragon Scale',
-      salvage: {
-        enabled: true,
-        ingredientQuantity: 2,
-        toolIds: ['tool-acid-vial'],
-        resultGroups: [
-          {
-            id: 'rg-high',
-            name: 'Critical Salvage',
-            results: [{ id: 'r-1', componentId: 'pristine-scale', quantity: 3 }]
-          },
-          {
-            id: 'rg-low',
-            name: 'Partial Salvage',
-            results: [{ id: 'r-2', componentId: 'cracked-scale', quantity: 1 }]
-          }
-        ],
-        outcomeRouting: { critical: 'rg-high', pass: 'rg-low', fail: 'rg-low' },
-        timeRequirement: { hours: 2 },
-        currencyRequirement: { unit: 'gp', amount: 50 }
-      }
-    }]
+    components: [
+      {
+        id: 'comp-full',
+        name: 'Dragon Scale',
+        salvage: {
+          enabled: true,
+          ingredientQuantity: 2,
+          toolIds: ['tool-acid-vial'],
+          resultGroups: [
+            {
+              id: 'rg-high',
+              name: 'Critical Salvage',
+              results: [{ id: 'r-1', componentId: 'pristine-scale', quantity: 3 }],
+            },
+            {
+              id: 'rg-low',
+              name: 'Partial Salvage',
+              results: [{ id: 'r-2', componentId: 'cracked-scale', quantity: 1 }],
+            },
+          ],
+          outcomeRouting: { critical: 'rg-high', pass: 'rg-low', fail: 'rg-low' },
+          timeRequirement: { hours: 2 },
+          currencyRequirement: { unit: 'gp', amount: 50 },
+        },
+      },
+    ],
   });
 
   // System-level checks
@@ -381,7 +398,11 @@ test('full round-trip: system with salvage enabled, component with full salvage 
   assert.equal(comp.salvage.ingredientQuantity, 2);
   assert.deepEqual(comp.salvage.toolIds, ['tool-acid-vial']);
   assert.equal(comp.salvage.resultGroups.length, 2);
-  assert.deepEqual(comp.salvage.outcomeRouting, { critical: 'rg-high', pass: 'rg-low', fail: 'rg-low' });
+  assert.deepEqual(comp.salvage.outcomeRouting, {
+    critical: 'rg-high',
+    pass: 'rg-low',
+    fail: 'rg-low',
+  });
   assert.deepEqual(comp.salvage.timeRequirement, { hours: 2 });
   assert.deepEqual(comp.salvage.currencyRequirement, { unit: 'gp', amount: 50 });
 });
@@ -494,7 +515,11 @@ test('_normalizeSalvage (simple): a failure-FIRST input re-orders so the success
     { enabled: true, resultGroups: [failureGroup('grp-fail'), successGroup('grp-win')] },
     simpleContext(true)
   );
-  assert.equal(salvage.resultGroups[0].id, 'grp-win', 'success-first: the engine awards slice(0,1)');
+  assert.equal(
+    salvage.resultGroups[0].id,
+    'grp-win',
+    'success-first: the engine awards slice(0,1)'
+  );
   assert.equal(salvage.resultGroups[0].role, undefined, 'index 0 is not a failure group');
   assert.equal(salvage.resultGroups[1].id, 'grp-fail');
 });
@@ -577,7 +602,13 @@ test('writer path — createItem clamps Simple groups', async () => {
 
 test('writer path — updateItem clamps Simple groups', async () => {
   const manager = makeLoadedManager([
-    SIMPLE_SYSTEM([{ id: 'comp-1', name: 'Scale', salvage: { enabled: true, resultGroups: [successGroup('grp-a')] } }]),
+    SIMPLE_SYSTEM([
+      {
+        id: 'comp-1',
+        name: 'Scale',
+        salvage: { enabled: true, resultGroups: [successGroup('grp-a')] },
+      },
+    ]),
   ]);
   const updated = await manager.updateItem('sys-simple', 'comp-1', {
     salvage: { enabled: true, resultGroups: [successGroup('grp-a'), successGroup('grp-b')] },
@@ -598,7 +629,11 @@ test('writer path — replaceItemSource clamps the existing Simple groups', asyn
   ]);
   // Stub the source-resolution collaborators so `replaceItemSource` reaches its
   // `_normalizeComponent` call with the existing (multi-group) salvage carried through.
-  globalThis.fromUuid = async () => ({ documentName: 'Item', name: 'Scale', img: 'icons/svg/item-bag.svg' });
+  globalThis.fromUuid = async () => ({
+    documentName: 'Item',
+    name: 'Scale',
+    img: 'icons/svg/item-bag.svg',
+  });
   manager._buildComponentSourceSnapshot = async () => ({
     name: 'Scale',
     img: 'icons/svg/item-bag.svg',
@@ -621,7 +656,11 @@ test('writer path — addItemFromUuid threads the Simple context to the clamp', 
   // clamped, which pins the context threading at this writer (an unthreaded site would
   // ship green). Stub the source-resolution collaborators so the snapshot carries salvage.
   const manager = makeLoadedManager([SIMPLE_SYSTEM([])]);
-  globalThis.fromUuid = async () => ({ documentName: 'Item', name: 'Relic', img: 'icons/svg/item-bag.svg' });
+  globalThis.fromUuid = async () => ({
+    documentName: 'Item',
+    name: 'Relic',
+    img: 'icons/svg/item-bag.svg',
+  });
   manager._resolveImportedComponentSourceData = async () => ({
     currentUuid: 'Item.relic',
     canonicalUuid: 'Item.relic',
@@ -665,13 +704,23 @@ test('reserved failure group is RETAINED when the SIMPLE slot has a formula (via
       {
         id: 'comp-1',
         name: 'Scale',
-        salvage: { enabled: true, resultGroups: [successGroup('grp-ok'), failureGroup('grp-fail')] },
+        salvage: {
+          enabled: true,
+          resultGroups: [successGroup('grp-ok'), failureGroup('grp-fail')],
+        },
       },
     ],
   });
   const groups = system.components[0].salvage.resultGroups;
-  assert.deepEqual(groups.map((g) => g.id), ['grp-ok', 'grp-fail']);
-  assert.equal(groups[1].role, 'failure', 'the reserved failure group survives with a Simple formula');
+  assert.deepEqual(
+    groups.map((g) => g.id),
+    ['grp-ok', 'grp-fail']
+  );
+  assert.equal(
+    groups[1].role,
+    'failure',
+    'the reserved failure group survives with a Simple formula'
+  );
 });
 
 test('reserved failure group is DROPPED when ONLY a non-simple slot has a formula (via _normalizeSystem)', () => {
@@ -691,7 +740,10 @@ test('reserved failure group is DROPPED when ONLY a non-simple slot has a formul
       {
         id: 'comp-1',
         name: 'Scale',
-        salvage: { enabled: true, resultGroups: [successGroup('grp-ok'), failureGroup('grp-fail')] },
+        salvage: {
+          enabled: true,
+          resultGroups: [successGroup('grp-ok'), failureGroup('grp-fail')],
+        },
       },
     ],
   });

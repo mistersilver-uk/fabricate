@@ -44,9 +44,8 @@ globalThis.ui = {
   notifications: { info: () => {}, warn: () => {}, error: () => {} },
 };
 
-const { evaluateSystemValidation, computeSystemVisibility } = await import(
-  '../src/systems/systemValidation.js'
-);
+const { evaluateSystemValidation, computeSystemVisibility } =
+  await import('../src/systems/systemValidation.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
 // ---------------------------------------------------------------------------
@@ -72,7 +71,11 @@ function makeRecipe(overrides = {}) {
       {
         id: 'set-1',
         ingredientGroups: [
-          { id: 'group-1', name: 'Iron', options: [{ id: 'opt-1', match: componentMatch('iron') }] },
+          {
+            id: 'group-1',
+            name: 'Iron',
+            options: [{ id: 'opt-1', match: componentMatch('iron') }],
+          },
         ],
         essences: {},
       },
@@ -210,8 +213,7 @@ describe('evaluateSystemValidation — composition', () => {
     const report = evaluateSystemValidation(system, { recipes: [recipe] });
     assert.equal(
       report.issues.some(
-        (issue) =>
-          issue.code === 'unroutedResultGroup' || issue.code === 'unproducedOutcomeTier'
+        (issue) => issue.code === 'unroutedResultGroup' || issue.code === 'unproducedOutcomeTier'
       ),
       false,
       'a single-result-group routedByCheck recipe needs no mapping'
@@ -222,7 +224,12 @@ describe('evaluateSystemValidation — composition', () => {
     const component = {
       id: 'comp-1',
       name: 'Cracked Gem',
-      salvage: { resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }] },
+      salvage: {
+        resultGroups: [
+          { id: 'g1', results: [] },
+          { id: 'g2', results: [] },
+        ],
+      },
     };
     const system = makeSystem({ salvageResolutionMode: 'simple' });
     const report = evaluateSystemValidation(system, { components: [component] });
@@ -259,7 +266,12 @@ describe('evaluateSystemValidation — composition', () => {
     // deep-link navigation) still carries the id, but no user-facing label may.
     const component = {
       id: 'secret-internal-component-id',
-      salvage: { resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }] },
+      salvage: {
+        resultGroups: [
+          { id: 'g1', results: [] },
+          { id: 'g2', results: [] },
+        ],
+      },
     };
     const system = makeSystem({ salvageResolutionMode: 'simple' });
     const report = evaluateSystemValidation(system, { components: [component] });
@@ -445,8 +457,7 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
 
     assert.equal(
       report.issues.some(
-        (issue) =>
-          issue.code === 'salvageRoutedNoTiers' || issue.code === 'salvageRoutedNoFormula'
+        (issue) => issue.code === 'salvageRoutedNoTiers' || issue.code === 'salvageRoutedNoFormula'
       ),
       false,
       'a configured routed salvage check clears the salvage system issues'
@@ -625,7 +636,12 @@ describe('computeSystemVisibility', () => {
       {
         id: 'bad-salvage',
         name: 'Cracked Gem',
-        salvage: { resultGroups: [{ id: 'g1', results: [] }, { id: 'g2', results: [] }] },
+        salvage: {
+          resultGroups: [
+            { id: 'g1', results: [] },
+            { id: 'g2', results: [] },
+          ],
+        },
       },
     ];
     const { blocksSystem, hiddenEntityIds } = computeSystemVisibility(system, { components });

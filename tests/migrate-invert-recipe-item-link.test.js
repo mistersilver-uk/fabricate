@@ -22,12 +22,20 @@ function fixture() {
     recipes: [
       { id: 'r1', craftingSystemId: 'sys-1', recipeItemId: 'book-1' },
       // Legacy uuid link (no recipeItemId) resolves via originItemUuid.
-      { id: 'r2', craftingSystemId: 'sys-1', linkedRecipeItemUuid: 'Compendium.world.items.book-2' },
+      {
+        id: 'r2',
+        craftingSystemId: 'sys-1',
+        linkedRecipeItemUuid: 'Compendium.world.items.book-2',
+      },
       // Unlinked recipe.
       { id: 'r3', craftingSystemId: 'sys-1' },
       // A standalone alchemy formula item — linkedRecipeItemUuid points at an item that
       // is NOT a recipe-item definition, so it must be preserved (not book membership).
-      { id: 'r4', craftingSystemId: 'sys-1', linkedRecipeItemUuid: 'Compendium.world.items.formula-x' },
+      {
+        id: 'r4',
+        craftingSystemId: 'sys-1',
+        linkedRecipeItemUuid: 'Compendium.world.items.formula-x',
+      },
     ],
   };
 }
@@ -68,7 +76,11 @@ test('a recipe with BOTH a book recipeItemId AND a separate alchemy formula link
     ],
   };
   const out = migrateInvertRecipeItemLink(data);
-  assert.deepEqual(out.systems[0].recipeItemDefinitions[0].recipeIds, ['r1'], 'book membership recorded');
+  assert.deepEqual(
+    out.systems[0].recipeItemDefinitions[0].recipeIds,
+    ['r1'],
+    'book membership recorded'
+  );
   assert.equal('recipeItemId' in out.recipes[0], false, 'book-only reverse ref stripped');
   assert.equal(
     out.recipes[0].linkedRecipeItemUuid,

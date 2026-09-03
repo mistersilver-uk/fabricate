@@ -28,7 +28,10 @@ function item(uuid, quantity, essences) {
 }
 
 function essenceGroup(essenceId, amount) {
-  return { id: `g-${essenceId}`, options: [{ quantity: 1, match: { type: 'essence', essenceId, amount } }] };
+  return {
+    id: `g-${essenceId}`,
+    options: [{ quantity: 1, match: { type: 'essence', essenceId, amount } }],
+  };
 }
 
 test('default (flag-only) resolver draws down flag-carrying items to meet the essence amount', () => {
@@ -63,7 +66,10 @@ test('anti-double-consume: an item claimed by a component group is not recounted
   const set = new IngredientSet({
     id: 's',
     ingredientGroups: [
-      { id: 'g-comp', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-ember' } }] },
+      {
+        id: 'g-comp',
+        options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-ember' } }],
+      },
       essenceGroup('fire', 1),
     ],
   });
@@ -87,28 +93,45 @@ test('anti-double-consume (tag + essence): one component carrying both cannot sa
   const set = new IngredientSet({
     id: 's',
     ingredientGroups: [
-      { id: 'g-tag', options: [{ quantity: 1, match: { type: 'tags', tags: ['iron'], tagMatch: 'any' } }] },
+      {
+        id: 'g-tag',
+        options: [{ quantity: 1, match: { type: 'tags', tags: ['iron'], tagMatch: 'any' } }],
+      },
       essenceGroup('fire', 2),
     ],
   });
   // Only Blazing Iron carries the iron tag (matcher), and it also carries fire (probe).
-  const matcher = (ingredient, it) => ingredient?.match?.type === 'tags' && it.uuid === 'blazing-iron';
+  const matcher = (ingredient, it) =>
+    ingredient?.match?.type === 'tags' && it.uuid === 'blazing-iron';
   const blazing = item('blazing-iron', 1, {});
 
   const alone = set.resolveIngredientSelection([blazing], matcher, {
     resolveItemEssences: () => ({ fire: 2 }),
   });
-  assert.equal(alone.success, false, 'Blazing Iron alone cannot satisfy both the tag and the essence requirement');
+  assert.equal(
+    alone.success,
+    false,
+    'Blazing Iron alone cannot satisfy both the tag and the essence requirement'
+  );
   assert.equal(alone.missingGroups.length, 1);
-  assert.equal(alone.missingGroups[0].ingredient.match.type, 'essence', 'the essence group is left unsatisfied');
+  assert.equal(
+    alone.missingGroups[0].ingredient.match.type,
+    'essence',
+    'the essence group is left unsatisfied'
+  );
 
   // Adding a DEDICATED fire source (no iron tag) makes it craftable: the tag group
   // consumes Blazing Iron, the essence group draws the dedicated source — no double count.
   const bottled = item('bottled-fire', 1, {});
   const withBottle = set.resolveIngredientSelection([blazing, bottled], matcher, {
-    resolveItemEssences: (it) => (it.uuid === 'bottled-fire' || it.uuid === 'blazing-iron' ? { fire: 2 } : {}),
+    resolveItemEssences: (it) =>
+      it.uuid === 'bottled-fire' || it.uuid === 'blazing-iron' ? { fire: 2 } : {},
   });
-  assert.equal(withBottle.success, true, 'a separate fire source satisfies the essence group without reusing Blazing Iron');
+  assert.equal(
+    withBottle.success,
+    true,
+    'a separate fire source satisfies the essence group without reusing Blazing Iron'
+  );
 });
 
 test('unit-granular: an indivisible item may over-consume past the amount', () => {
@@ -145,7 +168,10 @@ test('back-compat: a no-resolver resolveIngredientSelection with NO essence opti
   const set = new IngredientSet({
     id: 's',
     ingredientGroups: [
-      { id: 'g-1', options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-iron' } }] },
+      {
+        id: 'g-1',
+        options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-iron' } }],
+      },
     ],
   });
   const iron = { uuid: 'iron', system: { quantity: 5 }, getFlag: () => undefined };

@@ -46,29 +46,41 @@ const mainSource = readFileSync(resolve(__dirname, '../../src/main.js'), 'utf8')
 function makeHarness({ readyAtStart = false } = {}) {
   let constructs = 0;
   let resolveReady;
-  const readyPromise = new Promise((r) => { resolveReady = r; });
+  const readyPromise = new Promise((r) => {
+    resolveReady = r;
+  });
   const state = { ready: readyAtStart, gm: true };
   if (readyAtStart) resolveReady();
 
   const fabricate = {
-    get ready() { return state.ready; },
+    get ready() {
+      return state.ready;
+    },
     getRecipeManager: () => ({ initialized: state.ready }),
     getCraftingSystemManager: () => ({ initialized: state.ready }),
-    whenReady: () => readyPromise
+    whenReady: () => readyPromise,
   };
 
   class FakeApp {
-    constructor() { constructs += 1; this.rendered = false; }
-    render() { this.rendered = true; return this; }
+    constructor() {
+      constructs += 1;
+      this.rendered = false;
+    }
+    render() {
+      this.rendered = true;
+      return this;
+    }
 
     static _pendingReadyOpen = false;
     static warnings = 0;
     static opened = null;
 
     static _isFabricateReady() {
-      return fabricate.ready === true
-        && fabricate.getRecipeManager()?.initialized === true
-        && fabricate.getCraftingSystemManager()?.initialized === true;
+      return (
+        fabricate.ready === true &&
+        fabricate.getRecipeManager()?.initialized === true &&
+        fabricate.getCraftingSystemManager()?.initialized === true
+      );
     }
 
     // Faithful copy of the shipped deferred-open decision.
@@ -91,7 +103,9 @@ function makeHarness({ readyAtStart = false } = {}) {
           if (typeof whenReady === 'function') {
             Promise.resolve(whenReady.call(fabricate))
               .then(openWhenReady)
-              .catch(() => { FakeApp._pendingReadyOpen = false; });
+              .catch(() => {
+                FakeApp._pendingReadyOpen = false;
+              });
           }
         }
         return null;
@@ -108,9 +122,12 @@ function makeHarness({ readyAtStart = false } = {}) {
     FakeApp,
     constructs: () => constructs,
     // Startup completes: flip readiness AND settle the promise (the real `initialize`).
-    becomeReady: () => { state.ready = true; resolveReady(); },
+    becomeReady: () => {
+      state.ready = true;
+      resolveReady();
+    },
     // Settle the promise WITHOUT readiness — models a stale/early signal.
-    settlePromiseOnly: () => resolveReady()
+    settlePromiseOnly: () => resolveReady(),
   };
 }
 

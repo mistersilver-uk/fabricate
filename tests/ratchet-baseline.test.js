@@ -112,7 +112,8 @@ test('a pinned total that disagrees with the sum fails before anything is compar
 
 test('a scan that looked at almost nothing fails instead of reporting a clean tree', () => {
   assert.throws(() => run(clean(), { scanned: 12 }), {
-    message: /only 12 candidates, below the floor of 800[\s\S]*broken scan reported as a clean tree/,
+    message:
+      /only 12 candidates, below the floor of 800[\s\S]*broken scan reported as a clean tree/,
   });
 });
 
@@ -154,12 +155,12 @@ test('the four categories are separable without parsing a message', () => {
 test('tallying counts repeats rather than collapsing them', () => {
   // Counted, not set-valued, for the reason `manager-button-source-contract.test.js` gives:
   // deleting one of two identical probes must not be silently absorbed.
-  const counts = tallyByKey(
-    [{ file: 'a' }, { file: 'b' }, { file: 'a' }],
-    (entry) => entry.file
+  const counts = tallyByKey([{ file: 'a' }, { file: 'b' }, { file: 'a' }], (entry) => entry.file);
+  assert.deepEqual(
+    [...counts],
+    [
+      ['a', 2],
+      ['b', 1],
+    ]
   );
-  assert.deepEqual([...counts], [
-    ['a', 2],
-    ['b', 1],
-  ]);
 });

@@ -40,10 +40,7 @@ const uiRoot = join(repoRoot, 'src/ui');
 const CONSUMERS = Object.freeze([
   ['src/ui/svelte/apps/manager/ComponentEditView.svelte', 'visibleEssenceOptions'],
   ['src/ui/svelte/apps/ComponentEditorRoot.svelte', 'visibleEssenceOptions'],
-  [
-    'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
-    'visibleEssenceOptions',
-  ],
+  ['src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte', 'visibleEssenceOptions'],
   ['src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte', 'visibleEssenceOptions'],
 ]);
 
@@ -89,8 +86,7 @@ test('1036/18: no consumer filters the essence PROP itself', () => {
   // drops a disabled essence's authored quantity through `buildComponentEditorUpdates`,
   // wipes it across a whole selection through the bulk panel's whole-map replacement, and
   // renders authored recipe options unresolved.
-  const destructive =
-    /(essenceOptions|essenceDefinitions)\s*(\|\|\s*\[\])?\s*\)?\s*\.filter\s*\(/;
+  const destructive = /(essenceOptions|essenceDefinitions)\s*(\|\|\s*\[\])?\s*\)?\s*\.filter\s*\(/;
   for (const path of uiSourceFiles()) {
     assert.ok(
       !destructive.test(read(path)),
@@ -116,7 +112,10 @@ test('1036/18: the consumer list is CLOSED — no unlisted file renders an essen
     return ADD_MARKERS.some((marker) => marker.test(source));
   });
 
-  assert.ok(rendering.length > 0, 'the markers still match something — a vacuous scan proves nothing');
+  assert.ok(
+    rendering.length > 0,
+    'the markers still match something — a vacuous scan proves nothing'
+  );
   assert.deepEqual(
     rendering.filter((path) => !listed.has(path)),
     [],

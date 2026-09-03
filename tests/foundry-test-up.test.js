@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  inspectCachedContainerStatus,
-  runFoundryLauncher,
-} from '../scripts/foundry-test-up.mjs';
+import { inspectCachedContainerStatus, runFoundryLauncher } from '../scripts/foundry-test-up.mjs';
 
 test('launcher treats only a confirmed missing container as absent', () => {
   const absent = inspectCachedContainerStatus({

@@ -58,7 +58,9 @@ describe('recipeItemDefinitionsContaining — the membership basis', () => {
 
   it('falls back to the legacy scalar only while the marker is unset', () => {
     const recipe = { id: 'r1', recipeItemId: 'book-a' };
-    assert.deepEqual(ids(recipeItemDefinitionsContaining(definitions(), recipe, false)), ['book-a']);
+    assert.deepEqual(ids(recipeItemDefinitionsContaining(definitions(), recipe, false)), [
+      'book-a',
+    ]);
     assert.deepEqual(
       ids(recipeItemDefinitionsContaining(definitions(), recipe, true)),
       [],
@@ -95,7 +97,12 @@ describe('recipeItemDefinitionsContaining — the membership basis', () => {
 
   it('hands back a fresh array, so a caller cannot corrupt a shared index bucket', () => {
     const defs = definitions({ a: ['r1'] });
-    const first = recipeItemDefinitionsContaining(defs, { id: 'r1' }, true, indexedMembershipLookups);
+    const first = recipeItemDefinitionsContaining(
+      defs,
+      { id: 'r1' },
+      true,
+      indexedMembershipLookups
+    );
     first.length = 0;
     assert.deepEqual(
       ids(recipeItemDefinitionsContaining(defs, { id: 'r1' }, true, indexedMembershipLookups)),
@@ -110,7 +117,9 @@ describe('recipeItemDefinitionsContaining — the legacy fallback order', () => 
     // The leg the admin row projection did not have. This is the case where unification
     // CHANGED what the GM browser shows for an un-migrated world.
     const recipe = { id: 'r1', linkedRecipeItemUuid: BOOK_B_UUID };
-    assert.deepEqual(ids(recipeItemDefinitionsContaining(definitions(), recipe, false)), ['book-b']);
+    assert.deepEqual(ids(recipeItemDefinitionsContaining(definitions(), recipe, false)), [
+      'book-b',
+    ]);
   });
 
   it('refuses to fall through when a PRESENT recipeItemId names nothing', () => {
@@ -122,7 +131,9 @@ describe('recipeItemDefinitionsContaining — the legacy fallback order', () => 
 
   it('prefers the scalar over the uuid when BOTH resolve', () => {
     const recipe = { id: 'r1', recipeItemId: 'book-a', linkedRecipeItemUuid: BOOK_B_UUID };
-    assert.deepEqual(ids(recipeItemDefinitionsContaining(definitions(), recipe, false)), ['book-a']);
+    assert.deepEqual(ids(recipeItemDefinitionsContaining(definitions(), recipe, false)), [
+      'book-a',
+    ]);
   });
 
   it('resolves at most one definition, and none for an unlinked recipe', () => {
@@ -136,7 +147,9 @@ describe('recipeItemDefinitionsContaining — the legacy fallback order', () => 
 
   it('trims both sides of every comparison', () => {
     const recipe = { id: ' r1 ', recipeItemId: ' book-a ' };
-    assert.deepEqual(ids(recipeItemDefinitionsContaining(definitions(), recipe, false)), ['book-a']);
+    assert.deepEqual(ids(recipeItemDefinitionsContaining(definitions(), recipe, false)), [
+      'book-a',
+    ]);
   });
 });
 
@@ -222,7 +235,8 @@ describe('recipeItemDefinitionsContaining — data access is injected, the rule 
     };
 
     assert.equal(
-      resolveLegacyMembershipDefinition(defs, { id: 'r1', recipeItemId: 'book-b' }, seedLookups)?.id,
+      resolveLegacyMembershipDefinition(defs, { id: 'r1', recipeItemId: 'book-b' }, seedLookups)
+        ?.id,
       'book-b'
     );
     assert.equal(

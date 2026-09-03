@@ -152,7 +152,7 @@ test('(a) copy-import regenerates every component id and remaps every D1 referen
 // (b) Residual closure
 // ---------------------------------------------------------------------------
 
-test('(b) a second copy from one origin BINDS to the first copy\'s world entities (issue 1364)', () => {
+test("(b) a second copy from one origin BINDS to the first copy's world entities (issue 1364)", () => {
   // The shared, GROWING destination index: the first import's world entities are what the second
   // import matches against, which is exactly what the two live call sites build from the three
   // world-scope entity stores.
@@ -167,7 +167,7 @@ test('(b) a second copy from one origin BINDS to the first copy\'s world entitie
 
   // Every fixture component is LINKED — each carries an `originItemUuid` — so every one of them
   // binds rather than minting. Pre-1364 this assertion was its exact negation.
-  assert.deepEqual(ids2, ids1, 'a second copy must bind to the first copy\'s world entity ids');
+  assert.deepEqual(ids2, ids1, "a second copy must bind to the first copy's world entity ids");
   assert.equal(
     copy2.componentScope.entities.length,
     0,

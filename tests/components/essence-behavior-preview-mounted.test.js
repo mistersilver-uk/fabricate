@@ -70,7 +70,9 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
     assert.ok(component, 'the carrying-component cell renders');
     const art = component.querySelector('.inventory-card-art img');
     assert.ok(
-      art?.getAttribute('src').includes('icons/containers/bags/pack-engraved-leather-leaf-tan.webp'),
+      art
+        ?.getAttribute('src')
+        .includes('icons/containers/bags/pack-engraved-leather-leaf-tan.webp'),
       'on the core engraved-leather pack icon, NOT the item-bag "no image" sentinel'
     );
     const pip = component.querySelector('[data-inventory-pip="essence"]');

@@ -102,10 +102,7 @@ describe('issue 1072 — the ingredient solver reports its own search cost', () 
   // product of tree size and per-node cost that it cannot separate, and #1083 moved both terms.
   // Discarding this number left #1083's bounds unfalsifiable.
   it('surfaces searchStats on a satisfied selection', () => {
-    const result = contendedSet(2).resolveIngredientSelection(
-      sharedStacks(2),
-      matchHeldComponent
-    );
+    const result = contendedSet(2).resolveIngredientSelection(sharedStacks(2), matchHeldComponent);
 
     assert.equal(result.success, true, 'fixture must be satisfiable');
     assert.ok(result.searchStats, 'a satisfied resolve must report its search cost');
@@ -121,10 +118,7 @@ describe('issue 1072 — the ingredient solver reports its own search cost', () 
     // to the greedy pass. Both exits must carry the statistic or a caller has to branch on which
     // one produced the result — and the UNSATISFIABLE case is the expensive one worth measuring,
     // because it is the branch that explores the whole space before giving up.
-    const result = contendedSet(2).resolveIngredientSelection(
-      sharedStacks(1),
-      matchHeldComponent
-    );
+    const result = contendedSet(2).resolveIngredientSelection(sharedStacks(1), matchHeldComponent);
 
     assert.equal(result.success, false, 'fixture must be unsatisfiable');
     assert.ok(result.searchStats, 'the greedy fallback must report the search cost too');
@@ -252,7 +246,8 @@ describe('issue 1072 — RecipeManager reaches its system manager through the co
     hostileGlobalEnv();
     const system = makeCraftingSystem({ componentCount: 2, resolutionMode: 'alchemy' });
     const manager = new RecipeManager({
-      getCraftingSystemManager: () => makeSystemManager(system, () => [...manager.recipes.values()]),
+      getCraftingSystemManager: () =>
+        makeSystemManager(system, () => [...manager.recipes.values()]),
     });
 
     // The realistic enable transition: the candidate is STORED and still disabled, its
@@ -367,8 +362,14 @@ describe('issue 1072 — the probes cannot report a vacuous zero', () => {
     // `atMostLinear` is the shape every scaling guard uses, so it needs its own negative
     // control: a helper that returns `ok: true` unconditionally would make every guard in
     // the sibling file vacuous at once.
-    assert.equal(atMostLinear({ baseline: 10, scaled: 20, factor: 2, axis: 'x', what: 'y' }).ok, true);
-    assert.equal(atMostLinear({ baseline: 10, scaled: 21, factor: 2, axis: 'x', what: 'y' }).ok, false);
+    assert.equal(
+      atMostLinear({ baseline: 10, scaled: 20, factor: 2, axis: 'x', what: 'y' }).ok,
+      true
+    );
+    assert.equal(
+      atMostLinear({ baseline: 10, scaled: 21, factor: 2, axis: 'x', what: 'y' }).ok,
+      false
+    );
     assert.match(
       atMostLinear({ baseline: 10, scaled: 40, factor: 2, axis: 'items', what: 'scans' }).message,
       /grew faster than linearly in items/

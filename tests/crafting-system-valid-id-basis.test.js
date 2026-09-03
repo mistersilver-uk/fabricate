@@ -27,7 +27,13 @@ globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { CharacterLibrariesStore } = await import('../src/systems/CharacterLibrariesStore.js');
 
-const PREREQ = { id: 'smithsTools', name: "Smith's Tools", path: 'tools.smith.value', op: 'gte', value: 1 };
+const PREREQ = {
+  id: 'smithsTools',
+  name: "Smith's Tools",
+  path: 'tools.smith.value',
+  op: 'gte',
+  value: 1,
+};
 const MODIFIER = { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' };
 
 /** A system carrying references to both libraries, plus its own legacy in-system copies. */

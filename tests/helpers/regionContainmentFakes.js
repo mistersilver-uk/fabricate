@@ -62,7 +62,7 @@ export function rectRegion({
   y = 0,
   w = 100,
   h = 100,
-  elevationBand = null
+  elevationBand = null,
 } = {}) {
   const region = {
     id,
@@ -76,7 +76,7 @@ export function rectRegion({
       if (!Number.isFinite(px) || !Number.isFinite(py)) return false;
       if (px < x || px > x + w || py < y || py > y + h) return false;
       return elevationBand ? admitsElevation(elevationBand, point?.elevation) : true;
-    }
+    },
   };
   return region;
 }
@@ -158,7 +158,7 @@ export function tokenDoc({
   elevation,
   regions = [],
   insideRegion = 'absent',
-  actorId = 'actor-1'
+  actorId = 'actor-1',
 } = {}) {
   const gridSize = Number(scene?.grid?.size);
   const grid = Number.isFinite(gridSize) && gridSize > 0 ? gridSize : 100;
@@ -179,8 +179,8 @@ export function tokenDoc({
     getCenterPoint: () => ({
       x: x + (grid * width) / 2,
       y: y + (grid * height) / 2,
-      elevation
-    })
+      elevation,
+    }),
   };
   if (insideRegion !== 'absent') {
     doc.testInsideRegion = (region) => {

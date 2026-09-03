@@ -17,8 +17,8 @@ let idCounter = 0;
 globalThis.foundry = {
   utils: {
     randomID: () => `random-${++idCounter}`,
-    getProperty: () => undefined
-  }
+    getProperty: () => undefined,
+  },
 };
 // `updateSystem` calls `_assertGM`, so the stub user must be a GM (issue 1374): the clear
 // round trip below drives the REAL `updateSystem`, not a normalizer call.
@@ -54,7 +54,7 @@ test('_normalizeTool produces the canonical Tool shape with defaults for a spars
     breakage: { mode: 'limitedUses', maxUses: null },
     checkBreakable: true,
     onBreak: { mode: 'destroy' },
-    repairRequirements: []
+    repairRequirements: [],
   });
 });
 
@@ -66,7 +66,11 @@ test('_normalizeTool generates an id when absent', () => {
 
 test('_normalizeTool trims the label and componentId, coercing blanks to null', () => {
   const manager = makeManager();
-  const tool = manager._normalizeTool({ id: 't1', label: '  Iron Pickaxe  ', componentId: '  comp-pick  ' });
+  const tool = manager._normalizeTool({
+    id: 't1',
+    label: '  Iron Pickaxe  ',
+    componentId: '  comp-pick  ',
+  });
   assert.equal(tool.label, 'Iron Pickaxe');
   assert.equal(tool.componentId, 'comp-pick');
 
@@ -86,7 +90,7 @@ test('_normalizeTool coerces unknown breakage / on-break modes to defaults but k
   const tool = manager._normalizeTool({
     id: 't1',
     breakage: { mode: 'frobnicate', maxUses: 7 },
-    onBreak: { mode: 'banana' }
+    onBreak: { mode: 'banana' },
   });
   assert.equal(tool.breakage.mode, 'limitedUses');
   assert.equal(tool.breakage.maxUses, 7);
@@ -95,16 +99,25 @@ test('_normalizeTool coerces unknown breakage / on-break modes to defaults but k
 
 test('_normalizeTool normalizes breakageChance breakage', () => {
   const manager = makeManager();
-  const tool = manager._normalizeTool({ id: 't1', breakage: { mode: 'breakageChance', breakageChance: 25 } });
+  const tool = manager._normalizeTool({
+    id: 't1',
+    breakage: { mode: 'breakageChance', breakageChance: 25 },
+  });
   assert.deepEqual(tool.breakage, { mode: 'breakageChance', breakageChance: 25 });
 
-  const nonNumeric = manager._normalizeTool({ id: 't2', breakage: { mode: 'breakageChance', breakageChance: 'x' } });
+  const nonNumeric = manager._normalizeTool({
+    id: 't2',
+    breakage: { mode: 'breakageChance', breakageChance: 'x' },
+  });
   assert.equal(nonNumeric.breakage.breakageChance, 0);
 });
 
 test('_normalizeTool normalizes diceExpression breakage', () => {
   const manager = makeManager();
-  const tool = manager._normalizeTool({ id: 't1', breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 } });
+  const tool = manager._normalizeTool({
+    id: 't1',
+    breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 },
+  });
   assert.deepEqual(tool.breakage, { mode: 'diceExpression', formula: '1d20', threshold: 10 });
 
   const sparse = manager._normalizeTool({ id: 't2', breakage: { mode: 'diceExpression' } });
@@ -113,7 +126,10 @@ test('_normalizeTool normalizes diceExpression breakage', () => {
 
 test('_normalizeTool reads legacy replacementComponentId into a discriminated target', () => {
   const manager = makeManager();
-  const tool = manager._normalizeTool({ id: 't1', onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-broken' } });
+  const tool = manager._normalizeTool({
+    id: 't1',
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-broken' },
+  });
   assert.deepEqual(tool.onBreak, {
     mode: 'replaceWith',
     replacementTarget: { type: 'component', componentId: 'comp-broken' },
@@ -135,7 +151,10 @@ test('_normalizeTool normalizes a requirement gate to a formula-only shape', () 
   assert.deepEqual(tool.requirement, { formula: '@abilities.str.mod' });
 
   // Legacy provider/macroUuid fields are dropped on normalization.
-  const legacy = manager._normalizeTool({ id: 't2', requirement: { provider: 'bogus', formula: '@x', macroUuid: 'Macro.x' } });
+  const legacy = manager._normalizeTool({
+    id: 't2',
+    requirement: { provider: 'bogus', formula: '@x', macroUuid: 'Macro.x' },
+  });
   assert.deepEqual(legacy.requirement, { formula: '@x' });
 
   const nullReq = manager._normalizeTool({ id: 't3', requirement: null });
@@ -152,9 +171,19 @@ test('_normalizeSystem populates a normalized tools array', () => {
     id: 'sys1',
     name: 'Wildcraft',
     tools: [
-      { id: 'tool-axe', label: 'Axe', componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: 5 } },
-      { id: 'tool-saw', componentId: 'comp-saw', breakage: { mode: 'breakageChance', breakageChance: 10 }, onBreak: { mode: 'flagBroken' } }
-    ]
+      {
+        id: 'tool-axe',
+        label: 'Axe',
+        componentId: 'comp-axe',
+        breakage: { mode: 'limitedUses', maxUses: 5 },
+      },
+      {
+        id: 'tool-saw',
+        componentId: 'comp-saw',
+        breakage: { mode: 'breakageChance', breakageChance: 10 },
+        onBreak: { mode: 'flagBroken' },
+      },
+    ],
   });
   assert.equal(system.tools.length, 2);
   assert.deepEqual(system.tools[0], {
@@ -174,7 +203,7 @@ test('_normalizeSystem populates a normalized tools array', () => {
     breakage: { mode: 'limitedUses', maxUses: 5 },
     checkBreakable: true,
     onBreak: { mode: 'destroy' },
-    repairRequirements: []
+    repairRequirements: [],
   });
   assert.equal(system.tools[1].breakage.mode, 'breakageChance');
   assert.equal(system.tools[1].onBreak.mode, 'flagBroken');
@@ -189,7 +218,10 @@ test('_normalizeSystem returns [] for an absent or non-array tools field', () =>
 
 test('_normalizeSystem round-trips tools through normalization (re-normalize is stable)', () => {
   const manager = makeManager();
-  const once = manager._normalizeSystem({ id: 'sys1', tools: [{ id: 't1', label: ' Pick ', componentId: ' c1 ' }] });
+  const once = manager._normalizeSystem({
+    id: 'sys1',
+    tools: [{ id: 't1', label: ' Pick ', componentId: ' c1 ' }],
+  });
   const twice = manager._normalizeSystem(once);
   assert.deepEqual(twice.tools, once.tools);
 });
@@ -233,7 +265,11 @@ test('_normalizeTool preserves source refs + name/img snapshot and never clobber
 
 test('_normalizeToolBreakage reads legacy immune forward exactly like the Tool model', () => {
   const manager = makeManager();
-  const breakage = manager._normalizeToolBreakage({ mode: 'immune', maxUses: 5, breakageChance: 9 });
+  const breakage = manager._normalizeToolBreakage({
+    mode: 'immune',
+    maxUses: 5,
+    breakageChance: 9,
+  });
   assert.deepEqual(breakage, { mode: 'limitedUses', maxUses: null });
 });
 
@@ -343,7 +379,11 @@ test('_normalizeSystem emits NO toolBreakage key at all when none was authored',
 
 test('_normalizeSystem drops an unknown toolBreakage.authority rather than coercing it', () => {
   const manager = makeManager();
-  const system = manager._normalizeSystem({ id: 's', name: 'S', toolBreakage: { authority: 'bogus' } });
+  const system = manager._normalizeSystem({
+    id: 's',
+    name: 'S',
+    toolBreakage: { authority: 'bogus' },
+  });
   assert.equal('toolBreakage' in system, false);
 });
 
@@ -364,7 +404,11 @@ test('the shipped read shape survives the flip: no authored authority still RESO
 
 test('_normalizeSystem preserves a checkDriven toolBreakage.authority', () => {
   const manager = makeManager();
-  const system = manager._normalizeSystem({ id: 's', name: 'S', toolBreakage: { authority: 'checkDriven' } });
+  const system = manager._normalizeSystem({
+    id: 's',
+    name: 'S',
+    toolBreakage: { authority: 'checkDriven' },
+  });
   assert.deepEqual(system.toolBreakage, { authority: 'checkDriven' });
 });
 
@@ -437,11 +481,21 @@ test('_normalizeCheckBreakage normalizes unified triggers and drops malformed on
   const block = manager._normalizeCheckBreakage({
     triggers: [
       // Unified trigger carrying an explicit outcome/breakTools; the label is dropped.
-      { id: 't1', label: 'Roll low', outcome: 'failure', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: '5' } },
+      {
+        id: 't1',
+        label: 'Roll low',
+        outcome: 'failure',
+        breakTools: true,
+        condition: { type: 'rollTotal', operator: '<=', value: '5' },
+      },
       // Legacy break-only trigger (no outcome/breakTools) → breakTools true, outcome none.
       { id: 't2', condition: { type: 'progressiveValue', operator: '>=', value: 10 } },
       // outcomeTier cannot force an outcome → outcome coerced to none.
-      { id: 't3', outcome: 'success', condition: { type: 'outcomeTier', tierIds: ['x'], outcomeKeys: ['Pass'] } },
+      {
+        id: 't3',
+        outcome: 'success',
+        condition: { type: 'outcomeTier', tierIds: ['x'], outcomeKeys: ['Pass'] },
+      },
       {
         id: 't4',
         outcome: 'none',
@@ -451,7 +505,10 @@ test('_normalizeCheckBreakage normalizes unified triggers and drops malformed on
       // malformed → dropped:
       { id: 'bad-op', condition: { type: 'rollTotal', operator: '!=', value: 1 } },
       { id: 'bad-type', condition: { type: 'unknown' } },
-      { id: 'bad-agg', condition: { type: 'diceGroup', groupId: 0, aggregate: 'sum', operator: '==', value: 1 } },
+      {
+        id: 'bad-agg',
+        condition: { type: 'diceGroup', groupId: 0, aggregate: 'sum', operator: '==', value: 1 },
+      },
       { id: 'bad-tier', condition: { type: 'outcomeTier' } },
       'not-an-object',
     ],
@@ -487,7 +544,16 @@ test('_normalizeUnifiedTriggers converts legacy diceCrits ahead of the checkBrea
   const block = manager._normalizeUnifiedTriggers(
     '1d20',
     [{ id: 'crit', die: '1d20', raw: 1, success: false, breakTools: true }],
-    { triggers: [{ id: 'r', outcome: 'success', breakTools: false, condition: { type: 'rollTotal', operator: '>=', value: 18 } }] }
+    {
+      triggers: [
+        {
+          id: 'r',
+          outcome: 'success',
+          breakTools: false,
+          condition: { type: 'rollTotal', operator: '>=', value: 18 },
+        },
+      ],
+    }
   );
   assert.equal(block.triggers.length, 2);
   // The converted crit comes first as a diceGroup/total/== trigger.
@@ -545,7 +611,11 @@ test('_normalizeTierStep keeps the four valid modes and collapses anything else 
     assert.equal(manager._normalizeTierStep({ mode }).mode, mode);
   }
   for (const mode of ['set', 'UP', '', 0, null, undefined, { mode: 'up' }]) {
-    assert.equal(manager._normalizeTierStep({ mode }).mode, 'none', `${String(mode)} is not a mode`);
+    assert.equal(
+      manager._normalizeTierStep({ mode }).mode,
+      'none',
+      `${String(mode)} is not a mode`
+    );
   }
 });
 
@@ -582,7 +652,10 @@ test('_normalizeTierStep preserves a dangling tierId verbatim', () => {
   // This normalizer cannot see the outcome lists — a simple or progressive check has
   // none at all — so a target naming no tier is kept for the editor to display and
   // the runtime to no-op on, rather than being silently discarded here.
-  assert.equal(manager._normalizeTierStep({ mode: 'target', tierId: 'no-such-tier' }).tierId, 'no-such-tier');
+  assert.equal(
+    manager._normalizeTierStep({ mode: 'target', tierId: 'no-such-tier' }).tierId,
+    'no-such-tier'
+  );
 });
 
 test('_normalizeTierStep retains the other mode operands across a mode switch', () => {
@@ -611,7 +684,12 @@ test('every normalized trigger carries a tierStep, defaulting to the inert step'
   const manager = makeManager();
   const block = manager._normalizeCheckBreakage({
     triggers: [
-      { id: 'plain', outcome: 'failure', breakTools: false, condition: { type: 'rollTotal', operator: '<=', value: 5 } },
+      {
+        id: 'plain',
+        outcome: 'failure',
+        breakTools: false,
+        condition: { type: 'rollTotal', operator: '<=', value: 5 },
+      },
       {
         id: 'stepping',
         outcome: 'none',
@@ -688,7 +766,10 @@ test('_convertNatSteppingToTriggers synthesises the stable-id stepping pair', ()
   // Stable literals, not randomID(): the ids reach chat and captured result data, so
   // re-minting them on every read until a save drops `natStepping` is not acceptable.
   const again = manager._convertNatSteppingToTriggers(true, '1d20+4', 'relative');
-  assert.deepEqual(again.map((trigger) => trigger.id), ['natstep-up', 'natstep-down']);
+  assert.deepEqual(
+    again.map((trigger) => trigger.id),
+    ['natstep-up', 'natstep-down']
+  );
 });
 
 test('_convertNatSteppingToTriggers synthesises nothing for an inert flag', () => {
@@ -706,15 +787,22 @@ test('_normalizeUnifiedTriggers orders converted crits, converted nat-stepping, 
   const block = manager._normalizeUnifiedTriggers(
     '1d20',
     [{ id: 'crit', die: '1d20', raw: 20, success: true }],
-    { triggers: [{ id: 'authored', outcome: 'none', breakTools: false, condition: { type: 'rollTotal', operator: '>=', value: 18 } }] },
+    {
+      triggers: [
+        {
+          id: 'authored',
+          outcome: 'none',
+          breakTools: false,
+          condition: { type: 'rollTotal', operator: '>=', value: 18 },
+        },
+      ],
+    },
     { natStepping: true, type: 'relative' }
   );
-  assert.deepEqual(block.triggers.map((trigger) => trigger.id), [
-    'crit',
-    'natstep-up',
-    'natstep-down',
-    'authored',
-  ]);
+  assert.deepEqual(
+    block.triggers.map((trigger) => trigger.id),
+    ['crit', 'natstep-up', 'natstep-down', 'authored']
+  );
   assert.deepEqual(block.triggers[0].tierStep, INERT_TIER_STEP, 'a converted crit steps nothing');
 });
 
@@ -722,8 +810,12 @@ test('_normalizeUnifiedTriggers defaults the legacy-routed argument so simple/pr
   const manager = makeManager();
   // The simple and progressive normalizers pass three arguments; a routed-only
   // legacy field must not leak into them.
-  assert.deepEqual(manager._normalizeUnifiedTriggers('1d20', undefined, undefined), { triggers: [] });
-  assert.deepEqual(manager._normalizeUnifiedTriggers('1d20', undefined, undefined, {}), { triggers: [] });
+  assert.deepEqual(manager._normalizeUnifiedTriggers('1d20', undefined, undefined), {
+    triggers: [],
+  });
+  assert.deepEqual(manager._normalizeUnifiedTriggers('1d20', undefined, undefined, {}), {
+    triggers: [],
+  });
 });
 
 test('_normalizeSimpleCraftingCheck carries a unified checkBreakage block and drops diceCrits', () => {
@@ -734,7 +826,11 @@ test('_normalizeSimpleCraftingCheck carries a unified checkBreakage block and dr
     checkBreakage: { triggers: [] },
   });
   assert.equal(simple.diceCrits, undefined, 'the legacy diceCrits field is dropped');
-  assert.equal(simple.checkBreakage.triggers.length, 1, 'the legacy crit is migrated into a trigger');
+  assert.equal(
+    simple.checkBreakage.triggers.length,
+    1,
+    'the legacy crit is migrated into a trigger'
+  );
   assert.equal(simple.checkBreakage.triggers[0].outcome, 'failure');
   assert.equal(simple.checkBreakage.triggers[0].breakTools, true);
 });

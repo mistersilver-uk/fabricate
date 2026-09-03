@@ -5,16 +5,20 @@ import {
   collectModuleTargets,
   formatTable,
   parseArgs,
-  resolveAwsEnv
+  resolveAwsEnv,
 } from '../scripts/latest-module-versions.mjs';
 
 test('parseArgs accepts profile, channel, JSON mode, and explicit modules', () => {
   const options = parseArgs([
-    '--profile', 'fabricate-beta-admin',
-    '--channel', 'beta',
+    '--profile',
+    'fabricate-beta-admin',
+    '--channel',
+    'beta',
     '--json',
-    '--include', 'extra-module',
-    '--include', 'second-module'
+    '--include',
+    'extra-module',
+    '--include',
+    'second-module',
   ]);
 
   assert.equal(options.profile, 'fabricate-beta-admin');
@@ -45,7 +49,10 @@ test('resolveAwsEnv ignores an inherited AWS_PROFILE in CI unless --profile is p
 test('resolveAwsEnv falls back to the local default profile outside CI', () => {
   assert.equal(resolveAwsEnv({}, {}).AWS_PROFILE, 'fabricate-beta');
   assert.equal(resolveAwsEnv({}, { AWS_PROFILE: 'other' }).AWS_PROFILE, 'other');
-  assert.equal(resolveAwsEnv({ profile: 'explicit' }, { AWS_PROFILE: 'other' }).AWS_PROFILE, 'explicit');
+  assert.equal(
+    resolveAwsEnv({ profile: 'explicit' }, { AWS_PROFILE: 'other' }).AWS_PROFILE,
+    'explicit'
+  );
   assert.equal(resolveAwsEnv({}, {}).AWS_REGION, 'eu-west-2');
   assert.equal(resolveAwsEnv({ region: 'us-east-1' }, {}).AWS_REGION, 'us-east-1');
 });
@@ -93,21 +100,21 @@ test('collectModuleTargets combines Fabricate and premium modules without bucket
     fabricateConfig: {
       moduleId: 'fabricate',
       bucket: 'fabricate-modules',
-      channel: 'beta'
+      channel: 'beta',
     },
     premiumConfig: {
       bucket: 'legacy-premium-bucket',
       modules: [
         { slug: 'fabricate-mythwright', channel: 'beta' },
-        { slug: 'balehound-foe-folio', channel: 'beta' }
-      ]
+        { slug: 'balehound-foe-folio', channel: 'beta' },
+      ],
     },
     options: {
       bucket: '',
       channel: 'beta',
       premium: true,
-      include: ['manual-module']
-    }
+      include: ['manual-module'],
+    },
   });
 
   assert.deepEqual(
@@ -123,20 +130,23 @@ test('collectModuleTargets respects --no-premium', () => {
     fabricateConfig: {
       moduleId: 'fabricate',
       bucket: 'fabricate-modules',
-      channel: 'beta'
+      channel: 'beta',
     },
     premiumConfig: {
       bucket: 'legacy-premium-bucket',
-      modules: [{ slug: 'fabricate-mythwright', channel: 'beta' }]
+      modules: [{ slug: 'fabricate-mythwright', channel: 'beta' }],
     },
     options: {
       channel: 'beta',
       premium: false,
-      include: []
-    }
+      include: [],
+    },
   });
 
-  assert.deepEqual(targets.map((target) => target.moduleId), ['fabricate']);
+  assert.deepEqual(
+    targets.map((target) => target.moduleId),
+    ['fabricate']
+  );
 });
 
 test('formatTable prints successful and failed module rows', () => {
@@ -146,13 +156,13 @@ test('formatTable prints successful and failed module rows', () => {
       moduleId: 'fabricate',
       version: '1.0.0-rc.71',
       lastModified: '2026-06-12T22:55:47.000Z',
-      manifestUrl: 'https://example.test/modules/fabricate/beta/latest/module.json'
+      manifestUrl: 'https://example.test/modules/fabricate/beta/latest/module.json',
     },
     {
       ok: false,
       moduleId: 'missing-module',
-      error: 'AccessDenied'
-    }
+      error: 'AccessDenied',
+    },
   ]);
 
   assert.match(table, /fabricate\s+1\.0\.0-rc\.71\s+2026-06-12T22:55:47Z/);

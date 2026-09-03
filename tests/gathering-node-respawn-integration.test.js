@@ -9,7 +9,12 @@ import { SETTING_KEYS } from '../src/config/settings.js';
 const HOUR = 3600;
 const SYS = 'sys-int';
 
-const SYSTEM = { id: SYS, name: 'Integration System', enabled: true, features: { gathering: true } };
+const SYSTEM = {
+  id: SYS,
+  name: 'Integration System',
+  enabled: true,
+  features: { gathering: true },
+};
 
 // A library task that the environment sources via enabledTaskIds (so environment
 // validation passes) and that carries an over-time, guaranteed respawn.
@@ -19,7 +24,7 @@ function libraryTask(respawn) {
     name: 'Mine Ore',
     enabled: true,
     dropRows: [],
-    nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn }
+    nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn },
   };
 }
 
@@ -33,7 +38,7 @@ function environmentRecord(nodeRespawn, { seedRuntime = true, runtime = {} } = {
     enabledTaskIds: ['lib-1'], // satisfies "targeted requires a task source"
     biomes: [],
     dangerTags: [],
-    risk: 'safe'
+    risk: 'safe',
   };
   // Depleted to empty, with a fresh (null-anchored) respawn — the user's state.
   if (seedRuntime) {
@@ -43,26 +48,38 @@ function environmentRecord(nodeRespawn, { seedRuntime = true, runtime = {} } = {
         max: runtime.max ?? 3,
         current: runtime.current ?? 0,
         depletionTiming: 'onStart',
-        respawn: nodeRespawn
-      }
+        respawn: nodeRespawn,
+      },
     };
   }
   return record;
 }
 
-function harness(nodeRespawn, { seedRuntime = true, libraryRespawn = nodeRespawn, runtime = {} } = {}) {
+function harness(
+  nodeRespawn,
+  { seedRuntime = true, libraryRespawn = nodeRespawn, runtime = {} } = {}
+) {
   const settings = new Map([
-    [SETTING_KEYS.GATHERING_CONFIG, { systems: { [SYS]: { economy: { mode: 'nodes' }, tasks: [libraryTask(libraryRespawn)] } } }],
-    [SETTING_KEYS.GATHERING_ENVIRONMENTS, [environmentRecord(nodeRespawn, { seedRuntime, runtime })]]
+    [
+      SETTING_KEYS.GATHERING_CONFIG,
+      { systems: { [SYS]: { economy: { mode: 'nodes' }, tasks: [libraryTask(libraryRespawn)] } } },
+    ],
+    [
+      SETTING_KEYS.GATHERING_ENVIRONMENTS,
+      [environmentRecord(nodeRespawn, { seedRuntime, runtime })],
+    ],
   ]);
   const getSetting = (key) => settings.get(key);
-  const setSetting = async (key, value) => { settings.set(key, value); return value; };
+  const setSetting = async (key, value) => {
+    settings.set(key, value);
+    return value;
+  };
 
   const store = new GatheringEnvironmentStore({
     getSetting,
     setSetting,
     getSystems: () => [SYSTEM],
-    randomID: () => 'env-1'
+    randomID: () => 'env-1',
   });
   store.load();
 
@@ -70,7 +87,7 @@ function harness(nodeRespawn, { seedRuntime = true, libraryRespawn = nodeRespawn
     environmentStore: store,
     getSetting,
     setSetting,
-    settingKey: SETTING_KEYS.GATHERING_CONFIG
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
   });
 
   return { settings, store, richState };
@@ -79,7 +96,11 @@ function harness(nodeRespawn, { seedRuntime = true, libraryRespawn = nodeRespawn
 describe('node respawn over world time — real store integration (reproduction)', () => {
   it('refills a depleted overTime/guaranteed node across world-time ticks (unit+amount schema)', async () => {
     const { store, richState } = harness({
-      policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: null
+      policy: 'overTime',
+      gainMode: 'guaranteed',
+      intervalUnit: 'hours',
+      intervalAmount: 1,
+      lastEvaluatedWorldTime: null,
     });
 
     // Tick 1 (anchor), tick 2 (gain) — re-read the environment from the store each
@@ -93,7 +114,11 @@ describe('node respawn over world time — real store integration (reproduction)
 
   it('drives respawn through GatheringEngine.processWorldTime', async () => {
     const { store, richState } = harness({
-      policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: null
+      policy: 'overTime',
+      gainMode: 'guaranteed',
+      intervalUnit: 'hours',
+      intervalAmount: 1,
+      lastEvaluatedWorldTime: null,
     });
     const engine = new GatheringEngine({
       environmentStore: store,
@@ -101,7 +126,7 @@ describe('node respawn over world time — real store integration (reproduction)
       getSystems: () => [SYSTEM],
       isPrimaryGM: () => true,
       getActors: () => [],
-      runManager: { getMaturedWaitingRuns: async () => [] }
+      runManager: { getMaturedWaitingRuns: async () => [] },
     });
 
     await engine.processWorldTime(0);
@@ -112,7 +137,10 @@ describe('node respawn over world time — real store integration (reproduction)
 
   it('refills a legacy intervalSeconds node (pre unit/amount schema)', async () => {
     const { store, richState } = harness({
-      policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR, lastEvaluatedWorldTime: null
+      policy: 'overTime',
+      gainMode: 'guaranteed',
+      intervalSeconds: HOUR,
+      lastEvaluatedWorldTime: null,
     });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 0 });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 2 * HOUR });
@@ -121,7 +149,12 @@ describe('node respawn over world time — real store integration (reproduction)
 
   it('refills with a 100% chance gain mode', async () => {
     const { store, richState } = harness({
-      policy: 'overTime', gainMode: 'chance', chance: 1, intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: null
+      policy: 'overTime',
+      gainMode: 'chance',
+      chance: 1,
+      intervalUnit: 'hours',
+      intervalAmount: 1,
+      lastEvaluatedWorldTime: null,
     });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 0 });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 2 * HOUR });
@@ -136,9 +169,15 @@ describe('node respawn over world time — real store integration (reproduction)
   // stamina was unaffected). Read-time legacy mapping now keeps respawn working.
   it('refills a node whose nodeRuntime still carries a legacy (un-migrated) respawn policy', async () => {
     const { store, richState } = harness({
-      policy: 'elapsedTime', intervalSeconds: HOUR, lastEvaluatedWorldTime: null
+      policy: 'elapsedTime',
+      intervalSeconds: HOUR,
+      lastEvaluatedWorldTime: null,
     });
-    assert.equal(store.get('env-1').nodeRuntime['lib-1'].respawn.policy, 'overTime', 'legacy policy maps to overTime on load');
+    assert.equal(
+      store.get('env-1').nodeRuntime['lib-1'].respawn.policy,
+      'overTime',
+      'legacy policy maps to overTime on load'
+    );
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 0 });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 2 * HOUR });
     assert.equal(store.get('env-1').nodeRuntime['lib-1'].current, 2);
@@ -150,8 +189,23 @@ describe('node respawn over world time — real store integration (reproduction)
   // emptied pool never re-depletes to refresh it. Respawn now sources config from
   // the library task, keeping only the runtime count/anchor per environment.
   it('refills when the nodeRuntime entry has STALE respawn config vs the library task', async () => {
-    const stale = { policy: 'manual', gainMode: 'guaranteed', chance: 0, amountExpression: '', intervalUnit: 'hours', intervalAmount: 0, lastEvaluatedWorldTime: null };
-    const healthy = { policy: 'overTime', gainMode: 'chance', chance: 1, amountExpression: '1d4', intervalUnit: 'hours', intervalAmount: 1 };
+    const stale = {
+      policy: 'manual',
+      gainMode: 'guaranteed',
+      chance: 0,
+      amountExpression: '',
+      intervalUnit: 'hours',
+      intervalAmount: 0,
+      lastEvaluatedWorldTime: null,
+    };
+    const healthy = {
+      policy: 'overTime',
+      gainMode: 'chance',
+      chance: 1,
+      amountExpression: '1d4',
+      intervalUnit: 'hours',
+      intervalAmount: 1,
+    };
     const { store, richState } = harness(stale, { libraryRespawn: healthy });
 
     // The stored per-environment copy is stale (manual / interval 0)…
@@ -161,7 +215,11 @@ describe('node respawn over world time — real store integration (reproduction)
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 2 * HOUR });
     const after = store.get('env-1').nodeRuntime['lib-1'];
     assert.equal(after.current, 2, 'restocks despite the stale stored config');
-    assert.equal(after.respawn.policy, 'overTime', 'and self-heals the stored config to match the library');
+    assert.equal(
+      after.respawn.policy,
+      'overTime',
+      'and self-heals the stored config to match the library'
+    );
   });
 
   // `max` (node capacity) is library CONFIG, not per-environment state — the same
@@ -171,28 +229,52 @@ describe('node respawn over world time — real store integration (reproduction)
   // node count would never take effect in environments that had already gathered
   // it. The merge uses the library max and clamps the stored current to it.
   it('uses the library max over a stale stored max, clamping current to the library cap', async () => {
-    const respawn = { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1 };
+    const respawn = {
+      policy: 'overTime',
+      gainMode: 'guaranteed',
+      intervalUnit: 'hours',
+      intervalAmount: 1,
+    };
     // Library max is 3 (libraryTask); this environment's stale snapshot says max 12, current 5.
     const { store, richState } = harness(respawn, { runtime: { current: 5, max: 12 } });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 0 });
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: 2 * HOUR });
     const after = store.get('env-1').nodeRuntime['lib-1'];
     assert.equal(after.max, 3, 'the library node count is authoritative, not the stale stored max');
-    assert.equal(after.current, 3, 'current is clamped to the library cap (no overstock beyond it)');
+    assert.equal(
+      after.current,
+      3,
+      'current is clamped to the library cap (no overstock beyond it)'
+    );
   });
 
   it('seeds the respawn anchor on depletion so the FIRST advance restocks (no wasted tick)', async () => {
-    const respawn = { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1 };
+    const respawn = {
+      policy: 'overTime',
+      gainMode: 'guaranteed',
+      intervalUnit: 'hours',
+      intervalAmount: 1,
+    };
     const { store, richState } = harness(respawn, { seedRuntime: false });
 
     // Deplete once through the real attempt-commit path, which seeds nodeRuntime.
-    const runtimeTask = richState._libraryTaskToRuntimeTask(libraryTask(respawn), store.get('env-1'));
+    const runtimeTask = richState._libraryTaskToRuntimeTask(
+      libraryTask(respawn),
+      store.get('env-1')
+    );
     await richState.commitAcceptedAttempt({
-      system: SYSTEM, environment: store.get('env-1'), task: runtimeTask, outcome: { status: 'succeeded' }
+      system: SYSTEM,
+      environment: store.get('env-1'),
+      task: runtimeTask,
+      outcome: { status: 'succeeded' },
     });
     const seeded = store.get('env-1').nodeRuntime['lib-1'];
     assert.equal(seeded.current, 2, 'depletion seeds and decrements the pool');
-    assert.equal(typeof seeded.respawn.lastEvaluatedWorldTime, 'number', 'anchor seeded at depletion');
+    assert.equal(
+      typeof seeded.respawn.lastEvaluatedWorldTime,
+      'number',
+      'anchor seeded at depletion'
+    );
 
     // A single one-hour advance now restocks immediately (anchor was seeded).
     await richState.respawnNodes({ environment: store.get('env-1'), worldTime: HOUR });

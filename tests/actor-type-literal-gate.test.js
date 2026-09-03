@@ -151,7 +151,7 @@ describe('the actor-type literal gate can actually fail', () => {
     );
   });
 
-  it('does NOT flag the `entry.kind === \'character\'` near-miss', () => {
+  it("does NOT flag the `entry.kind === 'character'` near-miss", () => {
     const findings = findActorTypeLiterals({
       // Four real lines from GatheringTaskEditView.svelte's task-requirement entries.
       'src/fake/kind.svelte': [
@@ -176,7 +176,7 @@ describe('the actor-type literal gate can actually fail', () => {
       'src/fake/prose.js': [
         '/**',
         " * The predicate used to be `actor.type === 'character'` at five sites, and the",
-        " * `.svelte` one was written `actor?.type === \"character\"`.",
+        ' * `.svelte` one was written `actor?.type === "character"`.',
         ' */',
         "// was: return actor.type === 'character';",
         'export const isPc = (actor) => isPlayerCharacterActor(actor);',

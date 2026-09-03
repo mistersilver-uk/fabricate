@@ -20,7 +20,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js'
+    'src/ui/svelte/util/foundryIconCatalogue.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
@@ -36,9 +36,9 @@ const harness = createMountedComponentHarness({
     // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte'
+    'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
 });
 
 before(() => harness.setup());
@@ -54,7 +54,7 @@ describe('ImportFolderMappingModal (mounted)', () => {
       itemTags: [],
       onAddCategory: async () => true,
       onCommit: () => {},
-      onClose: () => {}
+      onClose: () => {},
     });
 
     // The modal renders in a portal, so we need to look in the document body
@@ -67,7 +67,7 @@ describe('ImportFolderMappingModal (mounted)', () => {
     const checkBox = input.nextElementSibling;
     assert.ok(
       checkBox?.classList.contains('fab-selection-check'),
-      'visible box must be the input\'s immediate next sibling for the focus ring rule to apply'
+      "visible box must be the input's immediate next sibling for the focus ring rule to apply"
     );
   });
 
@@ -79,7 +79,7 @@ describe('ImportFolderMappingModal (mounted)', () => {
       itemTags: [],
       onAddCategory: async () => true,
       onCommit: () => {},
-      onClose: () => {}
+      onClose: () => {},
     });
 
     // The focus-visible rule is compiled into the component's scoped styles.
@@ -112,6 +112,9 @@ describe('ImportFolderMappingModal (mounted)', () => {
       if (ruleFound) break;
     }
 
-    assert.ok(ruleFound, 'focus-visible CSS rule should be compiled for the match-by-name checkbox');
+    assert.ok(
+      ruleFound,
+      'focus-visible CSS rule should be compiled for the match-by-name checkbox'
+    );
   });
 });

@@ -6,7 +6,10 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/svelte-component-harness.js';
+import {
+  createSvelteCompiler,
+  installComponentTestGlobals,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -19,7 +22,13 @@ const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, (
 
 function baseProps(overrides = {}) {
   return {
-    environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: [] },
+    environment: {
+      id: 'env-1',
+      name: 'Moonlit Forest',
+      enabled: true,
+      biomes: [],
+      includedRealmIds: [],
+    },
     realmRecords: [],
     realmsEnabled: false,
     biomeOptions: [],
@@ -28,7 +37,7 @@ function baseProps(overrides = {}) {
     onPickImagePath: null,
     onUpdate: () => {},
     onSetCompositionMode: () => {},
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -42,7 +51,10 @@ async function mountTab(props) {
 }
 
 function remount() {
-  if (mounted) { unmount(mounted); mounted = null; }
+  if (mounted) {
+    unmount(mounted);
+    mounted = null;
+  }
   target?.remove();
 }
 
@@ -61,7 +73,11 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/CompositionModeControl.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte');
-    const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte.js')).href);
+    const mod = await import(
+      pathToFileURL(
+        join(tempRoot, 'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte.js')
+      ).href
+    );
     EnvironmentOverviewTab = mod.default;
   });
 
@@ -73,10 +89,20 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
   });
 
   it('hides the realm field entirely when the Travel & Realms toggle is off', async () => {
-    await mountTab(baseProps({ realmsEnabled: false, realmRecords: [{ id: 'r1', name: 'Verdant' }] }));
-    assert.equal(target.querySelector('[data-environment-field="includedRealmIds"]'), null, 'realm field is hidden when disabled');
+    await mountTab(
+      baseProps({ realmsEnabled: false, realmRecords: [{ id: 'r1', name: 'Verdant' }] })
+    );
+    assert.equal(
+      target.querySelector('[data-environment-field="includedRealmIds"]'),
+      null,
+      'realm field is hidden when disabled'
+    );
     // The legacy single-region <select> must not appear either.
-    assert.equal(target.querySelector('[data-environment-field="region"]'), null, 'legacy single-region select is removed');
+    assert.equal(
+      target.querySelector('[data-environment-field="region"]'),
+      null,
+      'legacy single-region select is removed'
+    );
     remount();
   });
 
@@ -91,20 +117,30 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
 
   it('adds and removes realm chips bound to includedRealmIds', async () => {
     const updates = [];
-    await mountTab(baseProps({
-      realmsEnabled: true,
-      realmRecords: [
-        { id: 'r1', name: 'Verdant' },
-        { id: 'r2', name: 'Dunes' }
-      ],
-      environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: ['r1'] },
-      onUpdate: (patch) => updates.push(patch)
-    }));
+    await mountTab(
+      baseProps({
+        realmsEnabled: true,
+        realmRecords: [
+          { id: 'r1', name: 'Verdant' },
+          { id: 'r2', name: 'Dunes' },
+        ],
+        environment: {
+          id: 'env-1',
+          name: 'Moonlit Forest',
+          enabled: true,
+          biomes: [],
+          includedRealmIds: ['r1'],
+        },
+        onUpdate: (patch) => updates.push(patch),
+      })
+    );
 
     const field = target.querySelector('[data-environment-field="includedRealmIds"]');
     assert.ok(field, 'realm field renders');
     // r1 already selected → its chip shows; only r2 remains in the add-select.
-    const options = Array.from(field.querySelectorAll('select option')).map(o => o.value).filter(Boolean);
+    const options = Array.from(field.querySelectorAll('select option'))
+      .map((o) => o.value)
+      .filter(Boolean);
     assert.deepEqual(options, ['r2']);
 
     const select = field.querySelector('select');

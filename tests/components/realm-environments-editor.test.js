@@ -6,7 +6,10 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/svelte-component-harness.js';
+import {
+  createSvelteCompiler,
+  installComponentTestGlobals,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -32,8 +35,8 @@ async function mountEditor(props) {
       saving: false,
       onAdd: () => {},
       onRemove: () => {},
-      ...props
-    }
+      ...props,
+    },
   });
   flushSync();
   await tick();
@@ -41,7 +44,10 @@ async function mountEditor(props) {
 }
 
 function remount() {
-  if (mounted) { unmount(mounted); mounted = null; }
+  if (mounted) {
+    unmount(mounted);
+    mounted = null;
+  }
   target?.remove();
 }
 
@@ -49,7 +55,9 @@ function column(which) {
   return target.querySelector(`[data-realm-env-column="${which}"]`);
 }
 function rowNames(which) {
-  return Array.from(column(which).querySelectorAll('.manager-realm-env-name')).map(n => n.textContent.trim());
+  return Array.from(column(which).querySelectorAll('.manager-realm-env-name')).map((n) =>
+    n.textContent.trim()
+  );
 }
 
 describe('RealmEnvironmentsEditor mounted behavior', () => {
@@ -70,7 +78,10 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
-    const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte.js')).href);
+    const mod = await import(
+      pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte.js'))
+        .href
+    );
     RealmEnvironmentsEditor = mod.default;
   });
 
@@ -86,11 +97,14 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
       environments: [
         env('e1', 'Grove', ['r1']),
         env('e2', 'Glade', []),
-        env('e3', 'Marsh', ['r2'])
-      ]
+        env('e3', 'Marsh', ['r2']),
+      ],
     });
     assert.deepEqual(rowNames('included'), ['Grove']);
-    assert.deepEqual(rowNames('available').sort((a, b) => a.localeCompare(b)), ['Glade', 'Marsh']);
+    assert.deepEqual(
+      rowNames('available').sort((a, b) => a.localeCompare(b)),
+      ['Glade', 'Marsh']
+    );
     remount();
   });
 
@@ -98,7 +112,7 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
     const added = [];
     await mountEditor({
       environments: [env('e2', 'Glade', [])],
-      onAdd: (envId, realmId) => added.push([envId, realmId])
+      onAdd: (envId, realmId) => added.push([envId, realmId]),
     });
     column('available').querySelector('.manager-realm-env-add').click();
     flushSync();
@@ -110,7 +124,7 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
     const removed = [];
     await mountEditor({
       environments: [env('e1', 'Grove', ['r1'])],
-      onRemove: (envId, realmId) => removed.push([envId, realmId])
+      onRemove: (envId, realmId) => removed.push([envId, realmId]),
     });
     column('included').querySelector('.manager-realm-env-remove').click();
     flushSync();
@@ -120,7 +134,11 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
 
   it('filters each column independently by search', async () => {
     await mountEditor({
-      environments: [env('e1', 'Grove', ['r1']), env('e2', 'Glade', ['r1']), env('e3', 'Marsh', [])]
+      environments: [
+        env('e1', 'Grove', ['r1']),
+        env('e2', 'Glade', ['r1']),
+        env('e3', 'Marsh', []),
+      ],
     });
     const includedSearch = column('included').querySelector('input[type="search"]');
     includedSearch.value = 'grove';

@@ -49,12 +49,17 @@ const HERBALIST_SYSTEM = {
 
 describe('interactableSourceLibrary — system + tool + task enumeration', () => {
   it('lists crafting systems as { id, name } rows', () => {
-    const options = listSystemOptions(deps({ systems: { [HERBALIST_SYSTEM.id]: HERBALIST_SYSTEM } }));
+    const options = listSystemOptions(
+      deps({ systems: { [HERBALIST_SYSTEM.id]: HERBALIST_SYSTEM } })
+    );
     assert.deepEqual(options, [{ id: 'sys-herb', name: 'Herbalism' }]);
   });
 
   it('returns the raw system-owned tool library for a system', () => {
-    const tools = listSystemTools(deps({ systems: { [HERBALIST_SYSTEM.id]: HERBALIST_SYSTEM } }), 'sys-herb');
+    const tools = listSystemTools(
+      deps({ systems: { [HERBALIST_SYSTEM.id]: HERBALIST_SYSTEM } }),
+      'sys-herb'
+    );
     assert.equal(tools.length, 2);
     assert.equal(tools[0].id, 'tool-sickle');
   });
@@ -95,7 +100,11 @@ describe('interactableSourceLibrary — system + tool + task enumeration', () =>
 
   it('reads gathering tasks from the persisted config and offers them as sources', () => {
     const d = deps({
-      gatheringConfig: { systems: { 'sys-herb': { tasks: [{ id: 'task-forage', name: 'Forage' }, { id: 'task-noname' }] } } },
+      gatheringConfig: {
+        systems: {
+          'sys-herb': { tasks: [{ id: 'task-forage', name: 'Forage' }, { id: 'task-noname' }] },
+        },
+      },
     });
     assert.equal(listSystemTasks(d, 'sys-herb').length, 2);
     const options = listTaskSourceOptions(d, 'sys-herb');

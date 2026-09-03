@@ -41,8 +41,22 @@ const harness = createMountedComponentHarness({
 });
 
 const STAGES = [
-  { id: 's1', componentId: 'c1', name: 'Rough Blade', img: 'icons/rough.webp', difficulty: 2, threshold: 2 },
-  { id: 's2', componentId: 'c2', name: 'Fine Blade', img: 'icons/fine.webp', difficulty: 3, threshold: 5 },
+  {
+    id: 's1',
+    componentId: 'c1',
+    name: 'Rough Blade',
+    img: 'icons/rough.webp',
+    difficulty: 2,
+    threshold: 2,
+  },
+  {
+    id: 's2',
+    componentId: 'c2',
+    name: 'Fine Blade',
+    img: 'icons/fine.webp',
+    difficulty: 3,
+    threshold: 5,
+  },
   { id: 's3', componentId: 'c3', name: 'Master Blade', img: null, difficulty: 4, threshold: 9 },
 ];
 
@@ -50,7 +64,12 @@ function progressiveRecipe(overrides = {}) {
   return recipe({ modeToken: 'progressive', ...overrides });
 }
 
-function mountBody({ stages = STAGES, canReorder = true, onReorderStage = () => {}, recipeOverrides = {} } = {}) {
+function mountBody({
+  stages = STAGES,
+  canReorder = true,
+  onReorderStage = () => {},
+  recipeOverrides = {},
+} = {}) {
   return harness.mount({
     recipe: progressiveRecipe(recipeOverrides),
     craftability: craftability(),
@@ -72,7 +91,10 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
 
   it('F1: renders a POPULATED stage list where the output table was always empty', async () => {
     const target = await mountBody();
-    assert.ok(target.querySelector('[data-recipe-section="progressive-stages"]'), 'the list renders');
+    assert.ok(
+      target.querySelector('[data-recipe-section="progressive-stages"]'),
+      'the list renders'
+    );
     assert.equal(rows(target).length, 3, 'every authored stage, not the zero-budget award');
   });
 
@@ -105,7 +127,9 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
   it('rows carry ordinals in rendered position order', async () => {
     const target = await mountBody({ stages: [STAGES[2], STAGES[0], STAGES[1]] });
     assert.deepEqual(
-      [...target.querySelectorAll('[data-progressive-stage-ordinal]')].map((n) => n.textContent.trim()),
+      [...target.querySelectorAll('[data-progressive-stage-ordinal]')].map((n) =>
+        n.textContent.trim()
+      ),
       ['1', '2', '3'],
       'the ordinal is the POSITION, not the stage identity'
     );
@@ -193,7 +217,9 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     const target = await mountBody({ canReorder: false });
     assert.equal(rows(target).length, 3, 'the order is still information');
     assert.deepEqual(
-      [...target.querySelectorAll('[data-progressive-stage-ordinal]')].map((n) => n.textContent.trim()),
+      [...target.querySelectorAll('[data-progressive-stage-ordinal]')].map((n) =>
+        n.textContent.trim()
+      ),
       ['1', '2', '3']
     );
     assert.equal(target.querySelectorAll('[data-progressive-stage-difficulty]').length, 3);
@@ -322,8 +348,12 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     assert.equal(target.querySelector('[data-progressive-stage-fixed-note]'), null);
 
     // The same lifecycle that reorders nothing above DOES reorder here.
-    row.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true, cancelable: true }));
-    rows(target)[2].dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
+    row.dispatchEvent(
+      new globalThis.window.Event('dragstart', { bubbles: true, cancelable: true })
+    );
+    rows(target)[2].dispatchEvent(
+      new globalThis.window.Event('drop', { bubbles: true, cancelable: true })
+    );
     flushSync();
     assert.equal(moves.length, 1, 'a drag from row 1 onto row 3 reorders');
     assert.deepEqual([moves[0][0], moves[0][1]], [0, 2]);
@@ -339,11 +369,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
 
   it('675: the crafting rendering is unchanged when the new props are omitted', async () => {
     const target = await mountBody();
-    assert.equal(
-      target.querySelector('[data-progressive-stage-state]'),
-      null,
-      'no state chip'
-    );
+    assert.equal(target.querySelector('[data-progressive-stage-state]'), null, 'no state chip');
     // The rest of the row is untouched: ordinal, difficulty, threshold, move buttons.
     const first = rows(target)[0];
     assert.ok(first.querySelector('[data-progressive-stage-ordinal]'));
@@ -389,9 +415,9 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     // last element child is the line (or the band), never the chevrons. The claim under
     // test is unchanged: the chevrons end the line the stage reads on.
     assert.equal(
-      row.querySelector('.crafting-stage-line').lastElementChild.hasAttribute(
-        'data-progressive-stage-move'
-      ),
+      row
+        .querySelector('.crafting-stage-line')
+        .lastElementChild.hasAttribute('data-progressive-stage-move'),
       true,
       'and they are the last thing on the line'
     );

@@ -24,14 +24,14 @@ function getProperty(object, path) {
 globalThis.foundry = {
   utils: {
     getProperty,
-    randomID: () => Math.random().toString(36).slice(2)
-  }
+    randomID: () => Math.random().toString(36).slice(2),
+  },
 };
 
 globalThis.game = {};
 
 globalThis.ui = {
-  notifications: { info: () => {}, warn: () => {}, error: () => {} }
+  notifications: { info: () => {}, warn: () => {}, error: () => {} },
 };
 
 // ---------------------------------------------------------------------------
@@ -65,23 +65,34 @@ test('effectTransfer is false when set to a non-boolean truthy value', () => {
 test('#102: complexRecipes is no longer emitted as a normalized feature', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   assert.equal('complexRecipes' in manager._normalizeFeatures({}), false);
-  assert.equal('complexRecipes' in manager._normalizeFeatures({ features: { complexRecipes: true } }), false);
+  assert.equal(
+    'complexRecipes' in manager._normalizeFeatures({ features: { complexRecipes: true } }),
+    false
+  );
 });
 
 test('#102: legacy features.complexRecipes still seeds multiStepRecipes when multiStepRecipes is absent', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
-  assert.equal(manager._normalizeFeatures({ features: { complexRecipes: true } }).multiStepRecipes, true);
-  assert.equal(manager._normalizeFeatures({ features: { complexRecipes: false } }).multiStepRecipes, false);
+  assert.equal(
+    manager._normalizeFeatures({ features: { complexRecipes: true } }).multiStepRecipes,
+    true
+  );
+  assert.equal(
+    manager._normalizeFeatures({ features: { complexRecipes: false } }).multiStepRecipes,
+    false
+  );
 });
 
 test('#102: an explicit multiStepRecipes wins over the legacy complexRecipes seed', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   assert.equal(
-    manager._normalizeFeatures({ features: { multiStepRecipes: false, complexRecipes: true } }).multiStepRecipes,
+    manager._normalizeFeatures({ features: { multiStepRecipes: false, complexRecipes: true } })
+      .multiStepRecipes,
     false
   );
   assert.equal(
-    manager._normalizeFeatures({ features: { multiStepRecipes: true, complexRecipes: false } }).multiStepRecipes,
+    manager._normalizeFeatures({ features: { multiStepRecipes: true, complexRecipes: false } })
+      .multiStepRecipes,
     true
   );
 });
@@ -97,22 +108,22 @@ test('#102: an explicit multiStepRecipes wins over the legacy complexRecipes see
 function setupGameWithEffectTransfer(effectTransferValue) {
   const system = {
     features: {
-      effectTransfer: effectTransferValue
+      effectTransfer: effectTransferValue,
     },
     craftingCheck: {
-      enabled: false
-    }
+      enabled: false,
+    },
   };
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({
-        getSystem: () => system
+        getSystem: () => system,
       }),
       getResolutionModeService: () => null,
-      getCraftingRunManager: () => null
+      getCraftingRunManager: () => null,
     },
     user: { id: 'user-1' },
-    time: { worldTime: 0 }
+    time: { worldTime: 0 },
   };
   return system;
 }
@@ -126,13 +137,15 @@ function buildFakeIngredientItem(id, quantity = 2) {
     system: { quantity },
     deleteCalled: false,
     updateCalled: false,
-    async delete() { this.deleteCalled = true; },
+    async delete() {
+      this.deleteCalled = true;
+    },
     async update(payload) {
       this.updateCalled = true;
       if (payload['system.quantity'] !== undefined) {
         this.system.quantity = payload['system.quantity'];
       }
-    }
+    },
   };
 }
 
@@ -141,15 +154,15 @@ function buildFakeIngredientSet(ingredientItem) {
     systemItemId: ingredientItem.id,
     quantity: 1,
     extractEffects: false,
-    getDescription: () => ingredientItem.name
+    getDescription: () => ingredientItem.name,
   };
   return {
     id: 'set-1',
     matchIngredients(availableItems, matcher) {
-      const matched = availableItems.find(i => i === ingredientItem);
+      const matched = availableItems.find((i) => i === ingredientItem);
       if (!matched) return [];
       return [{ item: matched, quantity: 1, ingredient }];
-    }
+    },
   };
 }
 
@@ -163,8 +176,12 @@ function buildFakeRecipe(ingredientSet, transferEffects) {
     outcomeRouting: null,
     transferEffects,
     getExecutionSteps: null,
-    validate() { return { valid: true, errors: [] }; },
-    toJSON() { return { id: this.id, name: this.name }; }
+    validate() {
+      return { valid: true, errors: [] };
+    },
+    toJSON() {
+      return { id: this.id, name: this.name };
+    },
   };
 }
 
@@ -180,23 +197,35 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
   const recipe = buildFakeRecipe(ingredientSet, transferEffectsFlag);
 
   const mockResolutionService = {
-    validateRecipe() { return { valid: true, errors: [] }; },
-    validateCheckResult() { return true; },
+    validateRecipe() {
+      return { valid: true, errors: [] };
+    },
+    validateCheckResult() {
+      return true;
+    },
     resolveResultGroups() {
       // Return one result group with one result so _createSingleResult is called
       return {
         groups: [{ results: [{ systemItemId: 'item-a', quantity: 1 }] }],
-        meta: {}
+        meta: {},
       };
     },
-    getMode() { return 'simple'; }
+    getMode() {
+      return 'simple';
+    },
   };
 
   const mockRecipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [] },
+      };
     },
-    ingredientMatchesItem(recipe, ingredient, item) { return item === ingredientItem; }
+    ingredientMatchesItem(recipe, ingredient, item) {
+      return item === ingredientItem;
+    },
   };
 
   const engine = new CraftingEngine(mockRecipeManager, null, mockResolutionService);
@@ -204,7 +233,9 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
 
   let transferEffectsCalled = false;
-  engine._transferEffects = async () => { transferEffectsCalled = true; };
+  engine._transferEffects = async () => {
+    transferEffectsCalled = true;
+  };
 
   // _createSingleResult needs fromUuid and createEmbeddedDocuments
   // Provide a minimal fake source item lookup
@@ -221,7 +252,7 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
     name: 'Crafter',
     uuid: 'Actor.a1',
     items: { contents: [] },
-    createEmbeddedDocuments: async () => [fakeCreatedItem]
+    createEmbeddedDocuments: async () => [fakeCreatedItem],
   };
 
   // Also inject the system with components so _createSingleResult can find it
@@ -230,9 +261,9 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
       features: { effectTransfer: effectTransferValue },
       craftingCheck: { enabled: false },
       components: [
-        { id: 'item-a', name: 'Item A', img: 'icons/svg/item-bag.svg', registeredItemUuid: null }
-      ]
-    })
+        { id: 'item-a', name: 'Item A', img: 'icons/svg/item-bag.svg', registeredItemUuid: null },
+      ],
+    }),
   });
 
   await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -256,7 +287,11 @@ test('effect transfer is skipped when system features.effectTransfer is false ev
 
 test('effect transfer is skipped when recipe.transferEffects is false regardless of system features.effectTransfer', async () => {
   const called = await runCraftAndCheckTransfer(false, true);
-  assert.equal(called, false, '_transferEffects should NOT be called when recipe.transferEffects is false');
+  assert.equal(
+    called,
+    false,
+    '_transferEffects should NOT be called when recipe.transferEffects is false'
+  );
 });
 
 test('effect transfer is skipped when both recipe.transferEffects and system features.effectTransfer are false', async () => {

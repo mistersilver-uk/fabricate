@@ -6,7 +6,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
-  CRAFTING_APP_COMPILED_MODULES
+  CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -16,7 +16,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-sources-bar-',
   rawModules: CRAFTING_APP_RAW_MODULES,
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
-  componentPath: 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte'
+  componentPath: 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
 });
 
 function craftingSources(overrides = {}) {
@@ -26,18 +26,18 @@ function craftingSources(overrides = {}) {
     store: {
       sources: overrides.sources ?? [
         { id: 'a', name: 'Aria', img: 'icons/svg/mystery-man.svg', removable: false },
-        { id: 'b', name: 'Borin', img: '', removable: true }
+        { id: 'b', name: 'Borin', img: '', removable: true },
       ],
       available: overrides.available ?? [
         { id: 'a', name: 'Aria', img: 'icons/svg/mystery-man.svg' },
         { id: 'b', name: 'Borin', img: '' },
-        { id: 'c', name: 'Cy', img: '' }
+        { id: 'c', name: 'Cy', img: '' },
       ],
       selectedSourceIds: overrides.selectedSourceIds ?? ['a', 'b'],
       remove: (id) => calls.remove.push(id),
       toggle: (id) => calls.toggle.push(id),
-      add: () => {}
-    }
+      add: () => {},
+    },
   };
 }
 
@@ -56,7 +56,10 @@ describe('ComponentSourcesBar mounted behavior', () => {
     const avatars = target.querySelectorAll('.crafting-source-avatar');
     for (const avatar of avatars) {
       assert.equal(avatar.tagName.toLowerCase(), 'button', 'each avatar is a button (focusable)');
-      assert.ok((avatar.getAttribute('aria-label') || '').trim() !== '', 'avatar has a non-empty aria-label');
+      assert.ok(
+        (avatar.getAttribute('aria-label') || '').trim() !== '',
+        'avatar has a non-empty aria-label'
+      );
     }
   });
 
@@ -65,13 +68,25 @@ describe('ComponentSourcesBar mounted behavior', () => {
     const target = await harness.mount({ services: { craftingSources: store } });
 
     const required = target.querySelector('[data-source-id="a"]');
-    assert.equal(required.getAttribute('data-source-removable'), 'false', 'required source flagged non-removable');
+    assert.equal(
+      required.getAttribute('data-source-removable'),
+      'false',
+      'required source flagged non-removable'
+    );
     const avatar = required.querySelector('.crafting-source-avatar');
     assert.equal(avatar.getAttribute('aria-disabled'), 'true', 'required avatar is aria-disabled');
     assert.match(avatar.getAttribute('aria-label'), /Aria/, 'aria-label names the actor');
-    assert.match(avatar.getAttribute('aria-label'), /AlwaysIncluded/, 'aria-label carries the always-included suffix');
+    assert.match(
+      avatar.getAttribute('aria-label'),
+      /AlwaysIncluded/,
+      'aria-label carries the always-included suffix'
+    );
     assert.ok(required.querySelector('.crafting-source-lock'), 'lock badge rendered');
-    assert.equal(required.querySelector('.crafting-source-remove'), null, 'no remove control for the required source');
+    assert.equal(
+      required.querySelector('.crafting-source-remove'),
+      null,
+      'no remove control for the required source'
+    );
   });
 
   it('renders a keyboard-reachable remove control for a removable source and calls remove on click', async () => {
@@ -79,11 +94,22 @@ describe('ComponentSourcesBar mounted behavior', () => {
     const target = await harness.mount({ services: { craftingSources: store } });
 
     const removable = target.querySelector('[data-source-id="b"]');
-    assert.equal(removable.getAttribute('data-source-removable'), 'true', 'removable source flagged removable');
+    assert.equal(
+      removable.getAttribute('data-source-removable'),
+      'true',
+      'removable source flagged removable'
+    );
     const removeButton = removable.querySelector('[data-source-remove="b"]');
     assert.ok(removeButton, 'remove control rendered');
-    assert.equal(removeButton.tagName.toLowerCase(), 'button', 'remove control is a button (keyboard reachable)');
-    assert.ok((removeButton.getAttribute('aria-label') || '').includes('Remove'), 'remove control has a descriptive aria-label');
+    assert.equal(
+      removeButton.tagName.toLowerCase(),
+      'button',
+      'remove control is a button (keyboard reachable)'
+    );
+    assert.ok(
+      (removeButton.getAttribute('aria-label') || '').includes('Remove'),
+      'remove control has a descriptive aria-label'
+    );
 
     removeButton.click();
     flushSync();
@@ -94,12 +120,14 @@ describe('ComponentSourcesBar mounted behavior', () => {
     const { store, calls } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
 
-    target.querySelector('[data-source-id="b"] .crafting-source-avatar')
+    target
+      .querySelector('[data-source-id="b"] .crafting-source-avatar')
       .dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     flushSync();
     assert.deepEqual(calls.remove, ['b'], 'right-click removed the removable source');
 
-    target.querySelector('[data-source-id="a"] .crafting-source-avatar')
+    target
+      .querySelector('[data-source-id="a"] .crafting-source-avatar')
       .dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     flushSync();
     assert.deepEqual(calls.remove, ['b'], 'right-click did NOT remove the required source');
@@ -109,7 +137,11 @@ describe('ComponentSourcesBar mounted behavior', () => {
     const { store, calls } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
 
-    assert.equal(target.querySelector('.crafting-sources-popover'), null, 'popover closed by default');
+    assert.equal(
+      target.querySelector('.crafting-sources-popover'),
+      null,
+      'popover closed by default'
+    );
     target.querySelector('[data-crafting-sources-add]').click();
     flushSync();
 

@@ -33,16 +33,12 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { buildExportPayload } = await import('../src/systems/CraftingSystemExporter.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
-const { evaluateCheckReadiness } = await import(
-  '../src/ui/svelte/apps/manager/checks/checksReadiness.js'
-);
+const { evaluateCheckReadiness } =
+  await import('../src/ui/svelte/apps/manager/checks/checksReadiness.js');
 const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
 const { createServices, makeSystem } = await import('./helpers/adminStoreServices.js');
-const {
-  formatPreviewDifficulties,
-  normalizePreviewSandbox,
-  parsePreviewDifficulties,
-} = await import('../src/systems/progressiveCheckSandbox.js');
+const { formatPreviewDifficulties, normalizePreviewSandbox, parsePreviewDifficulties } =
+  await import('../src/systems/progressiveCheckSandbox.js');
 
 const manager = () => new CraftingSystemManager({ getRecipes: () => [] });
 
@@ -198,10 +194,9 @@ describe('the store projects it and writes it back', () => {
     const { store } = await storeOverCheck({
       progressive: { rollFormula: '1d20', preview: { difficulties: [6, 9, 14, 40] } },
     });
-    assert.deepEqual(
-      get(store.viewState).selectedSystem.craftingCheck.progressive.preview,
-      { difficulties: [6, 9, 14, 40] }
-    );
+    assert.deepEqual(get(store.viewState).selectedSystem.craftingCheck.progressive.preview, {
+      difficulties: [6, 9, 14, 40],
+    });
   });
 
   it('projects ABSENCE as absence', async () => {

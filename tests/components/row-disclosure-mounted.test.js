@@ -68,7 +68,10 @@ describe('RowDisclosure (mounted)', () => {
     assert.notEqual(collapsedIcon, expandedIcon, 'the two states are visually distinguishable');
     // The glyph is decorative: the state is already announced by `aria-expanded`, so an
     // icon that ALSO announced it would be read twice.
-    assert.equal(expanded.querySelector('.fab-row-disclosure > i').getAttribute('aria-hidden'), 'true');
+    assert.equal(
+      expanded.querySelector('.fab-row-disclosure > i').getAttribute('aria-hidden'),
+      'true'
+    );
   });
 
   it('points the collapsed chevron either way, without changing anything announced', async () => {
@@ -149,7 +152,12 @@ describe('RowDisclosure (mounted)', () => {
     const styleStart = source.indexOf('<style>');
     assert.notEqual(styleStart, -1, 'the component still has a scoped style block to read');
     const styles = source.slice(styleStart);
-    for (const declaration of ['width: 24px;', 'height: 24px;', 'min-height: 24px;', 'padding: 0;']) {
+    for (const declaration of [
+      'width: 24px;',
+      'height: 24px;',
+      'min-height: 24px;',
+      'padding: 0;',
+    ]) {
       assert.ok(styles.includes(declaration), `the reset declares ${declaration}`);
     }
     assert.match(styles, /:focus-visible\s*\{[^}]*outline:/, 'and keeps a visible focus ring');

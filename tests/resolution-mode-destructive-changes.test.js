@@ -5,8 +5,8 @@ let idSeq = 0;
 globalThis.foundry = {
   utils: {
     randomID: () => `rid-${++idSeq}`,
-    getProperty: () => undefined
-  }
+    getProperty: () => undefined,
+  },
 };
 globalThis.ui = { notifications: { warn: () => {}, info: () => {}, error: () => {} } };
 
@@ -19,8 +19,8 @@ globalThis.game = {
     set: async (_namespace, key, value) => {
       settingsStore.set(key, value);
       return value;
-    }
-  }
+    },
+  },
 };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
@@ -44,7 +44,9 @@ function makeRecipeManager(recipes = []) {
   return {
     getRecipes(filters = {}) {
       if (filters.craftingSystemId) {
-        return mutableRecipes.filter((recipe) => recipe.craftingSystemId === filters.craftingSystemId);
+        return mutableRecipes.filter(
+          (recipe) => recipe.craftingSystemId === filters.craftingSystemId
+        );
       }
       return mutableRecipes;
     },
@@ -93,7 +95,7 @@ function makeRecipeManager(recipes = []) {
     },
     getSignatureCheckCount() {
       return signatureChecks;
-    }
+    },
   };
 }
 
@@ -113,7 +115,7 @@ function oneByOneRecipe(id, systemId, overrides = {}) {
     craftingSystemId: systemId,
     ingredientSets: [{ id: `${id}-s1` }],
     resultGroups: [{ id: `${id}-g1`, name: 'Default' }],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -125,10 +127,10 @@ function multiGroupRecipe(id, systemId, overrides = {}) {
     ingredientSets: [{ id: `${id}-s1` }, { id: `${id}-s2` }],
     resultGroups: [
       { id: `${id}-g1`, name: 'Alpha' },
-      { id: `${id}-g2`, name: 'Beta' }
+      { id: `${id}-g2`, name: 'Beta' },
     ],
     resultSelection: { provider: 'ingredientSet' },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -138,19 +140,22 @@ test('changing resolutionMode migrates 1×1 recipes instead of deleting them (in
   // Keys are namespaced `recipe:<id>` (issue 651); values are result ids.
   settingsStore.set('progressiveResultOrder', {
     'recipe:recipe-1': ['a', 'b'],
-    'recipe:recipe-2': ['c', 'd']
+    'recipe:recipe-2': ['c', 'd'],
   });
 
   const recipeManager = makeRecipeManager([
     oneByOneRecipe('recipe-1', 'sys-1'),
-    oneByOneRecipe('recipe-2', 'sys-2')
+    oneByOneRecipe('recipe-2', 'sys-2'),
   ]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Alchemy Bench',
-    resolutionMode: 'simple'
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Alchemy Bench',
+      resolutionMode: 'simple',
+    })
+  );
 
   // The legacy `tiered` token normalizes to `routedByCheck`; the mode still
   // changes (simple → routedByCheck). Migration-first: the 1×1 recipe-1 is now
@@ -173,11 +178,14 @@ test('updating a system without changing resolutionMode does not migrate or dele
 
   const recipeManager = makeRecipeManager([oneByOneRecipe('recipe-1', 'sys-1')]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'simple'
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'simple',
+    })
+  );
 
   await manager.updateSystem('sys-1', { name: 'Grand Forge' });
 
@@ -191,14 +199,17 @@ test('widening simple → routed deletes zero recipes and seeds providers', asyn
   settingsStore.clear();
   const recipeManager = makeRecipeManager([
     oneByOneRecipe('recipe-1', 'sys-1'),
-    multiGroupRecipe('recipe-2', 'sys-1', { resultSelection: undefined })
+    multiGroupRecipe('recipe-2', 'sys-1', { resultSelection: undefined }),
   ]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'simple'
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'simple',
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'routed' });
 
@@ -210,14 +221,17 @@ test('narrowing routed → simple deletes ONLY the multi-set recipe and migrates
   settingsStore.clear();
   const recipeManager = makeRecipeManager([
     oneByOneRecipe('keep-me', 'sys-1', { resultSelection: { provider: 'ingredientSet' } }),
-    multiGroupRecipe('delete-me', 'sys-1')
+    multiGroupRecipe('delete-me', 'sys-1'),
   ]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'routed'
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'routed',
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'simple' });
 
@@ -235,18 +249,21 @@ test('moving a multi-step recipe into alchemy is the only alchemy-direction dele
       craftingSystemId: 'sys-1',
       steps: [
         { id: 'st-1', ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'g1', name: 'A' }] },
-        { id: 'st-2', ingredientSets: [{ id: 's2' }], resultGroups: [{ id: 'g2', name: 'B' }] }
+        { id: 'st-2', ingredientSets: [{ id: 's2' }], resultGroups: [{ id: 'g2', name: 'B' }] },
       ],
-      resultSelection: { provider: 'check' }
+      resultSelection: { provider: 'check' },
     },
-    oneByOneRecipe('flat', 'sys-1', { resultSelection: { provider: 'check' } })
+    oneByOneRecipe('flat', 'sys-1', { resultSelection: { provider: 'check' } }),
   ]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Bench',
-    resolutionMode: 'routed'
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Bench',
+      resolutionMode: 'routed',
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'alchemy' });
 
@@ -268,14 +285,17 @@ test('the merged system (with its new mode) is saved BEFORE recipes are migrated
     return originalUpdate(recipeId, updates);
   };
   const manager = makeManager(recipeManager, {
-    recordSaves: (_event, mode) => events.push(`save:${mode}`)
+    recordSaves: (_event, mode) => events.push(`save:${mode}`),
   });
   managerRef = manager;
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'simple'
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'simple',
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'routedByIngredients' });
 
@@ -289,14 +309,17 @@ test('the merged system (with its new mode) is saved BEFORE recipes are migrated
 test('switching to alchemy runs the signature reconciliation after migration', async () => {
   settingsStore.clear();
   const recipeManager = makeRecipeManager([
-    oneByOneRecipe('recipe-1', 'sys-1', { resultSelection: { provider: 'check' } })
+    oneByOneRecipe('recipe-1', 'sys-1', { resultSelection: { provider: 'check' } }),
   ]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Bench',
-    resolutionMode: 'routed'
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Bench',
+      resolutionMode: 'routed',
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'alchemy' });
 
@@ -307,11 +330,14 @@ test('a non-alchemy mode change does not run signature reconciliation', async ()
   settingsStore.clear();
   const recipeManager = makeRecipeManager([oneByOneRecipe('recipe-1', 'sys-1')]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'simple'
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'simple',
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'routed' });
 
@@ -330,19 +356,22 @@ test('switching routedByCheck → routedByIngredients copies the pass/fail confi
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'routedByCheck',
-    craftingCheck: {
-      routed: {
-        rollFormula: '1d20+3',
-        dc: 17,
-        thresholdMode: 'exceed',
-        tiers: [{ id: 'tier-hard', name: 'Hard', dc: 22 }]
-      }
-    }
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'routedByCheck',
+      craftingCheck: {
+        routed: {
+          rollFormula: '1d20+3',
+          dc: 17,
+          thresholdMode: 'exceed',
+          tiers: [{ id: 'tier-hard', name: 'Hard', dc: 22 }],
+        },
+      },
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'routedByIngredients' });
 
@@ -357,14 +386,17 @@ test('switching routedByIngredients → routedByCheck copies the pass/fail confi
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'routedByIngredients',
-    craftingCheck: {
-      simple: { rollFormula: '2d6+1', dc: 11, thresholdMode: 'meet' }
-    }
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: {
+        simple: { rollFormula: '2d6+1', dc: 11, thresholdMode: 'meet' },
+      },
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'routedByCheck' });
 
@@ -378,15 +410,18 @@ test('into routedByIngredients does NOT clobber an already-authored simple slot'
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'routedByCheck',
-    craftingCheck: {
-      routed: { rollFormula: '1d20+3', dc: 17 },
-      simple: { rollFormula: '1d8', dc: 6 }
-    }
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'routedByCheck',
+      craftingCheck: {
+        routed: { rollFormula: '1d20+3', dc: 17 },
+        simple: { rollFormula: '1d8', dc: 6 },
+      },
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'routedByIngredients' });
 
@@ -399,15 +434,18 @@ test('out of routedByIngredients does NOT clobber an already-authored routed slo
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'routedByIngredients',
-    craftingCheck: {
-      simple: { rollFormula: '2d6+1', dc: 11 },
-      routed: { rollFormula: '1d20', dc: 25 }
-    }
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: {
+        simple: { rollFormula: '2d6+1', dc: 11 },
+        routed: { rollFormula: '1d20', dc: 25 },
+      },
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'routedByCheck' });
 
@@ -420,14 +458,17 @@ test('a dynamic-DC simple check moved into routedByCheck KEEPS its dynamic DC (i
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'routedByIngredients',
-    craftingCheck: {
-      simple: { rollFormula: '1d20', dc: 13, dcMode: 'dynamic', macroUuid: 'Macro.abc' }
-    }
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 13, dcMode: 'dynamic', macroUuid: 'Macro.abc' },
+      },
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'routedByCheck' });
 
@@ -444,12 +485,15 @@ test('crossing into a non-RI, non-routedByCheck mode moves no crafting-check con
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
-  manager.systems.set('sys-1', manager._normalizeSystem({
-    id: 'sys-1',
-    name: 'Forge',
-    resolutionMode: 'routedByIngredients',
-    craftingCheck: { simple: { rollFormula: '2d6', dc: 9 } }
-  }));
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: { simple: { rollFormula: '2d6', dc: 9 } },
+    })
+  );
 
   await manager.updateSystem('sys-1', { resolutionMode: 'progressive' });
 

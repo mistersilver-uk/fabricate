@@ -341,7 +341,11 @@ test('alchemy checkMode=simple with NO roll formula is a misconfiguration (abort
   stubThrowingRoll();
   const result = await run(engine);
   assert.equal(result.success, false);
-  assert.equal(result.misconfigured, true, 'a mandatory simple check with no formula is misconfigured');
+  assert.equal(
+    result.misconfigured,
+    true,
+    'a mandatory simple check with no formula is misconfigured'
+  );
 });
 
 test('simple mode with the check disabled does not run (no roll, auto-success)', async () => {
@@ -498,15 +502,25 @@ test('checkDriven simple: a breakTools trigger forces break via the decision sea
   const { engine, system } = makeEngine({
     simple: defaultSimple({
       dc: 1,
-      ...breakage(totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'success', breakTools: true })),
+      ...breakage(
+        totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'success', breakTools: true })
+      ),
     }),
   });
   system.toolBreakage = { authority: 'checkDriven' };
   stubRoll(20, [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }]);
   const result = await run(engine);
   assert.equal(result.success, true);
-  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, result);
-  assert.equal(decision.forceBreak, true, 'the breakTools trigger forces a break under checkDriven');
+  const decision = engine._resolveCraftingBreakageDecision(
+    system,
+    { craftingSystemId: 'sys-1' },
+    result
+  );
+  assert.equal(
+    decision.forceBreak,
+    true,
+    'the breakTools trigger forces a break under checkDriven'
+  );
   assert.equal(decision.triggerId, 'bt');
 });
 
@@ -514,15 +528,25 @@ test('toolSpecific simple: a breakTools trigger never force-breaks (either-or au
   const { engine, system } = makeEngine({
     simple: defaultSimple({
       dc: 1,
-      ...breakage(totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'none', breakTools: true })),
+      ...breakage(
+        totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'none', breakTools: true })
+      ),
     }),
   });
   // Default toolSpecific authority: a check never breaks tools.
   stubRoll(20, [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }]);
   const result = await run(engine);
-  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, result);
+  const decision = engine._resolveCraftingBreakageDecision(
+    system,
+    { craftingSystemId: 'sys-1' },
+    result
+  );
   assert.equal(decision.authority, 'toolSpecific');
-  assert.equal(decision.forceBreak, false, 'a matching breakTools trigger is inert under toolSpecific');
+  assert.equal(
+    decision.forceBreak,
+    false,
+    'a matching breakTools trigger is inert under toolSpecific'
+  );
 });
 
 test('a non-forced success path surfaces no crit/breakTools fields', async () => {
@@ -547,14 +571,31 @@ test('checkDriven simple: a diceGroup anyDie==1 trigger forces breakage on the s
   const simple = defaultSimple({
     dc: 1,
     checkBreakage: {
-      triggers: [{ id: 'nat1', breakTools: true, outcome: 'none', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
+      triggers: [
+        {
+          id: 'nat1',
+          breakTools: true,
+          outcome: 'none',
+          condition: {
+            type: 'diceGroup',
+            groupId: 0,
+            aggregate: 'anyDie',
+            operator: '==',
+            value: 1,
+          },
+        },
+      ],
     },
   });
   const { engine, system } = makeEngine({ simple });
   system.toolBreakage = { authority: 'checkDriven' };
   stubRoll(1, [{ number: 1, faces: 20, total: 1, results: [{ result: 1, active: true }] }]);
   const r = await run(engine);
-  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, r);
+  const decision = engine._resolveCraftingBreakageDecision(
+    system,
+    { craftingSystemId: 'sys-1' },
+    r
+  );
   assert.equal(decision.authority, 'checkDriven');
   assert.equal(decision.forceBreak, true);
   assert.equal(decision.triggerId, 'nat1');
@@ -564,7 +605,11 @@ test('toolSpecific simple: no checkBreakage trigger and no crit → no forced br
   const { engine, system } = makeEngine({ simple: defaultSimple({ dc: 1 }) });
   stubRoll(20, [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }]);
   const r = await run(engine);
-  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, r);
+  const decision = engine._resolveCraftingBreakageDecision(
+    system,
+    { craftingSystemId: 'sys-1' },
+    r
+  );
   assert.equal(decision.authority, 'toolSpecific');
   assert.equal(decision.forceBreak, false);
 });

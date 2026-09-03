@@ -672,7 +672,10 @@ test('the notice LEADS with the sentence that names every affected system', () =
   assert.match(message, /removed from these systems: Alchemy, Smithing\./);
   // A blank/absent name contributes nothing rather than an empty list slot.
   assert.equal(
-    buildRetiredCraftingModNotice([{ system: '', inert: 1 }, { system: 'Only', inert: 1 }]).systems,
+    buildRetiredCraftingModNotice([
+      { system: '', inert: 1 },
+      { system: 'Only', inert: 1 },
+    ]).systems,
     'Only'
   );
 });
@@ -680,7 +683,11 @@ test('the notice LEADS with the sentence that names every affected system', () =
 test('the notice DROPS every zero clause, so a single-cause world reads one sentence', () => {
   const { message } = buildRetiredCraftingModNotice([{ system: 'Alchemy', inert: 4 }]);
   assert.match(message, /4 check\(s\) had modifiers/);
-  for (const absent of [/subtracted the modifier/, /counted it more than once/, /left exactly as authored/]) {
+  for (const absent of [
+    /subtracted the modifier/,
+    /counted it more than once/,
+    /left exactly as authored/,
+  ]) {
     assert.equal(absent.test(message), false, `a zero cause says nothing: ${absent}`);
   }
   assert.equal(message.includes('0 '), false, 'and no clause reports a zero');
@@ -690,7 +697,13 @@ test('the notice keeps the clauses in cause order and joins them into one string
   const { message } = buildRetiredCraftingModNotice([
     { system: 'All', inert: 1, subtractive: 2, repeated: 3, untouched: 4 },
   ]);
-  const order = ['these systems: All', '1 check(s)', '2 formula(s) subtracted', '3 formula(s) counted', '4 formula(s) were left'];
+  const order = [
+    'these systems: All',
+    '1 check(s)',
+    '2 formula(s) subtracted',
+    '3 formula(s) counted',
+    '4 formula(s) were left',
+  ];
   let cursor = -1;
   for (const fragment of order) {
     const at = message.indexOf(fragment);
@@ -700,8 +713,14 @@ test('the notice keeps the clauses in cause order and joins them into one string
 });
 
 test('the notice warns PERMANENTLY only when a formula was left untouched', () => {
-  const clean = buildRetiredCraftingModNotice([{ system: 'A', inert: 1, subtractive: 1, repeated: 1 }]);
-  assert.equal(clean.severity, 'info', 'a behaviour change the GM need not repair cannot fail a capture');
+  const clean = buildRetiredCraftingModNotice([
+    { system: 'A', inert: 1, subtractive: 1, repeated: 1 },
+  ]);
+  assert.equal(
+    clean.severity,
+    'info',
+    'a behaviour change the GM need not repair cannot fail a capture'
+  );
   assert.equal(clean.permanent, false);
 
   const broken = buildRetiredCraftingModNotice([{ system: 'A', untouched: 1 }]);
@@ -727,7 +746,9 @@ test('the notice localizes every clause, and falls back to interpolated English'
   );
   assert.deepEqual(asked[0][1], { systems: 'Alchemy, Smithing' });
   assert.deepEqual(asked[1][1], { count: 3 });
-  assert.ok(localized.message.startsWith('[FABRICATE.Migration.RetireCheckModifierPlaceholder.Lead:'));
+  assert.ok(
+    localized.message.startsWith('[FABRICATE.Migration.RetireCheckModifierPlaceholder.Lead:')
+  );
 
   // The fallback branch: `game.i18n` absent (or the key unresolved) still interpolates the
   // count and the system list rather than rendering a literal `{count}`.
@@ -759,13 +780,18 @@ test('every notice clause is localized under a key that exists in en.json', () =
   // The keys the composer actually asks for, harvested from a real composition rather than
   // hand-listed — so a renamed key is caught here instead of resolving a stale name.
   const asked = [];
-  buildRetiredCraftingModNotice([{ system: 'A', inert: 1, subtractive: 1, repeated: 1, untouched: 1 }], (key) => {
-    asked.push(key);
-    return '';
-  });
+  buildRetiredCraftingModNotice(
+    [{ system: 'A', inert: 1, subtractive: 1, repeated: 1, untouched: 1 }],
+    (key) => {
+      asked.push(key);
+      return '';
+    }
+  );
   assert.equal(asked.length, 5, 'the lead plus all four clauses');
   for (const key of asked) {
-    const leaf = key.split('.').reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
+    const leaf = key
+      .split('.')
+      .reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
     assert.equal(typeof leaf, 'string', `${key} resolves to a string leaf`);
   }
 

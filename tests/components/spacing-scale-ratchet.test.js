@@ -217,7 +217,8 @@ test('every spacing property spelling is scanned, including the logical longhand
     [],
     'a spacing property spelling has been dropped from SCANNED_SPACING_PROPERTIES. Each one is a ' +
       'way to write the same declaration, so an unscanned spelling is a rename away from being a ' +
-      'bypass:\n  ' + missing.join('\n  ')
+      'bypass:\n  ' +
+      missing.join('\n  ')
   );
 });
 
@@ -417,6 +418,7 @@ test('no raw spacing literal has been laundered into a private token', () => {
       'been paid — the gap is still that many pixels wide — and the count above did not move ' +
       `because the scan resolves \`var()\`. Use a published \`${SPACING_SCALE_PREFIX}\` token, ` +
       'which this scan holds opaque precisely because deriving from the scale is what the spec ' +
-      'asks for:\n  ' + laundered.join('\n  ')
+      'asks for:\n  ' +
+      laundered.join('\n  ')
   );
 });

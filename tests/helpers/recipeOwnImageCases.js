@@ -20,7 +20,7 @@ import { it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_CRAFTING_IMAGE,
-  GENERIC_ITEM_IMAGE
+  GENERIC_ITEM_IMAGE,
 } from '../../src/ui/svelte/util/craftingImageDefaults.js';
 
 // A recipe item definition's artwork — a bound book. This is exactly what the

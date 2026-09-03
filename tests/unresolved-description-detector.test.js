@@ -17,11 +17,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 globalThis.foundry = { utils: { getProperty: () => undefined } };
 
-const { countUnresolvedDirectiveDescriptions, notifyUnresolvedItemDescriptions, runItemDataRepair } =
-  await import('../src/config/repairItemData.js');
-const { REPORTER_ENRICHER_DESCRIPTION, REPORTER_RESOLVED_EXPECTED } = await import(
-  './helpers/enricherDescriptionFixtures.js'
-);
+const {
+  countUnresolvedDirectiveDescriptions,
+  notifyUnresolvedItemDescriptions,
+  runItemDataRepair,
+} = await import('../src/config/repairItemData.js');
+const { REPORTER_ENRICHER_DESCRIPTION, REPORTER_RESOLVED_EXPECTED } =
+  await import('./helpers/enricherDescriptionFixtures.js');
 
 function installWorld({ isGM = true, systems = [] } = {}) {
   const infos = [];

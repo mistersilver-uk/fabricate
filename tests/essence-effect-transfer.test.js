@@ -33,12 +33,12 @@ globalThis.foundry = {
       }
       cur[parts[parts.length - 1]] = value;
     },
-    randomID: () => Math.random().toString(36).slice(2)
-  }
+    randomID: () => Math.random().toString(36).slice(2),
+  },
 };
 
 globalThis.ui = {
-  notifications: { info: () => {}, warn: () => {}, error: () => {} }
+  notifications: { info: () => {}, warn: () => {}, error: () => {} },
 };
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ globalThis.ui = {
 function makeEngine() {
   const mockRecipeManager = {
     canCraft: () => ({ canCraft: false }),
-    ingredientMatchesItem: () => false
+    ingredientMatchesItem: () => false,
   };
   return new CraftingEngine(mockRecipeManager, null, null);
 }
@@ -72,10 +72,10 @@ function makeConsumedItem(id, essencesMap = {}) {
       getFlag(scope, key) {
         if (scope === 'fabricate') return flagStore[key];
         return undefined;
-      }
+      },
     },
     quantity: 1,
-    ingredient: { systemItemId: id, quantity: 1 }
+    ingredient: { systemItemId: id, quantity: 1 },
   };
 }
 
@@ -101,18 +101,18 @@ function setupGame({ essencesEnabled = true, essenceDefinitions = [], components
   const system = {
     features: {
       essences: essencesEnabled,
-      effectTransfer: true
+      effectTransfer: true,
     },
     essenceDefinitions,
     components,
-    craftingCheck: { enabled: false }
+    craftingCheck: { enabled: false },
   };
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({
-        getSystem: () => system
-      })
-    }
+        getSystem: () => system,
+      }),
+    },
   };
   return system;
 }
@@ -127,12 +127,10 @@ test('T-009-G1-1: effects transferred from essence sourceItemUuid when essences 
 
   setupGame({
     essencesEnabled: true,
-    essenceDefinitions: [
-      { id: 'essence-fire', sourceItemUuid: 'uuid-fire-essence' }
-    ]
+    essenceDefinitions: [{ id: 'essence-fire', sourceItemUuid: 'uuid-fire-essence' }],
   });
 
-  globalThis.fromUuid = async (uuid) => uuid === 'uuid-fire-essence' ? sourceItem : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'uuid-fire-essence' ? sourceItem : null);
 
   const engine = makeEngine();
 
@@ -144,7 +142,7 @@ test('T-009-G1-1: effects transferred from essence sourceItemUuid when essences 
     createEmbeddedDocuments: async (type, data) => {
       capturedEffects.push(...data);
       return data;
-    }
+    },
   };
 
   const recipe = { craftingSystemId: 'sys-1', transferEffects: true };
@@ -161,12 +159,14 @@ test('effects transfer resolves sourceComponentId through the managed component 
 
   setupGame({
     essencesEnabled: true,
-    components: [
-      { id: 'component-earth', originItemUuid: 'uuid-earth-source' }
-    ],
+    components: [{ id: 'component-earth', originItemUuid: 'uuid-earth-source' }],
     essenceDefinitions: [
-      { id: 'essence-earth', sourceComponentId: 'component-earth', sourceItemUuid: 'legacy-component-earth' }
-    ]
+      {
+        id: 'essence-earth',
+        sourceComponentId: 'component-earth',
+        sourceItemUuid: 'legacy-component-earth',
+      },
+    ],
   });
 
   const resolvedUuids = [];
@@ -182,10 +182,13 @@ test('effects transfer resolves sourceComponentId through the managed component 
     createEmbeddedDocuments: async (type, data) => {
       capturedEffects.push(...data);
       return data;
-    }
+    },
   };
 
-  await engine._transferEffects(resultItem, consumedItems, { craftingSystemId: 'sys-1', transferEffects: true });
+  await engine._transferEffects(resultItem, consumedItems, {
+    craftingSystemId: 'sys-1',
+    transferEffects: true,
+  });
 
   assert.deepEqual(resolvedUuids, ['uuid-earth-source']);
   assert.equal(capturedEffects.length, 1);
@@ -199,8 +202,12 @@ test('effects transfer skips stale sourceComponentId instead of falling back to 
     essencesEnabled: true,
     components: [],
     essenceDefinitions: [
-      { id: 'essence-stale', sourceComponentId: 'missing-component', sourceItemUuid: 'uuid-legacy-source' }
-    ]
+      {
+        id: 'essence-stale',
+        sourceComponentId: 'missing-component',
+        sourceItemUuid: 'uuid-legacy-source',
+      },
+    ],
   });
 
   const resolvedUuids = [];
@@ -216,10 +223,13 @@ test('effects transfer skips stale sourceComponentId instead of falling back to 
     createEmbeddedDocuments: async () => {
       createCalled = true;
       return [];
-    }
+    },
   };
 
-  await engine._transferEffects(resultItem, consumedItems, { craftingSystemId: 'sys-1', transferEffects: true });
+  await engine._transferEffects(resultItem, consumedItems, {
+    craftingSystemId: 'sys-1',
+    transferEffects: true,
+  });
 
   assert.deepEqual(resolvedUuids, []);
   assert.equal(createCalled, false);
@@ -228,34 +238,40 @@ test('effects transfer skips stale sourceComponentId instead of falling back to 
 test('T-009-G1-2: no effects transferred when essences feature is disabled', async () => {
   setupGame({
     essencesEnabled: false,
-    essenceDefinitions: [
-      { id: 'essence-fire', sourceItemUuid: 'uuid-fire-essence' }
-    ]
+    essenceDefinitions: [{ id: 'essence-fire', sourceItemUuid: 'uuid-fire-essence' }],
   });
 
-  globalThis.fromUuid = async () => makeSourceItem('uuid-fire-essence', [makeEffect('Fire Resist')]);
+  globalThis.fromUuid = async () =>
+    makeSourceItem('uuid-fire-essence', [makeEffect('Fire Resist')]);
 
   const engine = makeEngine();
   const consumedItems = [makeConsumedItem('ing-1', { 'essence-fire': 1 })];
 
   let createCalled = false;
   const resultItem = {
-    createEmbeddedDocuments: async () => { createCalled = true; return []; }
+    createEmbeddedDocuments: async () => {
+      createCalled = true;
+      return [];
+    },
   };
 
   const recipe = { craftingSystemId: 'sys-1', transferEffects: true };
 
   await engine._transferEffects(resultItem, consumedItems, recipe);
 
-  assert.equal(createCalled, false, 'createEmbeddedDocuments should not be called when essences are disabled');
+  assert.equal(
+    createCalled,
+    false,
+    'createEmbeddedDocuments should not be called when essences are disabled'
+  );
 });
 
 test('T-009-G1-3: essence with no sourceItemUuid contributes no effects', async () => {
   setupGame({
     essencesEnabled: true,
     essenceDefinitions: [
-      { id: 'essence-water' } // no sourceItemUuid
-    ]
+      { id: 'essence-water' }, // no sourceItemUuid
+    ],
   });
 
   globalThis.fromUuid = async () => null;
@@ -265,22 +281,27 @@ test('T-009-G1-3: essence with no sourceItemUuid contributes no effects', async 
 
   let createCalled = false;
   const resultItem = {
-    createEmbeddedDocuments: async () => { createCalled = true; return []; }
+    createEmbeddedDocuments: async () => {
+      createCalled = true;
+      return [];
+    },
   };
 
   const recipe = { craftingSystemId: 'sys-1', transferEffects: true };
 
   await engine._transferEffects(resultItem, consumedItems, recipe);
 
-  assert.equal(createCalled, false, 'no effects should be transferred when sourceItemUuid is absent');
+  assert.equal(
+    createCalled,
+    false,
+    'no effects should be transferred when sourceItemUuid is absent'
+  );
 });
 
 test('T-009-G1-4: sourceItemUuid that resolves to null is gracefully skipped', async () => {
   setupGame({
     essencesEnabled: true,
-    essenceDefinitions: [
-      { id: 'essence-void', sourceItemUuid: 'uuid-does-not-exist' }
-    ]
+    essenceDefinitions: [{ id: 'essence-void', sourceItemUuid: 'uuid-does-not-exist' }],
   });
 
   globalThis.fromUuid = async () => null; // resolution fails
@@ -290,7 +311,10 @@ test('T-009-G1-4: sourceItemUuid that resolves to null is gracefully skipped', a
 
   let createCalled = false;
   const resultItem = {
-    createEmbeddedDocuments: async () => { createCalled = true; return []; }
+    createEmbeddedDocuments: async () => {
+      createCalled = true;
+      return [];
+    },
   };
 
   const recipe = { craftingSystemId: 'sys-1', transferEffects: true };
@@ -308,8 +332,8 @@ test('T-009-G1-5: effects from multiple essence sources are all collected', asyn
     essencesEnabled: true,
     essenceDefinitions: [
       { id: 'essence-fire', sourceItemUuid: 'uuid-fire' },
-      { id: 'essence-ice', sourceItemUuid: 'uuid-ice' }
-    ]
+      { id: 'essence-ice', sourceItemUuid: 'uuid-ice' },
+    ],
   });
 
   globalThis.fromUuid = async (uuid) => {
@@ -322,7 +346,7 @@ test('T-009-G1-5: effects from multiple essence sources are all collected', asyn
   // Two consumed items, each contributing a different essence
   const consumedItems = [
     makeConsumedItem('ing-fire', { 'essence-fire': 1 }),
-    makeConsumedItem('ing-ice', { 'essence-ice': 1 })
+    makeConsumedItem('ing-ice', { 'essence-ice': 1 }),
   ];
 
   const capturedEffects = [];
@@ -330,15 +354,19 @@ test('T-009-G1-5: effects from multiple essence sources are all collected', asyn
     createEmbeddedDocuments: async (type, data) => {
       capturedEffects.push(...data);
       return data;
-    }
+    },
   };
 
   const recipe = { craftingSystemId: 'sys-1', transferEffects: true };
 
   await engine._transferEffects(resultItem, consumedItems, recipe);
 
-  const names = capturedEffects.map(e => e.name).sort();
-  assert.deepEqual(names, ['Fire Resist', 'Ice Resist'], 'effects from both essence sources should be transferred');
+  const names = capturedEffects.map((e) => e.name).sort();
+  assert.deepEqual(
+    names,
+    ['Fire Resist', 'Ice Resist'],
+    'effects from both essence sources should be transferred'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -348,7 +376,7 @@ test('T-009-G1-5: effects from multiple essence sources are all collected', asyn
 test('T-009-G2-1: ingredient extractEffects=true does NOT cause effect transfer (old path removed)', async () => {
   setupGame({
     essencesEnabled: true,
-    essenceDefinitions: [] // no essence definitions at all
+    essenceDefinitions: [], // no essence definitions at all
   });
 
   globalThis.fromUuid = async () => null;
@@ -366,27 +394,34 @@ test('T-009-G2-1: ingredient extractEffects=true does NOT cause effect transfer 
         if (scope === 'fabricate' && key === 'fabricate.essences') return {};
         return undefined;
       },
-      effects: [makeEffect('Should Not Transfer')]
+      effects: [makeEffect('Should Not Transfer')],
     },
     quantity: 1,
     ingredient: {
       systemItemId: 'ing-old',
       quantity: 1,
-      extractEffects: true,        // old flag — must be ignored by new implementation
-      effectFilter: null
-    }
+      extractEffects: true, // old flag — must be ignored by new implementation
+      effectFilter: null,
+    },
   };
 
   let createCalled = false;
   const resultItem = {
-    createEmbeddedDocuments: async () => { createCalled = true; return []; }
+    createEmbeddedDocuments: async () => {
+      createCalled = true;
+      return [];
+    },
   };
 
   const recipe = { craftingSystemId: 'sys-1', transferEffects: true };
 
   await engine._transferEffects(resultItem, [consumedItem], recipe);
 
-  assert.equal(createCalled, false, 'extractEffects on ingredient should be ignored — old path is removed');
+  assert.equal(
+    createCalled,
+    false,
+    'extractEffects on ingredient should be ignored — old path is removed'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -396,9 +431,7 @@ test('T-009-G2-1: ingredient extractEffects=true does NOT cause effect transfer 
 test('T-009-G3-1: source item with empty effects array transfers nothing', async () => {
   setupGame({
     essencesEnabled: true,
-    essenceDefinitions: [
-      { id: 'essence-empty', sourceItemUuid: 'uuid-empty-source' }
-    ]
+    essenceDefinitions: [{ id: 'essence-empty', sourceItemUuid: 'uuid-empty-source' }],
   });
 
   globalThis.fromUuid = async () => makeSourceItem('uuid-empty-source', []); // no effects
@@ -408,7 +441,10 @@ test('T-009-G3-1: source item with empty effects array transfers nothing', async
 
   let createCalled = false;
   const resultItem = {
-    createEmbeddedDocuments: async () => { createCalled = true; return []; }
+    createEmbeddedDocuments: async () => {
+      createCalled = true;
+      return [];
+    },
   };
 
   const recipe = { craftingSystemId: 'sys-1', transferEffects: true };
@@ -421,9 +457,7 @@ test('T-009-G3-1: source item with empty effects array transfers nothing', async
 test('T-009-G3-2: empty consumedItems list results in no effects transferred', async () => {
   setupGame({
     essencesEnabled: true,
-    essenceDefinitions: [
-      { id: 'essence-fire', sourceItemUuid: 'uuid-fire' }
-    ]
+    essenceDefinitions: [{ id: 'essence-fire', sourceItemUuid: 'uuid-fire' }],
   });
 
   globalThis.fromUuid = async () => makeSourceItem('uuid-fire', [makeEffect('Fire Resist')]);
@@ -432,7 +466,10 @@ test('T-009-G3-2: empty consumedItems list results in no effects transferred', a
 
   let createCalled = false;
   const resultItem = {
-    createEmbeddedDocuments: async () => { createCalled = true; return []; }
+    createEmbeddedDocuments: async () => {
+      createCalled = true;
+      return [];
+    },
   };
 
   const recipe = { craftingSystemId: 'sys-1', transferEffects: true };

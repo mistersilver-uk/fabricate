@@ -8,9 +8,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { resolveRecipeFixedOutcomeTierOptions } = await import(
-  '../src/utils/routedOutcomeKeywords.js'
-);
+const { resolveRecipeFixedOutcomeTierOptions } =
+  await import('../src/utils/routedOutcomeKeywords.js');
 
 const FIXED_OUTCOMES = [
   { id: 'high', name: 'Clean', success: true, start: 15, end: 20 },
@@ -43,7 +42,12 @@ test('routedByIngredients + fixed yields no options (the field is never read the
 
 test('failure tiers are excluded — only success tiers are a valid minimum', () => {
   const options = resolveRecipeFixedOutcomeTierOptions(
-    { routed: { type: 'fixed', fixedOutcomes: [{ id: 'low', name: 'Fumble', success: false, start: 1 }] } },
+    {
+      routed: {
+        type: 'fixed',
+        fixedOutcomes: [{ id: 'low', name: 'Fumble', success: false, start: 1 }],
+      },
+    },
     'routedByCheck'
   );
   assert.deepEqual(options, []);
@@ -77,7 +81,10 @@ test('routedByCheck + relative yields no options (fixed-type only)', () => {
 
 test('routedByCheck + omitted type yields no options (defaults to relative)', () => {
   assert.deepEqual(
-    resolveRecipeFixedOutcomeTierOptions({ routed: { fixedOutcomes: FIXED_OUTCOMES } }, 'routedByCheck'),
+    resolveRecipeFixedOutcomeTierOptions(
+      { routed: { fixedOutcomes: FIXED_OUTCOMES } },
+      'routedByCheck'
+    ),
     []
   );
 });
@@ -94,5 +101,8 @@ test('missing config / outcomes yield an empty list (no throw)', () => {
   assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(null, 'routedByCheck'), []);
   assert.deepEqual(resolveRecipeFixedOutcomeTierOptions(undefined, 'routedByCheck'), []);
   assert.deepEqual(resolveRecipeFixedOutcomeTierOptions({}, 'routedByCheck'), []);
-  assert.deepEqual(resolveRecipeFixedOutcomeTierOptions({ routed: { type: 'fixed' } }, 'routedByCheck'), []);
+  assert.deepEqual(
+    resolveRecipeFixedOutcomeTierOptions({ routed: { type: 'fixed' } }, 'routedByCheck'),
+    []
+  );
 });

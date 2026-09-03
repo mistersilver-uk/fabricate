@@ -185,7 +185,10 @@ describe('what a Save writes, and what it deliberately does not', () => {
 
 describe('flushing a draft through the world-scope write family', () => {
   /** A recording stand-in for one entity type's action family. */
-  function actionsOf({ updateEntity = async () => true, updateWorldDefaultSection = async () => true } = {}) {
+  function actionsOf({
+    updateEntity = async () => true,
+    updateWorldDefaultSection = async () => true,
+  } = {}) {
     const calls = [];
     return {
       calls,
@@ -243,7 +246,11 @@ describe('flushing a draft through the world-scope write family', () => {
   it('refuses an empty entity id rather than writing against nothing', async () => {
     const actions = actionsOf();
     assert.equal(
-      await flushScopedEntryDraft({ entityId: '', writes: { identity: {}, sections: [] }, actions }),
+      await flushScopedEntryDraft({
+        entityId: '',
+        writes: { identity: {}, sections: [] },
+        actions,
+      }),
       false
     );
     assert.deepEqual(actions.calls, []);
@@ -291,12 +298,18 @@ describe('the route-exit guard', () => {
   it('discards and proceeds, or cancels and stays, on the other two answers', () => {
     let discarded = 0;
     assert.equal(
-      finishScopedEntryExit('discard', { save: () => assert.fail('saved'), discard: () => (discarded += 1) }),
+      finishScopedEntryExit('discard', {
+        save: () => assert.fail('saved'),
+        discard: () => (discarded += 1),
+      }),
       true
     );
     assert.equal(discarded, 1);
     assert.equal(
-      finishScopedEntryExit('cancel', { save: () => assert.fail('saved'), discard: () => assert.fail('discarded') }),
+      finishScopedEntryExit('cancel', {
+        save: () => assert.fail('saved'),
+        discard: () => assert.fail('discarded'),
+      }),
       false
     );
   });
@@ -307,12 +320,18 @@ describe('the route-exit guard', () => {
     // pair reaches this shape from `confirmDiscardDirtyToolsDraft`, so both are read.
     let discarded = 0;
     assert.equal(
-      finishScopedEntryExit(true, { save: () => assert.fail('saved'), discard: () => (discarded += 1) }),
+      finishScopedEntryExit(true, {
+        save: () => assert.fail('saved'),
+        discard: () => (discarded += 1),
+      }),
       true
     );
     assert.equal(discarded, 1);
     assert.equal(
-      finishScopedEntryExit(false, { save: () => assert.fail('saved'), discard: () => assert.fail('discarded') }),
+      finishScopedEntryExit(false, {
+        save: () => assert.fail('saved'),
+        discard: () => assert.fail('discarded'),
+      }),
       false
     );
   });

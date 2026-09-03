@@ -33,7 +33,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

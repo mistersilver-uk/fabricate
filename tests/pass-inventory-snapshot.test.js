@@ -34,12 +34,10 @@ globalThis.foundry = { utils: { getProperty, randomID: () => `id-${Math.random()
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 globalThis.game = { actors: [] };
 
-const { buildPassInventorySnapshot, legacyRecipeItemUuidsBySystem } = await import(
-  '../src/systems/passInventorySnapshot.js'
-);
-const { buildInventorySnapshot, projectRecipeAvailability } = await import(
-  '../src/systems/inventorySnapshot.js'
-);
+const { buildPassInventorySnapshot, legacyRecipeItemUuidsBySystem } =
+  await import('../src/systems/passInventorySnapshot.js');
+const { buildInventorySnapshot, projectRecipeAvailability } =
+  await import('../src/systems/inventorySnapshot.js');
 const { itemMatchesRecipeItemSource } = await import('../src/utils/sourceUuid.js');
 
 const SYSTEM_ID = 'sys-1';
@@ -211,7 +209,10 @@ describe('the unified pass snapshot serves both consumers from ONE value', () =>
 
     const left = before.componentTallies(SYSTEM);
     const right = after.componentTallies(SYSTEM);
-    assert.deepEqual(mapToObject(right.quantityByComponentId), mapToObject(left.quantityByComponentId));
+    assert.deepEqual(
+      mapToObject(right.quantityByComponentId),
+      mapToObject(left.quantityByComponentId)
+    );
     assert.deepEqual(mapToObject(right.stacksByComponentId), mapToObject(left.stacksByComponentId));
     assert.deepEqual(mapToObject(right.essenceTotals), mapToObject(left.essenceTotals));
     assert.deepEqual(mapToObject(right.quantityByTag), mapToObject(left.quantityByTag));

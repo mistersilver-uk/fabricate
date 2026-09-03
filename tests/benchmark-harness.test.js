@@ -76,7 +76,10 @@ describe('scale fixtures are reproducible from {profile, seed} alone', () => {
         'the recipe corpus must be a pure function of {profile, seed}'
       );
       assert.equal(fixtureChecksum(first.components), fixtureChecksum(second.components));
-      assert.equal(fixtureChecksum(first.inventory.actors), fixtureChecksum(second.inventory.actors));
+      assert.equal(
+        fixtureChecksum(first.inventory.actors),
+        fixtureChecksum(second.inventory.actors)
+      );
     });
 
     it(`${profile} honours its declared scale`, () => {
@@ -142,7 +145,10 @@ describe('pickDistinct returns exactly the requested scale', () => {
     // picked the same set differently would report generator drift that is not there.
     const picked = pickDistinct(createSeededRandom(3), pool, 4);
     const positions = picked.map((entry) => pool.indexOf(entry));
-    assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+    assert.deepEqual(
+      positions,
+      [...positions].sort((left, right) => left - right)
+    );
   });
 
   it('terminates and still returns the full count for a degenerate generator', () => {
@@ -238,10 +244,7 @@ describe('most held items resolve to NO component', () => {
     const fixture = buildScaleFixture({ profile: 'held-inventory', seed: DEFAULT_SEED });
     for (const entry of fixture.inventorySeries) {
       assert.equal(entry.mix.unmatchedRatio, 0.7);
-      assert.equal(
-        entry.mix.unmatched + entry.mix.durable + entry.mix.sourceRef,
-        entry.mix.stacks
-      );
+      assert.equal(entry.mix.unmatched + entry.mix.durable + entry.mix.sourceRef, entry.mix.stacks);
     }
   });
 
@@ -274,10 +277,16 @@ describe('the operation counters can go up, and by the right amount', () => {
     const counters = createOperationCounters();
     const array = countingCandidates([1, 2, 3, 4, 5], counters, 'examined');
     assert.ok(Array.isArray(array), 'resolvers guard on Array.isArray — the wrapper must pass');
-    assert.equal(array.find((value) => value === 3), 3);
+    assert.equal(
+      array.find((value) => value === 3),
+      3
+    );
     assert.equal(counters.get('examined'), 3, 'find stops at the match');
     counters.reset();
-    assert.equal(array.find((value) => value === 99), undefined);
+    assert.equal(
+      array.find((value) => value === 99),
+      undefined
+    );
     assert.equal(counters.get('examined'), 5, 'a miss examines everything');
   });
 

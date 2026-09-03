@@ -24,12 +24,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const {
-  buildExportPayload,
-  validateImportData,
-  prepareForImport,
-  makeExportFilename
-} = await import('../src/systems/CraftingSystemExporter.js');
+const { buildExportPayload, validateImportData, prepareForImport, makeExportFilename } =
+  await import('../src/systems/CraftingSystemExporter.js');
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 
@@ -46,12 +42,23 @@ function makeSystem(overrides = {}) {
     resolutionMode: 'simple',
     features: { essences: true, recipeCategories: false, itemTags: false },
     essenceDefinitions: [
-      { id: 'earth', name: 'Earth', description: '', icon: 'fas fa-mountain', associatedSystemItemId: null }
+      {
+        id: 'earth',
+        name: 'Earth',
+        description: '',
+        icon: 'fas fa-mountain',
+        associatedSystemItemId: null,
+      },
     ],
     categories: ['Potions'],
     itemTags: ['ingredient'],
     components: [
-      { id: 'comp-1', name: 'Iron Ore', originItemUuid: 'Compendium.test.items.iron', essences: { earth: 1 } }
+      {
+        id: 'comp-1',
+        name: 'Iron Ore',
+        originItemUuid: 'Compendium.test.items.iron',
+        essences: { earth: 1 },
+      },
     ],
     // Transitional aliases that should be stripped on export
     items: [{ id: 'comp-1' }],
@@ -65,7 +72,7 @@ function makeSystem(overrides = {}) {
     enableTiers: false,
     tiers: [],
     advancedOptionsEnabled: true,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -78,7 +85,7 @@ function makeRecipe(overrides = {}) {
     ingredientSets: [],
     resultGroups: [],
     enabled: true,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -139,8 +146,11 @@ test('buildExportPayload: strips associatedSystemItemId from essence definitions
   const payload = buildExportPayload(system, [], '1.0.0');
 
   for (const def of payload.system.essenceDefinitions) {
-    assert.equal(def.associatedSystemItemId, undefined,
-      `Essence "${def.id}" should not have associatedSystemItemId`);
+    assert.equal(
+      def.associatedSystemItemId,
+      undefined,
+      `Essence "${def.id}" should not have associatedSystemItemId`
+    );
   }
 });
 
@@ -160,16 +170,16 @@ test('buildExportPayload: retains canonical system fields', () => {
   assert.equal(payload.system.id, 'sys-1');
   assert.equal(payload.system.name, 'Test System');
   assert.ok(Array.isArray(payload.system.components), 'components should be preserved');
-  assert.ok(Array.isArray(payload.system.essenceDefinitions), 'essenceDefinitions should be preserved');
+  assert.ok(
+    Array.isArray(payload.system.essenceDefinitions),
+    'essenceDefinitions should be preserved'
+  );
   assert.ok(Array.isArray(payload.system.categories), 'categories should be preserved');
   assert.ok(Array.isArray(payload.system.itemTags), 'itemTags should be preserved');
 });
 
 test('buildExportPayload: throws on missing system', () => {
-  assert.throws(
-    () => buildExportPayload(null, [], '1.0.0'),
-    /Cannot export: system is missing/
-  );
+  assert.throws(() => buildExportPayload(null, [], '1.0.0'), /Cannot export: system is missing/);
 });
 
 test('buildExportPayload: throws on system without id', () => {
@@ -200,7 +210,7 @@ test('validateImportData: accepts valid export data', () => {
   const data = {
     fabricateVersion: '1.0.0',
     system: { name: 'Test' },
-    recipes: [{ id: 'r1', name: 'Recipe 1' }]
+    recipes: [{ id: 'r1', name: 'Recipe 1' }],
   };
 
   const result = validateImportData(data);
@@ -220,49 +230,49 @@ test('validateImportData: rejects missing system field', () => {
   const result = validateImportData({ recipes: [] });
 
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('system')));
+  assert.ok(result.errors.some((e) => e.includes('system')));
 });
 
 test('validateImportData: rejects system without name', () => {
   const result = validateImportData({ system: { id: 'x' }, recipes: [] });
 
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('name')));
+  assert.ok(result.errors.some((e) => e.includes('name')));
 });
 
 test('validateImportData: warns on missing fabricateVersion', () => {
   const result = validateImportData({ system: { name: 'Test' }, recipes: [] });
 
   assert.equal(result.valid, true);
-  assert.ok(result.warnings.some(w => w.includes('fabricateVersion')));
+  assert.ok(result.warnings.some((w) => w.includes('fabricateVersion')));
 });
 
 test('validateImportData: rejects non-array recipes', () => {
   const result = validateImportData({
     fabricateVersion: '1.0.0',
     system: { name: 'Test' },
-    recipes: 'not-an-array'
+    recipes: 'not-an-array',
   });
 
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('array')));
+  assert.ok(result.errors.some((e) => e.includes('array')));
 });
 
 test('validateImportData: warns on recipe without name', () => {
   const result = validateImportData({
     fabricateVersion: '1.0.0',
     system: { name: 'Test' },
-    recipes: [{ id: 'r1' }]
+    recipes: [{ id: 'r1' }],
   });
 
   assert.equal(result.valid, true);
-  assert.ok(result.warnings.some(w => w.includes('no name')));
+  assert.ok(result.warnings.some((w) => w.includes('no name')));
 });
 
 test('validateImportData: accepts data with no recipes field', () => {
   const result = validateImportData({
     fabricateVersion: '1.0.0',
-    system: { name: 'Test' }
+    system: { name: 'Test' },
   });
 
   assert.equal(result.valid, true);
@@ -272,12 +282,12 @@ test('validateImportData: reports invalid recipe objects', () => {
   const result = validateImportData({
     fabricateVersion: '1.0.0',
     system: { name: 'Test' },
-    recipes: [null, 42, { id: 'valid', name: 'OK' }]
+    recipes: [null, 42, { id: 'valid', name: 'OK' }],
   });
 
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('index 0')));
-  assert.ok(result.errors.some(e => e.includes('index 1')));
+  assert.ok(result.errors.some((e) => e.includes('index 0')));
+  assert.ok(result.errors.some((e) => e.includes('index 1')));
 });
 
 // ---------------------------------------------------------------------------
@@ -287,7 +297,7 @@ test('validateImportData: reports invalid recipe objects', () => {
 test('prepareForImport: keep mode preserves IDs', () => {
   const data = {
     system: { id: 'sys-1', name: 'Test' },
-    recipes: [{ id: 'r1', name: 'Recipe', craftingSystemId: '__SYSTEM_ID__' }]
+    recipes: [{ id: 'r1', name: 'Recipe', craftingSystemId: '__SYSTEM_ID__' }],
   };
 
   const prepared = prepareForImport(data, 'keep');
@@ -299,7 +309,7 @@ test('prepareForImport: keep mode preserves IDs', () => {
 test('prepareForImport: copy mode strips the system ID, appends "(Copy)", and regenerates recipe IDs', () => {
   const data = {
     system: { id: 'sys-1', name: 'Test System' },
-    recipes: [{ id: 'r1', name: 'Recipe', craftingSystemId: '__SYSTEM_ID__' }]
+    recipes: [{ id: 'r1', name: 'Recipe', craftingSystemId: '__SYSTEM_ID__' }],
   };
 
   const prepared = prepareForImport(data, 'copy', emptyCopyOptions());
@@ -315,7 +325,7 @@ test('prepareForImport: copy mode strips the system ID, appends "(Copy)", and re
 test('prepareForImport: does not mutate original data', () => {
   const data = {
     system: { id: 'sys-1', name: 'Test' },
-    recipes: [{ id: 'r1', name: 'Recipe' }]
+    recipes: [{ id: 'r1', name: 'Recipe' }],
   };
 
   prepareForImport(data, 'copy', emptyCopyOptions());
@@ -374,7 +384,7 @@ test('makeExportFilename: includes date in ISO format', () => {
 test('buildExportPayload: includes gatheringRealms on the system payload', () => {
   const system = makeSystem({
     gatheringRealms: [{ id: 'r1', craftingSystemId: 'sys-1', name: 'Verdant', enabled: true }],
-    gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' }
+    gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
   });
   const payload = buildExportPayload(system, [], '1.0.0');
   assert.equal(payload.system.gatheringRealms.length, 1);
@@ -385,28 +395,31 @@ test('buildExportPayload: includes gatheringRealms on the system payload', () =>
 test('validateImportData: rejects non-array gatheringRealms', () => {
   const result = validateImportData({
     fabricateVersion: '1.0.0',
-    system: { name: 'X', gatheringRealms: { not: 'an array' } }
+    system: { name: 'X', gatheringRealms: { not: 'an array' } },
   });
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('gatheringRealms')));
+  assert.ok(result.errors.some((e) => e.includes('gatheringRealms')));
 });
 
 test('validateImportData: warns on a realm missing a name', () => {
   const result = validateImportData({
     fabricateVersion: '1.0.0',
-    system: { name: 'X', gatheringRealms: [{ id: 'r1' }] }
+    system: { name: 'X', gatheringRealms: [{ id: 'r1' }] },
   });
   assert.equal(result.valid, true);
-  assert.ok(result.warnings.some(w => w.includes('Gathering realm')));
+  assert.ok(result.warnings.some((w) => w.includes('Gathering realm')));
 });
 
 test('validateImportData: accepts the legacy gatheringRegions key on read (pre-1.1.0 export)', () => {
   const result = validateImportData({
     fabricateVersion: '1.0.0',
-    system: { name: 'X', gatheringRegions: { not: 'an array' } }
+    system: { name: 'X', gatheringRegions: { not: 'an array' } },
   });
   assert.equal(result.valid, false, 'legacy gatheringRegions is validated, not silently ignored');
-  assert.ok(result.errors.some(e => e.includes('gatheringRealms')), 'reports under the canonical realm name');
+  assert.ok(
+    result.errors.some((e) => e.includes('gatheringRealms')),
+    'reports under the canonical realm name'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -438,7 +451,7 @@ test('buildExportPayload: writes the explicit schemaVersion + runtimeStateInclud
 test('buildExportPayload: filters environments to the exported system and strips nodeRuntime', () => {
   const environments = [
     { id: 'env-1', craftingSystemId: 'sys-1', name: 'Keep', nodeRuntime: { t: { remaining: 3 } } },
-    { id: 'env-2', craftingSystemId: 'other', name: 'Drop', nodeRuntime: {} }
+    { id: 'env-2', craftingSystemId: 'other', name: 'Drop', nodeRuntime: {} },
   ];
   const payload = buildExportPayload(makeSystem(), [], '1.0.0', environments, {});
   assert.equal(payload.gatheringEnvironments.length, 1);
@@ -455,11 +468,11 @@ test('buildExportPayload: slices this system config + resets current condition s
         rules: { rewardLimit: 2 },
         conditions: {
           weather: { enabled: true, current: 'rain', values: [{ id: 'clear' }, { id: 'rain' }] },
-          timeOfDay: { enabled: true, current: 'night', values: [{ id: 'day' }] }
-        }
+          timeOfDay: { enabled: true, current: 'night', values: [{ id: 'day' }] },
+        },
       },
-      'other': { rules: { rewardLimit: 9 } }
-    }
+      other: { rules: { rewardLimit: 9 } },
+    },
   };
   const payload = buildExportPayload(makeSystem(), [], '1.0.0', [], gatheringConfig);
   // Only this system's slice is exported.
@@ -477,7 +490,7 @@ test('validateImportData: upcasts a legacy payload then accepts it (no schemaVer
   const result = validateImportData({
     fabricateVersion: '1.5.0',
     system: { name: 'Legacy' },
-    recipes: []
+    recipes: [],
   });
   assert.equal(result.valid, true);
 });
@@ -490,10 +503,10 @@ test('validateImportData: rejects a non-array gatheringEnvironments', () => {
     schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     fabricateVersion: '1.0.0',
     system: { name: 'X' },
-    gatheringEnvironments: { not: 'array' }
+    gatheringEnvironments: { not: 'array' },
   });
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => e.includes('gatheringEnvironments')));
+  assert.ok(result.errors.some((e) => e.includes('gatheringEnvironments')));
 });
 
 test('prepareForImport: passes gathering bundle through in keep mode', () => {

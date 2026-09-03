@@ -17,7 +17,10 @@ import assert from 'node:assert/strict';
 // Minimal Foundry surface this module's import chain touches. Assembled
 // piecewise (rather than one large object literal) so this arrange block stays
 // distinct from the shared stubs in sibling suites.
-const utils = { randomID: () => `id-${crypto.randomUUID().slice(0, 8)}`, getProperty: () => undefined };
+const utils = {
+  randomID: () => `id-${crypto.randomUUID().slice(0, 8)}`,
+  getProperty: () => undefined,
+};
 const HandlebarsApplicationMixin = (Base) => class extends Base {};
 class ApplicationV2 {
   async _prepareContext() {
@@ -25,7 +28,10 @@ class ApplicationV2 {
   }
   close() {}
 }
-globalThis.foundry = { utils, applications: { api: { HandlebarsApplicationMixin, ApplicationV2 } } };
+globalThis.foundry = {
+  utils,
+  applications: { api: { HandlebarsApplicationMixin, ApplicationV2 } },
+};
 globalThis.game = { user: { isGM: true }, fabricate: null };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
@@ -144,10 +150,15 @@ test('1135: toJSON OMITS resultGroupId when null, and absence rebuilds null', ()
   // nothing distinguishes an omitted key from the written default.
   const set = new IngredientSet({});
   const json = set.toJSON();
-  assert.ok(!Object.prototype.hasOwnProperty.call(json, 'resultGroupId'),
-    'toJSON() omits an unset resultGroupId rather than writing null');
-  assert.equal(IngredientSet.fromJSON(json).resultGroupId, null,
-    'and the constructor rebuilds exactly the value that was omitted');
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(json, 'resultGroupId'),
+    'toJSON() omits an unset resultGroupId rather than writing null'
+  );
+  assert.equal(
+    IngredientSet.fromJSON(json).resultGroupId,
+    null,
+    'and the constructor rebuilds exactly the value that was omitted'
+  );
 });
 
 test('fromJSON round-trip preserves resultGroupId', () => {
@@ -162,7 +173,11 @@ test('fromJSON round-trip preserves resultGroupId', () => {
 // ---------------------------------------------------------------------------
 
 test('routed + ingredientSet uses resultGroupId to select the correct result group', () => {
-  const result = resolveForIngredientSet({ id: 'set-1', resultGroupId: 'rg-2', ingredientGroups: [] });
+  const result = resolveForIngredientSet({
+    id: 'set-1',
+    resultGroupId: 'rg-2',
+    ingredientGroups: [],
+  });
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
   assert.equal(result.groups[0].id, 'rg-2', 'should select rg-2 as specified by resultGroupId');
@@ -189,8 +204,11 @@ test('routed + ingredientSet prefers resultGroupId over resultMapping when both 
   });
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
-  assert.equal(result.groups[0].id, 'rg-2',
-    'should prefer resultGroupId (rg-2) over resultMapping (rg-1)');
+  assert.equal(
+    result.groups[0].id,
+    'rg-2',
+    'should prefer resultGroupId (rg-2) over resultMapping (rg-1)'
+  );
 });
 
 test('routed + ingredientSet falls back to selectedResultGroupId when ingredientSet has no resultGroupId', () => {
@@ -200,8 +218,11 @@ test('routed + ingredientSet falls back to selectedResultGroupId when ingredient
   );
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
-  assert.equal(result.groups[0].id, 'rg-1',
-    'should use selectedResultGroupId when resultGroupId and resultMapping are absent');
+  assert.equal(
+    result.groups[0].id,
+    'rg-1',
+    'should use selectedResultGroupId when resultGroupId and resultMapping are absent'
+  );
 });
 
 test('routed + ingredientSet falls back to first result group when no routing info is available', () => {
@@ -214,8 +235,11 @@ test('routed + ingredientSet falls back to first result group when no routing in
   });
 
   assert.equal(result.groups.length, 1, 'should return exactly one group');
-  assert.equal(result.groups[0].id, 'rg-1',
-    'should fall back to the first result group when no routing info is available');
+  assert.equal(
+    result.groups[0].id,
+    'rg-1',
+    'should fall back to the first result group when no routing info is available'
+  );
 });
 
 test('routed + ingredientSet returns empty array when resultGroupId references a nonexistent group', () => {
@@ -225,6 +249,9 @@ test('routed + ingredientSet returns empty array when resultGroupId references a
     ingredientGroups: [],
   });
 
-  assert.equal(result.groups.length, 0,
-    'should return an empty array when resultGroupId does not match any group');
+  assert.equal(
+    result.groups.length,
+    0,
+    'should return an empty array when resultGroupId does not match any group'
+  );
 });

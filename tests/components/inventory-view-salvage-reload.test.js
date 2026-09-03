@@ -172,7 +172,11 @@ function makeServices() {
     salvageComponent: async () => {
       // The engine consumed the only copy: the salvage row leaves the listing.
       rows = [otherRow()];
-      return { success: true, results: [{ name: 'Iron Shard', img: null }], message: 'Salvaged Iron Ore' };
+      return {
+        success: true,
+        results: [{ name: 'Iron Shard', img: null }],
+        message: 'Salvaged Iron Ore',
+      };
     },
     notify: () => {},
     craftingSources: { load: () => {}, setCraftingActor: () => {}, selectedSourceIds: [] },

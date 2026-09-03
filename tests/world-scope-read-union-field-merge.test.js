@@ -177,7 +177,10 @@ describe('an unrecognised entityType is REFUSED, never defaulted', () => {
     assert.equal('description' in call('components')[0], false);
     assert.doesNotThrow(() =>
       unionScopedDefinitions({
-        corpus: collidingCorpus({ id: 'fire' }, { entityId: 'fire', systemId: 'sys-a', inherit: {} }),
+        corpus: collidingCorpus(
+          { id: 'fire' },
+          { entityId: 'fire', systemId: 'sys-a', inherit: {} }
+        ),
         systemId: 'sys-a',
         systemDefinitions: [{ id: 'fire' }],
         resolve: resolveEssence,
@@ -335,7 +338,11 @@ describe('the two spread hazards stay RETIRED for a row with no section to inher
       resolve: resolveEssence,
       entityType: 'essences',
     });
-    assert.equal(union[0].enabled, false, 'the world layer supplies keys the record does not carry');
+    assert.equal(
+      union[0].enabled,
+      false,
+      'the world layer supplies keys the record does not carry'
+    );
   });
 
   it('`member` and `inherited` are emitted, and no shipped record carries them to contest it', () => {

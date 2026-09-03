@@ -60,7 +60,12 @@ test('the low preset is the same trigger against the worst face, stepping down',
 });
 
 test('a simple check gets a forced VERDICT, because it has no tiers to step', () => {
-  const high = buildPresetTrigger({ presetId: 'high', kind: 'simple', diceGroups: D20, newId: ids });
+  const high = buildPresetTrigger({
+    presetId: 'high',
+    kind: 'simple',
+    diceGroups: D20,
+    newId: ids,
+  });
   const low = buildPresetTrigger({ presetId: 'low', kind: 'simple', diceGroups: D20, newId: ids });
   assert.equal(high.outcome, 'success');
   assert.equal(low.outcome, 'failure');

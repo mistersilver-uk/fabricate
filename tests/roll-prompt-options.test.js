@@ -417,10 +417,7 @@ describe('promptCheckRoll: playerPicks radio fieldset', () => {
         /<span class="fabricate-roll-prompt__modifier-value">\+1d4<\/span>/,
         'the rolling option chips its dice'
       );
-      assert.ok(
-        !captured.content.includes('2.5'),
-        'and never the average it is merely RANKED by'
-      );
+      assert.ok(!captured.content.includes('2.5'), 'and never the average it is merely RANKED by');
       assert.match(
         captured.content,
         /<span class="fabricate-roll-prompt__modifier-value">\+3<\/span>/,

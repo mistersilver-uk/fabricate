@@ -49,8 +49,28 @@ function optionChoice(groupId, groupName) {
     groupName,
     selectedOptionIndex: 0,
     options: [
-      { optionIndex: 0, name: `${groupName} A`, img: null, need: 1, have: 1, satisfied: true, isCurrency: false, costLabel: '', affordable: true },
-      { optionIndex: 1, name: `${groupName} B`, img: null, need: 1, have: 0, satisfied: false, isCurrency: false, costLabel: '', affordable: true },
+      {
+        optionIndex: 0,
+        name: `${groupName} A`,
+        img: null,
+        need: 1,
+        have: 1,
+        satisfied: true,
+        isCurrency: false,
+        costLabel: '',
+        affordable: true,
+      },
+      {
+        optionIndex: 1,
+        name: `${groupName} B`,
+        img: null,
+        need: 1,
+        have: 0,
+        satisfied: false,
+        isCurrency: false,
+        costLabel: '',
+        affordable: true,
+      },
     ],
   };
 }
@@ -207,9 +227,7 @@ describe('IoTable mounted behavior', () => {
       openSlotId: 'essence-pool',
       onAllocateEssence: (itemKey, units) => calls.push([itemKey, units]),
     });
-    target
-      .querySelector('[data-essence-carrier="Item.prism-1"] [data-stepper-increment]')
-      .click();
+    target.querySelector('[data-essence-carrier="Item.prism-1"] [data-stepper-increment]').click();
     assert.deepEqual(calls.at(-1), ['Item.prism-1', 1]);
   });
 
@@ -219,7 +237,14 @@ describe('IoTable mounted behavior', () => {
     const target = await harness.mount({
       craftability: craftability({
         essenceStates: [
-          { type: 'aether', name: 'Aether', icon: 'fa-regular fa-star', need: 1, have: 1, satisfied: true },
+          {
+            type: 'aether',
+            name: 'Aether',
+            icon: 'fa-regular fa-star',
+            need: 1,
+            have: 1,
+            satisfied: true,
+          },
         ],
       }),
     });

@@ -10,18 +10,25 @@ function configFor({ events = [] } = {}) {
     systems: {
       'system-a': {
         rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
-        events
-      }
-    }
+        events,
+      },
+    },
   };
 }
 
-function environmentWithLibrary(service, system, { events = [], conditions = null, biomes = null, rules = {} } = {}) {
-  const composed = service.composeEnvironment({
-    id: 'env',
-    craftingSystemId: 'system-a',
-    tasks: []
-  }, system);
+function environmentWithLibrary(
+  service,
+  system,
+  { events = [], conditions = null, biomes = null, rules = {} } = {}
+) {
+  const composed = service.composeEnvironment(
+    {
+      id: 'env',
+      craftingSystemId: 'system-a',
+      tasks: [],
+    },
+    system
+  );
   // Override conditions, biomes, and events inline (composeEnvironment uses system defaults)
   if (conditions) composed.conditions = conditions;
   if (biomes) composed.biomes = biomes;
@@ -32,22 +39,31 @@ function environmentWithLibrary(service, system, { events = [], conditions = nul
     rewardLimit: 99,
     eventLimit: 99,
     eventPolicy: 'successWithEvent',
-    ...rules
+    ...rules,
   };
   return composed;
 }
 
-function composeAndResolve(service, system, { task, events = [], conditions = null, biomes = null, rules = {} } = {}) {
+function composeAndResolve(
+  service,
+  system,
+  { task, events = [], conditions = null, biomes = null, rules = {} } = {}
+) {
   const composed = environmentWithLibrary(service, system, { events, conditions, biomes, rules });
   return service.resolveD100Attempt({
     task,
     environment: composed,
-    actor: { uuid: 'Actor.x' }
+    actor: { uuid: 'Actor.x' },
   });
 }
 
 const STR_LIBRARY = [
-  { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' }
+  {
+    id: 'strength',
+    label: 'Strength',
+    icon: 'fa-solid fa-dumbbell',
+    expression: '@abilities.str.mod',
+  },
 ];
 
 test('drop row sums character modifier into final threshold', async () => {
@@ -55,19 +71,21 @@ test('drop row sums character modifier into final threshold', async () => {
     config: configFor(),
     modifiers: STR_LIBRARY,
     rolls: [100],
-    evaluateExpression: () => 5
+    evaluateExpression: () => 5,
   });
   const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1',
-        componentId: 'herb',
-        quantity: 1,
-        dropRate: 25,
-        characterModifiers: [{ id: 'r1', modifierId: 'strength', operator: '+' }]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 25,
+          characterModifiers: [{ id: 'r1', modifierId: 'strength', operator: '+' }],
+        },
+      ],
+    },
   });
   assert.equal(result.status, 'succeeded');
   const drop = result.items[0];
@@ -81,22 +99,24 @@ test('character modifier composes with condition modifier worked example', async
     config: configFor(),
     modifiers: STR_LIBRARY,
     rolls: [100],
-    evaluateExpression: () => 3
+    evaluateExpression: () => 3,
   });
   const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       gatheringModifier: { provider: 'static', value: 10 },
-      dropRows: [{
-        id: 'd1',
-        componentId: 'herb',
-        quantity: 1,
-        dropRate: 25,
-        conditionModifiers: { weather: [{ id: 'wm', conditionId: 'rain', value: 5 }] },
-        characterModifiers: [{ id: 'r1', modifierId: 'strength', operator: '+' }]
-      }]
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 25,
+          conditionModifiers: { weather: [{ id: 'wm', conditionId: 'rain', value: 5 }] },
+          characterModifiers: [{ id: 'r1', modifierId: 'strength', operator: '+' }],
+        },
+      ],
     },
-    conditions: { weather: 'rain', timeOfDay: 'day' }
+    conditions: { weather: 'rain', timeOfDay: 'day' },
   });
   assert.equal(result.items.length, 1);
   const drop = result.items[0];
@@ -109,18 +129,22 @@ test('character modifier composes with condition modifier worked example', async
 test('event threshold reduced by negative character modifier', async () => {
   const { service, system } = makeRichState({
     config: configFor(),
-    modifiers: [{ id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-eye', expression: '@stealth' }],
+    modifiers: [
+      { id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-eye', expression: '@stealth' },
+    ],
     rolls: [100, 100],
-    evaluateExpression: () => 4
+    evaluateExpression: () => 4,
   });
   const result = await composeAndResolve(service, system, {
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },
-    events: [{
-      id: 'h1',
-      name: 'Trap',
-      dropRate: 30,
-      characterModifiers: [{ id: 'rh', modifierId: 'stealth', operator: '-' }]
-    }]
+    events: [
+      {
+        id: 'h1',
+        name: 'Trap',
+        dropRate: 30,
+        characterModifiers: [{ id: 'rh', modifierId: 'stealth', operator: '-' }],
+      },
+    ],
   });
   const haz = result.events[0];
   assert.equal(haz.characterModifierTotal, -4);
@@ -132,17 +156,19 @@ test('eventModifier and characterModifiers are independent on the same event', a
     config: configFor(),
     modifiers: [{ id: 'stealth', label: 'Stealth', expression: '@stealth' }],
     rolls: [100],
-    evaluateExpression: () => 5
+    evaluateExpression: () => 5,
   });
   const result = await composeAndResolve(service, system, {
     task: { id: 't', dropRows: [] },
-    events: [{
-      id: 'h',
-      name: 'Trap',
-      dropRate: 30,
-      eventModifier: { provider: 'static', value: 2 },
-      characterModifiers: [{ id: 'r', modifierId: 'stealth', operator: '-' }]
-    }]
+    events: [
+      {
+        id: 'h',
+        name: 'Trap',
+        dropRate: 30,
+        eventModifier: { provider: 'static', value: 2 },
+        characterModifiers: [{ id: 'r', modifierId: 'stealth', operator: '-' }],
+      },
+    ],
   });
   const haz = result.events[0];
   assert.equal(haz.modifier, 2, 'roll-side eventModifier preserved');
@@ -155,16 +181,21 @@ test('min/max clamp applied before operator', async () => {
     config: configFor(),
     modifiers: STR_LIBRARY,
     rolls: [100],
-    evaluateExpression: () => 8
+    evaluateExpression: () => 8,
   });
   const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10,
-        characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+', min: 0, max: 5 }]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 10,
+          characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+', min: 0, max: 5 }],
+        },
+      ],
+    },
   });
   assert.equal(result.items[0].characterModifierTotal, 5);
 });
@@ -174,22 +205,27 @@ test('multiple references on one row stack contributions', async () => {
     config: configFor(),
     modifiers: [
       { id: 'strength', label: 'Strength', expression: '@s' },
-      { id: 'athletics', label: 'Athletics', expression: '@a' }
+      { id: 'athletics', label: 'Athletics', expression: '@a' },
     ],
     rolls: [100],
-    evaluateExpression: ({ expression }) => expression === '@s' ? 2 : 4
+    evaluateExpression: ({ expression }) => (expression === '@s' ? 2 : 4),
   });
   const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10,
-        characterModifiers: [
-          { id: 'r1', modifierId: 'strength', operator: '+' },
-          { id: 'r2', modifierId: 'athletics', operator: '+' }
-        ]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 10,
+          characterModifiers: [
+            { id: 'r1', modifierId: 'strength', operator: '+' },
+            { id: 'r2', modifierId: 'athletics', operator: '+' },
+          ],
+        },
+      ],
+    },
   });
   assert.equal(result.items[0].characterModifierTotal, 6);
 });
@@ -200,19 +236,27 @@ test('same modifier id referenced twice on one row evaluates both', async () => 
     config: configFor(),
     modifiers: STR_LIBRARY,
     rolls: [100],
-    evaluateExpression: () => { calls += 1; return 3; }
+    evaluateExpression: () => {
+      calls += 1;
+      return 3;
+    },
   });
   const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10,
-        characterModifiers: [
-          { id: 'r1', modifierId: 'strength', operator: '+' },
-          { id: 'r2', modifierId: 'strength', operator: '-' }
-        ]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 10,
+          characterModifiers: [
+            { id: 'r1', modifierId: 'strength', operator: '+' },
+            { id: 'r2', modifierId: 'strength', operator: '-' },
+          ],
+        },
+      ],
+    },
   });
   assert.equal(calls, 2, 'evaluator invoked twice');
   // Both contributions: +3 and -3 = net 0
@@ -224,16 +268,28 @@ test('same modifier id across different rows resolves independently', async () =
     config: configFor(),
     modifiers: STR_LIBRARY,
     rolls: [100, 100],
-    evaluateExpression: () => 2
+    evaluateExpression: () => 2,
   });
   const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [
-        { id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10, characterModifiers: [{ id: 'r1', modifierId: 'strength', operator: '+' }] },
-        { id: 'd2', componentId: 'herb', quantity: 1, dropRate: 10, characterModifiers: [{ id: 'r2', modifierId: 'strength', operator: '+' }] }
-      ]
-    }
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 10,
+          characterModifiers: [{ id: 'r1', modifierId: 'strength', operator: '+' }],
+        },
+        {
+          id: 'd2',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 10,
+          characterModifiers: [{ id: 'r2', modifierId: 'strength', operator: '+' }],
+        },
+      ],
+    },
   });
   assert.equal(evaluateCalls.length, 2);
   assert.equal(result.items[0].characterModifierTotal, 2);
@@ -246,16 +302,31 @@ test('partial override inherits unset fields from library entry', async () => {
     config: configFor(),
     modifiers: STR_LIBRARY,
     rolls: [100],
-    evaluateExpression: (payload) => { lastPayload = payload; return 7; }
+    evaluateExpression: (payload) => {
+      lastPayload = payload;
+      return 7;
+    },
   });
   await composeAndResolve(service, system, {
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10,
-        characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+', expressionOverride: '1d6 + @abilities.str.mod' }]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 10,
+          characterModifiers: [
+            {
+              id: 'r',
+              modifierId: 'strength',
+              operator: '+',
+              expressionOverride: '1d6 + @abilities.str.mod',
+            },
+          ],
+        },
+      ],
+    },
   });
   assert.equal(lastPayload.expression, '1d6 + @abilities.str.mod');
   assert.equal(lastPayload.provider, undefined);
@@ -267,16 +338,26 @@ test('expression override replaces library expression', async () => {
     config: configFor(),
     modifiers: STR_LIBRARY,
     rolls: [100],
-    evaluateExpression: (payload) => { lastPayload = payload; return 1; }
+    evaluateExpression: (payload) => {
+      lastPayload = payload;
+      return 1;
+    },
   });
   await composeAndResolve(service, system, {
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10,
-        characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+', expressionOverride: '@a.b.c' }]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 10,
+          characterModifiers: [
+            { id: 'r', modifierId: 'strength', operator: '+', expressionOverride: '@a.b.c' },
+          ],
+        },
+      ],
+    },
   });
   assert.equal(lastPayload.expression, '@a.b.c');
   assert.equal(lastPayload.provider, undefined);
@@ -288,16 +369,24 @@ test('character modifier expression evaluation receives correct context shape', 
     config: configFor(),
     modifiers: [{ id: 'mod', label: 'Mod', expression: '@mod' }],
     rolls: [100],
-    evaluateExpression: (payload) => { lastPayload = payload; return 2; }
+    evaluateExpression: (payload) => {
+      lastPayload = payload;
+      return 2;
+    },
   });
   await composeAndResolve(service, system, {
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate: 10,
-        characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '+' }]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 10,
+          characterModifiers: [{ id: 'r', modifierId: 'mod', operator: '+' }],
+        },
+      ],
+    },
   });
   assert.equal(lastPayload.expression, '@mod');
   assert.ok(Object.hasOwn(lastPayload, 'actor'));
@@ -313,37 +402,48 @@ test('final threshold is clamped to 0..100', async () => {
     config: configFor(),
     modifiers: STR_LIBRARY,
     rolls: [100],
-    evaluateExpression: () => 1000
+    evaluateExpression: () => 1000,
   });
   const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50,
-        characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 50,
+          characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }],
+        },
+      ],
+    },
   });
   assert.equal(result.items[0].finalDropRate, 100);
 });
 
 // --- issue 299: multiplicative drop-chance modifiers (additive/multiplicative toggle) ---
 
-const MOD_LIBRARY = [
-  { id: 'mod', label: 'Mod', icon: 'fa-solid fa-dice', expression: '@mod' }
-];
+const MOD_LIBRARY = [{ id: 'mod', label: 'Mod', icon: 'fa-solid fa-dice', expression: '@mod' }];
 
-async function resolveSingleRow({ service, system }, { dropRate, reference, rules = {}, conditionModifiers } = {}) {
+async function resolveSingleRow(
+  { service, system },
+  { dropRate, reference, rules = {}, conditionModifiers } = {}
+) {
   const result = await composeAndResolve(service, system, {
     rules,
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate,
-        ...(conditionModifiers ? { conditionModifiers } : {}),
-        characterModifiers: [reference]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate,
+          ...(conditionModifiers ? { conditionModifiers } : {}),
+          characterModifiers: [reference],
+        },
+      ],
+    },
   });
   return result.items[0];
 }
@@ -367,7 +467,10 @@ async function previewDrop({ dropRate, reference, value = 10, rules = {} } = {})
 }
 
 test('issue 299: additive baseline unchanged (base 25, +10 => 35)', async () => {
-  const drop = await resolveDrop({ dropRate: 25, reference: { id: 'r', modifierId: 'mod', operator: '+' } });
+  const drop = await resolveDrop({
+    dropRate: 25,
+    reference: { id: 'r', modifierId: 'mod', operator: '+' },
+  });
   assert.equal(drop.characterModifierTotal, 10);
   assert.equal(drop.characterModifierFactor, 1);
   assert.equal(drop.finalDropRate, 35);
@@ -375,7 +478,10 @@ test('issue 299: additive baseline unchanged (base 25, +10 => 35)', async () => 
 });
 
 test('issue 299: additive negative (base 25, -10 => 15)', async () => {
-  const drop = await resolveDrop({ dropRate: 25, reference: { id: 'r', modifierId: 'mod', operator: '-' } });
+  const drop = await resolveDrop({
+    dropRate: 25,
+    reference: { id: 'r', modifierId: 'mod', operator: '-' },
+  });
   assert.equal(drop.characterModifierTotal, -10);
   assert.equal(drop.finalDropRate, 15);
 });
@@ -384,9 +490,13 @@ test('issue 299: multiplicative single negative clean (base 20 x0.9 => 18)', asy
   const drop = await resolveDrop({
     dropRate: 20,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '-' }
+    reference: { id: 'r', modifierId: 'mod', operator: '-' },
   });
-  assert.equal(drop.characterModifierTotal, 0, 'multiplicative entries contribute no additive delta');
+  assert.equal(
+    drop.characterModifierTotal,
+    0,
+    'multiplicative entries contribute no additive delta'
+  );
   assert.equal(drop.characterModifierFactor, 0.9);
   assert.equal(drop.finalDropRate, 18);
 });
@@ -395,7 +505,7 @@ test('issue 299: multiplicative single negative locks rounding (base 25 x0.9 => 
   const drop = await resolveDrop({
     dropRate: 25,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '-' }
+    reference: { id: 'r', modifierId: 'mod', operator: '-' },
   });
   // 25 * 0.9 = 22.5 -> Math.round => 23
   assert.equal(drop.finalDropRate, 23);
@@ -406,7 +516,7 @@ test('issue 299: multiplicative positive (base 50 x1.2 => 60)', async () => {
     dropRate: 50,
     value: 20,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '+' }
+    reference: { id: 'r', modifierId: 'mod', operator: '+' },
   });
   assert.equal(drop.characterModifierFactor, 1.2);
   assert.equal(drop.finalDropRate, 60);
@@ -419,23 +529,28 @@ test('issue 299: multiplicative system mode applies multiplicatively to every re
     config: configFor(),
     modifiers: [
       { id: 'add', label: 'Add', icon: 'fa-solid fa-plus', expression: '@add' },
-      { id: 'mult', label: 'Mult', icon: 'fa-solid fa-xmark', expression: '@mult' }
+      { id: 'mult', label: 'Mult', icon: 'fa-solid fa-xmark', expression: '@mult' },
     ],
     rolls: [100],
-    evaluateExpression: (payload) => (payload.modifier.id === 'add' ? 10 : 50)
+    evaluateExpression: (payload) => (payload.modifier.id === 'add' ? 10 : 50),
   });
   const result = await composeAndResolve(service, system, {
     rules: { dropModifierMode: 'multiplicative' },
     task: {
       id: 't',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate: 20,
-        characterModifiers: [
-          { id: 'r-add', modifierId: 'add', operator: '+' },
-          { id: 'r-mult', modifierId: 'mult', operator: '-' }
-        ]
-      }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate: 20,
+          characterModifiers: [
+            { id: 'r-add', modifierId: 'add', operator: '+' },
+            { id: 'r-mult', modifierId: 'mult', operator: '-' },
+          ],
+        },
+      ],
+    },
   });
   const drop = result.items[0];
   // Product of factors: 1.1 * 0.5 = 0.55; 20 * 0.55 = 11. No additive delta.
@@ -451,7 +566,7 @@ test('issue 299: system mode always wins; a per-reference mode value is ignored'
     dropRate: 50,
     value: 20,
     rules: { dropModifierMode: 'additive' },
-    reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'multiplicative' }
+    reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'multiplicative' },
   });
   assert.equal(additive.finalDropRate, 70, 'system additive mode ignores the per-reference value');
   assert.equal(additive.characterModifierFactor, 1);
@@ -463,9 +578,13 @@ test('issue 299: system mode always wins; a per-reference mode value is ignored'
     dropRate: 50,
     value: 20,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'additive' }
+    reference: { id: 'r', modifierId: 'mod', operator: '+', mode: 'additive' },
   });
-  assert.equal(multiplicative.finalDropRate, 60, 'system multiplicative mode ignores the per-reference value');
+  assert.equal(
+    multiplicative.finalDropRate,
+    60,
+    'system multiplicative mode ignores the per-reference value'
+  );
   assert.equal(multiplicative.characterModifierFactor, 1.2);
 });
 
@@ -473,14 +592,14 @@ test('issue 299: effective mode is driven solely by the system default (additive
   const additive = await resolveDrop({
     dropRate: 25,
     rules: { dropModifierMode: 'additive' },
-    reference: { id: 'r', modifierId: 'mod', operator: '+' }
+    reference: { id: 'r', modifierId: 'mod', operator: '+' },
   });
   assert.equal(additive.finalDropRate, 35);
 
   const multiplicative = await resolveDrop({
     dropRate: 20,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '-' }
+    reference: { id: 'r', modifierId: 'mod', operator: '-' },
   });
   assert.equal(multiplicative.finalDropRate, 18, 'multiplicative system mode scales the base');
 });
@@ -490,7 +609,7 @@ test('issue 299: min/max clamps value before factor (value 50 but max 10, - mult
     dropRate: 20,
     value: 50,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '-', max: 10 }
+    reference: { id: 'r', modifierId: 'mod', operator: '-', max: 10 },
   });
   // value clamped 50 -> 10, factor 1 - 10/100 = 0.9, 20*0.9 = 18
   assert.equal(drop.characterModifierFactor, 0.9);
@@ -506,12 +625,17 @@ async function previewSingleRow({ service, system }, { dropRate, reference, rule
     task: {
       id: 't',
       resolutionMode: 'd100',
-      dropRows: [{
-        id: 'd1', componentId: 'herb', quantity: 1, dropRate,
-        characterModifiers: [reference]
-      }]
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate,
+          characterModifiers: [reference],
+        },
+      ],
     },
-    actor: { uuid: 'Actor.x' }
+    actor: { uuid: 'Actor.x' },
   });
   return preview.drops[0];
 }
@@ -521,7 +645,7 @@ test('issue 299: rounding/clamp boundaries (100 x1.5 => 100 threshold 1)', async
     dropRate: 100,
     value: 50,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '+' }
+    reference: { id: 'r', modifierId: 'mod', operator: '+' },
   });
   assert.equal(high.finalDropRate, 100, '100 * 1.5 clamps to 100');
   assert.equal(high.threshold, 1, 'threshold floored at 1');
@@ -532,7 +656,7 @@ test('issue 299: rounding/clamp boundaries (1 x0.1 => 0 via preview)', async () 
     dropRate: 1,
     value: 90,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '-' }
+    reference: { id: 'r', modifierId: 'mod', operator: '-' },
   });
   // 1 * 0.1 = 0.1 -> Math.round => 0
   assert.equal(Math.round(drop.finalChance * 100), 0);
@@ -543,7 +667,7 @@ test('issue 299: negative-factor guard (value 150, - mult => factor 0 => 0)', as
     dropRate: 80,
     value: 150,
     rules: { dropModifierMode: 'multiplicative' },
-    reference: { id: 'r', modifierId: 'mod', operator: '-' }
+    reference: { id: 'r', modifierId: 'mod', operator: '-' },
   });
   // 1 - 150/100 = -0.5 -> guarded to 0; 80 * 0 = 0
   assert.equal(Math.round(drop.finalChance * 100), 0);
@@ -554,15 +678,19 @@ test('issue 299: event drop rate uses the same additive-then-multiplicative aggr
     config: configFor(),
     modifiers: MOD_LIBRARY,
     rolls: [100, 100],
-    evaluateExpression: () => 10
+    evaluateExpression: () => 10,
   });
   const result = await composeAndResolve(service, system, {
     rules: { dropModifierMode: 'multiplicative' },
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },
-    events: [{
-      id: 'h1', name: 'Trap', dropRate: 20,
-      characterModifiers: [{ id: 'rh', modifierId: 'mod', operator: '-' }]
-    }]
+    events: [
+      {
+        id: 'h1',
+        name: 'Trap',
+        dropRate: 20,
+        characterModifiers: [{ id: 'rh', modifierId: 'mod', operator: '-' }],
+      },
+    ],
   });
   const event = result.events[0];
   assert.equal(event.characterModifierFactor, 0.9);
@@ -571,7 +699,10 @@ test('issue 299: event drop rate uses the same additive-then-multiplicative aggr
 
 test('issue 299: back-compat config/reference with no mode fields is identical to additive baseline', async () => {
   // No dropModifierMode in rules, no mode on the reference: pure additive.
-  const drop = await resolveDrop({ dropRate: 25, reference: { id: 'r', modifierId: 'mod', operator: '+' } });
+  const drop = await resolveDrop({
+    dropRate: 25,
+    reference: { id: 'r', modifierId: 'mod', operator: '+' },
+  });
   assert.equal(drop.characterModifierTotal, 10);
   assert.equal(drop.characterModifierFactor, 1);
   assert.equal(drop.finalDropRate, 35);
@@ -581,14 +712,19 @@ test('issue 299: back-compat config/reference with no mode fields is identical t
 
 // Resolve a single drop row with only condition modifiers (no character modifiers)
 // under the given conditions/biomes. The row is scored on a guaranteed-miss roll.
-async function resolveConditionRow(
-  { dropRate, conditionModifiers, conditions = null, biomes = null, rules = {}, characterModifiers = [] } = {}
-) {
+async function resolveConditionRow({
+  dropRate,
+  conditionModifiers,
+  conditions = null,
+  biomes = null,
+  rules = {},
+  characterModifiers = [],
+} = {}) {
   const { service, system } = makeRichState({
     config: configFor(),
     modifiers: MOD_LIBRARY,
     rolls: [100],
-    evaluateExpression: () => 10
+    evaluateExpression: () => 10,
   });
   const result = await composeAndResolve(service, system, {
     rules,
@@ -596,14 +732,29 @@ async function resolveConditionRow(
     biomes,
     task: {
       id: 't',
-      dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate, conditionModifiers, characterModifiers }]
-    }
+      dropRows: [
+        {
+          id: 'd1',
+          componentId: 'herb',
+          quantity: 1,
+          dropRate,
+          conditionModifiers,
+          characterModifiers,
+        },
+      ],
+    },
   });
   return result.items[0];
 }
 
 // Preview a single drop row (returns regardless of the roll) with condition modifiers.
-async function previewConditionRow({ dropRate, conditionModifiers, conditions = null, biomes = null, rules = {} } = {}) {
+async function previewConditionRow({
+  dropRate,
+  conditionModifiers,
+  conditions = null,
+  biomes = null,
+  rules = {},
+} = {}) {
   const { service, system } = makeRichState({ config: configFor(), modifiers: MOD_LIBRARY });
   const composed = environmentWithLibrary(service, system, { conditions, biomes, rules });
   const preview = await service.previewDropBreakdown({
@@ -611,9 +762,9 @@ async function previewConditionRow({ dropRate, conditionModifiers, conditions = 
     task: {
       id: 't',
       resolutionMode: 'd100',
-      dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate, conditionModifiers }]
+      dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate, conditionModifiers }],
     },
-    actor: { uuid: 'Actor.x' }
+    actor: { uuid: 'Actor.x' },
   });
   return preview.drops[0];
 }
@@ -625,8 +776,8 @@ test('issue 299: additive-only condition modifiers stay byte-identical (conditio
     conditions: { weather: 'rain', timeOfDay: 'night' },
     conditionModifiers: {
       weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 15 }],
-      timeOfDay: [{ id: 't', conditionId: 'night', operator: '-', value: 5 }]
-    }
+      timeOfDay: [{ id: 't', conditionId: 'night', operator: '-', value: 5 }],
+    },
   });
   assert.equal(drop.conditionModifier, 10, 'additive condition total preserved');
   assert.equal(drop.finalDropRate, 35);
@@ -637,7 +788,7 @@ test('issue 299: multiplicative weather condition (base 20, rain -10% mult => 18
     dropRate: 20,
     rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
-    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10 }] }
+    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10 }] },
   });
   // 20 * 0.9 = 18; the multiplicative weather entry contributes no additive delta.
   assert.equal(drop.conditionModifier, 0);
@@ -649,7 +800,9 @@ test('issue 299: multiplicative time-of-day condition (base 50, night +20% mult 
     dropRate: 50,
     rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'clear', timeOfDay: 'night' },
-    conditionModifiers: { timeOfDay: [{ id: 't', conditionId: 'night', operator: '+', value: 20 }] }
+    conditionModifiers: {
+      timeOfDay: [{ id: 't', conditionId: 'night', operator: '+', value: 20 }],
+    },
   });
   assert.equal(drop.finalDropRate, 60);
 });
@@ -661,8 +814,8 @@ test('issue 299: additive system mode aggregates biome modifiers additively acro
     biome: [
       { id: 'b1', conditionId: 'forest', operator: '+', value: 30 },
       { id: 'b2', conditionId: 'swamp', operator: '-', value: 20 },
-      { id: 'b3', conditionId: 'cave', operator: '-', value: 5 }
-    ]
+      { id: 'b3', conditionId: 'cave', operator: '-', value: 5 },
+    ],
   };
   // cumulative: 30 - 20 - 5 = +5 => base 40 + 5 = 45.
   const cumulative = await resolveConditionRow({
@@ -670,7 +823,7 @@ test('issue 299: additive system mode aggregates biome modifiers additively acro
     conditions: { weather: 'clear', timeOfDay: 'day' },
     biomes: ['forest', 'swamp', 'cave'],
     rules: { biomeModifierAggregation: 'cumulative' },
-    conditionModifiers
+    conditionModifiers,
   });
   assert.equal(cumulative.conditionModifier, 5);
   assert.equal(cumulative.finalDropRate, 45);
@@ -681,7 +834,7 @@ test('issue 299: additive system mode aggregates biome modifiers additively acro
     conditions: { weather: 'clear', timeOfDay: 'day' },
     biomes: ['forest', 'swamp', 'cave'],
     rules: { biomeModifierAggregation: 'strongestOfEach' },
-    conditionModifiers
+    conditionModifiers,
   });
   assert.equal(strongest.conditionModifier, 10);
   assert.equal(strongest.finalDropRate, 50);
@@ -692,7 +845,7 @@ test('issue 299: additive system mode aggregates biome modifiers additively acro
     conditions: { weather: 'clear', timeOfDay: 'day' },
     biomes: ['forest', 'swamp', 'cave'],
     rules: { biomeModifierAggregation: 'dominant' },
-    conditionModifiers
+    conditionModifiers,
   });
   assert.equal(dominant.conditionModifier, 30);
   assert.equal(dominant.finalDropRate, 70);
@@ -708,12 +861,20 @@ test('issue 299: multiplicative system mode aggregates biome modifiers multiplic
     conditionModifiers: {
       biome: [
         { id: 'b1', conditionId: 'forest', operator: '-', value: 10 },
-        { id: 'b2', conditionId: 'swamp', operator: '-', value: 20 }
-      ]
-    }
+        { id: 'b2', conditionId: 'swamp', operator: '-', value: 20 },
+      ],
+    },
   });
-  assert.equal(cumulative.conditionModifier, 0, 'multiplicative entries contribute no additive delta');
-  assert.equal(cumulative.finalDropRate, 70, 'cumulative aggregates signed percents then applies one factor');
+  assert.equal(
+    cumulative.conditionModifier,
+    0,
+    'multiplicative entries contribute no additive delta'
+  );
+  assert.equal(
+    cumulative.finalDropRate,
+    70,
+    'cumulative aggregates signed percents then applies one factor'
+  );
 
   // strongestOfEach picks the largest boost + largest penalty in signed-percent space.
   const strongest = await resolveConditionRow({
@@ -725,9 +886,9 @@ test('issue 299: multiplicative system mode aggregates biome modifiers multiplic
       biome: [
         { id: 'b1', conditionId: 'forest', operator: '+', value: 30 },
         { id: 'b2', conditionId: 'swamp', operator: '-', value: 20 },
-        { id: 'b3', conditionId: 'cave', operator: '-', value: 5 }
-      ]
-    }
+        { id: 'b3', conditionId: 'cave', operator: '-', value: 5 },
+      ],
+    },
   });
   // +30 boost + -20 penalty = +10 signed => x1.1 => 50 * 1.1 = 55.
   assert.equal(strongest.finalDropRate, 55);
@@ -741,9 +902,9 @@ test('issue 299: multiplicative system mode aggregates biome modifiers multiplic
     conditionModifiers: {
       biome: [
         { id: 'b1', conditionId: 'forest', operator: '+', value: 10 },
-        { id: 'b2', conditionId: 'swamp', operator: '-', value: 40 }
-      ]
-    }
+        { id: 'b2', conditionId: 'swamp', operator: '-', value: 40 },
+      ],
+    },
   });
   assert.equal(dominant.finalDropRate, 60);
 });
@@ -759,11 +920,19 @@ test('issue 299: under multiplicative mode character + condition modifiers all a
     characterModifiers: [{ id: 'rc', modifierId: 'mod', operator: '+' }], // resolves to +10 (value 10)
     conditionModifiers: {
       weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 5 }],
-      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }]
-    }
+      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }],
+    },
   });
-  assert.equal(drop.characterModifierTotal, 0, 'multiplicative character modifiers contribute no additive delta');
-  assert.equal(drop.conditionModifier, 0, 'multiplicative condition modifiers contribute no additive delta');
+  assert.equal(
+    drop.characterModifierTotal,
+    0,
+    'multiplicative character modifiers contribute no additive delta'
+  );
+  assert.equal(
+    drop.conditionModifier,
+    0,
+    'multiplicative condition modifiers contribute no additive delta'
+  );
   assert.equal(drop.finalDropRate, 12);
 });
 
@@ -776,8 +945,8 @@ test('issue 299: under additive mode character + condition modifiers all apply a
     characterModifiers: [{ id: 'rc', modifierId: 'mod', operator: '+' }], // resolves to +10 (value 10)
     conditionModifiers: {
       weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 5 }],
-      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }]
-    }
+      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }],
+    },
   });
   // 60 + 10 + 5 - 50 = 25.
   assert.equal(drop.characterModifierTotal, 10);
@@ -792,7 +961,9 @@ test('issue 299: a per-entry condition mode value is ignored; system mode wins',
     dropRate: 20,
     rules: { dropModifierMode: 'additive' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
-    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 10, mode: 'multiplicative' }] }
+    conditionModifiers: {
+      weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 10, mode: 'multiplicative' }],
+    },
   });
   assert.equal(additive.finalDropRate, 30, 'system additive mode ignores the per-entry value');
   assert.equal(additive.conditionModifier, 10);
@@ -803,9 +974,15 @@ test('issue 299: a per-entry condition mode value is ignored; system mode wins',
     dropRate: 20,
     rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
-    conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10, mode: 'additive' }] }
+    conditionModifiers: {
+      weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10, mode: 'additive' }],
+    },
   });
-  assert.equal(multiplicative.finalDropRate, 18, 'system multiplicative mode ignores the per-entry value');
+  assert.equal(
+    multiplicative.finalDropRate,
+    18,
+    'system multiplicative mode ignores the per-entry value'
+  );
   assert.equal(multiplicative.conditionModifier, 0);
 });
 
@@ -817,14 +994,18 @@ test('issue 299: preview parity with the rolled result for a multiplicative cond
     biomes: ['forest'],
     conditionModifiers: {
       weather: [{ id: 'w', conditionId: 'rain', operator: '+', value: 5 }],
-      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }]
-    }
+      biome: [{ id: 'b', conditionId: 'forest', operator: '-', value: 50 }],
+    },
   };
   const rolled = await resolveConditionRow(args);
   const preview = await previewConditionRow(args);
   // 20 * 1.05 * 0.5 = 10.5 -> round => 11.
   assert.equal(rolled.finalDropRate, 11);
-  assert.equal(Math.round(preview.finalChance * 100), 11, 'preview finalChance matches the rolled rate');
+  assert.equal(
+    Math.round(preview.finalChance * 100),
+    11,
+    'preview finalChance matches the rolled rate'
+  );
   // Display payload: weather multiplicative factor and the biome multiplicative factor.
   assert.equal(preview.modifiers.weather.factor, 1.05);
   assert.equal(preview.modifiers.biome.factor, 0.5);
@@ -834,15 +1015,22 @@ test('issue 299: taskSuccessChance reflects a multiplicative condition modifier'
   const { service, system } = makeRichState({ config: configFor(), modifiers: [] });
   const composed = environmentWithLibrary(service, system, {
     conditions: { weather: 'rain', timeOfDay: 'day' },
-    rules: { dropModifierMode: 'multiplicative' }
+    rules: { dropModifierMode: 'multiplicative' },
   });
   const task = {
     id: 't',
     resolutionMode: 'd100',
-    dropRows: [{
-      id: 'd1', componentId: 'herb', quantity: 1, dropRate: 20,
-      conditionModifiers: { weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10 }] }
-    }]
+    dropRows: [
+      {
+        id: 'd1',
+        componentId: 'herb',
+        quantity: 1,
+        dropRate: 20,
+        conditionModifiers: {
+          weather: [{ id: 'w', conditionId: 'rain', operator: '-', value: 10 }],
+        },
+      },
+    ],
   };
   const chance = service.taskSuccessChance(task, composed);
   // 20 * 0.9 = 18 => 0.18 single-row miss-all.
@@ -853,16 +1041,22 @@ test('issue 299: event path honors a multiplicative condition modifier', async (
   const { service, system } = makeRichState({
     config: configFor(),
     modifiers: [],
-    rolls: [100, 100]
+    rolls: [100, 100],
   });
   const result = await composeAndResolve(service, system, {
     rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },
-    events: [{
-      id: 'h1', name: 'Trap', dropRate: 20,
-      conditionModifiers: { weather: [{ id: 'we', conditionId: 'rain', operator: '-', value: 10 }] }
-    }]
+    events: [
+      {
+        id: 'h1',
+        name: 'Trap',
+        dropRate: 20,
+        conditionModifiers: {
+          weather: [{ id: 'we', conditionId: 'rain', operator: '-', value: 10 }],
+        },
+      },
+    ],
   });
   const event = result.events[0];
   assert.equal(event.finalDropRate, 18);

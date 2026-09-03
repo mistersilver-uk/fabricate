@@ -22,7 +22,7 @@ function knownRecipe(id, name) {
     name,
     img: null,
     result: null,
-    signatureSummary: [{ setId: `${id}-set`, groups: [], essences: [] }]
+    signatureSummary: [{ setId: `${id}-set`, groups: [], essences: [] }],
   };
 }
 
@@ -37,9 +37,9 @@ describe('ComponentInventoryColumn (mounted)', () => {
     rawModules: ['src/ui/svelte/util/foundryBridge.js'],
     compiledModules: [
       'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
-      'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte'
+      'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte',
     ],
-    componentPath: 'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte'
+    componentPath: 'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte',
   });
 
   before(() => harness.setup());
@@ -51,7 +51,7 @@ describe('ComponentInventoryColumn (mounted)', () => {
     const target = await harness.mount({
       components: [inventoryRow('emberroot', 'Emberroot')],
       hasComponents: true,
-      onSearch: (value) => calls.push(value)
+      onSearch: (value) => calls.push(value),
     });
     const input = target.querySelector('.alchemy-inventory-search input');
     assert.ok(input, 'the search input renders');
@@ -62,7 +62,10 @@ describe('ComponentInventoryColumn (mounted)', () => {
 
   it('shows the distinct "no matches" filtered-empty state (NOT the onboarding state)', async () => {
     const target = await harness.mount({ components: [], hasComponents: true, search: 'zzz' });
-    assert.ok(target.querySelector('[data-alchemy-inventory-no-matches]'), 'filtered-empty state shown');
+    assert.ok(
+      target.querySelector('[data-alchemy-inventory-no-matches]'),
+      'filtered-empty state shown'
+    );
     assert.equal(
       target.querySelector('[data-alchemy-empty-inventory]'),
       null,
@@ -72,7 +75,10 @@ describe('ComponentInventoryColumn (mounted)', () => {
 
   it('shows the onboarding empty state when the actor owns no components', async () => {
     const target = await harness.mount({ components: [], hasComponents: false });
-    assert.ok(target.querySelector('[data-alchemy-empty-inventory]'), 'onboarding empty state shown');
+    assert.ok(
+      target.querySelector('[data-alchemy-empty-inventory]'),
+      'onboarding empty state shown'
+    );
     assert.equal(target.querySelector('[data-alchemy-inventory-no-matches]'), null);
   });
 
@@ -81,10 +87,13 @@ describe('ComponentInventoryColumn (mounted)', () => {
     const target = await harness.mount({
       components: [inventoryRow('emberroot', 'Emberroot')],
       hasComponents: true,
-      onAdd: (id) => calls.push(id)
+      onAdd: (id) => calls.push(id),
     });
     const row = target.querySelector('[data-alchemy-inventory-row="emberroot"]');
-    assert.ok(row.querySelector('.alchemy-inventory-grip i.fa-grip-vertical'), 'grip handle inside the row button');
+    assert.ok(
+      row.querySelector('.alchemy-inventory-grip i.fa-grip-vertical'),
+      'grip handle inside the row button'
+    );
     row.click();
     assert.deepEqual(calls, ['emberroot']);
   });
@@ -92,9 +101,11 @@ describe('ComponentInventoryColumn (mounted)', () => {
   it('renders essence icons + counts on a component row', async () => {
     const target = await harness.mount({
       components: [inventoryRow('emberroot', 'Emberroot', { essences: ESSENCES })],
-      hasComponents: true
+      hasComponents: true,
     });
-    const essence = target.querySelector('[data-alchemy-inventory-row="emberroot"] [data-alchemy-essence="fire"]');
+    const essence = target.querySelector(
+      '[data-alchemy-inventory-row="emberroot"] [data-alchemy-essence="fire"]'
+    );
     assert.ok(essence, 'the essence chip renders on the row');
     assert.ok(essence.querySelector('i.fa-fire'), 'the essence icon renders');
     assert.ok(essence.textContent.includes('×2'), 'the per-unit essence count renders');
@@ -111,7 +122,7 @@ describe('KnownRecipesColumn (mounted)', () => {
     tmpPrefix: 'fabricate-alchemy-known-',
     rawModules: ['src/ui/svelte/util/foundryBridge.js'],
     compiledModules: ['src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'],
-    componentPath: 'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'
+    componentPath: 'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte',
   });
 
   before(() => harness.setup());
@@ -123,7 +134,7 @@ describe('KnownRecipesColumn (mounted)', () => {
       recipes: [knownRecipe('vigor', 'Elixir of Vigor')],
       knownCount: 1,
       activeSystemName: 'Herbalism',
-      canSwitch: true
+      canSwitch: true,
     });
     const switchBtn = target.querySelector('[data-alchemy-switch]');
     const title = target.querySelector('.alchemy-known-title');
@@ -138,7 +149,10 @@ describe('KnownRecipesColumn (mounted)', () => {
 
   it('shows the distinct filtered "no matches" state when a search hides every revealed recipe', async () => {
     const target = await harness.mount({ recipes: [], knownCount: 3, search: 'zzz' });
-    assert.ok(target.querySelector('[data-alchemy-known-no-matches]'), 'filtered-empty state shown');
+    assert.ok(
+      target.querySelector('[data-alchemy-known-no-matches]'),
+      'filtered-empty state shown'
+    );
     assert.equal(
       target.querySelector('[data-alchemy-zero-known]'),
       null,
@@ -166,17 +180,44 @@ describe('KnownRecipesColumn (mounted)', () => {
           setId: 'bv-set',
           essences: [],
           groups: [
-            { options: [{ componentId: null, essenceId: 'toxic-id', name: 'Toxic', icon: 'fas fa-skull', quantity: 2 }] },
-            { options: [{ componentId: null, essenceId: 'water-id', name: 'Water', icon: 'fas fa-droplet', quantity: 1 }] }
-          ]
-        }
-      ]
+            {
+              options: [
+                {
+                  componentId: null,
+                  essenceId: 'toxic-id',
+                  name: 'Toxic',
+                  icon: 'fas fa-skull',
+                  quantity: 2,
+                },
+              ],
+            },
+            {
+              options: [
+                {
+                  componentId: null,
+                  essenceId: 'water-id',
+                  name: 'Water',
+                  icon: 'fas fa-droplet',
+                  quantity: 1,
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
     const target = await harness.mount({ recipes: [bladeVenom], knownCount: 1 });
     const sig = target.querySelector('[data-alchemy-recipe="blade-venom"] .alchemy-recipe-sig');
     assert.ok(sig, 'the signature summary renders');
-    assert.equal(sig.textContent.trim(), 'Toxic ×2 · Water ×1', 'resolved essence name + amount, not raw ids');
-    assert.ok(!sig.textContent.includes('toxic-id'), 'the raw essence id must not appear in the card');
+    assert.equal(
+      sig.textContent.trim(),
+      'Toxic ×2 · Water ×1',
+      'resolved essence name + amount, not raw ids'
+    );
+    assert.ok(
+      !sig.textContent.includes('toxic-id'),
+      'the raw essence id must not appear in the card'
+    );
   });
 });
 
@@ -193,7 +234,7 @@ describe('KnownRecipesColumn (mounted)', () => {
 describe('Alchemy list clip-fix (source guard)', () => {
   const files = {
     known: 'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte',
-    inventory: 'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte'
+    inventory: 'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte',
   };
 
   function read(relative) {
@@ -213,7 +254,10 @@ describe('Alchemy list clip-fix (source guard)', () => {
   it('both alchemy columns reserve outline-offset room for focused rows', () => {
     for (const [name, relative] of Object.entries(files)) {
       const source = read(relative);
-      assert.ok(source.includes('outline-offset'), `${name} column must reserve outline-offset room`);
+      assert.ok(
+        source.includes('outline-offset'),
+        `${name} column must reserve outline-offset room`
+      );
     }
   });
 
@@ -228,12 +272,12 @@ describe('Alchemy list clip-fix (source guard)', () => {
     const cards = {
       'known recipe card (.alchemy-recipe)': {
         relative: files.known,
-        selector: '.alchemy-recipe {'
+        selector: '.alchemy-recipe {',
       },
       'inventory row (.alchemy-inventory-row)': {
         relative: files.inventory,
-        selector: '.alchemy-inventory-row {'
-      }
+        selector: '.alchemy-inventory-row {',
+      },
     };
     for (const [name, { relative, selector }] of Object.entries(cards)) {
       const source = read(relative);
@@ -248,10 +292,7 @@ describe('Alchemy list clip-fix (source guard)', () => {
         /appearance:\s*none/.test(block),
         `${name} must reset appearance to override Foundry's button styling`
       );
-      assert.ok(
-        /line-height:\s*normal/.test(block),
-        `${name} must reset line-height to normal`
-      );
+      assert.ok(/line-height:\s*normal/.test(block), `${name} must reset line-height to normal`);
     }
   });
 });

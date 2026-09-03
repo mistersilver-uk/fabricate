@@ -1207,9 +1207,7 @@ function divergentFacets(candidate, primitive, overlap) {
   return overlap.filter((facet) => {
     const mine = declarationFor(candidate, facet);
     const theirs = declarationFor(primitive, facet);
-    return (
-      !mine || !theirs || mine.property !== theirs.property || mine.value !== theirs.value
-    );
+    return !mine || !theirs || mine.property !== theirs.property || mine.value !== theirs.value;
   });
 }
 

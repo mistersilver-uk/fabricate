@@ -27,10 +27,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  FabricateFacadeUnderTest,
-  mainMethodSource,
-} from './helpers/fabricateFacadeHarness.js';
+import { FabricateFacadeUnderTest, mainMethodSource } from './helpers/fabricateFacadeHarness.js';
 
 // --- Faithful reproduction of Fabricate#resetActorKnowledge ------------------
 class ResetKnowledgeFacade extends FabricateFacadeUnderTest {
@@ -152,7 +149,7 @@ test('SOURCE CONTRACT: resetActorKnowledge delegates its gate and delegates by s
     body.includes('const gate = this._requireGmActor(actorId, {') &&
       body.includes("gmOnlyKey: 'FABRICATE.Knowledge.Reset.GMOnly'") &&
       body.includes("noActorKey: 'FABRICATE.Knowledge.Reset.NoActor'"),
-    'the gate is delegated to the shared preamble, with THIS member\'s own refusal strings'
+    "the gate is delegated to the shared preamble, with THIS member's own refusal strings"
   );
   assert.ok(
     body.includes('if (gate.outcome) return { success: false, message: gate.message };'),
@@ -186,13 +183,13 @@ test('SOURCE CONTRACT: both gates resolve INSIDE _requireGmActor, in that order'
 
   const gmAt = preamble.indexOf('if (game.user?.isGM !== true) {');
   const actorAt = preamble.indexOf('const actor = this._resolveCraftingActor(actorId);');
-  assert.ok(gmAt >= 0, 'the GM gate is the preamble\'s first test');
+  assert.ok(gmAt >= 0, "the GM gate is the preamble's first test");
   assert.ok(actorAt >= 0, 'the actor is resolved through the ownership-gated resolver');
   assert.ok(gmAt < actorAt, 'GM before actor: a non-GM must never reach an actor resolution');
   assert.ok(
     preamble.includes('outcome: COMPANION_OUTCOMES.gmOnly, message: gmOnlyKey') &&
       preamble.includes('outcome: COMPANION_OUTCOMES.noActor, message: noActorKey'),
-    'each refusal answers with the CALLER\'s key, which is why the keys are parameters'
+    "each refusal answers with the CALLER's key, which is why the keys are parameters"
   );
   assert.equal(
     preamble.includes('this.ready') || preamble.includes('_requireReady'),

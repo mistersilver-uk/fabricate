@@ -107,5 +107,9 @@ test('lang/en.json has no duplicate sibling keys', () => {
   assert.doesNotThrow(() => JSON.parse(raw), 'lang/en.json must be valid JSON');
 
   const duplicates = findDuplicateKeys(tokenize(raw)).sort();
-  assert.deepEqual(duplicates, [], `duplicate sibling keys in lang/en.json: ${duplicates.join(', ')}`);
+  assert.deepEqual(
+    duplicates,
+    [],
+    `duplicate sibling keys in lang/en.json: ${duplicates.join(', ')}`
+  );
 });

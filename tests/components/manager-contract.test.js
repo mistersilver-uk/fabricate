@@ -394,7 +394,10 @@ describe('CraftingSystemManager source contract', () => {
     const dispose = closeSource.indexOf('disposeDowntimeProviderBeforeRemoval?.()');
     const superClose = closeSource.indexOf('return super.close(options);');
     assert.ok(dispose >= 0, 'the production manager close invokes the root disposal bridge');
-    assert.ok(superClose > dispose, 'the bridge runs before ApplicationV2 removes the Svelte target');
+    assert.ok(
+      superClose > dispose,
+      'the bridge runs before ApplicationV2 removes the Svelte target'
+    );
     assert.match(
       closeSource,
       /disposeDowntimeProviderBeforeRemoval\?\.\(\);[\s\S]*?return super\.close\(options\);/,
@@ -2152,7 +2155,9 @@ describe('CraftingSystemManager source contract', () => {
       'empty recipes inspector should use localized setup copy'
     );
     assert.ok(
-      recipeBrowserInspectorSource.includes('https://mistersilver-uk.github.io/fabricate/crafting/recipes/'),
+      recipeBrowserInspectorSource.includes(
+        'https://mistersilver-uk.github.io/fabricate/crafting/recipes/'
+      ),
       'empty recipes inspector should link to published recipe docs'
     );
     assert.ok(
@@ -2179,9 +2184,7 @@ describe('CraftingSystemManager source contract', () => {
       'empty components inspector should use localized setup copy'
     );
     assert.ok(
-      rootSource.includes(
-        'https://mistersilver-uk.github.io/fabricate/components/'
-      ),
+      rootSource.includes('https://mistersilver-uk.github.io/fabricate/components/'),
       'empty components inspector should link to published component docs'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Component.EmptySetup.Title, 'Set up components');
@@ -3031,7 +3034,10 @@ describe('CraftingSystemManager source contract', () => {
       'numberLabel',
       'rangeLabel',
     ]) {
-      assert.ok(chanceSliderSource.includes(snippet), `shared chance slider should include ${snippet}`);
+      assert.ok(
+        chanceSliderSource.includes(snippet),
+        `shared chance slider should include ${snippet}`
+      );
     }
     for (const snippet of [
       'manager-drop-editor-values',
@@ -3807,7 +3813,7 @@ describe('CraftingSystemManager source contract', () => {
     for (const snippet of [
       "currentView === 'knowledge'",
       'knowledge={knowledgeState}',
-      "const knowledgeState = $derived($viewState.knowledge || null)",
+      'const knowledgeState = $derived($viewState.knowledge || null)',
       "store.setKnowledgeActive?.(currentView === 'knowledge')",
       'store.selectKnowledgeActor?.(actorId)',
       'store.expendRecipeItemUse?.(actorId, itemId)',
@@ -3847,7 +3853,7 @@ describe('CraftingSystemManager source contract', () => {
       'KnowledgeLearnedRecipesTab',
       'filterKnowledgeRoster',
       'let armedToken = $state',
-      "role=\"tabpanel\"",
+      'role="tabpanel"',
     ]) {
       assert.ok(knowledgeSource.includes(snippet), `KnowledgeView should include ${snippet}`);
     }
@@ -3877,7 +3883,7 @@ describe('CraftingSystemManager source contract', () => {
       'aria-label={consequence}',
       "event.key !== 'Escape'",
       'function handleBlur()',
-      'armedIcon = \'fas fa-triangle-exclamation\'',
+      "armedIcon = 'fas fa-triangle-exclamation'",
     ]) {
       assert.ok(
         armedDangerButtonSource.includes(snippet),
@@ -4034,9 +4040,7 @@ describe('CraftingSystemManager source contract', () => {
     // The Foundry-free mutation bodies live in the collaborator, so the seam only
     // resolves documents and delegates.
     assert.ok(
-      appSource.includes(
-        "} from './svelte/apps/manager/knowledge/knowledgeMutations.js';"
-      ),
+      appSource.includes("} from './svelte/apps/manager/knowledge/knowledgeMutations.js';"),
       'the seam delegates its mutations to the plain-JS collaborator'
     );
     for (const call of [

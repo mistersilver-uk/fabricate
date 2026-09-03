@@ -76,7 +76,10 @@ export function fileWith(edits) {
  * @param {{baseRef?: string, mergedAt?: string|null}} [overrides] What to vary.
  * @returns {string} The JSON body.
  */
-export function associationPayload({ baseRef = 'release', mergedAt = '2026-09-01T07:48:19Z' } = {}) {
+export function associationPayload({
+  baseRef = 'release',
+  mergedAt = '2026-09-01T07:48:19Z',
+} = {}) {
   return JSON.stringify([
     {
       number: 1421,

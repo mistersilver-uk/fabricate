@@ -44,7 +44,10 @@ const SECTION_FIXTURE_SRC = readFileSync('scripts/lib/smokeSectionFixture.js', '
 // the producer whose text it is known not to over-ban; the segment guard below does both.)
 const CAPTURE_PRODUCERS = [
   { path: 'scripts/foundry-test-run.mjs', source: HARNESS },
-  { path: 'scripts/lib/viewLabCases.js', source: readFileSync('scripts/lib/viewLabCases.js', 'utf8') },
+  {
+    path: 'scripts/lib/viewLabCases.js',
+    source: readFileSync('scripts/lib/viewLabCases.js', 'utf8'),
+  },
 ];
 const KNOWLEDGE_LABELS = [
   'manager-knowledge-owned-copies',
@@ -71,14 +74,13 @@ const TOOL_STUDIO_LABELS = [
 ];
 const ONE_PIXEL_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-  'base64',
+  'base64'
 );
 
 function writeScopedRunEvidence(results, changedFiles, frames = []) {
   const runId = 'scoped-capture-test-run';
   const headSha = 'scope123';
-  const targetLabels = mapChangedFilesToViews(changedFiles)
-    .flatMap(view => view.smokeLabels);
+  const targetLabels = mapChangedFilesToViews(changedFiles).flatMap((view) => view.smokeLabels);
   const captures = frames.map(({ file, label }) => ({
     file,
     label,
@@ -88,54 +90,60 @@ function writeScopedRunEvidence(results, changedFiles, frames = []) {
   for (const { file } of captures) {
     writeFileSync(join(results, file), ONE_PIXEL_PNG);
   }
-  writeFileSync(join(results, 'summary.json'), JSON.stringify({
-    passed: true,
-    stepFailures: 0,
-    consoleErrorCount: 0,
-    degraded: false,
-    rendererCrashed: false,
-    screenshotRun: { runId, headSha, targetLabels },
-  }));
-  writeFileSync(join(results, 'screenshot-manifest.json'), JSON.stringify({
-    runId,
-    headSha,
-    targetLabels,
-    captures,
-  }));
+  writeFileSync(
+    join(results, 'summary.json'),
+    JSON.stringify({
+      passed: true,
+      stepFailures: 0,
+      consoleErrorCount: 0,
+      degraded: false,
+      rendererCrashed: false,
+      screenshotRun: { runId, headSha, targetLabels },
+    })
+  );
+  writeFileSync(
+    join(results, 'screenshot-manifest.json'),
+    JSON.stringify({
+      runId,
+      headSha,
+      targetLabels,
+      captures,
+    })
+  );
   return headSha;
 }
 
 function harnessFunctionSpan(start, end) {
-  const match = HARNESS.match(new RegExp(
-    String.raw`function ${start}[^]*?(?=\n(?:async )?function ${end})`,
-  ));
+  const match = HARNESS.match(
+    new RegExp(String.raw`function ${start}[^]*?(?=\n(?:async )?function ${end})`)
+  );
   assert.ok(match, `${start} harness function was not found`);
   return match[0];
 }
 
 const assertSingleToolMutation = new Function(
-  `"use strict"; ${harnessFunctionSpan('assertSingleToolMutation', 'beginToolStoreMutationProbe')}; `
-  + 'return assertSingleToolMutation;',
+  `"use strict"; ${harnessFunctionSpan('assertSingleToolMutation', 'beginToolStoreMutationProbe')}; ` +
+    'return assertSingleToolMutation;'
 )();
 const assertToolStudioHorizontalScrollSettled = new Function(
-  `"use strict"; ${harnessFunctionSpan('assertToolStudioHorizontalScrollSettled', 'readToolStudioHorizontalScroll')}; `
-  + 'return assertToolStudioHorizontalScrollSettled;',
+  `"use strict"; ${harnessFunctionSpan('assertToolStudioHorizontalScrollSettled', 'readToolStudioHorizontalScroll')}; ` +
+    'return assertToolStudioHorizontalScrollSettled;'
 )();
 const toolTabContracts = new Function(
-  `"use strict"; ${harnessFunctionSpan('assertHorizontalContainment', 'assertToolStudioTypography')}; `
-  + 'return { assertToolStudioTabContainment };',
+  `"use strict"; ${harnessFunctionSpan('assertHorizontalContainment', 'assertToolStudioTypography')}; ` +
+    'return { assertToolStudioTabContainment };'
 )();
 
 test('Fabricate ApplicationV2 cleanup awaits close and guards Manager detachment', () => {
   assert.match(
     HARNESS,
     /closePromises\.push\(Promise\.resolve\(app\.close\(\{ force: true \}\)\)\)/,
-    'ApplicationV2 close promises must be awaited before the next capture',
+    'ApplicationV2 close promises must be awaited before the next capture'
   );
   assert.match(
     HARNESS,
     /locator\('#fabricate-crafting-system-manager'\)[^]*?state: 'detached'/,
-    'the interactables capture must not begin until the Crafting System Manager detaches',
+    'the interactables capture must not begin until the Crafting System Manager detaches'
   );
 });
 
@@ -143,7 +151,10 @@ test('Fabricate ApplicationV2 cleanup awaits close and guards Manager detachment
 
 test('a broad styles/theme.css change scopes to theme-or-global-ui (6 core windows), NOT the full set', () => {
   const views = mapChangedFilesToViews(['styles/theme.css']);
-  assert.deepEqual(views.map(v => v.id), ['theme-or-global-ui']);
+  assert.deepEqual(
+    views.map((v) => v.id),
+    ['theme-or-global-ui']
+  );
   const labels = smokeLabelsForChangedFiles(['styles/theme.css']);
   // One frame per app-AREA shell plus the two manager archetypes (library vs editor),
   // rather than several frames from one area. See the recipe's comment for why each
@@ -162,30 +173,38 @@ test('a broad styles/theme.css change scopes to theme-or-global-ui (6 core windo
 });
 
 test('the global set spans every app-area shell, not just the manager', () => {
-  const themeView = VIEW_RECIPES.find(v => v.id === 'theme-or-global-ui');
+  const themeView = VIEW_RECIPES.find((v) => v.id === 'theme-or-global-ui');
   // The regression this guards: the set was once manager-only, so a global stylesheet
   // change published six frames and verified the player app not at all — even though
   // `.fabricate-app` carries its own global rules and its own Foundry-override block.
-  assert.ok(themeView.smokeLabels.some(l => l.startsWith('manager-')), 'no manager frame');
-  assert.ok(themeView.smokeLabels.some(l => l.startsWith('player-')), 'no player-app frame');
   assert.ok(
-    themeView.smokeLabels.some(l => l.startsWith('interactables-')),
+    themeView.smokeLabels.some((l) => l.startsWith('manager-')),
+    'no manager frame'
+  );
+  assert.ok(
+    themeView.smokeLabels.some((l) => l.startsWith('player-')),
+    'no player-app frame'
+  );
+  assert.ok(
+    themeView.smokeLabels.some((l) => l.startsWith('interactables-')),
     'no interactables-window frame'
   );
 });
 
 test('styles/fabricate.css scopes to the two rail frames and the global core set — NOT Tool Studio', () => {
   const views = mapChangedFilesToViews(['styles/fabricate.css']);
-  assert.deepEqual(views.map(v => v.id).sort(), [
+  assert.deepEqual(views.map((v) => v.id).sort(), [
     'manager-rail-collapsed',
     'manager-rail-expanded',
     'theme-or-global-ui',
   ]);
   // The regression this guards: the global stylesheet used to be a Tool Studio trigger,
   // so every CSS edit anywhere demanded all 12 Tool Studio parity and stress frames.
-  const ids = views.map(v => v.id);
+  const ids = views.map((v) => v.id);
   assert.ok(
-    !ids.some(id => /library-1280x720|overview|breakage|requirements|validation|stress-/.test(id)),
+    !ids.some((id) =>
+      /library-1280x720|overview|breakage|requirements|validation|stress-/.test(id)
+    ),
     'a global stylesheet change must not pull in Tool Studio frames'
   );
 });
@@ -193,17 +212,17 @@ test('styles/fabricate.css scopes to the two rail frames and the global core set
 test('Tool Studio frames are triggered only by Tool Studio files', () => {
   const own = mapChangedFilesToViews([
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
-  ]).map(v => v.id);
+  ]).map((v) => v.id);
   assert.ok(own.includes('01-library-1280x720'), 'its own file must still trigger the set');
   assert.ok(own.includes('stress-wrapping-680'), 'stress frames too');
   // The manager ROUTER hosts every manager view, so it is a global change, not a Tool
   // Studio one.
   const root = mapChangedFilesToViews([
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-  ]).map(v => v.id);
+  ]).map((v) => v.id);
   assert.ok(root.includes('theme-or-global-ui'), 'the router must route to the global set');
   assert.ok(
-    !root.some(id => /1280x720|stress-/.test(id)),
+    !root.some((id) => /1280x720|stress-/.test(id)),
     'the router must not pull in Tool Studio frames'
   );
 });
@@ -219,14 +238,14 @@ test('every VIEW_RECIPES smoke label is a capturable routine in the pure map', (
     for (const label of view.smokeLabels) {
       assert.ok(
         isCapturableLabel(label),
-        `${view.id} smoke label '${label}' is not registered in SCREENSHOT_CAPTURE_ORDER — a scoped run would never capture it and collect would throw`,
+        `${view.id} smoke label '${label}' is not registered in SCREENSHOT_CAPTURE_ORDER — a scoped run would never capture it and collect would throw`
       );
     }
   }
 });
 
 test("theme-or-global-ui's six labels are all reachable and span phase-D0 and phase-E", () => {
-  const themeView = VIEW_RECIPES.find(v => v.id === 'theme-or-global-ui');
+  const themeView = VIEW_RECIPES.find((v) => v.id === 'theme-or-global-ui');
   for (const label of themeView.smokeLabels) {
     assert.ok(isCapturableLabel(label), `${label} unreachable`);
   }
@@ -254,13 +273,14 @@ test('a player/craft target set needs phase-E; collect throws when a mapped view
     // No frame for the mapped view → collect throws (a silently-empty scoped run
     // must fail loudly, never publish a missing view).
     assert.throws(
-      () => collectScreenshotEvidence({
-        changedFiles,
-        prNumber: 826,
-        root,
-        headSha,
-      }),
-      /Missing smoke screenshots/,
+      () =>
+        collectScreenshotEvidence({
+          changedFiles,
+          prNumber: 826,
+          root,
+          headSha,
+        }),
+      /Missing smoke screenshots/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -269,12 +289,16 @@ test('a player/craft target set needs phase-E; collect throws when a mapped view
 
 // ── Per-view frame ordering (gap A): scoped renumber keeps candidates[0] intended ──
 
-test('capture order places a multi-label view\'s intended frame first (lowest counter)', () => {
+test("capture order places a multi-label view's intended frame first (lowest counter)", () => {
   // manager-systems: default-selection is captured before selected-normal/stacked, so
   // it wins collect's filename sort (candidates[0]) — the load-bearing invariant.
   assert.ok(captureOrderIndex('manager-default-selection') >= 0);
-  assert.ok(captureOrderIndex('manager-default-selection') < captureOrderIndex('manager-selected-normal'));
-  assert.ok(captureOrderIndex('manager-selected-normal') < captureOrderIndex('manager-selected-stacked'));
+  assert.ok(
+    captureOrderIndex('manager-default-selection') < captureOrderIndex('manager-selected-normal')
+  );
+  assert.ok(
+    captureOrderIndex('manager-selected-normal') < captureOrderIndex('manager-selected-stacked')
+  );
 });
 
 test('a scoped run renumbers the counter yet still selects the intended candidates[0]', () => {
@@ -343,15 +367,18 @@ test('every requirement-rail label is a capturable phase-E routine in walk order
   // The block sits between the existing essence frames and the multi-step frame, which
   // is where the walk actually captures it.
   assert.ok(
-    captureOrderIndex('player-crafting-essence-shopping') < captureOrderIndex(REQUIREMENT_RAIL_LABELS[0]),
+    captureOrderIndex('player-crafting-essence-shopping') <
+      captureOrderIndex(REQUIREMENT_RAIL_LABELS[0])
   );
   assert.ok(
-    captureOrderIndex(REQUIREMENT_RAIL_LABELS.at(-1)) < captureOrderIndex('player-crafting-multistep'),
+    captureOrderIndex(REQUIREMENT_RAIL_LABELS.at(-1)) <
+      captureOrderIndex('player-crafting-multistep')
   );
   for (let i = 1; i < REQUIREMENT_RAIL_LABELS.length; i += 1) {
     assert.ok(
-      captureOrderIndex(REQUIREMENT_RAIL_LABELS[i - 1]) < captureOrderIndex(REQUIREMENT_RAIL_LABELS[i]),
-      `${REQUIREMENT_RAIL_LABELS[i - 1]} must be captured before ${REQUIREMENT_RAIL_LABELS[i]}`,
+      captureOrderIndex(REQUIREMENT_RAIL_LABELS[i - 1]) <
+        captureOrderIndex(REQUIREMENT_RAIL_LABELS[i]),
+      `${REQUIREMENT_RAIL_LABELS[i - 1]} must be captured before ${REQUIREMENT_RAIL_LABELS[i]}`
     );
   }
 });
@@ -365,7 +392,7 @@ test('a requirement-rail-only change needs phase-E and NO phase-D0 section', () 
     assert.equal(
       isD0SectionNeededForTargets(section.name, targets),
       false,
-      `a rail-only target incorrectly kept D0 section '${section.name}'`,
+      `a rail-only target incorrectly kept D0 section '${section.name}'`
     );
   }
 });
@@ -384,7 +411,7 @@ test('every capture-map label appears as a literal in the harness (no phantom ro
   for (const label of SCREENSHOT_CAPTURE_ORDER) {
     assert.ok(
       HARNESS.includes(`'${label}'`),
-      `capture-map label '${label}' has no screenshot() call in the harness`,
+      `capture-map label '${label}' has no screenshot() call in the harness`
     );
   }
 });
@@ -394,9 +421,7 @@ test('World Parties and World Travel capture-map order mirrors the live Foundry 
   const end = HARNESS.indexOf('// Doc journey (quickstart Step 7', start);
   assert.ok(start >= 0 && end > start, 'the #1179 Foundry capture block must remain bounded');
   const harnessLabels = [
-    ...HARNESS.slice(start, end).matchAll(
-      /label: '(manager-world-(?:parties|travel)[^']+)'/g
-    ),
+    ...HARNESS.slice(start, end).matchAll(/label: '(manager-world-(?:parties|travel)[^']+)'/g),
   ].map((match) => match[1]);
   const mappedLabels = SCREENSHOT_CAPTURE_ORDER.filter(
     (label) => label.startsWith('manager-world-parties') || label.startsWith('manager-world-travel')
@@ -423,19 +448,14 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
   const viewLabCases = CAPTURE_PRODUCERS.find(
     ({ path }) => path === 'scripts/lib/viewLabCases.js'
   ).source;
-  const keyboardCaseStart = viewLabCases.indexOf(
-    "id: 'manager-world-travel-long-label-focus'"
-  );
+  const keyboardCaseStart = viewLabCases.indexOf("id: 'manager-world-travel-long-label-focus'");
   const keyboardCaseEnd = viewLabCases.indexOf('\n  managerCase({', keyboardCaseStart);
   assert.ok(
     keyboardCaseStart >= 0 && keyboardCaseEnd > keyboardCaseStart,
     'the View Lab Map keyboard evidence case must remain bounded'
   );
   const keyboardCase = viewLabCases.slice(keyboardCaseStart, keyboardCaseEnd);
-  assert.match(
-    keyboardCase,
-    /selector: '#manager-travel-nav-map', press: 'Space'/
-  );
+  assert.match(keyboardCase, /selector: '#manager-travel-nav-map', press: 'Space'/);
   assert.match(keyboardCase, /#manager-travel-nav-map\[aria-current="page"\]:focus-visible/);
 });
 
@@ -537,10 +557,7 @@ test('Phase C seeds world modifiers and character prerequisites canonically befo
 test('manager stability counts populated system Travel realm and map rows', () => {
   const guardStart = HARNESS.indexOf('async function assertManagerLayoutStable(page, label)');
   const rowCountStart = HARNESS.indexOf('const rowCount = metrics.filter', guardStart);
-  const editFormCountStart = HARNESS.indexOf(
-    'const editFormCount = metrics.filter',
-    rowCountStart
-  );
+  const editFormCountStart = HARNESS.indexOf('const editFormCount = metrics.filter', rowCountStart);
   assert.ok(
     guardStart >= 0 && guardStart < rowCountStart && rowCountStart < editFormCountStart,
     'the Manager layout measurement and row-count guard must remain bounded'
@@ -576,7 +593,7 @@ test('phase assignment matches the manager/player prefix split', () => {
 // ── Phase-D0 intra-phase section collapse (issue #826 increment 2) ──────────────
 
 const ALL_D0_LABELS = SCREENSHOT_CAPTURE_ORDER.filter(
-  (label) => phaseForCaptureLabel(label) === CAPTURE_PHASE_D0,
+  (label) => phaseForCaptureLabel(label) === CAPTURE_PHASE_D0
 );
 
 test('the D0 spine + skippable sections PARTITION every mapped phase-D0 label (nothing unguarded, nothing double-guarded)', () => {
@@ -584,7 +601,7 @@ test('the D0 spine + skippable sections PARTITION every mapped phase-D0 label (n
   const record = (label, owner) => {
     assert.ok(
       !seen.has(label),
-      `phase-D0 label '${label}' is claimed by both '${seen.get(label)}' and '${owner}' — a label must run in exactly one place`,
+      `phase-D0 label '${label}' is claimed by both '${seen.get(label)}' and '${owner}' — a label must run in exactly one place`
     );
     seen.set(label, owner);
   };
@@ -594,11 +611,17 @@ test('the D0 spine + skippable sections PARTITION every mapped phase-D0 label (n
   }
   // Every mapped D0 label is covered.
   for (const label of ALL_D0_LABELS) {
-    assert.ok(seen.has(label), `phase-D0 label '${label}' is neither in the spine nor any skippable section — a scoped run could never capture it`);
+    assert.ok(
+      seen.has(label),
+      `phase-D0 label '${label}' is neither in the spine nor any skippable section — a scoped run could never capture it`
+    );
   }
   // And nothing claims a label that is not a real mapped D0 capture.
   for (const label of seen.keys()) {
-    assert.ok(ALL_D0_LABELS.includes(label), `'${label}' is claimed by '${seen.get(label)}' but is not a mapped phase-D0 label`);
+    assert.ok(
+      ALL_D0_LABELS.includes(label),
+      `'${label}' is claimed by '${seen.get(label)}' but is not a mapped phase-D0 label`
+    );
   }
   assert.equal(seen.size, ALL_D0_LABELS.length);
 });
@@ -607,7 +630,10 @@ test('every skippable-section label is a capturable phase-D0 routine', () => {
   for (const section of D0_SKIPPABLE_SECTIONS) {
     assert.ok(section.labels.length > 0, `section '${section.name}' has no labels`);
     for (const label of section.labels) {
-      assert.ok(isCapturableLabel(label), `section '${section.name}' label '${label}' is not capturable`);
+      assert.ok(
+        isCapturableLabel(label),
+        `section '${section.name}' label '${label}' is not capturable`
+      );
       assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0);
     }
   }
@@ -624,7 +650,7 @@ test('spine labels are ALWAYS-run — none is gated by a skippable section', () 
     assert.equal(
       isD0SectionNeededForTargets(section.name, ['manager-system-edit-dirty']),
       false,
-      `a spine-only target incorrectly kept section '${section.name}'`,
+      `a spine-only target incorrectly kept section '${section.name}'`
     );
   }
 });
@@ -632,8 +658,19 @@ test('spine labels are ALWAYS-run — none is gated by a skippable section', () 
 test('a recipe-only target set runs ONLY the recipes section; component/tag/gathering/etc. are skippable', () => {
   const targets = ['manager-recipe-edit-ingredients', 'manager-recipes-normal'];
   assert.equal(isD0SectionNeededForTargets('recipes', targets), true);
-  for (const name of ['components-checks', 'tags-essences', 'gathering', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
-    assert.equal(isD0SectionNeededForTargets(name, targets), false, `recipe-only target should skip '${name}'`);
+  for (const name of [
+    'components-checks',
+    'tags-essences',
+    'gathering',
+    'knowledge',
+    'overview-interactables',
+    'import-alchemy-experimental',
+  ]) {
+    assert.equal(
+      isD0SectionNeededForTargets(name, targets),
+      false,
+      `recipe-only target should skip '${name}'`
+    );
   }
 });
 
@@ -666,7 +703,7 @@ const RECIPE_BULK_EDIT_LABELS = [
 // that survive parameterisation are asserted against THIS body; the ones that became studio
 // data are asserted against the studio descriptors below, per studio.
 const BULK_EDIT_SCAFFOLD = HARNESS.match(
-  /async function captureBulkEditFrame\([\s\S]*?\n\}\n/,
+  /async function captureBulkEditFrame\([\s\S]*?\n\}\n/
 )?.[0];
 
 /**
@@ -696,7 +733,15 @@ test('the issue-772 bulk-edit frames are scoped to the sections that can render 
   // not resurrect the recipes, tools or gathering walks.
   const arcaneTargets = ['manager-components-bulk-edit', 'manager-components-bulk-edit-unstaged'];
   assert.equal(isD0SectionNeededForTargets('components-checks', arcaneTargets), true);
-  for (const name of ['recipes', 'tags-essences', 'gathering', 'tools', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
+  for (const name of [
+    'recipes',
+    'tags-essences',
+    'gathering',
+    'tools',
+    'knowledge',
+    'overview-interactables',
+    'import-alchemy-experimental',
+  ]) {
     assert.equal(isD0SectionNeededForTargets(name, arcaneTargets), false, name);
   }
 
@@ -712,7 +757,7 @@ test('the issue-772 bulk-edit frames are scoped to the sections that can render 
   // run reaches it without a second system switch.
   assert.equal(
     captureOrderIndex('manager-components-bulk-edit-progressive'),
-    captureOrderIndex('manager-components-progressive') + 1,
+    captureOrderIndex('manager-components-progressive') + 1
   );
 
   // The staged frame is still captured immediately after the plain browser frame, so
@@ -720,11 +765,11 @@ test('the issue-772 bulk-edit frames are scoped to the sections that can render 
   // `manager-components-normal`; the unstaged frame follows it.
   assert.equal(
     captureOrderIndex('manager-components-bulk-edit'),
-    captureOrderIndex('manager-components-normal') + 1,
+    captureOrderIndex('manager-components-normal') + 1
   );
   assert.equal(
     captureOrderIndex('manager-components-bulk-edit-unstaged'),
-    captureOrderIndex('manager-components-bulk-edit') + 1,
+    captureOrderIndex('manager-components-bulk-edit') + 1
   );
 });
 
@@ -735,7 +780,15 @@ test('the issue-1010 recipe bulk-edit frames are scoped to the recipes section',
   }
 
   assert.equal(isD0SectionNeededForTargets('recipes', RECIPE_BULK_EDIT_LABELS), true);
-  for (const name of ['components-checks', 'tags-essences', 'gathering', 'tools', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
+  for (const name of [
+    'components-checks',
+    'tags-essences',
+    'gathering',
+    'tools',
+    'knowledge',
+    'overview-interactables',
+    'import-alchemy-experimental',
+  ]) {
     assert.equal(isD0SectionNeededForTargets(name, RECIPE_BULK_EDIT_LABELS), false, name);
   }
 
@@ -745,18 +798,18 @@ test('the issue-1010 recipe bulk-edit frames are scoped to the recipes section',
   // taken at the width the shared scaffold's `recipes normal` layout pin is measured against.
   assert.equal(
     captureOrderIndex('manager-recipes-bulk-edit'),
-    captureOrderIndex('manager-recipes-normal') + 1,
+    captureOrderIndex('manager-recipes-normal') + 1
   );
   for (let i = 1; i < RECIPE_BULK_EDIT_LABELS.length; i += 1) {
     assert.equal(
       captureOrderIndex(RECIPE_BULK_EDIT_LABELS[i]),
       captureOrderIndex(RECIPE_BULK_EDIT_LABELS[i - 1]) + 1,
-      `${RECIPE_BULK_EDIT_LABELS[i]} must follow ${RECIPE_BULK_EDIT_LABELS[i - 1]}`,
+      `${RECIPE_BULK_EDIT_LABELS[i]} must follow ${RECIPE_BULK_EDIT_LABELS[i - 1]}`
     );
   }
   assert.ok(
     captureOrderIndex(RECIPE_BULK_EDIT_LABELS.at(-1)) < captureOrderIndex('manager-recipes-narrow'),
-    'the bulk frames precede the narrow frame, which re-measures the row at 900px',
+    'the bulk frames precede the narrow frame, which re-measures the row at 900px'
   );
 });
 
@@ -778,7 +831,7 @@ test('the shared bulk-edit capture scaffold writes nothing and hands the rail ba
     assert.equal(
       new RegExp(String.raw`${applyHook}\]'\)(?:\s*\.\w+\([^()]*\))*\s*\.click\(`).test(HARNESS),
       false,
-      `the capture must never press Apply (${applyHook}) — it would rewrite the shared fixtures`,
+      `the capture must never press Apply (${applyHook}) — it would rewrite the shared fixtures`
     );
   }
   // Driven through the real controls, not seeded: `page.evaluate` here would touch
@@ -786,12 +839,15 @@ test('the shared bulk-edit capture scaffold writes nothing and hands the rail ba
   assert.equal(
     /page\.evaluate\(/.test(BULK_EDIT_SCAFFOLD),
     false,
-    'the bulk-edit state must be driven through the UI',
+    'the bulk-edit state must be driven through the UI'
   );
   // It goes through `captureStableManagerView`, as the plain browser frame beside it does, so
   // the overflow and overlay guards run on the bulk state too rather than only the bare
   // `screenshot()`. The layout itself is now the studio's, and is pinned per studio below.
-  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(page, \{ layout: studio\.layout, label \}\)/);
+  assert.match(
+    BULK_EDIT_SCAFFOLD,
+    /captureStableManagerView\(page, \{ layout: studio\.layout, label \}\)/
+  );
   // The panel REPLACES the single-row inspector; a rail rendering both is a failure, not a
   // frame. Nothing asserted this before it became shared, and it is the one property a
   // second studio could plausibly get wrong.
@@ -805,12 +861,12 @@ test('the shared bulk-edit capture scaffold writes nothing and hands the rail ba
   assert.match(BULK_EDIT_SCAFFOLD, /\} finally \{[\s\S]*?studio\.clearSelector/);
   assert.match(
     BULK_EDIT_SCAFFOLD,
-    /\} finally \{[\s\S]*?results\.steps\.push\(\{ step: `\$\{stepName\}-cleared`, passed: false/,
+    /\} finally \{[\s\S]*?results\.steps\.push\(\{ step: `\$\{stepName\}-cleared`, passed: false/
   );
   assert.equal(
     /state: 'detached', timeout: 5_000 \}\)\.catch\(/.test(BULK_EDIT_SCAFFOLD),
     false,
-    'a failed clear must not be swallowed by a bare .catch()',
+    'a failed clear must not be swallowed by a bare .catch()'
   );
 });
 
@@ -847,13 +903,13 @@ test('each bulk-edit studio pins its own layout, selection control and teardown 
     // overflow measurement this capture depends on.
     assert.ok(
       studio.source.includes(`layout: '${studio.layout}'`),
-      `${studio.name} must measure against the '${studio.layout}' layout pins`,
+      `${studio.name} must measure against the '${studio.layout}' layout pins`
     );
     // The selection control is an `<input>` inside a `<label>`, never a `<button>`, which is
     // what keeps this walk's row-action button selectors resolving to one control per row.
     assert.ok(
       studio.source.includes(studio.rowBox),
-      `${studio.name} must click the label wrapping its hidden selection input`,
+      `${studio.name} must click the label wrapping its hidden selection input`
     );
     for (const hook of [studio.clear, studio.panel, studio.inspector]) {
       assert.ok(studio.source.includes(hook), `${studio.name} must name ${hook}`);
@@ -868,17 +924,19 @@ test('the recipe bulk-edit frames pin their rows by NAME, not by position', () =
   // Selecting positionally would stage Enable over two ordinary recipes and publish the frame
   // with no Callout in it, while still satisfying every guard the scaffold has (two rows
   // selected, a visible count readout, a mounted panel).
-  const blocked = HARNESS
-    .split('await captureBulkEditFrame(page, results, {')
+  const blocked = HARNESS.split('await captureBulkEditFrame(page, results, {')
     .slice(1)
-    .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === 'manager-recipes-bulk-edit-blocked');
+    .find(
+      (candidate) =>
+        candidate.match(/label: '([^']+)'/)?.[1] === 'manager-recipes-bulk-edit-blocked'
+    );
   assert.ok(blocked, 'the blocked recipe bulk-edit call site was not found');
   const body = blocked.slice(0, blocked.search(/\n *\}\);/));
 
   assert.match(
     body,
     /selectRows: selectRecipeRowsByName\('Temper a Blade'/,
-    'the blocked frame must select the refused recipe by name, or it photographs no Callout',
+    'the blocked frame must select the refused recipe by name, or it photographs no Callout'
   );
   // And it is held to what it claims: the panel's warning AND the row pill the warning is
   // counting, in the frame. Either alone publishes a lie.
@@ -947,7 +1005,7 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
   assert.match(
     helper,
     /locator\(`label\[\$\{optionDataAttr\}="\$\{value\}"\]`\)/,
-    'the helper must target the wrapping label, which is what carries `optionDataAttr`',
+    'the helper must target the wrapping label, which is what carries `optionDataAttr`'
   );
   // A missing segment must report as a missing segment, not as a 30s actionability timeout —
   // that indistinguishability is what let the defect sit unread in the run output.
@@ -969,7 +1027,7 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
   assert.equal(
     occurrences,
     usages.length,
-    'every <SegmentedControl opening tag began its own parsed span — none was swallowed by the span before it',
+    'every <SegmentedControl opening tag began its own parsed span — none was swallowed by the span before it'
   );
   // The attribute is read with a literal-value regex, so `optionDataAttr={someVar}` would yield
   // `undefined`, be dropped by `.filter(Boolean)`, and under-cover that axis with no signal at
@@ -978,12 +1036,19 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
     assert.equal(
       /optionDataAttr=\{/.test(usage),
       false,
-      'a computed optionDataAttr cannot be read out of the source, so this axis would be banned nowhere: give it a literal name or teach this scan to resolve it',
+      'a computed optionDataAttr cannot be read out of the source, so this axis would be banned nowhere: give it a literal name or teach this scan to resolve it'
     );
   }
-  assert.ok(attributes.length > 0, 'the SegmentedControl optionDataAttr scan derived nothing to ban');
+  assert.ok(
+    attributes.length > 0,
+    'the SegmentedControl optionDataAttr scan derived nothing to ban'
+  );
   for (const attribute of attributes) {
-    assert.match(attribute, /^[\w-]+$/, `${attribute} is a plain name safe to key a selector ban on`);
+    assert.match(
+      attribute,
+      /^[\w-]+$/,
+      `${attribute} is a plain name safe to key a selector ban on`
+    );
   }
   // Non-empty is not the same as reaching the call sites that matter: the two axes the harness
   // clicks by name above must be IN the derived set, which is also what proves those two are
@@ -1006,7 +1071,7 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
       assert.deepEqual(
         producer.source.match(trap) ?? [],
         [],
-        `${producer.path}: \`[${attribute}="…"] input\` is the segmented-control interception trap`,
+        `${producer.path}: \`[${attribute}="…"] input\` is the segmented-control interception trap`
       );
     }
   }
@@ -1029,7 +1094,7 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
   assert.deepEqual(
     HARNESS.match(interpolationSafeTrap) ?? [],
     [],
-    'scripts/foundry-test-run.mjs: a `…-option="…"] input` click target is the segmented-control interception trap — click the wrapping label via clickSegment()',
+    'scripts/foundry-test-run.mjs: a `…-option="…"] input` click target is the segmented-control interception trap — click the wrapping label via clickSegment()'
   );
 });
 
@@ -1057,7 +1122,7 @@ const CHECKS_STUDIO_SRC = [
 
 test('every Checks hook a capture producer navigates by is still shipped', () => {
   const shipped = new Set(
-    [...CHECKS_STUDIO_SRC.matchAll(/\b(data-checks-[\w-]+)/g)].map((match) => match[1]),
+    [...CHECKS_STUDIO_SRC.matchAll(/\b(data-checks-[\w-]+)/g)].map((match) => match[1])
   );
   // A derived contract whose input set silently empties passes forever while checking nothing.
   // These three are the routing spine — the view wrapper, the activity panel and the section
@@ -1072,11 +1137,14 @@ test('every Checks hook a capture producer navigates by is still shipped', () =>
       navigated += 1;
       assert.ok(
         shipped.has(hook),
-        `${producer.path}: \`${hook}\` is not authored anywhere in the Checks Studio — it names a control the product no longer has`,
+        `${producer.path}: \`${hook}\` is not authored anywhere in the Checks Studio — it names a control the product no longer has`
       );
     }
   }
-  assert.ok(navigated > 0, 'no capture producer selects a Checks hook, so this guard checks nothing');
+  assert.ok(
+    navigated > 0,
+    'no capture producer selects a Checks hook, so this guard checks nothing'
+  );
 
   // The rail sub-item is addressed by its id, built by interpolation at both ends, so the
   // name-level scan above cannot see it. Pin the two halves against each other instead.
@@ -1091,8 +1159,7 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
   // Each segment is then truncated at its own `});` terminator, which is the first line in
   // it that is nothing but indentation and the closer.
   const callOf = (label) => {
-    const segment = HARNESS
-      .split('captureBulkEditFrame(page, results, {')
+    const segment = HARNESS.split('captureBulkEditFrame(page, results, {')
       .slice(1)
       .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === label);
     if (!segment) return null;
@@ -1104,7 +1171,10 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
   const staged = callOf('manager-components-bulk-edit');
   assert.ok(staged, 'the staged bulk-edit call site was not found');
   assert.match(staged, /data-bulk-tag-state="\$\{state\}"/);
-  assert.match(staged, /data-component-bulk-essences\] \[data-component-edit-essence\] \[data-stepper-increment\]/);
+  assert.match(
+    staged,
+    /data-component-bulk-essences\] \[data-component-edit-essence\] \[data-stepper-increment\]/
+  );
 
   // UNSTAGED: the pristine draft. Nothing is staged, so the ASSERTIONS are the state —
   // Apply inert, and the essence chip on the unstaged face that is the only route to
@@ -1113,7 +1183,10 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
   const unstaged = callOf('manager-components-bulk-edit-unstaged');
   assert.ok(unstaged, 'the unstaged bulk-edit call site was not found');
   assert.match(unstaged, /data-component-bulk-essences-staged="false"/);
-  assert.match(unstaged, /if \(!await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)/);
+  assert.match(
+    unstaged,
+    /if \(!await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)/
+  );
   for (const stagingControl of [
     'data-component-bulk-category',
     'data-bulk-tag',
@@ -1123,7 +1196,7 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
     assert.equal(
       unstaged.includes(stagingControl),
       false,
-      `the unstaged frame must not drive ${stagingControl}`,
+      `the unstaged frame must not drive ${stagingControl}`
     );
   }
 
@@ -1138,7 +1211,15 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
 
 test('a Tool Studio target runs only the dedicated persisted-net-zero tools section', () => {
   assert.equal(isD0SectionNeededForTargets('tools', TOOL_STUDIO_LABELS), true);
-  for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
+  for (const name of [
+    'recipes',
+    'components-checks',
+    'tags-essences',
+    'gathering',
+    'knowledge',
+    'overview-interactables',
+    'import-alchemy-experimental',
+  ]) {
     assert.equal(isD0SectionNeededForTargets(name, TOOL_STUDIO_LABELS), false, name);
   }
   for (const label of TOOL_STUDIO_LABELS) {
@@ -1149,15 +1230,15 @@ test('a Tool Studio target runs only the dedicated persisted-net-zero tools sect
 
 test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer coverage, and restoration', () => {
   const toolStudioWalk = HARNESS.match(
-    /async function exerciseToolStudioPointerTargets[\s\S]*?(?=\n\/\*\*\n \* Close Foundry application windows)/,
+    /async function exerciseToolStudioPointerTargets[\s\S]*?(?=\n\/\*\*\n \* Close Foundry application windows)/
   )?.[0];
   assert.ok(toolStudioWalk, 'Tool Studio walk source was not found');
   const managerSizing = HARNESS.match(
-    /async function setManagerWindowSize[\s\S]*?(?=\n\/\*\*\n \* Capture a manager view)/,
+    /async function setManagerWindowSize[\s\S]*?(?=\n\/\*\*\n \* Capture a manager view)/
   )?.[0];
   assert.ok(managerSizing, 'manager sizing helper source was not found');
   const managerReadiness = HARNESS.match(
-    /async function waitForManagerApplicationRendered[\s\S]*?(?=\n\/\*\*\n \* Resize the rendered Crafting System Manager)/,
+    /async function waitForManagerApplicationRendered[\s\S]*?(?=\n\/\*\*\n \* Resize the rendered Crafting System Manager)/
   )?.[0];
   assert.ok(managerReadiness, 'manager render-readiness helper source was not found');
   // The three frames that are DELIBERATELY captured scrolled: two stress states that live below
@@ -1177,7 +1258,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
       new RegExp(
         String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(page, '${label}', \w+\)|screenshot\(page, '${label}'(?:, \{[\s\S]*?\})?\));`
       ),
-      `${label} must reset the actual Tool Studio scroll owners immediately before capture`,
+      `${label} must reset the actual Tool Studio scroll owners immediately before capture`
     );
   }
   assert.equal(HARNESS.includes('.manager-tools-row'), true);
@@ -1190,39 +1271,48 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(managerSizing, /globalThis\.__fabricateSmokeManagerApp[\s\S]*?app\.setPosition\(\{/);
   const readinessIndex = managerSizing.indexOf('await waitForManagerApplicationRendered(page);');
   const setPositionIndex = managerSizing.indexOf('await app.setPosition({');
-  assert.ok(readinessIndex >= 0, 'manager sizing must wait for the live ApplicationV2 element to render');
+  assert.ok(
+    readinessIndex >= 0,
+    'manager sizing must wait for the live ApplicationV2 element to render'
+  );
   assert.ok(
     setPositionIndex > readinessIndex,
-    'ApplicationV2 render readiness must settle before setPosition touches the live element',
+    'ApplicationV2 render readiness must settle before setPosition touches the live element'
   );
   assert.match(
     managerReadiness,
-    /async function waitForManagerApplicationRendered[\s\S]*?__fabricateSmokeManagerApp[\s\S]*?app\?\.element[\s\S]*?#fabricate-crafting-system-manager[\s\S]*?\.fabricate-manager[\s\S]*?isConnected/,
+    /async function waitForManagerApplicationRendered[\s\S]*?__fabricateSmokeManagerApp[\s\S]*?app\?\.element[\s\S]*?#fabricate-crafting-system-manager[\s\S]*?\.fabricate-manager[\s\S]*?isConnected/
   );
   assert.doesNotMatch(managerReadiness, /appElement === outer/);
-  assert.match(managerReadiness, /foundry\?\.applications\?\.instances[\s\S]*?instances\.values\(\)/);
   assert.match(
     managerReadiness,
-    /explicitApp = globalThis\.__fabricateSmokeManagerApp[\s\S]*?new Set\(\[explicitApp, \.\.\.registeredApps\]\.filter\(Boolean\)\)/,
+    /foundry\?\.applications\?\.instances[\s\S]*?instances\.values\(\)/
   );
-  assert.match(managerReadiness, /app\?\.element \?\? app\?\._element[\s\S]*?rawElement\?\.\[0\] \?\? rawElement/);
+  assert.match(
+    managerReadiness,
+    /explicitApp = globalThis\.__fabricateSmokeManagerApp[\s\S]*?new Set\(\[explicitApp, \.\.\.registeredApps\]\.filter\(Boolean\)\)/
+  );
+  assert.match(
+    managerReadiness,
+    /app\?\.element \?\? app\?\._element[\s\S]*?rawElement\?\.\[0\] \?\? rawElement/
+  );
   assert.match(
     managerReadiness,
     /document\.querySelectorAll\(selector\)[\s\S]*?renderedOuters\.length !== 1[\s\S]*?ownsRenderedManager/
   );
-  assert.match(
-    managerReadiness,
-    /page\.evaluate\(resolveRegisteredManager, outerSelector\)/,
-  );
+  assert.match(managerReadiness, /page\.evaluate\(resolveRegisteredManager, outerSelector\)/);
   assert.match(
     managerReadiness,
     /element\?\.contains\?\.\(renderedManager\)[\s\S]*?ownsManager[\s\S]*?ownsRenderedManager/
   );
   assert.match(
     managerReadiness,
-    /liveMatches\.length !== 1[\s\S]*?applicationCandidates[\s\S]*?globalThis\.__fabricateSmokeManagerApp = liveMatches\[0\]\.app/,
+    /liveMatches\.length !== 1[\s\S]*?applicationCandidates[\s\S]*?globalThis\.__fabricateSmokeManagerApp = liveMatches\[0\]\.app/
   );
-  assert.match(managerReadiness, /appElement\?\.matches\?\.\('\.fabricate-manager'\)[\s\S]*?appElement\?\.querySelector\?\.\('\.fabricate-manager'\)/);
+  assert.match(
+    managerReadiness,
+    /appElement\?\.matches\?\.\('\.fabricate-manager'\)[\s\S]*?appElement\?\.querySelector\?\.\('\.fabricate-manager'\)/
+  );
   for (const diagnostic of [
     'appRendered',
     'elementType',
@@ -1231,7 +1321,10 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     'elementHasStyle',
     'managerConnected',
   ]) {
-    assert.ok(managerReadiness.includes(diagnostic), `manager readiness timeout must report ${diagnostic}`);
+    assert.ok(
+      managerReadiness.includes(diagnostic),
+      `manager readiness timeout must report ${diagnostic}`
+    );
   }
   assert.match(HARNESS, /browser:[\s\S]*?outer:[\s\S]*?product:/);
   assert.doesNotMatch(managerSizing, /Object\.assign\(app\.style/);
@@ -1249,17 +1342,20 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   // what the Tool Studio Requirements tab (or any other screen) reads.
   assert.match(
     HARNESS,
-    /The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}[\s\S]*?\}\);[\s\S]*?settings\.set\('fabricate', 'characterLibraries', \{[\s\S]*?\.\.\.worldCharacterLibraries,[\s\S]*?characterPrerequisites: parityPrerequisites,/,
+    /The parity frame owns an exact eight-row fixture[\s\S]*?tools: \[\],[\s\S]*?toolBreakage: \{ authority: 'toolSpecific' \}[\s\S]*?\}\);[\s\S]*?settings\.set\('fabricate', 'characterLibraries', \{[\s\S]*?\.\.\.worldCharacterLibraries,[\s\S]*?characterPrerequisites: parityPrerequisites,/
   );
   assert.doesNotMatch(
     HARNESS,
     /await csm\.updateSystem\(systemId, \{[\s\S]{0,40}characterPrerequisites: parityPrerequisites/,
-    'system.characterPrerequisites must not be reintroduced onto the Tool Studio updateSystem call',
+    'system.characterPrerequisites must not be reintroduced onto the Tool Studio updateSystem call'
   );
-  assert.match(HARNESS, /typeof sourceSystem\?\.description === 'string'[\s\S]*?sourceSystem\.description\.value = parityDescription/);
   assert.match(
     HARNESS,
-    /normalized Tool snapshot[\s\S]*?description: 'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/,
+    /typeof sourceSystem\?\.description === 'string'[\s\S]*?sourceSystem\.description\.value = parityDescription/
+  );
+  assert.match(
+    HARNESS,
+    /normalized Tool snapshot[\s\S]*?description: 'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/
   );
   // NAME-ASCENDING, THE WHOLE LIST, IN ORDER. This used to pin only that "Smith's Hammer"
   // preceded 'Woodcarving Tools', which the fixture-authored order satisfies just as well —
@@ -1269,7 +1365,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(
     HARNESS,
     /const expectedToolNames = \[\s*"Alchemist's Supplies",\s*'Arcane Forge',\s*'Ley-Line Nexus',\s*"Master's Anvil",\s*'Moonwell',\s*"Smith's Hammer",\s*'Volcanic Vent',\s*'Woodcarving Tools',\s*\];/,
-    'the parity library order must stay pinned name-ascending, not in fixture-authored order',
+    'the parity library order must stay pinned name-ascending, not in fixture-authored order'
   );
   // FIRST-RENDER EVIDENCE, ORDERED BY SOURCE POSITION rather than by a tool name the sort order
   // now decides. Auto-selection has to be read after the order check (so the row it names is
@@ -1286,15 +1382,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.ok(firstSelectionClickIndex > 0, 'the walk must click a row to select it');
   assert.ok(
     autoSelectionIndex > orderCheckIndex,
-    'first-row auto-selection must be read after the rendered order it is named against',
+    'first-row auto-selection must be read after the rendered order it is named against'
   );
   assert.ok(
     autoSelectionIndex < sortToggleIndex,
-    'first-row auto-selection must be observed on first render, before the sort toggle re-sorts',
+    'first-row auto-selection must be observed on first render, before the sort toggle re-sorts'
   );
   assert.ok(
     autoSelectionIndex < firstSelectionClickIndex,
-    'first-row auto-selection must be observed before any harness selection click',
+    'first-row auto-selection must be observed before any harness selection click'
   );
   // SELECTION IS AN IDENTITY. After the walk clicks the parity row, exactly that Tool is
   // selected — not the first row, which under the shipped name-ascending sort is a different
@@ -1302,12 +1398,12 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(
     HARNESS,
     /const selectedAfterParityClick = await visibleToolRows\.evaluateAll[\s\S]*?JSON\.stringify\(\[fixture\.toolId\]\)[\s\S]*?Tool Studio parity row selection did not select exactly the intended Tool/,
-    'the post-click selection check must assert the selected Tool ID, never a row position',
+    'the post-click selection check must assert the selected Tool ID, never a row position'
   );
   assert.match(HARNESS, /data-tool-inspector-description[\s\S]*?well-balanced forge hammer/);
   assert.match(
     HARNESS,
-    /route transition asks ApplicationV2[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}/,
+    /route transition asks ApplicationV2[\s\S]*?sourceViewport: \{ width: 1280, height: 720 \}/
   );
   // THE SYSTEM WALK MUST NOT AUTHOR IDENTITY (issue 1373). It used to drag a second world Item
   // onto a `[data-tool-source-card]` drop target on THIS screen, which is a crafting system
@@ -1317,9 +1413,12 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(
     toolStudioWalk,
     /data-tool-source-card|data-tool-source-copy-uuid|data-tool-source-unlink|dragTo\(sourceCard\)/,
-    'the SYSTEM Tool walk must not drive an identity edit — that belongs to the world Tool entry',
+    'the SYSTEM Tool walk must not drive an identity edit — that belongs to the world Tool entry'
   );
-  assert.doesNotMatch(toolStudioWalk, /new DataTransfer|dispatchEvent\('drop'|data-tool-source-picker|manager-tool-source-replace/);
+  assert.doesNotMatch(
+    toolStudioWalk,
+    /new DataTransfer|dispatchEvent\('drop'|data-tool-source-picker|manager-tool-source-replace/
+  );
   // THE THREE-TAB STRIP AND THE TWO NEW CONTROLS. `#tool-tab-overview` no longer exists, so a
   // walk still naming it would fail on a missing locator rather than on a wrong screen; the
   // inherit switch and the remove callout are pointer-tested rather than pressed, because both
@@ -1328,22 +1427,25 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(
     toolStudioWalk,
     /for \(const name of \['breakage', 'requirements', 'validation'\]\)/,
-    'the Tool tab strip is Breakage, Requirements and Validation',
+    'the Tool tab strip is Breakage, Requirements and Validation'
   );
   assert.match(
     toolStudioWalk,
     /assertPointerTarget\(\s*page,\s*breakageInheritToggle,\s*'\[data-scoped-inherit-toggle="breakage"\]'/,
-    'the per-section inherit switch must be proved hit-testable where it is drawn',
+    'the per-section inherit switch must be proved hit-testable where it is drawn'
   );
   assert.match(
     toolStudioWalk,
     /scrollToolEditorPanelToReveal\([\s\S]*?data-tool-remove-from-system[\s\S]*?manager-tool-parity-02-remove-1280x720/,
-    'the remove-from-system frame must reveal the callout it exists to show',
+    'the remove-from-system frame must reveal the callout it exists to show'
   );
-  assert.match(HARNESS, /async function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length !== 0/);
   assert.match(
     HARNESS,
-    /async function assertToolLibraryPagination[\s\S]*?data-tool-library[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?await assertSelectionRetained\(\)[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/,
+    /async function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length !== 0/
+  );
+  assert.match(
+    HARNESS,
+    /async function assertToolLibraryPagination[\s\S]*?data-tool-library[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?await assertSelectionRetained\(\)[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/
   );
   // The pager's selection check must keep firing on every page-1 call, and must be an identity
   // check: `selectedToolId` is mandatory there, so a caller that quietly stops passing it fails
@@ -1351,26 +1453,26 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(
     HARNESS,
     /expectedPage === 1 && !selectedToolId[\s\S]*?Tool pagination page-1 checks need the Tool ID the walk selected/,
-    'the pager must refuse a page-1 check that was not told which Tool the walk selected',
+    'the pager must refuse a page-1 check that was not told which Tool the walk selected'
   );
   assert.match(
     HARNESS,
-    /const assertSelectionRetained = async \(\)[\s\S]*?JSON\.stringify\(\[selectedToolId\]\)[\s\S]*?did not preserve its selection of/,
+    /const assertSelectionRetained = async \(\)[\s\S]*?JSON\.stringify\(\[selectedToolId\]\)[\s\S]*?did not preserve its selection of/
   );
   assert.doesNotMatch(
     HARNESS,
     /manager-tools-row:first-child'\)\?\.classList\.contains\('is-selected'\)/,
-    'Tool library selection must never be pinned to row position again',
+    'Tool library selection must never be pinned to row position again'
   );
   for (const paginationCall of [
-    "{ expectedTotal: 8, expectedPage: 1, expectFooter: false, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 9, expectedPage: 1, expectScrollable: true, selectedToolId: fixture.toolId }",
+    '{ expectedTotal: 8, expectedPage: 1, expectFooter: false, selectedToolId: fixture.toolId }',
+    '{ expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false, selectedToolId: fixture.toolId }',
+    '{ expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId }',
+    '{ expectedTotal: 9, expectedPage: 1, expectScrollable: true, selectedToolId: fixture.toolId }',
   ]) {
     assert.ok(
       toolStudioWalk.includes(paginationCall),
-      `Tool pagination call ${paginationCall} must name the selected Tool`,
+      `Tool pagination call ${paginationCall} must name the selected Tool`
     );
   }
   const issue800Search = HARNESS.indexOf("getByRole('searchbox', { name: 'Search components' })");
@@ -1378,33 +1480,35 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   const issue800Wait = HARNESS.indexOf("identity.waitFor({ state: 'visible'", issue800Fill);
   assert.ok(
     issue800Search > 0 && issue800Fill > issue800Search && issue800Wait > issue800Fill,
-    'issue-800 evidence must reveal a paginated component before selecting it',
+    'issue-800 evidence must reveal a paginated component before selecting it'
   );
   assert.match(
     toolStudioWalk,
     /expectedTotal: 8[\s\S]*?sourceViewport: \{ width: 1280, height: 520 \}[\s\S]*?expectedTotal: 8[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?expectedTotal: 9[\s\S]*?data-pagination-next[\s\S]*?expectedPage: 2[\s\S]*?Tool footer moved when the page changed/,
-    'the real library must cover tall/short one-page and 9+ pagination states',
+    'the real library must cover tall/short one-page and 9+ pagination states'
   );
   assert.match(
     toolStudioWalk,
     /paginationComponentId[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?componentId: paginationComponentId/,
-    'the synthetic ninth Tool must carry a valid managed Component identity',
+    'the synthetic ninth Tool must carry a valid managed Component identity'
   );
   assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
   assert.match(
     toolStudioWalk,
-    /const expectedPrerequisiteNames = \[[\s\S]*?'Expert Crafter'[\s\S]*?"Proficient with Smith's Tools"[\s\S]*?'Attuned to the Weave'[\s\S]*?'Strength 13 or higher'[\s\S]*?'Trained in Arcana'[\s\S]*?Tool Studio parity prerequisite order drifted/,
+    /const expectedPrerequisiteNames = \[[\s\S]*?'Expert Crafter'[\s\S]*?"Proficient with Smith's Tools"[\s\S]*?'Attuned to the Weave'[\s\S]*?'Strength 13 or higher'[\s\S]*?'Trained in Arcana'[\s\S]*?Tool Studio parity prerequisite order drifted/
   );
-  assert.ok(HARNESS.includes("editor.locator('[data-tool-validation-check].is-invalid').count() !== 0"));
+  assert.ok(
+    HARNESS.includes("editor.locator('[data-tool-validation-check].is-invalid').count() !== 0")
+  );
   assert.match(
     toolStudioWalk,
     /input\[name="tool-on-break"\]\[value="destroy"\][\s\S]*?saveToolStudioDraftIfDirty\(editor\)[\s\S]*?tab\('requirements'\)/,
-    'Requirements parity must be captured from a saved destroy-action baseline',
+    'Requirements parity must be captured from a saved destroy-action baseline'
   );
   assert.match(
     toolStudioWalk,
     /Tool invalid prerequisite fixture[\s\S]*?data-editor-validation-summary="block"[\s\S]*?data-tool-validation-check="prerequisites"\]\.is-invalid[\s\S]*?Tool prerequisite fixture restore[\s\S]*?saveToolStudioDraftIfDirty\(editor\)[\s\S]*?tab\('breakage'\)/,
-    'the invalid Validation frame must use a guaranteed domain blocker, then restore and save the prerequisite baseline',
+    'the invalid Validation frame must use a guaranteed domain blocker, then restore and save the prerequisite baseline'
   );
   for (const label of [
     'manager-tool-parity-01-library-1280x720',
@@ -1416,36 +1520,39 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   ]) {
     assert.ok(
       HARNESS.includes(`captureToolStudioProduct(page, '${label}', wideGeometry)`),
-      `${label} must capture the truthful settled wide product frame`,
+      `${label} must capture the truthful settled wide product frame`
     );
   }
   assert.ok(
     HARNESS.includes(
       "captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry)"
     ),
-    'the 900px parity frame must capture the truthful settled narrow product frame',
+    'the 900px parity frame must capture the truthful settled narrow product frame'
   );
   assert.match(
     toolStudioWalk,
     /screenshot\(page, 'manager-tool-stress-wrapping-680', \{\s*clip: \{ x: 0, y: 0, width: 680, height: 700 \},\s*\}\)/,
-    'the 680px stress frame must declare its truthful full-viewport dimensions in the manifest',
+    'the 680px stress frame must declare its truthful full-viewport dimensions in the manifest'
   );
   assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?900px/);
   assert.match(toolStudioWalk, /clickToolTabAndAssertEffect\(page,[\s\S]*?680px/);
   assert.match(
     HARNESS,
-    /async function waitForToolEnabledState[\s\S]*?persisted === expected[\s\S]*?aria-pressed[\s\S]*?String\(expected\)/,
+    /async function waitForToolEnabledState[\s\S]*?persisted === expected[\s\S]*?aria-pressed[\s\S]*?String\(expected\)/
   );
   assert.match(
     toolStudioWalk,
-    /persistedEnabledBefore[\s\S]*?waitForToolEnabledState\([\s\S]*?!persistedEnabledBefore[\s\S]*?waitForToolEnabledState\([\s\S]*?persistedEnabledBefore/,
+    /persistedEnabledBefore[\s\S]*?waitForToolEnabledState\([\s\S]*?!persistedEnabledBefore[\s\S]*?waitForToolEnabledState\([\s\S]*?persistedEnabledBefore/
   );
   assert.match(toolStudioWalk, /selectedToolIds[\s\S]*?fixture\.toolId/);
-  assert.match(toolStudioWalk, /data-tool-library-empty[\s\S]*?data-tool-browser-inspector-empty[\s\S]*?manager-tool-zero-state-empty-library-1280x720/);
+  assert.match(
+    toolStudioWalk,
+    /data-tool-library-empty[\s\S]*?data-tool-browser-inspector-empty[\s\S]*?manager-tool-zero-state-empty-library-1280x720/
+  );
   assert.match(
     toolStudioWalk,
     /emptyInspectorBounds[\s\S]*?emptyInspectorContentBounds[\s\S]*?Math\.abs\(inspectorCenterY - contentCenterY\) > 2[\s\S]*?empty inspector is not vertically centered/,
-    'the empty inspector content must be vertically centered in the full right rail',
+    'the empty inspector content must be vertically centered in the full right rail'
   );
   assert.match(HARNESS, /did not transition exactly once/);
   assert.match(HARNESS, /did not apply its observable toggle effect/);
@@ -1454,61 +1561,67 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(
     toolStudioWalk,
     /scrollToolEditorPanelToReveal\([\s\S]*?alternative-component[\s\S]*?manager-tool-stress-repair/,
-    'repair stress evidence must reveal the populated OR group in the editor pane',
+    'repair stress evidence must reveal the populated OR group in the editor pane'
   );
   assert.match(
     toolStudioWalk,
     /scrollToolEditorPanelToReveal\([\s\S]*?data-tool-replacement-target[\s\S]*?manager-tool-stress-replacement/,
-    'replacement stress evidence must reveal the complete managed Component card in the editor pane',
+    'replacement stress evidence must reveal the complete managed Component card in the editor pane'
   );
   assert.match(
     HARNESS,
-    /const addRepairAlternative = firstRepairGroup\.locator\('\[data-recipe-add="alternative-component"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
+    /const addRepairAlternative = firstRepairGroup\.locator\('\[data-recipe-add="alternative-component"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/
   );
   assert.match(
     HARNESS,
     /const addRepairGroup = editor\.locator\('\[data-tool-repair-requirements\] \[data-recipe-add="tag-requirement"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
-    'the repair group control must choose one strict-safe pointer target and mutate once',
+    'the repair group control must choose one strict-safe pointer target and mutate once'
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
   assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
   assert.match(
     HARNESS,
-    /const componentTarget = replacementGrid\.locator\('\.manager-tool-replacement-component-trigger'\);[\s\S]*?'Component replacement selection'[\s\S]*?\(\) => componentOption\.click\(\)[\s\S]*?Component replacement selection did not update the draft control/,
+    /const componentTarget = replacementGrid\.locator\('\.manager-tool-replacement-component-trigger'\);[\s\S]*?'Component replacement selection'[\s\S]*?\(\) => componentOption\.click\(\)[\s\S]*?Component replacement selection did not update the draft control/
   );
-  assert.doesNotMatch(toolStudioWalk, /Direct Item replacement|data-tool-replacement-type|data-tool-replacement-picker/);
+  assert.doesNotMatch(
+    toolStudioWalk,
+    /Direct Item replacement|data-tool-replacement-type|data-tool-replacement-picker/
+  );
   assert.match(
     toolStudioWalk,
     /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),[\s\S]*?withSingleToolDraftTransition\(\s*page,\s*fixture\.toolId,\s*'check-driven Tool Edit route'/,
-    'the persisted + projected authority mutation must settle before the exactly-once Edit route',
+    'the persisted + projected authority mutation must settle before the exactly-once Edit route'
   );
   assert.match(
     HARNESS,
     /async function withSingleToolDraftTransition[\s\S]*?viewState\.subscribe[\s\S]*?const distinctTransitions = report\.transitions\.filter[\s\S]*?distinctTransitions\.length !== 1[\s\S]*?publish exactly one distinct Tool draft transition/,
-    'selection and Edit must count one distinct live view-state transition instead of treating identical reactive publications as separate routes',
+    'selection and Edit must count one distinct live view-state transition instead of treating identical reactive publications as separate routes'
   );
   assert.match(
     HARNESS,
-    /async function waitForToolBreakageAuthority[\s\S]*?getCraftingSystemManager\(\)\.getSystem\(systemId\)\?\.toolBreakage\?\.authority[\s\S]*?__fabricateSmokeManagerApp\?\._adminStore\?\.viewState\?\.subscribe[\s\S]*?timeout: 10_000/,
+    /async function waitForToolBreakageAuthority[\s\S]*?getCraftingSystemManager\(\)\.getSystem\(systemId\)\?\.toolBreakage\?\.authority[\s\S]*?__fabricateSmokeManagerApp\?\._adminStore\?\.viewState\?\.subscribe[\s\S]*?timeout: 10_000/
   );
   assert.match(
     toolStudioWalk,
-    /const liveManagerApp = await requireSingleLocator\(page\.locator\('#fabricate-crafting-system-manager'\), 'live Crafting System Manager app'\);[\s\S]*?const editorManager = liveManagerApp\.locator\('\.fabricate-manager\[data-manager-view="tool-edit"\]'\);/,
+    /const liveManagerApp = await requireSingleLocator\(page\.locator\('#fabricate-crafting-system-manager'\), 'live Crafting System Manager app'\);[\s\S]*?const editorManager = liveManagerApp\.locator\('\.fabricate-manager\[data-manager-view="tool-edit"\]'\);/
   );
   assert.match(
     toolStudioWalk,
-    /const immuneOnBreakFieldset = editor\.locator\('\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\);[\s\S]*?await immuneOnBreakFieldset\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);[\s\S]*?await assertDisabledToolOnBreakFieldset\(immuneOnBreakFieldset\);/,
+    /const immuneOnBreakFieldset = editor\.locator\('\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\);[\s\S]*?await immuneOnBreakFieldset\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);[\s\S]*?await assertDisabledToolOnBreakFieldset\(immuneOnBreakFieldset\);/
   );
   assert.match(
     HARNESS,
-    /async function assertDisabledToolOnBreakFieldset[\s\S]*?element\.disabled === true[\s\S]*?element\.matches\(':disabled'\)[\s\S]*?fieldset\.locator\('button, input, select, textarea'\)[\s\S]*?controls\.nth\(index\)\.isDisabled\(\)/,
+    /async function assertDisabledToolOnBreakFieldset[\s\S]*?element\.disabled === true[\s\S]*?element\.matches\(':disabled'\)[\s\S]*?fieldset\.locator\('button, input, select, textarea'\)[\s\S]*?controls\.nth\(index\)\.isDisabled\(\)/
   );
   assert.doesNotMatch(
     toolStudioWalk,
-    /await checkDriven\.click\(\);\s*await page\.locator\(`\.fabricate-manager \[data-manager-tool-id=/,
+    /await checkDriven\.click\(\);\s*await page\.locator\(`\.fabricate-manager \[data-manager-tool-id=/
   );
   assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-edit-view\]'\)\.first\(\)/);
-  assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\)/);
+  assert.doesNotMatch(
+    toolStudioWalk,
+    /page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\)/
+  );
   assert.doesNotMatch(toolStudioWalk, /onBreakFieldset\.isDisabled\(\)/);
   // The closing move is RE-EXPRESSED, not relaxed (issue 1096). It used to be a bare Checks
   // rail click, because the trigger card the next span drives was one scroll down a single
@@ -1519,15 +1632,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(
     toolStudioWalk,
     /const recipeToolRow = page\.locator\([\s\S]*?select, \[data-recipe-tool-bonus-mode\][\s\S]*?must not expose Tool breakage or check-bonus policy controls[\s\S]*?unexpectedly dirtied the Recipe draft[\s\S]*?openChecksActivity\(page, 'crafting', 'triggers'\)/,
-    'the Recipe Tools check must prove policy-free rows without dirtying the Recipe draft',
+    'the Recipe Tools check must prove policy-free rows without dirtying the Recipe draft'
   );
   assert.match(
     HARNESS,
-    /const fieldsetState = await fieldset\.evaluate\(\(element\) => \(\{[\s\S]*?disabled: element\.disabled === true,[\s\S]*?matchesDisabled: element\.matches\(':disabled'\),[\s\S]*?\}\)\);/,
+    /const fieldsetState = await fieldset\.evaluate\(\(element\) => \(\{[\s\S]*?disabled: element\.disabled === true,[\s\S]*?matchesDisabled: element\.matches\(':disabled'\),[\s\S]*?\}\)\);/
   );
   assert.doesNotMatch(
     HARNESS,
-    /\[data-manager-tools-authority\] label\.is-selected:has\(input\[value="checkDriven"\]\)/,
+    /\[data-manager-tools-authority\] label\.is-selected:has\(input\[value="checkDriven"\]\)/
   );
   // The setup → exercise → finally-restore scaffold now lives in the shared
   // `runFixturedScreenshotSection` helper (the Knowledge section reuses it), so what
@@ -1536,12 +1649,12 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(
     HARNESS,
     /runFixturedScreenshotSection\(\{[\s\S]*?step: 'tool-studio-evidence',[\s\S]*?restore: \(fixture\) => restoreToolStudioFixture\(/,
-    'the Tool Studio section must hand its restore to the shared fixtured-section helper',
+    'the Tool Studio section must hand its restore to the shared fixtured-section helper'
   );
   assert.match(
     HARNESS,
     /step: 'tool-studio-evidence',\s*rethrow: true,/,
-    'a Tool Studio failure must still abort the phase rather than reporting a green run',
+    'a Tool Studio failure must still abort the phase rather than reporting a green run'
   );
 });
 
@@ -1549,7 +1662,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
 
 const CHECK_TRIGGERS_SRC = readFileSync(
   'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
-  'utf8',
+  'utf8'
 );
 
 test('the Phase D0 tier-step walk drives hooks the trigger component still emits', () => {
@@ -1571,7 +1684,7 @@ test('the Phase D0 tier-step walk drives hooks the trigger component still emits
     assert.ok(HARNESS.includes(hook), `the Phase D0 walk no longer drives [${hook}]`);
     assert.ok(
       CHECK_TRIGGERS_SRC.includes(hook),
-      `CheckTriggers.svelte no longer emits [${hook}], so the walk points at nothing`,
+      `CheckTriggers.svelte no longer emits [${hook}], so the walk points at nothing`
     );
   }
 
@@ -1581,12 +1694,14 @@ test('the Phase D0 tier-step walk drives hooks the trigger component still emits
   assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="up"]'), 'the up segment');
   assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="target"]'), 'the target segment');
   assert.match(CHECK_TRIGGERS_SRC, /optionDataAttr="data-trigger-tier-step-mode"/);
-  const tierStepModes = CHECK_TRIGGERS_SRC.match(/const TIER_STEP_MODES = \[[\s\S]*?\n {2}\];/)?.[0];
+  const tierStepModes = CHECK_TRIGGERS_SRC.match(
+    /const TIER_STEP_MODES = \[[\s\S]*?\n {2}\];/
+  )?.[0];
   assert.ok(tierStepModes, 'the TIER_STEP_MODES declaration was not found');
   for (const mode of ['up', 'target']) {
     assert.ok(
       tierStepModes.includes(`value: '${mode}'`),
-      `TIER_STEP_MODES no longer offers a '${mode}' segment for the walk to click`,
+      `TIER_STEP_MODES no longer offers a '${mode}' segment for the walk to click`
     );
   }
 
@@ -1595,7 +1710,7 @@ test('the Phase D0 tier-step walk drives hooks the trigger component still emits
   assert.ok(HARNESS.includes('[data-add-trigger]'), 'the walk must add a trigger');
   assert.ok(
     HARNESS.includes('[data-trigger] [data-remove-trigger]'),
-    'the walk must remove the trigger it authored',
+    'the walk must remove the trigger it authored'
   );
 });
 
@@ -1607,9 +1722,16 @@ test('the shared fixtured-section helper always restores, even when setup or the
   const ok = await runFixturedScreenshotSection({
     results,
     step: 'demo',
-    setup: async () => { calls.push('setup'); return { id: 'fixture' }; },
-    exercise: async (fixture) => { calls.push(`exercise:${fixture.id}`); },
-    restore: async (fixture) => { calls.push(`restore:${fixture?.id ?? 'null'}`); },
+    setup: async () => {
+      calls.push('setup');
+      return { id: 'fixture' };
+    },
+    exercise: async (fixture) => {
+      calls.push(`exercise:${fixture.id}`);
+    },
+    restore: async (fixture) => {
+      calls.push(`restore:${fixture?.id ?? 'null'}`);
+    },
   });
   assert.deepEqual(calls, ['setup', 'exercise:fixture', 'restore:fixture']);
   assert.deepEqual(results.steps, [{ step: 'demo', passed: true }]);
@@ -1619,14 +1741,19 @@ test('the shared fixtured-section helper always restores, even when setup or the
   const failing = [];
   const failingResults = { steps: [] };
   await assert.rejects(
-    () => runFixturedScreenshotSection({
-      results: failingResults,
-      step: 'demo',
-      setup: async () => ({ id: 'seeded' }),
-      exercise: async () => { throw new Error('capture blew up'); },
-      restore: async (fixture) => { failing.push(`restore:${fixture?.id ?? 'null'}`); },
-    }),
-    /capture blew up/,
+    () =>
+      runFixturedScreenshotSection({
+        results: failingResults,
+        step: 'demo',
+        setup: async () => ({ id: 'seeded' }),
+        exercise: async () => {
+          throw new Error('capture blew up');
+        },
+        restore: async (fixture) => {
+          failing.push(`restore:${fixture?.id ?? 'null'}`);
+        },
+      }),
+    /capture blew up/
   );
   assert.deepEqual(failing, ['restore:seeded']);
   assert.equal(failingResults.steps[0].passed, false);
@@ -1637,9 +1764,15 @@ test('the shared fixtured-section helper always restores, even when setup or the
     results: { steps: [] },
     step: 'demo',
     rethrow: false,
-    setup: async () => { throw new Error('seed blew up'); },
-    exercise: async () => { setupFailed.push('exercise'); },
-    restore: async (fixture) => { setupFailed.push(`restore:${fixture === null ? 'null' : 'handle'}`); },
+    setup: async () => {
+      throw new Error('seed blew up');
+    },
+    exercise: async () => {
+      setupFailed.push('exercise');
+    },
+    restore: async (fixture) => {
+      setupFailed.push(`restore:${fixture === null ? 'null' : 'handle'}`);
+    },
   });
   assert.deepEqual(setupFailed, ['restore:null']);
   assert.equal(evidential.passed, false);
@@ -1652,14 +1785,25 @@ test('the shared fixtured-section helper is a pure, playwright-free scripts/lib 
   // The restore MUST sit in a `finally`, not on the success path: these fixtures write
   // real actor flags and delete owned Items in a persisted world that later smoke runs
   // reuse, so a half-failed section that skipped its restore poisons unrelated PRs.
-  assert.match(SECTION_FIXTURE_SRC, /\} finally \{\s*(?:\/\/[^\n]*\n\s*)*await restore\(fixture\);/);
+  assert.match(
+    SECTION_FIXTURE_SRC,
+    /\} finally \{\s*(?:\/\/[^\n]*\n\s*)*await restore\(fixture\);/
+  );
 });
 
 // ── D0 section: the GM Knowledge surface (issue 785) ──────────────────────────
 
 test('a Knowledge target runs only the dedicated persisted-net-zero knowledge section', () => {
   assert.equal(isD0SectionNeededForTargets('knowledge', KNOWLEDGE_LABELS), true);
-  for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'tools', 'overview-interactables', 'import-alchemy-experimental']) {
+  for (const name of [
+    'recipes',
+    'components-checks',
+    'tags-essences',
+    'gathering',
+    'tools',
+    'overview-interactables',
+    'import-alchemy-experimental',
+  ]) {
     assert.equal(isD0SectionNeededForTargets(name, KNOWLEDGE_LABELS), false, name);
   }
   for (const label of KNOWLEDGE_LABELS) {
@@ -1674,27 +1818,42 @@ test('a Knowledge target runs only the dedicated persisted-net-zero knowledge se
   assert.deepEqual(armed.smokeLabels, ['manager-knowledge-delete-armed']);
   assert.equal(surface.smokeLabels.includes('manager-knowledge-delete-armed'), false);
   assert.ok(
-    captureOrderIndex('manager-knowledge-owned-copies')
-      < Math.min(...surface.smokeLabels.slice(1).map(captureOrderIndex)),
-    'the owned-copies frame must be captured first so it wins the surface view\'s candidates[0]',
+    captureOrderIndex('manager-knowledge-owned-copies') <
+      Math.min(...surface.smokeLabels.slice(1).map(captureOrderIndex)),
+    "the owned-copies frame must be captured first so it wins the surface view's candidates[0]"
   );
 });
 
 test('the Knowledge walk seeds every projected state, proves the inert merge, and restores net-zero', () => {
   const setup = harnessFunctionSpan('setupKnowledgeFixture', 'restoreKnowledgeFixture');
-  const restore = harnessFunctionSpan('restoreKnowledgeFixture', 'assertKnowledgeInertSurvivesExpend');
-  const merge = harnessFunctionSpan('assertKnowledgeInertSurvivesExpend', 'exerciseKnowledgeSurface');
+  const restore = harnessFunctionSpan(
+    'restoreKnowledgeFixture',
+    'assertKnowledgeInertSurvivesExpend'
+  );
+  const merge = harnessFunctionSpan(
+    'assertKnowledgeInertSurvivesExpend',
+    'exerciseKnowledgeSurface'
+  );
 
   // The five seeded copy states, including the two the delta calls out explicitly: an
   // UNCAPPED copy (so Expend renders disabled) and the inert-but-not-spent fifth state.
   assert.match(setup, /key: 'limited'[\s\S]*?limitUses: true, maxUses: 3/);
   assert.match(setup, /key: 'uncapped'[\s\S]*?limitUses: false/);
-  assert.match(setup, /key: 'inert'[\s\S]*?maxUses: 5[\s\S]*?usage: \{ timesUsed: 1, inert: true \}/);
-  assert.match(setup, /key: 'spent'[\s\S]*?maxUses: 2[\s\S]*?usage: \{ timesUsed: 2, inert: true \}/);
+  assert.match(
+    setup,
+    /key: 'inert'[\s\S]*?maxUses: 5[\s\S]*?usage: \{ timesUsed: 1, inert: true \}/
+  );
+  assert.match(
+    setup,
+    /key: 'spent'[\s\S]*?maxUses: 2[\s\S]*?usage: \{ timesUsed: 2, inert: true \}/
+  );
   assert.match(setup, /key: 'partyPool'[\s\S]*?learnScope: 'total'/);
   // A learned entry whose source copy is no longer owned, and an empty-inventory
   // character for the dimmed "Nothing tracked" roster row.
-  assert.match(setup, /sourceItemUuid: `Actor\.\$\{learnedOnlyActor\.id\}\.Item\.\$\{foundry\.utils\.randomID\(\)\}`/);
+  assert.match(
+    setup,
+    /sourceItemUuid: `Actor\.\$\{learnedOnlyActor\.id\}\.Item\.\$\{foundry\.utils\.randomID\(\)\}`/
+  );
   assert.match(setup, /untrackedActor = grantOnlyActors\[1\]/);
   // Owned copies claim their definition through the durable per-system roles map.
   assert.match(setup, /roles: \{ \[systemId\]: \{ recipeItemDefinitionId: definition\.id \} \}/);
@@ -1708,31 +1867,41 @@ test('the Knowledge walk seeds every projected state, proves the inert merge, an
   assert.ok(grantAt > 0, 'the fixture grants owned copies');
   assert.ok(
     membershipAt > grantAt,
-    'recipe membership must be linked only after every owned copy exists, or the createItem auto-learn consumes one',
+    'recipe membership must be linked only after every owned copy exists, or the createItem auto-learn consumes one'
   );
   assert.match(
     setup,
     /a createItem consumer \(auto-learn consumeOnLearn\) destroyed it/,
-    'seeding must fail loudly, naming the cause, if a copy is ever consumed again',
+    'seeding must fail loudly, naming the cause, if a copy is ever consumed again'
   );
   // Every actor the section can touch has its learned map snapshotted, not only the
   // two it seeds, so nothing it gains mid-run survives the restore.
-  assert.match(setup, /const learnedRestores = \[\s*chipStatesActor,\s*partyPoolActor,\s*learnedOnlyActor,\s*untrackedActor,\s*\]/);
+  assert.match(
+    setup,
+    /const learnedRestores = \[\s*chipStatesActor,\s*partyPoolActor,\s*learnedOnlyActor,\s*untrackedActor,\s*\]/
+  );
 
   // The seeded learned entry is removed by a real KEY DELETION, never a merge rewrite
   // (which would resurrect it on reload and leave the section not net-zero).
   assert.match(restore, /await actor\.unsetFlag\('fabricate', 'fabricate\.learnedRecipes'\)/);
   const unsetAt = restore.indexOf("unsetFlag('fabricate', 'fabricate.learnedRecipes')");
   const rewriteAt = restore.indexOf("'flags.fabricate.fabricate.learnedRecipes': learnedRecipes");
-  assert.ok(unsetAt > 0 && rewriteAt > unsetAt, 'any pre-existing map must be written back only AFTER the deletion lands');
-  assert.match(restore, /deleteEmbeddedDocuments\('Item', itemIds\)[\s\S]*?unsetFlag/, 'owned copies must be deleted before the learned entries, so no budget path resolves a still-held source');
+  assert.ok(
+    unsetAt > 0 && rewriteAt > unsetAt,
+    'any pre-existing map must be written back only AFTER the deletion lands'
+  );
+  assert.match(
+    restore,
+    /deleteEmbeddedDocuments\('Item', itemIds\)[\s\S]*?unsetFlag/,
+    'owned copies must be deleted before the learned entries, so no budget path resolves a still-held source'
+  );
   assert.match(restore, /deleteRecipeItemDefinition\(systemId, definitionId\)/);
   // `deleteRecipeItemDefinition` nulls `recipeItemId` / `linkedRecipeItemUuid` on every
   // recipe the definition claimed, so membership is dropped FIRST and the two link
   // fields are repaired from a setup snapshot if they ever drift.
   assert.match(
     restore,
-    /updateRecipeItemDefinition\(systemId, definitionId, \{ recipeIds: \[\] \}\)[\s\S]*?deleteRecipeItemDefinition\(systemId, definitionId\)/,
+    /updateRecipeItemDefinition\(systemId, definitionId, \{ recipeIds: \[\] \}\)[\s\S]*?deleteRecipeItemDefinition\(systemId, definitionId\)/
   );
   assert.match(restore, /recipe\.linkedRecipeItemUuid = links\.linkedRecipeItemUuid/);
   assert.match(setup, /recipeLinks: \{[\s\S]*?linkedRecipeItemUuid: recipe\.linkedRecipeItemUuid/);
@@ -1748,11 +1917,14 @@ test('the Knowledge walk seeds every projected state, proves the inert merge, an
   assert.match(
     HARNESS,
     /shouldRunScreenshotSection\('knowledge'\)[\s\S]*?runFixturedScreenshotSection\(\{[\s\S]*?step: 'knowledge-surface-evidence',[\s\S]*?restore: \(fixture\) => restoreKnowledgeFixture\(/,
-    'the Knowledge section must hand its restore to the shared fixtured-section helper',
+    'the Knowledge section must hand its restore to the shared fixtured-section helper'
   );
   // The narrow frame is captured ABOVE the 831px collapse, which is the band where
   // three columns still hold and the detail pane is at its narrowest.
-  assert.match(HARNESS, /setManagerWindowSize\(page, \{ width: 880, height: 900 \}\)[\s\S]*?assertManagerLayoutStable\(page, 'knowledge narrow'\)/);
+  assert.match(
+    HARNESS,
+    /setManagerWindowSize\(page, \{ width: 880, height: 900 \}\)[\s\S]*?assertManagerLayoutStable\(page, 'knowledge narrow'\)/
+  );
   assert.ok(HARNESS.includes("assertManagerLayoutStable(page, 'knowledge normal')"));
   assert.ok(HARNESS.includes("'.manager-knowledge-copy-row'"));
 });
@@ -1779,47 +1951,60 @@ test('Tool tab geometry contract rejects clipping, actual overflow, and a missin
   };
   assert.doesNotThrow(() => toolTabContracts.assertToolStudioTabContainment(valid));
   assert.throws(
-    () => toolTabContracts.assertToolStudioTabContainment({
-      ...valid,
-      tabButtons: valid.tabButtons.slice(0, 2),
-    }),
-    /three measurable tabs/,
+    () =>
+      toolTabContracts.assertToolStudioTabContainment({
+        ...valid,
+        tabButtons: valid.tabButtons.slice(0, 2),
+      }),
+    /three measurable tabs/
   );
   assert.throws(
-    () => toolTabContracts.assertToolStudioTabContainment({
-      ...valid,
-      tabsOverflow: { ...valid.tabsOverflow, scrollWidth: 340 },
-    }),
-    /horizontally scrollable/,
+    () =>
+      toolTabContracts.assertToolStudioTabContainment({
+        ...valid,
+        tabsOverflow: { ...valid.tabsOverflow, scrollWidth: 340 },
+      }),
+    /horizontally scrollable/
   );
   assert.throws(
-    () => toolTabContracts.assertToolStudioTabContainment({
-      ...valid,
-      // The LAST tab, derived rather than written: this case pushed index 3 past the strip's
-      // right edge, and when issue 1373 retired `Overview` there was no index 3 left to push,
-      // so nothing escaped, nothing threw, and the clipping arm silently stopped testing.
-      tabButtons: valid.tabButtons.map((tab, index) => (
-        index === valid.tabButtons.length - 1 ? { ...tab, right: 520 } : tab
-      )),
-    }),
-    /within visible tab list escapes horizontal containment/,
+    () =>
+      toolTabContracts.assertToolStudioTabContainment({
+        ...valid,
+        // The LAST tab, derived rather than written: this case pushed index 3 past the strip's
+        // right edge, and when issue 1373 retired `Overview` there was no index 3 left to push,
+        // so nothing escaped, nothing threw, and the clipping arm silently stopped testing.
+        tabButtons: valid.tabButtons.map((tab, index) =>
+          index === valid.tabButtons.length - 1 ? { ...tab, right: 520 } : tab
+        ),
+      }),
+    /within visible tab list escapes horizontal containment/
   );
 });
 
 test('Tool evidence contracts reject leaked horizontal state and duplicate store mutations', () => {
-  assert.doesNotThrow(() => assertToolStudioHorizontalScrollSettled([
-    { id: 'manager', scrollLeft: 0 },
-    { id: 'editor', scrollLeft: 0 },
-  ], 'stress frame'));
-  assert.throws(
-    () => assertToolStudioHorizontalScrollSettled([
-      { id: 'editor', scrollLeft: 24 },
-    ], 'stress frame'),
-    /leaked horizontal scroll/,
+  assert.doesNotThrow(() =>
+    assertToolStudioHorizontalScrollSettled(
+      [
+        { id: 'manager', scrollLeft: 0 },
+        { id: 'editor', scrollLeft: 0 },
+      ],
+      'stress frame'
+    )
   );
-  assert.doesNotThrow(() => assertSingleToolMutation({
-    calls: [{ method: 'patchToolDraft', args: [] }],
-  }, 'patchToolDraft', 'repair OR add'));
+  assert.throws(
+    () =>
+      assertToolStudioHorizontalScrollSettled([{ id: 'editor', scrollLeft: 24 }], 'stress frame'),
+    /leaked horizontal scroll/
+  );
+  assert.doesNotThrow(() =>
+    assertSingleToolMutation(
+      {
+        calls: [{ method: 'patchToolDraft', args: [] }],
+      },
+      'patchToolDraft',
+      'repair OR add'
+    )
+  );
   for (const calls of [
     [],
     [{ method: 'patchToolDraft' }, { method: 'patchToolDraft' }],
@@ -1827,7 +2012,7 @@ test('Tool evidence contracts reject leaked horizontal state and duplicate store
   ]) {
     assert.throws(
       () => assertSingleToolMutation({ calls }, 'patchToolDraft', 'repair OR add'),
-      /exactly one patchToolDraft mutation/,
+      /exactly one patchToolDraft mutation/
     );
   }
 });
@@ -1835,16 +2020,16 @@ test('Tool evidence contracts reject leaked horizontal state and duplicate store
 test('the Tool Studio run writes one summary/manifest identity with head, target labels, and measured clips', () => {
   assert.match(
     HARNESS,
-    /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha: resolveScreenshotHeadSha\(\{[\s\S]*?explicitHeadSha: process\.env\.FOUNDRY_SCREENSHOT_HEAD_SHA,[\s\S]*?ciHeadSha: process\.env\.GITHUB_SHA,[\s\S]*?\}\),[\s\S]*?targetLabels:/,
+    /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha: resolveScreenshotHeadSha\(\{[\s\S]*?explicitHeadSha: process\.env\.FOUNDRY_SCREENSHOT_HEAD_SHA,[\s\S]*?ciHeadSha: process\.env\.GITHUB_SHA,[\s\S]*?\}\),[\s\S]*?targetLabels:/
   );
   assert.match(HARNESS, /results\.screenshotRun = screenshotRunIdentity/);
   assert.match(
     HARNESS,
-    /await writeFile\([\s\S]*?'screenshot-manifest\.json'[\s\S]*?\.\.\.screenshotRunIdentity,[\s\S]*?captures: screenshotManifestEntries/,
+    /await writeFile\([\s\S]*?'screenshot-manifest\.json'[\s\S]*?\.\.\.screenshotRunIdentity,[\s\S]*?captures: screenshotManifestEntries/
   );
   assert.match(
     HARNESS,
-    /screenshotManifestEntries\.push\(\{[\s\S]*?label,[\s\S]*?file: `screenshot-\$\{num\}-\$\{label\}\.png`,[\s\S]*?width:[\s\S]*?height:/,
+    /screenshotManifestEntries\.push\(\{[\s\S]*?label,[\s\S]*?file: `screenshot-\$\{num\}-\$\{label\}\.png`,[\s\S]*?width:[\s\S]*?height:/
   );
 });
 
@@ -1853,24 +2038,24 @@ test('the Tool Studio fixture composes durable Tool identity through the canonic
   assert.match(
     HARNESS,
     /name: 'Smoke Tool Studio Replacement Item'[\s\S]*?img: sourceTemplate\.img/,
-    'the replacement Item must reuse a resolved fixture image rather than request a missing core asset',
+    'the replacement Item must reuse a resolved fixture image rather than request a missing core asset'
   );
   assert.match(HARNESS, /source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\)/);
   assert.match(HARNESS, /source\.unsetFlag\('fabricate', 'fabricate\.roles'\)/);
   assert.match(
     HARNESS,
     /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\) await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*if \(fixture\.sourceCreated\) await source\.delete\(\);\s*\}/,
-    'restoration must clear the fixture leaf, restore any prior roles snapshot, and delete the owned Smith fixture',
+    'restoration must clear the fixture leaf, restore any prior roles snapshot, and delete the owned Smith fixture'
   );
   assert.match(
     HARNESS,
     /flags\.fabricate\.fabricate\.roles\.\$\{systemId\}\.toolId/,
-    'the owned replacement fixture must seed the same durable identity shape runtime readers use',
+    'the owned replacement fixture must seed the same durable identity shape runtime readers use'
   );
   assert.match(
     HARNESS,
     /flags\.fabricate\.fabricate\.roles\.\$\{systemId\}\.componentId/,
-    'replacement evidence must inspect the canonical component-identity path',
+    'replacement evidence must inspect the canonical component-identity path'
   );
   assert.doesNotMatch(HARNESS, /source\.(?:get|set|unset)Flag\('fabricate', 'roles'/);
   assert.doesNotMatch(HARNESS, /flags\.fabricate\.roles\.\$\{systemId\}\.(?:toolId|componentId)/);
@@ -1904,14 +2089,18 @@ test('the harness wires a scoped-skip guard for every declared section (drift gu
   for (const section of D0_SKIPPABLE_SECTIONS) {
     assert.ok(
       HARNESS.includes(`shouldRunScreenshotSection('${section.name}')`),
-      `section '${section.name}' has no shouldRunScreenshotSection guard in the harness — it would never be skipped`,
+      `section '${section.name}' has no shouldRunScreenshotSection guard in the harness — it would never be skipped`
     );
   }
   // The guard is inert under rc/ci/full: it short-circuits true when scoping is off.
-  assert.ok(/function shouldRunScreenshotSection[\s\S]*?if \(!SCREENSHOT_SCOPING_ACTIVE\) return true;/.test(HARNESS));
+  assert.ok(
+    /function shouldRunScreenshotSection[\s\S]*?if \(!SCREENSHOT_SCOPING_ACTIVE\) return true;/.test(
+      HARNESS
+    )
+  );
 });
 
-test('no skippable-section label sits inside a DIFFERENT section\'s guard block (cross-section drift guard)', () => {
+test("no skippable-section label sits inside a DIFFERENT section's guard block (cross-section drift guard)", () => {
   // The partition test proves the MAP assigns each D0 label to one section; this proves
   // the HARNESS captures it there too. Without it, moving a label to the wrong section in
   // the map still passes partition, and a scoped run for its real section would skip its
@@ -1921,7 +2110,7 @@ test('no skippable-section label sits inside a DIFFERENT section\'s guard block 
   // captureRecipeEditorRoundtrip -> 'manager-recipes-editor-roundtrip') fall in no span
   // and are simply never attributed here — the invariant is only that a label must never
   // land in the WRONG span, which such labels cannot.
-  const guards = D0_SKIPPABLE_SECTIONS.map(section => {
+  const guards = D0_SKIPPABLE_SECTIONS.map((section) => {
     const at = HARNESS.indexOf(`shouldRunScreenshotSection('${section.name}')`);
     assert.ok(at !== -1, `section '${section.name}' guard not found in harness`);
     return { name: section.name, at };
@@ -1936,7 +2125,7 @@ test('no skippable-section label sits inside a DIFFERENT section\'s guard block 
       for (const label of other.labels) {
         assert.ok(
           !span.includes(`'${label}'`),
-          `label '${label}' is mapped to section '${other.name}' but its literal sits inside the '${guards[i].name}' guard block — a scoped run for '${other.name}' would skip its frame (cross-section drift)`,
+          `label '${label}' is mapped to section '${other.name}' but its literal sits inside the '${guards[i].name}' guard block — a scoped run for '${other.name}' would skip its frame (cross-section drift)`
         );
       }
     }

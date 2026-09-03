@@ -25,8 +25,8 @@ const harnesses = new Map(
         repoRoot,
         tmpPrefix: `fabricate-primitive-${name.toLowerCase()}-`,
         compiledModules: [componentPath],
-        componentPath
-      })
+        componentPath,
+      }),
     ];
   })
 );
@@ -48,7 +48,10 @@ afterEach(() => {
 describe('Recipe Studio primitives are import-free leaves', () => {
   it('never imports foundryBridge, a model, or a util', () => {
     for (const name of PRIMITIVES) {
-      const source = readFileSync(resolve(repoRoot, `src/ui/svelte/components/${name}.svelte`), 'utf8');
+      const source = readFileSync(
+        resolve(repoRoot, `src/ui/svelte/components/${name}.svelte`),
+        'utf8'
+      );
       const imports = source.match(/^\s*import\s.*$/gm) || [];
       assert.deepEqual(
         imports,
@@ -60,7 +63,10 @@ describe('Recipe Studio primitives are import-free leaves', () => {
 
   it('renders no gradient surfaces', () => {
     for (const name of PRIMITIVES) {
-      const source = readFileSync(resolve(repoRoot, `src/ui/svelte/components/${name}.svelte`), 'utf8');
+      const source = readFileSync(
+        resolve(repoRoot, `src/ui/svelte/components/${name}.svelte`),
+        'utf8'
+      );
       assert.ok(
         !/\b(?:linear|radial|conic)-gradient\s*\(/.test(source),
         `${name}.svelte must stay flat (flat-ui-style-contract)`
@@ -71,7 +77,12 @@ describe('Recipe Studio primitives are import-free leaves', () => {
 
 describe('Stepper (mounted)', () => {
   it('exposes a typeable number input, not a click-only control', async () => {
-    const root = await harnessFor('Stepper').mount({ value: 3, min: 1, max: 9, ariaLabel: 'Quantity' });
+    const root = await harnessFor('Stepper').mount({
+      value: 3,
+      min: 1,
+      max: 9,
+      ariaLabel: 'Quantity',
+    });
     const input = root.querySelector('[data-stepper-input]');
 
     assert.equal(input.tagName, 'INPUT');
@@ -82,7 +93,12 @@ describe('Stepper (mounted)', () => {
 
   it('commits a typed value through onChange', async () => {
     const changes = [];
-    const root = await harnessFor('Stepper').mount({ value: 3, min: 1, max: 9, onChange: (next) => changes.push(next) });
+    const root = await harnessFor('Stepper').mount({
+      value: 3,
+      min: 1,
+      max: 9,
+      onChange: (next) => changes.push(next),
+    });
     const input = root.querySelector('[data-stepper-input]');
 
     input.value = '7';
@@ -94,7 +110,12 @@ describe('Stepper (mounted)', () => {
 
   it('clamps a typed value to the max on blur', async () => {
     const changes = [];
-    const root = await harnessFor('Stepper').mount({ value: 3, min: 1, max: 9, onChange: (next) => changes.push(next) });
+    const root = await harnessFor('Stepper').mount({
+      value: 3,
+      min: 1,
+      max: 9,
+      onChange: (next) => changes.push(next),
+    });
     const input = root.querySelector('[data-stepper-input]');
 
     input.value = '40';
@@ -106,7 +127,13 @@ describe('Stepper (mounted)', () => {
 
   it('steps with the adjunct buttons and disables them at the bounds', async () => {
     const changes = [];
-    const root = await harnessFor('Stepper').mount({ value: 1, min: 1, max: 2, step: 1, onChange: (next) => changes.push(next) });
+    const root = await harnessFor('Stepper').mount({
+      value: 1,
+      min: 1,
+      max: 2,
+      step: 1,
+      onChange: (next) => changes.push(next),
+    });
 
     const decrement = root.querySelector('[data-stepper-decrement]');
     const increment = root.querySelector('[data-stepper-increment]');
@@ -123,7 +150,7 @@ describe('StatusPill (mounted)', () => {
     { tone: 'subtle', icon: '', label: 'Disabled' },
     { tone: 'accent', icon: 'fas fa-lock', label: 'Locked' },
     { tone: 'danger', icon: 'fas fa-circle-exclamation', label: "Can't enable" },
-    { tone: 'warning', icon: 'fas fa-pen-ruler', label: 'Incomplete' }
+    { tone: 'warning', icon: 'fas fa-pen-ruler', label: 'Incomplete' },
   ];
 
   for (const { tone, icon, label } of TONES) {
@@ -143,7 +170,10 @@ describe('StatusPill (mounted)', () => {
 
 describe('Medallion (mounted)', () => {
   it('renders the resolved image when one is passed', async () => {
-    const root = await harnessFor('Medallion').mount({ src: 'icons/svg/book.svg', icon: 'fas fa-scroll' });
+    const root = await harnessFor('Medallion').mount({
+      src: 'icons/svg/book.svg',
+      icon: 'fas fa-scroll',
+    });
     const medallion = root.querySelector('[data-medallion]');
 
     assert.equal(medallion.dataset.medallion, 'image');
@@ -173,7 +203,7 @@ describe('CollapsibleGroupHeader (mounted)', () => {
       name: 'Alchemy',
       countText: '4 recipes',
       expanded: true,
-      controls: 'group-alchemy'
+      controls: 'group-alchemy',
     });
     const header = root.querySelector('[data-group-header="Alchemy"]');
 
@@ -182,7 +212,10 @@ describe('CollapsibleGroupHeader (mounted)', () => {
     assert.equal(header.getAttribute('aria-controls'), 'group-alchemy');
     assert.ok(header.textContent.includes('Alchemy'));
     assert.ok(header.textContent.includes('4 recipes'));
-    assert.ok(header.querySelector('i.fa-chevron-down'), 'an expanded group shows the down chevron');
+    assert.ok(
+      header.querySelector('i.fa-chevron-down'),
+      'an expanded group shows the down chevron'
+    );
 
     // A tight LEFT CLUSTER: chevron, folder, name, count — then empty bar. `flex: 1 1 auto`
     // on the name grew it to fill the row and flung the count to the far right edge, which
@@ -203,12 +236,17 @@ describe('CollapsibleGroupHeader (mounted)', () => {
       countText: '2 recipes',
       expanded: false,
       controls: 'group-smithing',
-      onToggle: () => { toggles += 1; }
+      onToggle: () => {
+        toggles += 1;
+      },
     });
     const header = root.querySelector('[data-group-header="Smithing"]');
 
     assert.equal(header.getAttribute('aria-expanded'), 'false');
-    assert.ok(header.querySelector('i.fa-chevron-right'), 'a collapsed group shows the right chevron');
+    assert.ok(
+      header.querySelector('i.fa-chevron-right'),
+      'a collapsed group shows the right chevron'
+    );
 
     header.click();
     flushSync();

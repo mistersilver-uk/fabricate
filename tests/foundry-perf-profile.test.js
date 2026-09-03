@@ -59,7 +59,10 @@ import {
   seedFidelityProbe,
   toItemCreateData,
 } from '../scripts/lib/foundryPerfSeed.js';
-import { defaultRunTimeoutMs, EXPECTED_WALK_MS_BY_PROFILE } from '../scripts/lib/foundryRunBudget.js';
+import {
+  defaultRunTimeoutMs,
+  EXPECTED_WALK_MS_BY_PROFILE,
+} from '../scripts/lib/foundryRunBudget.js';
 import {
   STARTUP_PHASES,
   STARTUP_PHASE_NAMES,
@@ -179,7 +182,11 @@ test('seeding writes a bounded number of times whatever the corpus size', () => 
       `${label} fixture must batch every actor into one create call`
     );
   }
-  assert.deepEqual(large.writes, small.writes, 'the write count must not depend on the corpus size');
+  assert.deepEqual(
+    large.writes,
+    small.writes,
+    'the write count must not depend on the corpus size'
+  );
   assert.ok(
     large.actors.length > 1,
     'the fixture must seed MORE than one actor, or the batching assertion above is vacuous'
@@ -205,7 +212,11 @@ test('a multi-point inventory series seeds the point that was asked for', () => 
   assert.equal(first.invariant.inventorySeriesLength, 3);
   assert.equal(first.invariant.requestedMix.stacks, 6);
   assert.equal(last.invariant.inventoryPoint, 2);
-  assert.equal(last.invariant.requestedMix.stacks, 24, 'the third point holds four times the first');
+  assert.equal(
+    last.invariant.requestedMix.stacks,
+    24,
+    'the third point holds four times the first'
+  );
   assert.deepEqual(last.writes, first.writes, 'a bigger series point is still three writes');
 
   // A corpus-axis fixture has no series, and must say so rather than claim to be at point 0.
@@ -525,7 +536,9 @@ test('every measurement issue 1073 asks for is declared, with a class and a stat
 
 test('the deferred measurements are exactly the two with no shippable subject', () => {
   assert.deepEqual(
-    deferredMeasurements().map((measurement) => measurement.id).sort(),
+    deferredMeasurements()
+      .map((measurement) => measurement.id)
+      .sort(),
     ['persistence-experiments', 'propagation-unhydrated']
   );
 });
@@ -555,7 +568,10 @@ test('reconciliation names what produced nothing and what nothing declared', () 
   });
 
   assert.deepEqual(reconciled.undeclared, ['not-a-measurement']);
-  assert.ok(reconciled.missing.includes('player-open'), 'an implemented measurement with no result');
+  assert.ok(
+    reconciled.missing.includes('player-open'),
+    'an implemented measurement with no result'
+  );
   assert.ok(
     !reconciled.missing.includes('persistence-experiments'),
     'a deferred measurement producing nothing is expected, not a hole'
@@ -638,10 +654,7 @@ test('two runs are comparable only when host AND Foundry envelopes agree', () =>
 });
 
 test('a run record file name identifies the commit, the arm and the fixture', () => {
-  assert.equal(
-    perfRunFilename(runRecord()),
-    '2026-08-13T10-20-30Z-abcdef1-v14-simple-corpus.json'
-  );
+  assert.equal(perfRunFilename(runRecord()), '2026-08-13T10-20-30Z-abcdef1-v14-simple-corpus.json');
 });
 
 test('timings are compared as ratios, and a one-sided measurement yields none', () => {
@@ -689,7 +702,8 @@ test('the perf check reuses the existing up/run/down lifecycle and declares a pr
   assert.match(source, /=== foundry-test: PREFLIGHT ===/);
   // The preflight must run BEFORE the build and before `up`, or it has not saved anything.
   assert.ok(
-    source.indexOf('=== foundry-test: PREFLIGHT ===') < source.indexOf('=== foundry-test: BUILD ==='),
+    source.indexOf('=== foundry-test: PREFLIGHT ===') <
+      source.indexOf('=== foundry-test: BUILD ==='),
     'the preflight must precede the build'
   );
 });

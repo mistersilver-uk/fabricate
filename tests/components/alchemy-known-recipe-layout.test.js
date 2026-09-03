@@ -113,7 +113,11 @@ test('the recipe name renders fully even when the signature is a long raw-essenc
 
     // Bug-1 fixed: the resolved sig fits, so NOTHING overflows the column.
     const short = await measure(p, 'Blade Venom', SHORT_SIG);
-    assert.equal(short.name.scrollW, short.name.clientW, 'the name renders fully with the resolved sig');
+    assert.equal(
+      short.name.scrollW,
+      short.name.clientW,
+      'the name renders fully with the resolved sig'
+    );
     assert.equal(short.sig.scrollW, short.sig.clientW, 'the resolved sig fits without clipping');
     assert.equal(
       short.list.scrollW,
@@ -135,8 +139,16 @@ test('a genuinely long recipe name clips from the RIGHT with an ellipsis, never 
     // so text-overflow: ellipsis trims the RIGHT. The left edge never shifts (which is
     // what would reveal only a right-hand tail like "nom").
     assert.ok(long.name.scrollW > long.name.clientW, 'a long name overflows and is clipped');
-    assert.equal(long.name.left, before.name.left, 'the name stays left-anchored (clips right, not left)');
-    assert.equal(long.name.clientW, before.name.clientW, 'the name column width is stable regardless of name length');
+    assert.equal(
+      long.name.left,
+      before.name.left,
+      'the name stays left-anchored (clips right, not left)'
+    );
+    assert.equal(
+      long.name.clientW,
+      before.name.clientW,
+      'the name column width is stable regardless of name length'
+    );
   } finally {
     await browser.close();
   }

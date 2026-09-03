@@ -112,7 +112,11 @@ test('handles systems with no recipe items and missing config safely', () => {
   const systems = [
     { id: 'a', name: 'No defs, no config' },
     { id: 'b', name: 'Empty defs', recipeItemDefinitions: [] },
-    { id: 'c', name: 'Config, no defs', recipeVisibility: { knowledge: { mode: 'item', item: { limitUses: true, maxUses: 1 } } } },
+    {
+      id: 'c',
+      name: 'Config, no defs',
+      recipeVisibility: { knowledge: { mode: 'item', item: { limitUses: true, maxUses: 1 } } },
+    },
   ];
   const out = migrateRecipeItemCapsPerItem({ systems });
   assert.equal(out.systems.length, 3);

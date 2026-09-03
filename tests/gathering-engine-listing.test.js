@@ -8,7 +8,7 @@ const actor = {
   id: 'actor-1',
   uuid: 'Actor.actor-1',
   name: 'Gatherer',
-  items: []
+  items: [],
 };
 
 function makeEngine({
@@ -22,7 +22,7 @@ function makeEngine({
   toolAvailability = null,
   richState = null,
   systemManager = null,
-  calls = {}
+  calls = {},
 } = {}) {
   calls.visibility = [];
   calls.scene = [];
@@ -33,47 +33,50 @@ function makeEngine({
     richState,
     systemManager,
     environmentStore: {
-      list: () => environments
+      list: () => environments,
     },
     getSystems: () => systems,
     getSelectableActors: () => selectableActors,
-    isActorSelectable: ({ actor: candidate }) => selectableActors.some(entry => sameActor(entry, candidate)),
+    isActorSelectable: ({ actor: candidate }) =>
+      selectableActors.some((entry) => sameActor(entry, candidate)),
     evaluator: {
       evaluateVisibility: async ({ task }) => {
         calls.visibility.push(task.id);
         const result = visibility instanceof Map ? visibility.get(task.id) : visibility?.[task.id];
         return result ?? { visible: true, reasonCode: 'VISIBLE', diagnostic: null };
-      }
+      },
     },
     sceneAccess: {
       canAttempt: ({ environment, actor: selectedActor, viewer: selectedViewer }) => {
         calls.scene.push({ environment, actor: selectedActor, viewer: selectedViewer });
-        if (typeof sceneAccess === 'function') return sceneAccess({ environment, actor: selectedActor, viewer: selectedViewer });
+        if (typeof sceneAccess === 'function')
+          return sceneAccess({ environment, actor: selectedActor, viewer: selectedViewer });
         return sceneAccess ?? { allowed: true };
-      }
+      },
     },
     runManager: {
-      getActiveRuns: () => activeRuns instanceof Map ? Array.from(activeRuns.values()) : activeRuns,
+      getActiveRuns: () =>
+        activeRuns instanceof Map ? Array.from(activeRuns.values()) : activeRuns,
       getRunHistory: () => history,
       findActiveRunForTask: (selectedActor, taskId) => {
         calls.activeRuns.push({ actor: selectedActor, taskId });
-        return activeRuns instanceof Map ? activeRuns.get(taskId) : activeRuns?.[taskId] ?? null;
-      }
+        return activeRuns instanceof Map ? activeRuns.get(taskId) : (activeRuns?.[taskId] ?? null);
+      },
     },
     toolAvailability: {
       check: (payload) => {
         calls.tools.push(payload);
         if (typeof toolAvailability === 'function') return toolAvailability(payload);
         return toolAvailability ?? { available: true, missing: [], failedRequirements: [] };
-      }
+      },
     },
-    localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
+    localize: (key, data) => (data ? `${key}:${JSON.stringify(data)}` : key),
   });
 }
 
 const LIBRARY_TOOLS = [
   { id: 'tool-sickle', componentId: 'silver-sickle', enabled: true },
-  { id: 'tool-a', componentId: 'tool-comp-a', enabled: true }
+  { id: 'tool-a', componentId: 'tool-comp-a', enabled: true },
 ];
 
 function environment(overrides = {}) {
@@ -86,12 +89,12 @@ function environment(overrides = {}) {
     selectionMode: 'targeted',
     sceneUuid: null,
     tasks: [task()],
-    ...overrides
+    ...overrides,
   };
   Object.defineProperty(env, '__libraryTools', {
-    value: new Map(LIBRARY_TOOLS.map(t => [t.id, t])),
+    value: new Map(LIBRARY_TOOLS.map((t) => [t.id, t])),
     enumerable: false,
-    configurable: true
+    configurable: true,
   });
   return env;
 }
@@ -107,16 +110,18 @@ function task(overrides = {}) {
     toolIds: [],
     resultGroups: [{ id: 'group-a', name: 'Iron', results: [] }],
     resultSelection: { provider: 'macroOutcome', macroUuid: 'Macro.outcome' },
-    ...overrides
+    ...overrides,
   };
 }
 
 function sameActor(left, right) {
-  return Boolean(left && right && (left === right || left.id === right.id || left.uuid === right.uuid));
+  return Boolean(
+    left && right && (left === right || left.id === right.id || left.uuid === right.uuid)
+  );
 }
 
 function reasonCodes(entry) {
-  return entry.blockedReasons.map(reason => reason.code);
+  return entry.blockedReasons.map((reason) => reason.code);
 }
 
 test('listForActor reports no selectable actors before environment queries matter', async () => {
@@ -145,12 +150,12 @@ test('listForActor reports no environments configured after gathering feature fi
   const engine = makeEngine({
     environments: [
       environment({ id: 'disabled-feature-env', craftingSystemId: 'system-disabled' }),
-      environment({ id: 'missing-system-env', craftingSystemId: 'missing-system' })
+      environment({ id: 'missing-system-env', craftingSystemId: 'missing-system' }),
     ],
     systems: [
       { id: 'system-a', enabled: true, features: { gathering: true } },
-      { id: 'system-disabled', enabled: true, features: { gathering: false } }
-    ]
+      { id: 'system-disabled', enabled: true, features: { gathering: false } },
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -171,7 +176,7 @@ test('listForActor keeps active runs and history when browsing has no configured
     status: 'waitingTime',
     startedAtWorldTime: 100,
     updatedAtWorldTime: 100,
-    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 }
+    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 },
   };
   const historyRun = {
     id: 'run-history-no-env',
@@ -184,12 +189,12 @@ test('listForActor keeps active runs and history when browsing has no configured
     startedAtWorldTime: 10,
     updatedAtWorldTime: 20,
     completedAtWorldTime: 20,
-    checkResult: { blind: true, status: 'cancelled' }
+    checkResult: { blind: true, status: 'cancelled' },
   };
   const engine = makeEngine({
     environments: [],
     activeRuns: new Map([['task-gone', activeRun]]),
-    history: [historyRun]
+    history: [historyRun],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -212,7 +217,9 @@ test('listForActor keeps active runs and history when browsing has no configured
 test('listForActor reports no visible targeted tasks when all targeted task gates hide them', async () => {
   const engine = makeEngine({
     environments: [environment({ tasks: [task({ id: 'task-hidden' })] })],
-    visibility: new Map([['task-hidden', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }]])
+    visibility: new Map([
+      ['task-hidden', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }],
+    ]),
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -233,7 +240,7 @@ test('listForActor keeps targeted active runs and history when no tasks are visi
     status: 'waitingTime',
     startedAtWorldTime: 100,
     updatedAtWorldTime: 100,
-    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 }
+    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 },
   };
   const historyRun = {
     id: 'run-history-hidden',
@@ -245,13 +252,15 @@ test('listForActor keeps targeted active runs and history when no tasks are visi
     status: 'failed',
     startedAtWorldTime: 10,
     updatedAtWorldTime: 20,
-    completedAtWorldTime: 20
+    completedAtWorldTime: 20,
   };
   const engine = makeEngine({
     environments: [environment({ tasks: [task({ id: 'task-hidden', name: 'Gather Tin' })] })],
-    visibility: new Map([['task-hidden', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }]]),
+    visibility: new Map([
+      ['task-hidden', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }],
+    ]),
     activeRuns: new Map([['task-hidden', activeRun]]),
-    history: [historyRun]
+    history: [historyRun],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -272,10 +281,12 @@ test('listForActor reports blind sole-task hidden without exposing the task', as
     environments: [
       environment({
         selectionMode: 'blind',
-        tasks: [task({ id: 'blind-task', name: 'Secret Mooncap Patch' })]
-      })
+        tasks: [task({ id: 'blind-task', name: 'Secret Mooncap Patch' })],
+      }),
     ],
-    visibility: new Map([['blind-task', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }]])
+    visibility: new Map([
+      ['blind-task', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }],
+    ]),
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -297,7 +308,7 @@ test('listForActor keeps blind active runs and history redacted when the sole ta
     status: 'waitingTime',
     startedAtWorldTime: 100,
     updatedAtWorldTime: 100,
-    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 }
+    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 },
   };
   const historyRun = {
     id: 'blind-history-hidden',
@@ -312,13 +323,15 @@ test('listForActor keeps blind active runs and history redacted when the sole ta
     completedAtWorldTime: 20,
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-truffle', quantity: 1 }],
     usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-spade', quantity: 1 }],
-    checkResult: { provider: 'macro', value: 19 }
+    checkResult: { provider: 'macro', value: 19 },
   };
   const engine = makeEngine({
     environments: [environment({ selectionMode: 'blind', tasks: [secretTask] })],
-    visibility: new Map([[secretTask.id, { visible: false, reasonCode: 'HIDDEN', diagnostic: null }]]),
+    visibility: new Map([
+      [secretTask.id, { visible: false, reasonCode: 'HIDDEN', diagnostic: null }],
+    ]),
     activeRuns: new Map([[secretTask.id, activeRun]]),
-    history: [historyRun]
+    history: [historyRun],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -344,8 +357,12 @@ test('scene/token failure blocks attemptability but keeps the environment listed
   const calls = {};
   const engine = makeEngine({
     environments: [environment({ sceneUuid: 'Scene.old-mine' })],
-    sceneAccess: { allowed: false, code: 'SCENE_TOKEN_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.TokenMissing' },
-    calls
+    sceneAccess: {
+      allowed: false,
+      code: 'SCENE_TOKEN_BLOCKED',
+      messageKey: 'FABRICATE.Gathering.Blocked.TokenMissing',
+    },
+    calls,
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -363,21 +380,24 @@ test('duplicate active run blocks attemptability through GatheringRunManager.fin
   const calls = {};
   const engine = makeEngine({
     activeRuns: new Map([['task-a', { id: 'run-active', taskId: 'task-a' }]]),
-    calls
+    calls,
   });
 
   const listing = await engine.listForActor({ viewer, actor });
 
   assert.equal(listing.attemptable, false);
   assert.deepEqual(reasonCodes(listing.environments[0].tasks[0]), ['DUPLICATE_ACTIVE_RUN']);
-  assert.deepEqual(calls.activeRuns.map(call => call.taskId), ['task-a']);
+  assert.deepEqual(
+    calls.activeRuns.map((call) => call.taskId),
+    ['task-a']
+  );
 });
 
 test('tool blocking uses only the acting actor and does not mutate items', async () => {
   const componentSourceActor = { id: 'source-actor', items: [{ id: 'source-tool' }] };
   const actingActor = {
     ...actor,
-    items: Object.freeze([{ id: 'acting-item', system: { quantity: 1 } }])
+    items: Object.freeze([{ id: 'acting-item', system: { quantity: 1 } }]),
   };
   const calls = {};
   const tool = { componentId: 'tool-comp-a', degradesOnUse: true, maxUses: 2 };
@@ -386,9 +406,9 @@ test('tool blocking uses only the acting actor and does not mutate items', async
     selectableActors: [actingActor, componentSourceActor],
     toolAvailability: ({ actor: selectedActor }) => ({
       available: false,
-      missing: [{ componentId: 'tool-comp-a', actorId: selectedActor.id }]
+      missing: [{ componentId: 'tool-comp-a', actorId: selectedActor.id }],
     }),
-    calls
+    calls,
   });
 
   const listing = await engine.listForActor({ viewer, actor: actingActor });
@@ -410,29 +430,31 @@ test('non-GM visible blind task listing is opaque even when duplicate and tool b
     img: 'icons/commodities/flowers/mushroom-red.webp',
     resolutionMode: 'progressive',
     timeRequirement: { hours: 1 },
-    toolIds: ['tool-sickle']
+    toolIds: ['tool-sickle'],
   });
   const engine = makeEngine({
     environments: [
       environment({
         selectionMode: 'blind',
-        tasks: [revealingTask]
-      })
+        tasks: [revealingTask],
+      }),
     ],
-    visibility: new Map([[
-      revealingTask.id,
-      {
-        visible: true,
-        reasonCode: 'SECRET_MOONCAP_VISIBLE',
-        description: 'Secret Mooncap Patch',
-        diagnostic: { message: 'secret-mooncap-task' }
-      }
-    ]]),
+    visibility: new Map([
+      [
+        revealingTask.id,
+        {
+          visible: true,
+          reasonCode: 'SECRET_MOONCAP_VISIBLE',
+          description: 'Secret Mooncap Patch',
+          diagnostic: { message: 'secret-mooncap-task' },
+        },
+      ],
+    ]),
     activeRuns: new Map([[revealingTask.id, { id: 'run-active', taskId: revealingTask.id }]]),
     toolAvailability: {
       available: false,
-      missing: [{ componentId: 'silver-sickle', taskId: revealingTask.id }]
-    }
+      missing: [{ componentId: 'silver-sickle', taskId: revealingTask.id }],
+    },
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -464,10 +486,10 @@ test('non-GM visible blind task listing is opaque even when duplicate and tool b
   assert.equal(serializedListing.includes('mushroom-red'), false);
   assert.equal(serializedListing.includes('silver-sickle'), false);
   assert.deepEqual(
-    blindTask.blockedReasons.map(reason => [reason.code, reason.data]),
+    blindTask.blockedReasons.map((reason) => [reason.code, reason.data]),
     [
       ['DUPLICATE_ACTIVE_RUN', null],
-      ['TOOL_BLOCKED', null]
+      ['TOOL_BLOCKED', null],
     ]
   );
 });
@@ -481,15 +503,15 @@ test('GM blind task listing exposes real task metadata for inspection', async ()
     img: 'icons/commodities/flowers/mushroom-red.webp',
     resolutionMode: 'progressive',
     timeRequirement: { hours: 1 },
-    toolIds: ['tool-sickle']
+    toolIds: ['tool-sickle'],
   });
   const engine = makeEngine({
     environments: [
       environment({
         selectionMode: 'blind',
-        tasks: [revealingTask]
-      })
-    ]
+        tasks: [revealingTask],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer: gmViewer, actor });
@@ -510,21 +532,27 @@ test('hidden targeted tasks are omitted while visible targeted tasks remain atte
       environment({
         tasks: [
           task({ id: 'visible-task', name: 'Gather Iron' }),
-          task({ id: 'hidden-task', name: 'Gather Gold' })
-        ]
-      })
+          task({ id: 'hidden-task', name: 'Gather Gold' }),
+        ],
+      }),
     ],
     visibility: new Map([
       ['visible-task', { visible: true, reasonCode: 'VISIBLE', diagnostic: null }],
-      ['hidden-task', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }]
-    ])
+      ['hidden-task', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }],
+    ]),
   });
 
   const listing = await engine.listForActor({ viewer, actor });
 
   assert.equal(listing.attemptable, true);
-  assert.deepEqual(listing.environments.map(entry => entry.id), ['env-a']);
-  assert.deepEqual(listing.environments[0].tasks.map(entry => entry.id), ['visible-task']);
+  assert.deepEqual(
+    listing.environments.map((entry) => entry.id),
+    ['env-a']
+  );
+  assert.deepEqual(
+    listing.environments[0].tasks.map((entry) => entry.id),
+    ['visible-task']
+  );
   assert.equal(listing.environments[0].tasks[0].attemptable, true);
   assert.deepEqual(listing.environments[0].tasks[0].blockedReasons, []);
 });
@@ -540,7 +568,7 @@ test('listForActor returns active timed runs and recent terminal history for tar
     status: 'waitingTime',
     startedAtWorldTime: 100,
     updatedAtWorldTime: 100,
-    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 }
+    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 },
   };
   const historyRun = {
     id: 'run-history',
@@ -555,11 +583,11 @@ test('listForActor returns active timed runs and recent terminal history for tar
     completedAtWorldTime: 20,
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
     usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }],
-    checkResult: { value: 17, status: 'success' }
+    checkResult: { value: 17, status: 'success' },
   };
   const engine = makeEngine({
     activeRuns: new Map([['task-a', activeRun]]),
-    history: [historyRun]
+    history: [historyRun],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -584,8 +612,20 @@ test('listForActor returns active timed runs and recent terminal history for tar
 
 test('listForActor annotates environments and run rows with gathering system metadata', async () => {
   const systems = [
-    { id: 'system-a', name: 'Mythwright', enabled: true, features: { gathering: true }, components: [] },
-    { id: 'system-b', name: 'Alchemy', enabled: true, features: { gathering: true }, components: [] }
+    {
+      id: 'system-a',
+      name: 'Mythwright',
+      enabled: true,
+      features: { gathering: true },
+      components: [],
+    },
+    {
+      id: 'system-b',
+      name: 'Alchemy',
+      enabled: true,
+      features: { gathering: true },
+      components: [],
+    },
   ];
   const activeRun = {
     id: 'run-active',
@@ -594,7 +634,7 @@ test('listForActor annotates environments and run rows with gathering system met
     craftingSystemId: 'system-b',
     environmentId: 'env-b',
     taskId: 'task-b',
-    status: 'waitingTime'
+    status: 'waitingTime',
   };
   const historyRun = {
     id: 'run-history',
@@ -603,26 +643,37 @@ test('listForActor annotates environments and run rows with gathering system met
     craftingSystemId: 'system-a',
     environmentId: 'env-a',
     taskId: 'task-a',
-    status: 'succeeded'
+    status: 'succeeded',
   };
   const engine = makeEngine({
     systems,
     environments: [
       environment({ id: 'env-a', craftingSystemId: 'system-a', name: 'Mines' }),
-      environment({ id: 'env-b', craftingSystemId: 'system-b', name: 'Greenhouse', tasks: [task({ id: 'task-b', name: 'Clip Herbs' })] })
+      environment({
+        id: 'env-b',
+        craftingSystemId: 'system-b',
+        name: 'Greenhouse',
+        tasks: [task({ id: 'task-b', name: 'Clip Herbs' })],
+      }),
     ],
     activeRuns: new Map([['task-b', activeRun]]),
-    history: [historyRun]
+    history: [historyRun],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
 
   assert.deepEqual(listing.gatheringSystems, [
     { id: 'system-b', name: 'Alchemy' },
-    { id: 'system-a', name: 'Mythwright' }
+    { id: 'system-a', name: 'Mythwright' },
   ]);
-  assert.equal(listing.environments.find(entry => entry.id === 'env-a').craftingSystemName, 'Mythwright');
-  assert.equal(listing.environments.find(entry => entry.id === 'env-b').craftingSystemName, 'Alchemy');
+  assert.equal(
+    listing.environments.find((entry) => entry.id === 'env-a').craftingSystemName,
+    'Mythwright'
+  );
+  assert.equal(
+    listing.environments.find((entry) => entry.id === 'env-b').craftingSystemName,
+    'Alchemy'
+  );
   assert.equal(listing.activeRuns[0].craftingSystemName, 'Alchemy');
   assert.equal(listing.history[0].craftingSystemName, 'Mythwright');
 });
@@ -633,7 +684,7 @@ test('non-GM blind active and history rows do not expose task identity or termin
     name: 'Secret Mooncap Patch',
     description: 'A hidden mushroom source.',
     img: 'icons/commodities/flowers/mushroom-red.webp',
-    toolIds: ['tool-sickle']
+    toolIds: ['tool-sickle'],
   });
   const activeRun = {
     id: 'blind-active',
@@ -645,7 +696,7 @@ test('non-GM blind active and history rows do not expose task identity or termin
     status: 'waitingTime',
     startedAtWorldTime: 100,
     updatedAtWorldTime: 100,
-    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 }
+    timeGate: { initiatedAt: 100, availableAt: 460, requiredSeconds: 360 },
   };
   const historyRun = {
     id: 'blind-history',
@@ -663,19 +714,19 @@ test('non-GM blind active and history rows do not expose task identity or termin
     checkResult: {
       provider: 'macro',
       value: 22,
-      diagnostic: { message: 'Secret Mooncap Patch' }
-    }
+      diagnostic: { message: 'Secret Mooncap Patch' },
+    },
   };
   const engine = makeEngine({
     environments: [environment({ selectionMode: 'blind', tasks: [secretTask] })],
     activeRuns: new Map([[secretTask.id, activeRun]]),
-    history: [historyRun]
+    history: [historyRun],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
   const serialized = JSON.stringify({
     activeRuns: listing.activeRuns,
-    history: listing.history
+    history: listing.history,
   });
 
   assert.equal(listing.activeRuns[0].blind, true);
@@ -697,7 +748,7 @@ test('non-GM blind active and history rows do not expose task identity or termin
 function stubRichState({ revealCount = 0, biomeTags = [] } = {}) {
   return {
     countRevealedTasks: () => revealCount,
-    resolveBiomeTags: () => biomeTags
+    resolveBiomeTags: () => biomeTags,
   };
 }
 
@@ -706,15 +757,17 @@ test('listForActor surfaces a disabled environment to players as an identity-onl
     // Real composed tasks + a richState that WOULD report a non-zero reveal on a
     // non-locked path; the locked teaser must still pin both counts to 0 so a
     // regression leaking real composition through the teaser would fail here.
-    environments: [environment({
-      id: 'env-locked',
-      name: 'Sealed Vault',
-      enabled: false,
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt' },
-      tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })]
-    })],
-    richState: stubRichState({ revealCount: 2 })
+    environments: [
+      environment({
+        id: 'env-locked',
+        name: 'Sealed Vault',
+        enabled: false,
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt' },
+        tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })],
+      }),
+    ],
+    richState: stubRichState({ revealCount: 2 }),
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -740,13 +793,17 @@ test('listForActor surfaces a disabled environment to players as an identity-onl
 
 test('listForActor still locks a disabled blind environment whose sole task is hidden', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      id: 'env-blind-locked',
-      enabled: false,
-      selectionMode: 'blind',
-      tasks: [task({ id: 'task-hidden' })]
-    })],
-    visibility: new Map([['task-hidden', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }]])
+    environments: [
+      environment({
+        id: 'env-blind-locked',
+        enabled: false,
+        selectionMode: 'blind',
+        tasks: [task({ id: 'task-hidden' })],
+      }),
+    ],
+    visibility: new Map([
+      ['task-hidden', { visible: false, reasonCode: 'HIDDEN', diagnostic: null }],
+    ]),
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -764,15 +821,17 @@ test('listForActor surfaces a disabled environment to a GM as the same identity-
     // GM locked teaser must NOT leak real counts either. A regression that let
     // a non-locked path report through the GM teaser would surface non-zero
     // counts here and fail.
-    environments: [environment({
-      id: 'env-gm-disabled',
-      name: 'Sealed Vault',
-      enabled: false,
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt' },
-      tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })]
-    })],
-    richState: stubRichState({ revealCount: 2 })
+    environments: [
+      environment({
+        id: 'env-gm-disabled',
+        name: 'Sealed Vault',
+        enabled: false,
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt' },
+        tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })],
+      }),
+    ],
+    richState: stubRichState({ revealCount: 2 }),
   });
 
   const listing = await engine.listForActor({ viewer: gmViewer, actor });
@@ -795,14 +854,18 @@ test('listForActor surfaces a disabled environment to a GM as the same identity-
 });
 
 test('listForActor adds reveal/composition/biome fields to an enabled listing from system rules', async () => {
-  const biomeTags = [{ id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }];
+  const biomeTags = [
+    { id: 'forest', label: 'Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+  ];
   const engine = makeEngine({
-    environments: [environment({
-      biomes: ['forest'],
-      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
-      tasks: [task({ id: 'task-1' }), task({ id: 'task-2' })]
-    })],
-    richState: stubRichState({ revealCount: 1, biomeTags })
+    environments: [
+      environment({
+        biomes: ['forest'],
+        rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+        tasks: [task({ id: 'task-1' }), task({ id: 'task-2' })],
+      }),
+    ],
+    richState: stubRichState({ revealCount: 1, biomeTags }),
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -817,12 +880,14 @@ test('listForActor adds reveal/composition/biome fields to an enabled listing fr
 
 test('listForActor ignores an environment.reveal override when resolving revealPolicy', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      // System-level rules say never; a stray environment.reveal must not win.
-      rules: { revealPolicy: 'never' },
-      reveal: { policy: 'onSuccess', scope: 'global' }
-    })],
-    richState: stubRichState({ revealCount: 9 })
+    environments: [
+      environment({
+        // System-level rules say never; a stray environment.reveal must not win.
+        rules: { revealPolicy: 'never' },
+        reveal: { policy: 'onSuccess', scope: 'global' },
+      }),
+    ],
+    richState: stubRichState({ revealCount: 9 }),
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -842,26 +907,30 @@ test('listForActor drops an enabled composed-empty environment but pins a locked
   //    composedTaskCount / discoveredTaskCount are pinned to 0 regardless of
   //    stored reveals; that pinning is what we assert via the locked path.
   const emptyEngine = makeEngine({
-    environments: [environment({
-      id: 'env-empty',
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt' },
-      tasks: []
-    })],
-    richState: stubRichState({ revealCount: 4 })
+    environments: [
+      environment({
+        id: 'env-empty',
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt' },
+        tasks: [],
+      }),
+    ],
+    richState: stubRichState({ revealCount: 4 }),
   });
 
   // Locked env carries a real task; locking (not an empty pool) is what forces
   // the pinned 0 counts on the surfaced teaser.
   const lockedEngine = makeEngine({
-    environments: [environment({
-      id: 'env-locked-counts',
-      enabled: false,
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt' },
-      tasks: [task({ id: 'task-x' })]
-    })],
-    richState: stubRichState({ revealCount: 7 })
+    environments: [
+      environment({
+        id: 'env-locked-counts',
+        enabled: false,
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt' },
+        tasks: [task({ id: 'task-x' })],
+      }),
+    ],
+    richState: stubRichState({ revealCount: 7 }),
   });
 
   const lockedListing = await lockedEngine.listForActor({ viewer, actor });
@@ -881,22 +950,26 @@ function richStateWithReveals(revealedTaskIds = [], biomeTags = []) {
   return {
     countRevealedTasks: () => revealedTaskIds.length,
     listRevealedTaskIds: () => [...revealedTaskIds],
-    resolveBiomeTags: () => biomeTags
+    resolveBiomeTags: () => biomeTags,
   };
 }
 
 test('targeted d100 task listing exposes a static successChance from enabled drop rows', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [task({
-        id: 'd100-task',
-        resolutionMode: 'd100',
-        dropRows: [
-          { id: 'r1', dropRate: 50, enabled: true },
-          { id: 'r2', dropRate: 50, enabled: true }
-        ]
-      })]
-    })]
+    environments: [
+      environment({
+        tasks: [
+          task({
+            id: 'd100-task',
+            resolutionMode: 'd100',
+            dropRows: [
+              { id: 'r1', dropRate: 50, enabled: true },
+              { id: 'r2', dropRate: 50, enabled: true },
+            ],
+          }),
+        ],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -906,13 +979,17 @@ test('targeted d100 task listing exposes a static successChance from enabled dro
 
 test('successChance is null for a non-d100 task', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [task({
-        id: 'routed-task',
-        resolutionMode: 'routed',
-        dropRows: [{ id: 'r', dropRate: 80, enabled: true }]
-      })]
-    })]
+    environments: [
+      environment({
+        tasks: [
+          task({
+            id: 'routed-task',
+            resolutionMode: 'routed',
+            dropRows: [{ id: 'r', dropRate: 80, enabled: true }],
+          }),
+        ],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -921,16 +998,20 @@ test('successChance is null for a non-d100 task', async () => {
 
 test('successChance ignores disabled drop rows', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [task({
-        id: 'd100-task',
-        resolutionMode: 'd100',
-        dropRows: [
-          { id: 'r1', dropRate: 100, enabled: false },
-          { id: 'r2', dropRate: 50, enabled: true }
-        ]
-      })]
-    })]
+    environments: [
+      environment({
+        tasks: [
+          task({
+            id: 'd100-task',
+            resolutionMode: 'd100',
+            dropRows: [
+              { id: 'r1', dropRate: 100, enabled: false },
+              { id: 'r2', dropRate: 50, enabled: true },
+            ],
+          }),
+        ],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -939,19 +1020,29 @@ test('successChance ignores disabled drop rows', async () => {
 
 test('successChance clamps out-of-range drop rates', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [
-        task({ id: 'over', resolutionMode: 'd100', dropRows: [{ id: 'r', dropRate: 150, enabled: true }] }),
-        task({ id: 'mixed', resolutionMode: 'd100', dropRows: [
-          { id: 'a', dropRate: -10, enabled: true },
-          { id: 'b', dropRate: 50, enabled: true }
-        ] })
-      ]
-    })]
+    environments: [
+      environment({
+        tasks: [
+          task({
+            id: 'over',
+            resolutionMode: 'd100',
+            dropRows: [{ id: 'r', dropRate: 150, enabled: true }],
+          }),
+          task({
+            id: 'mixed',
+            resolutionMode: 'd100',
+            dropRows: [
+              { id: 'a', dropRate: -10, enabled: true },
+              { id: 'b', dropRate: 50, enabled: true },
+            ],
+          }),
+        ],
+      }),
+    ],
   });
 
   const tasks = (await engine.listForActor({ viewer, actor })).environments[0].tasks;
-  const byId = Object.fromEntries(tasks.map(entry => [entry.id, entry]));
+  const byId = Object.fromEntries(tasks.map((entry) => [entry.id, entry]));
   // 150 clamps to 100 -> certain.
   assert.equal(byId.over.successChance, 1);
   // -10 clamps to 0 (contributes nothing) -> only the 50% row counts.
@@ -960,13 +1051,17 @@ test('successChance clamps out-of-range drop rates', async () => {
 
 test('successChance is null when a d100 task has no enabled drop rows', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [task({
-        id: 'd100-empty',
-        resolutionMode: 'd100',
-        dropRows: [{ id: 'r', dropRate: 80, enabled: false }]
-      })]
-    })]
+    environments: [
+      environment({
+        tasks: [
+          task({
+            id: 'd100-empty',
+            resolutionMode: 'd100',
+            dropRows: [{ id: 'r', dropRate: 80, enabled: false }],
+          }),
+        ],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -975,22 +1070,24 @@ test('successChance is null when a d100 task has no enabled drop rows', async ()
 
 test('blind environment surfaces revealed tasks as discovered models and one opaque action', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      id: 'env-blind',
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
-      tasks: [
-        task({ id: 'task-a', name: 'Hidden A' }),
-        task({
-          id: 'task-b',
-          name: 'Revealed B',
-          description: 'Found it',
-          resolutionMode: 'd100',
-          dropRows: [{ id: 'r', dropRate: 50, enabled: true }]
-        })
-      ]
-    })],
-    richState: richStateWithReveals(['task-b'])
+    environments: [
+      environment({
+        id: 'env-blind',
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+        tasks: [
+          task({ id: 'task-a', name: 'Hidden A' }),
+          task({
+            id: 'task-b',
+            name: 'Revealed B',
+            description: 'Found it',
+            resolutionMode: 'd100',
+            dropRows: [{ id: 'r', dropRate: 50, enabled: true }],
+          }),
+        ],
+      }),
+    ],
+    richState: richStateWithReveals(['task-b']),
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -1019,27 +1116,31 @@ test('blind environment surfaces revealed tasks as discovered models and one opa
 
 test('discovered blind tasks carry real blocked-reason data while the opaque action stays redacted', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      id: 'env-blind-tools',
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
-      tasks: [
-        task({ id: 'task-a', name: 'Hidden A', toolIds: ['missing-tool'] }),
-        task({ id: 'task-b', name: 'Revealed B', toolIds: ['missing-tool'] })
-      ]
-    })],
-    richState: richStateWithReveals(['task-b'])
+    environments: [
+      environment({
+        id: 'env-blind-tools',
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+        tasks: [
+          task({ id: 'task-a', name: 'Hidden A', toolIds: ['missing-tool'] }),
+          task({ id: 'task-b', name: 'Revealed B', toolIds: ['missing-tool'] }),
+        ],
+      }),
+    ],
+    richState: richStateWithReveals(['task-b']),
   });
 
   const entry = (await engine.listForActor({ viewer, actor })).environments[0];
 
   // The opaque blind action surfaces the TOOL_BLOCKED code but redacts its data.
-  const opaqueTool = entry.tasks[0].blockedReasons.find(reason => reason.code === 'TOOL_BLOCKED');
+  const opaqueTool = entry.tasks[0].blockedReasons.find((reason) => reason.code === 'TOOL_BLOCKED');
   assert.ok(opaqueTool, 'opaque blind action still reports the blocked code');
   assert.equal(opaqueTool.data, null, 'opaque blind action redacts the blocked-reason data');
 
   // The discovered (transparent) task carries the real tool details.
-  const discoveredTool = entry.discoveredTasks[0].blockedReasons.find(reason => reason.code === 'TOOL_BLOCKED');
+  const discoveredTool = entry.discoveredTasks[0].blockedReasons.find(
+    (reason) => reason.code === 'TOOL_BLOCKED'
+  );
   assert.ok(discoveredTool, 'discovered task reports the blocked code');
   assert.ok(discoveredTool.data, 'discovered task carries real blocked-reason data');
   assert.deepEqual(discoveredTool.data.missingToolIds, ['missing-tool']);
@@ -1047,13 +1148,15 @@ test('discovered blind tasks carry real blocked-reason data while the opaque act
 
 test('blind environment with revealPolicy never exposes no discovered tasks', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      id: 'env-blind-never',
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'never' },
-      tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })]
-    })],
-    richState: richStateWithReveals(['task-b'])
+    environments: [
+      environment({
+        id: 'env-blind-never',
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'never' },
+        tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })],
+      }),
+    ],
+    richState: richStateWithReveals(['task-b']),
   });
 
   const entry = (await engine.listForActor({ viewer, actor })).environments[0];
@@ -1063,13 +1166,15 @@ test('blind environment with revealPolicy never exposes no discovered tasks', as
 test('GM viewer of a blind environment gets the full task list and no separate discovered list', async () => {
   const gmViewer = { id: 'gm-1', isGM: true };
   const engine = makeEngine({
-    environments: [environment({
-      id: 'env-blind-gm',
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
-      tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })]
-    })],
-    richState: richStateWithReveals(['task-b'])
+    environments: [
+      environment({
+        id: 'env-blind-gm',
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+        tasks: [task({ id: 'task-a' }), task({ id: 'task-b' })],
+      }),
+    ],
+    richState: richStateWithReveals(['task-b']),
   });
 
   const entry = (await engine.listForActor({ viewer: gmViewer, actor })).environments[0];
@@ -1081,7 +1186,7 @@ test('GM viewer of a blind environment gets the full task list and no separate d
 function toolItem({ componentId, broken = false }) {
   return {
     componentId,
-    getFlag: (ns, key) => (ns === 'fabricate' && key === 'toolBroken' ? broken : undefined)
+    getFlag: (ns, key) => (ns === 'fabricate' && key === 'toolBroken' ? broken : undefined),
   };
 }
 
@@ -1089,7 +1194,7 @@ function systemManagerMock(components = []) {
   return {
     getItems: () => components,
     toolMatchesItem: (_recipe, tool, candidate) =>
-      Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
+      Boolean(tool?.componentId) && tool.componentId === candidate?.componentId,
   };
 }
 
@@ -1099,68 +1204,102 @@ function actorWithItems(items) {
 
 test('task model exposes required tools with present / missing state and display metadata', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [task({
-        id: 'tooled',
-        tools: [{ componentId: 'c-axe' }, { componentId: 'c-lantern' }]
-      })]
-    })],
+    environments: [
+      environment({
+        tasks: [
+          task({
+            id: 'tooled',
+            tools: [{ componentId: 'c-axe' }, { componentId: 'c-lantern' }],
+          }),
+        ],
+      }),
+    ],
     systemManager: systemManagerMock([
       { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' },
-      { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp' }
-    ])
+      { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp' },
+    ]),
   });
 
-  const tools = (await engine.listForActor({
-    viewer,
-    actor: actorWithItems([toolItem({ componentId: 'c-axe' })])
-  })).environments[0].tasks[0].tools;
+  const tools = (
+    await engine.listForActor({
+      viewer,
+      actor: actorWithItems([toolItem({ componentId: 'c-axe' })]),
+    })
+  ).environments[0].tasks[0].tools;
 
   assert.deepEqual(tools, [
     { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp', state: 'present', required: true },
-    { id: 'c-lantern', name: 'Lantern', img: 'icons/lantern.webp', state: 'missing', required: true }
+    {
+      id: 'c-lantern',
+      name: 'Lantern',
+      img: 'icons/lantern.webp',
+      state: 'missing',
+      required: true,
+    },
   ]);
 });
 
 test('a matching but broken tool item is reported as damaged, not missing', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [task({ id: 'tooled', tools: [{ componentId: 'c-axe' }] })]
-    })],
-    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+    environments: [
+      environment({
+        tasks: [task({ id: 'tooled', tools: [{ componentId: 'c-axe' }] })],
+      }),
+    ],
+    systemManager: systemManagerMock([
+      { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' },
+    ]),
   });
 
-  const tools = (await engine.listForActor({
-    viewer,
-    actor: actorWithItems([toolItem({ componentId: 'c-axe', broken: true })])
-  })).environments[0].tasks[0].tools;
+  const tools = (
+    await engine.listForActor({
+      viewer,
+      actor: actorWithItems([toolItem({ componentId: 'c-axe', broken: true })]),
+    })
+  ).environments[0].tasks[0].tools;
 
   assert.equal(tools[0].state, 'damaged');
 });
 
 test('an unresolved library tool reference surfaces as a missing tool entry', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [task({ id: 'tooled', toolIds: ['ghost-tool'] })]
-    })],
-    systemManager: systemManagerMock([])
+    environments: [
+      environment({
+        tasks: [task({ id: 'tooled', toolIds: ['ghost-tool'] })],
+      }),
+    ],
+    systemManager: systemManagerMock([]),
   });
 
-  const tools = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0].tasks[0].tools;
+  const tools = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0]
+    .tasks[0].tools;
   assert.deepEqual(tools, [
-    { id: 'ghost-tool', name: 'ghost-tool', img: 'icons/svg/item-bag.svg', state: 'missing', required: true }
+    {
+      id: 'ghost-tool',
+      name: 'ghost-tool',
+      img: 'icons/svg/item-bag.svg',
+      state: 'missing',
+      required: true,
+    },
   ]);
 });
 
 test('a tool label overrides the component name', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      tasks: [task({ id: 'tooled', tools: [{ componentId: 'c-axe', label: 'Masterwork Pick' }] })]
-    })],
-    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+    environments: [
+      environment({
+        tasks: [
+          task({ id: 'tooled', tools: [{ componentId: 'c-axe', label: 'Masterwork Pick' }] }),
+        ],
+      }),
+    ],
+    systemManager: systemManagerMock([
+      { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' },
+    ]),
   });
 
-  const tools = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0].tasks[0].tools;
+  const tools = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0]
+    .tasks[0].tools;
   assert.equal(tools[0].name, 'Masterwork Pick');
 });
 
@@ -1172,17 +1311,21 @@ test('a task with no tools exposes an empty tools array', async () => {
 
 test('the opaque blind action carries no tools while a discovered task does', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      id: 'env-blind-tooled',
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
-      tasks: [
-        task({ id: 'task-a', tools: [{ componentId: 'c-axe' }] }),
-        task({ id: 'task-b', tools: [{ componentId: 'c-axe' }] })
-      ]
-    })],
+    environments: [
+      environment({
+        id: 'env-blind-tooled',
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
+        tasks: [
+          task({ id: 'task-a', tools: [{ componentId: 'c-axe' }] }),
+          task({ id: 'task-b', tools: [{ componentId: 'c-axe' }] }),
+        ],
+      }),
+    ],
     richState: richStateWithReveals(['task-b']),
-    systemManager: systemManagerMock([{ id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' }])
+    systemManager: systemManagerMock([
+      { id: 'c-axe', name: 'Stone Pickaxe', img: 'icons/axe.webp' },
+    ]),
   });
 
   const entry = (await engine.listForActor({ viewer, actor: actorWithItems([]) })).environments[0];
@@ -1193,81 +1336,116 @@ test('the opaque blind action carries no tools while a discovered task does', as
 
 test('listForActor exposes an environment eventChance derived from its events', async () => {
   const engine = makeEngine({
-    environments: [environment({ events: [{ id: 'h1', dropRate: 50 }, { id: 'h2', dropRate: 50, enabled: true }] })]
+    environments: [
+      environment({
+        events: [
+          { id: 'h1', dropRate: 50 },
+          { id: 'h2', dropRate: 50, enabled: true },
+        ],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
-  const env = listing.environments.find(entry => entry.id === 'env-a');
+  const env = listing.environments.find((entry) => entry.id === 'env-a');
   assert.ok(env, 'environment is listed');
   // 1 - (1 - 0.5)(1 - 0.5) = 0.75
-  assert.ok(Math.abs(env.eventChance - 0.75) < 1e-9, 'eventChance is 1 - product of per-event misses');
+  assert.ok(
+    Math.abs(env.eventChance - 0.75) < 1e-9,
+    'eventChance is 1 - product of per-event misses'
+  );
 });
 
 test('listForActor reports eventChance 0 for an environment with no events', async () => {
   const engine = makeEngine({ environments: [environment()] });
 
   const listing = await engine.listForActor({ viewer, actor });
-  const env = listing.environments.find(entry => entry.id === 'env-a');
+  const env = listing.environments.find((entry) => entry.id === 'env-a');
   assert.equal(env.eventChance, 0);
 });
 
 test('listForActor ignores disabled events and clamps out-of-range dropRates for eventChance', async () => {
   const engine = makeEngine({
-    environments: [environment({ events: [{ id: 'h1', dropRate: 150 }, { id: 'h2', dropRate: 80, enabled: false }] })]
+    environments: [
+      environment({
+        events: [
+          { id: 'h1', dropRate: 150 },
+          { id: 'h2', dropRate: 80, enabled: false },
+        ],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
-  const env = listing.environments.find(entry => entry.id === 'env-a');
+  const env = listing.environments.find((entry) => entry.id === 'env-a');
   // h1 clamps to 100% (-> certain), h2 disabled and excluded.
   assert.equal(env.eventChance, 1);
 });
 
 test('listForActor exposes per-event models (identity, danger, chance, matching) for a targeted environment', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      rules: { eventVisibility: 'full' },
-      events: [
-        {
-          id: 'h1', name: 'Rockslide', description: 'Falling rocks.', img: 'icons/svg/hazard.svg',
-          dropRate: 40, dangerTags: ['hazardous'],
-          // Legacy `regions` tag is ignored: region is no longer a composition
-          // axis and the event model no longer surfaces a regions field.
-          weather: ['storm'], timeOfDay: ['night'], biomes: ['mountain'], regions: ['north'],
-          linkedSceneUuid: 'Scene.abc'
-        },
-        { id: 'h2', name: 'Sinkhole', dropRate: 0, enabled: false }
-      ]
-    })]
+    environments: [
+      environment({
+        rules: { eventVisibility: 'full' },
+        events: [
+          {
+            id: 'h1',
+            name: 'Rockslide',
+            description: 'Falling rocks.',
+            img: 'icons/svg/hazard.svg',
+            dropRate: 40,
+            dangerTags: ['hazardous'],
+            // Legacy `regions` tag is ignored: region is no longer a composition
+            // axis and the event model no longer surfaces a regions field.
+            weather: ['storm'],
+            timeOfDay: ['night'],
+            biomes: ['mountain'],
+            regions: ['north'],
+            linkedSceneUuid: 'Scene.abc',
+          },
+          { id: 'h2', name: 'Sinkhole', dropRate: 0, enabled: false },
+        ],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
-  const env = listing.environments.find(entry => entry.id === 'env-a');
+  const env = listing.environments.find((entry) => entry.id === 'env-a');
   assert.ok(Array.isArray(env.events), 'environment carries a events array');
   // Disabled events are excluded, mirroring the eventChance computation.
   assert.equal(env.events.length, 1, 'only enabled events are surfaced');
-  assert.deepEqual(env.events[0], {
-    id: 'h1',
-    name: 'Rockslide',
-    description: 'Falling rocks.',
-    img: 'icons/svg/hazard.svg',
-    dangerTags: ['hazardous'],
-    risk: 'hazardous',
-    chance: 0.4,
-    weather: ['storm'],
-    timeOfDay: ['night'],
-    biomes: ['mountain'],
-    biomeTags: [],
-    linkedSceneUuid: 'Scene.abc'
-  }, 'the event model carries identity, danger, chance, and matching criteria (no region axis)');
+  assert.deepEqual(
+    env.events[0],
+    {
+      id: 'h1',
+      name: 'Rockslide',
+      description: 'Falling rocks.',
+      img: 'icons/svg/hazard.svg',
+      dangerTags: ['hazardous'],
+      risk: 'hazardous',
+      chance: 0.4,
+      weather: ['storm'],
+      timeOfDay: ['night'],
+      biomes: ['mountain'],
+      biomeTags: [],
+      linkedSceneUuid: 'Scene.abc',
+    },
+    'the event model carries identity, danger, chance, and matching criteria (no region axis)'
+  );
 });
 
 test('listForActor defaults event matching criteria to empty arrays', async () => {
   const engine = makeEngine({
-    environments: [environment({ rules: { eventVisibility: 'full' }, events: [{ id: 'h1', name: 'Rockslide', dropRate: 20 }] })]
+    environments: [
+      environment({
+        rules: { eventVisibility: 'full' },
+        events: [{ id: 'h1', name: 'Rockslide', dropRate: 20 }],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
-  const event = listing.environments.find(entry => entry.id === 'env-a').events[0];
+  const event = listing.environments.find((entry) => entry.id === 'env-a').events[0];
   assert.deepEqual(event.weather, []);
   assert.deepEqual(event.timeOfDay, []);
   assert.deepEqual(event.biomes, []);
@@ -1282,28 +1460,44 @@ test('listForActor resolves event biomeTags via richState, scoped to the craftin
   const richState = {
     resolveBiomeTags: (biomes, systemId) => {
       calls.push({ biomes, systemId });
-      return biomes.map(id => ({ id, label: id, icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }));
-    }
+      return biomes.map((id) => ({
+        id,
+        label: id,
+        icon: 'fas fa-tree',
+        colorToken: 'sage',
+        customColor: '',
+      }));
+    },
   };
   const engine = makeEngine({
     richState,
-    environments: [environment({ rules: { eventVisibility: 'full' }, events: [{ id: 'h1', name: 'Rockslide', dropRate: 20, biomes: ['forest'] }] })]
+    environments: [
+      environment({
+        rules: { eventVisibility: 'full' },
+        events: [{ id: 'h1', name: 'Rockslide', dropRate: 20, biomes: ['forest'] }],
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
-  const event = listing.environments.find(entry => entry.id === 'env-a').events[0];
-  assert.deepEqual(event.biomeTags, [{ id: 'forest', label: 'forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' }]);
-  assert.ok(calls.some(call => call.systemId === 'system-a' && call.biomes.includes('forest')), 'resolveBiomeTags called with the event biomes + system id');
+  const event = listing.environments.find((entry) => entry.id === 'env-a').events[0];
+  assert.deepEqual(event.biomeTags, [
+    { id: 'forest', label: 'forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+  ]);
+  assert.ok(
+    calls.some((call) => call.systemId === 'system-a' && call.biomes.includes('forest')),
+    'resolveBiomeTags called with the event biomes + system id'
+  );
 });
 
 test('listForActor redacts individual events for a non-GM viewer of a blind environment', async () => {
   const events = [{ id: 'h1', name: 'Rockslide', dropRate: 50 }];
   const engine = makeEngine({
-    environments: [environment({ selectionMode: 'blind', events })]
+    environments: [environment({ selectionMode: 'blind', events })],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
-  const env = listing.environments.find(entry => entry.id === 'env-a');
+  const env = listing.environments.find((entry) => entry.id === 'env-a');
   assert.deepEqual(env.events, [], 'a player sees no individual events for a blind environment');
   // The aggregate chance is still emitted so the UI can show the bar.
   assert.ok(env.eventChance > 0, 'the aggregate event chance is still exposed');
@@ -1312,32 +1506,45 @@ test('listForActor redacts individual events for a non-GM viewer of a blind envi
 test('listForActor exposes the full event list to a GM viewer of a blind environment', async () => {
   const events = [{ id: 'h1', name: 'Rockslide', dropRate: 50 }];
   const engine = makeEngine({
-    environments: [environment({ selectionMode: 'blind', events })]
+    environments: [environment({ selectionMode: 'blind', events })],
   });
 
   const listing = await engine.listForActor({ viewer: { id: 'gm', isGM: true }, actor });
-  const env = listing.environments.find(entry => entry.id === 'env-a');
+  const env = listing.environments.find((entry) => entry.id === 'env-a');
   assert.equal(env.events.length, 1, 'a GM sees the full event list even for a blind environment');
   assert.equal(env.events[0].name, 'Rockslide');
 });
 
 test('listForActor defaults a non-GM viewer to the encounterChance visibility tier', async () => {
   const engine = makeEngine({
-    environments: [environment({ events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+    environments: [environment({ events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })],
   });
 
-  const env = (await engine.listForActor({ viewer, actor })).environments.find(entry => entry.id === 'env-a');
-  assert.equal(env.eventVisibility, 'encounterChance', 'absent rules fall back to the restrictive tier');
+  const env = (await engine.listForActor({ viewer, actor })).environments.find(
+    (entry) => entry.id === 'env-a'
+  );
+  assert.equal(
+    env.eventVisibility,
+    'encounterChance',
+    'absent rules fall back to the restrictive tier'
+  );
   assert.deepEqual(env.events, [], 'individual events are withheld below the full tier');
   assert.ok(env.eventChance > 0, 'the aggregate encounter chance is still exposed');
 });
 
 test('listForActor with eventVisibility "encounterChance" exposes the chance but no events', async () => {
   const engine = makeEngine({
-    environments: [environment({ rules: { eventVisibility: 'encounterChance' }, events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+    environments: [
+      environment({
+        rules: { eventVisibility: 'encounterChance' },
+        events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }],
+      }),
+    ],
   });
 
-  const env = (await engine.listForActor({ viewer, actor })).environments.find(entry => entry.id === 'env-a');
+  const env = (await engine.listForActor({ viewer, actor })).environments.find(
+    (entry) => entry.id === 'env-a'
+  );
   assert.equal(env.eventVisibility, 'encounterChance');
   assert.deepEqual(env.events, []);
   assert.ok(env.eventChance > 0, 'the encounter-chance bar value is exposed');
@@ -1345,10 +1552,17 @@ test('listForActor with eventVisibility "encounterChance" exposes the chance but
 
 test('listForActor with eventVisibility "dangerLevelOnly" hides events and the encounter chance', async () => {
   const engine = makeEngine({
-    environments: [environment({ rules: { eventVisibility: 'dangerLevelOnly' }, events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+    environments: [
+      environment({
+        rules: { eventVisibility: 'dangerLevelOnly' },
+        events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }],
+      }),
+    ],
   });
 
-  const env = (await engine.listForActor({ viewer, actor })).environments.find(entry => entry.id === 'env-a');
+  const env = (await engine.listForActor({ viewer, actor })).environments.find(
+    (entry) => entry.id === 'env-a'
+  );
   assert.equal(env.eventVisibility, 'dangerLevelOnly');
   assert.deepEqual(env.events, [], 'no individual events');
   assert.equal(env.eventChance, null, 'the encounter chance is withheld (null, not 0)');
@@ -1356,10 +1570,17 @@ test('listForActor with eventVisibility "dangerLevelOnly" hides events and the e
 
 test('listForActor with eventVisibility "full" exposes events to a non-GM viewer', async () => {
   const engine = makeEngine({
-    environments: [environment({ rules: { eventVisibility: 'full' }, events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+    environments: [
+      environment({
+        rules: { eventVisibility: 'full' },
+        events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }],
+      }),
+    ],
   });
 
-  const env = (await engine.listForActor({ viewer, actor })).environments.find(entry => entry.id === 'env-a');
+  const env = (await engine.listForActor({ viewer, actor })).environments.find(
+    (entry) => entry.id === 'env-a'
+  );
   assert.equal(env.eventVisibility, 'full');
   assert.equal(env.events.length, 1, 'individual events are surfaced at the full tier');
   assert.ok(env.eventChance > 0);
@@ -1367,10 +1588,17 @@ test('listForActor with eventVisibility "full" exposes events to a non-GM viewer
 
 test('listForActor always resolves eventVisibility to full for a GM regardless of the rule', async () => {
   const engine = makeEngine({
-    environments: [environment({ rules: { eventVisibility: 'dangerLevelOnly' }, events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }] })]
+    environments: [
+      environment({
+        rules: { eventVisibility: 'dangerLevelOnly' },
+        events: [{ id: 'h1', name: 'Rockslide', dropRate: 50 }],
+      }),
+    ],
   });
 
-  const env = (await engine.listForActor({ viewer: { id: 'gm', isGM: true }, actor })).environments.find(entry => entry.id === 'env-a');
+  const env = (
+    await engine.listForActor({ viewer: { id: 'gm', isGM: true }, actor })
+  ).environments.find((entry) => entry.id === 'env-a');
   assert.equal(env.eventVisibility, 'full', 'a GM is never restricted by the visibility rule');
   assert.equal(env.events.length, 1, 'a GM sees the full event list');
   assert.ok(env.eventChance > 0, 'a GM sees the encounter chance');
@@ -1383,26 +1611,54 @@ test('getTaskDropBreakdown returns award/event info + per-drop chances with comp
     previewDropBreakdown: async (args) => {
       previewCalls.push(args);
       return {
-        drops: [{
-          id: 'd1', name: 'Iron', componentId: 'iron', quantity: 2,
-          baseChance: 0.4, finalChance: 0.53,
-          modifiers: { weather: { value: 10 }, timeOfDay: { value: -5 }, biome: { value: 3 }, character: [] }
-        }],
+        drops: [
+          {
+            id: 'd1',
+            name: 'Iron',
+            componentId: 'iron',
+            quantity: 2,
+            baseChance: 0.4,
+            finalChance: 0.53,
+            modifiers: {
+              weather: { value: 10 },
+              timeOfDay: { value: -5 },
+              biome: { value: 3 },
+              character: [],
+            },
+          },
+        ],
         successChance: 0.53,
-        awardMode: 'allDrops', awardLimit: 1, eventPolicy: 'successWithEvent'
+        awardMode: 'allDrops',
+        awardLimit: 1,
+        eventPolicy: 'successWithEvent',
       };
-    }
+    },
   };
   const systemManager = { getItems: () => [{ id: 'iron', name: 'Iron', img: 'icons/iron.webp' }] };
   const engine = makeEngine({
-    environments: [environment({ tasks: [task({ id: 'task-a', resolutionMode: 'd100', dropRows: [{ id: 'd1', dropRate: 40 }] })] })],
+    environments: [
+      environment({
+        tasks: [
+          task({ id: 'task-a', resolutionMode: 'd100', dropRows: [{ id: 'd1', dropRate: 40 }] }),
+        ],
+      }),
+    ],
     richState,
-    systemManager
+    systemManager,
   });
 
-  const result = await engine.getTaskDropBreakdown({ viewer, environmentId: 'env-a', taskId: 'task-a', rememberedActorId: 'actor-1' });
+  const result = await engine.getTaskDropBreakdown({
+    viewer,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+    rememberedActorId: 'actor-1',
+  });
   assert.equal(result.resolutionMode, 'd100');
-  assert.equal(result.successChance, 0.53, 'aggregate success chance passes through from the preview');
+  assert.equal(
+    result.successChance,
+    0.53,
+    'aggregate success chance passes through from the preview'
+  );
   assert.equal(result.awardMode, 'allDrops');
   assert.equal(result.eventPolicy, 'successWithEvent');
   assert.equal(result.drops.length, 1);
@@ -1411,16 +1667,29 @@ test('getTaskDropBreakdown returns award/event info + per-drop chances with comp
 });
 
 test('getTaskDropBreakdown returns empty drops for an unknown or hidden task', async () => {
-  const richState = { composeEnvironment: (env) => env, previewDropBreakdown: async () => ({ drops: [] }) };
+  const richState = {
+    composeEnvironment: (env) => env,
+    previewDropBreakdown: async () => ({ drops: [] }),
+  };
   const engine = makeEngine({ environments: [environment()], richState });
 
-  const result = await engine.getTaskDropBreakdown({ viewer, environmentId: 'env-a', taskId: 'task-missing', rememberedActorId: 'actor-1' });
+  const result = await engine.getTaskDropBreakdown({
+    viewer,
+    environmentId: 'env-a',
+    taskId: 'task-missing',
+    rememberedActorId: 'actor-1',
+  });
   assert.deepEqual(result.drops, []);
 });
 
 test('getTaskDropBreakdown returns empty drops when richState has no previewDropBreakdown', async () => {
   const engine = makeEngine({ environments: [environment()] });
-  const result = await engine.getTaskDropBreakdown({ viewer, environmentId: 'env-a', taskId: 'task-a', rememberedActorId: 'actor-1' });
+  const result = await engine.getTaskDropBreakdown({
+    viewer,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+    rememberedActorId: 'actor-1',
+  });
   assert.deepEqual(result.drops, []);
 });
 
@@ -1435,7 +1704,7 @@ const blockedGatheringSystem = {
   enabled: true,
   features: { gathering: true, multiStepRecipes: true },
   resolutionMode: 'alchemy',
-  components: []
+  components: [],
 };
 
 test('listForActor hides a system-blocked system from a non-GM viewer', async () => {
@@ -1445,7 +1714,11 @@ test('listForActor hides a system-blocked system from a non-GM viewer', async ()
 
   assert.equal(listing.attemptable, false);
   assert.deepEqual(reasonCodes(listing), ['NO_ENVIRONMENTS_CONFIGURED']);
-  assert.deepEqual(listing.environments, [], 'a system blocker drops its environments for a player');
+  assert.deepEqual(
+    listing.environments,
+    [],
+    'a system blocker drops its environments for a player'
+  );
 });
 
 test('listForActor still shows a system-blocked system to a GM (GM bypass)', async () => {
@@ -1462,27 +1735,37 @@ test('listForActor does not echo the inert legacy environment.region on a normal
     // The legacy free-text region is stored on the environment but must not
     // travel in the player-facing listing payload (the geography pip was removed
     // with the gathering-regions unification; players read resolved realms).
-    environments: [environment({ region: 'north' })]
+    environments: [environment({ region: 'north' })],
   });
 
   const listing = await engine.listForActor({ viewer, actor });
 
   assert.equal(listing.environments.length, 1);
   const entry = listing.environments[0];
-  assert.equal(entry.locked, false, 'precondition: this is the normal (unlocked) environment model');
-  assert.equal(Object.hasOwn(entry, 'region'), false, 'the normal player entry carries no region key');
+  assert.equal(
+    entry.locked,
+    false,
+    'precondition: this is the normal (unlocked) environment model'
+  );
+  assert.equal(
+    Object.hasOwn(entry, 'region'),
+    false,
+    'the normal player entry carries no region key'
+  );
 });
 
 test('listForActor does not echo the inert legacy environment.region on a locked teaser', async () => {
   const engine = makeEngine({
-    environments: [environment({
-      id: 'env-locked-region',
-      name: 'Sealed Vault',
-      enabled: false,
-      selectionMode: 'blind',
-      rules: { revealPolicy: 'onAttempt' },
-      region: 'north'
-    })]
+    environments: [
+      environment({
+        id: 'env-locked-region',
+        name: 'Sealed Vault',
+        enabled: false,
+        selectionMode: 'blind',
+        rules: { revealPolicy: 'onAttempt' },
+        region: 'north',
+      }),
+    ],
   });
 
   const listing = await engine.listForActor({ viewer, actor });

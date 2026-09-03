@@ -477,7 +477,10 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-player-note]').textContent,
       /Marked broken and renamed/
     );
-    assert.equal(root.querySelector('[data-tool-player-name]').textContent, "Smith's Hammer (Broken)");
+    assert.equal(
+      root.querySelector('[data-tool-player-name]').textContent,
+      "Smith's Hammer (Broken)"
+    );
     assert.equal(
       root.querySelector('[data-tool-player-image]').dataset.toolPlayerImage,
       'tool',
@@ -608,10 +611,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     // The GATE MODE decides the consequence, and the row states the one that applies: a
     // `usability` gate makes the Tool unusable, where a `bonus` gate would only withhold it.
-    assert.match(
-      root.querySelector('[data-tool-preview-usability]').textContent,
-      /Unusable here/
-    );
+    assert.match(root.querySelector('[data-tool-preview-usability]').textContent, /Unusable here/);
   });
 
   it('states the required-for empty case rather than an empty region', async () => {
@@ -757,7 +757,6 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(field.getAttribute('placeholder'), null);
     assert.ok(Boolean(field.closest('.manager-tool-label-field')));
   });
-
 
   it('offers NO route to re-point the linked Item, at any of its three former controls', async () => {
     // The negative half of issue 1373's relocation, asserted as three named absences rather
@@ -1025,10 +1024,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     // THE RAIL, THE PLAYER PREVIEW AND THE PANE NOW AGREE. The first two are the surfaces that
     // were already right; the assertion is that the pane has joined them, not that they moved.
-    assert.match(
-      root.querySelector('[data-tool-preview-breakage]').textContent,
-      /Unlimited uses/
-    );
+    assert.match(root.querySelector('[data-tool-preview-breakage]').textContent, /Unlimited uses/);
     assert.match(root.querySelector('[data-tool-player-preview]').textContent, /Unlimited uses/);
     assert.match(
       root.querySelector('[data-tool-breakage-choice="unlimited"]').textContent,
@@ -1098,7 +1094,9 @@ describe('Tool Studio editor (mounted)', () => {
       /Adds nothing to the crafting check/
     );
     // And no second card head: the body head is a subordinate ROW.
-    assert.ok(!root.querySelector('[data-tool-requirements-tab] .manager-tool-editor-card-heading'));
+    assert.ok(
+      !root.querySelector('[data-tool-requirements-tab] .manager-tool-editor-card-heading')
+    );
   });
 
   it('resets inactive breakage mode values when the mounted editor switches Tools', async () => {
@@ -1493,9 +1491,7 @@ describe('Tool Studio editor (mounted)', () => {
       ['prerequisites', 'bonus']
     );
     assert.deepEqual(
-      [...card.querySelectorAll('[data-tool-rule-eyebrow]')].map((node) =>
-        node.textContent.trim()
-      ),
+      [...card.querySelectorAll('[data-tool-rule-eyebrow]')].map((node) => node.textContent.trim()),
       ['Prerequisites', 'Bonus'],
       'the eyebrow is the short word at this scope as well'
     );
@@ -1523,10 +1519,7 @@ describe('Tool Studio editor (mounted)', () => {
         !enable.closest('.manager-tool-rule-card-head'),
         'which stays in the body rather than joining a second track on the head'
       );
-      assert.ok(
-        Boolean(enable.closest('.manager-tool-setting-row')),
-        'as the first row of it'
-      );
+      assert.ok(Boolean(enable.closest('.manager-tool-setting-row')), 'as the first row of it');
     }
   });
 
@@ -1541,9 +1534,9 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelectorAll('[data-tool-prerequisite-row]').length, 5);
     assert.deepEqual(
-      [...root.querySelectorAll('[data-tool-prerequisite-row] .manager-modifier-readonly-label')].map(
-        (node) => node.textContent
-      ),
+      [
+        ...root.querySelectorAll('[data-tool-prerequisite-row] .manager-modifier-readonly-label'),
+      ].map((node) => node.textContent),
       [
         'Expert Crafter',
         "Proficient with Smith's Tools",
@@ -1886,7 +1879,9 @@ describe('Tool Studio editor (mounted)', () => {
       'the group keeps its accessible name'
     );
     assert.ok(
-      cardText.includes('All selected prerequisites are required (AND). When a character fails them:'),
+      cardText.includes(
+        'All selected prerequisites are required (AND). When a character fails them:'
+      ),
       'the AND rule and the gate introduction are one sentence'
     );
 

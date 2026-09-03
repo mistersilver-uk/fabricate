@@ -489,8 +489,25 @@ function buildSystemRow(descriptor, system, membership, worldDefault, recipeCoun
     recipeCount: Number(recipeCount) || 0,
   };
   if (descriptor.enableable) {
-    row.enabled = descriptor.worldEnableable ? resolved.systemEnabled === true : resolved.enabled === true;
+    row.enabled = descriptor.worldEnableable
+      ? resolved.systemEnabled === true
+      : resolved.enabled === true;
     row.resolvedEnabled = resolved.enabled === true;
+  }
+  // WHICH WORLD TAGS THIS SYSTEM MUTES (issue 1371), for a TAGGABLE type alone — which is the
+  // component family and nothing else, so an essence or tool row is byte-identical to what it was.
+  //
+  // IT IS THE ONE PIECE OF MEMBERSHIP STATE A SCREEN CAN AUTHOR AND COULD NOT READ BACK. Muting
+  // is written through `setMutedTags`, which lands on the membership record — and this row was the
+  // only published view of that record, carrying `member`, `inherited` and `enabled` but not this.
+  // Without it the world entry's mute chips could write a state and never show it, which is the
+  // one failure mode a toggle must not have, and the tag note's "muted in {m} systems" clause
+  // would count zero on every world however many mutes a GM had authored.
+  //
+  // A COPY rather than the stored array, on the same rule the entry roster follows: a consumer
+  // that mutated the published value in place would edit the corpus behind the store's back.
+  if (descriptor.taggable) {
+    row.mutedTags = Array.isArray(membership?.mutedTags) ? [...membership.mutedTags] : [];
   }
   return row;
 }

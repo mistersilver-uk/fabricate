@@ -23,7 +23,7 @@ describe('resolveScopedGatheringSelection', () => {
       scopedTaskId: null,
       appliedScopeKey: null,
       currentSelectedId: 'env-b',
-      currentTaskId: 'task-7'
+      currentTaskId: 'task-7',
     });
     // Preserves the still-valid current selection (default resolver behaviour),
     // keeps the current task preference, no forced tab, no scope recorded.
@@ -41,7 +41,7 @@ describe('resolveScopedGatheringSelection', () => {
       scopedTaskId: null,
       appliedScopeKey: null,
       currentSelectedId: null,
-      currentTaskId: null
+      currentTaskId: null,
     });
     assert.equal(envOnly.switchToTasksTab, false);
     assert.equal(envOnly.appliedScopeKey, null);
@@ -53,7 +53,7 @@ describe('resolveScopedGatheringSelection', () => {
       scopedTaskId: 'task-1',
       appliedScopeKey: null,
       currentSelectedId: null,
-      currentTaskId: null
+      currentTaskId: null,
     });
     assert.equal(taskOnly.switchToTasksTab, false);
     assert.equal(taskOnly.appliedScopeKey, null);
@@ -68,7 +68,7 @@ describe('resolveScopedGatheringSelection', () => {
       appliedScopeKey: null,
       // The default resolver would have preserved env-a; the scope overrides it.
       currentSelectedId: 'env-a',
-      currentTaskId: 'task-old'
+      currentTaskId: 'task-old',
     });
     assert.equal(decision.selectedEnvironmentId, 'env-scoped');
     assert.equal(decision.taskPreferenceId, 'task-scoped');
@@ -87,7 +87,7 @@ describe('resolveScopedGatheringSelection', () => {
       appliedScopeKey: scopeKey,
       // ...and the player has since navigated to a different env + task.
       currentSelectedId: 'env-manual',
-      currentTaskId: 'task-manual'
+      currentTaskId: 'task-manual',
     });
     // The quiet re-load must NOT clobber the manual pick back to the scoped env.
     assert.equal(decision.selectedEnvironmentId, 'env-manual');
@@ -106,7 +106,7 @@ describe('resolveScopedGatheringSelection', () => {
       // new env+task, so the new scope must win.
       appliedScopeKey: 'env-old|task-old',
       currentSelectedId: 'env-old',
-      currentTaskId: 'task-old'
+      currentTaskId: 'task-old',
     });
     assert.equal(decision.selectedEnvironmentId, 'env-new');
     assert.equal(decision.taskPreferenceId, 'task-new');
@@ -115,17 +115,14 @@ describe('resolveScopedGatheringSelection', () => {
   });
 
   it('scoped env LOCKED -> still force-selected (activation already validated it)', () => {
-    const environments = [
-      env({ id: 'env-a' }),
-      env({ id: 'env-scoped', locked: true })
-    ];
+    const environments = [env({ id: 'env-a' }), env({ id: 'env-scoped', locked: true })];
     const decision = resolve({
       environments,
       scopedEnvironmentId: 'env-scoped',
       scopedTaskId: 'task-scoped',
       appliedScopeKey: null,
       currentSelectedId: null,
-      currentTaskId: null
+      currentTaskId: null,
     });
     // The default resolver's non-locked filter would skip env-scoped; the scope
     // overrides that and selects the locked env regardless.
@@ -143,7 +140,7 @@ describe('resolveScopedGatheringSelection', () => {
       scopedTaskId: 'task-scoped',
       appliedScopeKey: null,
       currentSelectedId: null,
-      currentTaskId: 'task-cur'
+      currentTaskId: 'task-cur',
     });
     // No matching env: default to the first non-locked env, keep current task,
     // no tab switch, and leave appliedScopeKey null so the scope can still apply
@@ -162,7 +159,7 @@ describe('resolveScopedGatheringSelection', () => {
       scopedTaskId: 'task-scoped',
       appliedScopeKey: null,
       currentSelectedId: null,
-      currentTaskId: null
+      currentTaskId: null,
     });
     assert.equal(first.appliedScopeKey, null);
     assert.equal(first.switchToTasksTab, false);
@@ -174,7 +171,7 @@ describe('resolveScopedGatheringSelection', () => {
       scopedTaskId: 'task-scoped',
       appliedScopeKey: first.appliedScopeKey,
       currentSelectedId: first.selectedEnvironmentId,
-      currentTaskId: null
+      currentTaskId: null,
     });
     assert.equal(second.selectedEnvironmentId, 'env-scoped');
     assert.equal(second.switchToTasksTab, true);
@@ -192,7 +189,7 @@ describe('resolveScopedGatheringSelection', () => {
       scopedTaskId: 'task-not-in-env',
       appliedScopeKey: null,
       currentSelectedId: null,
-      currentTaskId: null
+      currentTaskId: null,
     });
     assert.equal(decision.selectedEnvironmentId, 'env-scoped');
     // The preference is still the scoped task id; the env's visible-task list is
@@ -210,7 +207,7 @@ describe('resolveScopedGatheringSelection', () => {
       scopedTaskId: 'task-scoped',
       appliedScopeKey: null,
       currentSelectedId: 'whatever',
-      currentTaskId: null
+      currentTaskId: null,
     });
     assert.equal(decision.selectedEnvironmentId, null);
     assert.equal(decision.switchToTasksTab, false);

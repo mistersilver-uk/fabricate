@@ -16,7 +16,10 @@
  * client where the flow is player-reachable.
  */
 
-import { FABRICATE_SETTINGS_NAMESPACE, WORLD_SCOPED_SETTING_KEYS } from '../../src/config/settings.js';
+import {
+  FABRICATE_SETTINGS_NAMESPACE,
+  WORLD_SCOPED_SETTING_KEYS,
+} from '../../src/config/settings.js';
 
 /**
  * Whether a Fabricate setting key is world-scoped, and therefore GM-only to write.

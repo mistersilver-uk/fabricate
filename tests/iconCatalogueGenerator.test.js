@@ -282,7 +282,10 @@ describe('the committed catalogue names only icons Font Awesome publishes for fr
       release,
       'the catalogue was narrowed against a different free release than the one installed; regenerate it'
     );
-    assert.ok(names.size > 1000, `the free oracle yielded only ${names.size} names, so it misparsed`);
+    assert.ok(
+      names.size > 1000,
+      `the free oracle yielded only ${names.size} names, so it misparsed`
+    );
   });
 
   it('offers no name outside the free set, under any spelling', () => {

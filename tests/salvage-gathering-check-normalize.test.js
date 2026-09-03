@@ -119,6 +119,9 @@ test('salvage + gathering check normalization is idempotent', () => {
     progressive: { awardMode: 'exceed', rollFormula: '2d6' },
   });
   assert.deepEqual(mgr._normalizeSalvageCraftingCheck(salvageOnce), salvageOnce);
-  const gatherOnce = mgr._normalizeGatheringCraftingCheck({ enabled: true, routed: { type: 'fixed' } });
+  const gatherOnce = mgr._normalizeGatheringCraftingCheck({
+    enabled: true,
+    routed: { type: 'fixed' },
+  });
   assert.deepEqual(mgr._normalizeGatheringCraftingCheck(gatherOnce), gatherOnce);
 });

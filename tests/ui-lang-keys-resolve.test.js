@@ -108,7 +108,9 @@ function collectSourceFiles(dir) {
 }
 
 function resolveKey(langRoot, dottedKey) {
-  return dottedKey.split('.').reduce((node, part) => (node == null ? undefined : node[part]), langRoot);
+  return dottedKey
+    .split('.')
+    .reduce((node, part) => (node == null ? undefined : node[part]), langRoot);
 }
 
 // Scans `files` for every assertion-A reference. Returns the deduplicated set
@@ -160,7 +162,9 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
     `unresolved FABRICATE lang keys referenced in src (missing from en.json): ${unresolved.join(', ')}`
   );
 
-  const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
+  const objectResolving = resolved.filter(
+    ([, value]) => value !== undefined && typeof value !== 'string'
+  );
   assert.equal(
     objectResolving.length,
     41,
@@ -210,7 +214,9 @@ test('assertion A self-test: the scan is able to detect deletion of a live key',
   const mutatedLang = JSON.parse(JSON.stringify(LANG));
   delete mutatedLang.FABRICATE.Settings.Theme.Name;
 
-  const unresolvedAfterDeletion = [...referenced].filter((key) => resolveKey(mutatedLang, key) === undefined);
+  const unresolvedAfterDeletion = [...referenced].filter(
+    (key) => resolveKey(mutatedLang, key) === undefined
+  );
   assert.ok(
     unresolvedAfterDeletion.includes(target),
     `expected deleting ${target} from an in-memory lang tree to make the scan report it as unresolved`
@@ -228,8 +234,17 @@ test('assertion B: every leaf-shaped FABRICATE key reference in src resolves to 
     }
   }
 
-  assert.ok(referenced.size > 0, 'expected src to reference literal FABRICATE lang keys in a leaf shape');
+  assert.ok(
+    referenced.size > 0,
+    'expected src to reference literal FABRICATE lang keys in a leaf shape'
+  );
 
-  const unresolved = [...referenced].filter((key) => typeof resolveKey(LANG, key) !== 'string').sort();
-  assert.deepEqual(unresolved, [], `unresolved leaf-shaped src lang keys: ${unresolved.join(', ')}`);
+  const unresolved = [...referenced]
+    .filter((key) => typeof resolveKey(LANG, key) !== 'string')
+    .sort();
+  assert.deepEqual(
+    unresolved,
+    [],
+    `unresolved leaf-shaped src lang keys: ${unresolved.join(', ')}`
+  );
 });

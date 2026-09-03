@@ -19,7 +19,7 @@ import {
   parseFontAwesomeRelease,
   parseGlyphCodepoint,
   parseIconGlyphRules,
-  preferredIconName
+  preferredIconName,
 } from '../scripts/lib/fontAwesomeBundle.js';
 
 const BACKSLASH = '\\';
@@ -38,7 +38,7 @@ const STYLESHEET_FIXTURE = [
   `.fa-gears{--fa:"${BACKSLASH}f085"}`,
   `.fa-github{--fa:"${BACKSLASH}f09b"}`,
   `.fa-plus{--fa:"${BACKSLASH}+"}`,
-  `.fa-0{--fa:"${BACKSLASH}30 "}`
+  `.fa-0{--fa:"${BACKSLASH}30 "}`,
 ].join('');
 
 // Cut in the shape of Foundry 13.351's file, which opens with `@charset` and carries no comment
@@ -47,7 +47,7 @@ const V13_STYLESHEET_FIXTURE = [
   '@charset "utf-8";',
   '.fa{font-family:var(--fa-style-family,"Font Awesome 6 Pro");font-weight:var(--fa-style,900)}',
   '.fab{font-family:"Font Awesome 6 Brands"}',
-  `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013";--fa--fa:"${BACKSLASH}f013${BACKSLASH}f013"}`
+  `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013";--fa--fa:"${BACKSLASH}f013${BACKSLASH}f013"}`,
 ].join('');
 
 const CANDLE_HOLDER = 0xf6bc;
@@ -68,7 +68,7 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
       edition: 'Pro',
       version: '7.2.0',
       major: 7,
-      evidence: 'banner'
+      evidence: 'banner',
     });
   });
 
@@ -80,12 +80,15 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
       edition: 'Pro',
       version: null,
       major: 6,
-      evidence: 'font-family'
+      evidence: 'font-family',
     });
   });
 
   it('refuses a stylesheet that names no release by either route', () => {
-    assert.throws(() => parseFontAwesomeRelease('.fa-gear{--fa:"x"}'), /names no release to measure/);
+    assert.throws(
+      () => parseFontAwesomeRelease('.fa-gear{--fa:"x"}'),
+      /names no release to measure/
+    );
   });
 
   // Font Awesome 7 assigns a glyph with the `--fa` custom property rather than a `content` rule, so
@@ -142,7 +145,7 @@ const V13_FONT_FAMILIES = [
   'Font Awesome 6 Duotone',
   'Font Awesome 6 Brands',
   'Font Awesome 6 Sharp',
-  'Font Awesome 6 Sharp Duotone'
+  'Font Awesome 6 Sharp Duotone',
 ];
 const V14_FONT_FAMILIES = [
   'Font Awesome 7 Pro',
@@ -150,18 +153,18 @@ const V14_FONT_FAMILIES = [
   'Font Awesome 7 Duotone',
   'Font Awesome 5 Brands',
   'Font Awesome 5 Pro',
-  'Font Awesome 5 Duotone'
+  'Font Awesome 5 Duotone',
 ];
 
 describe('reading a release out of the font-family literals', () => {
   it('answers with the highest major present, not the first one declared', () => {
     assert.deepEqual(highestFontAwesomeFamilyRelease(V13_FONT_FAMILIES), {
       edition: 'Pro',
-      major: 6
+      major: 6,
     });
     assert.deepEqual(highestFontAwesomeFamilyRelease(V14_FONT_FAMILIES), {
       edition: 'Pro',
-      major: 7
+      major: 7,
     });
   });
 
@@ -172,17 +175,23 @@ describe('reading a release out of the font-family literals', () => {
       highestFontAwesomeFamilyRelease([...V14_FONT_FAMILIES].reverse()),
       highestFontAwesomeFamilyRelease(V14_FONT_FAMILIES)
     );
-    assert.deepEqual(highestFontAwesomeFamilyRelease(['Font Awesome 7 Brands', 'Font Awesome 7 Pro']), {
-      edition: 'Pro',
-      major: 7
-    });
+    assert.deepEqual(
+      highestFontAwesomeFamilyRelease(['Font Awesome 7 Brands', 'Font Awesome 7 Pro']),
+      {
+        edition: 'Pro',
+        major: 7,
+      }
+    );
   });
 
   it('reads the edition when a bundle is the free release', () => {
-    assert.deepEqual(highestFontAwesomeFamilyRelease(['Font Awesome 6 Brands', 'Font Awesome 6 Free']), {
-      edition: 'Free',
-      major: 6
-    });
+    assert.deepEqual(
+      highestFontAwesomeFamilyRelease(['Font Awesome 6 Brands', 'Font Awesome 6 Free']),
+      {
+        edition: 'Free',
+        major: 6,
+      }
+    );
   });
 
   // `FontAwesome` is the version-less Font Awesome 4 family alias, which names no generation.
@@ -223,7 +232,7 @@ const TWO_DECLARATION_FIXTURE = [
   `.fa-gears{--fa:"${BACKSLASH}f085";--fa--fa:"${BACKSLASH}f085${BACKSLASH}f085"}`,
   `.fa-github{--fa:"${BACKSLASH}f09b"}`,
   `.fa-0{--fa:"${BACKSLASH}30 ";--fa--fa:"${BACKSLASH}30 ${BACKSLASH}30 "}`,
-  '.fa-bracket-curly-right{--fa:"}";--fa--fa:"}}"}'
+  '.fa-bracket-curly-right{--fa:"}";--fa--fa:"}}"}',
 ].join('');
 
 describe('reading a bundle that assigns each glyph twice', () => {
@@ -235,7 +244,7 @@ describe('reading a bundle that assigns each glyph twice', () => {
       { names: ['gears'], codepoint: GEARS },
       { names: ['github'], codepoint: GITHUB },
       { names: ['0'], codepoint: ZERO },
-      { names: ['bracket-curly-right'], codepoint: CLOSING_BRACE }
+      { names: ['bracket-curly-right'], codepoint: CLOSING_BRACE },
     ]);
   });
 
@@ -269,7 +278,7 @@ describe('recognising a retired Font Awesome spelling', () => {
       'battery-5',
       'temperature-0',
       'sort-numeric-up-alt',
-      'money-bill-1'
+      'money-bill-1',
     ]) {
       assert.equal(isRetiredVariantName(name), true, `${name} is a retired spelling`);
     }
@@ -289,7 +298,7 @@ describe('recognising a retired Font Awesome spelling', () => {
       'h1',
       'otter',
       'battery-full',
-      'house-chimney'
+      'house-chimney',
     ]) {
       assert.equal(isRetiredVariantName(name), false, `${name} is not a retired spelling`);
     }
@@ -326,7 +335,7 @@ describe('choosing which of a glyph names the vocabulary offers', () => {
     'comment-alt-dots',
     'comment-lines',
     'comment-check',
-    'message-dots'
+    'message-dots',
   ]);
 
   // `-alt` retires a spelling wherever it sits in the name, not only at the end. Font Awesome's
@@ -347,7 +356,7 @@ describe('choosing which of a glyph names the vocabulary offers', () => {
       'home-lg',
       'temperature-empty',
       'temperature-0',
-      'thermometer-empty'
+      'thermometer-empty',
     ]);
 
     assert.equal(preferredIconName(['battery-5', 'battery-full'], groups), 'battery-full');
@@ -365,7 +374,10 @@ describe('choosing which of a glyph names the vocabulary offers', () => {
   });
 
   it('prefers the name whose leading token names the larger family', () => {
-    assert.equal(preferredIconName(['broadcast-tower', 'tower-broadcast'], counts), 'tower-broadcast');
+    assert.equal(
+      preferredIconName(['broadcast-tower', 'tower-broadcast'], counts),
+      'tower-broadcast'
+    );
     assert.equal(preferredIconName(['cog', 'gear'], counts), 'gear');
   });
 
@@ -395,7 +407,7 @@ describe('building the catalogue', () => {
     const catalogue = buildIconCatalogue({
       cssText: STYLESHEET_FIXTURE,
       classicCodepoints,
-      brandCodepoints
+      brandCodepoints,
     });
 
     // `0` is here because its rule is written `--fa:"\30 "`. Misreading that escape hands the
@@ -419,7 +431,7 @@ describe('building the catalogue', () => {
     const catalogue = buildIconCatalogue({
       cssText: STYLESHEET_FIXTURE,
       classicCodepoints,
-      brandCodepoints
+      brandCodepoints,
     });
 
     assert.ok(!catalogue.some((entry) => entry.iconCode === 'github'));
@@ -431,7 +443,7 @@ describe('building the catalogue', () => {
     const catalogue = buildIconCatalogue({
       cssText: STYLESHEET_FIXTURE,
       classicCodepoints: new Set([CANDLE_HOLDER]),
-      brandCodepoints
+      brandCodepoints,
     });
 
     assert.deepEqual(

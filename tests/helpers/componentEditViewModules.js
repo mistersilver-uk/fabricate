@@ -19,6 +19,21 @@
  * throws for it up front.
  */
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
+  // ── THE COMPONENT SCOPE LEAVES (issue 1371) ─────────────────────────────────────────────
+  // Both system-scope component screens now read the world projection: the rules list for its
+  // ghost cohort and its inherit summary, the rules editor for the category inherit switch and
+  // the read-only world tag card. These are the pure leaves behind that, and every one of them
+  // is in the STATIC graph — so an omission here does not fail one test, it HANGS the suite.
+  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+  'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
+  'src/ui/svelte/stores/worldScopeProjection.js',
+  'src/systems/scopedDefinitions.js',
+  'src/systems/scopedDefinitionStore.js',
+  'src/systems/componentScope.js',
+  'src/systems/essenceScope.js',
+  'src/systems/toolScope.js',
+  'src/migration/worldScopeEntityGrouping.js',
+  'src/utils/sourceReferenceUnion.js',
   // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
   // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
   'src/systems/characterLibraries.js',
@@ -81,6 +96,14 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
  * omits does not fail — it HANGS, and is reported as `# cancelled`, never `# fail`.
  */
 export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
+  // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
+  // the two system-scope component screens.
+  'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
+  'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/StatusPill.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
   // The manager's ONE chip (issue 883).
   'src/ui/svelte/apps/manager/Chip.svelte',
   // The manager's ONE icon-only push-button (issue 1422). `ComponentEditView` renders three

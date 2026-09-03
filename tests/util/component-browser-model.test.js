@@ -21,7 +21,12 @@ import {
 import { countByCategory } from '../../src/utils/browserGroupCounts.js';
 
 const ROWS = [
-  { id: 'a', name: 'Iron Ore', category: 'Metal', essences: [{ id: 'earth', name: 'Earth', quantity: 2 }] },
+  {
+    id: 'a',
+    name: 'Iron Ore',
+    category: 'Metal',
+    essences: [{ id: 'earth', name: 'Earth', quantity: 2 }],
+  },
   { id: 'b', name: 'Glass Vial', essences: [] },
   { id: 'c', name: 'Sage', category: 'Herb', essences: [{ id: 'air', name: 'Air', quantity: 1 }] },
   { id: 'd', name: 'Copper Ore', category: 'Metal', essences: [] },
@@ -63,7 +68,10 @@ describe('component browser model (issue 676)', () => {
   });
 
   it('filters by category, including the reserved general bucket', () => {
-    assert.deepEqual(names(filterComponents(ROWS, { category: 'Metal' })), ['Iron Ore', 'Copper Ore']);
+    assert.deepEqual(names(filterComponents(ROWS, { category: 'Metal' })), [
+      'Iron Ore',
+      'Copper Ore',
+    ]);
     assert.deepEqual(names(filterComponents(ROWS, { category: 'general' })), ['Glass Vial']);
     assert.deepEqual(names(filterComponents(ROWS, { category: 'all' })), names(ROWS));
     assert.deepEqual(names(filterComponents(ROWS, {})), names(ROWS));
@@ -75,7 +83,9 @@ describe('component browser model (issue 676)', () => {
   });
 
   it('combines the category and essence filters', () => {
-    assert.deepEqual(names(filterComponents(ROWS, { category: 'Metal', essence: 'Earth' })), ['Iron Ore']);
+    assert.deepEqual(names(filterComponents(ROWS, { category: 'Metal', essence: 'Earth' })), [
+      'Iron Ore',
+    ]);
     assert.deepEqual(filterComponents(ROWS, { category: 'Herb', essence: 'Earth' }), []);
   });
 
@@ -140,25 +150,43 @@ describe('component browser model (issue 676)', () => {
   // `rowComparator` flips them (rather than a self-comparison against the code).
   it('pins each sort key in both directions (the flat, non-grouped path)', () => {
     assert.deepEqual(names(sortComponents(ROWS, { key: 'name', direction: 'asc' })), [
-      'Copper Ore', 'Glass Vial', 'Iron Ore', 'Sage',
+      'Copper Ore',
+      'Glass Vial',
+      'Iron Ore',
+      'Sage',
     ]);
     assert.deepEqual(names(sortComponents(ROWS, { key: 'name', direction: 'desc' })), [
-      'Sage', 'Iron Ore', 'Glass Vial', 'Copper Ore',
+      'Sage',
+      'Iron Ore',
+      'Glass Vial',
+      'Copper Ore',
     ]);
     // Category ASC: Herb, then Metal (Copper before Iron by name), then general LAST.
     assert.deepEqual(names(sortComponents(ROWS, { key: 'category', direction: 'asc' })), [
-      'Sage', 'Copper Ore', 'Iron Ore', 'Glass Vial',
+      'Sage',
+      'Copper Ore',
+      'Iron Ore',
+      'Glass Vial',
     ]);
     // Category DESC flips the group order — general (pinned last) floats to the FRONT —
     // while the within-category tiebreak stays name-ascending.
     assert.deepEqual(names(sortComponents(ROWS, { key: 'category', direction: 'desc' })), [
-      'Glass Vial', 'Copper Ore', 'Iron Ore', 'Sage',
+      'Glass Vial',
+      'Copper Ore',
+      'Iron Ore',
+      'Sage',
     ]);
     assert.deepEqual(names(sortComponents(ROWS, { key: 'essences', direction: 'asc' })), [
-      'Copper Ore', 'Glass Vial', 'Iron Ore', 'Sage',
+      'Copper Ore',
+      'Glass Vial',
+      'Iron Ore',
+      'Sage',
     ]);
     assert.deepEqual(names(sortComponents(ROWS, { key: 'essences', direction: 'desc' })), [
-      'Iron Ore', 'Sage', 'Copper Ore', 'Glass Vial',
+      'Iron Ore',
+      'Sage',
+      'Copper Ore',
+      'Glass Vial',
     ]);
   });
 
@@ -170,7 +198,10 @@ describe('component browser model (issue 676)', () => {
       // A name-key sort with categoryMajor groups the rows into their category order
       // (Herb, Metal, general) with names ascending inside each bucket.
       assert.deepEqual(names(sortComponents(ROWS, { key: 'name', categoryMajor: true })), [
-        'Sage', 'Copper Ore', 'Iron Ore', 'Glass Vial',
+        'Sage',
+        'Copper Ore',
+        'Iron Ore',
+        'Glass Vial',
       ]);
     });
 
@@ -179,9 +210,10 @@ describe('component browser model (issue 676)', () => {
     // the tiebreak (names ascending) — it would otherwise double-apply and reverse the
     // very group order the headers render.
     it('keeps a desc category sort rendering ascending groups (general last), name-asc within', () => {
-      assert.deepEqual(names(sortComponents(ROWS, { key: 'category', direction: 'desc', categoryMajor: true })), [
-        'Sage', 'Copper Ore', 'Iron Ore', 'Glass Vial',
-      ]);
+      assert.deepEqual(
+        names(sortComponents(ROWS, { key: 'category', direction: 'desc', categoryMajor: true })),
+        ['Sage', 'Copper Ore', 'Iron Ore', 'Glass Vial']
+      );
       // Identical to the ascending category-major order — the direction is inert here,
       // exactly the opposite of the flat category-desc order pinned above.
       assert.deepEqual(
@@ -194,7 +226,9 @@ describe('component browser model (issue 676)', () => {
       // desc by essences: groups stay Herb, Metal, general (direction-independent), and
       // only the rows within Metal descend by essence count (Iron Ore[1] before Copper[0]).
       assert.deepEqual(
-        sortComponents(ROWS, { key: 'essences', direction: 'desc', categoryMajor: true }).map((row) => row.name),
+        sortComponents(ROWS, { key: 'essences', direction: 'desc', categoryMajor: true }).map(
+          (row) => row.name
+        ),
         ['Sage', 'Iron Ore', 'Copper Ore', 'Glass Vial']
       );
     });
@@ -204,7 +238,10 @@ describe('component browser model (issue 676)', () => {
     const before = names(ROWS);
     sortComponents(ROWS, { key: 'nonsense' });
     assert.deepEqual(names(ROWS), before, 'the input array is untouched');
-    assert.deepEqual(names(sortComponents(ROWS, { key: 'nonsense' })), names(sortComponents(ROWS, { key: 'name' })));
+    assert.deepEqual(
+      names(sortComponents(ROWS, { key: 'nonsense' })),
+      names(sortComponents(ROWS, { key: 'name' }))
+    );
     assert.ok(COMPONENT_SORT_KEYS.includes('category'));
   });
 

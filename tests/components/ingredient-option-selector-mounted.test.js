@@ -15,7 +15,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
@@ -33,8 +33,28 @@ function optionChoice(overrides = {}) {
     groupName: 'Herb slot',
     selectedOptionIndex: 0,
     options: [
-      { optionIndex: 0, name: 'Red Herb', img: null, need: 1, have: 2, satisfied: true, isCurrency: false, costLabel: '', affordable: true },
-      { optionIndex: 1, name: 'Blue Herb', img: null, need: 1, have: 0, satisfied: false, isCurrency: false, costLabel: '', affordable: true },
+      {
+        optionIndex: 0,
+        name: 'Red Herb',
+        img: null,
+        need: 1,
+        have: 2,
+        satisfied: true,
+        isCurrency: false,
+        costLabel: '',
+        affordable: true,
+      },
+      {
+        optionIndex: 1,
+        name: 'Blue Herb',
+        img: null,
+        need: 1,
+        have: 0,
+        satisfied: false,
+        isCurrency: false,
+        costLabel: '',
+        affordable: true,
+      },
     ],
     ...overrides,
   };
@@ -89,7 +109,11 @@ describe('IngredientOptionSelector mounted behavior', () => {
   it('flags an insufficient option as selectable-but-flagged', async () => {
     const target = await harness.mount({ choices: [optionChoice()], onChoose: null });
     const radios = target.querySelectorAll('[role="radio"]');
-    assert.equal(radios[1].getAttribute('data-option-satisfied'), 'false', 'insufficient option is flagged');
+    assert.equal(
+      radios[1].getAttribute('data-option-satisfied'),
+      'false',
+      'insufficient option is flagged'
+    );
     assert.equal(radios[1].hasAttribute('disabled'), false, 'but stays reachable (not disabled)');
   });
 
@@ -115,13 +139,19 @@ describe('IngredientOptionSelector mounted behavior', () => {
       onChoose: (groupId, choice) => calls.push([groupId, choice]),
     });
     const radios = [...target.querySelectorAll('[role="radio"]')];
-    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    radios[0].dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    );
     assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'ArrowRight moves the selection');
 
-    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    radios[0].dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: 'End', bubbles: true })
+    );
     assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'End jumps to the last option');
 
-    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    radios[0].dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: ' ', bubbles: true })
+    );
     assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0 }], 'Space commits the focused radio');
   });
 
@@ -147,6 +177,10 @@ describe('IngredientOptionSelector mounted behavior', () => {
     const radios = group.querySelectorAll('[role="radio"]');
     assert.equal(radios.length, 2);
     radios[1].click();
-    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'copper' }], 'commits the chosen stack');
+    assert.deepEqual(
+      calls.at(-1),
+      ['g1', { optionIndex: 0, heldItemId: 'copper' }],
+      'commits the chosen stack'
+    );
   });
 });

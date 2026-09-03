@@ -263,7 +263,9 @@ test('evaluateCheckBreakage: a non-engine-evaluated result does NOT force breaka
 test('evaluateCheckBreakage: an engine routed breakTools tier DOES force breakage', async () => {
   const { engine } = makeRoutedEngine({
     routed: defaultRouted({
-      relativeOutcomes: [{ id: 't-dang', name: 'Dangerous', success: true, breakTools: true, dc: 0 }],
+      relativeOutcomes: [
+        { id: 't-dang', name: 'Dangerous', success: true, breakTools: true, dc: 0 },
+      ],
       dc: 15,
     }),
   });
@@ -325,7 +327,6 @@ test('no Roll engine does not block the craft and fabricates no route', async ()
   assert.equal(r.outcome, null);
   assert.equal(r.value, null);
 });
-
 
 // ── Tier-step evidence reaches the result chat card (issue 975) ──────────────
 // The engine's `tierStepForCard` mapping had NO coverage: the chat-card suites feed
@@ -423,7 +424,14 @@ test('checkDriven routed: an outcomeTier trigger on a SUCCESSFUL tier forces bre
       relativeOutcomes: [successTier],
       dc: 15,
       checkBreakage: {
-        triggers: [{ id: 'tier', breakTools: true, outcome: 'none', condition: { type: 'outcomeTier', tierIds: ['t-win'], outcomeKeys: [] } }],
+        triggers: [
+          {
+            id: 'tier',
+            breakTools: true,
+            outcome: 'none',
+            condition: { type: 'outcomeTier', tierIds: ['t-win'], outcomeKeys: [] },
+          },
+        ],
       },
     }),
   });
@@ -431,14 +439,20 @@ test('checkDriven routed: an outcomeTier trigger on a SUCCESSFUL tier forces bre
   stubRoll(18, [{ number: 1, faces: 20, total: 18, results: [{ result: 18, active: true }] }]);
   const r = await runRoutedCheck(engine);
   assert.equal(r.success, true, 'the tier succeeds');
-  const decision = engine._resolveCraftingBreakageDecision(system, { craftingSystemId: 'sys-1' }, r);
+  const decision = engine._resolveCraftingBreakageDecision(
+    system,
+    { craftingSystemId: 'sys-1' },
+    r
+  );
   assert.equal(decision.forceBreak, true, 'a successful tier can break tools');
   assert.equal(decision.triggerId, 'tier');
 });
 
 test('routed surfaces data.diceGroups and the matched outcomeId for the DSL', async () => {
   const tier = { id: 't-win', name: 'Win', success: true, breakTools: false, dc: 0 };
-  const { engine } = makeRoutedEngine({ routed: defaultRouted({ relativeOutcomes: [tier], dc: 15 }) });
+  const { engine } = makeRoutedEngine({
+    routed: defaultRouted({ relativeOutcomes: [tier], dc: 15 }),
+  });
   stubRoll(18, [{ number: 1, faces: 20, total: 18, results: [{ result: 18, active: true }] }]);
   const r = await runRoutedCheck(engine);
   assert.equal(r.data.outcomeId, 't-win');

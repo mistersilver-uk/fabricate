@@ -73,7 +73,9 @@ test('config-card resolution radios stay a 16px dot and never starve the option 
           const r = el.getBoundingClientRect();
           return { w: Math.round(r.width), h: Math.round(r.height) };
         });
-      const radioStyle = [...document.querySelectorAll('.manager-resolution-option input[type=radio]')].map((el) => {
+      const radioStyle = [
+        ...document.querySelectorAll('.manager-resolution-option input[type=radio]'),
+      ].map((el) => {
         const cs = getComputedStyle(el);
         return { borderRadius: cs.borderRadius, appearance: cs.appearance };
       });
@@ -103,7 +105,11 @@ test('config-card resolution radios stay a 16px dot and never starve the option 
         '50%',
         `radio[${i}] should be a circle (border-radius: 50%), was ${style.borderRadius} (the field treatment squared it)`
       );
-      assert.equal(style.appearance, 'none', `radio[${i}] should keep appearance: none, was ${style.appearance}`);
+      assert.equal(
+        style.appearance,
+        'none',
+        `radio[${i}] should keep appearance: none, was ${style.appearance}`
+      );
     }
     for (const [i, body] of geo.bodies.entries()) {
       // A collapsed body measured 0px. A healthy body fills most of a ~669px card column.

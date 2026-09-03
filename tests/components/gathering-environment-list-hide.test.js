@@ -19,15 +19,15 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/sceneImages.js',
     'src/ui/svelte/util/gatheringFormat.js',
-    'src/gatheringImageDefaults.js'
+    'src/gatheringImageDefaults.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
-    'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
+    'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
+  componentPath: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
 });
 
 function environment(overrides = {}) {
@@ -42,7 +42,7 @@ function environment(overrides = {}) {
     discoveredTaskCount: 0,
     composedTaskCount: 0,
     biomeTags: [],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -52,13 +52,14 @@ function makeServices(initialHide = false) {
   return {
     calls,
     getHideUnavailableEnvironments: () => initialHide,
-    setHideUnavailableEnvironments: (value) => calls.set.push(value)
+    setHideUnavailableEnvironments: (value) => calls.set.push(value),
   };
 }
 
 function ids(target) {
-  return Array.from(target.querySelectorAll('[data-environment-id]'))
-    .map((card) => card.getAttribute('data-environment-id'));
+  return Array.from(target.querySelectorAll('[data-environment-id]')).map((card) =>
+    card.getAttribute('data-environment-id')
+  );
 }
 
 function toggle(target) {
@@ -82,22 +83,22 @@ function mixedListing() {
       name: 'Far Vale',
       locked: true,
       location: { gated: true, available: false, currentRealms: [], guidance: null },
-      blockedReasons: [{ code: 'NO_CURRENT_REALM', message: 'No party realm set.' }]
+      blockedReasons: [{ code: 'NO_CURRENT_REALM', message: 'No party realm set.' }],
     }),
     environment({
       id: 'env-blind-locked',
       name: 'Hidden Vault',
       locked: true,
       selectionMode: 'blind',
-      revealPolicy: 'onAttempt'
+      revealPolicy: 'onAttempt',
     }),
     environment({
       id: 'env-blind-open',
       name: 'Whispering Grove',
       locked: false,
       selectionMode: 'blind',
-      revealPolicy: 'onAttempt'
-    })
+      revealPolicy: 'onAttempt',
+    }),
   ];
 }
 
@@ -132,7 +133,11 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
       'toggle-on hides disabled + out-of-realm + blind-locked, keeps available + merely-blind'
     );
     // No locked teaser survives.
-    assert.equal(target.querySelector('[data-locked="true"]'), null, 'no locked card renders when hidden');
+    assert.equal(
+      target.querySelector('[data-locked="true"]'),
+      null,
+      'no locked card renders when hidden'
+    );
   });
 
   it('invokes the services setter and hides locked cards when the pill switch is toggled on', async () => {
@@ -142,7 +147,11 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
     toggle(target).click();
     flushSync();
 
-    assert.deepEqual(calls.set, [true], 'setter direction invoked through the services stub with true');
+    assert.deepEqual(
+      calls.set,
+      [true],
+      'setter direction invoked through the services stub with true'
+    );
     assert.deepEqual(
       ids(target).sort(),
       ['env-blind-open', 'env-open'],
@@ -163,7 +172,7 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
     const { calls, ...services } = makeServices(true);
     const lockedOnly = [
       environment({ id: 'env-a', name: 'Sealed A', locked: true }),
-      environment({ id: 'env-b', name: 'Sealed B', locked: true })
+      environment({ id: 'env-b', name: 'Sealed B', locked: true }),
     ];
     const target = await harness.mount({ environments: lockedOnly, services });
 
@@ -195,7 +204,7 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
     const { ...services } = makeServices(false);
     const target = await harness.mount({
       environments: [environment({ id: 'env-a', name: 'Alpha' })],
-      services
+      services,
     });
 
     const search = target.querySelector('.gathering-env-search input');

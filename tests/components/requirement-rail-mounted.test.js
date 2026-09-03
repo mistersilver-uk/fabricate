@@ -111,7 +111,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/requirementSlots.js',
   ],
   compiledModules: [
@@ -187,7 +187,11 @@ describe('RequirementRail mounted behavior', () => {
   });
 
   it('exposes a choice or essence slot as a button with the disclosure contract', async () => {
-    const target = await harness.mount({ slots: slots(), openSlotId: 'g-choice', panelId: 'panel-1' });
+    const target = await harness.mount({
+      slots: slots(),
+      openSlotId: 'g-choice',
+      panelId: 'panel-1',
+    });
     const [, choice, essence] = tilesIn(target);
 
     assert.equal(choice.tagName, 'BUTTON');
@@ -199,7 +203,9 @@ describe('RequirementRail mounted behavior', () => {
 
   it('opens exactly one chooser at a time', async () => {
     const target = await harness.mount({ slots: slots(), openSlotId: 'essence-pool' });
-    const expanded = tilesIn(target).filter((tile) => tile.getAttribute('aria-expanded') === 'true');
+    const expanded = tilesIn(target).filter(
+      (tile) => tile.getAttribute('aria-expanded') === 'true'
+    );
     assert.equal(expanded.length, 1);
     assert.equal(expanded[0].getAttribute('data-slot-kind'), 'essence');
   });
@@ -336,7 +342,10 @@ describe('RequirementRail mounted behavior', () => {
       openSlotId: 'g-choice',
       announcement: 'Picked for you.',
     });
-    assert.equal(target.querySelector('[data-requirement-rail-live]').textContent.trim(), 'Picked for you.');
+    assert.equal(
+      target.querySelector('[data-requirement-rail-live]').textContent.trim(),
+      'Picked for you.'
+    );
   });
 
   // -------------------------------------------------------------------------

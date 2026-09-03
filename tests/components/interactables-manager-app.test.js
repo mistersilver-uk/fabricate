@@ -31,7 +31,10 @@ const rootSource = readFileSync(
 describe('InteractablesManagerApp singleton window', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
     assert.ok(appSource.includes('SvelteApplicationMixin('), 'uses the SvelteApplicationMixin');
-    assert.ok(appSource.includes('foundry.applications.api.ApplicationV2'), 'extends ApplicationV2');
+    assert.ok(
+      appSource.includes('foundry.applications.api.ApplicationV2'),
+      'extends ApplicationV2'
+    );
     assert.ok(
       appSource.includes('static SVELTE_COMPONENT = InteractablesManagerRoot'),
       'mounts the manager root'
@@ -47,14 +50,20 @@ describe('InteractablesManagerApp singleton window', () => {
     assert.ok(appSource.includes('static _instance = null'), 'tracks a single instance');
     assert.ok(appSource.includes('static _renderPromise = null'), 'tracks an in-flight render');
     assert.ok(appSource.includes('static async show()'), 'exposes a static show()');
-    assert.ok(appSource.includes('existing.bringToFront()'), 're-show brings the existing window to front');
+    assert.ok(
+      appSource.includes('existing.bringToFront()'),
+      're-show brings the existing window to front'
+    );
     const newIdx = appSource.indexOf('new InteractablesManagerApp()');
     const guardIdx = appSource.indexOf('if (existing) {');
     assert.ok(newIdx > guardIdx, 'the only construct sits after the existing-instance guard');
   });
 
   it('clears the singleton on close() and the _onClose safety net', () => {
-    assert.ok(appSource.includes('InteractablesManagerApp._instance = null;'), 'clears the singleton');
+    assert.ok(
+      appSource.includes('InteractablesManagerApp._instance = null;'),
+      'clears the singleton'
+    );
     assert.ok(appSource.includes('_onClose(options)'), 'has the _onClose safety net');
   });
 
@@ -66,8 +75,14 @@ describe('InteractablesManagerApp singleton window', () => {
   });
 
   it('builds list rows through the pure scene-scan helper (reuse, no reinvented scan)', () => {
-    assert.ok(appSource.includes("import { scanSceneInteractables }"), 'imports the pure scene-scan');
-    assert.ok(appSource.includes('scanSceneInteractables(scene, {'), 'listRows delegates to the scan');
+    assert.ok(
+      appSource.includes('import { scanSceneInteractables }'),
+      'imports the pure scene-scan'
+    );
+    assert.ok(
+      appSource.includes('scanSceneInteractables(scene, {'),
+      'listRows delegates to the scan'
+    );
     assert.ok(
       appSource.includes('resolveSourceLabel:') && appSource.includes('resolveVisualResolved:'),
       'injects the source-label + visual-resolution lookups'
@@ -87,11 +102,17 @@ describe('InteractablesManagerApp singleton window', () => {
 
   it('jumps to a region via the canvas pan (reusing the shape-centre pan)', () => {
     assert.ok(appSource.includes('jumpToRegion:'), 'exposes a jump seam');
-    assert.ok(appSource.includes('canvas?.animatePan?.('), 'jump pans the canvas to the region centre');
+    assert.ok(
+      appSource.includes('canvas?.animatePan?.('),
+      'jump pans the canvas to the region centre'
+    );
   });
 
   it('routes delete through services.confirmDialog (DialogV2.confirm), never globalThis.confirm()', () => {
-    assert.ok(appSource.includes('await confirmDialog('), 'delete confirms through the DialogV2 bridge');
+    assert.ok(
+      appSource.includes('await confirmDialog('),
+      'delete confirms through the DialogV2 bridge'
+    );
     assert.ok(!appSource.includes('globalThis.confirm('), 'never calls globalThis.confirm()');
   });
 
@@ -115,8 +136,14 @@ describe('InteractablesManagerApp singleton window', () => {
   });
 
   it('promotes through the pure decision + the SHARED behaviour-system builder (no second builder)', () => {
-    assert.ok(appSource.includes("import { decidePromoteRegion }"), 'imports the pure promote decision');
-    assert.ok(appSource.includes('decidePromoteRegion({'), 'promote delegates to the pure decision');
+    assert.ok(
+      appSource.includes('import { decidePromoteRegion }'),
+      'imports the pure promote decision'
+    );
+    assert.ok(
+      appSource.includes('decidePromoteRegion({'),
+      'promote delegates to the pure decision'
+    );
     assert.ok(
       appSource.includes('buildBehaviorSystem: (spawn) => buildInteractableBehaviorSystem(spawn)'),
       'promotion uses the same buildInteractableBehaviorSystem builder'
@@ -128,9 +155,15 @@ describe('InteractablesManagerApp singleton window', () => {
   });
 
   it('runs the gathering-task environment-resolution precedence for a task promotion', () => {
-    assert.ok(appSource.includes("import { resolveDropEnvironment }"), 'imports the env precedence');
-    assert.ok(appSource.includes('resolveDropEnvironment({'), 'resolves the env via the shared precedence');
-    assert.ok(appSource.includes("import { promptDropEnvironment }"), 'reuses the env dialog edge');
+    assert.ok(
+      appSource.includes('import { resolveDropEnvironment }'),
+      'imports the env precedence'
+    );
+    assert.ok(
+      appSource.includes('resolveDropEnvironment({'),
+      'resolves the env via the shared precedence'
+    );
+    assert.ok(appSource.includes('import { promptDropEnvironment }'), 'reuses the env dialog edge');
   });
 
   it('creates the optional promote marker via the existing recreate-tile/drawing seams', () => {
@@ -154,11 +187,15 @@ describe('InteractablesManagerApp singleton window', () => {
       'listSystems delegates to the shared system enumeration'
     );
     assert.ok(
-      appSource.includes('listToolsForSystem: (systemId) => listToolSourceOptions(this._sourceDeps(), systemId)'),
+      appSource.includes(
+        'listToolsForSystem: (systemId) => listToolSourceOptions(this._sourceDeps(), systemId)'
+      ),
       'the promote Tool picker delegates to the shared Tool enumeration (the No-sources fix)'
     );
     assert.ok(
-      appSource.includes('listTasksForSystem: (systemId) => listTaskSourceOptions(this._sourceDeps(), systemId)'),
+      appSource.includes(
+        'listTasksForSystem: (systemId) => listTaskSourceOptions(this._sourceDeps(), systemId)'
+      ),
       'the promote Task picker delegates to the shared Task enumeration'
     );
     assert.ok(
@@ -169,7 +206,7 @@ describe('InteractablesManagerApp singleton window', () => {
 
   it('gates every mutating seam on GM', () => {
     assert.ok(appSource.includes('_assertGM()'), 'mutating seams assert GM');
-    assert.ok(appSource.includes("game?.user?.isGM === true"), 'GM gate reads the live user');
+    assert.ok(appSource.includes('game?.user?.isGM === true'), 'GM gate reads the live user');
   });
 });
 
@@ -205,7 +242,10 @@ describe('InteractablesManagerRoot body', () => {
 
   it('covers each marker-status variant + each state in its label maps', () => {
     expectAll([
-      ...['Tile', 'Drawing', 'Token', 'region-only', 'missing'].map((s) => [`'${s}'`, `marker map handles ${s}`]),
+      ...['Tile', 'Drawing', 'Token', 'region-only', 'missing'].map((s) => [
+        `'${s}'`,
+        `marker map handles ${s}`,
+      ]),
       ['FABRICATE.Canvas.Manage.StateDisabled', 'disabled state badge'],
       ['FABRICATE.Canvas.Manage.StateLocked', 'locked state badge'],
       ['FABRICATE.Canvas.Manage.StateConsumed', 'consumed state badge'],
@@ -239,9 +279,18 @@ describe('InteractablesManagerRoot body', () => {
     expectAll([
       ["from '../../util/systemDisambiguation.js'", 'uses the shared disambiguation helper'],
       ['buildSystemLabelMap(systems)', 'builds the disambiguated label map'],
-      ['systemDisplayLabel(system, systemLabels)', 'renders the disambiguated label in the promote system picker'],
-      ['pickDefaultSystemId(systems, systemHasSources)', 'default selection prefers a source-bearing system'],
-      ['function systemHasSources(systemId)', 'tests for selectable sources of the current source type'],
+      [
+        'systemDisplayLabel(system, systemLabels)',
+        'renders the disambiguated label in the promote system picker',
+      ],
+      [
+        'pickDefaultSystemId(systems, systemHasSources)',
+        'default selection prefers a source-bearing system',
+      ],
+      [
+        'function systemHasSources(systemId)',
+        'tests for selectable sources of the current source type',
+      ],
     ]);
   });
 

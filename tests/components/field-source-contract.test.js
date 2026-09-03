@@ -50,10 +50,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  SOURCES,
-  definePrimitiveAdoptionContract,
-} from '../helpers/primitiveAdoptionContract.js';
+import { SOURCES, definePrimitiveAdoptionContract } from '../helpers/primitiveAdoptionContract.js';
 
 /** The primitive whose adoption this file pins. */
 const FIELD_PATH = 'src/ui/svelte/components/Field.svelte';

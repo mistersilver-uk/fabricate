@@ -88,7 +88,12 @@ class FakeActor {
   }
   async createEmbeddedDocuments(_type, data) {
     const made = data.map((d, i) => {
-      const item = new FakeItem(`created-${this.created.length + i}`, d.name, d.system?.quantity ?? 1, null);
+      const item = new FakeItem(
+        `created-${this.created.length + i}`,
+        d.name,
+        d.system?.quantity ?? 1,
+        null
+      );
       item.img = d.img;
       return item;
     });
@@ -115,9 +120,26 @@ const SLUDGE_SRC = 'Compendium.src.Item.sludge';
 
 function components() {
   return [
-    { id: 'emberroot', name: 'Emberroot', registeredItemUuid: EMBER_SRC, originItemUuid: EMBER_SRC },
-    { id: 'potion', name: 'Potion of Vigor', img: 'icons/potion.webp', registeredItemUuid: POTION_SRC, originItemUuid: POTION_SRC },
-    { id: 'sludge', name: 'Toxic Sludge', img: 'icons/sludge.webp', registeredItemUuid: SLUDGE_SRC, originItemUuid: SLUDGE_SRC },
+    {
+      id: 'emberroot',
+      name: 'Emberroot',
+      registeredItemUuid: EMBER_SRC,
+      originItemUuid: EMBER_SRC,
+    },
+    {
+      id: 'potion',
+      name: 'Potion of Vigor',
+      img: 'icons/potion.webp',
+      registeredItemUuid: POTION_SRC,
+      originItemUuid: POTION_SRC,
+    },
+    {
+      id: 'sludge',
+      name: 'Toxic Sludge',
+      img: 'icons/sludge.webp',
+      registeredItemUuid: SLUDGE_SRC,
+      originItemUuid: SLUDGE_SRC,
+    },
   ];
 }
 
@@ -128,7 +150,16 @@ function alchemyRecipe(resultGroups) {
     id: 'brew-set',
     essences: {},
     ingredientGroups: [
-      { id: 'g1', options: [{ match: { type: 'component', componentId: 'emberroot' }, componentId: 'emberroot', quantity: 1 }] },
+      {
+        id: 'g1',
+        options: [
+          {
+            match: { type: 'component', componentId: 'emberroot' },
+            componentId: 'emberroot',
+            quantity: 1,
+          },
+        ],
+      },
     ],
     // Duck-typed craft-plan matcher (mirrors the back-compat matchIngredients path):
     // one plan entry per group, matching the first source-ref-matching owned item.
@@ -202,7 +233,14 @@ function makeMatcher(comps) {
   };
 }
 
-function setup({ checkMode, resultGroups, learnOnCraft = true, consumeOnFail = true, routed = null, chatOutput = false }) {
+function setup({
+  checkMode,
+  resultGroups,
+  learnOnCraft = true,
+  consumeOnFail = true,
+  routed = null,
+  chatOutput = false,
+}) {
   const comps = components();
   const recipe = alchemyRecipe(resultGroups);
   const system = {
@@ -214,11 +252,17 @@ function setup({ checkMode, resultGroups, learnOnCraft = true, consumeOnFail = t
     components: comps,
     managedItems: comps,
   };
-  const resolutionService = new ResolutionModeService({ getSystem: (id) => (id === 'sys-a' ? system : null) });
+  const resolutionService = new ResolutionModeService({
+    getSystem: (id) => (id === 'sys-a' ? system : null),
+  });
   const recipeManager = {
     getRecipes: () => [recipe],
     canCraft(_actors, execRecipe) {
-      return { canCraft: true, satisfiableSet: execRecipe.ingredientSets[0], missing: { ingredients: [], essences: [], tools: [] } };
+      return {
+        canCraft: true,
+        satisfiableSet: execRecipe.ingredientSets[0],
+        missing: { ingredients: [], essences: [], tools: [] },
+      };
     },
     getToolsForSet: () => [],
     ingredientMatchesItem: makeMatcher(comps),
@@ -268,14 +312,25 @@ function brewInputs() {
   const owned = new FakeItem('owned-emberroot', 'Emberroot', 1, EMBER_SRC);
   const actor = new FakeActor('src', [owned]);
   const crafter = new FakeActor('pc');
-  const submitted = [{ uuid: owned.uuid, name: 'Emberroot', _stats: { duplicateSource: EMBER_SRC } }];
+  const submitted = [
+    { uuid: owned.uuid, name: 'Emberroot', _stats: { duplicateSource: EMBER_SRC } },
+  ];
   return { owned, actor, crafter, submitted };
 }
 
 function successAndFailureGroups() {
   return [
-    { id: 'rg-ok', name: 'On success', results: [{ id: 'r-ok', componentId: 'potion', quantity: 1 }] },
-    { id: 'rg-fail', name: 'On a failed check', role: 'failure', results: [{ id: 'r-fail', componentId: 'sludge', quantity: 1 }] },
+    {
+      id: 'rg-ok',
+      name: 'On success',
+      results: [{ id: 'r-ok', componentId: 'potion', quantity: 1 }],
+    },
+    {
+      id: 'rg-fail',
+      name: 'On a failed check',
+      role: 'failure',
+      results: [{ id: 'r-fail', componentId: 'sludge', quantity: 1 }],
+    },
   ];
 }
 
@@ -297,7 +352,9 @@ async function brew(engine, validator, inputs, options = {}) {
 test('None: a matched brew always succeeds and produces the single success group (no roll)', async () => {
   const { engine, validator, visibility } = setup({
     checkMode: 'none',
-    resultGroups: [{ id: 'rg', name: 'Result', results: [{ id: 'r', componentId: 'potion', quantity: 1 }] }],
+    resultGroups: [
+      { id: 'rg', name: 'Result', results: [{ id: 'r', componentId: 'potion', quantity: 1 }] },
+    ],
   });
   const inputs = brewInputs();
   const result = await brew(engine, validator, inputs);
@@ -313,17 +370,27 @@ test('None: a matched brew always succeeds and produces the single success group
 // ===========================================================================
 
 test('Simple PASS produces the success group and learns', async () => {
-  const { engine, validator, visibility } = setup({ checkMode: 'simple', resultGroups: successAndFailureGroups() });
+  const { engine, validator, visibility } = setup({
+    checkMode: 'simple',
+    resultGroups: successAndFailureGroups(),
+  });
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'pass', value: 18, data: {} });
   const inputs = brewInputs();
   const result = await brew(engine, validator, inputs);
   assert.equal(result.success, true);
-  assert.equal(result.results[0].name, 'Potion of Vigor', 'the success result is produced on a pass');
+  assert.equal(
+    result.results[0].name,
+    'Potion of Vigor',
+    'the success result is produced on a pass'
+  );
   assert.deepEqual(visibility.learned, ['brew']);
 });
 
 test('Simple FAIL routes past the fizzle into the failure group: consumes, produces, learns, produced-on-failure', async () => {
-  const { engine, validator, visibility } = setup({ checkMode: 'simple', resultGroups: successAndFailureGroups() });
+  const { engine, validator, visibility } = setup({
+    checkMode: 'simple',
+    resultGroups: successAndFailureGroups(),
+  });
   engine._runCraftingCheck = async () => ({ success: false, outcome: 'fail', value: 4, data: {} });
   const inputs = brewInputs();
 
@@ -332,9 +399,20 @@ test('Simple FAIL routes past the fizzle into the failure group: consumes, produ
   // Would be `results:null` with no disposition if the failure-routing were reverted.
   assert.equal(result.success, false);
   assert.equal(result.disposition, 'produced-on-failure', 'NOT the no-match fizzle path');
-  assert.ok(Array.isArray(result.results) && result.results.length === 1, 'the failure group is produced');
-  assert.equal(result.results[0].name, 'Toxic Sludge', 'the REAL _createResultItems produced the reserved failure result');
-  assert.equal(inputs.owned._deleted, true, 'ingredients consumed on a matched fail (consumeOnFail=true)');
+  assert.ok(
+    Array.isArray(result.results) && result.results.length === 1,
+    'the failure group is produced'
+  );
+  assert.equal(
+    result.results[0].name,
+    'Toxic Sludge',
+    'the REAL _createResultItems produced the reserved failure result'
+  );
+  assert.equal(
+    inputs.owned._deleted,
+    true,
+    'ingredients consumed on a matched fail (consumeOnFail=true)'
+  );
   assert.deepEqual(visibility.learned, ['brew'], 'a matched fail is still a discovery');
 });
 
@@ -342,7 +420,11 @@ test('Simple FAIL with an EMPTY failure group consumes + learns but produces not
   const { engine, validator, visibility } = setup({
     checkMode: 'simple',
     resultGroups: [
-      { id: 'rg-ok', name: 'On success', results: [{ id: 'r-ok', componentId: 'potion', quantity: 1 }] },
+      {
+        id: 'rg-ok',
+        name: 'On success',
+        results: [{ id: 'r-ok', componentId: 'potion', quantity: 1 }],
+      },
       { id: 'rg-fail', name: 'On a failed check', role: 'failure', results: [] },
     ],
   });
@@ -400,7 +482,9 @@ test('brew is never gated by reveal: a non-revealed recipe still brews + produce
     const { engine, system, recipe, validator } = setup({
       checkMode: 'none',
       learnOnCraft: false,
-      resultGroups: [{ id: 'rg', name: 'Result', results: [{ id: 'r', componentId: 'potion', quantity: 1 }] }],
+      resultGroups: [
+        { id: 'rg', name: 'Result', results: [{ id: 'r', componentId: 'potion', quantity: 1 }] },
+      ],
     });
     system.visibilityMode = mode;
     // A Manual (restricted) grant that EXCLUDES the viewer, so restricted mode is
@@ -428,7 +512,11 @@ test('brew is never gated by reveal: a non-revealed recipe still brews + produce
     const inputs = brewInputs();
     const result = await brew(engine, validator, inputs);
     assert.equal(result.success, true, `${mode}: a matched brew succeeds despite being unrevealed`);
-    assert.equal(result.results[0].name, 'Potion of Vigor', `${mode}: the success group is produced`);
+    assert.equal(
+      result.results[0].name,
+      'Potion of Vigor',
+      `${mode}: the success group is produced`
+    );
     assert.equal(inputs.owned._deleted, true, `${mode}: the ingredient is consumed`);
   }
 });
@@ -445,11 +533,26 @@ test('Tiered success routes the outcome to its assigned tier group and produces 
     checkMode: 'tiered',
     routed,
     resultGroups: [
-      { id: 'rg-fine', name: 'Fine', checkOutcomeIds: ['t-fine'], results: [{ id: 'r-fine', componentId: 'potion', quantity: 1 }] },
-      { id: 'rg-superb', name: 'Superb', checkOutcomeIds: ['t-superb'], results: [{ id: 'r-superb', componentId: 'sludge', quantity: 1 }] },
+      {
+        id: 'rg-fine',
+        name: 'Fine',
+        checkOutcomeIds: ['t-fine'],
+        results: [{ id: 'r-fine', componentId: 'potion', quantity: 1 }],
+      },
+      {
+        id: 'rg-superb',
+        name: 'Superb',
+        checkOutcomeIds: ['t-superb'],
+        results: [{ id: 'r-superb', componentId: 'sludge', quantity: 1 }],
+      },
     ],
   });
-  engine._runCraftingCheck = async () => ({ success: true, outcome: 'Superb', value: 25, data: {} });
+  engine._runCraftingCheck = async () => ({
+    success: true,
+    outcome: 'Superb',
+    value: 25,
+    data: {},
+  });
   const inputs = brewInputs();
   const result = await brew(engine, validator, inputs);
   assert.equal(result.success, true);

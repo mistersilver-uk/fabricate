@@ -7,7 +7,7 @@ import {
   getRecipeCategoryLabel,
   isGeneralRecipeCategory,
   normalizeCustomRecipeCategories,
-  normalizeRecipeCategory
+  normalizeRecipeCategory,
 } from '../src/utils/recipeCategories.js';
 
 describe('recipe category helpers', () => {
@@ -34,15 +34,18 @@ describe('recipe category helpers', () => {
 
   it('builds effective category lists with the reserved general category first', () => {
     assert.deepEqual(getEffectiveRecipeCategories([]), [GENERAL_RECIPE_CATEGORY]);
-    assert.deepEqual(
-      getEffectiveRecipeCategories(['Potions', 'general', 'Weapons']),
-      [GENERAL_RECIPE_CATEGORY, 'Potions', 'Weapons']
-    );
+    assert.deepEqual(getEffectiveRecipeCategories(['Potions', 'general', 'Weapons']), [
+      GENERAL_RECIPE_CATEGORY,
+      'Potions',
+      'Weapons',
+    ]);
   });
 
   it('localizes the reserved general category label', () => {
     assert.equal(
-      getRecipeCategoryLabel('general', (key) => key === 'FABRICATE.Common.General' ? 'General' : '???'),
+      getRecipeCategoryLabel('general', (key) =>
+        key === 'FABRICATE.Common.General' ? 'General' : '???'
+      ),
       'General'
     );
     assert.equal(getRecipeCategoryLabel('Weapons'), 'Weapons');

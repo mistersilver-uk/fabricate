@@ -21,7 +21,7 @@ function makeRecipe(data) {
     toJSON() {
       const { toJSON, ...rest } = this;
       return structuredClone(rest);
-    }
+    },
   };
 }
 
@@ -38,7 +38,7 @@ function makeRecipeManager() {
       craftingSystemId: 'sys',
       enabled: true,
       ingredientSets: [{ id: 's1', essences: { fire: 2 }, ingredientGroups: [], ingredients: [] }],
-      resultGroups: [{ id: 'rg1', results: [{ componentId: 'potion' }] }]
+      resultGroups: [{ id: 'rg1', results: [{ componentId: 'potion' }] }],
     }),
     makeRecipe({
       id: 'recipe-iron',
@@ -50,10 +50,10 @@ function makeRecipeManager() {
           id: 's2',
           essences: {},
           ingredientGroups: [{ id: 'g2', options: [{ componentId: 'iron' }] }],
-          ingredients: [{ componentId: 'iron' }]
-        }
+          ingredients: [{ componentId: 'iron' }],
+        },
       ],
-      resultGroups: [{ id: 'rg2', results: [{ componentId: 'bar' }] }]
+      resultGroups: [{ id: 'rg2', results: [{ componentId: 'bar' }] }],
     }),
     makeRecipe({
       id: 'recipe-none',
@@ -65,10 +65,10 @@ function makeRecipeManager() {
           id: 's3',
           essences: { water: 1 },
           ingredientGroups: [{ id: 'g3', options: [{ componentId: 'wood' }] }],
-          ingredients: [{ componentId: 'wood' }]
-        }
+          ingredients: [{ componentId: 'wood' }],
+        },
       ],
-      resultGroups: [{ id: 'rg3', results: [{ componentId: 'plank' }] }]
+      resultGroups: [{ id: 'rg3', results: [{ componentId: 'plank' }] }],
     }),
     // Carries its component reference via a structured `match: { type: 'component', componentId }`
     // rather than a bare top-level `componentId`, so deletion must resolve the id through the match
@@ -83,12 +83,12 @@ function makeRecipeManager() {
           id: 's4',
           essences: {},
           ingredientGroups: [
-            { id: 'g4', options: [{ match: { type: 'component', componentId: 'iron' } }] }
+            { id: 'g4', options: [{ match: { type: 'component', componentId: 'iron' } }] },
           ],
-          ingredients: []
-        }
+          ingredients: [],
+        },
       ],
-      resultGroups: [{ id: 'rg4', results: [{ componentId: 'bar' }] }]
+      resultGroups: [{ id: 'rg4', results: [{ componentId: 'bar' }] }],
     }),
     // A recipe CONVERTED from single-step to multi-step by the shipped editor.
     // `handleEnterMultiStep` COPIES the recipe-level sets into step 1 and leaves the
@@ -105,8 +105,8 @@ function makeRecipeManager() {
           id: 'ms-set',
           essences: {},
           ingredientGroups: [{ id: 'ms-g', options: [{ componentId: 'iron' }] }],
-          ingredients: [{ componentId: 'iron' }]
-        }
+          ingredients: [{ componentId: 'iron' }],
+        },
       ],
       resultGroups: [{ id: 'ms-rg', results: [{ componentId: 'bar' }] }],
       steps: [
@@ -118,12 +118,12 @@ function makeRecipeManager() {
               id: 'ms-set',
               essences: {},
               ingredientGroups: [{ id: 'ms-g', options: [{ componentId: 'iron' }] }],
-              ingredients: [{ componentId: 'iron' }]
-            }
+              ingredients: [{ componentId: 'iron' }],
+            },
           ],
-          resultGroups: [{ id: 'ms-rg', results: [{ componentId: 'bar' }] }]
-        }
-      ]
+          resultGroups: [{ id: 'ms-rg', results: [{ componentId: 'bar' }] }],
+        },
+      ],
     }),
     // Carries its component reference via the legacy `systemItem`/`systemItemId` alias match shape,
     // which the handler aliases to the component handler — deletion must still resolve and strip it.
@@ -137,12 +137,12 @@ function makeRecipeManager() {
           id: 's5',
           essences: {},
           ingredientGroups: [
-            { id: 'g5', options: [{ match: { type: 'systemItem', systemItemId: 'iron' } }] }
+            { id: 'g5', options: [{ match: { type: 'systemItem', systemItemId: 'iron' } }] },
           ],
-          ingredients: []
-        }
+          ingredients: [],
+        },
       ],
-      resultGroups: [{ id: 'rg5', results: [{ componentId: 'bar' }] }]
+      resultGroups: [{ id: 'rg5', results: [{ componentId: 'bar' }] }],
     }),
     // Rewritten but NOT disabled. It names `bar` among ALTERNATIVES at both ends — an
     // ingredient group of two options and a result group of two results — so a delete that
@@ -159,14 +159,12 @@ function makeRecipeManager() {
           id: 's6',
           essences: {},
           ingredientGroups: [
-            { id: 'g6', options: [{ componentId: 'wood' }, { componentId: 'plank' }] }
+            { id: 'g6', options: [{ componentId: 'wood' }, { componentId: 'plank' }] },
           ],
-          ingredients: [{ componentId: 'wood' }]
-        }
+          ingredients: [{ componentId: 'wood' }],
+        },
       ],
-      resultGroups: [
-        { id: 'rg6', results: [{ componentId: 'bar' }, { componentId: 'plank' }] }
-      ]
+      resultGroups: [{ id: 'rg6', results: [{ componentId: 'bar' }, { componentId: 'plank' }] }],
     }),
     // ALREADY disabled, and it names `bar` as its only result. Deleting `bar` rewrites it
     // and leaves it with nothing to produce, so the rewrite clamps `enabled` to false again
@@ -185,23 +183,23 @@ function makeRecipeManager() {
           id: 's7',
           essences: {},
           ingredientGroups: [{ id: 'g7', options: [{ componentId: 'plank' }] }],
-          ingredients: [{ componentId: 'plank' }]
-        }
+          ingredients: [{ componentId: 'plank' }],
+        },
       ],
-      resultGroups: [{ id: 'rg7', results: [{ componentId: 'bar' }] }]
-    })
+      resultGroups: [{ id: 'rg7', results: [{ componentId: 'bar' }] }],
+    }),
   ];
 
   return {
     getRecipes(filters = {}) {
       if (filters.craftingSystemId) {
-        return recipes.filter(recipe => recipe.craftingSystemId === filters.craftingSystemId);
+        return recipes.filter((recipe) => recipe.craftingSystemId === filters.craftingSystemId);
       }
       return recipes;
     },
     async updateRecipe(recipeId, updates, options = {}) {
       updateCalls.push({ recipeId, updates, options });
-      const idx = recipes.findIndex(recipe => recipe.id === recipeId);
+      const idx = recipes.findIndex((recipe) => recipe.id === recipeId);
       if (idx >= 0) recipes[idx] = makeRecipe({ ...updates, id: recipeId });
       if (options.notify !== false) {
         ui.notifications.info(`Recipe "${updates.name}" updated`);
@@ -238,7 +236,7 @@ function makeRecipeManager() {
       this.disableCalls.push(systemId);
       return this.conflictDisableResult;
     },
-    updateCalls
+    updateCalls,
   };
 }
 
@@ -257,24 +255,27 @@ function makeManager(recipeManager) {
       (manager.getSystem('sys')?.components || []).map((component) => component.id)
     );
   };
-  manager.systems.set('sys', manager._normalizeSystem({
-    id: 'sys',
-    name: 'Alchemy',
-    features: { essences: true },
-    components: [
-      { id: 'iron', name: 'Iron' },
-      { id: 'wood', name: 'Wood' },
-      { id: 'unused', name: 'Unused' },
-      { id: 'potion', name: 'Potion' },
-      { id: 'bar', name: 'Bar' },
-      { id: 'plank', name: 'Plank' }
-    ],
-    essenceDefinitions: [
-      { id: 'fire', name: 'Fire' },
-      { id: 'water', name: 'Water' },
-      { id: 'air', name: 'Air' }
-    ]
-  }));
+  manager.systems.set(
+    'sys',
+    manager._normalizeSystem({
+      id: 'sys',
+      name: 'Alchemy',
+      features: { essences: true },
+      components: [
+        { id: 'iron', name: 'Iron' },
+        { id: 'wood', name: 'Wood' },
+        { id: 'unused', name: 'Unused' },
+        { id: 'potion', name: 'Potion' },
+        { id: 'bar', name: 'Bar' },
+        { id: 'plank', name: 'Plank' },
+      ],
+      essenceDefinitions: [
+        { id: 'fire', name: 'Fire' },
+        { id: 'water', name: 'Water' },
+        { id: 'air', name: 'Air' },
+      ],
+    })
+  );
   return manager;
 }
 
@@ -286,7 +287,7 @@ test('deleteItem updates only recipes that reference the component, with one sum
   await manager.deleteItem('sys', 'iron');
 
   assert.deepEqual(
-    recipeManager.updateCalls.map(call => call.recipeId),
+    recipeManager.updateCalls.map((call) => call.recipeId),
     ['recipe-iron', 'recipe-match-iron', 'recipe-multistep-iron', 'recipe-alias-iron'],
     'every iron-referencing recipe is updated — including the structured-match, legacy-alias and multi-step forms'
   );
@@ -303,12 +304,18 @@ test('deleteItem strips a structured component-match ingredient and disables the
 
   await manager.deleteItem('sys', 'iron');
 
-  const matchUpdate = recipeManager.updateCalls.find(call => call.recipeId === 'recipe-match-iron');
+  const matchUpdate = recipeManager.updateCalls.find(
+    (call) => call.recipeId === 'recipe-match-iron'
+  );
   assert.ok(matchUpdate, 'the structured-match recipe is updated');
   // The sole ingredient option referenced iron via `match: { type: 'component', componentId }`, so
   // stripping it empties the only ingredient set and the recipe is disabled.
   assert.equal(matchUpdate.updates.ingredientSets.length, 0, 'emptied ingredient set is dropped');
-  assert.equal(matchUpdate.updates.enabled, false, 'recipe left without ingredient sets is disabled');
+  assert.equal(
+    matchUpdate.updates.enabled,
+    false,
+    'recipe left without ingredient sets is disabled'
+  );
 });
 
 test('deleteItem strips a legacy systemItem-alias match ingredient', async () => {
@@ -318,10 +325,16 @@ test('deleteItem strips a legacy systemItem-alias match ingredient', async () =>
 
   await manager.deleteItem('sys', 'iron');
 
-  const aliasUpdate = recipeManager.updateCalls.find(call => call.recipeId === 'recipe-alias-iron');
+  const aliasUpdate = recipeManager.updateCalls.find(
+    (call) => call.recipeId === 'recipe-alias-iron'
+  );
   assert.ok(aliasUpdate, 'the legacy systemItem-alias recipe is detected and updated');
   assert.equal(aliasUpdate.updates.ingredientSets.length, 0, 'emptied ingredient set is dropped');
-  assert.equal(aliasUpdate.updates.enabled, false, 'recipe left without ingredient sets is disabled');
+  assert.equal(
+    aliasUpdate.updates.enabled,
+    false,
+    'recipe left without ingredient sets is disabled'
+  );
 });
 
 test('deleteItem disables a recipe whose only RESULT was the deleted component', async () => {
@@ -336,7 +349,7 @@ test('deleteItem disables a recipe whose only RESULT was the deleted component',
 
   await manager.deleteItem('sys', 'bar');
 
-  const ironUpdate = recipeManager.updateCalls.find(call => call.recipeId === 'recipe-iron');
+  const ironUpdate = recipeManager.updateCalls.find((call) => call.recipeId === 'recipe-iron');
   assert.ok(ironUpdate, 'the recipe producing the deleted component is updated');
   assert.equal(ironUpdate.updates.resultGroups.length, 0, 'the emptied result group is dropped');
   assert.ok(
@@ -361,11 +374,13 @@ test('_recipeReferencesComponent detects structured-match and legacy-alias compo
     ingredientSets: [
       {
         id: 's',
-        ingredientGroups: [{ id: 'g', options: [{ match: { type: 'component', componentId: 'iron' } }] }],
-        ingredients: []
-      }
+        ingredientGroups: [
+          { id: 'g', options: [{ match: { type: 'component', componentId: 'iron' } }] },
+        ],
+        ingredients: [],
+      },
     ],
-    resultGroups: []
+    resultGroups: [],
   });
   const aliasRecipe = makeRecipe({
     id: 'r-alias',
@@ -373,11 +388,13 @@ test('_recipeReferencesComponent detects structured-match and legacy-alias compo
     ingredientSets: [
       {
         id: 's',
-        ingredientGroups: [{ id: 'g', options: [{ match: { type: 'systemItem', systemItemId: 'iron' } }] }],
-        ingredients: []
-      }
+        ingredientGroups: [
+          { id: 'g', options: [{ match: { type: 'systemItem', systemItemId: 'iron' } }] },
+        ],
+        ingredients: [],
+      },
     ],
-    resultGroups: []
+    resultGroups: [],
   });
   const unrelated = makeRecipe({
     id: 'r-none',
@@ -385,11 +402,13 @@ test('_recipeReferencesComponent detects structured-match and legacy-alias compo
     ingredientSets: [
       {
         id: 's',
-        ingredientGroups: [{ id: 'g', options: [{ match: { type: 'component', componentId: 'wood' } }] }],
-        ingredients: []
-      }
+        ingredientGroups: [
+          { id: 'g', options: [{ match: { type: 'component', componentId: 'wood' } }] },
+        ],
+        ingredients: [],
+      },
     ],
-    resultGroups: []
+    resultGroups: [],
   });
 
   assert.equal(manager._recipeReferencesComponent(matchRecipe, 'iron'), true);
@@ -407,7 +426,7 @@ test('deleteItem with no referencing recipes emits no notification', async () =>
   assert.equal(result, true);
   assert.deepEqual(recipeManager.updateCalls, []);
   assert.deepEqual(notifications, []);
-  assert.ok(!manager.getSystem('sys').components.some(c => c.id === 'unused'));
+  assert.ok(!manager.getSystem('sys').components.some((c) => c.id === 'unused'));
 });
 
 test('deleteEssence strips the essence from referencing recipes and disables emptied recipes', async () => {
@@ -418,7 +437,7 @@ test('deleteEssence strips the essence from referencing recipes and disables emp
   await manager.deleteEssence('sys', 'fire');
 
   assert.deepEqual(
-    recipeManager.updateCalls.map(call => call.recipeId),
+    recipeManager.updateCalls.map((call) => call.recipeId),
     ['recipe-fire'],
     'only the fire-referencing recipe is updated'
   );
@@ -427,7 +446,7 @@ test('deleteEssence strips the essence from referencing recipes and disables emp
   assert.equal(update.updates.ingredientSets.length, 0, 'emptied ingredient set is dropped');
   assert.equal(update.updates.enabled, false, 'recipe left without ingredient sets is disabled');
   assert.deepEqual(notifications, ['Removed essence "Fire" and updated 1 recipe(s).']);
-  assert.ok(!manager.getSystem('sys').essenceDefinitions.some(def => def.id === 'fire'));
+  assert.ok(!manager.getSystem('sys').essenceDefinitions.some((def) => def.id === 'fire'));
 });
 
 test('deleteEssence with no referencing recipes removes the definition silently', async () => {
@@ -440,7 +459,7 @@ test('deleteEssence with no referencing recipes removes the definition silently'
   assert.equal(result, true);
   assert.deepEqual(recipeManager.updateCalls, []);
   assert.deepEqual(notifications, []);
-  assert.ok(!manager.getSystem('sys').essenceDefinitions.some(def => def.id === 'air'));
+  assert.ok(!manager.getSystem('sys').essenceDefinitions.some((def) => def.id === 'air'));
 });
 
 test('deleteEssence returns false for an unknown essence', async () => {
@@ -467,7 +486,7 @@ test('deleteItem in alchemy mode disables conflicting recipes and notifies their
   const recipeManager = makeRecipeManager();
   recipeManager.conflictDisableResult = [
     { id: 'recipe-fire', name: 'Fire Brew' },
-    { id: 'recipe-none', name: 'Wood Plank' }
+    { id: 'recipe-none', name: 'Wood Plank' },
   ];
   const manager = makeAlchemyManager(recipeManager);
 
@@ -475,7 +494,9 @@ test('deleteItem in alchemy mode disables conflicting recipes and notifies their
 
   assert.deepEqual(recipeManager.disableCalls, ['sys'], 'reconcile runs for alchemy systems');
   assert.ok(
-    notifications.includes('Disabled 2 recipe(s) with conflicting signatures: Fire Brew, Wood Plank'),
+    notifications.includes(
+      'Disabled 2 recipe(s) with conflicting signatures: Fire Brew, Wood Plank'
+    ),
     'a summary lists the disabled recipe names'
   );
 });
@@ -489,9 +510,7 @@ test('deleteEssence in alchemy mode runs the signature reconcile', async () => {
   await manager.deleteEssence('sys', 'fire');
 
   assert.deepEqual(recipeManager.disableCalls, ['sys']);
-  assert.ok(
-    notifications.includes('Disabled 1 recipe(s) with conflicting signatures: Fire Brew')
-  );
+  assert.ok(notifications.includes('Disabled 1 recipe(s) with conflicting signatures: Fire Brew'));
 });
 
 test('deletion in a non-alchemy system does not run the signature reconcile', async () => {
@@ -523,7 +542,10 @@ function makeEssenceOptionRecipeManager() {
           id: 's1',
           ingredientGroups: [
             { id: 'g-comp', options: [{ match: { type: 'component', componentId: 'iron' } }] },
-            { id: 'g-ess', options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
+            {
+              id: 'g-ess',
+              options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } }],
+            },
           ],
         },
       ],
@@ -577,7 +599,11 @@ test('deleteEssence detects and strips a first-class essence OPTION (not just th
   // component group survives.
   assert.equal(groups.length, 1, 'the emptied essence group is removed');
   assert.equal(groups[0].id, 'g-comp', 'the component group is retained');
-  assert.equal(update.updates.enabled, true, 'the recipe still has ingredients/results, so it stays enabled');
+  assert.equal(
+    update.updates.enabled,
+    true,
+    'the recipe still has ingredients/results, so it stays enabled'
+  );
 });
 
 // ── The batched set delete (issue 1129) ──────────────────────────────────────────────
@@ -608,7 +634,7 @@ test('deleteComponents rewrites each referencing recipe ONCE for the whole set',
       'recipe-match-iron',
       'recipe-multistep-iron',
       'recipe-alias-iron',
-      'recipe-assortment'
+      'recipe-assortment',
     ],
     'every referencing recipe is rewritten exactly once, in one pass over the recipe list'
   );
@@ -624,9 +650,7 @@ test('deleteComponents counts a SHARED recipe once rather than summing per compo
   // over-promise the impact statement exists to avoid.
   const result = await manager.deleteComponents('sys', ['iron', 'bar']);
 
-  const ironRewrites = recipeManager.updateCalls.filter(
-    (call) => call.recipeId === 'recipe-iron'
-  );
+  const ironRewrites = recipeManager.updateCalls.filter((call) => call.recipeId === 'recipe-iron');
   assert.equal(ironRewrites.length, 1, 'the shared recipe is written once, not once per component');
   assert.equal(
     result.recipesUpdated,
@@ -694,7 +718,12 @@ test('deleteComponents ignores unknown ids and is a no-op for an empty selection
   assert.deepEqual(empty, { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 });
 
   const unknown = await manager.deleteComponents('sys', ['nope', 'also-nope']);
-  assert.deepEqual(unknown, { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 });
+  assert.deepEqual(unknown, {
+    deleted: 0,
+    componentIds: [],
+    recipesUpdated: 0,
+    recipesDisabled: 0,
+  });
   assert.equal(recipeManager.updateCalls.length, 0, 'nothing is written for a no-op');
 });
 
@@ -747,7 +776,6 @@ test('deleteItem and deleteComponents agree — the singular is the set of one',
   );
 });
 
-
 test('1129: deleting a component strips it from STEP ingredient sets too', async () => {
   notifications.length = 0;
   const recipeManager = makeRecipeManager();
@@ -755,7 +783,9 @@ test('1129: deleting a component strips it from STEP ingredient sets too', async
 
   await manager.deleteComponents('sys', ['iron']);
 
-  const update = recipeManager.updateCalls.find((call) => call.recipeId === 'recipe-multistep-iron');
+  const update = recipeManager.updateCalls.find(
+    (call) => call.recipeId === 'recipe-multistep-iron'
+  );
   assert.ok(update, 'the converted multi-step recipe is detected as referencing iron');
 
   const stepSets = update.updates.steps?.[0]?.ingredientSets || [];
@@ -778,14 +808,15 @@ test('1129: a converted multi-step recipe left with no executable path is DISABL
   // permanently uncraftable, and offered to players.
   await manager.deleteComponents('sys', ['iron']);
 
-  const update = recipeManager.updateCalls.find((call) => call.recipeId === 'recipe-multistep-iron');
+  const update = recipeManager.updateCalls.find(
+    (call) => call.recipeId === 'recipe-multistep-iron'
+  );
   assert.equal(
     update.updates.enabled,
     false,
     'losing its only ingredient in every copy makes it uncraftable, so it must be disabled'
   );
 });
-
 
 test('1129: a batched delete emits exactly ONE recipes-changed signal, and never zero', async () => {
   notifications.length = 0;
@@ -1088,7 +1119,11 @@ test('1129: with no SalvageRunManager the cleanup walks every actor once per com
         return key === 'fabricate.salvageRuns' ? container : null;
       },
       async setFlag(_scope, key, value) {
-        writes.push({ actorId: id, key, componentIds: value.history.map((run) => run.componentId) });
+        writes.push({
+          actorId: id,
+          key,
+          componentIds: value.history.map((run) => run.componentId),
+        });
         container.history = value.history;
       },
     };

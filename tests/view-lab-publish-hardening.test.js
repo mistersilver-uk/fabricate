@@ -35,7 +35,9 @@ test('sanitizeLabel escapes alt-text terminators and strips block sentinels + co
 });
 
 test('buildScreenshotMarkdown sanitizes the label before it reaches markdown', () => {
-  const md = buildScreenshotMarkdown(42, [{ label: 'Evil ] break](http://x) ', url: 'https://e/x.png' }]);
+  const md = buildScreenshotMarkdown(42, [
+    { label: 'Evil ] break](http://x) ', url: 'https://e/x.png' },
+  ]);
   // The `]` is escaped so the alt-text cannot be terminated early.
   assert.match(md, /!\[pr-42 Evil \\\] break\\\]\(http:\/\/x\)\]\(https:\/\/e\/x\.png\)/);
 });
@@ -76,10 +78,17 @@ test('a published frame is named and captioned from the CASE REGISTRY with no wi
     // AND THE CAPTION IS ON THE FRAME THAT NEEDS IT AND NOT ON THE ONE THAT DOES NOT. Both are
     // World Downtime frames, so a caption applied by route rather than by what the case asked the
     // lab to register would land on both.
-    assert.equal(standIn.note, evidenceNoteForCaseId('manager-world-downtime-test-companion-installed'));
+    assert.equal(
+      standIn.note,
+      evidenceNoteForCaseId('manager-world-downtime-test-companion-installed')
+    );
     assert.match(standIn.note, /tests\/view-lab\/mount\.js/);
     assert.match(standIn.note, /neither the free module nor Fabricate Premium/);
-    assert.equal(shipped.note, '', 'a frame with no stand-in companion was captioned as if it had one');
+    assert.equal(
+      shipped.note,
+      '',
+      'a frame with no stand-in companion was captioned as if it had one'
+    );
     assert.match(shipped.label, /World Downtime Factions/);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -174,6 +183,6 @@ test('uploadScreenshotObjects rejects an invalid headSha segment (no prefix esca
         config: S3_CONFIG,
         putObject: async () => {},
       }),
-    /Invalid head SHA segment/,
+    /Invalid head SHA segment/
   );
 });

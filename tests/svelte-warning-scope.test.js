@@ -142,7 +142,10 @@ describe('the sweep actually fails on a warning', () => {
 
     assert.equal(outcome.status, 1, 'a warning must fail the sweep');
     assert.match(outcome.stdout, /svelte_compiler_warnings=1 over 2 files/);
-    assert.match(outcome.stdout, /Warns\.svelte:1:\d+ \[a11y_no_noninteractive_element_to_interactive_role]/);
+    assert.match(
+      outcome.stdout,
+      /Warns\.svelte:1:\d+ \[a11y_no_noninteractive_element_to_interactive_role]/
+    );
   });
 
   it('exits 0 on a clean tree, including files in subdirectories', () => {
@@ -266,7 +269,8 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
   // `vitePlugin` block here and an inline argument to `svelte()` in `vite.config.js`.
   it('leaves emitCss at its default on both surfaces that can set it', () => {
     assert.ok(
-      !Object.hasOwn(svelteConfig, 'emitCss') && !Object.hasOwn(svelteConfig.vitePlugin ?? {}, 'emitCss'),
+      !Object.hasOwn(svelteConfig, 'emitCss') &&
+        !Object.hasOwn(svelteConfig.vitePlugin ?? {}, 'emitCss'),
       'emitCss: false makes vite-plugin-svelte drop every css_unused_selector before onwarn' +
         ' sees it — the build would go quiet on the class this gate was installed for while the' +
         ' sweep kept reporting it, and the disagreement would look like graph reachability'

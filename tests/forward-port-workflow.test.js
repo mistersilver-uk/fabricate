@@ -660,7 +660,7 @@ test('the content gate DELEGATES to the shared script and fails the job on its r
   assert.match(
     gate.run,
     new RegExp(`${GATE_INVOCATION.source}[^\\n]*\\|\\|\\s*exit 1`),
-    "a refusal from the shared gate must fail the step, not merely be printed after it"
+    'a refusal from the shared gate must fail the step, not merely be printed after it'
   );
 
   // ALLOW_CONTENT and OVERRIDE_HINT reach the script through the step's environment, which is also
@@ -798,11 +798,7 @@ test('a git that cannot run the predicate REFUSES rather than falling back to th
   const statements = gateScriptStatements();
   assert.ok(
     statementIndex(statements, 'GIT_MINOR" -lt 38', 'asserts the git floor') <
-      statementIndex(
-        statements,
-        'git merge-tree --write-tree "${commit}^1"',
-        'runs the re-merge'
-      ),
+      statementIndex(statements, 'git merge-tree --write-tree "${commit}^1"', 'runs the re-merge'),
     'the git version floor must be asserted before the predicate that needs it runs'
   );
 });
@@ -890,7 +886,11 @@ test('the own-merge guard fails the job and is NOT overridable', () => {
   // the merge is clean, which no other assertion here would notice. (`remerge-conflicted` can also
   // pass since issue #1439, but only through the resolution checks below, never by falling through:
   // its arm carries no bare `;;`.)
-  assert.match(guard, /^content-free\) ;;$/m, '`content-free` passes the guard with no further test');
+  assert.match(
+    guard,
+    /^content-free\) ;;$/m,
+    '`content-free` passes the guard with no further test'
+  );
   assert.match(guard, /"carries-content "\*\)/, 'an invented-content merge has its own branch');
   assert.match(guard, /\bexit 1\b/, 'the own-merge guard fails the job');
 
@@ -923,7 +923,10 @@ test('the own-merge guard fails the job and is NOT overridable', () => {
     'the guard delegates the resolution checks to a helper, which this assertion must therefore reach'
   );
   for (const [name, body] of [['the own-merge guard', guard]].concat(
-    helpers.map((helper) => [`${helper}(), which the guard calls`, shellFunctionBodies(GATE_SCRIPT).get(helper)])
+    helpers.map((helper) => [
+      `${helper}(), which the guard calls`,
+      shellFunctionBodies(GATE_SCRIPT).get(helper),
+    ])
   )) {
     assert.ok(!/ALLOW_CONTENT/.test(body), `${name} must not consult the allow_content override`);
     assert.ok(!/OVERRIDE_HINT/.test(body), `${name} must not print the override hint`);
@@ -1064,7 +1067,7 @@ test('the association read authenticates as the App installation, on both paths'
   assert.match(
     script,
     /gh api "repos\/\$\{GITHUB_REPOSITORY\}\/commits\/\$\{SHA\}\/pulls/,
-    'the gate reads each commit\'s associated pull requests from this repository'
+    "the gate reads each commit's associated pull requests from this repository"
   );
 
   // The job holds only `contents: read`, and a called workflow can never exceed its caller's grant,
@@ -1446,8 +1449,14 @@ test('the completion script builds the merge itself, pushes nothing, and makes n
     "the forward-port's merge of origin/release into main CONFLICTED",
     'left no conflicting paths behind',
   ]) {
-    assert.ok(body.includes(quoted), `the completion script must still print ${JSON.stringify(quoted)}`);
-    assert.ok(runbook.includes(quoted), `CONTRIBUTING.md must still quote ${JSON.stringify(quoted)}`);
+    assert.ok(
+      body.includes(quoted),
+      `the completion script must still print ${JSON.stringify(quoted)}`
+    );
+    assert.ok(
+      runbook.includes(quoted),
+      `CONTRIBUTING.md must still quote ${JSON.stringify(quoted)}`
+    );
   }
 
   // BOTH PARENTS, IN THAT ORDER, and the tree taken wholesale. The order records `origin/main` as
@@ -1481,7 +1490,10 @@ test('the completion script builds the merge itself, pushes nothing, and makes n
   // IT MAKES NO VERDICT, and it is not a second copy of the gate. Every accept/refuse decision about
   // the resolution lives in the gate, which runs afterwards under the same guard chain.
   assert.ok(!/\bgit push\b/.test(body), 'the completion script must never push');
-  assert.ok(!/ALLOW_CONTENT/.test(body), 'a resolution is not an override, and this reads no override');
+  assert.ok(
+    !/ALLOW_CONTENT/.test(body),
+    'a resolution is not an override, and this reads no override'
+  );
   assert.ok(!/OVERRIDE_HINT/.test(body), 'nothing here may offer the override hint');
   assert.ok(
     !/forward-port-provenance\.mjs/.test(body),

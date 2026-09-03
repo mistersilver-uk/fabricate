@@ -176,7 +176,11 @@ test('a save payload that omits category preserves it (the REAL updateItem)', as
 
   assert.equal(updated.category, 'Metal', 'an omitted category survives the save');
   assert.deepEqual(updated.tags, ['ore'], 'and the authored field is applied');
-  assert.equal(manager.getSystem('sys1').components[0].category, 'Metal', 'persisted, not just returned');
+  assert.equal(
+    manager.getSystem('sys1').components[0].category,
+    'Metal',
+    'persisted, not just returned'
+  );
 });
 
 test('updateItem applies an explicitly authored category', async () => {

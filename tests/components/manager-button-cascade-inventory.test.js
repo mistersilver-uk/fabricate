@@ -692,7 +692,7 @@ const REVIEWED = [
     ),
     disposition: 'EXCLUDE',
     why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved '+
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved ' +
       'it into `SystemRulesRoster`, which both essence rails compose. The panel`s system ' +
       'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
       '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +

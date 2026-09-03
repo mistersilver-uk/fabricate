@@ -172,7 +172,11 @@ test('routedByCheck → alchemy clears a stale resultSelection (no provider reta
 test('simple → alchemy collapses a multi-ingredient-set recipe to its first set', () => {
   const result = migrateRecipeForModeChange(multiGroup(), 'simple', 'alchemy', SYSTEM_NO_CHECK);
   assert.notEqual(result.outcome, 'delete');
-  assert.equal(result.recipe.ingredientSets.length, 1, 'alchemy requires exactly one ingredient set');
+  assert.equal(
+    result.recipe.ingredientSets.length,
+    1,
+    'alchemy requires exactly one ingredient set'
+  );
   assert.equal(result.recipe.ingredientSets[0].id, 's-1');
 });
 
@@ -207,7 +211,12 @@ test('switching to progressive without a check never deletes a 1×1 recipe', () 
 });
 
 test('switching to routedByCheck without a routed formula never deletes a recipe', () => {
-  const result = migrateRecipeForModeChange(multiGroup(), 'simple', 'routedByCheck', SYSTEM_NO_CHECK);
+  const result = migrateRecipeForModeChange(
+    multiGroup(),
+    'simple',
+    'routedByCheck',
+    SYSTEM_NO_CHECK
+  );
   assert.notEqual(result.outcome, 'delete');
   assert.ok(result.recipe);
 });
@@ -223,8 +232,18 @@ test('re-running a from===to migration is a lossless no-op', () => {
 
 test('re-running an RI↔RC carry with no reconcile pending is idempotent in shape', () => {
   const recipe = multiGroup();
-  const first = migrateRecipeForModeChange(recipe, 'routedByIngredients', 'routedByCheck', SYSTEM_NO_CHECK);
-  const second = migrateRecipeForModeChange(first.recipe, 'routedByCheck', 'routedByCheck', SYSTEM_NO_CHECK);
+  const first = migrateRecipeForModeChange(
+    recipe,
+    'routedByIngredients',
+    'routedByCheck',
+    SYSTEM_NO_CHECK
+  );
+  const second = migrateRecipeForModeChange(
+    first.recipe,
+    'routedByCheck',
+    'routedByCheck',
+    SYSTEM_NO_CHECK
+  );
   assert.equal(second.outcome, 'lossless');
   assert.deepEqual(second.recipe, first.recipe);
 });

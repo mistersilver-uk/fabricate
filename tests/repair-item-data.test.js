@@ -208,7 +208,9 @@ function buildDescriptionRepairManager({
   mgr.save = async () => {};
   mgr._notifySystemsChanged = () => {};
   const component = { ...SUPPLIES };
-  mgr.systems = new Map([['sys1', { id: 'sys1', name: 'S1', components: [component], recipes: [] }]]);
+  mgr.systems = new Map([
+    ['sys1', { id: 'sys1', name: 'S1', components: [component], recipes: [] }],
+  ]);
   // The only pack in the world is LOCKED — the item walk skips it entirely.
   globalThis.game = {
     user: { isGM: true },
@@ -217,7 +219,11 @@ function buildDescriptionRepairManager({
   };
   globalThis.fromUuid = async (uuid) =>
     uuid === LOCKED_PACK_UUID
-      ? { uuid, name: "Alchemist's Supplies", system: { description: { value: sourceDescription } } }
+      ? {
+          uuid,
+          name: "Alchemist's Supplies",
+          system: { description: { value: sourceDescription } },
+        }
       : null;
   return { mgr, component, primeCalls, run: () => mgr.repairItemData({ includeCompendiums }) };
 }

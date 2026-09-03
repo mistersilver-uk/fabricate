@@ -158,7 +158,11 @@ describe('component bulk edit model (issue 772) — the staged draft', () => {
 
     const armed = toggleBulkDifficultyStaged(createComponentBulkDraft());
     assert.equal(armed.difficultyStaged, true);
-    assert.equal(armed.difficulty, 0, 'staged-but-untouched shows a 0 stepper, never a silent clear');
+    assert.equal(
+      armed.difficulty,
+      0,
+      'staged-but-untouched shows a 0 stepper, never a silent clear'
+    );
     assert.equal(toggleBulkDifficultyStaged(armed).difficultyStaged, false);
   });
 });
@@ -193,7 +197,9 @@ describe('component bulk edit model (issue 772) — has-changes and the emitted 
     assert.deepEqual(allZeroEdit.essences, { fire: 0 });
 
     // Unstaged, the values are carried in the draft but are NOT part of the write.
-    const unstaged = toggleBulkEssencesStaged(setBulkEssence(createComponentBulkDraft(), 'fire', 3));
+    const unstaged = toggleBulkEssencesStaged(
+      setBulkEssence(createComponentBulkDraft(), 'fire', 3)
+    );
     assert.equal(unstaged.essences.fire, 3);
     assert.equal(Object.hasOwn(toBulkComponentEdit(unstaged), 'essences'), false);
   });

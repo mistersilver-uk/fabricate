@@ -72,9 +72,8 @@ const { CraftingSystemManager } = await import('../src/systems/CraftingSystemMan
 // The PANEL side of the offer/accept pair, imported so the parity guard below compares the
 // write against the real producer of the dropdown rather than against a restated list.
 const { resolveRecipeCheckTierOptions } = await import('../src/utils/routedOutcomeKeywords.js');
-const { resolveActiveCraftingCheckFormula } = await import(
-  '../src/systems/checkModifierResolver.js'
-);
+const { resolveActiveCraftingCheckFormula } =
+  await import('../src/systems/checkModifierResolver.js');
 
 const SYSTEM_ID = 'sys1';
 const TIER_EASY = 't-easy';
@@ -524,7 +523,12 @@ describe('applyBulkEditToRecipes — which tiers a resolution mode offers', () =
       accepts: 'routed-tier',
       refuses: TIER_HARD,
     },
-    { resolutionMode: 'alchemy', alchemy: { checkMode: 'none' }, accepts: null, refuses: TIER_HARD },
+    {
+      resolutionMode: 'alchemy',
+      alchemy: { checkMode: 'none' },
+      accepts: null,
+      refuses: TIER_HARD,
+    },
   ];
 
   for (const mode of MODES) {

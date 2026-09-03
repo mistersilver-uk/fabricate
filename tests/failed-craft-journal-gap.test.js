@@ -146,7 +146,8 @@ function makeItem({ id, name = `Item ${id}`, quantity = 1 } = {}) {
     },
     async update(payload) {
       this.updateCalled = true;
-      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      if (payload['system.quantity'] !== undefined)
+        this.system.quantity = payload['system.quantity'];
     },
   };
 }
@@ -159,7 +160,12 @@ function makeSourceItem(name) {
     system: { quantity: 1 },
     effects: [],
   };
-  return { ...dataObj, toObject() { return { ...dataObj, system: { ...dataObj.system } }; } };
+  return {
+    ...dataObj,
+    toObject() {
+      return { ...dataObj, system: { ...dataObj.system } };
+    },
+  };
 }
 
 function makeIngredientSet({ id = 'set-1', ingredientItem, quantity = 1 } = {}) {
@@ -178,7 +184,13 @@ function makeIngredientSet({ id = 'set-1', ingredientItem, quantity = 1 } = {}) 
   };
 }
 
-function makeRecipe({ id = 'recipe-embercap', name = 'Embercap Skillet Cakes', craftingSystemId = 'sys-1', ingredientSets = [], resultGroups = [] } = {}) {
+function makeRecipe({
+  id = 'recipe-embercap',
+  name = 'Embercap Skillet Cakes',
+  craftingSystemId = 'sys-1',
+  ingredientSets = [],
+  resultGroups = [],
+} = {}) {
   const recipe = {
     id,
     name,
@@ -189,8 +201,12 @@ function makeRecipe({ id = 'recipe-embercap', name = 'Embercap Skillet Cakes', c
     resultSelection: null,
     transferEffects: false,
     steps: [{ id: 'step-1' }],
-    validate() { return { valid: true, errors: [] }; },
-    toJSON() { return { id: this.id, name: this.name, craftingSystemId: this.craftingSystemId }; },
+    validate() {
+      return { valid: true, errors: [] };
+    },
+    toJSON() {
+      return { id: this.id, name: this.name, craftingSystemId: this.craftingSystemId };
+    },
   };
   recipe.getExecutionSteps = () => [
     {
@@ -214,7 +230,14 @@ function makeSystem() {
     features: { multiStepRecipes: false, craftingChecks: true, essences: false },
     craftingCheck: {
       enabled: true,
-      simple: { rollFormula: '1d20', dc: 16, thresholdMode: 'meet', dcMode: 'static', tiers: [], checkBreakage: { triggers: [] } },
+      simple: {
+        rollFormula: '1d20',
+        dc: 16,
+        thresholdMode: 'meet',
+        dcMode: 'static',
+        tiers: [],
+        checkBreakage: { triggers: [] },
+      },
       outcomes: [],
       progressive: null,
       consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
@@ -236,7 +259,8 @@ function setupGame(system, runManager) {
     users: [{ id: 'user-akra', isGM: true }],
     time: { worldTime: 1000 },
   };
-  globalThis.fromUuid = async (uuid) => (uuid === 'uuid:cake' ? makeSourceItem('Embercap Skillet Cakes') : null);
+  globalThis.fromUuid = async (uuid) =>
+    uuid === 'uuid:cake' ? makeSourceItem('Embercap Skillet Cakes') : null;
 }
 
 test('ENGINE: an immediate check-FAILURE craft writes a `failed` entry to the actor crafting history', async () => {
@@ -257,13 +281,23 @@ test('ENGINE: an immediate check-FAILURE craft writes a `failed` entry to the ac
 
   const recipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [] },
+      };
     },
-    getToolsForSet() { return []; },
-    ingredientMatchesItem(_recipe, ingredient, item) { return item === flour && item.id === ingredient.systemItemId; },
+    getToolsForSet() {
+      return [];
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item === flour && item.id === ingredient.systemItemId;
+    },
   };
 
-  const resolutionService = new ResolutionModeService({ getSystem: (id) => (id === system.id ? system : null) });
+  const resolutionService = new ResolutionModeService({
+    getSystem: (id) => (id === system.id ? system : null),
+  });
   const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
 
   // Spy on discardRun to see whether the finally-block phantom discard fires.
@@ -283,7 +317,9 @@ test('ENGINE: an immediate check-FAILURE craft writes a `failed` entry to the ac
     data: { dc: 16, diceGroups: [{ groupId: 0, group: '1d20', sum: 12, results: [12] }] },
   });
 
-  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, { interactive: true });
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {
+    interactive: true,
+  });
 
   assert.equal(result.success, false, 'the craft reports failure');
 
@@ -294,7 +330,11 @@ test('ENGINE: an immediate check-FAILURE craft writes a `failed` entry to the ac
 
   assert.ok(persisted, 'a craftingRuns flag was persisted');
   assert.deepEqual(Object.keys(persisted.active || {}), [], 'no run left dangling in active');
-  assert.equal(Array.isArray(persisted.history) ? persisted.history.length : 0, 1, 'exactly one history entry persisted');
+  assert.equal(
+    Array.isArray(persisted.history) ? persisted.history.length : 0,
+    1,
+    'exactly one history entry persisted'
+  );
   assert.equal(persisted.history?.[0]?.status, 'failed', 'the persisted history entry is `failed`');
   assert.equal(discardCalls, 0, 'the phantom-discard did NOT fire on the completed-failure path');
 
@@ -316,7 +356,11 @@ test('ENGINE: an immediate check-FAILURE craft writes a `failed` entry to the ac
   console.log('projected history count =', projection.history.length);
   console.log('projected history[0] =', JSON.stringify(projection.history[0], null, 2));
 
-  assert.equal(projection.history.length, 1, 'the failed run projects to exactly one visible history entry');
+  assert.equal(
+    projection.history.length,
+    1,
+    'the failed run projects to exactly one visible history entry'
+  );
   assert.equal(projection.history[0].status, 'failed');
   assert.equal(projection.history[0].runType, 'crafting');
 
@@ -324,9 +368,17 @@ test('ENGINE: an immediate check-FAILURE craft writes a `failed` entry to the ac
   const reloadedManager = new CraftingRunManager();
   const reloadedHistory = reloadedManager.getRunHistory(craftingActor);
   console.log('reloaded history count =', reloadedHistory.length);
-  assert.equal(reloadedHistory.length, 1, 'the failed run survives a reload (fresh manager, persisted flag)');
+  assert.equal(
+    reloadedHistory.length,
+    1,
+    'the failed run survives a reload (fresh manager, persisted flag)'
+  );
   assert.equal(reloadedHistory[0].status, 'failed');
-  assert.deepEqual(reloadedManager.getActiveRuns(craftingActor), [], 'no run resurrected in active after reload');
+  assert.deepEqual(
+    reloadedManager.getActiveRuns(craftingActor),
+    [],
+    'no run resurrected in active after reload'
+  );
 });
 
 test('ENGINE: interactive deferred failure survives a concurrent world-time tick + journal read during the roll await', async () => {
@@ -345,12 +397,22 @@ test('ENGINE: interactive deferred failure survives a concurrent world-time tick
 
   const recipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [] },
+      };
     },
-    getToolsForSet() { return []; },
-    ingredientMatchesItem(_recipe, ingredient, item) { return item === flour && item.id === ingredient.systemItemId; },
+    getToolsForSet() {
+      return [];
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item === flour && item.id === ingredient.systemItemId;
+    },
   };
-  const resolutionService = new ResolutionModeService({ getSystem: (id) => (id === system.id ? system : null) });
+  const resolutionService = new ResolutionModeService({
+    getSystem: (id) => (id === system.id ? system : null),
+  });
   const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
 
   const journalBuilder = new RunJournalBuilder({
@@ -364,29 +426,53 @@ test('ENGINE: interactive deferred failure survives a concurrent world-time tick
   // events (a world-time tick's processWorldTime + a journal read) while the run
   // is sitting in `active`, mirroring a player taking time to roll.
   let releaseRoll;
-  const rollGate = new Promise((resolve) => { releaseRoll = resolve; });
+  const rollGate = new Promise((resolve) => {
+    releaseRoll = resolve;
+  });
   engine._runCraftingCheck = async () => {
     // While we're "waiting for the player to roll", the run is live in active.
     const midActive = runManager.getActiveRuns(craftingActor);
-    console.log('during roll await, active runs =', midActive.length, 'status =', midActive[0]?.status);
+    console.log(
+      'during roll await, active runs =',
+      midActive.length,
+      'status =',
+      midActive[0]?.status
+    );
     // A world-time tick fires (primary GM) and the journal re-reads.
     game.time.worldTime = 1500;
     await runManager.processWorldTime(1500);
     journalBuilder.buildListing({ actor: craftingActor, viewer: game.user });
     await rollGate;
-    return { success: false, outcome: 'fail', value: 12, message: 'Crafting check failed (rolled 12 vs DC 16)', data: { dc: 16 } };
+    return {
+      success: false,
+      outcome: 'fail',
+      value: 12,
+      message: 'Crafting check failed (rolled 12 vs DC 16)',
+      data: { dc: 16 },
+    };
   };
 
-  const craftPromise = engine.craft(craftingActor, [craftingActor], recipe, null, { interactive: true });
+  const craftPromise = engine.craft(craftingActor, [craftingActor], recipe, null, {
+    interactive: true,
+  });
   releaseRoll();
   const result = await craftPromise;
 
   assert.equal(result.success, false);
   const persisted = craftingActor.getFlag('fabricate', 'fabricate.craftingRuns');
-  console.log('deferred persisted =', JSON.stringify(persisted?.history?.map((h) => h.status)), 'active =', JSON.stringify(Object.keys(persisted?.active || {})));
+  console.log(
+    'deferred persisted =',
+    JSON.stringify(persisted?.history?.map((h) => h.status)),
+    'active =',
+    JSON.stringify(Object.keys(persisted?.active || {}))
+  );
   assert.equal(persisted.history.length, 1, 'the deferred failed run persisted to history');
   assert.equal(persisted.history[0].status, 'failed');
-  assert.deepEqual(Object.keys(persisted.active), [], 'no dangling active run after deferred failure');
+  assert.deepEqual(
+    Object.keys(persisted.active),
+    [],
+    'no dangling active run after deferred failure'
+  );
 
   const projection = journalBuilder.buildListing({ actor: craftingActor, viewer: game.user });
   assert.equal(projection.history.length, 1, 'deferred failed run projects to a visible entry');
@@ -420,7 +506,15 @@ test('ROOT CAUSE: a stale-cache timed-resume _persist clobbers an immediate fail
     name: 'Forge Breastplate',
     craftingSystemId: 'sys-1',
     getExecutionSteps: () => [
-      { id: 'forge-step', name: 'Forge', ingredientSets: [], resultGroups: [], toolIds: [], timeRequirement: { hours: 1 }, outcomeRouting: null },
+      {
+        id: 'forge-step',
+        name: 'Forge',
+        ingredientSets: [],
+        resultGroups: [],
+        toolIds: [],
+        timeRequirement: { hours: 1 },
+        outcomeRouting: null,
+      },
     ],
   };
 
@@ -431,11 +525,29 @@ test('ROOT CAUSE: a stale-cache timed-resume _persist clobbers an immediate fail
   await managerB.markStepWaitingForTime(actor, forgeRun, 0, { hours: 1 });
   // A prior successful run already in the doc's history (from "yesterday").
   const seededHistory = actor.getFlag('fabricate', 'fabricate.craftingRuns');
-  seededHistory.history.unshift({ id: 'run-yesterday', recipeId: 'recipe-forge', craftingSystemId: 'sys-1', status: 'succeeded', startedAt: 10, finishedAt: 20, steps: [] });
+  seededHistory.history.unshift({
+    id: 'run-yesterday',
+    recipeId: 'recipe-forge',
+    craftingSystemId: 'sys-1',
+    status: 'succeeded',
+    startedAt: 10,
+    finishedAt: 20,
+    steps: [],
+  });
   await actor.setFlag('fabricate', 'fabricate.craftingRuns', seededHistory);
   // managerB's cache now holds {active:{forge waitingTime}, history:[yesterday]} and
   // is NEVER invalidated when the doc changes out-of-band below.
-  managerB._cache.get(actor.id).history = [{ id: 'run-yesterday', recipeId: 'recipe-forge', craftingSystemId: 'sys-1', status: 'succeeded', startedAt: 10, finishedAt: 20, steps: [] }];
+  managerB._cache.get(actor.id).history = [
+    {
+      id: 'run-yesterday',
+      recipeId: 'recipe-forge',
+      craftingSystemId: 'sys-1',
+      status: 'succeeded',
+      startedAt: 10,
+      finishedAt: 20,
+      steps: [],
+    },
+  ];
 
   // (2) Client A crafts the immediate Embercap check-FAILURE. Its manager reads the
   // doc fresh (sees forge + yesterday) and appends the failure — persisted to the doc.
@@ -449,17 +561,43 @@ test('ROOT CAUSE: a stale-cache timed-resume _persist clobbers an immediate fail
     resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-cake', quantity: 1 }] }],
   });
   const recipeManager = {
-    canCraft() { return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } }; },
-    getToolsForSet() { return []; },
-    ingredientMatchesItem(_recipe, ingredient, item) { return item === flour && item.id === ingredient.systemItemId; },
+    canCraft() {
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [] },
+      };
+    },
+    getToolsForSet() {
+      return [];
+    },
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item === flour && item.id === ingredient.systemItemId;
+    },
   };
-  const engineA = new CraftingEngine(recipeManager, managerA, new ResolutionModeService({ getSystem: (id) => (id === system.id ? system : null) }));
-  engineA._runCraftingCheck = async () => ({ success: false, outcome: 'fail', value: 12, message: 'Crafting check failed (rolled 12 vs DC 16)', data: { dc: 16 } });
+  const engineA = new CraftingEngine(
+    recipeManager,
+    managerA,
+    new ResolutionModeService({ getSystem: (id) => (id === system.id ? system : null) })
+  );
+  engineA._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 12,
+    message: 'Crafting check failed (rolled 12 vs DC 16)',
+    data: { dc: 16 },
+  });
   await engineA.craft(actor, [actor], embercap, null, { interactive: true });
 
   const afterEmbercap = actor.getFlag('fabricate', 'fabricate.craftingRuns');
-  console.log('after Embercap write, doc history statuses =', JSON.stringify(afterEmbercap.history.map((h) => `${h.recipeId}:${h.status}`)));
-  assert.ok(afterEmbercap.history.some((h) => h.recipeId === 'recipe-embercap' && h.status === 'failed'), 'Embercap failure IS written to the doc');
+  console.log(
+    'after Embercap write, doc history statuses =',
+    JSON.stringify(afterEmbercap.history.map((h) => `${h.recipeId}:${h.status}`))
+  );
+  assert.ok(
+    afterEmbercap.history.some((h) => h.recipeId === 'recipe-embercap' && h.status === 'failed'),
+    'Embercap failure IS written to the doc'
+  );
 
   // (3) The Forge timer matures. The PRIMARY GM (manager B, stale cache) resumes it:
   // processWorldTime flips it to inProgress and persists B's STALE container.
@@ -472,11 +610,22 @@ test('ROOT CAUSE: a stale-cache timed-resume _persist clobbers an immediate fail
   // (4) Restart: a fresh manager reads the persisted doc.
   const fresh = new CraftingRunManager();
   const finalHistory = fresh.getRunHistory(actor);
-  console.log('POST-RESTART doc history =', JSON.stringify(finalHistory.map((h) => `${h.recipeId}:${h.status}`)));
+  console.log(
+    'POST-RESTART doc history =',
+    JSON.stringify(finalHistory.map((h) => `${h.recipeId}:${h.status}`))
+  );
 
-  const forgeShows = finalHistory.some((h) => h.recipeId === 'recipe-forge' && h.status === 'succeeded');
-  const embercapShows = finalHistory.some((h) => h.recipeId === 'recipe-embercap' && h.status === 'failed');
+  const forgeShows = finalHistory.some(
+    (h) => h.recipeId === 'recipe-forge' && h.status === 'succeeded'
+  );
+  const embercapShows = finalHistory.some(
+    (h) => h.recipeId === 'recipe-embercap' && h.status === 'failed'
+  );
   assert.equal(forgeShows, true, 'the timed Forge run survives (it did the clobbering write)');
   // The BUG: the immediate Embercap failure was clobbered by manager B's stale-cache persist.
-  assert.equal(embercapShows, true, 'REGRESSION GUARD: the immediate Embercap failure MUST survive the timed resume');
+  assert.equal(
+    embercapShows,
+    true,
+    'REGRESSION GUARD: the immediate Embercap failure MUST survive the timed resume'
+  );
 });

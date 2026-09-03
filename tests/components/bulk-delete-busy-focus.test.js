@@ -128,7 +128,10 @@ describe('1132 disabling the focused delete control fires blur in a real browser
       measured.rendered,
       `${CARD_PATH} rendered no .fab-bulk-delete-card .manager-button — the control this gate measures is not in the markup`
     );
-    assert.ok(measured.focusedBefore, 'the control did not take focus, so the disable below cannot blur it');
+    assert.ok(
+      measured.focusedBefore,
+      'the control did not take focus, so the disable below cannot blur it'
+    );
   });
 
   // THE SECOND PREMISE, and the one issue 1157's guard rests on. `BulkDeleteCard` no longer
@@ -143,8 +146,8 @@ describe('1132 disabling the focused delete control fires blur in a real browser
     assert.equal(
       measured.activeAfter,
       'BODY',
-      'Chromium no longer parks focus on <body> when the focused control is disabled — re-derive '
-        + "BulkDeleteCard's outcome focus guard, which only restores from that exact state"
+      'Chromium no longer parks focus on <body> when the focused control is disabled — re-derive ' +
+        "BulkDeleteCard's outcome focus guard, which only restores from that exact state"
     );
   });
 

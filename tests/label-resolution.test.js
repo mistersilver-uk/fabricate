@@ -25,21 +25,28 @@ import assert from 'node:assert/strict';
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
-  return String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), object);
+  return String(path)
+    .split('.')
+    .reduce((v, k) => (v == null ? undefined : v[k]), object);
 }
 
 let _idCounter = 0;
 globalThis.foundry = {
   utils: {
     randomID: () => `id-${++_idCounter}`,
-    getProperty
+    getProperty,
   },
   applications: {
     api: {
       HandlebarsApplicationMixin: (Base) => class extends Base {},
-      ApplicationV2: class { async _prepareContext() { return {}; } close() {} }
-    }
-  }
+      ApplicationV2: class {
+        async _prepareContext() {
+          return {};
+        }
+        close() {}
+      },
+    },
+  },
 };
 globalThis.game = { user: { isGM: true, name: 'Test' }, fabricate: null };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
@@ -63,7 +70,7 @@ function makeSystem(components = [], tools = []) {
     id: 'sys-1',
     features: {},
     components,
-    tools
+    tools,
   };
 }
 
@@ -77,13 +84,13 @@ function makeRecipeWithSystem(systemId = 'sys-1', extras = {}) {
     craftingSystemId: systemId,
     ingredientSets: [],
     results: [],
-    ...extras
+    ...extras,
   });
 }
 
 function makeSystemManager(system) {
   return {
-    getSystem: (id) => (id === system.id ? system : null)
+    getSystem: (id) => (id === system.id ? system : null),
   };
 }
 
@@ -92,8 +99,8 @@ function setupGame(system) {
   globalThis.game = {
     user: { isGM: true, name: 'Test' },
     fabricate: {
-      getCraftingSystemManager: () => systemManager
-    }
+      getCraftingSystemManager: () => systemManager,
+    },
   };
 }
 
@@ -210,21 +217,30 @@ test('TC6: _buildIngredientStates resolves component names instead of "managed i
   const manager = new RecipeManager();
   const recipe = makeRecipeWithSystem('sys-1');
 
-  const ingredient = new Ingredient({ match: { type: 'component', componentId: 'comp-3' }, quantity: 2 });
+  const ingredient = new Ingredient({
+    match: { type: 'component', componentId: 'comp-3' },
+    quantity: 2,
+  });
   const ingredientSet = IngredientSet.fromJSON({
-    ingredientGroups: [{ id: 'grp-1', options: [ingredient.toJSON()] }]
+    ingredientGroups: [{ id: 'grp-1', options: [ingredient.toJSON()] }],
   });
 
   // Simulate a missing selection (ingredient not found, forces isMissing path)
-  const missingGroups = [{ group: ingredientSet.ingredientGroups[0], ingredient, have: 0, need: 2 }];
+  const missingGroups = [
+    { group: ingredientSet.ingredientGroups[0], ingredient, have: 0, need: 2 },
+  ];
   const selection = { success: false, missingGroups, selectedIngredients: [] };
 
   const states = manager._buildIngredientStates(recipe, ingredientSet, selection, []);
   assert.equal(states.length, 1);
-  assert.ok(!states[0].description.includes('managed item'),
-    `Expected no "managed item" in description, got: "${states[0].description}"`);
-  assert.ok(states[0].description.includes('Dragon Scale'),
-    `Expected "Dragon Scale" in description, got: "${states[0].description}"`);
+  assert.ok(
+    !states[0].description.includes('managed item'),
+    `Expected no "managed item" in description, got: "${states[0].description}"`
+  );
+  assert.ok(
+    states[0].description.includes('Dragon Scale'),
+    `Expected "Dragon Scale" in description, got: "${states[0].description}"`
+  );
 
   teardownGame();
 });
@@ -235,7 +251,10 @@ test('TC6: _buildIngredientStates resolves component names instead of "managed i
 
 test('TC7: evaluateCraftability resolves tool names (not undefined)', () => {
   const component = makeComponent('cat-comp-1', 'Mortar and Pestle');
-  const system = makeSystem([component], [{ id: 'tool-mortar', componentId: 'cat-comp-1', enabled: true }]);
+  const system = makeSystem(
+    [component],
+    [{ id: 'tool-mortar', componentId: 'cat-comp-1', enabled: true }]
+  );
   setupGame(system);
 
   const manager = new RecipeManager();
@@ -243,7 +262,7 @@ test('TC7: evaluateCraftability resolves tool names (not undefined)', () => {
     craftingSystemId: 'sys-1',
     name: 'Tool Recipe',
     toolIds: ['tool-mortar'],
-    ingredientSets: [{ ingredientGroups: [] }]
+    ingredientSets: [{ ingredientGroups: [] }],
   });
 
   // Actor with no items — tool will be "unavailable"
@@ -271,10 +290,14 @@ test('TC8: resolveResultDescription returns component name instead of "Nx item"'
   const recipe = makeRecipeWithSystem('sys-1');
 
   const description = manager.resolveResultDescription(recipe, 'res-comp-1', 2);
-  assert.ok(!description.includes('item'),
-    `Expected no generic "item" in description, got: "${description}"`);
-  assert.ok(description.includes('Health Potion'),
-    `Expected "Health Potion" in description, got: "${description}"`);
+  assert.ok(
+    !description.includes('item'),
+    `Expected no generic "item" in description, got: "${description}"`
+  );
+  assert.ok(
+    description.includes('Health Potion'),
+    `Expected "Health Potion" in description, got: "${description}"`
+  );
   assert.ok(description.startsWith('2x'), `Expected "2x" prefix, got: "${description}"`);
 
   teardownGame();
@@ -301,11 +324,12 @@ test('TC10: _resolveRecipeIcon falls back to linked item when img is default bag
   const manager = new RecipeManager();
   const recipe = makeRecipeWithSystem('sys-1', {
     img: DEFAULT_RECIPE_IMAGE,
-    linkedRecipeItemUuid: 'World.Item.linked123'
+    linkedRecipeItemUuid: 'World.Item.linked123',
   });
 
   globalThis.fromUuid = async (uuid) => {
-    if (uuid === 'World.Item.linked123') return { name: 'Linked Recipe', img: 'icons/linked-recipe.png' };
+    if (uuid === 'World.Item.linked123')
+      return { name: 'Linked Recipe', img: 'icons/linked-recipe.png' };
     return null;
   };
 
@@ -323,12 +347,15 @@ test('TC11: _resolveRecipeIconAsync falls back to document icon when no linked i
   const manager = new RecipeManager();
   const recipe = makeRecipeWithSystem('sys-1', {
     img: DEFAULT_RECIPE_IMAGE,
-    linkedRecipeItemUuid: null
+    linkedRecipeItemUuid: null,
   });
 
   const icon = await manager.resolveRecipeIconAsync(recipe);
   assert.ok(typeof icon === 'string' && icon.length > 0);
-  assert.ok(icon !== DEFAULT_RECIPE_IMAGE, 'Should not return the default recipe image as final result');
+  assert.ok(
+    icon !== DEFAULT_RECIPE_IMAGE,
+    'Should not return the default recipe image as final result'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -341,7 +368,9 @@ test('TC12: resolveComponentNameAsync handles broken fromUuid gracefully', async
   setupGame(system);
 
   // fromUuid throws to simulate broken reference
-  globalThis.fromUuid = async () => { throw new Error('Item not found'); };
+  globalThis.fromUuid = async () => {
+    throw new Error('Item not found');
+  };
 
   const manager = new RecipeManager();
   const recipe = makeRecipeWithSystem('sys-1');

@@ -36,7 +36,10 @@ describe('browserGroupCounts — countByCategory', () => {
 });
 
 describe('browserGroupCounts — categoryTotalOf', () => {
-  const totals = countByCategory([{ category: 'a' }, { category: 'a' }, { category: 'b' }], categoryOf);
+  const totals = countByCategory(
+    [{ category: 'a' }, { category: 'a' }, { category: 'b' }],
+    categoryOf
+  );
 
   it('reports the category total when it exceeds what the page renders', () => {
     assert.equal(categoryTotalOf(totals, 'a', 1), 2);

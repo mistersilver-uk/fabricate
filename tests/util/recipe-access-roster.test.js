@@ -12,7 +12,7 @@ function character(overrides = {}) {
     img: 'icons/thorin.webp',
     controlledBy: [],
     sharedWithAllPlayers: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -22,7 +22,7 @@ describe('resolveRecipeAccessRoster', () => {
       { playerIds: ['u2', 'u1'], characterIds: ['a2', 'a1'] },
       {
         players: [ADA, BRIN],
-        characters: [character(), character({ id: 'a2', name: 'Nori' })]
+        characters: [character(), character({ id: 'a2', name: 'Nori' })],
       }
     );
     assert.deepEqual(
@@ -45,10 +45,16 @@ describe('resolveRecipeAccessRoster', () => {
     const access = { playerIds: ['u1', 'ghost-user'], characterIds: ['a1', 'ghost-actor'] };
     const resolved = resolveRecipeAccessRoster(access, {
       players: [ADA],
-      characters: [character()]
+      characters: [character()],
     });
-    assert.deepEqual(resolved.players.map((player) => player.id), ['u1']);
-    assert.deepEqual(resolved.characters.map((entry) => entry.id), ['a1']);
+    assert.deepEqual(
+      resolved.players.map((player) => player.id),
+      ['u1']
+    );
+    assert.deepEqual(
+      resolved.characters.map((entry) => entry.id),
+      ['a1']
+    );
     assert.deepEqual(
       access,
       { playerIds: ['u1', 'ghost-user'], characterIds: ['a1', 'ghost-actor'] },
@@ -73,7 +79,7 @@ describe('resolveRecipeAccessRoster', () => {
     for (const access of [null, undefined, {}, { playerIds: 'u1', characterIds: 7 }]) {
       const resolved = resolveRecipeAccessRoster(access, {
         players: [ADA],
-        characters: [character()]
+        characters: [character()],
       });
       assert.deepEqual(resolved, { players: [], characters: [] });
     }
@@ -92,9 +98,9 @@ describe('resolveRecipeAccessRoster', () => {
       name: 'Party Wagon',
       controlledBy: [
         { id: 'u1', name: 'Ada', avatar: '', assigned: false },
-        { id: 'u2', name: 'Brin', avatar: '', assigned: false }
+        { id: 'u2', name: 'Brin', avatar: '', assigned: false },
       ],
-      sharedWithAllPlayers: true
+      sharedWithAllPlayers: true,
     });
     const resolved = resolveRecipeAccessRoster(
       { characterIds: ['a-party'] },

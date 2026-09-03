@@ -34,7 +34,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/environment/RecordInspector.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/environment/RecordInspector.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/environment/RecordInspector.svelte',
 });
 
 function makeTaskRecord(overrides = {}) {
@@ -45,9 +45,9 @@ function makeTaskRecord(overrides = {}) {
     nodes: overrides.nodes || {
       max: 10,
       current: 5,
-      respawn: { policy: 'manual' }
+      respawn: { policy: 'manual' },
     },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -56,7 +56,7 @@ function makeEnvironment(overrides = {}) {
     id: overrides.id || 'env1',
     craftingSystemId: 'dnd5e',
     nodeRuntime: overrides.nodeRuntime || {},
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -68,7 +68,7 @@ function makeEntry(overrides = {}) {
     runtimeState: overrides.runtimeState || 'unavailable',
     evidence: overrides.evidence || {},
     dropRateAdjustmentRows: overrides.dropRateAdjustmentRows || [],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -79,7 +79,7 @@ function getNodeCountDisplay(root) {
   const span = countElement.querySelector('span:not([aria-hidden])');
   return {
     current: strong ? Number(strong.textContent) : null,
-    max: span ? Number(span.textContent) : null
+    max: span ? Number(span.textContent) : null,
   };
 }
 
@@ -94,14 +94,14 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { max: 10, current: 5, respawn: { policy: 'manual' } }
-          })
+            nodes: { max: 10, current: 5, respawn: { policy: 'manual' } },
+          }),
         }),
         environment: makeEnvironment({
           nodeRuntime: {
-            task1: { max: 20, current: 8 } // Runtime has different max
-          }
-        })
+            task1: { max: 20, current: 8 }, // Runtime has different max
+          },
+        }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -113,14 +113,14 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { respawn: { policy: 'manual' } } // No max in config
-          })
+            nodes: { respawn: { policy: 'manual' } }, // No max in config
+          }),
         }),
         environment: makeEnvironment({
           nodeRuntime: {
-            task1: { max: 15, current: 8 }
-          }
-        })
+            task1: { max: 15, current: 8 },
+          },
+        }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -132,10 +132,10 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { respawn: { policy: 'manual' } }
-          })
+            nodes: { respawn: { policy: 'manual' } },
+          }),
         }),
-        environment: makeEnvironment({ nodeRuntime: {} })
+        environment: makeEnvironment({ nodeRuntime: {} }),
       });
 
       const hasNodesSection = root.querySelector('[data-record-inspector-section="nodes"]');
@@ -147,14 +147,14 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { max: 5, respawn: { policy: 'manual' } } // Config max is 5
-          })
+            nodes: { max: 5, respawn: { policy: 'manual' } }, // Config max is 5
+          }),
         }),
         environment: makeEnvironment({
           nodeRuntime: {
-            task1: { max: 20, current: 18 } // Runtime current (18) exceeds config max (5)
-          }
-        })
+            task1: { max: 20, current: 18 }, // Runtime current (18) exceeds config max (5)
+          },
+        }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -167,10 +167,10 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { max: 10, current: 7, respawn: { policy: 'manual' } }
-          })
+            nodes: { max: 10, current: 7, respawn: { policy: 'manual' } },
+          }),
         }),
-        environment: makeEnvironment({ nodeRuntime: {} }) // No runtime entry
+        environment: makeEnvironment({ nodeRuntime: {} }), // No runtime entry
       });
 
       const display = getNodeCountDisplay(root);
@@ -183,10 +183,10 @@ describe('RecordInspector (mounted)', () => {
         kind: 'task',
         entry: makeEntry({
           record: makeTaskRecord({
-            nodes: { max: 8, respawn: { policy: 'manual' } } // No current defined
-          })
+            nodes: { max: 8, respawn: { policy: 'manual' } }, // No current defined
+          }),
         }),
-        environment: makeEnvironment({ nodeRuntime: {} })
+        environment: makeEnvironment({ nodeRuntime: {} }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -201,11 +201,11 @@ describe('RecordInspector (mounted)', () => {
             nodes: {
               max: 5,
               current: 3,
-              respawn: { policy: 'nonRegenerating' }
-            }
-          })
+              respawn: { policy: 'nonRegenerating' },
+            },
+          }),
         }),
-        environment: makeEnvironment()
+        environment: makeEnvironment(),
       });
 
       const readonlySection = root.querySelector(
@@ -229,18 +229,18 @@ describe('RecordInspector (mounted)', () => {
             nodes: {
               max: 5, // Lowered by GM
               current: 8, // Config's own current
-              respawn: { policy: 'manual' }
-            }
-          })
+              respawn: { policy: 'manual' },
+            },
+          }),
         }),
         environment: makeEnvironment({
           nodeRuntime: {
             task1: {
               max: 20, // Old max before lowering
-              current: 12 // Old current, exceeds new max
-            }
-          }
-        })
+              current: 12, // Old current, exceeds new max
+            },
+          },
+        }),
       });
 
       const display = getNodeCountDisplay(root);
@@ -258,9 +258,9 @@ describe('RecordInspector (mounted)', () => {
       const root = await harness.mount({
         kind: 'event',
         entry: makeEntry({
-          record: { id: 'event1', name: 'Test Event' }
+          record: { id: 'event1', name: 'Test Event' },
         }),
-        environment: makeEnvironment()
+        environment: makeEnvironment(),
       });
 
       const nodesSection = root.querySelector('[data-record-inspector-section="nodes"]');

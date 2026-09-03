@@ -1159,8 +1159,8 @@
           inherited={{ category: categoryInheriting }}
           notes={{ category: categoryNote.text }}
           disabled={saving}
-          onToggle={(section, overridden) =>
-            actions?.setSectionInherited?.(component?.id, systemId, section, !overridden)}
+          onToggle={(section, nextInherit) =>
+            actions?.setSectionInherited?.(component?.id, systemId, section, nextInherit)}
         />
       {:else}
         <p

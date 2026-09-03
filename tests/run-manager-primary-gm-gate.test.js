@@ -127,7 +127,11 @@ test('CraftingRunManager.processWorldTime: non-primary GM skips the broadcast _p
 
   await manager.processWorldTime(200);
 
-  assert.equal(actor.setFlagCalls, 0, 'no duplicate broadcast setFlag write on a non-primary client');
+  assert.equal(
+    actor.setFlagCalls,
+    0,
+    'no duplicate broadcast setFlag write on a non-primary client'
+  );
   assert.equal(manager.getActiveRun(actor, 'craft-1').status, 'waitingTime', 'run stays waiting');
 });
 

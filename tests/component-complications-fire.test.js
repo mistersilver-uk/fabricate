@@ -678,9 +678,8 @@ function gmRow(overrides = {}) {
  * A key-only stub was fine while the card's strings were labels; they are sentences now, and
  * a stub would let this suite agree with itself about copy that `lang/en.json` does not carry.
  */
-const CARD_LANG = JSON.parse(
-  readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8')
-).FABRICATE.Chat.GmComplication;
+const CARD_LANG = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'))
+  .FABRICATE.Chat.GmComplication;
 
 function cardLocalize(key) {
   const path = key.replace('FABRICATE.Chat.GmComplication.', '');
@@ -844,10 +843,7 @@ test('1286: the claimed stage outcome is worded as a REPORT, never stated flat',
     // the card may not assert it. Each sentence carries the attribution in its own grammar
     // rather than behind a separate "Reported by the acting client" label a GM must translate
     // (`openspec/specs/recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY").
-    assert.ok(
-      /reports/.test(sentence),
-      `the ${bucket} sentence attributes rather than asserts`
-    );
+    assert.ok(/reports/.test(sentence), `the ${bucket} sentence attributes rather than asserts`);
   }
 });
 
@@ -858,10 +854,7 @@ test('1286: an authored condition the GM can confirm is stated FLAT, and one it 
     [['unknown'], "Fabricate can't tell which of its conditions fired it."],
   ];
   for (const [reasons, sentence] of cases) {
-    const content = buildGmComplicationCardContent(
-      { entries: [gmRow({ reasons })] },
-      cardLocalize
-    );
+    const content = buildGmComplicationCardContent({ entries: [gmRow({ reasons })] }, cardLocalize);
     assert.deepEqual(sectionText(content, 'why'), ['Why it fired', sentence]);
   }
 
@@ -1255,7 +1248,13 @@ test('1286: every reason the GM card names really did fire the complication', ()
   // the REAL planner, and every reason the card would name must appear in that firing's own
   // matched conditions. The card may say less than the truth; it may never say something else.
   const buckets = ['full', 'partial', 'halted', 'unreached'];
-  const stageSets = [[], ['stageAwarded'], ['stagePartial'], ['stageMissed'], ['stageAwarded', 'stageMissed']];
+  const stageSets = [
+    [],
+    ['stageAwarded'],
+    ['stagePartial'],
+    ['stageMissed'],
+    ['stageAwarded', 'stageMissed'],
+  ];
   let named = 0;
   let admitted = 0;
   let fired = 0;

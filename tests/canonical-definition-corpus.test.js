@@ -157,7 +157,9 @@ function identityItemRecord(mutation) {
  */
 function legacyStoredCorpus(mutation = null) {
   const coalOption =
-    mutation === 'dropComponentRef' ? { quantity: 1 } : { componentId: COMPONENT_COAL_ID, quantity: 1 };
+    mutation === 'dropComponentRef'
+      ? { quantity: 1 }
+      : { componentId: COMPONENT_COAL_ID, quantity: 1 };
   const alpha = {
     id: RECIPE_ALPHA_ID,
     name: 'Alpha Ingot',
@@ -203,7 +205,9 @@ function legacyStoredCorpus(mutation = null) {
  */
 function migratedStoredCorpus(mutation = null) {
   const coalOption =
-    mutation === 'dropComponentRef' ? { quantity: 1 } : { componentId: COMPONENT_COAL_ID, quantity: 1 };
+    mutation === 'dropComponentRef'
+      ? { quantity: 1 }
+      : { componentId: COMPONENT_COAL_ID, quantity: 1 };
   const alpha = {
     id: RECIPE_ALPHA_ID,
     name: 'Alpha Ingot',
@@ -414,7 +418,10 @@ describe('the same stored bytes canonicalize identically', () => {
 
 describe('the form still detects what it exists to detect', () => {
   it('sees a dropped recipe', () => {
-    assert.notEqual(canonicalJson(legacyStoredCorpus), canonicalJson(legacyStoredCorpus, 'dropRecipe'));
+    assert.notEqual(
+      canonicalJson(legacyStoredCorpus),
+      canonicalJson(legacyStoredCorpus, 'dropRecipe')
+    );
     assert.notEqual(
       canonicalJson(migratedStoredCorpus),
       canonicalJson(migratedStoredCorpus, 'dropRecipe')
@@ -487,10 +494,9 @@ describe('a hydrate-stamped metadata block is normalized, a stored one is compar
     edited[0].metadata.author = 'Someone Else';
     assert.notEqual(
       canonicalDefinitionCorpusJson(records, { storedRecords }),
-      canonicalDefinitionCorpusJson(
-        [new Recipe(edited[0]), ...records.slice(1)],
-        { storedRecords: edited }
-      ),
+      canonicalDefinitionCorpusJson([new Recipe(edited[0]), ...records.slice(1)], {
+        storedRecords: edited,
+      }),
       'a stored metadata block is domain data; dropping or rewriting it must be visible'
     );
   });

@@ -38,7 +38,7 @@ const RECIPE_RAW_MODULES = [
   // Its shared leaf: those selection helpers live here and `recipeBulkEditModel.js`
   // re-exports them, so it is a STATIC import of that module. Naming only the model HANGS
   // the suite (`# cancelled`) rather than failing it.
-  'src/utils/bulkSelectionModel.js'
+  'src/utils/bulkSelectionModel.js',
 ];
 
 const RECIPE_PRIMITIVES = [
@@ -62,7 +62,7 @@ const RECIPE_PRIMITIVES = [
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
-  'src/ui/svelte/components/StatusToggle.svelte'
+  'src/ui/svelte/components/StatusToggle.svelte',
 ];
 
 const browser = createMountedComponentHarness({
@@ -77,9 +77,9 @@ const browser = createMountedComponentHarness({
     // rather than hoisted into RECIPE_PRIMITIVES.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-    'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
+    'src/ui/svelte/apps/manager/RecipesBrowserView.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte',
 });
 
 const inspector = createMountedComponentHarness({
@@ -88,9 +88,9 @@ const inspector = createMountedComponentHarness({
   rawModules: RECIPE_RAW_MODULES,
   compiledModules: [
     ...RECIPE_PRIMITIVES,
-    'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
+    'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte',
 });
 
 function makeRecipe(overrides = {}) {
@@ -109,18 +109,18 @@ function makeRecipe(overrides = {}) {
     resultGroupCount: 1,
     checkSummary: { kind: 'dc', dc: 15 },
     requirementsPreview: [],
-    ...overrides
+    ...overrides,
   };
 }
 
 const CATEGORIES = [
   { name: 'alchemy', count: 1 },
-  { name: 'smithing', count: 1 }
+  { name: 'smithing', count: 1 },
 ];
 
 const GROUPED = [
   makeRecipe({ id: 'r1', name: 'Acid Flask', category: 'alchemy' }),
-  makeRecipe({ id: 'r2', name: 'Bronze Ingot', category: 'smithing', ingredientCount: 4 })
+  makeRecipe({ id: 'r2', name: 'Bronze Ingot', category: 'smithing', ingredientCount: 4 }),
 ];
 
 function rowIds(root) {
@@ -169,7 +169,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     const root = await browser.mount({
       recipes: GROUPED,
       recipeCategories: CATEGORIES,
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
 
     assert.deepEqual(rowIds(root), ['r1', 'r2'], 'both recipes are visible on page 1');
@@ -198,13 +198,13 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
         id: `r${index + 1}`,
         // Zero-padded so name-ascending order is also numeric order.
         name: `Draught ${String(index + 1).padStart(2, '0')}`,
-        category: 'alchemy'
+        category: 'alchemy',
       })
     );
     const root = await browser.mount({
       recipes: many,
       recipeCategories: [{ name: 'alchemy', count: 12 }],
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
 
     const countText = () => root.querySelector('.fab-group-count').textContent.trim();
@@ -235,13 +235,13 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
       makeRecipe({
         id: `r${index + 1}`,
         name: `Draught ${String(index + 1).padStart(2, '0')}`,
-        category: 'alchemy'
+        category: 'alchemy',
       })
     );
     const root = await browser.mount({
       recipes: many,
       recipeCategories: [{ name: 'alchemy', count: 11 }],
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
     const countText = () => root.querySelector('.fab-group-count').textContent.trim();
 
@@ -260,7 +260,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     const root = await browser.mount({
       recipes: GROUPED,
       recipeCategories: CATEGORIES,
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
     const header = root.querySelector('[data-group-header]');
     const controls = header.getAttribute('aria-controls');
@@ -355,7 +355,7 @@ describeBrowserBulkSelection({
         // Zero-padded so name-ascending order is also numeric order, which is what makes
         // `flatId(1)` reliably the first row of page 1.
         name: `Flask ${String(index + 1).padStart(2, '0')}`,
-        category: 'general'
+        category: 'general',
       })
     ),
   flatId: (index) => `f${index}`,
@@ -363,14 +363,14 @@ describeBrowserBulkSelection({
     makeRecipe({ id: 'a1', name: 'Acid Flask', category: 'alchemy' }),
     makeRecipe({ id: 'a2', name: 'Alkahest', category: 'alchemy' }),
     makeRecipe({ id: 's1', name: 'Bronze Ingot', category: 'smithing' }),
-    makeRecipe({ id: 's2', name: 'Steel Ingot', category: 'smithing' })
+    makeRecipe({ id: 's2', name: 'Steel Ingot', category: 'smithing' }),
   ],
   grouped: {
     // The header's `data-group-header` is the DISPLAY name, and a custom recipe category
     // is its own label — only the reserved `general` is localized.
     collapseHeader: 'alchemy',
     hiddenIds: ['a1', 'a2'],
-    visibleIds: ['s1', 's2']
+    visibleIds: ['s1', 's2'],
   },
   props: (recipes, extra = {}) => ({
     recipes,
@@ -380,17 +380,17 @@ describeBrowserBulkSelection({
     showRecipeCategories: true,
     recipeCategories: [...new Set(recipes.map((recipe) => recipe.category))].map((name) => ({
       name,
-      count: recipes.filter((recipe) => recipe.category === name).length
+      count: recipes.filter((recipe) => recipe.category === name).length,
     })),
-    ...extra
+    ...extra,
   }),
   rowControls: {
     scope: '.manager-recipe-cluster',
     count: 3,
     why:
       'the row still carries exactly its three cluster buttons — lock, enable and edit — ' +
-      'so the smoke walk that reaches Edit through them is undisturbed by the new control'
-  }
+      'so the smoke walk that reaches Edit through them is undisturbed by the new control',
+  },
 });
 
 describe('RecipesBrowserView filtering and sorting', () => {
@@ -398,7 +398,7 @@ describe('RecipesBrowserView filtering and sorting', () => {
     const rows = [
       makeRecipe({ id: 'r1', name: 'On' }),
       makeRecipe({ id: 'r2', name: 'Off', enabled: false }),
-      makeRecipe({ id: 'r3', name: 'Locked', locked: true })
+      makeRecipe({ id: 'r3', name: 'Locked', locked: true }),
     ];
     const root = await browser.mount({ recipes: rows });
 
@@ -468,7 +468,11 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
       const io = root.querySelector('[data-recipe-io]');
       assert.match(io.textContent, /2 in/, `${mode} still reports the ingredient count`);
       assert.match(io.textContent, /3 groups/, `${mode} reports result GROUPS`);
-      assert.equal(io.textContent.includes('out'), false, `${mode} must not invent an outputs count`);
+      assert.equal(
+        io.textContent.includes('out'),
+        false,
+        `${mode} must not invent an outputs count`
+      );
       assert.ok(io.querySelector('.manager-recipe-io-routed'), `${mode} shows the routing glyph`);
       browser.remount();
     }
@@ -477,7 +481,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
   it('says "1 group", never "1 groups"', async () => {
     const root = await browser.mount({
       recipes: [makeRecipe({ resultGroupCount: 1 })],
-      resolutionMode: 'routedByCheck'
+      resolutionMode: 'routedByCheck',
     });
     const io = root.querySelector('[data-recipe-io]').textContent;
     assert.match(io, /1 group\b/);
@@ -485,7 +489,9 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
   });
 
   it('shows the projected check DC in the mono face', async () => {
-    const withDc = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'dc', dc: 18 } })] });
+    const withDc = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'dc', dc: 18 } })],
+    });
     const dcPill = withDc.querySelector('[data-recipe-check]');
     assert.equal(dcPill.dataset.recipeCheck, 'dc');
     assert.match(dcPill.textContent, /DC 18/);
@@ -495,7 +501,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     browser.remount();
 
     const dynamic = await browser.mount({
-      recipes: [makeRecipe({ checkSummary: { kind: 'dynamic', dc: null } })]
+      recipes: [makeRecipe({ checkSummary: { kind: 'dynamic', dc: null } })],
     });
     assert.equal(
       dynamic.querySelector('[data-recipe-check]').classList.contains('is-mono'),
@@ -511,7 +517,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
   // ingredient set that was used, so no check is a working configuration, not a gap.
   it('warns when the system cannot roll for a recipe, and stays neutral when it need not', async () => {
     const noCheck = await browser.mount({
-      recipes: [makeRecipe({ checkSummary: { kind: 'none', dc: null } })]
+      recipes: [makeRecipe({ checkSummary: { kind: 'none', dc: null } })],
     });
     const warning = noCheck.querySelector('[data-recipe-check]');
     assert.equal(warning.dataset.recipeCheck, 'none');
@@ -523,7 +529,7 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     browser.remount();
 
     const byIngredients = await browser.mount({
-      recipes: [makeRecipe({ checkSummary: { kind: 'ingredients', dc: null } })]
+      recipes: [makeRecipe({ checkSummary: { kind: 'ingredients', dc: null } })],
     });
     const neutral = byIngredients.querySelector('[data-recipe-check]');
     assert.equal(neutral.dataset.recipeCheck, 'ingredients');
@@ -554,18 +560,18 @@ describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
     [
       ...root.querySelectorAll(
         `[data-recipe-id="${id}"] .manager-recipe-name-row [data-status-pill]`
-      )
+      ),
     ].map((pill) => [pill.dataset.statusPill, pill.textContent.trim()]);
 
   it('paints an off, blocked recipe RED and says enabling would be refused', async () => {
     // `incomplete: false` is the load-bearing half: this is the structurally-broken row the
     // narrower predicate reads as fine, and it is exactly what the bulk panel forecasts.
     const root = await browser.mount({
-      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: false, enableBlocked: true })]
+      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: false, enableBlocked: true })],
     });
     assert.deepEqual(pills(root, 'r1'), [
       ['subtle', 'Disabled'],
-      ['danger', "Can't enable"]
+      ['danger', "Can't enable"],
     ]);
   });
 
@@ -573,7 +579,7 @@ describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
     // The activation gate fires only on the transition INTO enabled, so an already-on blocked
     // recipe is authoring work outstanding rather than a refusal. Two tones, one predicate.
     const root = await browser.mount({
-      recipes: [makeRecipe({ id: 'r1', enabled: true, incomplete: false, enableBlocked: true })]
+      recipes: [makeRecipe({ id: 'r1', enabled: true, incomplete: false, enableBlocked: true })],
     });
     assert.deepEqual(pills(root, 'r1'), [['warning', 'Incomplete']]);
   });
@@ -583,7 +589,7 @@ describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
   // both cases above and still let the browser and the panel disagree.
   it('paints no authoring pill on a row only the narrower incomplete predicate flags', async () => {
     const root = await browser.mount({
-      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true, enableBlocked: false })]
+      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true, enableBlocked: false })],
     });
     assert.deepEqual(pills(root, 'r1'), [['subtle', 'Disabled']]);
   });
@@ -601,7 +607,11 @@ describe('RecipesBrowserView result count', () => {
 
     const count = root.querySelector('[data-recipe-count]');
     assert.equal(count.textContent.trim(), '1–12 of 12');
-    assert.equal(count.classList.contains('manager-chip'), false, 'the count is not a chip to press');
+    assert.equal(
+      count.classList.contains('manager-chip'),
+      false,
+      'the count is not a chip to press'
+    );
 
     const size = root.querySelector('[data-pagination-size]');
     size.value = '10';
@@ -624,7 +634,7 @@ describe('RecipesBrowserView lock and enable controls', () => {
     const locks = [];
     const root = await browser.mount({
       recipes: [makeRecipe({ id: 'r1', locked: false }), makeRecipe({ id: 'r2', locked: true })],
-      onToggleLocked: (id, locked) => locks.push([id, locked])
+      onToggleLocked: (id, locked) => locks.push([id, locked]),
     });
 
     for (const id of ['r1', 'r2']) {
@@ -633,14 +643,25 @@ describe('RecipesBrowserView lock and enable controls', () => {
       assert.ok(row.querySelector('.manager-status-toggle'), 'the enable toggle is present');
       // Duplicate / Delete stay inspector-only (issue 643): the row carries a single Edit
       // pencil, not the old three-icon action group.
-      assert.equal(row.querySelector('.manager-action-group'), null, 'the row carries no action group');
+      assert.equal(
+        row.querySelector('.manager-action-group'),
+        null,
+        'the row carries no action group'
+      );
     }
 
     root.querySelector('[data-recipe-id="r1"] [data-recipe-lock]').click();
     root.querySelector('[data-recipe-id="r2"] [data-recipe-lock]').click();
     flushSync();
 
-    assert.deepEqual(locks, [['r1', true], ['r2', false]], 'lock toggles both ways');
+    assert.deepEqual(
+      locks,
+      [
+        ['r1', true],
+        ['r2', false],
+      ],
+      'lock toggles both ways'
+    );
   });
 
   // The row's Edit pencil is restored (issue 643), styled like the Books & Scrolls row
@@ -649,15 +670,24 @@ describe('RecipesBrowserView lock and enable controls', () => {
   it('renders a single Edit pencil per row that reports the recipe id', async () => {
     const edits = [];
     const root = await browser.mount({
-      recipes: [makeRecipe({ id: 'r1', name: 'Acid Flask' }), makeRecipe({ id: 'r2', name: 'Bronze Ingot' })],
-      onEditRecipe: (id) => edits.push(id)
+      recipes: [
+        makeRecipe({ id: 'r1', name: 'Acid Flask' }),
+        makeRecipe({ id: 'r2', name: 'Bronze Ingot' }),
+      ],
+      onEditRecipe: (id) => edits.push(id),
     });
 
     for (const id of ['r1', 'r2']) {
       const editButton = root.querySelector(`[data-recipe-id="${id}"] [data-recipe-edit]`);
       assert.ok(editButton, 'the row carries its own Edit pencil');
-      assert.ok(editButton.classList.contains('manager-icon-button'), 'styled like the Books & Scrolls row edit');
-      assert.ok(editButton.querySelector('i.fa-pen'), 'the Edit affordance is a pen, matching Books & Scrolls');
+      assert.ok(
+        editButton.classList.contains('manager-icon-button'),
+        'styled like the Books & Scrolls row edit'
+      );
+      assert.ok(
+        editButton.querySelector('i.fa-pen'),
+        'the Edit affordance is a pen, matching Books & Scrolls'
+      );
     }
 
     root.querySelector('[data-recipe-id="r2"] [data-recipe-edit]').click();
@@ -671,7 +701,7 @@ describe('RecipesBrowserView column header (issue 643)', () => {
     const root = await browser.mount({
       recipes: GROUPED,
       recipeCategories: CATEGORIES,
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
 
     const head = root.querySelector('.manager-recipe-table-head');
@@ -698,7 +728,8 @@ describe('RecipesBrowserView row medallion (issue 884)', () => {
   itResolvesTheRecipesOwnImage({
     harness: browser,
     mountProps: (imageOverrides) => ({ recipes: [makeRecipe({ id: 'r1', ...imageOverrides })] }),
-    selectImg: (root) => root.querySelector('[data-recipe-id="r1"] .fab-medallion-img').getAttribute('src')
+    selectImg: (root) =>
+      root.querySelector('[data-recipe-id="r1"] .fab-medallion-img').getAttribute('src'),
   });
 });
 
@@ -716,8 +747,11 @@ describe('RecipesBrowserView lifted browser state', () => {
     // proves the write REACHES the shared object rather than a hidden local copy.
     const shared = createRecipeBrowserState();
     const root = await browser.mount({
-      recipes: [makeRecipe({ id: 'r1', name: 'On' }), makeRecipe({ id: 'r2', name: 'Off', enabled: false })],
-      browserState: shared
+      recipes: [
+        makeRecipe({ id: 'r1', name: 'On' }),
+        makeRecipe({ id: 'r2', name: 'Off', enabled: false }),
+      ],
+      browserState: shared,
     });
 
     const off = root.querySelector('[data-recipe-status-option="off"] input');
@@ -725,12 +759,20 @@ describe('RecipesBrowserView lifted browser state', () => {
     off.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
     flushSync();
 
-    assert.equal(shared.statusFilter, 'off', 'the control write lands on the bound object, not local state');
+    assert.equal(
+      shared.statusFilter,
+      'off',
+      'the control write lands on the bound object, not local state'
+    );
 
     const direction = root.querySelector('[data-recipe-sort-direction]');
     direction.click();
     flushSync();
-    assert.equal(shared.sortDirection, 'desc', 'the sort direction write lands on the bound object too');
+    assert.equal(
+      shared.sortDirection,
+      'desc',
+      'the sort direction write lands on the bound object too'
+    );
   });
 
   it('seeds its controls from a restored browserState object on mount', async () => {
@@ -738,8 +780,11 @@ describe('RecipesBrowserView lifted browser state', () => {
     restored.statusFilter = 'off';
     restored.sortDirection = 'desc';
     const root = await browser.mount({
-      recipes: [makeRecipe({ id: 'r1', name: 'On' }), makeRecipe({ id: 'r2', name: 'Off', enabled: false })],
-      browserState: restored
+      recipes: [
+        makeRecipe({ id: 'r1', name: 'On' }),
+        makeRecipe({ id: 'r2', name: 'Off', enabled: false }),
+      ],
+      browserState: restored,
     });
 
     // The status filter the GM left is re-applied without any interaction.
@@ -763,10 +808,22 @@ describe('RecipesBrowserView lifted browser state', () => {
     // 15 alchemy + 5 smithing, so a page-2 (pageSize 10) alchemy filter is a real page.
     const rows = [];
     for (let i = 0; i < 15; i += 1) {
-      rows.push(makeRecipe({ id: `a${i}`, name: `Alch ${String(i + 1).padStart(2, '0')}`, category: 'alchemy' }));
+      rows.push(
+        makeRecipe({
+          id: `a${i}`,
+          name: `Alch ${String(i + 1).padStart(2, '0')}`,
+          category: 'alchemy',
+        })
+      );
     }
     for (let i = 0; i < 5; i += 1) {
-      rows.push(makeRecipe({ id: `s${i}`, name: `Smith ${String(i + 1).padStart(2, '0')}`, category: 'smithing' }));
+      rows.push(
+        makeRecipe({
+          id: `s${i}`,
+          name: `Smith ${String(i + 1).padStart(2, '0')}`,
+          category: 'smithing',
+        })
+      );
     }
     return rows;
   }
@@ -779,10 +836,13 @@ describe('RecipesBrowserView lifted browser state', () => {
     // ui.systemId = 'sys-1'.
     await browser.mount({
       recipes,
-      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      recipeCategories: [
+        { name: 'alchemy', count: 15 },
+        { name: 'smithing', count: 5 },
+      ],
       showRecipeCategories: true,
       selectedSystemId: 'sys-1',
-      browserState: shared
+      browserState: shared,
     });
     assert.equal(shared.systemId, 'sys-1', 'the first mount stamps the persisted system sentinel');
 
@@ -799,15 +859,22 @@ describe('RecipesBrowserView lifted browser state', () => {
     browser.remount();
     await browser.mount({
       recipes,
-      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      recipeCategories: [
+        { name: 'alchemy', count: 15 },
+        { name: 'smithing', count: 5 },
+      ],
       showRecipeCategories: true,
       selectedSystemId: 'sys-1',
-      browserState: shared
+      browserState: shared,
     });
 
     assert.equal(shared.categoryFilter, 'alchemy', 'the category filter survives the round-trip');
     assert.equal(shared.pageIndex, 1, 'the page survives the round-trip');
-    assert.equal(shared.collapsedCategories.has('alchemy'), true, 'the collapsed group survives the round-trip');
+    assert.equal(
+      shared.collapsedCategories.has('alchemy'),
+      true,
+      'the collapsed group survives the round-trip'
+    );
     assert.equal(shared.sortKey, 'dc', 'the sort key is a preference and is untouched');
   });
 
@@ -817,10 +884,13 @@ describe('RecipesBrowserView lifted browser state', () => {
 
     await browser.mount({
       recipes,
-      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      recipeCategories: [
+        { name: 'alchemy', count: 15 },
+        { name: 'smithing', count: 5 },
+      ],
       showRecipeCategories: true,
       selectedSystemId: 'sys-1',
-      browserState: shared
+      browserState: shared,
     });
 
     // The default page size keeps the 20-row library on a single page, so the page index
@@ -840,18 +910,29 @@ describe('RecipesBrowserView lifted browser state', () => {
     browser.remount();
     await browser.mount({
       recipes,
-      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      recipeCategories: [
+        { name: 'alchemy', count: 15 },
+        { name: 'smithing', count: 5 },
+      ],
       showRecipeCategories: true,
       selectedSystemId: 'sys-2',
-      browserState: shared
+      browserState: shared,
     });
 
-    assert.equal(shared.categoryFilter, 'all', 'a switch clears the vocabulary-scoped category filter');
+    assert.equal(
+      shared.categoryFilter,
+      'all',
+      'a switch clears the vocabulary-scoped category filter'
+    );
     assert.equal(shared.pageIndex, 0, 'a switch returns to the first page');
     assert.equal(shared.collapsedCategories.size, 0, 'a switch re-expands every group');
     assert.equal(shared.systemId, 'sys-2', 'the persisted sentinel advances to the new system');
     assert.equal(shared.sortKey, 'dc', 'sort key is a cross-system preference and is kept');
-    assert.equal(shared.groupByCategory, false, 'group-by-category is a cross-system preference and is kept');
+    assert.equal(
+      shared.groupByCategory,
+      false,
+      'group-by-category is a cross-system preference and is kept'
+    );
   });
 
   it('clamps a restored page that no longer exists to the last valid page', async () => {
@@ -860,10 +941,13 @@ describe('RecipesBrowserView lifted browser state', () => {
 
     await browser.mount({
       recipes,
-      recipeCategories: [{ name: 'alchemy', count: 15 }, { name: 'smithing', count: 5 }],
+      recipeCategories: [
+        { name: 'alchemy', count: 15 },
+        { name: 'smithing', count: 5 },
+      ],
       showRecipeCategories: true,
       selectedSystemId: 'sys-1',
-      browserState: shared
+      browserState: shared,
     });
 
     // The GM was on page 2 (pageSize 10, 20 rows → two pages) when they opened the editor.
@@ -877,7 +961,7 @@ describe('RecipesBrowserView lifted browser state', () => {
       recipeCategories: [{ name: 'alchemy', count: 8 }],
       showRecipeCategories: true,
       selectedSystemId: 'sys-1',
-      browserState: shared
+      browserState: shared,
     });
 
     // The pager clamps to the last valid page rather than stranding an empty one; the
@@ -894,7 +978,7 @@ describe('RecipesBrowserView lifted browser state', () => {
     const calls = [];
     const root = await browser.mount({
       recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true })],
-      onToggleEnabled: (id, enabled, options) => calls.push({ id, enabled, options })
+      onToggleEnabled: (id, enabled, options) => calls.push({ id, enabled, options }),
     });
 
     assert.equal(root.querySelector('[data-recipe-flash]'), null, 'no flash before a refusal');
@@ -939,7 +1023,7 @@ describe('RecipesBrowserView lifted browser state', () => {
 // what it PRODUCES. An inspector that cannot say what a recipe makes is not finished.
 const INSPECTOR_COMPONENTS = [
   { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' },
-  { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp' }
+  { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp' },
 ];
 const INSPECTOR_ESSENCES = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
 
@@ -954,20 +1038,20 @@ function makeAuthoredRecipe(overrides = {}) {
             id: 'grp-1',
             options: [
               { id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } },
-              { id: 'o2', quantity: 1, match: { type: 'currency', unit: 'gp', amount: 25 } }
-            ]
-          }
-        ]
-      }
+              { id: 'o2', quantity: 1, match: { type: 'currency', unit: 'gp', amount: 25 } },
+            ],
+          },
+        ],
+      },
     ],
     resultGroups: [
       {
         id: 'g1',
         name: 'On success',
-        results: [{ id: 'res-1', componentId: 'cmp-potion', quantity: 3 }]
-      }
+        results: [{ id: 'res-1', componentId: 'cmp-potion', quantity: 3 }],
+      },
     ],
-    ...overrides
+    ...overrides,
   });
 }
 
@@ -979,12 +1063,13 @@ describe('RecipeBrowserInspector (mounted)', () => {
         stepCount: 2,
         ingredientCount: 4,
         resultItemCount: 3,
-        checkSummary: { kind: 'dc', dc: 17 }
+        checkSummary: { kind: 'dc', dc: 17 },
       }),
-      recipeCount: 1
+      recipeCount: 1,
     });
 
-    const stat = (id) => root.querySelector(`[data-recipe-fact="${id}"] .manager-recipe-stat-value`);
+    const stat = (id) =>
+      root.querySelector(`[data-recipe-fact="${id}"] .manager-recipe-stat-value`);
     assert.equal(stat('ingredients').textContent, '4');
     assert.equal(stat('results').textContent, '3');
     assert.equal(stat('steps').textContent, '2');
@@ -999,7 +1084,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
   it('marks a recipe that produces nothing as a DANGER stat, not merely a zero', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', resultItemCount: 0, resultGroups: [] }),
-      recipeCount: 1
+      recipeCount: 1,
     });
     assert.ok(
       root
@@ -1019,18 +1104,27 @@ describe('RecipeBrowserInspector (mounted)', () => {
       selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
       recipeCount: 1,
       showRecipeCategories: true,
-      onEdit: () => { edited += 1; },
-      onDuplicate: () => { duplicated += 1; },
-      onDelete: () => { deleted += 1; }
+      onEdit: () => {
+        edited += 1;
+      },
+      onDuplicate: () => {
+        duplicated += 1;
+      },
+      onDelete: () => {
+        deleted += 1;
+      },
     });
 
     assert.equal(root.querySelector('[data-medallion]').dataset.medallion, 'image');
-    assert.ok(root.querySelector('[data-recipe-category]'), 'the category is a hero chip, not a stat');
+    assert.ok(
+      root.querySelector('[data-recipe-category]'),
+      'the category is a hero chip, not a stat'
+    );
 
     assert.deepEqual(
-      [...root.querySelectorAll('.manager-recipe-browser-inspector-actions [data-recipe-action]')].map(
-        (button) => button.dataset.recipeAction
-      ),
+      [
+        ...root.querySelectorAll('.manager-recipe-browser-inspector-actions [data-recipe-action]'),
+      ].map((button) => button.dataset.recipeAction),
       ['duplicate', 'edit', 'delete'],
       'Duplicate (secondary), then Edit (primary), then Delete demoted below it'
     );
@@ -1047,7 +1141,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const root = await inspector.mount({
       selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     assert.equal(
@@ -1075,24 +1169,39 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const on = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', enabled: true, locked: false }),
       recipeCount: 1,
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
 
-    assert.equal(on.querySelectorAll('.manager-chip-row > *').length, 2, 'category + status, one line');
+    assert.equal(
+      on.querySelectorAll('.manager-chip-row > *').length,
+      2,
+      'category + status, one line'
+    );
     const status = on.querySelector('[data-status-pill="success"]');
-    assert.equal(status.textContent.trim(), 'On', 'the same state has the same name as the row switch');
+    assert.equal(
+      status.textContent.trim(),
+      'On',
+      'the same state has the same name as the row switch'
+    );
     assert.ok(status.querySelector('i.fa-circle'), 'the status pill leads with a dot');
     assert.equal(on.textContent.includes('Unlocked'), false, 'unlocked is not a state to chip');
-    assert.equal(on.textContent.includes('Active'), false, 'the state is named On, as the row names it');
+    assert.equal(
+      on.textContent.includes('Active'),
+      false,
+      'the state is named On, as the row names it'
+    );
     inspector.remount();
 
     const off = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', enabled: false, locked: true }),
       recipeCount: 1,
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
     assert.equal(off.querySelector('[data-status-pill="subtle"]').textContent.trim(), 'Off');
-    assert.ok(off.querySelector('[data-status-pill="accent"]'), 'Locked IS a state and keeps its pill');
+    assert.ok(
+      off.querySelector('[data-status-pill="accent"]'),
+      'Locked IS a state and keeps its pill'
+    );
   });
 
   // The panel is the one surface with the room for the recipe's flavour text; it used to
@@ -1101,9 +1210,12 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const description = 'A classic arming sword. '.repeat(12).trim();
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', description }),
-      recipeCount: 1
+      recipeCount: 1,
     });
-    assert.equal(root.querySelector('.manager-recipe-browser-inspector-flavour').textContent.trim(), description);
+    assert.equal(
+      root.querySelector('.manager-recipe-browser-inspector-flavour').textContent.trim(),
+      description
+    );
     assert.equal(root.textContent.includes('…'), false, 'nothing is truncated');
   });
 
@@ -1116,7 +1228,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const general = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', category: 'general' }),
       recipeCount: 1,
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
     assert.equal(
       general.querySelector('[data-recipe-category]').textContent.trim(),
@@ -1128,7 +1240,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const custom = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', category: 'Alchemy' }),
       recipeCount: 1,
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
     assert.equal(
       custom.querySelector('[data-recipe-category]').textContent.trim(),
@@ -1141,7 +1253,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', category: '' }),
       recipeCount: 1,
-      showRecipeCategories: true
+      showRecipeCategories: true,
     });
     assert.equal(
       root.querySelector('[data-recipe-category]').textContent.trim(),
@@ -1154,7 +1266,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
       selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
       recipeCount: 1,
       componentOptions: INSPECTOR_COMPONENTS,
-      essenceOptions: INSPECTOR_ESSENCES
+      essenceOptions: INSPECTOR_ESSENCES,
     });
 
     // The two options share ONE requirement, so they render as equal members inside an
@@ -1189,7 +1301,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const root = await inspector.mount({
       selectedRecipe: makeAuthoredRecipe({ id: 'r1' }),
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     const rows = [...root.querySelectorAll('[data-recipe-produces]')];
@@ -1210,7 +1322,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({ id: 'r1', resultGroups: [], resultItemCount: 0 }),
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     const empty = root.querySelector('[data-recipe-produces-empty]');
@@ -1235,19 +1347,22 @@ describe('RecipeBrowserInspector (mounted)', () => {
             id: 'g-fail',
             name: 'On a failed check',
             role: 'failure',
-            results: [{ id: 'x', componentId: 'cmp-potion', quantity: 1 }]
-          }
-        ]
+            results: [{ id: 'x', componentId: 'cmp-potion', quantity: 1 }],
+          },
+        ],
       }),
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     const rows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(rows.length, 1, 'the failure output is not deleted from the panel');
     assert.equal(rows[0].dataset.recipeProduces, 'failure');
     assert.ok(rows[0].classList.contains('is-failure'), 'a failure output rings in danger');
-    assert.ok(rows[0].querySelector('.manager-recipe-flow-group.is-failure'), 'and its group pill does too');
+    assert.ok(
+      rows[0].querySelector('.manager-recipe-flow-group.is-failure'),
+      'and its group pill does too'
+    );
     assert.ok(
       root.querySelector('[data-recipe-produces-empty]'),
       'a recipe whose only group is the failure group still makes nothing on a success'
@@ -1264,9 +1379,9 @@ describe('RecipeBrowserInspector (mounted)', () => {
         enabled: false,
         locked: true,
         incomplete: true,
-        enableBlocked: true
+        enableBlocked: true,
       }),
-      recipeCount: 1
+      recipeCount: 1,
     });
 
     assert.ok(root.querySelector('[data-status-pill="accent"]'), 'the locked state shows');
@@ -1282,7 +1397,9 @@ describe('RecipeBrowserInspector (mounted)', () => {
       selectedRecipe: null,
       recipeCount: 0,
       componentCount: 0,
-      onAddComponents: () => { addComponents += 1; }
+      onAddComponents: () => {
+        addComponents += 1;
+      },
     });
 
     assert.match(root.textContent, /Set up recipes/);
@@ -1312,20 +1429,42 @@ describe('RecipeBrowserInspector (mounted)', () => {
           id: 'set-1',
           name: 'Herb route',
           resultGroupId: 'grp-1',
-          ingredientGroups: [{ id: 'ig1', options: [{ id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }]
+          ingredientGroups: [
+            {
+              id: 'ig1',
+              options: [
+                { id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } },
+              ],
+            },
+          ],
         },
         {
           id: 'set-2',
           name: 'Potion route',
           resultGroupId: 'grp-2',
-          ingredientGroups: [{ id: 'ig2', options: [{ id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-potion' } }] }]
-        }
+          ingredientGroups: [
+            {
+              id: 'ig2',
+              options: [
+                { id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-potion' } },
+              ],
+            },
+          ],
+        },
       ],
       resultGroups: [
-        { id: 'grp-1', name: 'Result Group 1', results: [{ id: 'x1', componentId: 'cmp-potion', quantity: 3 }] },
-        { id: 'grp-2', name: 'Result Group 2', results: [{ id: 'x2', componentId: 'cmp-herb', quantity: 1 }] }
+        {
+          id: 'grp-1',
+          name: 'Result Group 1',
+          results: [{ id: 'x1', componentId: 'cmp-potion', quantity: 3 }],
+        },
+        {
+          id: 'grp-2',
+          name: 'Result Group 2',
+          results: [{ id: 'x2', componentId: 'cmp-herb', quantity: 1 }],
+        },
       ],
-      ...overrides
+      ...overrides,
     });
   }
 
@@ -1340,14 +1479,21 @@ describe('RecipeBrowserInspector (mounted)', () => {
       selectedRecipe: makeRoutedByIngredientsRecipe(),
       resolutionMode: 'routedByIngredients',
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     const setSelect = root.querySelector('[data-recipe-route="ingredient-set"]');
     assert.ok(setSelect, 'the ingredient-set dropdown renders');
     // The lower result-set dropdown was removed — the single set dropdown drives both lists.
-    assert.equal(root.querySelector('[data-recipe-route="result-set"]'), null, 'no redundant result-set dropdown');
-    assert.deepEqual([...setSelect.options].map((o) => o.textContent.trim()), ['Herb route', 'Potion route']);
+    assert.equal(
+      root.querySelector('[data-recipe-route="result-set"]'),
+      null,
+      'no redundant result-set dropdown'
+    );
+    assert.deepEqual(
+      [...setSelect.options].map((o) => o.textContent.trim()),
+      ['Herb route', 'Potion route']
+    );
     assert.equal(setSelect.value, 'set-1', 'defaults to the first set');
 
     const requires = root.querySelector('.manager-recipe-flow-list');
@@ -1357,7 +1503,11 @@ describe('RecipeBrowserInspector (mounted)', () => {
     const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(produceRows.length, 1, 'only the routed result group is produced');
     assert.match(produceRows[0].textContent, /Healing Potion/, 'grp-1 produces the potion');
-    assert.equal(root.querySelector('.manager-recipe-flow-group'), null, 'no Result Group pill in the produces list');
+    assert.equal(
+      root.querySelector('.manager-recipe-flow-group'),
+      null,
+      'no Result Group pill in the produces list'
+    );
   });
 
   it('routed by ingredients: choosing an ingredient set re-filters both the Requires and Produces lists', async () => {
@@ -1365,7 +1515,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
       selectedRecipe: makeRoutedByIngredientsRecipe(),
       resolutionMode: 'routedByIngredients',
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     changeSelect(root.querySelector('[data-recipe-route="ingredient-set"]'), 'set-2');
@@ -1375,7 +1525,11 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.doesNotMatch(requires.textContent, /Mountain Herb/);
     const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(produceRows.length, 1);
-    assert.match(produceRows[0].textContent, /Mountain Herb/, 'set-2 routes to grp-2, which produces the herb');
+    assert.match(
+      produceRows[0].textContent,
+      /Mountain Herb/,
+      'set-2 routes to grp-2, which produces the herb'
+    );
   });
 
   it('non-routed modes keep the flat lists and the group pill, with no dropdowns', async () => {
@@ -1383,14 +1537,21 @@ describe('RecipeBrowserInspector (mounted)', () => {
       selectedRecipe: makeRoutedByIngredientsRecipe(),
       resolutionMode: 'simple',
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
-    assert.equal(root.querySelector('[data-recipe-route]'), null, 'no routing dropdowns outside routed-by-ingredients');
+    assert.equal(
+      root.querySelector('[data-recipe-route]'),
+      null,
+      'no routing dropdowns outside routed-by-ingredients'
+    );
     // Both groups' produces are listed, each keeping its group pill.
     const produceRows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(produceRows.length, 2);
-    assert.ok(root.querySelector('.manager-recipe-flow-group'), 'the group pill stays outside routed-by-ingredients');
+    assert.ok(
+      root.querySelector('.manager-recipe-flow-group'),
+      'the group pill stays outside routed-by-ingredients'
+    );
   });
 
   it('progressive: shows per-component DC (not a group pill or quantity) and keeps ordered repeats', async () => {
@@ -1408,27 +1569,37 @@ describe('RecipeBrowserInspector (mounted)', () => {
               { id: 'a', componentId: 'cmp-herb', quantity: 1 },
               { id: 'b', componentId: 'cmp-potion', quantity: 1 },
               // The SAME component again, later in the order — it must appear twice.
-              { id: 'c', componentId: 'cmp-herb', quantity: 1 }
-            ]
-          }
-        ]
+              { id: 'c', componentId: 'cmp-herb', quantity: 1 },
+            ],
+          },
+        ],
       }),
       resolutionMode: 'progressive',
       recipeCount: 1,
       componentOptions: [
         { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp', difficulty: 8 },
-        { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp', difficulty: 14 }
-      ]
+        { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp', difficulty: 14 },
+      ],
     });
 
     const rows = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(rows.length, 3, 'a repeated component appears once per ordered entry');
     // No redundant "Result Group 1" pill, and no "×1" quantity implying a bulk output.
-    assert.equal(root.querySelector('.manager-recipe-flow-group.is-success'), null, 'no group pill in progressive');
-    assert.equal(root.querySelector('.manager-recipe-flow-qty'), null, 'no quantity in progressive');
+    assert.equal(
+      root.querySelector('.manager-recipe-flow-group.is-success'),
+      null,
+      'no group pill in progressive'
+    );
+    assert.equal(
+      root.querySelector('.manager-recipe-flow-qty'),
+      null,
+      'no quantity in progressive'
+    );
 
     // Each row shows the component's DC, in authoring order (8, 14, 8 — the herb twice).
-    const dcs = [...root.querySelectorAll('[data-recipe-produces-dc]')].map((el) => el.textContent.trim());
+    const dcs = [...root.querySelectorAll('[data-recipe-produces-dc]')].map((el) =>
+      el.textContent.trim()
+    );
     assert.deepEqual(dcs, ['DC 8', 'DC 14', 'DC 8']);
   });
 
@@ -1439,14 +1610,23 @@ describe('RecipeBrowserInspector (mounted)', () => {
         checkSummary: { kind: 'progressive', dc: null },
         resultItemCount: 1,
         resultGroupCount: 1,
-        resultGroups: [{ id: 'g1', name: 'Result Group 1', results: [{ id: 'a', componentId: 'cmp-herb', quantity: 1 }] }]
+        resultGroups: [
+          {
+            id: 'g1',
+            name: 'Result Group 1',
+            results: [{ id: 'a', componentId: 'cmp-herb', quantity: 1 }],
+          },
+        ],
       }),
       resolutionMode: 'progressive',
       recipeCount: 1,
-      componentOptions: [{ id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' }]
+      componentOptions: [{ id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' }],
     });
 
-    assert.equal(root.querySelector('[data-recipe-produces-dc]').textContent.trim(), 'No difficulty');
+    assert.equal(
+      root.querySelector('[data-recipe-produces-dc]').textContent.trim(),
+      'No difficulty'
+    );
   });
 
   it('routed by check: full-width collapsible outcome-tier sections named by tier, collapsed by default', async () => {
@@ -1463,24 +1643,24 @@ describe('RecipeBrowserInspector (mounted)', () => {
             checkOutcomeIds: ['t-std'],
             results: [
               { id: 'a', componentId: 'cmp-herb', quantity: 1 },
-              { id: 'b', componentId: 'cmp-potion', quantity: 2 }
-            ]
+              { id: 'b', componentId: 'cmp-potion', quantity: 2 },
+            ],
           },
           {
             id: 'g2',
             name: 'Result Group 2',
             checkOutcomeIds: ['t-master'],
-            results: [{ id: 'c', componentId: 'cmp-potion', quantity: 1 }]
-          }
-        ]
+            results: [{ id: 'c', componentId: 'cmp-potion', quantity: 1 }],
+          },
+        ],
       }),
       resolutionMode: 'routedByCheck',
       outcomeTiers: [
         { id: 't-std', name: 'Standard' },
-        { id: 't-master', name: 'Masterwork' }
+        { id: 't-master', name: 'Masterwork' },
       ],
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     const tiers = [...root.querySelectorAll('[data-recipe-produces-group]')];
@@ -1502,14 +1682,26 @@ describe('RecipeBrowserInspector (mounted)', () => {
     heads[0].click();
     flushSync();
     assert.equal(heads[0].getAttribute('aria-expanded'), 'true');
-    assert.equal(tiers[0].querySelectorAll('[data-recipe-produces]').length, 2, 'the tier reveals its two items');
-    assert.equal(tiers[1].querySelectorAll('[data-recipe-produces]').length, 0, 'other tiers remain collapsed');
+    assert.equal(
+      tiers[0].querySelectorAll('[data-recipe-produces]').length,
+      2,
+      'the tier reveals its two items'
+    );
+    assert.equal(
+      tiers[1].querySelectorAll('[data-recipe-produces]').length,
+      0,
+      'other tiers remain collapsed'
+    );
     assert.equal(
       tiers[0].querySelector('[data-recipe-produces] .manager-recipe-flow-group'),
       null,
       'no per-row group pill inside an expanded tier'
     );
-    assert.match(tiers[0].textContent, /×2/, 'quantities still show (routed-by-check is not progressive)');
+    assert.match(
+      tiers[0].textContent,
+      /×2/,
+      'quantities still show (routed-by-check is not progressive)'
+    );
   });
 
   it('multi-step: paginates one step at a time with its own Requires/Produces and an (x/y) hint', async () => {
@@ -1521,19 +1713,63 @@ describe('RecipeBrowserInspector (mounted)', () => {
           {
             id: 's1',
             name: 'Prepare',
-            ingredientSets: [{ id: 'set1', ingredientGroups: [{ id: 'ig1', options: [{ id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
-            resultGroups: [{ id: 'g1', name: 'Base', results: [{ id: 'r1', componentId: 'cmp-potion', quantity: 1 }] }]
+            ingredientSets: [
+              {
+                id: 'set1',
+                ingredientGroups: [
+                  {
+                    id: 'ig1',
+                    options: [
+                      {
+                        id: 'o1',
+                        quantity: 2,
+                        match: { type: 'component', componentId: 'cmp-herb' },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+            resultGroups: [
+              {
+                id: 'g1',
+                name: 'Base',
+                results: [{ id: 'r1', componentId: 'cmp-potion', quantity: 1 }],
+              },
+            ],
           },
           {
             id: 's2',
             name: 'Finish',
-            ingredientSets: [{ id: 'set2', ingredientGroups: [{ id: 'ig2', options: [{ id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-potion' } }] }] }],
-            resultGroups: [{ id: 'g2', name: 'Final', results: [{ id: 'r2', componentId: 'cmp-herb', quantity: 3 }] }]
-          }
-        ]
+            ingredientSets: [
+              {
+                id: 'set2',
+                ingredientGroups: [
+                  {
+                    id: 'ig2',
+                    options: [
+                      {
+                        id: 'o2',
+                        quantity: 1,
+                        match: { type: 'component', componentId: 'cmp-potion' },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+            resultGroups: [
+              {
+                id: 'g2',
+                name: 'Final',
+                results: [{ id: 'r2', componentId: 'cmp-herb', quantity: 3 }],
+              },
+            ],
+          },
+        ],
       }),
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     // A pager with the step name and an (x / y) hint; only the FIRST step is shown.
@@ -1555,7 +1791,11 @@ describe('RecipeBrowserInspector (mounted)', () => {
 
     assert.equal(root.querySelector('[data-recipe-step-name]').textContent.trim(), 'Finish');
     assert.equal(root.querySelector('[data-recipe-step-count]').textContent.trim(), '2 / 2');
-    assert.equal(root.querySelector('[data-recipe-step-next]').disabled, true, 'Next is disabled on the last step');
+    assert.equal(
+      root.querySelector('[data-recipe-step-next]').disabled,
+      true,
+      'Next is disabled on the last step'
+    );
     // Step 2 requires the potion and produces the herb (×3).
     const produces = [...root.querySelectorAll('[data-recipe-produces]')];
     assert.equal(produces.length, 1);
@@ -1570,23 +1810,46 @@ describe('RecipeBrowserInspector (mounted)', () => {
         resultItemCount: 2,
         resultGroupCount: 2,
         resultGroups: [
-          { id: 'g-succ', name: 'Result Group 1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] },
-          { id: 'g-fail', name: 'Result Group 2', role: 'failure', results: [{ id: 'b', componentId: 'cmp-herb', quantity: 1 }] }
-        ]
+          {
+            id: 'g-succ',
+            name: 'Result Group 1',
+            results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }],
+          },
+          {
+            id: 'g-fail',
+            name: 'Result Group 2',
+            role: 'failure',
+            results: [{ id: 'b', componentId: 'cmp-herb', quantity: 1 }],
+          },
+        ],
       }),
       resolutionMode: 'alchemy',
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     const sections = [...root.querySelectorAll('[data-recipe-produces-outcome]')];
-    assert.deepEqual(sections.map((s) => s.dataset.recipeProducesOutcome), ['success', 'failure']);
+    assert.deepEqual(
+      sections.map((s) => s.dataset.recipeProducesOutcome),
+      ['success', 'failure']
+    );
     const heads = sections.map((s) => s.querySelector('.manager-recipe-produces-outcome-head'));
-    assert.deepEqual(heads.map((h) => h.textContent.trim()), ['Success', 'Failure']);
+    assert.deepEqual(
+      heads.map((h) => h.textContent.trim()),
+      ['Success', 'Failure']
+    );
     assert.ok(heads[0].classList.contains('is-success'));
     assert.ok(heads[1].classList.contains('is-failure'));
-    assert.match(sections[0].textContent, /Healing Potion/, 'success section shows the success item');
-    assert.match(sections[1].textContent, /Mountain Herb/, 'failure section shows the failure item');
+    assert.match(
+      sections[0].textContent,
+      /Healing Potion/,
+      'success section shows the success item'
+    );
+    assert.match(
+      sections[1].textContent,
+      /Mountain Herb/,
+      'failure section shows the failure item'
+    );
     assert.doesNotMatch(
       root.querySelector('.manager-recipe-flow-list').textContent,
       /Result Group/,
@@ -1599,17 +1862,29 @@ describe('RecipeBrowserInspector (mounted)', () => {
       selectedRecipe: makeRecipe({
         id: 'r-simple',
         checkSummary: { kind: 'dc', dc: 16 },
-        resultGroups: [{ id: 'g-succ', name: 'Result Group 1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] }]
+        resultGroups: [
+          {
+            id: 'g-succ',
+            name: 'Result Group 1',
+            results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }],
+          },
+        ],
       }),
       resolutionMode: 'simple',
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
 
     const sections = [...root.querySelectorAll('[data-recipe-produces-outcome]')];
-    assert.deepEqual(sections.map((s) => s.dataset.recipeProducesOutcome), ['success', 'failure']);
+    assert.deepEqual(
+      sections.map((s) => s.dataset.recipeProducesOutcome),
+      ['success', 'failure']
+    );
     assert.match(sections[0].textContent, /Healing Potion/, 'success shows the produced item');
-    assert.ok(root.querySelector('[data-recipe-outcome-empty="failure"]'), 'failure shows a No-results state');
+    assert.ok(
+      root.querySelector('[data-recipe-outcome-empty="failure"]'),
+      'failure shows a No-results state'
+    );
     assert.match(sections[1].textContent, /No results/);
   });
 
@@ -1618,13 +1893,19 @@ describe('RecipeBrowserInspector (mounted)', () => {
       selectedRecipe: makeRecipe({
         id: 'r-simple-nocheck',
         checkSummary: { kind: 'none', dc: null },
-        resultGroups: [{ id: 'g1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] }]
+        resultGroups: [
+          { id: 'g1', results: [{ id: 'a', componentId: 'cmp-potion', quantity: 1 }] },
+        ],
       }),
       resolutionMode: 'simple',
       recipeCount: 1,
-      componentOptions: INSPECTOR_COMPONENTS
+      componentOptions: INSPECTOR_COMPONENTS,
     });
-    assert.equal(root.querySelector('[data-recipe-produces-outcome]'), null, 'no outcome sections without a check');
+    assert.equal(
+      root.querySelector('[data-recipe-produces-outcome]'),
+      null,
+      'no outcome sections without a check'
+    );
     assert.match(root.querySelector('.manager-recipe-flow-list').textContent, /Healing Potion/);
   });
 
@@ -1634,11 +1915,11 @@ describe('RecipeBrowserInspector (mounted)', () => {
     harness: inspector,
     mountProps: (imageOverrides) => ({
       selectedRecipe: makeRecipe({ id: 'r1', ...imageOverrides }),
-      recipeCount: 1
+      recipeCount: 1,
     }),
     selectImg: (root) =>
       root
         .querySelector('.manager-recipe-browser-inspector-hero .fab-medallion-img')
-        .getAttribute('src')
+        .getAttribute('src'),
   });
 });

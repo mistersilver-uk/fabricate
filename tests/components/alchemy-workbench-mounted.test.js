@@ -10,10 +10,16 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 // Standalone fixture constants (NO model imports) so the mounted graph stays on
 // the harness allowlist (importing a model would hang the suite as # cancelled).
 const ESSENCES = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 }];
-const RESULT = { componentId: 'out', name: 'Vigor Elixir', img: null, quantity: 1, essences: ESSENCES };
+const RESULT = {
+  componentId: 'out',
+  name: 'Vigor Elixir',
+  img: null,
+  quantity: 1,
+  essences: ESSENCES,
+};
 const BENCH = [{ componentId: 'emberroot', name: 'Emberroot', img: null, qty: 1 }];
 const BENCH_WITH_ESSENCES = [
-  { componentId: 'emberroot', name: 'Emberroot', img: null, qty: 2, essences: ESSENCES }
+  { componentId: 'emberroot', name: 'Emberroot', img: null, qty: 2, essences: ESSENCES },
 ];
 
 const harness = createMountedComponentHarness({
@@ -22,9 +28,9 @@ const harness = createMountedComponentHarness({
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [
     'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
-    'src/ui/svelte/apps/alchemy/Workbench.svelte'
+    'src/ui/svelte/apps/alchemy/Workbench.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/alchemy/Workbench.svelte'
+  componentPath: 'src/ui/svelte/apps/alchemy/Workbench.svelte',
 });
 
 function brewButton(target) {
@@ -52,10 +58,13 @@ describe('Workbench (mounted)', () => {
       benchEmpty: false,
       benchChips: BENCH,
       result: RESULT,
-      brewEnabled: true
+      brewEnabled: true,
     });
     assert.equal(statusPill(target).getAttribute('data-alchemy-status'), 'ready');
-    assert.ok(statusPill(target).textContent.includes('Elixir of Vigor'), 'status names the ready recipe');
+    assert.ok(
+      statusPill(target).textContent.includes('Elixir of Vigor'),
+      'status names the ready recipe'
+    );
     assert.equal(brewButton(target).disabled, false, 'ready mode enables Brew');
     assert.equal(target.querySelector('[data-alchemy-status]').getAttribute('aria-live'), 'polite');
   });
@@ -66,7 +75,7 @@ describe('Workbench (mounted)', () => {
       targetName: 'Elixir of Vigor',
       benchEmpty: false,
       benchChips: BENCH,
-      brewEnabled: false
+      brewEnabled: false,
     });
     assert.equal(brewButton(target).disabled, true);
   });
@@ -76,7 +85,7 @@ describe('Workbench (mounted)', () => {
       mode: 'untried',
       benchEmpty: false,
       benchChips: BENCH,
-      brewEnabled: true
+      brewEnabled: true,
     });
     assert.equal(brewButton(target).disabled, false, 'untried can experiment');
     // The untried Produces panel must NOT confirm a reaction or name any hidden
@@ -84,7 +93,10 @@ describe('Workbench (mounted)', () => {
     const html = target.innerHTML;
     assert.ok(!html.includes('SECRET_UNDISCOVERED'), 'no undiscovered recipe name leaks');
     assert.ok(!html.includes('Vigor Elixir'), 'no result is shown for an untried bench');
-    assert.ok(target.querySelector('[data-alchemy-unknown]'), 'the neutral unknown-outcome card is shown');
+    assert.ok(
+      target.querySelector('[data-alchemy-unknown]'),
+      'the neutral unknown-outcome card is shown'
+    );
   });
 
   it('brew-in-flight disables Brew even when the mode would enable it', async () => {
@@ -95,7 +107,7 @@ describe('Workbench (mounted)', () => {
       benchChips: BENCH,
       result: RESULT,
       brewEnabled: true,
-      brewInFlight: true
+      brewInFlight: true,
     });
     assert.equal(brewButton(target).disabled, true, 'in-flight guard blocks double-submit');
   });
@@ -111,7 +123,7 @@ describe('Workbench (mounted)', () => {
       benchChips: BENCH,
       onAdd: (id) => calls.push(['add', id]),
       onRemoveOne: (id) => calls.push(['removeOne', id]),
-      onRemoveAll: (id) => calls.push(['removeAll', id])
+      onRemoveAll: (id) => calls.push(['removeAll', id]),
     });
   }
 
@@ -126,18 +138,29 @@ describe('Workbench (mounted)', () => {
     const calls = [];
     const target = await mountChip(calls);
     const chip = target.querySelector('[data-alchemy-chip="emberroot"]');
-    chip.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     chip.dispatchEvent(
-      new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true })
+      new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
     );
-    assert.deepEqual(calls, [['add', 'emberroot'], ['removeOne', 'emberroot']]);
+    chip.dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', {
+        key: 'Enter',
+        shiftKey: true,
+        bubbles: true,
+      })
+    );
+    assert.deepEqual(calls, [
+      ['add', 'emberroot'],
+      ['removeOne', 'emberroot'],
+    ]);
   });
 
   it('chip right-click (contextmenu) REMOVES one', async () => {
     const calls = [];
     const target = await mountChip(calls);
     const chip = target.querySelector('[data-alchemy-chip="emberroot"]');
-    chip.dispatchEvent(new globalThis.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    chip.dispatchEvent(
+      new globalThis.window.MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+    );
     assert.deepEqual(calls, [['removeOne', 'emberroot']]);
   });
 
@@ -164,7 +187,9 @@ describe('Workbench (mounted)', () => {
     const removeAll = target.querySelector('[data-alchemy-chip-remove="emberroot"]');
     // A real activation dispatches keydown (bubbling) AND the native click; the
     // guard must let the click through while ignoring the bubbled keydown.
-    removeAll.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    removeAll.dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    );
     removeAll.click();
     assert.deepEqual(calls, [['removeAll', 'emberroot']], 'Enter on × removes all and never adds');
   });
@@ -173,7 +198,9 @@ describe('Workbench (mounted)', () => {
     const calls = [];
     const target = await mountChip(calls);
     const removeOne = target.querySelector('[data-alchemy-chip-remove-one="emberroot"]');
-    removeOne.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    removeOne.dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    );
     removeOne.click();
     assert.deepEqual(calls, [['removeOne', 'emberroot']], 'Enter on − removes one and never adds');
   });
@@ -182,7 +209,7 @@ describe('Workbench (mounted)', () => {
     const target = await harness.mount({
       mode: 'untried',
       benchEmpty: false,
-      benchChips: BENCH_WITH_ESSENCES
+      benchChips: BENCH_WITH_ESSENCES,
     });
     const chip = target.querySelector('[data-alchemy-chip="emberroot"]');
     const essence = chip.querySelector('[data-alchemy-essence="fire"]');
@@ -201,8 +228,8 @@ describe('Workbench (mounted)', () => {
       signatureText: 'Emberroot ×2',
       benchEssences: [
         { id: 'toxic', name: 'Toxic', icon: 'fas fa-skull', quantity: 4 },
-        { id: 'water', name: 'Water', icon: 'fas fa-droplet', quantity: 1 }
-      ]
+        { id: 'water', name: 'Water', icon: 'fas fa-droplet', quantity: 1 },
+      ],
     });
     const readout = target.querySelector('[data-alchemy-bench-essences]');
     assert.ok(readout, 'the aggregate essence readout renders');
@@ -220,7 +247,7 @@ describe('Workbench (mounted)', () => {
       mode: 'untried',
       benchEmpty: false,
       benchChips: BENCH,
-      benchEssences: []
+      benchEssences: [],
     });
     assert.equal(
       target.querySelector('[data-alchemy-bench-essences]'),
@@ -236,7 +263,7 @@ describe('Workbench (mounted)', () => {
       benchEmpty: false,
       benchChips: BENCH,
       result: RESULT,
-      brewEnabled: true
+      brewEnabled: true,
     });
     const essence = target.querySelector('[data-alchemy-result] [data-alchemy-essence="fire"]');
     assert.ok(essence, 'the Produces result surfaces essence chips');

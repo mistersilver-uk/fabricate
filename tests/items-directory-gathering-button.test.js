@@ -20,7 +20,7 @@ function setupDirectory() {
   return {
     document,
     itemsDirectory: { element: root },
-    actions: root.querySelector('.header-actions')
+    actions: root.querySelector('.header-actions'),
   };
 }
 
@@ -40,12 +40,12 @@ test('syncGatheringDirectoryButton inserts the Gathering button when gathering b
     itemsDirectory,
     enabled: true,
     createButton: () => createGatheringButton(document),
-    documentRef: document
+    documentRef: document,
   });
 
   assert.ok(actions.querySelector('[data-fabricate-action="gathering"]'));
   assert.deepEqual(
-    Array.from(actions.querySelectorAll('button')).map(button => button.dataset.fabricateAction),
+    Array.from(actions.querySelectorAll('button')).map((button) => button.dataset.fabricateAction),
     ['gathering', 'craft']
   );
 });
@@ -57,13 +57,13 @@ test('syncGatheringDirectoryButton removes a stale Gathering button when gatheri
     itemsDirectory,
     enabled: true,
     createButton: () => createGatheringButton(document),
-    documentRef: document
+    documentRef: document,
   });
   syncGatheringDirectoryButton({
     itemsDirectory,
     enabled: false,
     createButton: () => createGatheringButton(document),
-    documentRef: document
+    documentRef: document,
   });
 
   assert.equal(actions.querySelector('[data-fabricate-action="gathering"]'), null);
@@ -77,13 +77,13 @@ test('syncGatheringDirectoryButton does not duplicate an existing Gathering butt
     itemsDirectory,
     enabled: true,
     createButton: () => createGatheringButton(document),
-    documentRef: document
+    documentRef: document,
   });
   syncGatheringDirectoryButton({
     itemsDirectory,
     enabled: true,
     createButton: () => createGatheringButton(document),
-    documentRef: document
+    documentRef: document,
   });
 
   assert.equal(actions.querySelectorAll('[data-fabricate-action="gathering"]').length, 1);

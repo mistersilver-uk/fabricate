@@ -18,11 +18,11 @@ globalThis.foundry = {
             } catch (_) {
               return null;
             }
-          }
-        }
-      }
-    }
-  }
+          },
+        },
+      },
+    },
+  },
 };
 
 const { dragDrop } = await import('../../src/ui/svelte/actions/dragDrop.js');
@@ -41,17 +41,25 @@ function makeNode(children = []) {
     },
     removeEventListener(type, fn) {
       if (listeners[type]) {
-        listeners[type] = listeners[type].filter(f => f !== fn);
+        listeners[type] = listeners[type].filter((f) => f !== fn);
       }
     },
     classList: {
-      add(cls) { classes.add(cls); },
-      remove(cls) { classes.delete(cls); },
-      has(cls) { return classes.has(cls); }
+      add(cls) {
+        classes.add(cls);
+      },
+      remove(cls) {
+        classes.delete(cls);
+      },
+      has(cls) {
+        return classes.has(cls);
+      },
     },
-    contains(target) { return children.includes(target); },
+    contains(target) {
+      return children.includes(target);
+    },
     _listeners: listeners,
-    _classes: classes
+    _classes: classes,
   };
 }
 
@@ -61,12 +69,12 @@ function makeDragEvent(type, { relatedTarget = null, data = null } = {}) {
     type,
     preventDefault: () => {},
     relatedTarget,
-    dataTransfer: { getData: () => raw }
+    dataTransfer: { getData: () => raw },
   };
 }
 
 function fire(node, type, event) {
-  for (const fn of (node._listeners[type] ?? [])) {
+  for (const fn of node._listeners[type] ?? []) {
     fn(event);
   }
 }
@@ -114,7 +122,10 @@ describe('DropZone DOM and Behavior', () => {
     icon.className = 'fas fa-plus-circle';
     div.appendChild(icon);
 
-    assert.ok(div.querySelector('i.fas.fa-plus-circle'), 'custom icon class is applied to i element');
+    assert.ok(
+      div.querySelector('i.fas.fa-plus-circle'),
+      'custom icon class is applied to i element'
+    );
     assert.equal(div.querySelector('i').className, 'fas fa-plus-circle');
   });
 
@@ -165,7 +176,10 @@ describe('DropZone DOM and Behavior', () => {
 
     fire(div, 'dragleave', makeDragEvent('dragleave', { relatedTarget: child }));
 
-    assert.ok(div._classes.has('drop-active'), 'drop-active NOT removed when leaving to a child element');
+    assert.ok(
+      div._classes.has('drop-active'),
+      'drop-active NOT removed when leaving to a child element'
+    );
   });
 
   // Test 7: removes drop-active class on drop and calls onDrop with data
@@ -187,7 +201,11 @@ describe('DropZone DOM and Behavior', () => {
   // Test 8: does not call onDrop when drag data is null
   it('does not call onDrop when drag data is null', () => {
     let called = false;
-    const { div } = buildDropZone({ onDrop: () => { called = true; } });
+    const { div } = buildDropZone({
+      onDrop: () => {
+        called = true;
+      },
+    });
 
     fire(div, 'drop', makeDragEvent('drop', { data: null }));
 
@@ -198,8 +216,16 @@ describe('DropZone DOM and Behavior', () => {
   it('does not attach listeners when disabled is true', () => {
     const { div } = buildDropZone({ onDrop: () => {}, disabled: true });
 
-    assert.equal((div._listeners['dragover'] ?? []).length, 0, 'no dragover listener when disabled');
-    assert.equal((div._listeners['dragleave'] ?? []).length, 0, 'no dragleave listener when disabled');
+    assert.equal(
+      (div._listeners['dragover'] ?? []).length,
+      0,
+      'no dragover listener when disabled'
+    );
+    assert.equal(
+      (div._listeners['dragleave'] ?? []).length,
+      0,
+      'no dragleave listener when disabled'
+    );
     assert.equal((div._listeners['drop'] ?? []).length, 0, 'no drop listener when disabled');
   });
 });

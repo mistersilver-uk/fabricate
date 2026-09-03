@@ -10,11 +10,14 @@ import { GatheringLocationService } from '../src/systems/GatheringLocationServic
  * `GatheringEngine._locationBlockedReasons`. So there is no `systemId` and no gate here.
  */
 function makeService({ parties = [], realms = [], senseSceneRegions } = {}) {
-  const partyMap = new Map(parties.map(p => [p.id, p]));
+  const partyMap = new Map(parties.map((p) => [p.id, p]));
   const partyStore = {
-    get: id => partyMap.get(id) || null,
-    findEnabledPartyForActor: uuid => parties.find(p => p.enabled
-      && (p.travelActorUuid === uuid || (p.memberActorUuids || []).includes(uuid))) || null
+    get: (id) => partyMap.get(id) || null,
+    findEnabledPartyForActor: (uuid) =>
+      parties.find(
+        (p) =>
+          p.enabled && (p.travelActorUuid === uuid || (p.memberActorUuids || []).includes(uuid))
+      ) || null,
   };
   const travelStore = { list: () => realms };
   return new GatheringLocationService({ partyStore, travelStore, senseSceneRegions });
@@ -23,13 +26,15 @@ function makeService({ parties = [], realms = [], senseSceneRegions } = {}) {
 const realms = [
   { id: 'r1', name: 'Verdant', enabled: true },
   { id: 'r2', name: 'Ashen', enabled: true },
-  { id: 'r-disabled', name: 'Closed', enabled: false }
+  { id: 'r-disabled', name: 'Closed', enabled: false },
 ];
 
 test('manual override resolves with source manualOverride', () => {
   const service = makeService({
     realms,
-    parties: [{ id: 'p1', enabled: true, currentRealmOverride: { mode: 'manual', realmIds: ['r1'] } }]
+    parties: [
+      { id: 'p1', enabled: true, currentRealmOverride: { mode: 'manual', realmIds: ['r1'] } },
+    ],
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, true);
@@ -44,7 +49,9 @@ test('the override is no longer keyed by crafting system — a party is in ONE p
   // per party and the resolver stopped taking a system at all.
   const service = makeService({
     realms,
-    parties: [{ id: 'p1', enabled: true, currentRealmOverride: { mode: 'manual', realmIds: ['r1'] } }]
+    parties: [
+      { id: 'p1', enabled: true, currentRealmOverride: { mode: 'manual', realmIds: ['r1'] } },
+    ],
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, true);
@@ -55,7 +62,7 @@ test('the override is no longer keyed by crafting system — a party is in ONE p
 test('mode none resolves to unresolved', () => {
   const service = makeService({
     realms,
-    parties: [{ id: 'p1', enabled: true, currentRealmOverride: { mode: 'none', realmIds: [] } }]
+    parties: [{ id: 'p1', enabled: true, currentRealmOverride: { mode: 'none', realmIds: [] } }],
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, false);
@@ -71,7 +78,13 @@ test('no party resolves to unresolved', () => {
 test('disabled realm in a manual override still resolves (GM diagnostic inclusion)', () => {
   const service = makeService({
     realms,
-    parties: [{ id: 'p1', enabled: true, currentRealmOverride: { mode: 'manual', realmIds: ['r-disabled'] } }]
+    parties: [
+      {
+        id: 'p1',
+        enabled: true,
+        currentRealmOverride: { mode: 'manual', realmIds: ['r-disabled'] },
+      },
+    ],
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, true);
@@ -81,7 +94,9 @@ test('disabled realm in a manual override still resolves (GM diagnostic inclusio
 test('missing realm id surfaces as staleRealmIds and does not resolve', () => {
   const service = makeService({
     realms,
-    parties: [{ id: 'p1', enabled: true, currentRealmOverride: { mode: 'manual', realmIds: ['r-gone'] } }]
+    parties: [
+      { id: 'p1', enabled: true, currentRealmOverride: { mode: 'manual', realmIds: ['r-gone'] } },
+    ],
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, false);
@@ -92,7 +107,13 @@ test('missing realm id surfaces as staleRealmIds and does not resolve', () => {
 test('mixed missing + valid realm ids resolve the valid ones and report stale', () => {
   const service = makeService({
     realms,
-    parties: [{ id: 'p1', enabled: true, currentRealmOverride: { mode: 'manual', realmIds: ['r1', 'r-gone'] } }]
+    parties: [
+      {
+        id: 'p1',
+        enabled: true,
+        currentRealmOverride: { mode: 'manual', realmIds: ['r1', 'r-gone'] },
+      },
+    ],
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, true);
@@ -103,7 +124,15 @@ test('mixed missing + valid realm ids resolve the valid ones and report stale', 
 test('resolveForActor uses findEnabledPartyForActor', () => {
   const service = makeService({
     realms,
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.alice'], travelActorUuid: 'Actor.t1', currentRealmOverride: { mode: 'manual', realmIds: ['r2'] } }]
+    parties: [
+      {
+        id: 'p1',
+        enabled: true,
+        memberActorUuids: ['Actor.alice'],
+        travelActorUuid: 'Actor.t1',
+        currentRealmOverride: { mode: 'manual', realmIds: ['r2'] },
+      },
+    ],
   });
   const result = service.resolveForActor({ actor: { uuid: 'Actor.alice' } });
   assert.equal(result.resolved, true);
@@ -113,7 +142,7 @@ test('resolveForActor uses findEnabledPartyForActor', () => {
 test('resolveForActor returns unresolved when the actor is in no enabled party', () => {
   const service = makeService({
     realms,
-    parties: [{ id: 'p1', enabled: false, memberActorUuids: ['Actor.alice'] }]
+    parties: [{ id: 'p1', enabled: false, memberActorUuids: ['Actor.alice'] }],
   });
   const result = service.resolveForActor({ actor: { uuid: 'Actor.alice' } });
   assert.equal(result.resolved, false);
@@ -124,7 +153,13 @@ test('resolveForActor returns unresolved when the actor is in no enabled party',
 // Toggle disabled: every resolver entry point fast-exits to unresolved-empty.
 // ---------------------------------------------------------------------------
 
-const overrideParty = { id: 'p1', enabled: true, memberActorUuids: ['Actor.alice'], travelActorUuid: 'Actor.t1', currentRealmOverride: { mode: 'manual', realmIds: ['r1'] } };
+const overrideParty = {
+  id: 'p1',
+  enabled: true,
+  memberActorUuids: ['Actor.alice'],
+  travelActorUuid: 'Actor.t1',
+  currentRealmOverride: { mode: 'manual', realmIds: ['r1'] },
+};
 
 // The three tests that stood here asserted the resolver fast-exiting when a system's travel
 // toggle was off. That gate MOVED in issue 1282: where a party is standing does not depend on
@@ -152,7 +187,10 @@ test('buildCurrentRealmContext is the same answer, ungated', () => {
   const result = service.buildCurrentRealmContext({ actor: { uuid: 'Actor.alice' } });
 
   assert.equal(result.resolved, true);
-  assert.deepEqual(result.realms.map((realm) => realm.id), ['r1']);
+  assert.deepEqual(
+    result.realms.map((realm) => realm.id),
+    ['r1']
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -161,16 +199,26 @@ test('buildCurrentRealmContext is the same answer, ungated', () => {
 // ---------------------------------------------------------------------------
 
 const mappedRealms = [
-  { id: 'r1', name: 'Verdant', enabled: true, sceneMappings: [{ sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Realm.a' }] },
-  { id: 'r2', name: 'Ashen', enabled: true, sceneMappings: [{ sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Realm.b' }] },
-  { id: 'r3', name: 'Unmapped', enabled: true, sceneMappings: [] }
+  {
+    id: 'r1',
+    name: 'Verdant',
+    enabled: true,
+    sceneMappings: [{ sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Realm.a' }],
+  },
+  {
+    id: 'r2',
+    name: 'Ashen',
+    enabled: true,
+    sceneMappings: [{ sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Realm.b' }],
+  },
+  { id: 'r3', name: 'Unmapped', enabled: true, sceneMappings: [] },
 ];
 
 test('auto: marker inside a linked Scene Realm resolves the Fabricate realm (source travelActor)', () => {
   const service = makeService({
     realms: mappedRealms,
     parties: [{ id: 'p1', enabled: true, travelActorUuid: 'Actor.m1', currentRealmOverride: null }],
-    senseSceneRegions: (uuid) => (uuid === 'Actor.m1' ? ['Scene.s1.Realm.a'] : [])
+    senseSceneRegions: (uuid) => (uuid === 'Actor.m1' ? ['Scene.s1.Realm.a'] : []),
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, true);
@@ -181,20 +229,37 @@ test('auto: marker inside a linked Scene Realm resolves the Fabricate realm (sou
 test('auto: marker inside multiple linked Scene Realms resolves all matching Fabricate realms', () => {
   const service = makeService({
     realms: mappedRealms,
-    parties: [{ id: 'p1', enabled: true, travelActorUuid: 'Actor.m1', currentRealmOverride: { mode: 'none', realmIds: [] } }],
-    senseSceneRegions: () => new Set(['Scene.s1.Realm.a', 'Scene.s1.Realm.b'])
+    parties: [
+      {
+        id: 'p1',
+        enabled: true,
+        travelActorUuid: 'Actor.m1',
+        currentRealmOverride: { mode: 'none', realmIds: [] },
+      },
+    ],
+    senseSceneRegions: () => new Set(['Scene.s1.Realm.a', 'Scene.s1.Realm.b']),
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, true);
   assert.equal(result.source, 'travelActor');
-  assert.deepEqual([...result.realmIds].sort((a, b) => a.localeCompare(b)), ['r1', 'r2']);
+  assert.deepEqual(
+    [...result.realmIds].sort((a, b) => a.localeCompare(b)),
+    ['r1', 'r2']
+  );
 });
 
 test('auto: a manual override still wins over live sensing', () => {
   const service = makeService({
     realms: mappedRealms,
-    parties: [{ id: 'p1', enabled: true, travelActorUuid: 'Actor.m1', currentRealmOverride: { mode: 'manual', realmIds: ['r2'] } }],
-    senseSceneRegions: () => ['Scene.s1.Realm.a']
+    parties: [
+      {
+        id: 'p1',
+        enabled: true,
+        travelActorUuid: 'Actor.m1',
+        currentRealmOverride: { mode: 'manual', realmIds: ['r2'] },
+      },
+    ],
+    senseSceneRegions: () => ['Scene.s1.Realm.a'],
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.source, 'manualOverride');
@@ -205,7 +270,7 @@ test('auto: marker in no linked Scene Realm resolves to unresolved', () => {
   const service = makeService({
     realms: mappedRealms,
     parties: [{ id: 'p1', enabled: true, travelActorUuid: 'Actor.m1', currentRealmOverride: null }],
-    senseSceneRegions: () => ['Scene.s1.Realm.unmapped']
+    senseSceneRegions: () => ['Scene.s1.Realm.unmapped'],
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, false);
@@ -217,7 +282,10 @@ test('auto: a travel-actor-less party resolves to unresolved (no sensing attempt
   const service = makeService({
     realms: mappedRealms,
     parties: [{ id: 'p1', enabled: true, currentRealmOverride: null }],
-    senseSceneRegions: () => { sensed = true; return ['Scene.s1.Realm.a']; }
+    senseSceneRegions: () => {
+      sensed = true;
+      return ['Scene.s1.Realm.a'];
+    },
   });
   const result = service.resolveCurrentRealms({ partyId: 'p1' });
   assert.equal(result.resolved, false);
@@ -227,8 +295,16 @@ test('auto: a travel-actor-less party resolves to unresolved (no sensing attempt
 test('auto: resolveForActor derives the realm from the party marker for a member', () => {
   const service = makeService({
     realms: mappedRealms,
-    parties: [{ id: 'p1', enabled: true, memberActorUuids: ['Actor.alice'], travelActorUuid: 'Actor.m1', currentRealmOverride: null }],
-    senseSceneRegions: (uuid) => (uuid === 'Actor.m1' ? ['Scene.s1.Realm.b'] : [])
+    parties: [
+      {
+        id: 'p1',
+        enabled: true,
+        memberActorUuids: ['Actor.alice'],
+        travelActorUuid: 'Actor.m1',
+        currentRealmOverride: null,
+      },
+    ],
+    senseSceneRegions: (uuid) => (uuid === 'Actor.m1' ? ['Scene.s1.Realm.b'] : []),
   });
   const result = service.resolveForActor({ actor: { uuid: 'Actor.alice' } });
   assert.equal(result.resolved, true);

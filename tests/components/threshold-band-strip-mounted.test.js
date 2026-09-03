@@ -262,7 +262,11 @@ describe('ThresholdBandStrip: bounds and the clamp', () => {
     press(handles(root)[0], 'Home');
     assert.deepEqual(writes.at(-1), { binding: 'relative', index: 1, dc: -9 }, 'absolute 3, not 2');
     press(handles(root).at(-1), 'End');
-    assert.deepEqual(writes.at(-1), { binding: 'relative', index: 4, dc: 14 }, 'absolute 26, not 27');
+    assert.deepEqual(
+      writes.at(-1),
+      { binding: 'relative', index: 4, dc: 14 },
+      'absolute 26, not 27'
+    );
   });
 
   it('takes the fixed domain from the authored span, whose last band ends INCLUSIVELY', async () => {

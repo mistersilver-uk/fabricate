@@ -52,7 +52,6 @@ function resolveLocalModule(importerPath, specifier) {
   return match ? relative(repoRoot, match).replaceAll('\\', '/') : null;
 }
 
-
 /**
  * Create a temp compiler for a single test suite.
  *

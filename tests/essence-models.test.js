@@ -370,7 +370,11 @@ describe('1036 — essenceEditorValidation', () => {
       { componentUsageCount: 4, recipeUsageCount: 2 }
     );
     assert.equal(check(result, 'usage').state, 'disabled-in-use');
-    assert.equal(check(result, 'usage').valid, true, 'the headline state of this feature is not a defect');
+    assert.equal(
+      check(result, 'usage').valid,
+      true,
+      'the headline state of this feature is not a defect'
+    );
     assert.deepEqual(result.counts, { passing: 7, warnings: 0, blocking: 0 });
   });
 
@@ -386,10 +390,31 @@ describe('1036 — essenceEditorValidation', () => {
 
 describe('1036 — essenceBrowserModel', () => {
   const ROWS = [
-    { id: 'fire', name: 'Fire', enabled: true, sourceState: 'linked', componentUsageCount: 3, recipeUsageCount: 1 },
-    { id: 'water', name: 'Water', enabled: false, sourceState: 'stale', componentUsageCount: 1, recipeUsageCount: 4 },
+    {
+      id: 'fire',
+      name: 'Fire',
+      enabled: true,
+      sourceState: 'linked',
+      componentUsageCount: 3,
+      recipeUsageCount: 1,
+    },
+    {
+      id: 'water',
+      name: 'Water',
+      enabled: false,
+      sourceState: 'stale',
+      componentUsageCount: 1,
+      recipeUsageCount: 4,
+    },
     { id: 'air', name: 'Air', sourceState: 'none', componentUsageCount: 0, recipeUsageCount: 0 },
-    { id: 'earth', name: 'Earth', enabled: false, sourceState: 'missing', componentUsageCount: 2, recipeUsageCount: 0 },
+    {
+      id: 'earth',
+      name: 'Earth',
+      enabled: false,
+      sourceState: 'missing',
+      componentUsageCount: 2,
+      recipeUsageCount: 0,
+    },
   ];
 
   it('seeds a FRESH lifted browser state, with a NEW selection Set each call', () => {
@@ -463,7 +488,10 @@ describe('1036 — essenceBrowserModel', () => {
   it('clamps an out-of-range page rather than stranding the pager on an empty one', () => {
     const model = buildEssenceBrowserModel(ROWS, { pageSize: 2, pageIndex: 9 });
     assert.equal(model.pageIndex, 1);
-    assert.deepEqual(model.essences.map((row) => row.id), ['fire', 'water']);
+    assert.deepEqual(
+      model.essences.map((row) => row.id),
+      ['fire', 'water']
+    );
     assert.deepEqual([model.rangeStart, model.rangeEnd, model.totalCount], [3, 4, 4]);
   });
 
@@ -486,8 +514,7 @@ describe('1036 — essenceBrowserModel', () => {
     // would actually show — 2, 0 and 2 rather than the roster's 4, 2 and 2. This is the
     // rule `browserGroupCounts.js` states for the library group headers, on a second axis.
     assert.deepEqual(
-      buildEssenceBrowserModel(ROWS, { status: 'enabled', source: 'needs-attention' })
-        .statusCounts,
+      buildEssenceBrowserModel(ROWS, { status: 'enabled', source: 'needs-attention' }).statusCounts,
       { all: 2, enabled: 0, disabled: 2 }
     );
   });

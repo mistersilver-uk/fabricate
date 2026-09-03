@@ -51,7 +51,9 @@ const required = process.env.VIEWLAB_REQUIRE_CHROME === '1';
 
 if (!haveSource && required) {
   test('harvested Foundry chrome is present (VIEWLAB_REQUIRE_CHROME=1)', () => {
-    assert.fail(`no harvested chrome under .foundry-chrome/, but VIEWLAB_REQUIRE_CHROME=1; ${HARVEST_HINT}`);
+    assert.fail(
+      `no harvested chrome under .foundry-chrome/, but VIEWLAB_REQUIRE_CHROME=1; ${HARVEST_HINT}`
+    );
   });
 }
 
@@ -65,7 +67,9 @@ if (!haveDialogSource && required) {
 }
 
 const skip = haveSource ? false : `no harvested Foundry chrome; ${HARVEST_HINT}`;
-const skipDialog = haveDialogSource ? false : `no harvested ${DIALOG_MJS}; ${HARVEST_HINT} -- --force`;
+const skipDialog = haveDialogSource
+  ? false
+  : `no harvested ${DIALOG_MJS}; ${HARVEST_HINT} -- --force`;
 const source = haveSource ? readFileSync(applicationPath, 'utf8') : '';
 const dialogSource = haveDialogSource ? readFileSync(dialogPath, 'utf8') : '';
 
@@ -156,14 +160,21 @@ test('_renderFrame still emits the header markup the spec transcribes', { skip }
   );
 });
 
-test('_renderFrame still builds the content element and resize handle the same way', { skip }, () => {
-  const body = normalize(methodBody(source, 'async _renderFrame(options)'));
-  assert.match(body, /content\.classList\.add\("window-content", \.\.\.this\.options\.window\.contentClasses\)/);
-  assert.ok(
-    body.includes(`insertAdjacentHTML("beforeend", '${FOUNDRY_CHROME_SPEC.resizeHandleHtml}')`),
-    'the resize-handle markup no longer matches FOUNDRY_CHROME_SPEC.resizeHandleHtml'
-  );
-});
+test(
+  '_renderFrame still builds the content element and resize handle the same way',
+  { skip },
+  () => {
+    const body = normalize(methodBody(source, 'async _renderFrame(options)'));
+    assert.match(
+      body,
+      /content\.classList\.add\("window-content", \.\.\.this\.options\.window\.contentClasses\)/
+    );
+    assert.ok(
+      body.includes(`insertAdjacentHTML("beforeend", '${FOUNDRY_CHROME_SPEC.resizeHandleHtml}')`),
+      'the resize-handle markup no longer matches FOUNDRY_CHROME_SPEC.resizeHandleHtml'
+    );
+  }
+);
 
 test('_updateFrame still derives the window icon class the same way', { skip }, () => {
   const body = normalize(methodBody(source, '_updateFrame(options)'));
@@ -172,22 +183,33 @@ test('_updateFrame still derives the window icon class the same way', { skip }, 
     body.includes('`window-icon fa-fw ${window.icon || "hidden"}`'),
     'the window-icon class template moved; re-transcribe FOUNDRY_CHROME_SPEC.windowIconClass'
   );
-  assert.equal(FOUNDRY_CHROME_SPEC.windowIconClass('fa-solid fa-flask'), 'window-icon fa-fw fa-solid fa-flask');
+  assert.equal(
+    FOUNDRY_CHROME_SPEC.windowIconClass('fa-solid fa-flask'),
+    'window-icon fa-fw fa-solid fa-flask'
+  );
   assert.equal(FOUNDRY_CHROME_SPEC.windowIconClass(''), 'window-icon fa-fw hidden');
 });
 
-test('_updateFrame still hides the controls button when there are no header controls', { skip }, () => {
-  const body = normalize(methodBody(source, '_updateFrame(options)'));
-  assert.match(
-    body,
-    /controls\.classList\.toggle\("hidden", !Array\.from\(this\._headerControlButtons\(\)\)\.length\)/,
-    'the header-controls visibility rule moved. Fabricate registers no header controls, so the lab ' +
-      'hides that button; if Foundry stopped doing this, every captured frame is now missing a control.'
-  );
-  for (const [appId, app] of Object.entries(APP_CHROME)) {
-    assert.equal(app.window.controls.length, 0, `${appId} is expected to declare no header controls`);
+test(
+  '_updateFrame still hides the controls button when there are no header controls',
+  { skip },
+  () => {
+    const body = normalize(methodBody(source, '_updateFrame(options)'));
+    assert.match(
+      body,
+      /controls\.classList\.toggle\("hidden", !Array\.from\(this\._headerControlButtons\(\)\)\.length\)/,
+      'the header-controls visibility rule moved. Fabricate registers no header controls, so the lab ' +
+        'hides that button; if Foundry stopped doing this, every captured frame is now missing a control.'
+    );
+    for (const [appId, app] of Object.entries(APP_CHROME)) {
+      assert.equal(
+        app.window.controls.length,
+        0,
+        `${appId} is expected to declare no header controls`
+      );
+    }
   }
-});
+);
 
 test('_renderFrame still emits no controls dropdown', { skip }, () => {
   // V13 appended `<menu class="controls-dropdown"></menu>` to the frame and filled it in
@@ -201,7 +223,11 @@ test('_renderFrame still emits no controls dropdown', { skip }, () => {
       'and in tests/view-lab/foundryFrame.js, or every captured frame is missing an element ' +
       'production draws.'
   );
-  assert.ok(!FOUNDRY_CHROME_SPEC.frameInnerHtml({ toggleControls: 'a', close: 'b' }).includes('controls-dropdown'));
+  assert.ok(
+    !FOUNDRY_CHROME_SPEC.frameInnerHtml({ toggleControls: 'a', close: 'b' }).includes(
+      'controls-dropdown'
+    )
+  );
 });
 
 test('_getFrameButtons is still empty, so no extra header button is drawn', { skip }, () => {
@@ -246,7 +272,8 @@ test('the max-height ceiling the geometry assertion relies on is unchanged', { s
 /*  DialogV2 (client/applications/api/dialog.mjs)                              */
 /* -------------------------------------------------------------------------- */
 
-const RETRANSCRIBE = 'Re-transcribe FOUNDRY_DIALOG_SPEC in scripts/lib/foundryChromeSpec.js and the ' +
+const RETRANSCRIBE =
+  'Re-transcribe FOUNDRY_DIALOG_SPEC in scripts/lib/foundryChromeSpec.js and the ' +
   'builder in tests/view-lab/foundryDialog.js from the harvested source.';
 
 test('the harvested dialog module still matches the recorded digest', { skip: skipDialog }, () => {
@@ -288,7 +315,9 @@ test('DialogV2 DEFAULT_OPTIONS still match the transcription', { skip: skipDialo
 });
 
 test('_renderHTML still builds the form the spec transcribes', { skip: skipDialog }, () => {
-  const body = normalize(methodBody(dialogSource, 'async _renderHTML(_context, _options)', DIALOG_MJS));
+  const body = normalize(
+    methodBody(dialogSource, 'async _renderHTML(_context, _options)', DIALOG_MJS)
+  );
   assert.ok(
     body.includes(`form.className = "${FOUNDRY_DIALOG_SPEC.formClassName}"`),
     `the dialog form's class list moved. ${RETRANSCRIBE}`
@@ -315,9 +344,9 @@ test('_renderHTML still builds the form the spec transcribes', { skip: skipDialo
   assert.ok(!FOUNDRY_DIALOG_SPEC.formInnerHtml('', 'B').includes('dialog-content'));
 
   assert.ok(
-    normalize(methodBody(dialogSource, '_replaceHTML(result, content, _options)', DIALOG_MJS)).includes(
-      'content.replaceChildren(result);'
-    ),
+    normalize(
+      methodBody(dialogSource, '_replaceHTML(result, content, _options)', DIALOG_MJS)
+    ).includes('content.replaceChildren(result);'),
     `the dialog no longer replaces the window-content children with its form. ${RETRANSCRIBE}`
   );
 });
@@ -343,7 +372,10 @@ test('_renderButtons still builds each button the same way', { skip: skipDialog 
     'return button.outerHTML;',
   ];
   for (const fragment of expected) {
-    assert.ok(body.includes(fragment), `"${fragment}" is gone from _renderButtons. ${RETRANSCRIBE}`);
+    assert.ok(
+      body.includes(fragment),
+      `"${fragment}" is gone from _renderButtons. ${RETRANSCRIBE}`
+    );
   }
   // The attribute ORDER above is what decides the order in the captured markup, and the default
   // rule is what decides which button carries `autofocus`.

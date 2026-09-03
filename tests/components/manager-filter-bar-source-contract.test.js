@@ -214,8 +214,11 @@ test('every filter bar and every search field passes an accessible name', () => 
   // failing direction, so it cannot hide — while a change that made it return a constant would
   // leave every site passing. The count is what distinguishes those.
   const total = NAMED.reduce((sum, entry) => sum + entry.sites.length, 0);
-  assert.ok(total >= 22, `only ${total} call sites across both primitives, so this clause has ` +
-    'lost most of its domain');
+  assert.ok(
+    total >= 22,
+    `only ${total} call sites across both primitives, so this clause has ` +
+      'lost most of its domain'
+  );
 
   const offenders = [];
   for (const { tag, sites } of NAMED) {

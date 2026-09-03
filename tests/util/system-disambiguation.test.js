@@ -15,13 +15,13 @@ import assert from 'node:assert/strict';
 import {
   buildSystemLabelMap,
   systemDisplayLabel,
-  pickDefaultSystemId
+  pickDefaultSystemId,
 } from '../../src/ui/svelte/util/systemDisambiguation.js';
 
 test('leaves a unique system name untouched', () => {
   const systems = [
     { id: 'alpha-id', name: 'Alchemy' },
-    { id: 'beta-id', name: 'Smithing' }
+    { id: 'beta-id', name: 'Smithing' },
   ];
   const labels = buildSystemLabelMap(systems);
   assert.equal(labels.get('alpha-id'), 'Alchemy');
@@ -32,7 +32,7 @@ test('appends an id-fragment disambiguator only to colliding names', () => {
   const systems = [
     { id: 'aaaa1111zzzz', name: 'Herbalism' },
     { id: 'bbbb2222zzzz', name: 'Herbalism' },
-    { id: 'unique-id', name: 'Cooking' }
+    { id: 'unique-id', name: 'Cooking' },
   ];
   const labels = buildSystemLabelMap(systems);
   assert.equal(labels.get('aaaa1111zzzz'), 'Herbalism (id: aaaa1111)');
@@ -45,7 +45,7 @@ test('appends an id-fragment disambiguator only to colliding names', () => {
 test('treats names as colliding case-insensitively and ignoring surrounding whitespace', () => {
   const systems = [
     { id: 'a1234567890', name: 'Herbalism' },
-    { id: 'b1234567890', name: '  herbalism ' }
+    { id: 'b1234567890', name: '  herbalism ' },
   ];
   const labels = buildSystemLabelMap(systems);
   assert.equal(labels.get('a1234567890'), 'Herbalism (id: a1234567)');
@@ -55,7 +55,7 @@ test('treats names as colliding case-insensitively and ignoring surrounding whit
 test('falls back to the id when a system has no name', () => {
   const systems = [
     { id: 'no-name-id', name: '' },
-    { id: 'named-id', name: 'Named' }
+    { id: 'named-id', name: 'Named' },
   ];
   const labels = buildSystemLabelMap(systems);
   assert.equal(labels.get('no-name-id'), 'no-name-id');
@@ -72,7 +72,7 @@ test('systemDisplayLabel reads the map, falling back to the system name', () => 
 test('pickDefaultSystemId prefers a source-bearing system over an empty duplicate', () => {
   const systems = [
     { id: 'empty-id', name: 'Herbalism' },
-    { id: 'sourced-id', name: 'Herbalism' }
+    { id: 'sourced-id', name: 'Herbalism' },
   ];
   const hasSources = (id) => id === 'sourced-id';
   assert.equal(pickDefaultSystemId(systems, hasSources), 'sourced-id');
@@ -81,17 +81,26 @@ test('pickDefaultSystemId prefers a source-bearing system over an empty duplicat
 test('pickDefaultSystemId falls back to the first system when none have sources', () => {
   const systems = [
     { id: 'first-id', name: 'A' },
-    { id: 'second-id', name: 'B' }
+    { id: 'second-id', name: 'B' },
   ];
-  assert.equal(pickDefaultSystemId(systems, () => false), 'first-id');
+  assert.equal(
+    pickDefaultSystemId(systems, () => false),
+    'first-id'
+  );
 });
 
 test('pickDefaultSystemId falls back to the first system when no predicate is supplied', () => {
-  const systems = [{ id: 'first-id', name: 'A' }, { id: 'second-id', name: 'B' }];
+  const systems = [
+    { id: 'first-id', name: 'A' },
+    { id: 'second-id', name: 'B' },
+  ];
   assert.equal(pickDefaultSystemId(systems), 'first-id');
 });
 
 test('pickDefaultSystemId returns an empty string for an empty list', () => {
-  assert.equal(pickDefaultSystemId([], () => true), '');
+  assert.equal(
+    pickDefaultSystemId([], () => true),
+    ''
+  );
   assert.equal(pickDefaultSystemId(null), '');
 });

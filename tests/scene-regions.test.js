@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   readSceneRegions,
   toCssColor,
-  filterActorUuidsInsideRegion
+  filterActorUuidsInsideRegion,
 } from '../src/ui/svelte/util/sceneRegions.js';
 
 test('readSceneRegions extracts uuid, name and color from an array collection', () => {
@@ -12,14 +12,14 @@ test('readSceneRegions extracts uuid, name and color from an array collection', 
     uuid: 'Scene.abc',
     regions: [
       { uuid: 'Scene.abc.Region.r1', name: 'Forest', color: '#1a9c4f' },
-      { uuid: 'Scene.abc.Region.r2', name: 'Cave', color: '#332211' }
-    ]
+      { uuid: 'Scene.abc.Region.r2', name: 'Cave', color: '#332211' },
+    ],
   };
   const result = readSceneRegions(scene);
   assert.equal(result.sceneUuid, 'Scene.abc');
   assert.deepEqual(result.regions, [
     { sceneRegionUuid: 'Scene.abc.Region.r1', name: 'Forest', color: '#1a9c4f' },
-    { sceneRegionUuid: 'Scene.abc.Region.r2', name: 'Cave', color: '#332211' }
+    { sceneRegionUuid: 'Scene.abc.Region.r2', name: 'Cave', color: '#332211' },
   ]);
 });
 
@@ -41,7 +41,7 @@ test('readSceneRegions returns empty defaults when scene or regions are absent',
   assert.deepEqual(readSceneRegions({}), { sceneUuid: '', regions: [] });
   assert.deepEqual(readSceneRegions({ uuid: 'Scene.empty', regions: [] }), {
     sceneUuid: 'Scene.empty',
-    regions: []
+    regions: [],
   });
 });
 
@@ -50,11 +50,14 @@ test('readSceneRegions drops regions without a uuid', () => {
     uuid: 'Scene.x',
     regions: [
       { name: 'No uuid', color: '#fff' },
-      { uuid: 'Scene.x.Region.ok', name: 'Ok', color: '#fff' }
-    ]
+      { uuid: 'Scene.x.Region.ok', name: 'Ok', color: '#fff' },
+    ],
   };
   const result = readSceneRegions(scene);
-  assert.deepEqual(result.regions.map(r => r.sceneRegionUuid), ['Scene.x.Region.ok']);
+  assert.deepEqual(
+    result.regions.map((r) => r.sceneRegionUuid),
+    ['Scene.x.Region.ok']
+  );
 });
 
 test('toCssColor coerces Color instances, numbers, bare hex and falls back', () => {
@@ -81,12 +84,12 @@ test('filterActorUuidsInsideRegion keeps only actors whose token centre is insid
     'Actor.in': { x: 10, y: 10 },
     'Actor.out': { x: 200, y: 10 },
     'Actor.notoken': null,
-    'Actor.nan': { x: Number.NaN, y: 5 }
+    'Actor.nan': { x: Number.NaN, y: 5 },
   };
   const inside = filterActorUuidsInsideRegion({
     regionDoc,
     actorUuids: ['Actor.in', 'Actor.out', 'Actor.notoken', 'Actor.nan'],
-    resolveActorTokenCenter: (uuid) => centers[uuid] ?? null
+    resolveActorTokenCenter: (uuid) => centers[uuid] ?? null,
   });
   assert.deepEqual(inside, ['Actor.in']);
 });
@@ -94,14 +97,36 @@ test('filterActorUuidsInsideRegion keeps only actors whose token centre is insid
 test('filterActorUuidsInsideRegion is defensive about inputs and testPoint throwing', () => {
   const resolve = () => ({ x: 1, y: 1 });
   // Missing / malformed regionDoc.
-  assert.deepEqual(filterActorUuidsInsideRegion({ regionDoc: null, actorUuids: ['a'], resolveActorTokenCenter: resolve }), []);
-  assert.deepEqual(filterActorUuidsInsideRegion({ regionDoc: {}, actorUuids: ['a'], resolveActorTokenCenter: resolve }), []);
+  assert.deepEqual(
+    filterActorUuidsInsideRegion({
+      regionDoc: null,
+      actorUuids: ['a'],
+      resolveActorTokenCenter: resolve,
+    }),
+    []
+  );
+  assert.deepEqual(
+    filterActorUuidsInsideRegion({
+      regionDoc: {},
+      actorUuids: ['a'],
+      resolveActorTokenCenter: resolve,
+    }),
+    []
+  );
   // Missing actor list / resolver.
   assert.deepEqual(filterActorUuidsInsideRegion({ regionDoc: { testPoint: () => true } }), []);
   // testPoint throwing => treated as not-contained, not a crash.
-  const throwingRegion = { testPoint: () => { throw new Error('boom'); } };
+  const throwingRegion = {
+    testPoint: () => {
+      throw new Error('boom');
+    },
+  };
   assert.deepEqual(
-    filterActorUuidsInsideRegion({ regionDoc: throwingRegion, actorUuids: ['a'], resolveActorTokenCenter: resolve }),
+    filterActorUuidsInsideRegion({
+      regionDoc: throwingRegion,
+      actorUuids: ['a'],
+      resolveActorTokenCenter: resolve,
+    }),
     []
   );
 });

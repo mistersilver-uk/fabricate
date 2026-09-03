@@ -284,8 +284,8 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
     path: 'src/ui/svelte/components/ChanceSlider.svelte',
     register: 'R1',
     reason:
-      'a sibling type="range" track in the same control is already a pointer-driven stepping '
-      + 'affordance, and its own handleNumberKeydown keeps the keyboard one',
+      'a sibling type="range" track in the same control is already a pointer-driven stepping ' +
+      'affordance, and its own handleNumberKeydown keeps the keyboard one',
     spinnerSuppressed: true,
   }),
   Object.freeze({
@@ -294,18 +294,18 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
     path: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
     register: 'R2',
     reason:
-      'a bare field inside a bordered currency chip, which is not a form row; it has no other '
-      + 'pointer affordance at all, so its native spinner is the correct iff outcome and stays',
+      'a bare field inside a bordered currency chip, which is not a form row; it has no other ' +
+      'pointer affordance at all, so its native spinner is the correct iff outcome and stays',
     spinnerSuppressed: false,
   }),
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
     register: 'R3',
     reason:
-      'the trigger condition VALUE, returned from a Stepper to a plain field by issue 1096: a '
-      + 'threshold is typed rather than walked to (reaching 20 from 1 is nineteen clicks) and the '
-      + 'prototype draws one input there; with no adjuncts beside it the native spinner is its '
-      + 'only pointer path to the value, so it stays',
+      'the trigger condition VALUE, returned from a Stepper to a plain field by issue 1096: a ' +
+      'threshold is typed rather than walked to (reaching 20 from 1 is nineteen clicks) and the ' +
+      'prototype draws one input there; with no adjuncts beside it the native spinner is its ' +
+      'only pointer path to the value, so it stays',
     spinnerSuppressed: false,
   }),
 ]);
@@ -363,7 +363,8 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
       path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
       anchor: ['data-gathering-task-node-count'],
       kind: 'genuine-absence',
-      evidence: 'setNodeCount nulls the whole `nodes` object; normalizeNodeConfig(null) short-circuits',
+      evidence:
+        'setNodeCount nulls the whole `nodes` object; normalizeNodeConfig(null) short-circuits',
     },
     {
       id: 'stamina cost modifier min',
@@ -385,8 +386,8 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
       anchor: ['bound.patch(next)'],
       kind: 'genuine-absence',
       evidence:
-        'an unbounded modifier bound persists as literal null, and 0 is itself a legitimate '
-        + 'bound, so the two have to stay distinguishable',
+        'an unbounded modifier bound persists as literal null, and 0 is itself a legitimate ' +
+        'bound, so the two have to stay distinguishable',
     },
     {
       id: 'economy actor draftMaxOverride',
@@ -436,8 +437,8 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
       anchor: ['data-interactable-node-count'],
       kind: 'cosmetic-zero',
       evidence:
-        'every patch routes through normalizeNodeConfig, which hard-codes `max: max ?? 0`, so '
-        + 'onChange(null) would silently persist 0 — recorded as a known limitation in the spec',
+        'every patch routes through normalizeNodeConfig, which hard-codes `max: max ?? 0`, so ' +
+        'onChange(null) would silently persist 0 — recorded as a known limitation in the spec',
     },
   ].map((entry) => Object.freeze(entry))
 );

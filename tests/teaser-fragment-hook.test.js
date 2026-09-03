@@ -18,10 +18,16 @@ function makeSystem(overrides = {}) {
       enabled: true,
       discoveryMode: 'fragments',
       fragments: [
-        { id: 'frag-1', name: 'Fragment', linkedItemUuid: 'Compendium.world.items.abc', recipeIds: ['r1'], progressValue: 30 }
-      ]
+        {
+          id: 'frag-1',
+          name: 'Fragment',
+          linkedItemUuid: 'Compendium.world.items.abc',
+          recipeIds: ['r1'],
+          progressValue: 30,
+        },
+      ],
     },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -29,7 +35,7 @@ function makeItem(uuid, parentActor = null, registeredItemUuid = null) {
   return {
     uuid,
     parent: parentActor,
-    _sourceUuid: registeredItemUuid
+    _sourceUuid: registeredItemUuid,
   };
 }
 
@@ -45,7 +51,7 @@ function makeActor() {
       const k = key.replace('fabricate.', '');
       store[k] = value;
     },
-    _store: store
+    _store: store,
   };
 }
 
@@ -54,7 +60,7 @@ function makeVisibilityService(systems, discoverCalls) {
   return {
     discoverFragment: async (actor, fragmentId, system) => {
       discoverCalls.push({ actor, fragmentId, systemId: system.id });
-    }
+    },
   };
 }
 
@@ -117,7 +123,20 @@ describe('FragmentDiscoveryHook', () => {
   it('system with teaserConfig.enabled=false is skipped', async () => {
     const discoverCalls = [];
     const actor = makeActor();
-    const system = makeSystem({ teaserConfig: { enabled: false, discoveryMode: 'fragments', fragments: [{ id: 'frag-1', linkedItemUuid: 'Compendium.world.items.abc', recipeIds: ['r1'], progressValue: 30 }] } });
+    const system = makeSystem({
+      teaserConfig: {
+        enabled: false,
+        discoveryMode: 'fragments',
+        fragments: [
+          {
+            id: 'frag-1',
+            linkedItemUuid: 'Compendium.world.items.abc',
+            recipeIds: ['r1'],
+            progressValue: 30,
+          },
+        ],
+      },
+    });
     const item = makeItem('Compendium.world.items.abc', actor);
 
     const manager = makeCraftingSystemManager([system]);
@@ -132,7 +151,20 @@ describe('FragmentDiscoveryHook', () => {
   it('system with discoveryMode=threshold (not fragments) is skipped', async () => {
     const discoverCalls = [];
     const actor = makeActor();
-    const system = makeSystem({ teaserConfig: { enabled: true, discoveryMode: 'threshold', fragments: [{ id: 'frag-1', linkedItemUuid: 'Compendium.world.items.abc', recipeIds: ['r1'], progressValue: 30 }] } });
+    const system = makeSystem({
+      teaserConfig: {
+        enabled: true,
+        discoveryMode: 'threshold',
+        fragments: [
+          {
+            id: 'frag-1',
+            linkedItemUuid: 'Compendium.world.items.abc',
+            recipeIds: ['r1'],
+            progressValue: 30,
+          },
+        ],
+      },
+    });
     const item = makeItem('Compendium.world.items.abc', actor);
 
     const manager = makeCraftingSystemManager([system]);

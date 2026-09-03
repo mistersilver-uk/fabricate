@@ -28,23 +28,17 @@ import { destinationWorld, emptySeededScope } from './helpers/worldScopeImportHa
 
 installFoundryUtilsEnv();
 
-const { buildExportPayload, prepareForImport, validateImportData } = await import(
-  '../src/systems/CraftingSystemExporter.js'
-);
+const { buildExportPayload, prepareForImport, validateImportData } =
+  await import('../src/systems/CraftingSystemExporter.js');
 const { migrateExportPayload } = await import('../src/migration/migrateExportPayload.js');
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 const { reportWorldIdentityDrift } = await import('../src/systems/worldIdentityDrift.js');
 const { REFERENCE_KINDS } = await import('../src/systems/importReferenceResolver.js');
-const { buildWorldScopeGrouping } = await import(
-  '../src/migration/worldScopeEntityGrouping.js'
-);
-const { migrateWorldScopeEntities } = await import(
-  '../src/migration/migrateWorldScopeEntities.js'
-);
+const { buildWorldScopeGrouping } = await import('../src/migration/worldScopeEntityGrouping.js');
+const { migrateWorldScopeEntities } = await import('../src/migration/migrateWorldScopeEntities.js');
 const { resolveComponentScope } = await import('../src/systems/componentScope.js');
-const { CompendiumImporter, scopeStoreDelegate } = await import(
-  '../src/systems/CompendiumImporter.js'
-);
+const { CompendiumImporter, scopeStoreDelegate } =
+  await import('../src/systems/CompendiumImporter.js');
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_SYSTEM_ID = 'sys-source';
@@ -524,7 +518,7 @@ test('14: the DEFAULTS and MEMBERSHIP destination-wins guards, with a COLLIDING 
   assert.equal(
     persisted.membership[`c1|${SOURCE_SYSTEM_ID}`].category,
     'destination-member',
-    "a COLLIDING membership record loses to the destination, hand edits and all"
+    'a COLLIDING membership record loses to the destination, hand edits and all'
   );
 
   // The positive half, so neither assertion above can pass because the merge simply did nothing.
@@ -803,7 +797,11 @@ test('13: every membership record the import writes names the DESTINATION system
   const overwritten = Object.values(world.persisted('components').membership);
   assert.ok(overwritten.length > 0, 'the overwrite wrote a membership record');
   for (const record of overwritten) {
-    assert.equal(record.systemId, 'dest-sys', 'the record follows the RESOLVED id, not the payload');
+    assert.equal(
+      record.systemId,
+      'dest-sys',
+      'the record follows the RESOLVED id, not the payload'
+    );
   }
   assert.equal(
     overwritten.filter((record) => record.systemId === SOURCE_SYSTEM_ID).length,
@@ -1071,7 +1069,12 @@ test('19: a multi-match binds to the largest intersection, reports the losers, a
     envelope({
       system: {
         components: [
-          { id: 'incoming', name: 'Incoming', originItemUuid: 'Item.x', aliasItemUuids: ['Item.y'] },
+          {
+            id: 'incoming',
+            name: 'Incoming',
+            originItemUuid: 'Item.x',
+            aliasItemUuids: ['Item.y'],
+          },
         ],
       },
     });
@@ -1920,12 +1923,21 @@ test('16(f): with the component scope UNSEEDED, a component-referencing section 
     essenceScope: emptySeededScope(),
     toolScope: emptySeededScope(),
   });
-  assert.equal(world.stores.components.isSeeded('entities'), false, 'the component scope is UNSEEDED');
+  assert.equal(
+    world.stores.components.isSeeded('entities'),
+    false,
+    'the component scope is UNSEEDED'
+  );
 
   const { summary } = await runImport(
     world,
     envelope({
-      system: { tools: [{ id: 't1', name: 'Hammer' }, { id: 't2', name: 'Anvil' }] },
+      system: {
+        tools: [
+          { id: 't1', name: 'Hammer' },
+          { id: 't2', name: 'Anvil' },
+        ],
+      },
       toolScope: slice({
         entities: [
           { id: 't1', name: 'Hammer' },
@@ -2021,7 +2033,16 @@ test('export: the three slices are FILTERED BY MEMBERSHIP to the exported system
     }
   );
 
-  assert.deepEqual(payload.componentScope.membership.map((r) => r.entityId), ['mine']);
-  assert.deepEqual(payload.componentScope.entities.map((r) => r.id), ['mine']);
-  assert.deepEqual(payload.componentScope.defaults.map((r) => r.id), ['mine']);
+  assert.deepEqual(
+    payload.componentScope.membership.map((r) => r.entityId),
+    ['mine']
+  );
+  assert.deepEqual(
+    payload.componentScope.entities.map((r) => r.id),
+    ['mine']
+  );
+  assert.deepEqual(
+    payload.componentScope.defaults.map((r) => r.id),
+    ['mine']
+  );
 });

@@ -81,7 +81,17 @@ export function authoredComplication({
  */
 export function visibleComplicationPair(overrides = {}) {
   return [
-    authoredComplication({ id: 'p1', name: 'Shrapnel', description: 'Splinters fly.', ...overrides }),
-    authoredComplication({ id: 'p2', name: 'Scalding', description: 'The metal spits.', ...overrides }),
+    authoredComplication({
+      id: 'p1',
+      name: 'Shrapnel',
+      description: 'Splinters fly.',
+      ...overrides,
+    }),
+    authoredComplication({
+      id: 'p2',
+      name: 'Scalding',
+      description: 'The metal spits.',
+      ...overrides,
+    }),
   ];
 }

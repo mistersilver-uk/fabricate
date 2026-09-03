@@ -43,7 +43,8 @@ test('resolveRollDataPath: nested read, @ affordance, missing segments', () => {
 
 test('numeric operators compare coerced values', () => {
   const rollData = { skills: { cra: { rank: 2 } } };
-  const at = (op, value) => evaluatePrerequisite(rollData, { path: 'skills.cra.rank', op, value }, silent);
+  const at = (op, value) =>
+    evaluatePrerequisite(rollData, { path: 'skills.cra.rank', op, value }, silent);
   assert.ok(at('gte', 2));
   assert.ok(at('gte', 1));
   assert.ok(!at('gte', 3));
@@ -55,7 +56,9 @@ test('numeric operators compare coerced values', () => {
   assert.ok(!at('eq', 3));
   assert.ok(at('neq', 3));
   // string comparand coerces
-  assert.ok(evaluatePrerequisite(rollData, { path: 'skills.cra.rank', op: 'gte', value: '2' }, silent));
+  assert.ok(
+    evaluatePrerequisite(rollData, { path: 'skills.cra.rank', op: 'gte', value: '2' }, silent)
+  );
 });
 
 test('boolean operators coerce; exists checks presence', () => {
@@ -81,14 +84,22 @@ test('unknown path never throws: falls back to 0 / false and warns', () => {
   assert.ok(warnings.length >= 3);
   // exists on a missing path does not warn (a legitimate negative)
   const existsWarnings = [];
-  assert.ok(!evaluatePrerequisite({}, { path: 'flags.x', op: 'exists' }, { warn: (p) => existsWarnings.push(p) }));
+  assert.ok(
+    !evaluatePrerequisite(
+      {},
+      { path: 'flags.x', op: 'exists' },
+      { warn: (p) => existsWarnings.push(p) }
+    )
+  );
   assert.equal(existsWarnings.length, 0);
 });
 
 test('malformed op falls back to the default operator', () => {
   const rollData = { skills: { cra: { rank: 2 } } };
   assert.equal(DEFAULT_PREREQUISITE_OPERATOR, 'gte');
-  assert.ok(evaluatePrerequisite(rollData, { path: 'skills.cra.rank', op: 'nonsense', value: 2 }, silent));
+  assert.ok(
+    evaluatePrerequisite(rollData, { path: 'skills.cra.rank', op: 'nonsense', value: 2 }, silent)
+  );
 });
 
 test('evaluatePrerequisites: AND semantics with failure previews', () => {
@@ -124,9 +135,18 @@ test('evaluatePrerequisites: AND semantics with failure previews', () => {
 });
 
 test('prerequisitePreview: valued and valueless shapes', () => {
-  assert.equal(prerequisitePreview({ path: 'skills.cra.rank', op: 'gte', value: 2 }), '@skills.cra.rank ≥ 2');
-  assert.equal(prerequisitePreview({ path: '@tools.smith.value', op: 'gte', value: 1 }), '@tools.smith.value ≥ 1');
-  assert.equal(prerequisitePreview({ path: 'flags.attuned', op: 'isTrue' }), '@flags.attuned is true');
+  assert.equal(
+    prerequisitePreview({ path: 'skills.cra.rank', op: 'gte', value: 2 }),
+    '@skills.cra.rank ≥ 2'
+  );
+  assert.equal(
+    prerequisitePreview({ path: '@tools.smith.value', op: 'gte', value: 1 }),
+    '@tools.smith.value ≥ 1'
+  );
+  assert.equal(
+    prerequisitePreview({ path: 'flags.attuned', op: 'isTrue' }),
+    '@flags.attuned is true'
+  );
   assert.equal(prerequisitePreview({ path: 'flags.x', op: 'exists' }), '@flags.x exists');
   assert.equal(prerequisitePreview({ path: '', op: 'gte', value: 2 }), '@… ≥ 2');
 });
@@ -146,7 +166,12 @@ test('normalizeCharacterPrerequisite: defaults, id fallback, valueless nulls val
   });
 
   // valueless op forces value to null even when supplied
-  const bool = normalizeCharacterPrerequisite({ id: 'b', op: 'isTrue', path: 'flags.x', value: '9' });
+  const bool = normalizeCharacterPrerequisite({
+    id: 'b',
+    op: 'isTrue',
+    path: 'flags.x',
+    value: '9',
+  });
   assert.equal(bool.value, null);
 
   // empty-string value -> null
@@ -167,21 +192,37 @@ test('normalizeCharacterPrerequisite: defaults, id fallback, valueless nulls val
 
 test('normalizeCharacterPrerequisiteList: drops unassignable, keeps order', () => {
   const list = normalizeCharacterPrerequisiteList(
-    [{ id: 'a', op: 'gte', path: 'x', value: 1 }, { name: 'no id' }, { id: 'b', op: 'exists', path: 'y' }],
+    [
+      { id: 'a', op: 'gte', path: 'x', value: 1 },
+      { name: 'no id' },
+      { id: 'b', op: 'exists', path: 'y' },
+    ],
     () => ''
   );
-  assert.deepEqual(list.map((e) => e.id), ['a', 'b']);
+  assert.deepEqual(
+    list.map((e) => e.id),
+    ['a', 'b']
+  );
   assert.equal(normalizeCharacterPrerequisiteList('nope').length, 0);
 });
 
 test('presets: bundles keyed by foundry system id', () => {
   assert.ok(DND5E_CHARACTER_PREREQUISITE_PRESETS.length > 0);
   assert.ok(PF2E_CHARACTER_PREREQUISITE_PRESETS.length > 0);
-  assert.equal(getCharacterPrerequisitePresetsForFoundrySystem('dnd5e'), DND5E_CHARACTER_PREREQUISITE_PRESETS);
-  assert.equal(getCharacterPrerequisitePresetsForFoundrySystem('pf2e'), PF2E_CHARACTER_PREREQUISITE_PRESETS);
+  assert.equal(
+    getCharacterPrerequisitePresetsForFoundrySystem('dnd5e'),
+    DND5E_CHARACTER_PREREQUISITE_PRESETS
+  );
+  assert.equal(
+    getCharacterPrerequisitePresetsForFoundrySystem('pf2e'),
+    PF2E_CHARACTER_PREREQUISITE_PRESETS
+  );
   assert.deepEqual(getCharacterPrerequisitePresetsForFoundrySystem('cyberpunk'), []);
   // every preset entry is a well-formed prerequisite
-  for (const preset of [...DND5E_CHARACTER_PREREQUISITE_PRESETS, ...PF2E_CHARACTER_PREREQUISITE_PRESETS]) {
+  for (const preset of [
+    ...DND5E_CHARACTER_PREREQUISITE_PRESETS,
+    ...PF2E_CHARACTER_PREREQUISITE_PRESETS,
+  ]) {
     const normalized = normalizeCharacterPrerequisite(preset);
     assert.equal(normalized.id, preset.id);
     assert.ok(normalized.path.length > 0);
@@ -228,8 +269,18 @@ test('presets: every pf2e path is rooted at `actor.`, and resolves against a pf2
       `pf2e preset "${preset.id}" must resolve to a number against pf2e-shaped roll data`
     );
   }
-  assert.equal(evaluatePrerequisite(pf2eRollData, { path: 'actor.skills.crafting.rank', op: 'gte', value: 2 }), true);
-  assert.equal(evaluatePrerequisite(pf2eRollData, { path: 'skills.cra.rank', op: 'gte', value: 1 }, { warn: () => {} }), false);
+  assert.equal(
+    evaluatePrerequisite(pf2eRollData, { path: 'actor.skills.crafting.rank', op: 'gte', value: 2 }),
+    true
+  );
+  assert.equal(
+    evaluatePrerequisite(
+      pf2eRollData,
+      { path: 'skills.cra.rank', op: 'gte', value: 1 },
+      { warn: () => {} }
+    ),
+    false
+  );
 });
 
 test('presets: dnd5e paths stay bare, because dnd5e spreads system onto its roll data', () => {
@@ -254,7 +305,10 @@ test('presets: dnd5e paths stay bare, because dnd5e spreads system onto its roll
 });
 
 test('seedCharacterPrerequisitePresets: idempotent merge preserves existing ids', () => {
-  const first = seedCharacterPrerequisitePresets({ presets: DND5E_CHARACTER_PREREQUISITE_PRESETS, currentLibrary: [] });
+  const first = seedCharacterPrerequisitePresets({
+    presets: DND5E_CHARACTER_PREREQUISITE_PRESETS,
+    currentLibrary: [],
+  });
   assert.equal(first.added.length, DND5E_CHARACTER_PREREQUISITE_PRESETS.length);
   assert.equal(first.skipped.length, 0);
 

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import {
   formatRespawnDuration,
   formatDurationHMS,
-  formatRelativeWorldTime
+  formatRelativeWorldTime,
 } from '../../src/ui/svelte/util/formatDuration.js';
 
 const HOUR = 3600;
@@ -47,8 +47,8 @@ test('day/week thresholds follow a CUSTOM calendar (10-hour days)', () => {
       hoursPerDay: 10,
       minutesPerHour: 60,
       secondsPerMinute: 60,
-      values: [{}, {}, {}, {}, {}] // 5-day week
-    }
+      values: [{}, {}, {}, {}, {}], // 5-day week
+    },
   };
   const customDay = 10 * 60 * 60; // 36000
   assert.equal(formatRespawnDuration(2 * customDay, calendar), '2 days');

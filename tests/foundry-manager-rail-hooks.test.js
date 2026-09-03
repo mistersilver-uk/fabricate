@@ -43,9 +43,9 @@ const RAIL_BUTTON_CLASS = 'manager-nav-button';
 const RAIL_ENTRIES = [...MANAGER_SYSTEM_RAIL_ENTRIES, ...MANAGER_WORLD_SCOPED_RAIL_ENTRIES];
 
 /** The components that RENDER the manager rail. */
-const railSources = Object.entries(
-  collectWorkingTreeSources(['src'], ['.js', '.svelte'])
-).filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+const railSources = Object.entries(collectWorkingTreeSources(['src'], ['.js', '.svelte'])).filter(
+  ([, text]) => text.includes(RAIL_BUTTON_CLASS)
+);
 
 test('the rail entry table is non-trivial and internally consistent', () => {
   // NON-VACUITY FIRST. Every assertion below iterates this table, so an empty or truncated one
@@ -110,7 +110,8 @@ test('the harness targets rail entries by id, and every id it targets is rendere
     unrendered,
     [],
     'these rail ids are targeted by the harness but rendered by no component that renders ' +
-      `"${RAIL_BUTTON_CLASS}", so the smoke would time out on them:\n  ` + unrendered.join('\n  ')
+      `"${RAIL_BUTTON_CLASS}", so the smoke would time out on them:\n  ` +
+      unrendered.join('\n  ')
   );
 });
 

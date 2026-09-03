@@ -30,7 +30,7 @@ function getProperty(object, path) {
 
 globalThis.foundry = { utils: { getProperty, setProperty: () => {} } };
 globalThis.ui = {
-  notifications: { info: () => {}, warn: () => {}, error: () => {} }
+  notifications: { info: () => {}, warn: () => {}, error: () => {} },
 };
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ function makeItem({ id, name = `Item ${id}`, quantity = 1, registeredItemUuid = 
       if (payload['system.quantity'] !== undefined) {
         this.system.quantity = payload['system.quantity'];
       }
-    }
+    },
   };
 }
 
@@ -75,11 +75,13 @@ function makeSourceItem(name, opts = {}) {
     img: opts.img || 'icons/svg/item-bag.svg',
     type: opts.type || 'loot',
     system: { quantity: opts.quantity || 1, ...(opts.system || {}) },
-    effects: []
+    effects: [],
   };
   return {
     ...data,
-    toObject() { return { ...data, system: { ...data.system } }; }
+    toObject() {
+      return { ...data, system: { ...data.system } };
+    },
   };
 }
 
@@ -100,11 +102,11 @@ function makeActor({ id = 'actor-1', items = [] } = {}) {
         id: `created-item-${createdItems.length + i}`,
         uuid: `Item.created-item-${createdItems.length + i}`,
         name: d.name || 'Created Item',
-        system: { quantity: d.system?.quantity || 1 }
+        system: { quantity: d.system?.quantity || 1 },
       }));
       createdItems.push(...stubs);
       return stubs;
-    }
+    },
   };
 }
 
@@ -115,16 +117,16 @@ function makeIngredientSet({ id = 'set-1', ingredientItem, quantity = 1 } = {}) 
   const ingredient = {
     systemItemId: ingredientItem.id,
     quantity,
-    getDescription: () => `${quantity}x ${ingredientItem.name}`
+    getDescription: () => `${quantity}x ${ingredientItem.name}`,
   };
   return {
     id,
     ingredientGroups: [{ options: [{ componentId: ingredientItem.id, quantity }] }],
     matchIngredients(availableItems, matcher) {
-      const matched = availableItems.find(i => matcher(ingredient, i));
+      const matched = availableItems.find((i) => matcher(ingredient, i));
       if (!matched) return [];
       return [{ item: matched, quantity, ingredient }];
-    }
+    },
   };
 }
 
@@ -140,7 +142,7 @@ function makeRecipe({
   resultGroups = [],
   outcomeRouting = null,
   resultSelection = null,
-  steps = null
+  steps = null,
 } = {}) {
   const recipe = {
     id,
@@ -151,8 +153,12 @@ function makeRecipe({
     outcomeRouting,
     resultSelection,
     transferEffects: false,
-    validate() { return { valid: true, errors: [] }; },
-    toJSON() { return { id: this.id, name: this.name, craftingSystemId: this.craftingSystemId }; }
+    validate() {
+      return { valid: true, errors: [] };
+    },
+    toJSON() {
+      return { id: this.id, name: this.name, craftingSystemId: this.craftingSystemId };
+    },
   };
   recipe.getExecutionSteps = steps !== null ? () => steps : null;
   return recipe;
@@ -167,7 +173,7 @@ function makeSystem({
   craftingCheck = null,
   managedItems = [],
   features = {},
-  toolBreakage = undefined
+  toolBreakage = undefined,
 } = {}) {
   const sys = {
     id,
@@ -178,10 +184,10 @@ function makeSystem({
       enabled: false,
       outcomes: [],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false }
+      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
     },
     managedItems,
-    components: managedItems
+    components: managedItems,
   };
   return sys;
 }
@@ -191,7 +197,7 @@ function makeSystem({
  */
 function makeResolutionService(system) {
   const craftingSystemManager = {
-    getSystem: (id) => (system && id === system.id ? system : null)
+    getSystem: (id) => (system && id === system.id ? system : null),
   };
   return new ResolutionModeService(craftingSystemManager);
 }
@@ -199,10 +205,19 @@ function makeResolutionService(system) {
 /**
  * Build a RecipeManager mock that uses item identity (by id) for ingredient matching.
  */
-function makeRecipeManager({ ingredientItem, toolItem = null, toolModel = null, ingredientSet } = {}) {
+function makeRecipeManager({
+  ingredientItem,
+  toolItem = null,
+  toolModel = null,
+  ingredientSet,
+} = {}) {
   return {
     canCraft(_actors, _recipe) {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [] },
+      };
     },
     getToolsForSet(_recipe, _set) {
       return toolModel ? [toolModel] : [];
@@ -212,7 +227,7 @@ function makeRecipeManager({ ingredientItem, toolItem = null, toolModel = null, 
     },
     ingredientMatchesItem(_recipe, ingredient, item) {
       return item === ingredientItem && item.id === ingredient.systemItemId;
-    }
+    },
   };
 }
 
@@ -223,13 +238,13 @@ function setupGame(system) {
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({
-        getSystem: (id) => (system && id === system.id ? system : null)
+        getSystem: (id) => (system && id === system.id ? system : null),
       }),
       getResolutionModeService: () => null,
-      getRecipeVisibilityService: () => null
+      getRecipeVisibilityService: () => null,
     },
     user: { id: 'user-gm', isGM: true },
-    time: { worldTime: 1000 }
+    time: { worldTime: 1000 },
   };
 }
 
@@ -241,12 +256,12 @@ test('simple mode: successful craft consumes ingredient and creates result item'
   const system = makeSystem({
     id: 'sys-1',
     resolutionMode: 'simple',
-    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }]
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }],
   });
   setupGame(system);
 
   const potionSource = makeSourceItem('Potion');
-  globalThis.fromUuid = async (uuid) => uuid === 'uuid:potion' ? potionSource : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'uuid:potion' ? potionSource : null);
 
   const herb = makeItem({ id: 'herb-1', name: 'Herb', quantity: 2 });
   const ingredientSet = makeIngredientSet({ ingredientItem: herb, quantity: 1 });
@@ -254,7 +269,9 @@ test('simple mode: successful craft consumes ingredient and creates result item'
   const recipe = makeRecipe({
     craftingSystemId: 'sys-1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] }]
+    resultGroups: [
+      { id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] },
+    ],
   });
 
   const sourceActor = makeActor({ id: 'a1', items: [herb] });
@@ -273,7 +290,11 @@ test('simple mode: successful craft consumes ingredient and creates result item'
   // Ingredient consumed: quantity was 2, requested 1, so update to 1
   assert.equal(herb.updateCalled, true, 'ingredient should have been consumed via update');
   assert.equal(herb.system.quantity, 1, 'ingredient quantity should be reduced by 1');
-  assert.equal(herb.deleteCalled, false, 'ingredient should not be deleted when quantity > requested');
+  assert.equal(
+    herb.deleteCalled,
+    false,
+    'ingredient should not be deleted when quantity > requested'
+  );
 
   // Result item created on craftingActor
   assert.equal(craftingActor.createdItems.length, 1, 'one result item should be created');
@@ -290,7 +311,7 @@ test('simple mode: returns failure when ingredient is missing', async () => {
   const recipe = makeRecipe({
     craftingSystemId: 'sys-1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-1', results: [] }]
+    resultGroups: [{ id: 'rg-1', results: [] }],
   });
 
   const craftingActor = makeActor({ id: 'a1' });
@@ -304,10 +325,10 @@ test('simple mode: returns failure when ingredient is missing', async () => {
         missing: {
           ingredients: [{ ingredient: { getDescription: () => '1x Herb' }, have: 0, need: 1 }],
           essences: [],
-        }
+        },
       };
     },
-    ingredientMatchesItem: () => false
+    ingredientMatchesItem: () => false,
   };
 
   const resolutionService = makeResolutionService(system);
@@ -325,12 +346,12 @@ test('simple mode: exact quantity match deletes ingredient item', async () => {
   const system = makeSystem({
     id: 'sys-1',
     resolutionMode: 'simple',
-    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }]
+    managedItems: [{ id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }],
   });
   setupGame(system);
 
   const potionSource = makeSourceItem('Potion');
-  globalThis.fromUuid = async (uuid) => uuid === 'uuid:potion' ? potionSource : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'uuid:potion' ? potionSource : null);
 
   const herb = makeItem({ id: 'herb-exact', name: 'Herb', quantity: 1 });
   const ingredientSet = makeIngredientSet({ ingredientItem: herb, quantity: 1 });
@@ -338,7 +359,9 @@ test('simple mode: exact quantity match deletes ingredient item', async () => {
   const recipe = makeRecipe({
     craftingSystemId: 'sys-1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] }]
+    resultGroups: [
+      { id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] },
+    ],
   });
 
   const sourceActor = makeActor({ id: 'a1', items: [herb] });
@@ -369,7 +392,9 @@ test('simple mode: exact quantity match deletes ingredient item', async () => {
 function makeRunManager(totalSteps = 2) {
   let runStore = null;
   return {
-    get storedRun() { return runStore; },
+    get storedRun() {
+      return runStore;
+    },
     getActiveRun(_actor, runId) {
       return runStore && runStore.id === runId ? runStore : null;
     },
@@ -384,13 +409,19 @@ function makeRunManager(totalSteps = 2) {
         currentStepIndex: 0,
         steps: [],
         startedAt: 1000,
-        finishedAt: null
+        finishedAt: null,
       };
       return runStore;
     },
-    canProceedTimeGate() { return true; },
-    async markStepWaitingForTime(_actor, run) { return run; },
-    async markStepInProgress(_actor, run) { return run; },
+    canProceedTimeGate() {
+      return true;
+    },
+    async markStepWaitingForTime(_actor, run) {
+      return run;
+    },
+    async markStepInProgress(_actor, run) {
+      return run;
+    },
     async completeStepSuccess(_actor, run, stepIndex, _data) {
       run.steps[stepIndex] = { stepName: `Step ${stepIndex + 1}`, status: 'succeeded' };
       if (stepIndex >= totalSteps - 1) {
@@ -406,7 +437,7 @@ function makeRunManager(totalSteps = 2) {
       run.status = 'failed';
       run.finishedAt = 2000;
       return run;
-    }
+    },
   };
 }
 
@@ -416,8 +447,8 @@ test('multi-step: craft() advances through two steps to completion', async () =>
     resolutionMode: 'simple',
     managedItems: [
       { id: 'comp-extract', registeredItemUuid: 'uuid:extract', difficulty: 1 },
-      { id: 'comp-ingot', registeredItemUuid: 'uuid:ingot', difficulty: 1 }
-    ]
+      { id: 'comp-ingot', registeredItemUuid: 'uuid:ingot', difficulty: 1 },
+    ],
   });
   setupGame(system);
 
@@ -437,15 +468,25 @@ test('multi-step: craft() advances through two steps to completion', async () =>
 
   const steps = [
     {
-      id: 'step-1', name: 'Step 1',
+      id: 'step-1',
+      name: 'Step 1',
       ingredientSets: [set1],
-      resultGroups: [{ id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'comp-extract', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
+      resultGroups: [
+        { id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'comp-extract', quantity: 1 }] },
+      ],
+      outcomeRouting: null,
+      timeRequirement: null,
     },
     {
-      id: 'step-2', name: 'Step 2',
+      id: 'step-2',
+      name: 'Step 2',
       ingredientSets: [set2],
-      resultGroups: [{ id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'comp-ingot', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
-    }
+      resultGroups: [
+        { id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'comp-ingot', quantity: 1 }] },
+      ],
+      outcomeRouting: null,
+      timeRequirement: null,
+    },
   ];
 
   const recipe = makeRecipe({ craftingSystemId: 'sys-1', steps });
@@ -458,15 +499,24 @@ test('multi-step: craft() advances through two steps to completion', async () =>
   const recipeManager = {
     canCraft(_actors, executionRecipe) {
       const currentSets = executionRecipe.ingredientSets || [];
-      if (currentSets.some(s => s.id === 'set-step1')) {
+      if (currentSets.some((s) => s.id === 'set-step1')) {
         return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [] } };
       }
-      if (currentSets.some(s => s.id === 'set-step2')) {
+      if (currentSets.some((s) => s.id === 'set-step2')) {
         return { canCraft: true, satisfiableSet: set2, missing: { ingredients: [], essences: [] } };
       }
-      return { canCraft: false, satisfiableSet: null, missing: { ingredients: [{ ingredient: { getDescription: () => 'Item' }, have: 0, need: 1 }], essences: [] } };
+      return {
+        canCraft: false,
+        satisfiableSet: null,
+        missing: {
+          ingredients: [{ ingredient: { getDescription: () => 'Item' }, have: 0, need: 1 }],
+          essences: [],
+        },
+      };
     },
-    ingredientMatchesItem(_recipe, ingredient, item) { return item.id === ingredient.systemItemId; }
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item.id === ingredient.systemItemId;
+    },
   };
 
   const resolutionService = makeResolutionService(system);
@@ -477,15 +527,29 @@ test('multi-step: craft() advances through two steps to completion', async () =>
   const result1 = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
   assert.equal(result1.success, true, 'step 1 should succeed');
-  assert.equal(runManager.storedRun.currentStepIndex, 1, 'run should advance to step index 1 after step 1');
-  assert.equal(runManager.storedRun.status, 'inProgress', 'run should still be inProgress after step 1');
+  assert.equal(
+    runManager.storedRun.currentStepIndex,
+    1,
+    'run should advance to step index 1 after step 1'
+  );
+  assert.equal(
+    runManager.storedRun.status,
+    'inProgress',
+    'run should still be inProgress after step 1'
+  );
   assert.ok(herb.updateCalled || herb.deleteCalled, 'herb should be consumed in step 1');
 
   // Step 2: craft resumes existing run and executes step 1
-  const result2 = await engine.craft(craftingActor, [sourceActor], recipe, null, { runId: 'run-1' });
+  const result2 = await engine.craft(craftingActor, [sourceActor], recipe, null, {
+    runId: 'run-1',
+  });
 
   assert.equal(result2.success, true, 'step 2 should succeed');
-  assert.equal(runManager.storedRun.status, 'succeeded', 'run should be succeeded after final step');
+  assert.equal(
+    runManager.storedRun.status,
+    'succeeded',
+    'run should be succeeded after final step'
+  );
   assert.ok(ore.updateCalled || ore.deleteCalled, 'ore should be consumed in step 2');
 
   // Both steps created result items
@@ -498,8 +562,8 @@ test('multi-step: a cancelled interactive continuation aborts the resume with ze
     resolutionMode: 'simple',
     managedItems: [
       { id: 'comp-extract', registeredItemUuid: 'uuid:extract', difficulty: 1 },
-      { id: 'comp-ingot', registeredItemUuid: 'uuid:ingot', difficulty: 1 }
-    ]
+      { id: 'comp-ingot', registeredItemUuid: 'uuid:ingot', difficulty: 1 },
+    ],
   });
   setupGame(system);
 
@@ -519,15 +583,25 @@ test('multi-step: a cancelled interactive continuation aborts the resume with ze
 
   const steps = [
     {
-      id: 'step-1', name: 'Step 1',
+      id: 'step-1',
+      name: 'Step 1',
       ingredientSets: [set1],
-      resultGroups: [{ id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'comp-extract', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
+      resultGroups: [
+        { id: 'rg-s1', results: [{ id: 'r-s1', componentId: 'comp-extract', quantity: 1 }] },
+      ],
+      outcomeRouting: null,
+      timeRequirement: null,
     },
     {
-      id: 'step-2', name: 'Step 2',
+      id: 'step-2',
+      name: 'Step 2',
       ingredientSets: [set2],
-      resultGroups: [{ id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'comp-ingot', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
-    }
+      resultGroups: [
+        { id: 'rg-s2', results: [{ id: 'r-s2', componentId: 'comp-ingot', quantity: 1 }] },
+      ],
+      outcomeRouting: null,
+      timeRequirement: null,
+    },
   ];
 
   const recipe = makeRecipe({ craftingSystemId: 'sys-1', steps });
@@ -538,15 +612,17 @@ test('multi-step: a cancelled interactive continuation aborts the resume with ze
   const recipeManager = {
     canCraft(_actors, executionRecipe) {
       const currentSets = executionRecipe.ingredientSets || [];
-      if (currentSets.some(s => s.id === 'set-step1')) {
+      if (currentSets.some((s) => s.id === 'set-step1')) {
         return { canCraft: true, satisfiableSet: set1, missing: { ingredients: [], essences: [] } };
       }
-      if (currentSets.some(s => s.id === 'set-step2')) {
+      if (currentSets.some((s) => s.id === 'set-step2')) {
         return { canCraft: true, satisfiableSet: set2, missing: { ingredients: [], essences: [] } };
       }
       return { canCraft: false, satisfiableSet: null, missing: { ingredients: [], essences: [] } };
     },
-    ingredientMatchesItem(_recipe, ingredient, item) { return item.id === ingredient.systemItemId; }
+    ingredientMatchesItem(_recipe, ingredient, item) {
+      return item.id === ingredient.systemItemId;
+    },
   };
 
   const resolutionService = makeResolutionService(system);
@@ -564,14 +640,18 @@ test('multi-step: a cancelled interactive continuation aborts the resume with ze
   const oreConsumedBefore = ore.updateCalled || ore.deleteCalled;
   const result2 = await engine.craft(craftingActor, [sourceActor], recipe, null, {
     runId: 'run-1',
-    interactive: true
+    interactive: true,
   });
 
   assert.equal(result2.success, false, 'cancelled continuation is not a success');
   assert.equal(result2.cancelled, true, 'cancelled flag surfaced');
   assert.equal(runManager.storedRun.currentStepIndex, 1, 'run did NOT advance past step index 1');
   assert.equal(runManager.storedRun.status, 'inProgress', 'run still in progress after cancel');
-  assert.equal(ore.updateCalled || ore.deleteCalled, oreConsumedBefore, 'step-2 ingredient not consumed on cancel');
+  assert.equal(
+    ore.updateCalled || ore.deleteCalled,
+    oreConsumedBefore,
+    'step-2 ingredient not consumed on cancel'
+  );
 });
 
 test('multi-step: craft() returns failure when step ingredient is insufficient', async () => {
@@ -582,11 +662,16 @@ test('multi-step: craft() returns failure when step ingredient is insufficient',
   const herb = makeItem({ id: 'herb-insuf', name: 'Herb', quantity: 1 });
   const set1 = makeIngredientSet({ id: 'set-step1', ingredientItem: herb, quantity: 2 });
 
-  const steps = [{
-    id: 'step-1', name: 'Step 1',
-    ingredientSets: [set1],
-    resultGroups: [{ id: 'rg-s1', results: [] }], outcomeRouting: null, timeRequirement: null
-  }];
+  const steps = [
+    {
+      id: 'step-1',
+      name: 'Step 1',
+      ingredientSets: [set1],
+      resultGroups: [{ id: 'rg-s1', results: [] }],
+      outcomeRouting: null,
+      timeRequirement: null,
+    },
+  ];
 
   const recipe = makeRecipe({ craftingSystemId: 'sys-1', steps });
   const craftingActor = makeActor({ id: 'a-insuf' });
@@ -600,10 +685,10 @@ test('multi-step: craft() returns failure when step ingredient is insufficient',
         missing: {
           ingredients: [{ ingredient: { getDescription: () => '2x Herb' }, have: 1, need: 2 }],
           essences: [],
-        }
+        },
       };
     },
-    ingredientMatchesItem: () => false
+    ingredientMatchesItem: () => false,
   };
 
   const resolutionService = makeResolutionService(system);
@@ -627,12 +712,12 @@ function makeLegacyOutcomeRoutingSystem(id = 'sys-legacy-routing') {
       enabled: true,
       outcomes: ['critical', 'pass', 'fail'],
       progressive: null,
-      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
     },
     managedItems: [
       { id: 'comp-great-potion', registeredItemUuid: 'uuid:great-potion', difficulty: 1 },
-      { id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 }
-    ]
+      { id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 },
+    ],
   });
 }
 
@@ -644,19 +729,29 @@ function makeLegacyOutcomeRoutingRecipeFixture(system) {
   // name-matched against the outcome. The non-reserved outcomes `critical`/`pass`
   // name their groups; the reserved `fail` outcome takes the failure path.
   const step = {
-    id: 'step-1', name: 'Step 1',
+    id: 'step-1',
+    name: 'Step 1',
     ingredientSets: [ingredientSet],
     resultGroups: [
-      { id: 'rg-critical', name: 'critical', results: [{ id: 'r-critical', componentId: 'comp-great-potion', quantity: 1 }] },
-      { id: 'rg-pass', name: 'pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }
+      {
+        id: 'rg-critical',
+        name: 'critical',
+        results: [{ id: 'r-critical', componentId: 'comp-great-potion', quantity: 1 }],
+      },
+      {
+        id: 'rg-pass',
+        name: 'pass',
+        results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }],
+      },
     ],
-    resultSelection: { provider: 'check' }, timeRequirement: null
+    resultSelection: { provider: 'check' },
+    timeRequirement: null,
   };
 
   const recipe = makeRecipe({
     craftingSystemId: system.id,
     resultSelection: { provider: 'check' },
-    steps: [step]
+    steps: [step],
   });
 
   return { herb, ingredientSet, step, recipe };
@@ -681,13 +776,22 @@ test('routed check: "critical" outcome routes to the critical-named result group
   const recipeManager = makeRecipeManager({ ingredientItem: herb, ingredientSet });
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
-  engine._runCraftingCheck = async () => ({ success: true, outcome: 'critical', value: 20, data: {} });
+  engine._runCraftingCheck = async () => ({
+    success: true,
+    outcome: 'critical',
+    value: 20,
+    data: {},
+  });
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
   assert.equal(result.success, true, 'routed check craft should succeed');
   assert.equal(craftingActor.createdItems.length, 1, 'exactly one result item created');
-  assert.equal(craftingActor.createdItems[0].name, 'Greater Potion', '"critical" outcome routes to Greater Potion');
+  assert.equal(
+    craftingActor.createdItems[0].name,
+    'Greater Potion',
+    '"critical" outcome routes to Greater Potion'
+  );
 });
 
 test('routed check: "pass" outcome routes to the pass-named result group', async () => {
@@ -721,7 +825,11 @@ test('routed check: "pass" outcome routes to the pass-named result group', async
 
   assert.equal(result.success, true, 'routed check craft should succeed with "pass" outcome');
   assert.equal(craftingActor.createdItems.length, 1, 'exactly one result item created');
-  assert.equal(craftingActor.createdItems[0].name, 'Potion', '"pass" outcome routes to normal Potion');
+  assert.equal(
+    craftingActor.createdItems[0].name,
+    'Potion',
+    '"pass" outcome routes to normal Potion'
+  );
 });
 
 test('routed check: check failure returns failure without creating results', async () => {
@@ -733,16 +841,24 @@ test('routed check: check failure returns failure without creating results', asy
   const ingredientSet = makeIngredientSet({ id: 'set-t3', ingredientItem: herb, quantity: 1 });
 
   const step = {
-    id: 'step-1', name: 'Step 1',
+    id: 'step-1',
+    name: 'Step 1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-pass', name: 'pass', results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }] }],
-    resultSelection: { provider: 'check' }, timeRequirement: null
+    resultGroups: [
+      {
+        id: 'rg-pass',
+        name: 'pass',
+        results: [{ id: 'r-pass', componentId: 'comp-potion', quantity: 1 }],
+      },
+    ],
+    resultSelection: { provider: 'check' },
+    timeRequirement: null,
   };
 
   const recipe = makeRecipe({
     craftingSystemId: system.id,
     resultSelection: { provider: 'check' },
-    steps: [step]
+    steps: [step],
   });
 
   const sourceActor = makeActor({ id: 'a-t3', items: [herb] });
@@ -751,7 +867,13 @@ test('routed check: check failure returns failure without creating results', asy
   const recipeManager = makeRecipeManager({ ingredientItem: herb, ingredientSet });
   const resolutionService = makeResolutionService(system);
   const engine = new CraftingEngine(recipeManager, null, resolutionService);
-  engine._runCraftingCheck = async () => ({ success: false, message: 'Roll too low', outcome: null, value: null, data: {} });
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    message: 'Roll too low',
+    outcome: null,
+    value: null,
+    data: {},
+  });
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -772,13 +894,13 @@ function makeProgressiveSystem(id = 'sys-prog') {
       enabled: true,
       outcomes: [],
       progressive: { awardMode: 'equal', rollFormula: '1d20' },
-      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false }
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
     },
     managedItems: [
       { id: 'comp-a', registeredItemUuid: 'uuid:item-a', difficulty: 3 },
       { id: 'comp-b', registeredItemUuid: 'uuid:item-b', difficulty: 5 },
-      { id: 'comp-c', registeredItemUuid: 'uuid:item-c', difficulty: 7 }
-    ]
+      { id: 'comp-c', registeredItemUuid: 'uuid:item-c', difficulty: 7 },
+    ],
   });
 }
 
@@ -800,16 +922,21 @@ test('progressive mode: check value 8 awards comp-a (cost 3) and comp-b (cost 5)
   const ingredientSet = makeIngredientSet({ id: 'set-p1', ingredientItem: herb, quantity: 1 });
 
   const step = {
-    id: 'step-1', name: 'Step 1',
+    id: 'step-1',
+    name: 'Step 1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{
-      id: 'rg-prog',
-      results: [
-        { id: 'r-a', componentId: 'comp-a', quantity: 1 },
-        { id: 'r-b', componentId: 'comp-b', quantity: 1 },
-        { id: 'r-c', componentId: 'comp-c', quantity: 1 }
-      ]
-    }], outcomeRouting: null, timeRequirement: null
+    resultGroups: [
+      {
+        id: 'rg-prog',
+        results: [
+          { id: 'r-a', componentId: 'comp-a', quantity: 1 },
+          { id: 'r-b', componentId: 'comp-b', quantity: 1 },
+          { id: 'r-c', componentId: 'comp-c', quantity: 1 },
+        ],
+      },
+    ],
+    outcomeRouting: null,
+    timeRequirement: null,
   };
 
   const recipe = makeRecipe({ craftingSystemId: system.id, steps: [step] });
@@ -825,8 +952,12 @@ test('progressive mode: check value 8 awards comp-a (cost 3) and comp-b (cost 5)
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
   assert.equal(result.success, true, 'progressive craft should succeed');
-  assert.equal(craftingActor.createdItems.length, 2, 'exactly 2 items awarded (budget covers A and B)');
-  const names = craftingActor.createdItems.map(i => i.name);
+  assert.equal(
+    craftingActor.createdItems.length,
+    2,
+    'exactly 2 items awarded (budget covers A and B)'
+  );
+  const names = craftingActor.createdItems.map((i) => i.name);
   assert.ok(names.includes('Item A'), 'Item A should be created');
   assert.ok(names.includes('Item B'), 'Item B should be created');
   assert.ok(!names.includes('Item C'), 'Item C should NOT be created (insufficient budget)');
@@ -837,15 +968,18 @@ test('progressive mode: check value 0 awards no results', async () => {
   setupGame(system);
 
   const itemA = makeSourceItem('Item A');
-  globalThis.fromUuid = async (uuid) => uuid === 'uuid:item-a' ? itemA : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'uuid:item-a' ? itemA : null);
 
   const herb = makeItem({ id: 'herb-p2', name: 'Herb', quantity: 2 });
   const ingredientSet = makeIngredientSet({ id: 'set-p2', ingredientItem: herb, quantity: 1 });
 
   const step = {
-    id: 'step-1', name: 'Step 1',
+    id: 'step-1',
+    name: 'Step 1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-prog', results: [{ id: 'r-a', componentId: 'comp-a', quantity: 1 }] }], outcomeRouting: null, timeRequirement: null
+    resultGroups: [{ id: 'rg-prog', results: [{ id: 'r-a', componentId: 'comp-a', quantity: 1 }] }],
+    outcomeRouting: null,
+    timeRequirement: null,
   };
 
   const recipe = makeRecipe({ craftingSystemId: system.id, steps: [step] });
@@ -879,15 +1013,20 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
   const ingredientSet = makeIngredientSet({ id: 'set-p3', ingredientItem: herb, quantity: 1 });
 
   const step = {
-    id: 'step-1', name: 'Step 1',
+    id: 'step-1',
+    name: 'Step 1',
     ingredientSets: [ingredientSet],
-    resultGroups: [{
-      id: 'rg-prog',
-      results: [
-        { id: 'r-a', componentId: 'comp-a', quantity: 1 },
-        { id: 'r-b', componentId: 'comp-b', quantity: 1 }
-      ]
-    }], outcomeRouting: null, timeRequirement: null
+    resultGroups: [
+      {
+        id: 'rg-prog',
+        results: [
+          { id: 'r-a', componentId: 'comp-a', quantity: 1 },
+          { id: 'r-b', componentId: 'comp-b', quantity: 1 },
+        ],
+      },
+    ],
+    outcomeRouting: null,
+    timeRequirement: null,
   };
 
   const recipe = makeRecipe({ craftingSystemId: system.id, steps: [step] });
@@ -904,7 +1043,7 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
 
   assert.equal(result.success, true, 'progressive craft should succeed');
   assert.equal(craftingActor.createdItems.length, 2, 'both results awarded when budget covers all');
-  const names = craftingActor.createdItems.map(i => i.name);
+  const names = craftingActor.createdItems.map((i) => i.name);
   assert.ok(names.includes('Item A'), 'Item A should be created');
   assert.ok(names.includes('Item B'), 'Item B should be created');
 });
@@ -960,7 +1099,9 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
   const recipe = makeRecipe({
     craftingSystemId: 'sys-break',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] }],
+    resultGroups: [
+      { id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] },
+    ],
   });
 
   // A never-breaking tool (breakageChance 0) that records breakage via a flag — so
@@ -977,7 +1118,11 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
 
   const recipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [] },
+      };
     },
     getToolsForSet() {
       return [tool];
@@ -1032,7 +1177,9 @@ test('check-failure breakTools: a macro data.breakTools does NOT force-break the
   const recipe = makeRecipe({
     craftingSystemId: 'sys-nobreak',
     ingredientSets: [ingredientSet],
-    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] }],
+    resultGroups: [
+      { id: 'rg-1', results: [{ id: 'r-1', componentId: 'comp-potion', quantity: 1 }] },
+    ],
   });
 
   const tool = new Tool({
@@ -1047,7 +1194,11 @@ test('check-failure breakTools: a macro data.breakTools does NOT force-break the
 
   const recipeManager = {
     canCraft() {
-      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [] } };
+      return {
+        canCraft: true,
+        satisfiableSet: ingredientSet,
+        missing: { ingredients: [], essences: [] },
+      };
     },
     getToolsForSet() {
       return [tool];
@@ -1263,7 +1414,11 @@ test('craft(): the failure award is reported on the return value, the run record
   assert.equal(runManager.failurePayloads.length, 1, 'the failure was recorded');
   const recorded = runManager.failurePayloads[0].createdResults;
   assert.equal(recorded.length, 1, 'the award is in the run record');
-  assert.equal(recorded[0].name, 'Sludge', 'in the SUCCESS branch shape, name captured at award time');
+  assert.equal(
+    recorded[0].name,
+    'Sludge',
+    'in the SUCCESS branch shape, name captured at award time'
+  );
   assert.ok(recorded[0].actorUuid && recorded[0].itemUuid);
 
   // 3. THE RENDERED CHAT CARD, read as HTML rather than as the arguments passed to the

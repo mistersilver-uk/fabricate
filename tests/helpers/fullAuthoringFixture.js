@@ -35,7 +35,13 @@ export function buildFullAuthoringFixture() {
       gathering: true,
     },
     essenceDefinitions: [
-      { id: 'earth', name: 'Earth', description: '', icon: 'fas fa-mountain', sourceComponentId: 'comp-ore' },
+      {
+        id: 'earth',
+        name: 'Earth',
+        description: '',
+        icon: 'fas fa-mountain',
+        sourceComponentId: 'comp-ore',
+      },
     ],
     categories: ['Potions', 'Reagents'],
     itemTags: ['ingredient', 'reagent'],
@@ -406,10 +412,7 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
       ),
   ],
   ['gathering is enabled', (f) => f.system.features?.gathering === true],
-  [
-    'has a targeted environment',
-    (f) => f.environments.some((e) => e.selectionMode === 'targeted'),
-  ],
+  ['has a targeted environment', (f) => f.environments.some((e) => e.selectionMode === 'targeted')],
   [
     'has a blind environment with blind selection weights',
     (f) => f.environments.some((e) => e.selectionMode === 'blind' && e.blindSelection?.weights),
@@ -434,7 +437,10 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
     },
   ],
   ['has weather vocabulary', (f) => (f.gatheringConfig.vocabularies?.weather?.length ?? 0) >= 1],
-  ['has timeOfDay vocabulary', (f) => (f.gatheringConfig.vocabularies?.timeOfDay?.length ?? 0) >= 1],
+  [
+    'has timeOfDay vocabulary',
+    (f) => (f.gatheringConfig.vocabularies?.timeOfDay?.length ?? 0) >= 1,
+  ],
   ['has biome vocabulary', (f) => (f.gatheringConfig.vocabularies?.biomes?.length ?? 0) >= 1],
   ['has danger vocabulary', (f) => (f.gatheringConfig.vocabularies?.danger?.length ?? 0) >= 1],
   ['has a WORLD realm', (f) => (f.travelConfig.realms?.length ?? 0) >= 1],
@@ -523,8 +529,7 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
     'a gathering task authors a TWO-ID check-modifier pick',
     (f) =>
       (slice(f).tasks ?? []).some(
-        (task) =>
-          Array.isArray(task.checkModifierIds) && task.checkModifierIds.length === 2
+        (task) => Array.isArray(task.checkModifierIds) && task.checkModifierIds.length === 2
       ),
   ],
 ]);

@@ -66,8 +66,18 @@ test('selectWritableActors copies rather than filtering in place', () => {
 test('runStartupMaintenance runs every pass in order', async () => {
   const order = [];
   const failed = await runStartupMaintenance([
-    ['first', async () => { order.push('first'); }],
-    ['second', async () => { order.push('second'); }],
+    [
+      'first',
+      async () => {
+        order.push('first');
+      },
+    ],
+    [
+      'second',
+      async () => {
+        order.push('second');
+      },
+    ],
   ]);
   assert.deepEqual(order, ['first', 'second']);
   assert.deepEqual(failed, [], 'nothing failed');
@@ -79,8 +89,18 @@ test('runStartupMaintenance isolates a failing pass and keeps going', async () =
 
   const failed = await runStartupMaintenance(
     [
-      ['crafting runs', async () => { throw new Error('User lacks permission to update Actor'); }],
-      ['learned recipes', async () => { ran.push('learned recipes'); }],
+      [
+        'crafting runs',
+        async () => {
+          throw new Error('User lacks permission to update Actor');
+        },
+      ],
+      [
+        'learned recipes',
+        async () => {
+          ran.push('learned recipes');
+        },
+      ],
     ],
     { log: (message, error) => logged.push({ message, error }) }
   );
@@ -99,8 +119,18 @@ test('runStartupMaintenance never rejects, so it can never block readiness', asy
   await assert.doesNotReject(() =>
     runStartupMaintenance(
       [
-        ['a', async () => { throw new Error('boom'); }],
-        ['b', async () => { throw new Error('boom'); }],
+        [
+          'a',
+          async () => {
+            throw new Error('boom');
+          },
+        ],
+        [
+          'b',
+          async () => {
+            throw new Error('boom');
+          },
+        ],
       ],
       { log: () => {} }
     )

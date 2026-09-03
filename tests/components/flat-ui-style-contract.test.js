@@ -7,15 +7,10 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const specPath = resolve(repoRoot, 'openspec/specs/ui-integration/spec.md');
-const productRoots = [
-  resolve(repoRoot, 'src/ui'),
-  resolve(repoRoot, 'styles')
-];
+const productRoots = [resolve(repoRoot, 'src/ui'), resolve(repoRoot, 'styles')];
 const allowedExtensions = new Set(['.js', '.svelte', '.css']);
 const gradientPattern = /\b(?:linear|radial|conic)-gradient\s*\(/g;
-const allowedGradientSelectors = [
-  '.fabricate-manager .manager-tool-breakage-chance-control'
-];
+const allowedGradientSelectors = ['.fabricate-manager .manager-tool-breakage-chance-control'];
 
 function collectProductFiles(rootPath) {
   const files = [];
@@ -44,7 +39,7 @@ function isAllowedGradientUse(filePath, source, index) {
   if (ruleOpen < ruleStart) return false;
 
   const selectorText = source.slice(ruleStart, ruleOpen).trim();
-  return allowedGradientSelectors.some(selector => selectorText.includes(selector));
+  return allowedGradientSelectors.some((selector) => selectorText.includes(selector));
 }
 
 describe('Flat UI style contract', () => {
@@ -52,7 +47,7 @@ describe('Flat UI style contract', () => {
     const specSource = readFileSync(specPath, 'utf8');
 
     assert.ok(
-      specSource.includes("must not use `linear-gradient`, `radial-gradient`, or `conic-gradient`"),
+      specSource.includes('must not use `linear-gradient`, `radial-gradient`, or `conic-gradient`'),
       'the UI spec should explicitly forbid gradient backgrounds in product UI'
     );
     assert.ok(

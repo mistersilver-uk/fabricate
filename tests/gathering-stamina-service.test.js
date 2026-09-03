@@ -22,7 +22,7 @@ function makeFakeActor() {
     setFlag: async (ns, key, value) => {
       flags = { ...flags, [`${ns}.${key}`]: value };
       return value;
-    }
+    },
   };
 }
 
@@ -33,21 +33,22 @@ function staminaEntry(actor, systemId = 'sys') {
 }
 
 function makeService({
-  economy = { stamina: { enabled: true, max: '40', start: '', regen: { policy: 'none' } }, nodes: { enabled: false } },
+  economy = {
+    stamina: { enabled: true, max: '40', start: '', regen: { policy: 'none' } },
+    nodes: { enabled: false },
+  },
   evaluate = null,
   now = () => 0,
-  secondsPerUnit = () => HOUR
+  secondsPerUnit = () => HOUR,
 } = {}) {
   const hooks = [];
   const service = new GatheringStaminaService({
     getSystemEconomy: () => economy,
-    evaluateExpression: evaluate
-      ? async (payload) => evaluate(payload)
-      : null,
+    evaluateExpression: evaluate ? async (payload) => evaluate(payload) : null,
     secondsPerUnit,
     now,
     callHook: (name, payload) => hooks.push({ name, payload }),
-    historyEvent: (type, data = {}) => ({ id: `${type}-stub`, type, worldTime: now(), ...data })
+    historyEvent: (type, data = {}) => ({ id: `${type}-stub`, type, worldTime: now(), ...data }),
   });
   return { service, hooks };
 }
@@ -77,7 +78,7 @@ test('getActorStamina maps legacy provider:external to a read-only max', async (
   const { service } = makeService();
   const actor = makeFakeActor();
   await actor.setFlag('fabricate', 'gatheringState', {
-    stamina: { sys: { max: 10, current: 5, provider: 'external' } }
+    stamina: { sys: { max: 10, current: 5, provider: 'external' } },
   });
   assert.equal(service.getActorStamina(actor, 'sys').maxReadOnly, true);
 });
@@ -86,8 +87,15 @@ test('getActorStamina maps legacy provider:external to a read-only max', async (
 
 test('seedActorStaminaIfNeeded rolls max/start once and persists numbers', async () => {
   const { service, hooks } = makeService({
-    economy: { stamina: { enabled: true, max: '40', start: '', regen: { policy: 'overTime', unit: 'hours' } } },
-    now: () => 100
+    economy: {
+      stamina: {
+        enabled: true,
+        max: '40',
+        start: '',
+        regen: { policy: 'overTime', unit: 'hours' },
+      },
+    },
+    now: () => 100,
   });
   const actor = makeFakeActor();
   const entry = await service.seedActorStaminaIfNeeded({ actor, systemId: 'sys' });
@@ -100,7 +108,7 @@ test('seedActorStaminaIfNeeded rolls max/start once and persists numbers', async
 
 test('seedActorStaminaIfNeeded is idempotent unless forced', async () => {
   const { service } = makeService({
-    economy: { stamina: { enabled: true, max: '40', start: '', regen: { policy: 'none' } } }
+    economy: { stamina: { enabled: true, max: '40', start: '', regen: { policy: 'none' } } },
   });
   const actor = makeFakeActor();
   await service.seedActorStaminaIfNeeded({ actor, systemId: 'sys' });
@@ -113,19 +121,34 @@ test('seedActorStaminaIfNeeded is idempotent unless forced', async () => {
 
 test('seedActorStaminaIfNeeded no-ops when stamina disabled or max blank', async () => {
   const disabled = makeService({ economy: { stamina: { enabled: false } } });
-  assert.equal(await disabled.service.seedActorStaminaIfNeeded({ actor: makeFakeActor(), systemId: 'sys' }), null);
+  assert.equal(
+    await disabled.service.seedActorStaminaIfNeeded({ actor: makeFakeActor(), systemId: 'sys' }),
+    null
+  );
 
   const noMax = makeService({ economy: { stamina: { enabled: true, max: '', start: '' } } });
-  assert.equal(await noMax.service.seedActorStaminaIfNeeded({ actor: makeFakeActor(), systemId: 'sys' }), null);
+  assert.equal(
+    await noMax.service.seedActorStaminaIfNeeded({ actor: makeFakeActor(), systemId: 'sys' }),
+    null
+  );
 });
 
 // --- _evaluateStaminaExpression -------------------------------------------
 
 test('_evaluateStaminaExpression returns null for blank and resolves the evaluator', async () => {
   const seen = [];
-  const { service } = makeService({ evaluate: (p) => { seen.push(p); return 7; } });
+  const { service } = makeService({
+    evaluate: (p) => {
+      seen.push(p);
+      return 7;
+    },
+  });
   assert.equal(await service._evaluateStaminaExpression({ expression: '' }), null);
-  const value = await service._evaluateStaminaExpression({ expression: '1d1+6', actor: makeFakeActor(), kind: 'staminaMax' });
+  const value = await service._evaluateStaminaExpression({
+    expression: '1d1+6',
+    actor: makeFakeActor(),
+    kind: 'staminaMax',
+  });
   assert.equal(value, 7);
   assert.equal(seen[0].kind, 'staminaMax');
 });
@@ -136,7 +159,7 @@ test('setActorStamina preserves the regen anchor on a manual GM set', async () =
   const { service } = makeService();
   const actor = makeFakeActor();
   await actor.setFlag('fabricate', 'gatheringState', {
-    stamina: { sys: { max: 40, current: 20, lastRegenWorldTime: 555 } }
+    stamina: { sys: { max: 40, current: 20, lastRegenWorldTime: 555 } },
   });
   const next = await service.setActorStamina(actor, { systemId: 'sys', current: 10 });
   assert.equal(next.current, 10);
@@ -147,23 +170,39 @@ test('adjustActorStamina clamps to the effective cap and floors at zero', async 
   const { service } = makeService();
   const actor = makeFakeActor();
   await service.setActorStamina(actor, { systemId: 'sys', current: 5, max: 40 });
-  assert.equal((await service.adjustActorStamina(actor, { systemId: 'sys', delta: 100 })).current, 40);
-  assert.equal((await service.adjustActorStamina(actor, { systemId: 'sys', delta: -1000 })).current, 0);
+  assert.equal(
+    (await service.adjustActorStamina(actor, { systemId: 'sys', delta: 100 })).current,
+    40
+  );
+  assert.equal(
+    (await service.adjustActorStamina(actor, { systemId: 'sys', delta: -1000 })).current,
+    0
+  );
 });
 
 // --- regenerateActorStamina (anchor math) ---------------------------------
 
 test('regenerateActorStamina adds per-interval amount and advances the anchor', async () => {
   const { service } = makeService({
-    economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } },
+    economy: {
+      stamina: {
+        enabled: true,
+        max: '40',
+        regen: { policy: 'overTime', unit: 'hours', amount: '2' },
+      },
+    },
     evaluate: () => 2,
-    now: () => 0
+    now: () => 0,
   });
   const actor = makeFakeActor();
   await actor.setFlag('fabricate', 'gatheringState', {
-    stamina: { sys: { max: 40, current: 10, lastRegenWorldTime: 0, regenerationMode: 'auto' } }
+    stamina: { sys: { max: 40, current: 10, lastRegenWorldTime: 0, regenerationMode: 'auto' } },
   });
-  const next = await service.regenerateActorStamina({ actor, systemId: 'sys', worldTime: 3 * HOUR });
+  const next = await service.regenerateActorStamina({
+    actor,
+    systemId: 'sys',
+    worldTime: 3 * HOUR,
+  });
   assert.equal(next.current, 16, '3 intervals × 2');
   assert.equal(next.lastRegenWorldTime, 3 * HOUR, 'anchor advanced by consumed intervals');
 });
@@ -173,17 +212,31 @@ test('regenerateActorStamina adds per-interval amount and advances the anchor', 
 // legitimately sit ahead of the current world time.
 test('regenerateActorStamina freezes the anchor without gain when time runs backwards', async () => {
   const { service } = makeService({
-    economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } },
-    evaluate: () => 2
+    economy: {
+      stamina: {
+        enabled: true,
+        max: '40',
+        regen: { policy: 'overTime', unit: 'hours', amount: '2' },
+      },
+    },
+    evaluate: () => 2,
   });
   const actor = makeFakeActor();
   await actor.setFlag('fabricate', 'gatheringState', {
-    stamina: { sys: { max: 40, current: 10, lastRegenWorldTime: 5 * HOUR } }
+    stamina: { sys: { max: 40, current: 10, lastRegenWorldTime: 5 * HOUR } },
   });
-  const result = await service.regenerateActorStamina({ actor, systemId: 'sys', worldTime: 2 * HOUR });
+  const result = await service.regenerateActorStamina({
+    actor,
+    systemId: 'sys',
+    worldTime: 2 * HOUR,
+  });
   assert.equal(result, null, 'no-op on backwards time');
   assert.equal(service.getActorStamina(actor, 'sys').current, 10);
-  assert.equal(staminaEntry(actor).lastRegenWorldTime, 5 * HOUR, 'the anchor never moves backwards');
+  assert.equal(
+    staminaEntry(actor).lastRegenWorldTime,
+    5 * HOUR,
+    'the anchor never moves backwards'
+  );
 });
 
 // The pool shape `setActorStamina` produces on an actor with NO prior pool: it
@@ -192,29 +245,65 @@ test('regenerateActorStamina freezes the anchor without gain when time runs back
 // An absent anchor must SEED (not freeze), or that pool never regenerates again.
 test('regenerateActorStamina seeds an anchorless pool at now, then regenerates from the seed', async () => {
   const { service } = makeService({
-    economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } },
-    evaluate: () => 2
+    economy: {
+      stamina: {
+        enabled: true,
+        max: '40',
+        regen: { policy: 'overTime', unit: 'hours', amount: '2' },
+      },
+    },
+    evaluate: () => 2,
   });
   const actor = makeFakeActor();
   await actor.setFlag('fabricate', 'gatheringState', {
-    stamina: { sys: { max: 40, current: 10, regenerationMode: 'auto' } }
+    stamina: { sys: { max: 40, current: 10, regenerationMode: 'auto' } },
   });
-  const seeded = await service.regenerateActorStamina({ actor, systemId: 'sys', worldTime: 3 * HOUR });
+  const seeded = await service.regenerateActorStamina({
+    actor,
+    systemId: 'sys',
+    worldTime: 3 * HOUR,
+  });
   assert.equal(seeded, null, 'seeding is not a regeneration — it grants no backlog');
   assert.equal(staminaEntry(actor).lastRegenWorldTime, 3 * HOUR, 'anchored at now and persisted');
   assert.equal(staminaEntry(actor).current, 10, 'the count is untouched by the seed');
   // Second observation: a single call cannot distinguish "seeded correctly" from
   // "frozen forever", so prove the seeded pool still accrues.
-  const later = await service.regenerateActorStamina({ actor, systemId: 'sys', worldTime: 5 * HOUR });
+  const later = await service.regenerateActorStamina({
+    actor,
+    systemId: 'sys',
+    worldTime: 5 * HOUR,
+  });
   assert.equal(later.current, 14, '2 intervals × 2 measured from the seeded anchor');
 });
 
 test('regenerateActorStamina no-ops when regen is off or the pool is unmaterialized', async () => {
-  const off = makeService({ economy: { stamina: { enabled: true, max: '40', regen: { policy: 'none' } } } });
-  assert.equal(await off.service.regenerateActorStamina({ actor: makeFakeActor(), systemId: 'sys', worldTime: HOUR }), null);
+  const off = makeService({
+    economy: { stamina: { enabled: true, max: '40', regen: { policy: 'none' } } },
+  });
+  assert.equal(
+    await off.service.regenerateActorStamina({
+      actor: makeFakeActor(),
+      systemId: 'sys',
+      worldTime: HOUR,
+    }),
+    null
+  );
 
   const noPool = makeService({
-    economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } }
+    economy: {
+      stamina: {
+        enabled: true,
+        max: '40',
+        regen: { policy: 'overTime', unit: 'hours', amount: '2' },
+      },
+    },
   });
-  assert.equal(await noPool.service.regenerateActorStamina({ actor: makeFakeActor(), systemId: 'sys', worldTime: HOUR }), null);
+  assert.equal(
+    await noPool.service.regenerateActorStamina({
+      actor: makeFakeActor(),
+      systemId: 'sys',
+      worldTime: HOUR,
+    }),
+    null
+  );
 });

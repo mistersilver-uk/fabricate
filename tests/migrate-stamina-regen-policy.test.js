@@ -8,7 +8,11 @@ function configWithRegen(regen) {
 }
 
 test('rewrites a legacy elapsedTime stamina-regen policy to overTime', () => {
-  const config = configWithRegen({ policy: 'elapsedTime', unit: 'days', amount: '1 + @abilities.con.mod' });
+  const config = configWithRegen({
+    policy: 'elapsedTime',
+    unit: 'days',
+    amount: '1 + @abilities.con.mod',
+  });
   const { gatheringConfig } = migrateStaminaRegenPolicy(config);
   const regen = gatheringConfig.systems['sys-a'].economy.stamina.regen;
   assert.equal(regen.policy, 'overTime');
@@ -23,17 +27,26 @@ test('preserves sibling economy fields (max/start/nodes) while migrating', () =>
     systems: {
       'sys-a': {
         economy: {
-          stamina: { enabled: true, max: '20', start: '12', regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 } },
-          nodes: { enabled: true }
-        }
-      }
-    }
+          stamina: {
+            enabled: true,
+            max: '20',
+            start: '12',
+            regen: { policy: 'elapsedTime', unit: 'hours', amount: 5 },
+          },
+          nodes: { enabled: true },
+        },
+      },
+    },
   };
-  const stamina = migrateStaminaRegenPolicy(config).gatheringConfig.systems['sys-a'].economy.stamina;
+  const stamina =
+    migrateStaminaRegenPolicy(config).gatheringConfig.systems['sys-a'].economy.stamina;
   assert.equal(stamina.regen.policy, 'overTime');
   assert.equal(stamina.max, '20');
   assert.equal(stamina.start, '12');
-  assert.equal(migrateStaminaRegenPolicy(config).gatheringConfig.systems['sys-a'].economy.nodes.enabled, true);
+  assert.equal(
+    migrateStaminaRegenPolicy(config).gatheringConfig.systems['sys-a'].economy.nodes.enabled,
+    true
+  );
 });
 
 test('migrates every system independently', () => {
@@ -41,8 +54,8 @@ test('migrates every system independently', () => {
     systems: {
       'sys-a': { economy: { stamina: { regen: { policy: 'elapsedTime', unit: 'hours' } } } },
       'sys-b': { economy: { stamina: { regen: { policy: 'overTime', unit: 'days' } } } },
-      'sys-c': { economy: { stamina: { regen: { policy: 'none' } } } }
-    }
+      'sys-c': { economy: { stamina: { regen: { policy: 'none' } } } },
+    },
   };
   const { systems } = migrateStaminaRegenPolicy(config).gatheringConfig;
   assert.equal(systems['sys-a'].economy.stamina.regen.policy, 'overTime');

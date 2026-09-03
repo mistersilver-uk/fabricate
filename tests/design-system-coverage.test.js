@@ -52,7 +52,11 @@ import {
 } from '../scripts/lib/designSystemPrimitives.js';
 import { listSvelteComponents, toRepositoryPaths } from '../scripts/lib/svelteComponentFiles.js';
 
-import { parseDesignLibrary, primitiveNamesIn, readDesignLibrary } from './helpers/designLibrary.js';
+import {
+  parseDesignLibrary,
+  primitiveNamesIn,
+  readDesignLibrary,
+} from './helpers/designLibrary.js';
 import { styleTextFor } from './helpers/styleBlockScan.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -250,13 +254,39 @@ test('every manifest library name resolves to a library entry', () => {
  * the same size as the change that caused it.
  */
 const SPECIFIED_ONLY = [
-  'AppRail', 'AppTitleBar', 'Avatar', 'BandedBar', 'BrowseCard',
-  'ChoiceGroup', 'DataTable', 'InfoStrip', 'Kicker',
-  'ListRow', 'LogList', 'Menu', 'Meter', 'NavSidebar',
-  'Notice', 'PageHeader', 'PickerRow', 'Rail',
-  'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'Select',
-  'SetPicker', 'SortableList', 'StageBars', 'StatBox', 'TierTrack',
-  'ValidationList', 'ValidationSummary', 'ViewToggle', 'Well', 'XrefList',
+  'AppRail',
+  'AppTitleBar',
+  'Avatar',
+  'BandedBar',
+  'BrowseCard',
+  'ChoiceGroup',
+  'DataTable',
+  'InfoStrip',
+  'Kicker',
+  'ListRow',
+  'LogList',
+  'Menu',
+  'Meter',
+  'NavSidebar',
+  'Notice',
+  'PageHeader',
+  'PickerRow',
+  'Rail',
+  'RequirementChooser',
+  'RuleRow',
+  'RuleSentence',
+  'Search',
+  'Select',
+  'SetPicker',
+  'SortableList',
+  'StageBars',
+  'StatBox',
+  'TierTrack',
+  'ValidationList',
+  'ValidationSummary',
+  'ViewToggle',
+  'Well',
+  'XrefList',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
@@ -763,7 +793,10 @@ test('every component the library cites by filename still exists', () => {
     (match) => match[0]
   );
   const cited = [...new Set(citations)].sort(byCodePoint);
-  assert.ok(cited.length > 20, `the library cites ${cited.length} components, so it stopped citing`);
+  assert.ok(
+    cited.length > 20,
+    `the library cites ${cited.length} components, so it stopped citing`
+  );
   for (const file of cited) {
     assert.ok(
       SHIPPED_COMPONENT_NAMES.has(path.basename(file, '.svelte')),

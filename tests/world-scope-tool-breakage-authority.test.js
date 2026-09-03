@@ -232,7 +232,10 @@ test('the UI readers are routed at ONE point: the selected-system projection (is
   // rather than inferring a completeness it does not have.
   const TOOL_BREAKAGE_READ = /[A-Za-z0-9_$?.[\]'"]*\??\.toolBreakage\b[A-Za-z0-9_$?.[\]'"]*/g;
   const reads = root.match(TOOL_BREAKAGE_READ) ?? [];
-  assert.ok(reads.length > 0, 'the shell reads this field somewhere; a zero count is a broken scan');
+  assert.ok(
+    reads.length > 0,
+    'the shell reads this field somewhere; a zero count is a broken scan'
+  );
   const tally = new Map();
   for (const read of reads) tally.set(read, (tally.get(read) ?? 0) + 1);
   assert.deepEqual(
@@ -286,9 +289,8 @@ test('the source pill names all three layers, including the one no frame can rea
   // acts on: an amber pill says this system has departed from the world, and an informational
   // one says it has not. A branch that returned the right words in the wrong tone would read as
   // a defect in a system that has none.
-  const { breakModeSourcePill } = await import(
-    '../src/ui/svelte/apps/manager/scoped/worldToolStudio.js'
-  );
+  const { breakModeSourcePill } =
+    await import('../src/ui/svelte/apps/manager/scoped/worldToolStudio.js');
   const text = (key, fallback) => fallback;
 
   assert.deepEqual(breakModeSourcePill('system', text), {

@@ -69,9 +69,8 @@ function membershipOf(store, entityId, systemId) {
   return (
     store
       .corpus()
-      .membership.find(
-        (record) => record.entityId === entityId && record.systemId === systemId
-      ) ?? null
+      .membership.find((record) => record.entityId === entityId && record.systemId === systemId) ??
+    null
   );
 }
 
@@ -119,7 +118,10 @@ test('the world repairRequirements default is writable, and updateWorldDefaultSe
   const { store, actions, reload } = toolScope();
   await actions.createEntity({ id: 'hammer', name: 'Hammer' });
 
-  const groups = [{ id: 'g1', ingredients: [] }, { id: 'g2', ingredients: [] }];
+  const groups = [
+    { id: 'g1', ingredients: [] },
+    { id: 'g2', ingredients: [] },
+  ];
 
   // THE REFUSAL IS THE REASON THE SECOND ACTION EXISTS, asserted first so the write below is
   // demonstrably not reachable any other way. `TOOL_SECTIONS` is `['breakage', 'onBreak']`.

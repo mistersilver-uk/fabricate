@@ -13,7 +13,7 @@ function buildFilterBar({
   selectedCategory = '',
   onToggleCraftable = null,
   onToggleFavourites = null,
-  onCategoryChange = null
+  onCategoryChange = null,
 } = {}) {
   const container = document.createElement('div');
   container.className = 'fabricate-filters';
@@ -79,18 +79,28 @@ describe('FilterBar: Craftable Only button', () => {
   it('has active class when showCraftableOnly is true', () => {
     const bar = buildFilterBar({ showCraftableOnly: true });
     const btn = bar.querySelector('.fabricate-filter-btn');
-    assert.ok(btn.classList.contains('active'), 'Should have active class when showCraftableOnly=true');
+    assert.ok(
+      btn.classList.contains('active'),
+      'Should have active class when showCraftableOnly=true'
+    );
   });
 
   it('does not have active class when showCraftableOnly is false', () => {
     const bar = buildFilterBar({ showCraftableOnly: false });
     const btn = bar.querySelector('.fabricate-filter-btn');
-    assert.ok(!btn.classList.contains('active'), 'Should not have active class when showCraftableOnly=false');
+    assert.ok(
+      !btn.classList.contains('active'),
+      'Should not have active class when showCraftableOnly=false'
+    );
   });
 
   it('clicking craftable button calls onToggleCraftable', () => {
     let called = false;
-    const bar = buildFilterBar({ onToggleCraftable: () => { called = true; } });
+    const bar = buildFilterBar({
+      onToggleCraftable: () => {
+        called = true;
+      },
+    });
     bar.querySelector('.fabricate-filter-btn').click();
     assert.ok(called, 'onToggleCraftable should be called on click');
   });
@@ -119,18 +129,28 @@ describe('FilterBar: Favourites Only button', () => {
   it('favourites button has active class when showFavouritesOnly is true', () => {
     const bar = buildFilterBar({ showFavouritesOnly: true });
     const btn = bar.querySelector('[data-testid="favourites-filter"]');
-    assert.ok(btn.classList.contains('active'), 'Should have active class when showFavouritesOnly=true');
+    assert.ok(
+      btn.classList.contains('active'),
+      'Should have active class when showFavouritesOnly=true'
+    );
   });
 
   it('favourites button does not have active class when showFavouritesOnly is false', () => {
     const bar = buildFilterBar({ showFavouritesOnly: false });
     const btn = bar.querySelector('[data-testid="favourites-filter"]');
-    assert.ok(!btn.classList.contains('active'), 'Should not have active class when showFavouritesOnly=false');
+    assert.ok(
+      !btn.classList.contains('active'),
+      'Should not have active class when showFavouritesOnly=false'
+    );
   });
 
   it('clicking favourites button calls onToggleFavourites', () => {
     let called = false;
-    const bar = buildFilterBar({ onToggleFavourites: () => { called = true; } });
+    const bar = buildFilterBar({
+      onToggleFavourites: () => {
+        called = true;
+      },
+    });
     bar.querySelector('[data-testid="favourites-filter"]').click();
     assert.ok(called, 'onToggleFavourites should be called on click');
   });

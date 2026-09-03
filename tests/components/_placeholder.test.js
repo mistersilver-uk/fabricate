@@ -17,7 +17,11 @@ describe('happy-dom component test infrastructure', () => {
 
   it('setupDOM() provides a working document object', () => {
     assert.ok(globalThis.document, 'globalThis.document should be defined after setupDOM()');
-    assert.equal(typeof globalThis.document.createElement, 'function', 'document.createElement should be a function');
+    assert.equal(
+      typeof globalThis.document.createElement,
+      'function',
+      'document.createElement should be a function'
+    );
   });
 
   it('document.createElement() returns a real DOM element', () => {
@@ -46,9 +50,16 @@ describe('happy-dom component test infrastructure', () => {
   });
 
   it('HTMLElement is available as a constructor', () => {
-    assert.equal(typeof globalThis.HTMLElement, 'function', 'HTMLElement should be a constructor function');
+    assert.equal(
+      typeof globalThis.HTMLElement,
+      'function',
+      'HTMLElement should be a constructor function'
+    );
     const div = document.createElement('div');
-    assert.ok(div instanceof HTMLElement, 'createElement("div") should return an HTMLElement instance');
+    assert.ok(
+      div instanceof HTMLElement,
+      'createElement("div") should return an HTMLElement instance'
+    );
   });
 
   it('document.body is accessible', () => {

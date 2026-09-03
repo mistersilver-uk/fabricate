@@ -153,7 +153,12 @@ describe('InventoryListingBuilder — one card per unified physical stack (issue
     ];
     const builder = collapseBuilder(systems);
     // ONE physical document (uuid), stack quantity 2, backing a component in BOTH systems.
-    const doc = rolesDocument({ uuid: 'Item.air-1', quantity: 2, componentA: 'cA', componentB: 'cB' });
+    const doc = rolesDocument({
+      uuid: 'Item.air-1',
+      quantity: 2,
+      componentA: 'cA',
+      componentB: 'cB',
+    });
     const listing = builder.buildListing({
       craftingActor: { id: 'a1', name: 'Akra', img: null, items: [doc] },
     });
@@ -164,10 +169,7 @@ describe('InventoryListingBuilder — one card per unified physical stack (issue
     assert.notEqual(rows[0].totalQuantity, 4, 'and NEVER doubled across systems');
     assert.equal(listing.counts.components, 1);
     // Both systems are reachable via the participation array.
-    assert.deepEqual(
-      rows[0].systems.map((entry) => entry.systemId).sort(),
-      [SYS_A, SYS_B]
-    );
+    assert.deepEqual(rows[0].systems.map((entry) => entry.systemId).sort(), [SYS_A, SYS_B]);
   });
 
   it('still aggregates one component held by two source actors into one card (multi-actor)', () => {
@@ -211,7 +213,12 @@ describe('InventoryListingBuilder — one card per unified physical stack (issue
       salvageSystem(SYS_B, [salvageComponent('cB', 'Air Shard')]),
     ];
     const builder = collapseBuilder(systems);
-    const doc1 = rolesDocument({ uuid: 'Item.air-1', quantity: 2, componentA: 'cA', componentB: 'cB' });
+    const doc1 = rolesDocument({
+      uuid: 'Item.air-1',
+      quantity: 2,
+      componentA: 'cA',
+      componentB: 'cB',
+    });
     const doc2 = rolesDocument({ uuid: 'Item.air-2', quantity: 3, componentA: 'cA' });
     const listing = builder.buildListing({
       craftingActor: { id: 'a1', name: 'Akra', img: null, items: [doc1, doc2] },
@@ -263,19 +270,22 @@ describe('InventoryListingBuilder — one card per unified physical stack (issue
 
   it('unions essence pips across participations, deduped by essence id', () => {
     const systems = [
-      salvageSystem(
-        SYS_A,
-        [salvageComponent('cA', 'Air Shard', { essences: { fire: 1 } })],
-        { enableEssences: true, essenceDefinitions: [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }] }
-      ),
-      salvageSystem(
-        SYS_B,
-        [salvageComponent('cB', 'Air Shard', { essences: { fire: 2 } })],
-        { enableEssences: true, essenceDefinitions: [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }] }
-      ),
+      salvageSystem(SYS_A, [salvageComponent('cA', 'Air Shard', { essences: { fire: 1 } })], {
+        enableEssences: true,
+        essenceDefinitions: [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
+      }),
+      salvageSystem(SYS_B, [salvageComponent('cB', 'Air Shard', { essences: { fire: 2 } })], {
+        enableEssences: true,
+        essenceDefinitions: [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }],
+      }),
     ];
     const builder = collapseBuilder(systems);
-    const doc = rolesDocument({ uuid: 'Item.air-1', quantity: 1, componentA: 'cA', componentB: 'cB' });
+    const doc = rolesDocument({
+      uuid: 'Item.air-1',
+      quantity: 1,
+      componentA: 'cA',
+      componentB: 'cB',
+    });
     const listing = builder.buildListing({
       craftingActor: { id: 'a1', name: 'Akra', img: null, items: [doc] },
     });
@@ -296,7 +306,12 @@ describe('InventoryListingBuilder — one card per unified physical stack (issue
       salvageSystem(SYS_B, [salvageComponent('cB', 'Air Shard')]),
     ];
     const builder = collapseBuilder(systems);
-    const doc = rolesDocument({ uuid: 'Item.air-1', quantity: 1, componentA: 'cA', componentB: 'cB' });
+    const doc = rolesDocument({
+      uuid: 'Item.air-1',
+      quantity: 1,
+      componentA: 'cA',
+      componentB: 'cB',
+    });
     const listing = builder.buildListing({
       craftingActor: { id: 'a1', name: 'Akra', img: null, items: [doc] },
     });

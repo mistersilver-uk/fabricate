@@ -62,11 +62,8 @@ export async function destinationWorld(options = {}) {
   }
 
   const { getSetting, setSetting } = await import('../../src/config/settings.js');
-  const {
-    createComponentScopeStore,
-    createEssenceScopeStore,
-    createToolScopeStore,
-  } = await import('../../src/systems/worldScopeStores.js');
+  const { createComponentScopeStore, createEssenceScopeStore, createToolScopeStore } =
+    await import('../../src/systems/worldScopeStores.js');
   const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
   const { CompendiumImporter } = await import('../../src/systems/CompendiumImporter.js');
 

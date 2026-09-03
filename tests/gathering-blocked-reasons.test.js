@@ -5,7 +5,7 @@ import {
   BLOCK_LABEL_KEYS,
   localizeBlockedReasons,
   describeBlockedReasons,
-  calloutFor
+  calloutFor,
 } from '../src/ui/svelte/apps/gathering/gatheringBlockedReasons.js';
 
 // An echo `localize` so assertions read against the resolved keys/formatting.
@@ -17,29 +17,34 @@ describe('gatheringBlockedReasons', () => {
       [
         { code: 'STAMINA_BLOCKED' },
         { code: 'NO_CURRENT_REALM' },
-        { code: 'STAMINA_BLOCKED' } // duplicate code collapses
+        { code: 'STAMINA_BLOCKED' }, // duplicate code collapses
       ],
       localize
     );
-    assert.deepEqual(labels, [
-      BLOCK_LABEL_KEYS.STAMINA_BLOCKED,
-      BLOCK_LABEL_KEYS.NO_CURRENT_REALM
-    ]);
+    assert.deepEqual(labels, [BLOCK_LABEL_KEYS.STAMINA_BLOCKED, BLOCK_LABEL_KEYS.NO_CURRENT_REALM]);
   });
 
   it('covers the location codes that caused the silent no-op', () => {
-    assert.equal(BLOCK_LABEL_KEYS.LOCATION_BLOCKED, 'FABRICATE.App.Gathering.Detail.Callout.Location');
-    assert.equal(BLOCK_LABEL_KEYS.NO_CURRENT_REALM, 'FABRICATE.App.Gathering.Detail.Callout.NoRealm');
+    assert.equal(
+      BLOCK_LABEL_KEYS.LOCATION_BLOCKED,
+      'FABRICATE.App.Gathering.Detail.Callout.Location'
+    );
+    assert.equal(
+      BLOCK_LABEL_KEYS.NO_CURRENT_REALM,
+      'FABRICATE.App.Gathering.Detail.Callout.NoRealm'
+    );
   });
 
   it('maps the permanently-exhausted (nonRegenerating) node code to its own label (issue 301)', () => {
-    assert.equal(BLOCK_LABEL_KEYS.NODE_EXHAUSTED, 'FABRICATE.App.Gathering.Detail.Callout.NodeExhausted');
+    assert.equal(
+      BLOCK_LABEL_KEYS.NODE_EXHAUSTED,
+      'FABRICATE.App.Gathering.Detail.Callout.NodeExhausted'
+    );
     // It is distinct from the regenerating "depleted" code.
     assert.notEqual(BLOCK_LABEL_KEYS.NODE_EXHAUSTED, BLOCK_LABEL_KEYS.NODE_DEPLETED);
-    assert.deepEqual(
-      localizeBlockedReasons([{ code: 'NODE_EXHAUSTED' }], localize),
-      ['FABRICATE.App.Gathering.Detail.Callout.NodeExhausted']
-    );
+    assert.deepEqual(localizeBlockedReasons([{ code: 'NODE_EXHAUSTED' }], localize), [
+      'FABRICATE.App.Gathering.Detail.Callout.NodeExhausted',
+    ]);
   });
 
   it('falls back to the reason message, then a generic label, for unknown codes', () => {
@@ -47,10 +52,9 @@ describe('gatheringBlockedReasons', () => {
       localizeBlockedReasons([{ code: 'WEIRD_CODE', message: 'Custom reason' }], localize),
       ['Custom reason']
     );
-    assert.deepEqual(
-      localizeBlockedReasons([{ code: 'WEIRD_CODE' }], localize),
-      ['FABRICATE.App.Gathering.Detail.Blocked']
-    );
+    assert.deepEqual(localizeBlockedReasons([{ code: 'WEIRD_CODE' }], localize), [
+      'FABRICATE.App.Gathering.Detail.Blocked',
+    ]);
   });
 
   it('describeBlockedReasons builds a "Can\'t attempt — …" sentence', () => {
@@ -69,7 +73,7 @@ describe('gatheringBlockedReasons', () => {
       code: 'STAMINA_BLOCKED',
       icon: 'fa-bolt',
       tone: 'warning',
-      label: BLOCK_LABEL_KEYS.STAMINA_BLOCKED
+      label: BLOCK_LABEL_KEYS.STAMINA_BLOCKED,
     });
   });
 
@@ -83,13 +87,13 @@ describe('gatheringBlockedReasons', () => {
       code: 'WEIRD_CODE',
       icon: 'fa-triangle-exclamation',
       tone: 'warning',
-      label: 'Custom reason'
+      label: 'Custom reason',
     });
     assert.deepEqual(calloutFor('WEIRD_CODE', {}, localize), {
       code: 'WEIRD_CODE',
       icon: 'fa-triangle-exclamation',
       tone: 'warning',
-      label: 'FABRICATE.App.Gathering.Detail.Blocked'
+      label: 'FABRICATE.App.Gathering.Detail.Blocked',
     });
   });
 });

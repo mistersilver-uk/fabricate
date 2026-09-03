@@ -35,12 +35,10 @@ globalThis.game = { actors: [] };
 
 const { grantRecipeKnowledge } = await import('../src/systems/companionKnowledgeGrant.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
-const { LEARNED_RECIPES_FLAG_KEY, getFabricateFlag, setFabricateFlag } = await import(
-  '../src/config/flags.js'
-);
-const { COMPANION_OUTCOMES, GRANTED_BY_MAX_LENGTH, KNOWLEDGE_GRANT_MESSAGE_KEYS } = await import(
-  '../src/systems/companionContract.js'
-);
+const { LEARNED_RECIPES_FLAG_KEY, getFabricateFlag, setFabricateFlag } =
+  await import('../src/config/flags.js');
+const { COMPANION_OUTCOMES, GRANTED_BY_MAX_LENGTH, KNOWLEDGE_GRANT_MESSAGE_KEYS } =
+  await import('../src/systems/companionContract.js');
 const { readLearnedRecipeEntries } = await import('../src/systems/recipeKeyedFlagEntries.js');
 const { assertContractResult } = await import('./helpers/companionContractOutcomes.js');
 

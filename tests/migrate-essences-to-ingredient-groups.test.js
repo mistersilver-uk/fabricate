@@ -29,7 +29,10 @@ test('rewrites each positive per-set essence into a single-option essence group 
           {
             id: 's-1',
             ingredientGroups: [
-              { id: 'g-1', options: [{ quantity: 1, match: { type: 'component', componentId: 'c1' } }] },
+              {
+                id: 'g-1',
+                options: [{ quantity: 1, match: { type: 'component', componentId: 'c1' } }],
+              },
             ],
             essences: { fire: 2, water: 1 },
           },
@@ -74,7 +77,10 @@ test('migrates step-level ingredient sets too (no orphaned step essences)', () =
     recipes: [
       recipe('r1', {
         steps: [
-          { id: 'st-1', ingredientSets: [{ id: 's-1', ingredientGroups: [], essences: { earth: 3 } }] },
+          {
+            id: 'st-1',
+            ingredientSets: [{ id: 's-1', ingredientGroups: [], essences: { earth: 3 } }],
+          },
         ],
       }),
     ],
@@ -104,7 +110,9 @@ test('drops empty / non-positive essence entries (runtime no-ops)', () => {
   const data = {
     recipes: [
       recipe('r1', {
-        ingredientSets: [{ id: 's-1', ingredientGroups: [], essences: { fire: 0, water: -2, air: 3 } }],
+        ingredientSets: [
+          { id: 's-1', ingredientGroups: [], essences: { fire: 0, water: -2, air: 3 } },
+        ],
       }),
     ],
   };
@@ -146,7 +154,15 @@ test('disables BOTH colliding recipes after folding essences into signature-bear
     recipes: [
       recipe('A', {
         ingredientSets: [
-          { id: 'sA', ingredientGroups: [{ id: 'gA', options: [{ quantity: 1, match: { type: 'component', componentId: 'C' } }] }] },
+          {
+            id: 'sA',
+            ingredientGroups: [
+              {
+                id: 'gA',
+                options: [{ quantity: 1, match: { type: 'component', componentId: 'C' } }],
+              },
+            ],
+          },
         ],
       }),
       recipe('B', {
@@ -165,7 +181,10 @@ test('disables BOTH colliding recipes after folding essences into signature-bear
   const { recipes, _essenceCollisionDisabledRecipes } = migrateEssencesToIngredientGroups(data);
 
   // (1) both recipes still present (not deleted).
-  assert.deepEqual(recipes.map((r) => r.id).sort((a, b) => a.localeCompare(b)), ['A', 'B']);
+  assert.deepEqual(
+    recipes.map((r) => r.id).sort((a, b) => a.localeCompare(b)),
+    ['A', 'B']
+  );
   // (2) at least one collider disabled — the reconciliation disables BOTH.
   const byId = Object.fromEntries(recipes.map((r) => [r.id, r]));
   assert.equal(byId.A.enabled, false);

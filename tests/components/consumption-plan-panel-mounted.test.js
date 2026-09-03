@@ -26,7 +26,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
@@ -112,7 +112,11 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
     const pending = target.querySelector('[data-consumption-pending]').textContent;
     assert.match(pending, /ConsumptionPlan\.StillToChoose/);
     assert.match(pending, /Red Herb/);
-    assert.match(pending, /ConsumptionPlan\.EssenceRequirement/, 'an essence gets its own sentence');
+    assert.match(
+      pending,
+      /ConsumptionPlan\.EssenceRequirement/,
+      'an essence gets its own sentence'
+    );
     assert.match(pending, /Shadow/, 'and it is the SHORT requirement that is listed');
     assert.ok(!/Radiant/.test(pending), 'the met requirement is not still to choose');
   });
@@ -170,9 +174,7 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
   it('flags a row whose quantity exceeds what is held', async () => {
     const target = await harness.mount({
       plan: buildConsumptionPlan({
-        ingredientStates: [
-          { groupId: 'g-iron', name: 'Iron', need: 4, have: 1, satisfied: false },
-        ],
+        ingredientStates: [{ groupId: 'g-iron', name: 'Iron', need: 4, have: 1, satisfied: false }],
       }),
     });
     const qty = target.querySelector('.consumption-plan-qty');

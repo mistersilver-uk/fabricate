@@ -168,7 +168,8 @@ const INLINE_TARGETS = Object.freeze([
 ]);
 
 /** `:root`, or one compound of a theme block's two-selector list. */
-const THEME_ROOT_COMPOUND = /^(?::root|:root\[data-fabricate-theme="[^"]+"\]|\.fabricate\[data-fabricate-theme="[^"]+"\])$/;
+const THEME_ROOT_COMPOUND =
+  /^(?::root|:root\[data-fabricate-theme="[^"]+"\]|\.fabricate\[data-fabricate-theme="[^"]+"\])$/;
 
 /**
  * The prefix that DECLARES an intent to be area-scoped. It is no longer what the gate scans.
@@ -374,7 +375,8 @@ test('no retired token generation survives anywhere under src/ or styles/', () =
       '`openspec/specs/design-system/spec.md`. A surface that wants to name a colour it already ' +
       'gets from a foundation token reads that token directly; a forwarding alias hides it from ' +
       'every surface outside its own selector. Prose that must name a retired generation belongs ' +
-      'in the spec or in a test, both outside these roots:\n  ' + offences.join('\n  ')
+      'in the spec or in a test, both outside these roots:\n  ' +
+      offences.join('\n  ')
   );
 });
 
@@ -403,7 +405,10 @@ test('every inline target is declared only at theme root', () => {
       'satisfied by an empty set, so this is a broken walk rather than a tidied stylesheet.'
   );
   for (const [name, rules] of declaring) {
-    assert.ok(rules.length > 0, `${name} is no longer declared anywhere, so it is not a foundation token`);
+    assert.ok(
+      rules.length > 0,
+      `${name} is no longer declared anywhere, so it is not a foundation token`
+    );
   }
 
   const offences = [];
@@ -422,7 +427,8 @@ test('every inline target is declared only at theme root', () => {
       'lazy and site-local: the inline moved the substitution point from `.fabricate-manager` to ' +
       'each reading element, and that is value-preserving only while every one of these fourteen ' +
       'resolves to the same text at both places. One redeclaration inside the manager breaks it ' +
-      'silently, at hundreds of sites, in the direction nobody looks:\n  ' + offences.join('\n  ')
+      'silently, at hundreds of sites, in the direction nobody looks:\n  ' +
+      offences.join('\n  ')
   );
 });
 
@@ -452,7 +458,9 @@ test('a rule is cited at the line its own selector starts on', () => {
     const cited = (sources[rule.file] ?? '').split('\n')[rule.line - 1];
     checked += 1;
     if (cited === undefined || !cited.includes(head)) {
-      offences.push(`${rule.file}:${rule.line} \`${rule.selector}\` cites "${(cited ?? '').trim()}"`);
+      offences.push(
+        `${rule.file}:${rule.line} \`${rule.selector}\` cites "${(cited ?? '').trim()}"`
+      );
     }
   }
 
@@ -466,7 +474,8 @@ test('a rule is cited at the line its own selector starts on', () => {
     [],
     'a rule is reported at a line that does not hold the start of its selector, so every offence ' +
       'either of the assertions above prints sends its reader to the wrong place in a ' +
-      '20,000-line stylesheet — or, for a Svelte scoped block, to line 1:\n  ' + offences.join('\n  ')
+      '20,000-line stylesheet — or, for a Svelte scoped block, to line 1:\n  ' +
+      offences.join('\n  ')
   );
 });
 

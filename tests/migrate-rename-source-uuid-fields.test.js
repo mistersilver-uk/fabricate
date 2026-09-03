@@ -10,12 +10,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { migrateRenameSourceUuidFields } = await import(
-  '../src/migration/migrateRenameSourceUuidFields.js'
-);
-const { migrateToolsToFirstClass, deriveToolSourceFromComponents } = await import(
-  '../src/migration/migrateToolsToFirstClass.js'
-);
+const { migrateRenameSourceUuidFields } =
+  await import('../src/migration/migrateRenameSourceUuidFields.js');
+const { migrateToolsToFirstClass, deriveToolSourceFromComponents } =
+  await import('../src/migration/migrateToolsToFirstClass.js');
 const { migrateExportPayload } = await import('../src/migration/migrateExportPayload.js');
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 
@@ -102,7 +100,9 @@ test('1.16.0 is idempotent: migrate(migrate(x)) deep-equals migrate(x)', () => {
     },
   ];
   const once = migrateRenameSourceUuidFields(input()).systems;
-  const twice = migrateRenameSourceUuidFields(migrateRenameSourceUuidFields(input()).systems).systems;
+  const twice = migrateRenameSourceUuidFields(
+    migrateRenameSourceUuidFields(input()).systems
+  ).systems;
   assert.deepEqual(twice, once);
 });
 
@@ -111,7 +111,12 @@ test('1.16.0 tolerates new-only entries (no old keys) as a no-op', () => {
     {
       id: 'sys',
       components: [
-        { id: 'c1', registeredItemUuid: 'Item.new', originItemUuid: 'Compendium.new', aliasItemUuids: [] },
+        {
+          id: 'c1',
+          registeredItemUuid: 'Item.new',
+          originItemUuid: 'Compendium.new',
+          aliasItemUuids: [],
+        },
       ],
     },
   ]);

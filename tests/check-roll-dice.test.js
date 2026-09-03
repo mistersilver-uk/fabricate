@@ -186,7 +186,11 @@ test('evaluateCheckRoll: an invalid situational bonus is ignored and the base fo
     assert.equal(result.cancelled, undefined, 'NOT cancelled — a normal roll happened');
     assert.equal(result.total, 15, 'base formula rolled to a normal total');
     assert.ok(lastRoll, 'a Roll was constructed');
-    assert.equal(lastRoll.formula, '1d20 + 5', 'the BASE formula was rolled, not the bad combined one');
+    assert.equal(
+      lastRoll.formula,
+      '1d20 + 5',
+      'the BASE formula was rolled, not the bad combined one'
+    );
     assert.ok(
       warnings.some((w) => String(w[0]).includes('Ignoring invalid situational bonus')),
       'the ignored bonus is warned'

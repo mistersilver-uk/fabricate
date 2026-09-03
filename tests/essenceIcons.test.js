@@ -11,7 +11,7 @@ import {
   getEssenceIconOptions,
   getEssenceIconPrefix,
   normalizeEssenceColorToken,
-  normalizeEssenceIcon
+  normalizeEssenceIcon,
 } from '../src/ui/svelte/util/essenceIcons.js';
 import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
@@ -19,7 +19,7 @@ import {
   FOUNDRY_ICON_DEFINITIONS,
   FOUNDRY_ICON_FREE_INTERSECTION,
   findCuratedIcon,
-  isExcludedIconName
+  isExcludedIconName,
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
 const CURATED_ICON_COUNT = 750;
@@ -114,10 +114,16 @@ describe('the catalogue Foundry can actually render', () => {
   // would keep passing if they came back as uncurated catalogue rows.
   it('declines the Pro-only names Foundry can render but Fabricate may not reference', () => {
     for (const iconName of [
-      'candle-holder', 'cauldron', 'raygun', 'starship', 'treasure-chest', 'scythe',
+      'candle-holder',
+      'cauldron',
+      'raygun',
+      'starship',
+      'treasure-chest',
+      'scythe',
       // Emoji reactions Font Awesome draws only in Pro. The exclusion rule would hold them out
       // anyway; the licence gets there first, and this is where a name absent by licence belongs.
-      'weary', 'woozy'
+      'weary',
+      'woozy',
     ]) {
       assert.ok(
         FOUNDRY_ICON_DEFINITIONS.every(
@@ -190,9 +196,9 @@ describe('essenceIcons utility', () => {
     assert.equal(
       curatedCount,
       CURATED_ICON_COUNT,
-      `Expected exactly ${CURATED_ICON_COUNT} curated icons, got ${curatedCount}. `
-        + 'If a pattern change moved the membership deliberately, update this number and say which '
-        + 'icons moved and why in the commit body.'
+      `Expected exactly ${CURATED_ICON_COUNT} curated icons, got ${curatedCount}. ` +
+        'If a pattern change moved the membership deliberately, update this number and say which ' +
+        'icons moved and why in the commit body.'
     );
   });
 
@@ -203,39 +209,124 @@ describe('essenceIcons utility', () => {
   it('draws every curated entry from the catalogue by identity', () => {
     const catalogueEntries = new Set(FOUNDRY_ICON_DEFINITIONS);
     for (const definition of FOUNDRY_CURATED_ICON_DEFINITIONS) {
-      assert.ok(catalogueEntries.has(definition), `"${definition.iconCode}" is not a catalogue entry`);
+      assert.ok(
+        catalogueEntries.has(definition),
+        `"${definition.iconCode}" is not a catalogue entry`
+      );
     }
   });
 
   it('includes core fantasy crafting icons', () => {
     assertCurated([
-      'mortar-pestle', 'flask', 'flask-vial', 'vial', 'vials',
-      'fire', 'fire-flame-curved', 'fire-flame-simple',
-      'water', 'wind', 'bolt', 'bolt-lightning',
-      'snowflake', 'sun', 'moon', 'star', 'meteor',
-      'scroll', 'book', 'book-skull', 'book-open',
-      'wand-magic', 'wand-magic-sparkles', 'wand-sparkles',
-      'hat-wizard', 'dragon', 'skull', 'skull-crossbones',
-      'gem', 'diamond', 'ring', 'crown', 'shield',
-      'feather', 'feather-pointed', 'leaf', 'seedling', 'tree',
-      'spider', 'frog', 'crow', 'dove', 'fish', 'horse', 'cat', 'dog', 'worm',
-      'key', 'lock', 'lock-open',
-      'hammer', 'gavel', 'wrench', 'scissors',
-      'eye', 'eye-dropper', 'hand', 'brain', 'bone',
-      'heart', 'droplet', 'ghost',
-      'dungeon', 'church', 'monument', 'archway',
-      'mountain', 'volcano', 'tornado', 'hurricane', 'rainbow',
-      'dice-d20', 'dice-d6', 'chess-knight', 'chess-rook',
-      'anchor', 'ship', 'sailboat', 'compass',
-      'hourglass', 'clock', 'bell',
-      'flag', 'map', 'route',
-      'wine-glass', 'mug-hot', 'utensils', 'egg', 'bread-slice',
-      'scale-balanced', 'weight-hanging',
-      'paintbrush', 'palette', 'pen', 'pencil',
-      'staff-snake', 'cross', 'ankh', 'yin-yang', 'om',
-      'user', 'user-ninja', 'user-secret', 'users',
-      'mask', 'masks-theater',
-      'tag', 'tags'
+      'mortar-pestle',
+      'flask',
+      'flask-vial',
+      'vial',
+      'vials',
+      'fire',
+      'fire-flame-curved',
+      'fire-flame-simple',
+      'water',
+      'wind',
+      'bolt',
+      'bolt-lightning',
+      'snowflake',
+      'sun',
+      'moon',
+      'star',
+      'meteor',
+      'scroll',
+      'book',
+      'book-skull',
+      'book-open',
+      'wand-magic',
+      'wand-magic-sparkles',
+      'wand-sparkles',
+      'hat-wizard',
+      'dragon',
+      'skull',
+      'skull-crossbones',
+      'gem',
+      'diamond',
+      'ring',
+      'crown',
+      'shield',
+      'feather',
+      'feather-pointed',
+      'leaf',
+      'seedling',
+      'tree',
+      'spider',
+      'frog',
+      'crow',
+      'dove',
+      'fish',
+      'horse',
+      'cat',
+      'dog',
+      'worm',
+      'key',
+      'lock',
+      'lock-open',
+      'hammer',
+      'gavel',
+      'wrench',
+      'scissors',
+      'eye',
+      'eye-dropper',
+      'hand',
+      'brain',
+      'bone',
+      'heart',
+      'droplet',
+      'ghost',
+      'dungeon',
+      'church',
+      'monument',
+      'archway',
+      'mountain',
+      'volcano',
+      'tornado',
+      'hurricane',
+      'rainbow',
+      'dice-d20',
+      'dice-d6',
+      'chess-knight',
+      'chess-rook',
+      'anchor',
+      'ship',
+      'sailboat',
+      'compass',
+      'hourglass',
+      'clock',
+      'bell',
+      'flag',
+      'map',
+      'route',
+      'wine-glass',
+      'mug-hot',
+      'utensils',
+      'egg',
+      'bread-slice',
+      'scale-balanced',
+      'weight-hanging',
+      'paintbrush',
+      'palette',
+      'pen',
+      'pencil',
+      'staff-snake',
+      'cross',
+      'ankh',
+      'yin-yang',
+      'om',
+      'user',
+      'user-ninja',
+      'user-secret',
+      'users',
+      'mask',
+      'masks-theater',
+      'tag',
+      'tags',
     ]);
   });
 
@@ -255,9 +346,22 @@ describe('essenceIcons utility', () => {
   // regression.
   it('carries every icon a companion offered that Fabricate is free to name', () => {
     assertCurated([
-      'hand-sparkles', 'virus', 'prescription-bottle', 'pills', 'capsules', 'syringe', 'lungs',
-      'blender', 'jug-detergent', 'plug', 'circle-nodes', 'stopwatch', 'flag-checkered',
-      'list-check', 'wheat-awn-circle-exclamation', 'dumbbell'
+      'hand-sparkles',
+      'virus',
+      'prescription-bottle',
+      'pills',
+      'capsules',
+      'syringe',
+      'lungs',
+      'blender',
+      'jug-detergent',
+      'plug',
+      'circle-nodes',
+      'stopwatch',
+      'flag-checkered',
+      'list-check',
+      'wheat-awn-circle-exclamation',
+      'dumbbell',
     ]);
     assert.equal(
       findCuratedIcon('candle-holder'),
@@ -290,12 +394,28 @@ describe('essenceIcons utility', () => {
   });
 
   it('excludes real-world currency signs and the money instruments built around them', () => {
-    assertNotCurated([
-      'dollar-sign', 'euro-sign', 'sterling-sign', 'yen-sign', 'bitcoin-sign',
-      'indian-rupee-sign', 'ruble-sign', 'won-sign', 'turkish-lira-sign',
-      'circle-dollar-to-slot', 'money-bill-wave', 'money-check',
-      'money-bill', 'money-check-dollar', 'credit-card', 'cash-register', 'receipt'
-    ], 'Currency icon');
+    assertNotCurated(
+      [
+        'dollar-sign',
+        'euro-sign',
+        'sterling-sign',
+        'yen-sign',
+        'bitcoin-sign',
+        'indian-rupee-sign',
+        'ruble-sign',
+        'won-sign',
+        'turkish-lira-sign',
+        'circle-dollar-to-slot',
+        'money-bill-wave',
+        'money-check',
+        'money-bill',
+        'money-check-dollar',
+        'credit-card',
+        'cash-register',
+        'receipt',
+      ],
+      'Currency icon'
+    );
   });
 
   // Treasure is not a currency sign. A coin, a sack of gold and a merchant's shop belong to every
@@ -303,39 +423,124 @@ describe('essenceIcons utility', () => {
   // companion module into keeping a rival list in the first place.
   it('admits treasure, trade and the pre-modern market', () => {
     assertCurated([
-      'coins', 'sack-dollar', 'sack-xmark', 'shop', 'store', 'warehouse',
-      'basket-shopping', 'cart-flatbed', 'boxes-packing', 'people-carry-box', 'pallet', 'dolly',
-      'certificate', 'stamp', 'file-contract', 'file-signature',
-      'envelope', 'envelope-open', 'envelope-open-text'
+      'coins',
+      'sack-dollar',
+      'sack-xmark',
+      'shop',
+      'store',
+      'warehouse',
+      'basket-shopping',
+      'cart-flatbed',
+      'boxes-packing',
+      'people-carry-box',
+      'pallet',
+      'dolly',
+      'certificate',
+      'stamp',
+      'file-contract',
+      'file-signature',
+      'envelope',
+      'envelope-open',
+      'envelope-open-text',
     ]);
   });
 
   it('excludes UI, editor and navigation controls', () => {
-    assertNotCurated([
-      'align-left', 'align-right', 'align-center', 'align-justify',
-      'bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript',
-      'indent', 'outdent', 'list', 'list-ul', 'list-ol',
-      'copy', 'paste', 'clone', 'code', 'code-branch',
-      'sort', 'sort-up', 'sort-down', 'filter',
-      'magnifying-glass', 'magnifying-glass-plus',
-      'upload', 'download', 'share', 'share-nodes',
-      'backward', 'forward', 'play', 'pause', 'stop',
-      'chevron-left', 'chevron-right', 'angle-left', 'caret-up',
-      'arrow-up', 'arrow-down', 'arrows-rotate', 'arrow-right-arrow-left', 'circle-arrow-right',
-      'angles-up', 'caret-down', 'right-from-bracket', 'table-columns',
-      'sliders', 'toggle-on', 'toggle-off',
-      'arrow-pointer', 'i-cursor', 'spell-check',
-      'chart-bar', 'chart-line', 'chart-pie', 'chart-area',
-      'diagram-project', 'diagram-next',
-      'circle-check', 'circle-xmark', 'circle-info', 'circle-question',
-      'square-check', 'square-xmark', 'square-plus', 'square-minus',
-      'ellipsis', 'ellipsis-vertical', 'bars', 'grip', 'grip-vertical',
-      'compress', 'expand', 'maximize', 'minimize',
-      'spinner', 'notdef',
-      'file', 'file-pdf', 'file-code', 'file-excel', 'file-image',
-      'folder', 'folder-open', 'inbox', 'paperclip',
-      'terminal', 'wave-square'
-    ], 'UI icon');
+    assertNotCurated(
+      [
+        'align-left',
+        'align-right',
+        'align-center',
+        'align-justify',
+        'bold',
+        'italic',
+        'underline',
+        'strikethrough',
+        'subscript',
+        'superscript',
+        'indent',
+        'outdent',
+        'list',
+        'list-ul',
+        'list-ol',
+        'copy',
+        'paste',
+        'clone',
+        'code',
+        'code-branch',
+        'sort',
+        'sort-up',
+        'sort-down',
+        'filter',
+        'magnifying-glass',
+        'magnifying-glass-plus',
+        'upload',
+        'download',
+        'share',
+        'share-nodes',
+        'backward',
+        'forward',
+        'play',
+        'pause',
+        'stop',
+        'chevron-left',
+        'chevron-right',
+        'angle-left',
+        'caret-up',
+        'arrow-up',
+        'arrow-down',
+        'arrows-rotate',
+        'arrow-right-arrow-left',
+        'circle-arrow-right',
+        'angles-up',
+        'caret-down',
+        'right-from-bracket',
+        'table-columns',
+        'sliders',
+        'toggle-on',
+        'toggle-off',
+        'arrow-pointer',
+        'i-cursor',
+        'spell-check',
+        'chart-bar',
+        'chart-line',
+        'chart-pie',
+        'chart-area',
+        'diagram-project',
+        'diagram-next',
+        'circle-check',
+        'circle-xmark',
+        'circle-info',
+        'circle-question',
+        'square-check',
+        'square-xmark',
+        'square-plus',
+        'square-minus',
+        'ellipsis',
+        'ellipsis-vertical',
+        'bars',
+        'grip',
+        'grip-vertical',
+        'compress',
+        'expand',
+        'maximize',
+        'minimize',
+        'spinner',
+        'notdef',
+        'file',
+        'file-pdf',
+        'file-code',
+        'file-excel',
+        'file-image',
+        'folder',
+        'folder-open',
+        'inbox',
+        'paperclip',
+        'terminal',
+        'wave-square',
+      ],
+      'UI icon'
+    );
   });
 
   // The line the affordance rule draws, and it is a real one. A rack of servers, a stack of discs,
@@ -343,23 +548,65 @@ describe('essenceIcons utility', () => {
   // chart are not: one is a software affordance, the other is literally a chart type.
   it('admits depicted machines while excluding the console prompt and the chart', () => {
     assertCurated([
-      'rocket', 'shuttle-space', 'jet-fighter', 'helicopter', 'user-astronaut',
-      'satellite', 'satellite-dish', 'tower-broadcast', 'tower-observation',
-      'solar-panel', 'robot', 'microchip', 'server', 'database', 'walkie-talkie',
-      'battery-empty', 'battery-full', 'radiation', 'circle-radiation', 'biohazard',
-      'industry', 'oil-well', 'city', 'explosion', 'burst',
-      'laptop', 'desktop', 'computer', 'keyboard', 'camera', 'gamepad', 'mobile'
+      'rocket',
+      'shuttle-space',
+      'jet-fighter',
+      'helicopter',
+      'user-astronaut',
+      'satellite',
+      'satellite-dish',
+      'tower-broadcast',
+      'tower-observation',
+      'solar-panel',
+      'robot',
+      'microchip',
+      'server',
+      'database',
+      'walkie-talkie',
+      'battery-empty',
+      'battery-full',
+      'radiation',
+      'circle-radiation',
+      'biohazard',
+      'industry',
+      'oil-well',
+      'city',
+      'explosion',
+      'burst',
+      'laptop',
+      'desktop',
+      'computer',
+      'keyboard',
+      'camera',
+      'gamepad',
+      'mobile',
     ]);
     assertNotCurated(['terminal', 'wave-square'], 'Affordance');
   });
 
   it('excludes emoji reactions under both the face- prefix and the bare Pro names', () => {
-    assertNotCurated([
-      'face-smile', 'face-frown', 'face-grin', 'face-angry',
-      'face-laugh', 'face-meh', 'face-sad-tear', 'face-surprise',
-      'face-dizzy', 'face-grimace', 'face-rolling-eyes', 'face-tired',
-      'grin', 'grin-beam', 'laugh-wink', 'kiss-wink-heart', 'angry'
-    ], 'Emoji reaction');
+    assertNotCurated(
+      [
+        'face-smile',
+        'face-frown',
+        'face-grin',
+        'face-angry',
+        'face-laugh',
+        'face-meh',
+        'face-sad-tear',
+        'face-surprise',
+        'face-dizzy',
+        'face-grimace',
+        'face-rolling-eyes',
+        'face-tired',
+        'grin',
+        'grin-beam',
+        'laugh-wink',
+        'kiss-wink-heart',
+        'angry',
+      ],
+      'Emoji reaction'
+    );
   });
 
   // Font Awesome draws several glyphs as a ladder: five battery fills, nine temperature entries,
@@ -369,24 +616,59 @@ describe('essenceIcons utility', () => {
   // any member that means something DIFFERENT; the steps between them, the rotations, the status
   // badges and the scenery variants are not.
   it('excludes redundant variants of a glyph the vocabulary already carries', () => {
-    assertNotCurated([
-      'battery-quarter', 'battery-half', 'battery-three-quarters',
-      'temperature-empty', 'temperature-quarter', 'temperature-half',
-      'temperature-three-quarters', 'temperature-full',
-      'temperature-arrow-up', 'temperature-arrow-down',
-      'gauge', 'gauge-simple', 'gauge-simple-high',
-      'shop-lock', 'shop-slash', 'store-slash',
-      'mountain-city', 'tree-city',
-      'jet-fighter-up', 'tower-cell', 'gauge-med',
-      'hourglass-start', 'hourglass-end', 'calendar-check', 'calendar-days', 'comment-dots',
-      'user-gear', 'mobile-screen-button'
-    ], 'Variant');
+    assertNotCurated(
+      [
+        'battery-quarter',
+        'battery-half',
+        'battery-three-quarters',
+        'temperature-empty',
+        'temperature-quarter',
+        'temperature-half',
+        'temperature-three-quarters',
+        'temperature-full',
+        'temperature-arrow-up',
+        'temperature-arrow-down',
+        'gauge',
+        'gauge-simple',
+        'gauge-simple-high',
+        'shop-lock',
+        'shop-slash',
+        'store-slash',
+        'mountain-city',
+        'tree-city',
+        'jet-fighter-up',
+        'tower-cell',
+        'gauge-med',
+        'hourglass-start',
+        'hourglass-end',
+        'calendar-check',
+        'calendar-days',
+        'comment-dots',
+        'user-gear',
+        'mobile-screen-button',
+      ],
+      'Variant'
+    );
 
     // The glyph each of those is a variant OF stays, so the idea is still expressible.
     assertCurated([
-      'battery-empty', 'battery-full', 'thermometer', 'temperature-high', 'temperature-low',
-      'gauge-high', 'shop', 'store', 'city', 'jet-fighter', 'tower-broadcast', 'tower-observation',
-      'hourglass', 'calendar', 'comment', 'user', 'mobile'
+      'battery-empty',
+      'battery-full',
+      'thermometer',
+      'temperature-high',
+      'temperature-low',
+      'gauge-high',
+      'shop',
+      'store',
+      'city',
+      'jet-fighter',
+      'tower-broadcast',
+      'tower-observation',
+      'hourglass',
+      'calendar',
+      'comment',
+      'user',
+      'mobile',
     ]);
   });
 
@@ -402,23 +684,49 @@ describe('essenceIcons utility', () => {
   // rather than a status light stuck on it, which is the line that keeps the crop failure in while
   // the shape badges go.
   it('keeps a badge on a depicted object while excluding one stuck on a shape', () => {
-    assertCurated(['wheat-awn-circle-exclamation', 'road-circle-xmark', 'plane-circle-exclamation']);
+    assertCurated([
+      'wheat-awn-circle-exclamation',
+      'road-circle-xmark',
+      'plane-circle-exclamation',
+    ]);
     assertNotCurated(['circle-check', 'square-xmark', 'circle-exclamation'], 'Shape badge');
   });
 
   it('excludes the iconography of a present-day relief operation', () => {
-    assertNotCurated([
-      'building-un', 'building-ngo', 'building-shield', 'building-wheat',
-      'helmet-un', 'children', 'child-combatant',
-      'people-group', 'people-line', 'people-roof',
-      'person-rifle', 'person-military-rifle', 'person-shelter',
-      'person-drowning', 'person-falling', 'person-burst',
-      'house-flood-water', 'house-tsunami', 'house-lock',
-      'mosquito', 'mosquito-net', 'locust',
-      'tent', 'tents', 'tent-arrows-down',
-      'hill-avalanche', 'hill-rockslide',
-      'bridge-water', 'bridge-lock'
-    ], 'Relief-operation icon');
+    assertNotCurated(
+      [
+        'building-un',
+        'building-ngo',
+        'building-shield',
+        'building-wheat',
+        'helmet-un',
+        'children',
+        'child-combatant',
+        'people-group',
+        'people-line',
+        'people-roof',
+        'person-rifle',
+        'person-military-rifle',
+        'person-shelter',
+        'person-drowning',
+        'person-falling',
+        'person-burst',
+        'house-flood-water',
+        'house-tsunami',
+        'house-lock',
+        'mosquito',
+        'mosquito-net',
+        'locust',
+        'tent',
+        'tents',
+        'tent-arrows-down',
+        'hill-avalanche',
+        'hill-rockslide',
+        'bridge-water',
+        'bridge-lock',
+      ],
+      'Relief-operation icon'
+    );
   });
 
   // The corollary of scoping that rule by subject. A glyph Font Awesome shipped in the same release
@@ -427,20 +735,44 @@ describe('essenceIcons utility', () => {
   // failing is a story rather than an operation and the category's own wording never predicted it.
   it('admits the ordinary objects that shipped alongside the relief pictograms', () => {
     assertCurated([
-      'boxes-packing', 'people-carry-box', 'fire-burner', 'kitchen-set',
-      'bore-hole', 'sack-xmark', 'tower-observation', 'explosion', 'burst',
-      'wheat-awn-circle-exclamation'
+      'boxes-packing',
+      'people-carry-box',
+      'fire-burner',
+      'kitchen-set',
+      'bore-hole',
+      'sack-xmark',
+      'tower-observation',
+      'explosion',
+      'burst',
+      'wheat-awn-circle-exclamation',
     ]);
   });
 
   it('excludes the symbols that stand for a present-day cause or access provision', () => {
-    assertNotCurated([
-      'wheelchair', 'wheelchair-move', 'universal-access',
-      'braille', 'closed-captioning', 'audio-description',
-      'ear-deaf', 'ear-listen', 'eye-low-vision', 'person-cane',
-      'democrat', 'republican', 'landmark-dome', 'check-to-slot', 'person-booth',
-      'transgender', 'genderless', 'neuter', 'flag-usa'
-    ], 'Cause symbol');
+    assertNotCurated(
+      [
+        'wheelchair',
+        'wheelchair-move',
+        'universal-access',
+        'braille',
+        'closed-captioning',
+        'audio-description',
+        'ear-deaf',
+        'ear-listen',
+        'eye-low-vision',
+        'person-cane',
+        'democrat',
+        'republican',
+        'landmark-dome',
+        'check-to-slot',
+        'person-booth',
+        'transgender',
+        'genderless',
+        'neuter',
+        'flag-usa',
+      ],
+      'Cause symbol'
+    );
   });
 
   // The gender block used to take the planetary symbols with it. Mars is iron and Venus is copper:
@@ -456,8 +788,15 @@ describe('essenceIcons utility', () => {
     // `do-not-enter` and `escalator` used to stand here and are Pro-only names; `street-view`,
     // `ban` and `location-dot` are free members of the same pattern.
     assertNotCurated(
-      ['restroom', 'square-parking', 'elevator', 'hospital-symbol', 'street-view', 'ban',
-        'location-dot'],
+      [
+        'restroom',
+        'square-parking',
+        'elevator',
+        'hospital-symbol',
+        'street-view',
+        'ban',
+        'location-dot',
+      ],
       'Signage'
     );
     assertCurated(['toilet', 'bath', 'shower', 'ambulance', 'hospital', 'car', 'bus', 'train']);
@@ -468,21 +807,53 @@ describe('essenceIcons utility', () => {
   // fiction reaches for the med-bay twice, so the blocks that held them are gone, not trimmed.
   it('admits the med-bay, the kitchen and the training montage the old rule held out', () => {
     assertCurated([
-      'stethoscope', 'x-ray', 'kit-medical', 'suitcase-medical', 'bandage', 'user-injured',
-      'user-doctor', 'user-nurse', 'bed-pulse', 'prescription-bottle-medical', 'notes-medical',
-      'hospital-user', 'bacteria', 'mask-face', 'soap', 'tooth',
-      'burger', 'pizza-slice', 'hotdog', 'ice-cream', 'bowl-food', 'cheese',
-      'baseball', 'basketball', 'football', 'volleyball', 'hockey-puck', 'person-running',
-      'golf-ball-tee'
+      'stethoscope',
+      'x-ray',
+      'kit-medical',
+      'suitcase-medical',
+      'bandage',
+      'user-injured',
+      'user-doctor',
+      'user-nurse',
+      'bed-pulse',
+      'prescription-bottle-medical',
+      'notes-medical',
+      'hospital-user',
+      'bacteria',
+      'mask-face',
+      'soap',
+      'tooth',
+      'burger',
+      'pizza-slice',
+      'hotdog',
+      'ice-cream',
+      'bowl-food',
+      'cheese',
+      'baseball',
+      'basketball',
+      'football',
+      'volleyball',
+      'hockey-puck',
+      'person-running',
+      'golf-ball-tee',
     ]);
   });
 
   it('admits the craft, labour, and laboratory tools a crafting module needs', () => {
     assertCurated([
-      'fire-burner', 'kitchen-set', 'oil-can', 'bore-hole',
-      'screwdriver', 'screwdriver-wrench', 'helmet-safety',
-      'gauge-high', 'thermometer', 'temperature-high', 'temperature-low',
-      'microscope', 'dna'
+      'fire-burner',
+      'kitchen-set',
+      'oil-can',
+      'bore-hole',
+      'screwdriver',
+      'screwdriver-wrench',
+      'helmet-safety',
+      'gauge-high',
+      'thermometer',
+      'temperature-high',
+      'temperature-low',
+      'microscope',
+      'dna',
     ]);
   });
 
@@ -509,7 +880,11 @@ describe('essenceIcons utility', () => {
       'the projectile carve-out must survive: the arrow that is a weapon is not a direction'
     );
     assert.equal(isExcludedIconName('arrow-right'), true, 'every other arrow means "go that way"');
-    assert.equal(findCuratedIcon('arrow-archery'), null, 'and it is Pro-only, so it is unofferable');
+    assert.equal(
+      findCuratedIcon('arrow-archery'),
+      null,
+      'and it is Pro-only, so it is unofferable'
+    );
   });
 
   // hand-spock and spaghetti-monster-flying are the two the "institution or cause" exclusion looks
@@ -518,10 +893,18 @@ describe('essenceIcons utility', () => {
   // SUBJECT is the institution, not a gesture or a symbol a fiction is free to reuse.
   it('admits scholarship, renown, and eldritch icons', () => {
     assertCurated([
-      'user-clock', 'user-graduate', 'graduation-cap',
-      'chalkboard', 'chalkboard-user', 'person-chalkboard',
-      'award', 'puzzle-piece', 'bell-concierge', 'champagne-glasses',
-      'spaghetti-monster-flying', 'hand-spock'
+      'user-clock',
+      'user-graduate',
+      'graduation-cap',
+      'chalkboard',
+      'chalkboard-user',
+      'person-chalkboard',
+      'award',
+      'puzzle-piece',
+      'bell-concierge',
+      'champagne-glasses',
+      'spaghetti-monster-flying',
+      'hand-spock',
     ]);
   });
 
@@ -555,7 +938,10 @@ describe('essenceIcons utility', () => {
     assert.equal(options.length, CURATED_ICON_COUNT);
     assert.ok(options.every((option) => option.iconClass.startsWith('fas ')));
     assert.ok(!options.some((option) => option.iconClass === 'far fa-bell'));
-    assert.ok(!options.some((option) => option.iconClass === 'fas fa-cog'), 'an alias is not a second row');
+    assert.ok(
+      !options.some((option) => option.iconClass === 'fas fa-cog'),
+      'an alias is not a second row'
+    );
   });
 
   it('can still build the whole catalogue when explicitly requested', () => {
@@ -572,13 +958,13 @@ describe('essenceIcons utility', () => {
   it('builds custom icon definitions into one solid option each', () => {
     const options = buildEssenceIconOptions([
       { iconCode: 'address-book', label: 'Address Book', aliases: ['contact-book'] },
-      { iconCode: 'fire', label: 'Fire', aliases: [] }
+      { iconCode: 'fire', label: 'Fire', aliases: [] },
     ]);
 
-    assert.deepEqual(options.map((option) => option.iconClass), [
-      'fas fa-address-book',
-      'fas fa-fire'
-    ]);
+    assert.deepEqual(
+      options.map((option) => option.iconClass),
+      ['fas fa-address-book', 'fas fa-fire']
+    );
   });
 
   it('filters icon options by label, icon name, and alias', () => {
@@ -642,11 +1028,18 @@ describe('essenceIcons lazy initialization', () => {
       // permitted here because this is a node --test file, not a build/runtime script.
       const fresh = await import(`../src/ui/svelte/util/essenceIcons.js?fresh=${Date.now()}`);
 
-      assert.equal(optionFreezeCount.value, 0, 'importing essenceIcons.js must not build any icon option');
+      assert.equal(
+        optionFreezeCount.value,
+        0,
+        'importing essenceIcons.js must not build any icon option'
+      );
 
       const options = fresh.getEssenceIconOptions();
       assert.ok(options.length > 0, 'the first accessor call must build the curated catalog');
-      assert.ok(optionFreezeCount.value > 0, 'building the catalog must freeze option-shaped objects');
+      assert.ok(
+        optionFreezeCount.value > 0,
+        'building the catalog must freeze option-shaped objects'
+      );
 
       // The fresh instance memoizes independently of the shared module under test.
       assert.equal(fresh.getEssenceIconOptions(), fresh.getEssenceIconOptions());

@@ -25,9 +25,8 @@ import { installFoundryUtilsEnv } from './helpers/foundryEnv.js';
 installFoundryUtilsEnv();
 globalThis.game = { user: { isGM: true, name: 'GM' } };
 
-const { Recipe, RECIPE_OMITTED_WHEN_DEFAULT, DEFAULT_RECIPE_IMAGE } = await import(
-  '../src/models/Recipe.js'
-);
+const { Recipe, RECIPE_OMITTED_WHEN_DEFAULT, DEFAULT_RECIPE_IMAGE } =
+  await import('../src/models/Recipe.js');
 
 const METADATA = { created: 1, modified: 2, author: 'GM', version: '1.0.0' };
 
@@ -216,15 +215,10 @@ test('1087: a fully defaulted recipe emits EXACTLY the un-omittable field set', 
   // DELETED from it: the field silently returns to every payload and the guards stay green.
   // This pins the other side of the same fact — the literal key set on the wire — so growing
   // it needs a deliberate edit here, whichever direction the change came from.
-  assert.deepEqual(Object.keys(minimalRecipe().toJSON()).sort((a, b) => a.localeCompare(b)), [
-    'complex',
-    'enabled',
-    'id',
-    'ingredientSets',
-    'metadata',
-    'name',
-    'resultGroups',
-  ]);
+  assert.deepEqual(
+    Object.keys(minimalRecipe().toJSON()).sort((a, b) => a.localeCompare(b)),
+    ['complex', 'enabled', 'id', 'ingredientSets', 'metadata', 'name', 'resultGroups']
+  );
 });
 
 test('1087: a defaulted recipe rebuilds every omitted field to the value that was omitted', () => {

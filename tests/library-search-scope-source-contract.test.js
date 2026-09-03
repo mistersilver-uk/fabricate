@@ -59,7 +59,7 @@ function searchScopeForView(view) {
 /** Every route the router renders, taken from its own `currentView === '…'` guards. */
 function reachableRoutes() {
   const guards = [...source.matchAll(/currentView === '([a-z0-9-]+)'/g)].map((m) => m[1]);
-  assert.ok(guards.length > 20, 'the route guards are still spelled `currentView === \'…\'`');
+  assert.ok(guards.length > 20, "the route guards are still spelled `currentView === '…'`");
   return [...new Set([...guards, ...Object.keys(SCOPE_BY_VIEW)])].sort();
 }
 

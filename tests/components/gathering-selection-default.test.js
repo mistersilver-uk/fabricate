@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   resolveDefaultSelection,
   resolveDefaultTaskSelection,
-  visibleTasksFor
+  visibleTasksFor,
 } from '../../src/ui/svelte/apps/gathering/selectionDefault.js';
 
 function env(overrides = {}) {
@@ -17,10 +17,7 @@ function task(overrides = {}) {
 
 describe('resolveDefaultSelection', () => {
   it('preserves a still-valid non-locked selection on re-fetch (does not reset to first)', () => {
-    const list = [
-      env({ id: 'env-a' }),
-      env({ id: 'env-b' })
-    ];
+    const list = [env({ id: 'env-a' }), env({ id: 'env-b' })];
     // selectedId points at the SECOND (non-locked) env; it must survive, not
     // get clobbered back to the first.
     assert.equal(resolveDefaultSelection(list, 'env-b'), 'env-b');
@@ -32,18 +29,12 @@ describe('resolveDefaultSelection', () => {
   });
 
   it('skips a leading locked env and selects the first non-locked one', () => {
-    const list = [
-      env({ id: 'env-locked', locked: true }),
-      env({ id: 'env-open' })
-    ];
+    const list = [env({ id: 'env-locked', locked: true }), env({ id: 'env-open' })];
     assert.equal(resolveDefaultSelection(list, null), 'env-open');
   });
 
   it('returns null when every env is locked', () => {
-    const list = [
-      env({ id: 'env-1', locked: true }),
-      env({ id: 'env-2', locked: true })
-    ];
+    const list = [env({ id: 'env-1', locked: true }), env({ id: 'env-2', locked: true })];
     assert.equal(resolveDefaultSelection(list, null), null);
   });
 
@@ -57,10 +48,7 @@ describe('resolveDefaultSelection', () => {
   });
 
   it('falls through to the first non-locked env when selectedId points at a now-locked env', () => {
-    const list = [
-      env({ id: 'env-open' }),
-      env({ id: 'env-was-open', locked: true })
-    ];
+    const list = [env({ id: 'env-open' }), env({ id: 'env-was-open', locked: true })];
     // The user had selected env-was-open; it is now locked, so the selection is
     // replaced with the first selectable env.
     assert.equal(resolveDefaultSelection(list, 'env-was-open'), 'env-open');
@@ -72,23 +60,34 @@ describe('resolveDefaultSelection', () => {
   });
 
   it('returns null when selectedId is absent and all remaining envs are locked', () => {
-    const list = [
-      env({ id: 'env-1', locked: true }),
-      env({ id: 'env-2', locked: true })
-    ];
+    const list = [env({ id: 'env-1', locked: true }), env({ id: 'env-2', locked: true })];
     assert.equal(resolveDefaultSelection(list, 'env-gone'), null);
   });
 });
 
 describe('visibleTasksFor', () => {
   it('returns the full task list for a targeted environment', () => {
-    const environment = { selectionMode: 'targeted', tasks: [task({ id: 't1' })], discoveredTasks: [task({ id: 'd1' })] };
-    assert.deepEqual(visibleTasksFor(environment).map(t => t.id), ['t1']);
+    const environment = {
+      selectionMode: 'targeted',
+      tasks: [task({ id: 't1' })],
+      discoveredTasks: [task({ id: 'd1' })],
+    };
+    assert.deepEqual(
+      visibleTasksFor(environment).map((t) => t.id),
+      ['t1']
+    );
   });
 
   it('returns discovered tasks for a blind environment', () => {
-    const environment = { selectionMode: 'blind', tasks: [task({ id: 't1' })], discoveredTasks: [task({ id: 'd1' })] };
-    assert.deepEqual(visibleTasksFor(environment).map(t => t.id), ['d1']);
+    const environment = {
+      selectionMode: 'blind',
+      tasks: [task({ id: 't1' })],
+      discoveredTasks: [task({ id: 'd1' })],
+    };
+    assert.deepEqual(
+      visibleTasksFor(environment).map((t) => t.id),
+      ['d1']
+    );
   });
 
   it('returns an empty array for null or missing lists', () => {

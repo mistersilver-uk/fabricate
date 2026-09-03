@@ -583,11 +583,38 @@ describe('the leading-multiplicative residue guard (belt and braces)', () => {
   const residueOf = (formula) =>
     formula.replaceAll(/\s*[+-]\s*@craftingmod\b|@craftingmod\b/g, '').trim();
 
-  const PREFIXES = ['', '1d20 ', '1d20 + ', '1d20 - ', '1d20 * ', '1d20 / ', '1d20 % ',
-    '(1d20 + ', 'max(', '2 + ', '(', '{2 + ', 'floor((1d20 + '];
+  const PREFIXES = [
+    '',
+    '1d20 ',
+    '1d20 + ',
+    '1d20 - ',
+    '1d20 * ',
+    '1d20 / ',
+    '1d20 % ',
+    '(1d20 + ',
+    'max(',
+    '2 + ',
+    '(',
+    '{2 + ',
+    'floor((1d20 + ',
+  ];
   const BEFORE = ['', ' ', '+', '- ', '+ ', '- -', '--', '+-'];
-  const AFTER = ['', ' + 2', ' - 2', ' * 2', ' / 2', ' + 1d6', ')', ') * 2', ', 2)', ')d6',
-    ' +', ' -', '}kh1', ' % 3'];
+  const AFTER = [
+    '',
+    ' + 2',
+    ' - 2',
+    ' * 2',
+    ' / 2',
+    ' + 1d6',
+    ')',
+    ') * 2',
+    ', 2)',
+    ')d6',
+    ' +',
+    ' -',
+    '}kh1',
+    ' % 3',
+  ];
 
   const SWEEP = [];
   for (const prefix of PREFIXES) {
@@ -613,7 +640,10 @@ describe('the leading-multiplicative residue guard (belt and braces)', () => {
         `${formula}: clause 4 should already have refused any shape that could produce this`
       );
     }
-    assert.ok(additive >= 100, `${additive} additive placements were reached, so this is not vacuous`);
+    assert.ok(
+      additive >= 100,
+      `${additive} additive placements were reached, so this is not vacuous`
+    );
   });
 
   // The counter-case, so "never fires" is not read as "the structural check does nothing":

@@ -20,49 +20,81 @@ function makeManager() {
 
 describe('Recipe._normalizeTeaser', () => {
   it('produces correct defaults when teaser is undefined', () => {
-    const recipe = new Recipe({ name: 'Test', resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
+    const recipe = new Recipe({
+      name: 'Test',
+      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
+    });
     assert.deepEqual(recipe.teaser, {
       enabled: true,
       hiddenFields: ['ingredients', 'results', 'description'],
       revealThreshold: 100,
-      teaserDescription: ''
+      teaserDescription: '',
     });
   });
 
   it('produces correct defaults when teaser is null', () => {
-    const recipe = new Recipe({ name: 'Test', teaser: null, resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
+    const recipe = new Recipe({
+      name: 'Test',
+      teaser: null,
+      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
+    });
     assert.deepEqual(recipe.teaser, {
       enabled: true,
       hiddenFields: ['ingredients', 'results', 'description'],
       revealThreshold: 100,
-      teaserDescription: ''
+      teaserDescription: '',
     });
   });
 
   it('accepts custom hiddenFields', () => {
-    const recipe = new Recipe({ name: 'Test', teaser: { hiddenFields: ['description', 'tools'] }, resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
+    const recipe = new Recipe({
+      name: 'Test',
+      teaser: { hiddenFields: ['description', 'tools'] },
+      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
+    });
     assert.deepEqual(recipe.teaser.hiddenFields, ['description', 'tools']);
   });
 
   it('filters out invalid hiddenFields values', () => {
-    const recipe = new Recipe({ name: 'Test', teaser: { hiddenFields: ['ingredients', 'invalid-field', 'RESULTS'] }, resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
+    const recipe = new Recipe({
+      name: 'Test',
+      teaser: { hiddenFields: ['ingredients', 'invalid-field', 'RESULTS'] },
+      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
+    });
     assert.deepEqual(recipe.teaser.hiddenFields, ['ingredients']);
   });
 
   it('clamps revealThreshold to 0-100', () => {
-    const r1 = new Recipe({ name: 'T', teaser: { revealThreshold: 150 }, resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
+    const r1 = new Recipe({
+      name: 'T',
+      teaser: { revealThreshold: 150 },
+      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
+    });
     assert.equal(r1.teaser.revealThreshold, 100);
-    const r2 = new Recipe({ name: 'T', teaser: { revealThreshold: -10 }, resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
+    const r2 = new Recipe({
+      name: 'T',
+      teaser: { revealThreshold: -10 },
+      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
+    });
     assert.equal(r2.teaser.revealThreshold, 0);
-    const r3 = new Recipe({ name: 'T', teaser: { revealThreshold: 50 }, resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }] });
+    const r3 = new Recipe({
+      name: 'T',
+      teaser: { revealThreshold: 50 },
+      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
+    });
     assert.equal(r3.teaser.revealThreshold, 50);
   });
 
   it('round-trips through toJSON/fromJSON', () => {
     const original = new Recipe({
       name: 'Test',
-      teaser: { enabled: false, hiddenFields: ['essences'], revealThreshold: 75, teaserDescription: 'Hint text' },
-      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }]
+      teaser: {
+        enabled: false,
+        hiddenFields: ['essences'],
+        revealThreshold: 75,
+        teaserDescription: 'Hint text',
+      },
+      resultGroups: [{ id: 'g', results: [{ id: 'r', itemUuid: 'uuid' }] }],
     });
     const json = original.toJSON();
     assert.ok(json.teaser, 'teaser should be in toJSON output');
@@ -71,7 +103,7 @@ describe('Recipe._normalizeTeaser', () => {
       enabled: false,
       hiddenFields: ['essences'],
       revealThreshold: 75,
-      teaserDescription: 'Hint text'
+      teaserDescription: 'Hint text',
     });
   });
 });
@@ -82,20 +114,30 @@ describe('CraftingSystemManager._normalizeTeaserConfig', () => {
   it('produces correct defaults when teaserConfig is undefined', () => {
     const manager = makeManager();
     const system = manager._normalizeSystem({ name: 'Test' });
-    assert.deepEqual(system.teaserConfig, { enabled: false, discoveryMode: 'threshold', fragments: [] });
+    assert.deepEqual(system.teaserConfig, {
+      enabled: false,
+      discoveryMode: 'threshold',
+      fragments: [],
+    });
   });
 
   it('accepts valid discoveryMode values', () => {
     const manager = makeManager();
     for (const mode of ['threshold', 'fragments', 'both']) {
-      const system = manager._normalizeSystem({ name: 'Test', teaserConfig: { enabled: true, discoveryMode: mode } });
+      const system = manager._normalizeSystem({
+        name: 'Test',
+        teaserConfig: { enabled: true, discoveryMode: mode },
+      });
       assert.equal(system.teaserConfig.discoveryMode, mode);
     }
   });
 
   it('falls back to threshold for invalid discoveryMode', () => {
     const manager = makeManager();
-    const system = manager._normalizeSystem({ name: 'Test', teaserConfig: { discoveryMode: 'invalid' } });
+    const system = manager._normalizeSystem({
+      name: 'Test',
+      teaserConfig: { discoveryMode: 'invalid' },
+    });
     assert.equal(system.teaserConfig.discoveryMode, 'threshold');
   });
 
@@ -107,9 +149,15 @@ describe('CraftingSystemManager._normalizeTeaserConfig', () => {
         enabled: true,
         discoveryMode: 'fragments',
         fragments: [
-          { id: 'frag-1', name: 'Scroll Fragment', linkedItemUuid: 'Compendium.world.items.abc', recipeIds: ['r1', 'r2'], progressValue: 25 }
-        ]
-      }
+          {
+            id: 'frag-1',
+            name: 'Scroll Fragment',
+            linkedItemUuid: 'Compendium.world.items.abc',
+            recipeIds: ['r1', 'r2'],
+            progressValue: 25,
+          },
+        ],
+      },
     });
     assert.equal(system.teaserConfig.fragments.length, 1);
     const frag = system.teaserConfig.fragments[0];
@@ -129,9 +177,9 @@ describe('CraftingSystemManager._normalizeTeaserConfig', () => {
         discoveryMode: 'fragments',
         fragments: [
           { id: 'f1', progressValue: 200 },
-          { id: 'f2', progressValue: -5 }
-        ]
-      }
+          { id: 'f2', progressValue: -5 },
+        ],
+      },
     });
     assert.equal(system.teaserConfig.fragments[0].progressValue, 100);
     assert.equal(system.teaserConfig.fragments[1].progressValue, 0);
@@ -139,7 +187,10 @@ describe('CraftingSystemManager._normalizeTeaserConfig', () => {
 
   it("accepts 'teaser' as a valid recipeVisibility listMode", () => {
     const manager = makeManager();
-    const system = manager._normalizeSystem({ name: 'Test', recipeVisibility: { listMode: 'teaser' } });
+    const system = manager._normalizeSystem({
+      name: 'Test',
+      recipeVisibility: { listMode: 'teaser' },
+    });
     assert.equal(system.recipeVisibility.listMode, 'teaser');
   });
 });

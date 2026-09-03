@@ -127,7 +127,10 @@ test('1036: the arithmetic row is unconditional and comes FIRST', () => {
     text,
     format
   );
-  assert.deepEqual(facts.map((fact) => fact.id), ['counted']);
+  assert.deepEqual(
+    facts.map((fact) => fact.id),
+    ['counted']
+  );
   assert.equal(
     facts[0].suppressed,
     false,
@@ -149,7 +152,10 @@ test('1036: both behaviour rows state the SUPPRESSION in the same words, and nei
     format
   );
 
-  assert.deepEqual(suppressed.map((fact) => fact.id), ['counted', 'effects', 'macro']);
+  assert.deepEqual(
+    suppressed.map((fact) => fact.id),
+    ['counted', 'effects', 'macro']
+  );
   const [effects, macro] = suppressed.slice(1);
   assert.equal(effects.subtitle, macro.subtitle, 'one sentence, one reason, both behaviours');
   assert.deepEqual([effects.suppressed, macro.suppressed], [true, true]);

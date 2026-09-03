@@ -10,7 +10,7 @@ const gmViewer = { id: 'gm-1', isGM: true };
 const actor = {
   id: 'actor-1',
   uuid: 'Actor.actor-1',
-  name: 'Gatherer'
+  name: 'Gatherer',
 };
 
 function makeEngine({
@@ -27,7 +27,7 @@ function makeEngine({
   runManager = null,
   gatheringCraftingCheck = null,
   systemManager = null,
-  calls = {}
+  calls = {},
 } = {}) {
   calls.resolveProgressive = [];
   calls.evaluateCheck = [];
@@ -39,7 +39,7 @@ function makeEngine({
   calls.createTerminalRun = [];
   calls.createWaitingRun = [];
 
-  const libraryToolsMap = new Map(libraryTools.map(tool => [tool.id, tool]));
+  const libraryToolsMap = new Map(libraryTools.map((tool) => [tool.id, tool]));
 
   // Routed tasks resolve via the system-level routed gathering check formula.
   // Default a routed system check (named after the task's first result group) so
@@ -47,58 +47,68 @@ function makeEngine({
   // check (or `gatheringCraftingCheck: false` to assert the no-formula path).
   const effectiveCheck =
     gatheringCraftingCheck === undefined || gatheringCraftingCheck === null
-      ? (task?.resolutionMode === 'routed'
-          ? routedSystemCheck({ tierName: task?.resultGroups?.[0]?.name })
-          : null)
+      ? task?.resolutionMode === 'routed'
+        ? routedSystemCheck({ tierName: task?.resultGroups?.[0]?.name })
+        : null
       : gatheringCraftingCheck || null;
 
   return new GatheringEngine({
     environmentStore: {
       list: () => {
         const composed = { ...environment, tasks: [task] };
-        Object.defineProperty(composed, '__libraryTools', { value: libraryToolsMap, enumerable: false });
+        Object.defineProperty(composed, '__libraryTools', {
+          value: libraryToolsMap,
+          enumerable: false,
+        });
         return [composed];
-      }
+      },
     },
-    getSystems: () => [{
-      id: 'system-a',
-      enabled: true,
-      features: { gathering: true },
-      components: [
-        { id: 'comp-a', difficulty: 3 },
-        { id: 'comp-b', difficulty: 5 },
-        { id: 'comp-c', difficulty: 7 }
-      ],
-      ...(effectiveCheck ? { gatheringCraftingCheck: effectiveCheck } : {})
-    }],
+    getSystems: () => [
+      {
+        id: 'system-a',
+        enabled: true,
+        features: { gathering: true },
+        components: [
+          { id: 'comp-a', difficulty: 3 },
+          { id: 'comp-b', difficulty: 5 },
+          { id: 'comp-c', difficulty: 7 },
+        ],
+        ...(effectiveCheck ? { gatheringCraftingCheck: effectiveCheck } : {}),
+      },
+    ],
     getSelectableActors: () => [actingActor],
-    isActorSelectable: ({ actor: candidate }) => candidate === actingActor || candidate?.id === actingActor.id,
+    isActorSelectable: ({ actor: candidate }) =>
+      candidate === actingActor || candidate?.id === actingActor.id,
     isGamePaused: () => false,
     evaluator: {
       evaluateVisibility: async () => ({ visible: true, reasonCode: 'VISIBLE', diagnostic: null }),
       evaluateCheck: async (payload) => {
         calls.evaluateCheck.push(payload);
         return checkResult;
-      }
+      },
     },
     sceneAccess: {
-      canAttempt: () => ({ allowed: true })
+      canAttempt: () => ({ allowed: true }),
     },
     toolAvailability: {
-      check: () => ({ available: true, missing: [], failedRequirements: [] })
+      check: () => ({ available: true, missing: [], failedRequirements: [] }),
     },
-    resultResolver: includeProgressiveResolver ? {
-      resolveProgressive: async (payload) => {
-        calls.resolveProgressive.push(payload);
-        if (resolver.progressive) return resolver.progressive;
-        const awarded = task.resultGroups[0].results.filter(result => result.componentId !== 'comp-c');
-        return {
-          status: awarded.length > 0 ? 'succeeded' : 'failed',
-          resultGroups: [{ ...task.resultGroups[0], results: awarded }],
-          checkResult: payload.checkResult
-        };
-      }
-    } : {},
+    resultResolver: includeProgressiveResolver
+      ? {
+          resolveProgressive: async (payload) => {
+            calls.resolveProgressive.push(payload);
+            if (resolver.progressive) return resolver.progressive;
+            const awarded = task.resultGroups[0].results.filter(
+              (result) => result.componentId !== 'comp-c'
+            );
+            return {
+              status: awarded.length > 0 ? 'succeeded' : 'failed',
+              resultGroups: [{ ...task.resultGroups[0], results: awarded }],
+              checkResult: payload.checkResult,
+            };
+          },
+        }
+      : {},
     resultCreator: {
       plan: async (payload) => {
         calls.planResults.push(payload);
@@ -107,7 +117,7 @@ function makeEngine({
       create: async (payload) => {
         calls.createResults.push(payload);
         return createdResults;
-      }
+      },
     },
     toolBreakage: {
       plan: async (payload) => {
@@ -117,13 +127,13 @@ function makeEngine({
       apply: async (payload) => {
         calls.applyTools.push(payload);
         return usedTools;
-      }
+      },
     },
     failureFeedback: {
       apply: async (payload) => {
         calls.failureFeedback.push(payload);
         return { delivered: true };
-      }
+      },
     },
     runManager: runManager ?? {
       findActiveRunForTask: () => null,
@@ -135,12 +145,12 @@ function makeEngine({
           id: `run-${calls.createTerminalRun.length}`,
           status: args[2],
           ...args[1],
-          ...args[3]
+          ...args[3],
         };
-      }
+      },
     },
-    localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key,
-    ...(systemManager ? { systemManager } : {})
+    localize: (key, data) => (data ? `${key}:${JSON.stringify(data)}` : key),
+    ...(systemManager ? { systemManager } : {}),
   });
 }
 
@@ -153,7 +163,7 @@ function targetedEnvironment(overrides = {}) {
     selectionMode: 'targeted',
     sceneUuid: null,
     tasks: [routedTask()],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -164,12 +174,14 @@ function routedTask(overrides = {}) {
     enabled: true,
     resolutionMode: 'routed',
     toolIds: [],
-    resultGroups: [{
-      id: 'group-a',
-      name: 'Iron',
-      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }]
-    }],
-    ...overrides
+    resultGroups: [
+      {
+        id: 'group-a',
+        name: 'Iron',
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }],
+      },
+    ],
+    ...overrides,
   };
 }
 
@@ -197,21 +209,23 @@ function progressiveTask(overrides = {}) {
     resultSelection: null,
     check: { formula: '1d20 + @skills.sur.mod', threshold: '12' },
     progressive: { awardMode: 'equal' },
-    resultGroups: [{
-      id: 'group-progressive',
-      name: 'Ore',
-      results: [
-        { id: 'result-a', componentId: 'comp-a', quantity: 1 },
-        { id: 'result-b', componentId: 'comp-b', quantity: 1 },
-        { id: 'result-c', componentId: 'comp-c', quantity: 1 }
-      ]
-    }],
-    ...overrides
+    resultGroups: [
+      {
+        id: 'group-progressive',
+        name: 'Ore',
+        results: [
+          { id: 'result-a', componentId: 'comp-a', quantity: 1 },
+          { id: 'result-b', componentId: 'comp-b', quantity: 1 },
+          { id: 'result-c', componentId: 'comp-c', quantity: 1 },
+        ],
+      },
+    ],
+    ...overrides,
   });
 }
 
 function codes(result) {
-  return result.blockedReasons.map(reason => reason.code);
+  return result.blockedReasons.map((reason) => reason.code);
 }
 
 function assertNoTerminalSideEffects(calls) {
@@ -246,9 +260,20 @@ test('immediate routed success creates result items and writes succeeded termina
   const task = routedTask({ toolIds: ['tool-pick'] });
   routedRoll(true);
   try {
-    const engine = makeEngine({ task, createdResults, usedTools, libraryTools: [{ id: 'tool-pick', componentId: 'pick' }], calls });
+    const engine = makeEngine({
+      task,
+      createdResults,
+      usedTools,
+      libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
+      calls,
+    });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'succeeded');
@@ -266,7 +291,7 @@ test('immediate routed success creates result items and writes succeeded termina
       taskId: 'task-a',
       // The run belongs to the VIEWER that requested it (issue 1288), never to whichever
       // client happens to be executing the attempt.
-      userId: viewer.id
+      userId: viewer.id,
     });
     assert.equal(calls.createTerminalRun[0][2], 'succeeded');
     // The terminal history carries the formula-derived check result; the routed
@@ -294,10 +319,15 @@ test('immediate routed failure writes failed terminal history, creates no result
       gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
       libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
       usedTools,
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'failed');
@@ -324,7 +354,7 @@ test('progressive success awards expected results from numeric check value', asy
   const task = progressiveTask();
   const createdResults = [
     { actorUuid: actor.uuid, itemUuid: 'Item.ore-a', quantity: 1 },
-    { actorUuid: actor.uuid, itemUuid: 'Item.ore-b', quantity: 1 }
+    { actorUuid: actor.uuid, itemUuid: 'Item.ore-b', quantity: 1 },
   ];
   stubRoll(8); // system gathering check rolls 8 → drives the numeric award value
   try {
@@ -332,10 +362,15 @@ test('progressive success awards expected results from numeric check value', asy
       task,
       gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'equal' } },
       createdResults,
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'succeeded');
@@ -343,7 +378,7 @@ test('progressive success awards expected results from numeric check value', asy
     assert.equal(calls.resolveProgressive.length, 1);
     assert.equal(calls.resolveProgressive[0].checkResult.value, 8);
     assert.deepEqual(
-      calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
+      calls.createResults[0].resultGroups[0].results.map((entry) => entry.id),
       ['result-a', 'result-b']
     );
     assert.deepEqual(result.createdResults, createdResults);
@@ -355,13 +390,13 @@ test('progressive success awards expected results from numeric check value', asy
 test('progressive fallback uses component difficulty and ignores inline result difficulty', async () => {
   const calls = {};
   const task = progressiveTask({
-    resultGroups: [{
-      id: 'group-progressive',
-      name: 'Ore',
-      results: [
-        { id: 'result-a', componentId: 'comp-a', quantity: 1, difficulty: 1 }
-      ]
-    }]
+    resultGroups: [
+      {
+        id: 'group-progressive',
+        name: 'Ore',
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1, difficulty: 1 }],
+      },
+    ],
   });
   stubRoll(2); // value 2 < comp-a difficulty (3) → awards nothing → terminal failure
   try {
@@ -369,10 +404,15 @@ test('progressive fallback uses component difficulty and ignores inline result d
       task,
       gatheringCraftingCheck: { progressive: { rollFormula: '1d8', awardMode: 'equal' } },
       includeProgressiveResolver: false,
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'failed');
@@ -398,13 +438,18 @@ test('progressive neutral zero-award path writes terminal failure when no explic
         progressive: {
           status: 'failed',
           resultGroups: [{ ...task.resultGroups[0], results: [] }],
-          checkResult: { value: 0, reasonCode: 'CHECK_VALUE' }
-        }
+          checkResult: { value: 0, reasonCode: 'CHECK_VALUE' },
+        },
       },
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'failed');
@@ -424,13 +469,18 @@ test('invalid failureOutcome aborts before resolver or terminal side effects', a
   for (const failureOutcome of [
     { mode: 'text', text: '' },
     { mode: 'macro', macroUuid: '' },
-    { mode: 'other', text: 'No useful finds.' }
+    { mode: 'other', text: 'No useful finds.' },
   ]) {
     const calls = {};
     const task = routedTask({ failureOutcome });
     const engine = makeEngine({ task, calls });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, false);
     assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -441,17 +491,24 @@ test('invalid failureOutcome aborts before resolver or terminal side effects', a
 test('terminal history persistence failure prevents results, tools, and failure feedback side effects', async () => {
   const calls = {};
   const task = routedTask({
-    failureOutcome: { mode: 'text', text: 'No useful finds.' }
+    failureOutcome: { mode: 'text', text: 'No useful finds.' },
   });
   routedRoll(false); // routed failure → terminal failure write that then fails to persist
   try {
     const engine = makeEngine({
       task,
-      terminalRunError: Object.assign(new Error('flag write failed'), { code: 'FLAG_WRITE_FAILED' }),
-      calls
+      terminalRunError: Object.assign(new Error('flag write failed'), {
+        code: 'FLAG_WRITE_FAILED',
+      }),
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, false);
     assert.deepEqual(codes(result), ['RUN_CREATION_FAILED']);
@@ -471,7 +528,7 @@ test('real run manager persists immediate non-blind history with the same create
   const runManager = new GatheringRunManager({
     randomID: () => 'run-terminal',
     nowWorldTime: () => 1000,
-    getUserId: () => viewer.id
+    getUserId: () => viewer.id,
   });
   routedRoll(true);
   try {
@@ -482,10 +539,15 @@ test('real run manager persists immediate non-blind history with the same create
       usedTools,
       libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
       runManager,
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor: actingActor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor: actingActor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
     const history = actingActor.flags.fabricate.gatheringRuns.history;
 
     assert.equal(result.accepted, true);
@@ -509,7 +571,11 @@ test('tool terminal usage receives only the acting actor and never actor collect
   const task = routedTask({ toolIds: ['tool-pick'] });
   routedRoll(true);
   try {
-    const engine = makeEngine({ task, libraryTools: [{ id: 'tool-pick', componentId: 'pick' }], calls });
+    const engine = makeEngine({
+      task,
+      libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
+      calls,
+    });
 
     await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
@@ -529,7 +595,12 @@ test('misconfiguration abort creates no active run, terminal history, result ite
   // requires the system-level gathering check formula).
   const engine = makeEngine({ task, gatheringCraftingCheck: false, calls });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+  });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -539,15 +610,22 @@ test('misconfiguration abort creates no active run, terminal history, result ite
 test('routed task with reserved failure keyword result group aborts before resolver or terminal side effects', async () => {
   const calls = {};
   const task = routedTask({
-    resultGroups: [{
-      id: 'group-fail',
-      name: 'fail',
-      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }]
-    }]
+    resultGroups: [
+      {
+        id: 'group-fail',
+        name: 'fail',
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }],
+      },
+    ],
   });
   const engine = makeEngine({ task, calls });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+  });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -561,18 +639,23 @@ test('routed task with duplicate normalized result group names aborts before ter
       {
         id: 'group-a',
         name: 'Iron',
-        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }]
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }],
       },
       {
         id: 'group-b',
         name: ' iron ',
-        results: [{ id: 'result-b', componentId: 'comp-b', quantity: 1 }]
-      }
-    ]
+        results: [{ id: 'result-b', componentId: 'comp-b', quantity: 1 }],
+      },
+    ],
   });
   const engine = makeEngine({ task, calls });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+  });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -594,7 +677,12 @@ test('routed resolution with no system roll formula reports a misconfiguration d
   assert.match(outcome.diagnostics[0].message, /system-level gathering check roll formula/);
 
   // End to end: the attempt aborts as a task misconfiguration with no side effects.
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+  });
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
   assertNoTerminalSideEffects(calls);
@@ -605,7 +693,7 @@ test('blind non-GM terminal success response redacts task, tool, provider, and r
   const secretTask = routedTask({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    toolIds: ['tool-sickle']
+    toolIds: ['tool-sickle'],
   });
   routedRoll(true);
   try {
@@ -615,7 +703,7 @@ test('blind non-GM terminal success response redacts task, tool, provider, and r
       createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1 }],
       usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
       libraryTools: [{ id: 'tool-sickle', componentId: 'silver-sickle' }],
-      calls
+      calls,
     });
 
     const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -636,12 +724,12 @@ test('blind non-GM terminal success response redacts task, tool, provider, and r
       craftingSystemId: 'system-a',
       environmentId: 'env-a',
       taskId: 'blind',
-      userId: viewer.id
+      userId: viewer.id,
     });
     assert.deepEqual(calls.createTerminalRun[0][3], {
       createdResults: [],
       usedTools: [],
-      checkResult: { blind: true, status: 'succeeded' }
+      checkResult: { blind: true, status: 'succeeded' },
     });
     assertNoBlindTerminalLeak(calls.createTerminalRun[0]);
   } finally {
@@ -654,7 +742,7 @@ test('blind non-GM terminal failure response redacts task, tool, provider diagno
   const secretTask = routedTask({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    toolIds: ['tool-sickle']
+    toolIds: ['tool-sickle'],
   });
   routedRoll(false); // 5 lands the failure tier (threshold 5) → routed failure
   try {
@@ -665,7 +753,7 @@ test('blind non-GM terminal failure response redacts task, tool, provider diagno
       gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
       libraryTools: [{ id: 'tool-sickle', componentId: 'silver-sickle' }],
       usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.silver-sickle', quantity: 1 }],
-      calls
+      calls,
     });
 
     const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -686,12 +774,12 @@ test('blind non-GM terminal failure response redacts task, tool, provider diagno
       craftingSystemId: 'system-a',
       environmentId: 'env-a',
       taskId: 'blind',
-      userId: viewer.id
+      userId: viewer.id,
     });
     assert.deepEqual(calls.createTerminalRun[0][3], {
       createdResults: [],
       usedTools: [],
-      checkResult: { blind: true, status: 'failed' }
+      checkResult: { blind: true, status: 'failed' },
     });
     assertNoBlindTerminalLeak(calls.createTerminalRun[0]);
   } finally {
@@ -703,7 +791,7 @@ test('GM blind terminal response may include task and result details for inspect
   const calls = {};
   const secretTask = routedTask({
     id: 'secret-mooncap-task',
-    name: 'Secret Mooncap Patch'
+    name: 'Secret Mooncap Patch',
   });
   const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1 }];
   routedRoll(true);
@@ -712,7 +800,7 @@ test('GM blind terminal response may include task and result details for inspect
       environment: targetedEnvironment({ selectionMode: 'blind', tasks: [secretTask] }),
       task: secretTask,
       createdResults,
-      calls
+      calls,
     });
 
     const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
@@ -742,17 +830,22 @@ test('progressive: system gathering check formula drives the numeric award value
       includeProgressiveResolver: false,
       gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'equal' } },
       createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'succeeded');
     // The legacy expression evaluator must NOT be consulted when the system formula is set.
     assert.deepEqual(calls.evaluateCheck, []);
     assert.deepEqual(
-      calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
+      calls.createResults[0].resultGroups[0].results.map((entry) => entry.id),
       ['result-a', 'result-b']
     );
   } finally {
@@ -766,7 +859,7 @@ test('progressive: with no system formula the check is misconfigured (no legacy 
   const engine = makeEngine({
     task,
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
-    calls
+    calls,
   });
 
   // Directly exercise the check evaluation: no system progressive roll formula
@@ -776,7 +869,7 @@ test('progressive: with no system formula the check is misconfigured (no legacy 
     viewer,
     system: {},
     environment: {},
-    task
+    task,
   });
   assert.equal(checkResult.success, null);
   assert.equal(checkResult.status, null);
@@ -787,7 +880,12 @@ test('progressive: with no system formula the check is misconfigured (no legacy 
 
   // End to end: the attempt is rejected as a task misconfiguration and the
   // legacy evaluator is never consulted or even able to award results.
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+  });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -809,14 +907,19 @@ test('progressive: system awardMode drives the award (per-task award mode is ign
       includeProgressiveResolver: false,
       gatheringCraftingCheck: { progressive: { rollFormula: '1d8', awardMode: 'partial' } },
       createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.deepEqual(
-      calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
+      calls.createResults[0].resultGroups[0].results.map((entry) => entry.id),
       ['result-a', 'result-b']
     );
   } finally {
@@ -836,15 +939,20 @@ test('progressive exceed mode awards only results whose cost is strictly below r
       includeProgressiveResolver: false,
       gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'exceed' } },
       createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'succeeded');
     assert.deepEqual(
-      calls.createResults[0].resultGroups[0].results.map(entry => entry.id),
+      calls.createResults[0].resultGroups[0].results.map((entry) => entry.id),
       ['result-a'],
       'exceed awards comp-a only (8 > 3); comp-b stops (5 > 5 is false)'
     );
@@ -859,14 +967,16 @@ test('progressive: a result whose component lacks a valid difficulty makes the t
   // finite difficulty >= 1: INVALID_PROGRESSIVE_DIFFICULTY → misconfigured → the
   // attempt surfaces TASK_MISCONFIGURED and creates no results.
   const task = progressiveTask({
-    resultGroups: [{
-      id: 'group-progressive',
-      name: 'Ore',
-      results: [
-        { id: 'result-a', componentId: 'comp-a', quantity: 1 }, // difficulty 3
-        { id: 'result-x', componentId: 'comp-missing', quantity: 1 } // no such component → invalid difficulty
-      ]
-    }]
+    resultGroups: [
+      {
+        id: 'group-progressive',
+        name: 'Ore',
+        results: [
+          { id: 'result-a', componentId: 'comp-a', quantity: 1 }, // difficulty 3
+          { id: 'result-x', componentId: 'comp-missing', quantity: 1 }, // no such component → invalid difficulty
+        ],
+      },
+    ],
   });
   stubRoll(20); // ample value so the loop reaches the invalid result
   try {
@@ -874,10 +984,15 @@ test('progressive: a result whose component lacks a valid difficulty makes the t
       task,
       includeProgressiveResolver: false,
       gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'equal' } },
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, false);
     assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -890,7 +1005,13 @@ test('progressive: a result whose component lacks a valid difficulty makes the t
 test('routed: system routed formula resolves a tier name and routes to the same-named result group', async () => {
   const calls = {};
   const task = routedTask({
-    resultGroups: [{ id: 'group-iron', name: 'Iron', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }] }]
+    resultGroups: [
+      {
+        id: 'group-iron',
+        name: 'Iron',
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }],
+      },
+    ],
   });
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]); // 18 ≥ dc 15 → 'Iron' tier
   try {
@@ -902,19 +1023,27 @@ test('routed: system routed formula resolves a tier name and routes to the same-
           dc: 15,
           type: 'relative',
           thresholdMode: 'meet',
-          relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
-        }
+          relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }],
+        },
       },
       createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'succeeded');
     assert.equal(calls.createTerminalRun[0][3].checkResult.outcome, 'Iron');
-    assert.deepEqual(calls.createResults[0].resultGroups[0].results.map(entry => entry.id), ['result-a']);
+    assert.deepEqual(
+      calls.createResults[0].resultGroups[0].results.map((entry) => entry.id),
+      ['result-a']
+    );
   } finally {
     delete globalThis.Roll;
   }
@@ -929,17 +1058,28 @@ test('routed: task.dcOverride shifts the base DC for the formula tier match', as
   const task = routedTask({
     dcOverride: 20,
     failureOutcome: { mode: 'text', text: 'No useful finds.' },
-    resultGroups: [{ id: 'group-iron', name: 'Iron', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }] }]
+    resultGroups: [
+      {
+        id: 'group-iron',
+        name: 'Iron',
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }],
+      },
+    ],
   });
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
   try {
     const engine = makeEngine({
       task,
       gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true);
     assert.equal(result.state, 'failed');
@@ -963,7 +1103,13 @@ test('routed: a winning tier whose name matches no result group is blocked, with
   // no-throw guarantee the test was written for is unchanged and still asserted.
   const task = routedTask({
     failureOutcome: { mode: 'text', text: 'No useful finds.' },
-    resultGroups: [{ id: 'group-copper', name: 'Copper', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }] }]
+    resultGroups: [
+      {
+        id: 'group-copper',
+        name: 'Copper',
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }],
+      },
+    ],
   });
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
   try {
@@ -975,13 +1121,18 @@ test('routed: a winning tier whose name matches no result group is blocked, with
           dc: 15,
           type: 'relative',
           thresholdMode: 'meet',
-          relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }]
-        }
+          relativeOutcomes: [{ id: 'tier-iron', name: 'Iron', success: true, dc: 0 }],
+        },
       },
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, false, 'an unroutable success tier is a misconfiguration');
     assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -996,7 +1147,12 @@ test('routed: with no system routed formula the attempt is a task misconfigurati
   const task = routedTask();
   const engine = makeEngine({ task, gatheringCraftingCheck: false, calls });
 
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+  });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -1007,18 +1163,26 @@ test('d100: a d100 task still resolves via the d100 path regardless of a system 
   const task = routedTask({
     resolutionMode: 'd100',
     resultSelection: null,
-    dropRows: [{ id: 'drop-a', componentId: 'comp-a', dropRate: 50, quantity: 1, enabled: true }]
+    dropRows: [{ id: 'drop-a', componentId: 'comp-a', dropRate: 50, quantity: 1, enabled: true }],
   });
   const engine = makeEngine({
     task,
-    gatheringCraftingCheck: { progressive: { rollFormula: '2d8', awardMode: 'equal' }, routed: { rollFormula: '1d20', dc: 15 } },
-    calls
+    gatheringCraftingCheck: {
+      progressive: { rollFormula: '2d8', awardMode: 'equal' },
+      routed: { rollFormula: '1d20', dc: 15 },
+    },
+    calls,
   });
 
   // No richState.resolveD100Attempt is wired in this harness, so the d100 path
   // surfaces its own misconfigured outcome — proving dispatch stayed on d100 and
   // never touched the progressive/routed formula resolvers.
-  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+  });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -1043,11 +1207,14 @@ test('_resolveRoutedFormulaOutcome: a passing tier routes to the same-named resu
       routed,
       rollFormula: routed.rollFormula,
       actor,
-      task
+      task,
     });
     assert.equal(outcome.status, 'succeeded');
     assert.equal(outcome.checkResult.outcome, 'Iron');
-    assert.deepEqual(outcome.resultGroups.map(group => group.id), ['group-a']);
+    assert.deepEqual(
+      outcome.resultGroups.map((group) => group.id),
+      ['group-a']
+    );
   } finally {
     delete globalThis.Roll;
   }
@@ -1066,11 +1233,14 @@ test('_resolveRoutedFormulaOutcome: a below-lowest total clamps to the closest t
       routed,
       rollFormula: routed.rollFormula,
       actor,
-      task
+      task,
     });
     assert.equal(outcome.status, 'succeeded');
     assert.equal(outcome.checkResult.outcome, 'Iron');
-    assert.deepEqual(outcome.resultGroups.map(group => group.id), ['group-a']);
+    assert.deepEqual(
+      outcome.resultGroups.map((group) => group.id),
+      ['group-a']
+    );
   } finally {
     delete globalThis.Roll;
   }
@@ -1085,8 +1255,8 @@ test('_resolveRoutedFormulaOutcome: a matched failure tier resolves to a termina
     ...routedSystemCheck().routed,
     relativeOutcomes: [
       { id: 'tier-iron', name: 'Iron', success: true, dc: 0 }, // threshold 15
-      { id: 'tier-dust', name: 'Dust', success: false, dc: -10 } // threshold 5
-    ]
+      { id: 'tier-dust', name: 'Dust', success: false, dc: -10 }, // threshold 5
+    ],
   };
   stubRoll(5, [{ number: 1, faces: 20, total: 5 }]); // matches Dust (threshold 5)
   try {
@@ -1095,7 +1265,7 @@ test('_resolveRoutedFormulaOutcome: a matched failure tier resolves to a termina
       routed,
       rollFormula: routed.rollFormula,
       actor,
-      task
+      task,
     });
     assert.equal(outcome.status, 'failed');
     assert.deepEqual(outcome.resultGroups, []);
@@ -1111,7 +1281,13 @@ test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group
   // asserted `succeeded` with an empty result set — the routed twin of the d100 miss in
   // issue 1027, except that here nothing rolled badly: the content is simply unrouted.
   const task = routedTask({
-    resultGroups: [{ id: 'group-copper', name: 'Copper', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }] }]
+    resultGroups: [
+      {
+        id: 'group-copper',
+        name: 'Copper',
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }],
+      },
+    ],
   });
   const routed = routedSystemCheck().routed;
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
@@ -1121,7 +1297,7 @@ test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group
       routed,
       rollFormula: routed.rollFormula,
       actor,
-      task
+      task,
     });
     assert.equal(outcome.status, 'misconfigured');
     assert.equal(outcome.code, 'ROUTED_TIER_UNROUTED');
@@ -1149,21 +1325,31 @@ test('_resolveRoutedFormulaOutcome: a tier-step trigger moves the gathering tier
   // follows the final tier — a failure tier stepped up onto a success tier succeeds.
   const task = routedTask({
     resultGroups: [
-      { id: 'group-dust', name: 'Dust', results: [{ id: 'result-dust', componentId: 'comp-a', quantity: 1 }] },
-      { id: 'group-iron', name: 'Iron', results: [{ id: 'result-iron', componentId: 'comp-b', quantity: 1 }] }
-    ]
+      {
+        id: 'group-dust',
+        name: 'Dust',
+        results: [{ id: 'result-dust', componentId: 'comp-a', quantity: 1 }],
+      },
+      {
+        id: 'group-iron',
+        name: 'Iron',
+        results: [{ id: 'result-iron', componentId: 'comp-b', quantity: 1 }],
+      },
+    ],
   });
   // A `rollTotal` condition rather than a `diceGroup` one: it reads only `total`, which the
   // roll stub supplies unconditionally, so the test cannot pass or fail on dice-group shape.
   const routed = routedSystemCheck({
     failureTierName: 'Dust',
-    triggers: [{
-      id: 'gather-step-up',
-      condition: { type: 'rollTotal', operator: '<=', value: 5 },
-      outcome: 'none',
-      breakTools: false,
-      tierStep: { mode: 'up', steps: 1, tierId: null }
-    }]
+    triggers: [
+      {
+        id: 'gather-step-up',
+        condition: { type: 'rollTotal', operator: '<=', value: 5 },
+        outcome: 'none',
+        breakTools: false,
+        tierStep: { mode: 'up', steps: 1, tierId: null },
+      },
+    ],
   }).routed;
   stubRoll(5, [{ number: 1, faces: 20, total: 5 }]); // matches Dust (threshold 5) → steps up to Iron
   try {
@@ -1172,19 +1358,22 @@ test('_resolveRoutedFormulaOutcome: a tier-step trigger moves the gathering tier
       routed,
       rollFormula: routed.rollFormula,
       actor,
-      task
+      task,
     });
     assert.equal(outcome.status, 'succeeded');
     assert.equal(outcome.checkResult.outcome, 'Iron', 'the FINAL tier name is the routing key');
     assert.equal(outcome.checkResult.success, true, 'success follows the final tier');
-    assert.deepEqual(outcome.resultGroups.map(group => group.id), ['group-iron']);
+    assert.deepEqual(
+      outcome.resultGroups.map((group) => group.id),
+      ['group-iron']
+    );
     assert.deepEqual(outcome.checkResult.data.tierStepApplied, {
       mode: 'up',
       steps: 1,
       fromOutcomeId: 'tier-Dust',
       toOutcomeId: 'tier-Iron',
       stepClamped: false,
-      triggerIds: ['gather-step-up']
+      triggerIds: ['gather-step-up'],
     });
   } finally {
     delete globalThis.Roll;
@@ -1210,7 +1399,7 @@ test('_resolveRoutedOutcome: no system roll formula reports a MISSING_ROUTED_CHE
 function stubCancelDialog() {
   const original = globalThis.foundry;
   globalThis.foundry = {
-    applications: { api: { DialogV2: { wait: async () => ({ confirmed: false }) } } }
+    applications: { api: { DialogV2: { wait: async () => ({ confirmed: false }) } } },
   };
   return () => {
     if (original === undefined) delete globalThis.foundry;
@@ -1229,7 +1418,7 @@ test('immediate interactive cancel (routed): dismissing the roll dialog aborts w
       actor,
       environmentId: 'env-a',
       taskId: 'task-a',
-      interactive: true
+      interactive: true,
     });
 
     assert.equal(result.accepted, false, 'a cancelled attempt is not accepted');
@@ -1250,14 +1439,14 @@ test('immediate interactive cancel (progressive): dismissing the roll dialog abo
     const engine = makeEngine({
       task: progressiveTask(),
       gatheringCraftingCheck: { progressive: { rollFormula: '1d20' } },
-      calls
+      calls,
     });
     const result = await engine.startAttempt({
       viewer,
       actor,
       environmentId: 'env-a',
       taskId: 'task-a',
-      interactive: true
+      interactive: true,
     });
 
     assert.equal(result.accepted, false, 'a cancelled attempt is not accepted');
@@ -1285,18 +1474,27 @@ test('a routed success tier with NO matching result group is blocked, not a sile
   // the tier routes nowhere.
   const task = routedTask({
     resultGroups: [
-      { id: 'group-copper', name: 'Copper', results: [{ id: 'r', componentId: 'comp-a', quantity: 1 }] }
-    ]
+      {
+        id: 'group-copper',
+        name: 'Copper',
+        results: [{ id: 'r', componentId: 'comp-a', quantity: 1 }],
+      },
+    ],
   });
   routedRoll(true);
   try {
     const engine = makeEngine({
       task,
       gatheringCraftingCheck: routedSystemCheck({ tierName: 'Iron' }),
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, false, 'the attempt is blocked, not accepted as a success');
     assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -1310,8 +1508,12 @@ test('an unrouted success tier consumes nothing — no run, no results, no tools
   const task = routedTask({
     toolIds: ['tool-pick'],
     resultGroups: [
-      { id: 'group-copper', name: 'Copper', results: [{ id: 'r', componentId: 'comp-a', quantity: 1 }] }
-    ]
+      {
+        id: 'group-copper',
+        name: 'Copper',
+        results: [{ id: 'r', componentId: 'comp-a', quantity: 1 }],
+      },
+    ],
   });
   routedRoll(true);
   try {
@@ -1319,7 +1521,7 @@ test('an unrouted success tier consumes nothing — no run, no results, no tools
       task,
       gatheringCraftingCheck: routedSystemCheck({ tierName: 'Iron' }),
       libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
-      calls
+      calls,
     });
 
     await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
@@ -1340,17 +1542,22 @@ test('a tier whose group EXISTS but is empty still succeeds — deliberate no-aw
   // succeeds and awards nothing". It matches by name, so it must NOT be treated as a
   // misconfiguration — it renders the explicit nothing-found card instead.
   const task = routedTask({
-    resultGroups: [{ id: 'group-iron', name: 'Iron', results: [] }]
+    resultGroups: [{ id: 'group-iron', name: 'Iron', results: [] }],
   });
   routedRoll(true);
   try {
     const engine = makeEngine({
       task,
       gatheringCraftingCheck: routedSystemCheck({ tierName: 'Iron' }),
-      calls
+      calls,
     });
 
-    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+    });
 
     assert.equal(result.accepted, true, 'an explicitly empty group is legal authoring');
     assert.equal(result.state, 'succeeded');
@@ -1385,7 +1592,7 @@ function gatheringComplication({
   visibility = 'gmOnly',
   when = { stageAwarded: true },
   match = 'any',
-  activities = { gathering: true }
+  activities = { gathering: true },
 } = {}) {
   return {
     id,
@@ -1397,7 +1604,7 @@ function gatheringComplication({
     match,
     when,
     rollCondition: { enabled: false },
-    effectRoll: { enabled: false }
+    effectRoll: { enabled: false },
   };
 }
 
@@ -1420,8 +1627,8 @@ function progressiveGatheringSystem({ complications = {}, difficulties = {}, tri
     features: { gathering: true },
     components: [component('comp-a', 3), component('comp-b', 5), component('comp-c', 7)],
     gatheringCraftingCheck: {
-      progressive: { rollFormula: '1d20', awardMode: 'equal', checkBreakage: { triggers } }
-    }
+      progressive: { rollFormula: '1d20', awardMode: 'equal', checkBreakage: { triggers } },
+    },
   };
 }
 
@@ -1435,7 +1642,7 @@ async function driveProgressiveGathering({ engine, system, task, total = 8 }) {
       actor,
       system,
       environment,
-      task
+      task,
     });
     if (outcome.status !== 'misconfigured') {
       await engine._commitTerminalSideEffects({
@@ -1445,7 +1652,7 @@ async function driveProgressiveGathering({ engine, system, task, total = 8 }) {
         environment,
         task,
         outcome,
-        checkResult: outcome.checkResult
+        checkResult: outcome.checkResult,
       });
     }
     return outcome;
@@ -1458,13 +1665,19 @@ test('progressive gathering (DORMANT): a committed award fires its awarded stage
   const calls = {};
   const task = progressiveTask();
   const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
-  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  const writer = {
+    calls: [],
+    deliver(args) {
+      this.calls.push(args);
+      return true;
+    },
+  };
   engine.installComplicationDelivery({ writer });
   const system = progressiveGatheringSystem({
     complications: {
       'comp-a': [gatheringComplication({ id: 'ca' })],
-      'comp-c': [gatheringComplication({ id: 'cc', when: { stageMissed: true } })]
-    }
+      'comp-c': [gatheringComplication({ id: 'cc', when: { stageMissed: true } })],
+    },
   });
 
   const outcome = await driveProgressiveGathering({ engine, system, task });
@@ -1476,14 +1689,14 @@ test('progressive gathering (DORMANT): a committed award fires its awarded stage
     remaining: 0,
     partialResultId: null,
     haltedResultId: 'result-c',
-    skippedResultIds: []
+    skippedResultIds: [],
   });
   assert.equal(writer.calls.length, 1, 'one delivery for one resolution');
   assert.deepEqual(
-    writer.calls[0].complications.map(entry => [entry.componentId, entry.bucket, entry.activity]),
+    writer.calls[0].complications.map((entry) => [entry.componentId, entry.bucket, entry.activity]),
     [
       ['comp-a', 'full', 'gathering'],
-      ['comp-c', 'halted', 'gathering']
+      ['comp-c', 'halted', 'gathering'],
     ]
   );
   assert.equal(writer.calls[0].actorUuid, actor.uuid);
@@ -1497,14 +1710,20 @@ test('progressive gathering (DORMANT): NEGATIVE CONTROL — an invalid-cost abor
   const calls = {};
   const task = progressiveTask();
   const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
-  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  const writer = {
+    calls: [],
+    deliver(args) {
+      this.calls.push(args);
+      return true;
+    },
+  };
   engine.installComplicationDelivery({ writer });
   const system = progressiveGatheringSystem({
     complications: {
       'comp-a': [gatheringComplication({ id: 'ca' })],
-      'comp-b': [gatheringComplication({ id: 'cb', when: { stageMissed: true } })]
+      'comp-b': [gatheringComplication({ id: 'cb', when: { stageMissed: true } })],
     },
-    difficulties: { 'comp-b': 0 }
+    difficulties: { 'comp-b': 0 },
   });
 
   const outcome = await driveProgressiveGathering({ engine, system, task });
@@ -1518,7 +1737,13 @@ test('progressive gathering (DORMANT): NEGATIVE CONTROL — a d100 outcome never
   const calls = {};
   const task = routedTask();
   const engine = makeEngine({ task, calls });
-  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  const writer = {
+    calls: [],
+    deliver(args) {
+      this.calls.push(args);
+      return true;
+    },
+  };
   engine.installComplicationDelivery({ writer });
   const system = progressiveGatheringSystem({
     // Deliberately a complication that would match on EVERY bucket. Without the mode
@@ -1526,8 +1751,8 @@ test('progressive gathering (DORMANT): NEGATIVE CONTROL — a d100 outcome never
     // a loop that never ran — and this would fire. That is the failure mode the control
     // exists to catch, so a `stageAwarded`-only complication would prove nothing.
     complications: {
-      'comp-a': [gatheringComplication({ when: { stageAwarded: true, stageMissed: true } })]
-    }
+      'comp-a': [gatheringComplication({ when: { stageAwarded: true, stageMissed: true } })],
+    },
   });
 
   // A d100 outcome carries no progressive resolution meta, and the guard reads the
@@ -1538,8 +1763,12 @@ test('progressive gathering (DORMANT): NEGATIVE CONTROL — a d100 outcome never
     system,
     environment: targetedEnvironment({ tasks: [task] }),
     task,
-    outcome: { status: 'succeeded', resultGroups: task.resultGroups, checkResult: { provider: 'd100' } },
-    checkResult: { provider: 'd100' }
+    outcome: {
+      status: 'succeeded',
+      resultGroups: task.resultGroups,
+      checkResult: { provider: 'd100' },
+    },
+    checkResult: { provider: 'd100' },
   });
 
   assert.equal(writer.calls.length, 0, 'complications are a progressive-only consequence');
@@ -1553,11 +1782,11 @@ test('progressive gathering (DORMANT): a THROWING delivery writer never costs th
     writer: {
       deliver() {
         throw new Error('socket exploded');
-      }
-    }
+      },
+    },
   });
   const system = progressiveGatheringSystem({
-    complications: { 'comp-a': [gatheringComplication()] }
+    complications: { 'comp-a': [gatheringComplication()] },
   });
 
   const outcome = await driveProgressiveGathering({ engine, system, task });
@@ -1605,7 +1834,7 @@ function stubGatheringChat({ isGM = true, userId = 'gm-1' } = {}) {
     },
     getSpeaker({ actor: forActor } = {}) {
       return { alias: forActor?.name || 'Unknown' };
-    }
+    },
   };
   return {
     messages,
@@ -1614,7 +1843,7 @@ function stubGatheringChat({ isGM = true, userId = 'gm-1' } = {}) {
       else globalThis.game = originalGame;
       if (originalChatMessage === undefined) delete globalThis.ChatMessage;
       else globalThis.ChatMessage = originalChatMessage;
-    }
+    },
   };
 }
 
@@ -1637,12 +1866,18 @@ async function driveProgressiveGatheringToResponse({
   total = 8,
   run = null,
   createdResults = [],
-  usedTools = []
+  usedTools = [],
 }) {
   stubRoll(total, [{ number: 1, faces: 20, total }]);
   try {
     const environment = targetedEnvironment({ tasks: [task] });
-    const outcome = await engine._resolveProgressiveOutcome({ viewer, actor, system, environment, task });
+    const outcome = await engine._resolveProgressiveOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+    });
     if (outcome.status === 'misconfigured') {
       return { outcome, sideEffects: null, response: null };
     }
@@ -1653,7 +1888,7 @@ async function driveProgressiveGatheringToResponse({
       environment,
       task,
       outcome,
-      checkResult: outcome.checkResult
+      checkResult: outcome.checkResult,
     });
     const response = await engine._terminalStart({
       viewer,
@@ -1666,7 +1901,7 @@ async function driveProgressiveGatheringToResponse({
       createdResults,
       usedTools,
       checkResult: outcome.checkResult,
-      complications: sideEffects.complications
+      complications: sideEffects.complications,
     });
     return { outcome, sideEffects, response };
   } finally {
@@ -1681,23 +1916,31 @@ test('progressive gathering complications (issue 1286): the terminal response an
     complications: {
       // Budget 8 (equal mode): comp-a (3) and comp-b (5) are both fully awarded;
       // comp-c (7) halts the loop — the same budget the first DORMANT test above uses.
-      'comp-a': [gatheringComplication({
-        id: 'ca',
-        name: 'Rockslide',
-        description: 'A rockslide buries the vein.',
-        visibility: 'visible'
-      })],
-      'comp-b': [gatheringComplication({ id: 'cb', name: 'Cave-in', description: 'The tunnel roof gives way.' })]
-    }
+      'comp-a': [
+        gatheringComplication({
+          id: 'ca',
+          name: 'Rockslide',
+          description: 'A rockslide buries the vein.',
+          visibility: 'visible',
+        }),
+      ],
+      'comp-b': [
+        gatheringComplication({
+          id: 'cb',
+          name: 'Cave-in',
+          description: 'The tunnel roof gives way.',
+        }),
+      ],
+    },
   });
   system.features.chatOutput = true;
-  system.components.find(component => component.id === 'comp-a').name = 'Iron Ore';
-  system.components.find(component => component.id === 'comp-b').name = 'Silver Ore';
+  system.components.find((component) => component.id === 'comp-a').name = 'Iron Ore';
+  system.components.find((component) => component.id === 'comp-b').name = 'Silver Ore';
   const engine = makeEngine({
     task,
     includeProgressiveResolver: false,
     calls,
-    systemManager: { getItems: () => system.components }
+    systemManager: { getItems: () => system.components },
   });
   const chat = stubGatheringChat({ isGM: true });
   try {
@@ -1707,21 +1950,35 @@ test('progressive gathering complications (issue 1286): the terminal response an
       task,
       createdResults: [
         { actorUuid: actor.uuid, itemUuid: 'Item.iron-ore', quantity: 1 },
-        { actorUuid: actor.uuid, itemUuid: 'Item.silver-ore', quantity: 1 }
-      ]
+        { actorUuid: actor.uuid, itemUuid: 'Item.silver-ore', quantity: 1 },
+      ],
     });
 
     assert.equal(outcome.status, 'succeeded');
-    assert.deepEqual(sideEffects.complications.map(entry => entry.name), ['Rockslide']);
+    assert.deepEqual(
+      sideEffects.complications.map((entry) => entry.name),
+      ['Rockslide']
+    );
     assert.equal('when' in sideEffects.complications[0], false, 'never emits the authored trigger');
     assert.equal('macroUuid' in sideEffects.complications[0], false, 'never emits the macro uuid');
 
     // The response never carries the gmOnly complication's name or description,
     // whatever `game.user.isGM` says.
     const serializedResponse = JSON.stringify(response);
-    assert.equal(serializedResponse.includes('Cave-in'), false, 'gmOnly complication name absent from the response');
-    assert.equal(serializedResponse.includes('tunnel roof'), false, 'gmOnly complication description absent from the response');
-    assert.deepEqual(response.complications.map(entry => entry.name), ['Rockslide']);
+    assert.equal(
+      serializedResponse.includes('Cave-in'),
+      false,
+      'gmOnly complication name absent from the response'
+    );
+    assert.equal(
+      serializedResponse.includes('tunnel roof'),
+      false,
+      'gmOnly complication description absent from the response'
+    );
+    assert.deepEqual(
+      response.complications.map((entry) => entry.name),
+      ['Rockslide']
+    );
 
     // The chat card renders the visible complication's name AND the resolved
     // component name, inside the section the shared `renderComplications` renderer
@@ -1730,9 +1987,20 @@ test('progressive gathering complications (issue 1286): the terminal response an
     const { content } = chat.messages[0];
     assert.match(content, /fabricate-gather-chat__section--complications/);
     assert.match(content, /fabricate-gather-chat__complication-name">Rockslide</);
-    assert.ok(content.includes('Iron Ore'), 'the resolved component name is rendered alongside the complication');
-    assert.equal(content.includes('Cave-in'), false, 'gmOnly complication name never reaches the card');
-    assert.equal(content.includes('tunnel roof'), false, 'gmOnly complication description never reaches the card');
+    assert.ok(
+      content.includes('Iron Ore'),
+      'the resolved component name is rendered alongside the complication'
+    );
+    assert.equal(
+      content.includes('Cave-in'),
+      false,
+      'gmOnly complication name never reaches the card'
+    );
+    assert.equal(
+      content.includes('tunnel roof'),
+      false,
+      'gmOnly complication description never reaches the card'
+    );
   } finally {
     chat.restore();
   }
@@ -1747,15 +2015,23 @@ test('progressive gathering complications (issue 1286): a resolution that fires 
     task,
     includeProgressiveResolver: false,
     calls,
-    systemManager: { getItems: () => system.components }
+    systemManager: { getItems: () => system.components },
   });
   const chat = stubGatheringChat();
   try {
-    const { outcome, sideEffects, response } = await driveProgressiveGatheringToResponse({ engine, system, task });
+    const { outcome, sideEffects, response } = await driveProgressiveGatheringToResponse({
+      engine,
+      system,
+      task,
+    });
 
     assert.equal(outcome.status, 'succeeded');
     assert.deepEqual(sideEffects.complications, []);
-    assert.equal('complications' in response, false, 'no key at all when nothing fired — not merely an empty array');
+    assert.equal(
+      'complications' in response,
+      false,
+      'no key at all when nothing fired — not merely an empty array'
+    );
     assert.equal(chat.messages.length, 1);
     assert.equal(
       chat.messages[0].content.includes('fabricate-gather-chat__section--complications'),
@@ -1776,7 +2052,7 @@ test('gathering chat card (issue 1286): an empty complications list is byte-iden
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
     usedTools: [],
     checkResult: { items: [], events: [] },
-    run: { id: 'run-x', status: 'succeeded', economyEvidence: {} }
+    run: { id: 'run-x', status: 'succeeded', economyEvidence: {} },
   };
   const engine = new GatheringEngine({});
 
@@ -1814,19 +2090,31 @@ test('progressive gathering complications (issue 1286): NEGATIVE CONTROL — an 
   const calls = {};
   const task = progressiveTask();
   const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
-  const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
+  const writer = {
+    calls: [],
+    deliver(args) {
+      this.calls.push(args);
+      return true;
+    },
+  };
   engine.installComplicationDelivery({ writer });
   const system = progressiveGatheringSystem({
     complications: {
       'comp-a': [gatheringComplication({ id: 'ca' })],
-      'comp-b': [gatheringComplication({ id: 'cb', when: { stageMissed: true } })]
+      'comp-b': [gatheringComplication({ id: 'cb', when: { stageMissed: true } })],
     },
-    difficulties: { 'comp-b': 0 }
+    difficulties: { 'comp-b': 0 },
   });
   stubRoll(8, [{ number: 1, faces: 20, total: 8 }]);
   try {
     const environment = targetedEnvironment({ tasks: [task] });
-    const outcome = await engine._resolveProgressiveOutcome({ viewer, actor, system, environment, task });
+    const outcome = await engine._resolveProgressiveOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+    });
     assert.equal(outcome.status, 'misconfigured');
     assert.equal(outcome.code, 'INVALID_PROGRESSIVE_DIFFICULTY');
 
@@ -1837,11 +2125,15 @@ test('progressive gathering complications (issue 1286): NEGATIVE CONTROL — an 
       environment,
       task,
       outcome,
-      checkResult: outcome.checkResult
+      checkResult: outcome.checkResult,
     });
 
     assert.deepEqual(sideEffects.complications, []);
-    assert.equal(writer.calls.length, 0, 'a misconfigured resolution fires nothing even if committed directly');
+    assert.equal(
+      writer.calls.length,
+      0,
+      'a misconfigured resolution fires nothing even if committed directly'
+    );
   } finally {
     delete globalThis.Roll;
   }

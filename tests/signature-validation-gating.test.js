@@ -69,12 +69,18 @@ function makeRecipeData(id, name) {
       {
         id: `${id}-set`,
         ingredientGroups: [
-          { id: `${id}-grp`, name: 'Ingredients', options: [{ componentId: 'comp-a', quantity: 1 }] },
+          {
+            id: `${id}-grp`,
+            name: 'Ingredients',
+            options: [{ componentId: 'comp-a', quantity: 1 }],
+          },
         ],
         essences: {},
       },
     ],
-    resultGroups: [{ id: `${id}-rg`, results: [{ id: `${id}-r`, itemUuid: 'Item.result', quantity: 1 }] }],
+    resultGroups: [
+      { id: `${id}-rg`, results: [{ id: `${id}-r`, itemUuid: 'Item.result', quantity: 1 }] },
+    ],
   };
 }
 
@@ -147,7 +153,10 @@ describe('RecipeManager signature validation gating', () => {
     const manager = seedManagerWithOneEnabledRecipe();
 
     const result = manager.canActivateRecipe('r-a');
-    assert.ok(result.valid, `an uncontested recipe must stay activatable: ${result.errors.join(', ')}`);
+    assert.ok(
+      result.valid,
+      `an uncontested recipe must stay activatable: ${result.errors.join(', ')}`
+    );
   });
 
   it('reports a stored recipe colliding with an enabled peer as not activatable', () => {
@@ -247,7 +256,9 @@ describe('RecipeManager signature gating for a not-yet-stored candidate', () => 
     resolutionMode = 'alchemy';
     const manager = seedManagerWithOneEnabledRecipe();
     const distinct = makeRecipeData('r-d', 'Forge a Shield');
-    distinct.ingredientSets[0].ingredientGroups[0].options = [{ componentId: 'comp-b', quantity: 1 }];
+    distinct.ingredientSets[0].ingredientGroups[0].options = [
+      { componentId: 'comp-b', quantity: 1 },
+    ];
 
     const result = await manager.importRecipes([makeRecipeData('r-c', 'Forge a Pike'), distinct]);
 

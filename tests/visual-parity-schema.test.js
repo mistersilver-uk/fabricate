@@ -27,7 +27,12 @@ const SPEC = () => ({
     { name: 'rail', screen: 'roll', measuredOn: 'inspector', groups: ['box'], locator: '.rail' },
   ],
   alignments: [
-    { name: 'bodies', screen: 'roll', edges: ['left', 'right'], regions: ['card-body', 'tier-body'] },
+    {
+      name: 'bodies',
+      screen: 'roll',
+      edges: ['left', 'right'],
+      regions: ['card-body', 'tier-body'],
+    },
   ],
 });
 
@@ -40,7 +45,9 @@ test('an alignment group is the rule a per-region measurement cannot express', a
     const spec = SPEC();
     spec.alignments[0].regions = ['card-body', 'no-such-region'];
     assert.ok(
-      alignmentProblems(spec).some((problem) => problem.includes('"no-such-region" is not declared')),
+      alignmentProblems(spec).some((problem) =>
+        problem.includes('"no-such-region" is not declared')
+      ),
       'a group that names nothing measurable must fail rather than assert nothing'
     );
   });
@@ -58,9 +65,7 @@ test('an alignment group is the rule a per-region measurement cannot express', a
 
   await subtests.test('a group needs two regions and a known edge', () => {
     const spec = SPEC();
-    spec.alignments = [
-      { name: 'lonely', screen: 'roll', edges: ['top'], regions: ['card-body'] },
-    ];
+    spec.alignments = [{ name: 'lonely', screen: 'roll', edges: ['top'], regions: ['card-body'] }];
     const problems = alignmentProblems(spec);
     assert.ok(
       problems.some((problem) => problem.includes('at least two regions')),
@@ -97,9 +102,15 @@ test('edge agreement is measured, not assumed', async (subtests) => {
     assert.equal(spread.low, 'roll-card-body', 'and the box it should have lined up with');
   });
 
-  await subtests.test('the tolerance is sub-pixel, an order below the smallest spacing token', () => {
-    assert.ok(EDGE_TOLERANCE_PX < 4, 'a tolerance a spacing mistake can hide under gates nothing');
-  });
+  await subtests.test(
+    'the tolerance is sub-pixel, an order below the smallest spacing token',
+    () => {
+      assert.ok(
+        EDGE_TOLERANCE_PX < 4,
+        'a tolerance a spacing mistake can hide under gates nothing'
+      );
+    }
+  );
 });
 
 test('a locator is DATA, and the schema refuses anything else', async (subtests) => {
@@ -126,13 +137,19 @@ test('a locator is DATA, and the schema refuses anything else', async (subtests)
     );
   });
 
-  await subtests.test('a filter key nothing reads fails, because it would widen the locator', () => {
-    const problems = locatorProblems([{ op: 'where', txt: { equals: 'Difficulty' } }], 'region x');
-    assert.ok(
-      problems.some((problem) => problem.includes('which no filter reads')),
-      'a mistyped predicate matches everything, which is worse than matching nothing'
-    );
-  });
+  await subtests.test(
+    'a filter key nothing reads fails, because it would widen the locator',
+    () => {
+      const problems = locatorProblems(
+        [{ op: 'where', txt: { equals: 'Difficulty' } }],
+        'region x'
+      );
+      assert.ok(
+        problems.some((problem) => problem.includes('which no filter reads')),
+        'a mistyped predicate matches everything, which is worse than matching nothing'
+      );
+    }
+  );
 
   await subtests.test('an empty locator fails', () => {
     assert.equal(locatorProblems([], 'region x').length, 1);

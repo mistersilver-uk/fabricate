@@ -75,8 +75,8 @@ describe('Stepper call sites (issue 1050)', () => {
     );
     assert.ok(
       CALL_SITES.length >= UNSET_VALUE_CALL_SITES.length,
-      `found only ${CALL_SITES.length} <Stepper> tags, fewer than the ${UNSET_VALUE_CALL_SITES.length} `
-        + 'the unset-value table alone names, so the tag extractor is broken'
+      `found only ${CALL_SITES.length} <Stepper> tags, fewer than the ${UNSET_VALUE_CALL_SITES.length} ` +
+        'the unset-value table alone names, so the tag extractor is broken'
     );
   });
 
@@ -126,8 +126,8 @@ describe('Stepper call sites (issue 1050)', () => {
     assert.deepEqual(
       MIGRATED_INPUT_HOOKS.filter((hook) => !owners.has(hook)),
       [],
-      'these hooks no longer ride `inputProps` on any Stepper — the smoke harness and the mounted '
-        + 'suites resolve them against the real `<input>`'
+      'these hooks no longer ride `inputProps` on any Stepper — the smoke harness and the mounted ' +
+        'suites resolve them against the real `<input>`'
     );
     assert.deepEqual(bare, [], 'a hook on the tag lands on the wrapper `<div>`, not on the input');
   });
@@ -140,14 +140,11 @@ describe('Stepper call sites (issue 1050)', () => {
     // which supplies all three at once and is what the ~20 migrated fields now use. The spread only
     // counts as coverage because `tests/util/stepper-labels.test.js` pins that the helper returns
     // exactly those three props — without that this rule would be reading a `{...}` as a promise.
-    const named = (tag, prop) =>
-      new RegExp(String.raw`(?:\b${prop}=|\{\s*${prop}\s*\})`).test(tag);
+    const named = (tag, prop) => new RegExp(String.raw`(?:\b${prop}=|\{\s*${prop}\s*\})`).test(tag);
     const anonymous = CALL_SITES.filter(
       ({ path, tag }) =>
-        !spreadsSharedStepperLabels(tag, markup[path])
-        && (!named(tag, 'ariaLabel')
-          || !named(tag, 'decrementLabel')
-          || !named(tag, 'incrementLabel'))
+        !spreadsSharedStepperLabels(tag, markup[path]) &&
+        (!named(tag, 'ariaLabel') || !named(tag, 'decrementLabel') || !named(tag, 'incrementLabel'))
     ).map(({ path }) => path);
     assert.deepEqual(anonymous, [], 'every Stepper names its input and both of its adjuncts');
   });
@@ -158,9 +155,8 @@ describe('Stepper call sites (issue 1050)', () => {
     // `text('KEY', 'fallback')` idiom, `manager-contract.test.js`'s matcher cannot see them and
     // `lang-keys-no-orphans.test.js` would not notice their removal either. Deleting them would
     // ship the literal key strings as the adjuncts' accessible names on every migrated field.
-    const stepperKeys = JSON.parse(
-      readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8')
-    ).FABRICATE?.Common?.Stepper;
+    const stepperKeys = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'))
+      .FABRICATE?.Common?.Stepper;
     assert.ok(Boolean(stepperKeys), 'FABRICATE.Common.Stepper exists');
     for (const name of ['Decrease', 'Increase']) {
       assert.match(
@@ -212,7 +208,9 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
 
   it('resolves every table entry to exactly one call site', () => {
     assert.deepEqual(
-      resolved.filter(({ matches }) => matches.length !== 1).map(({ entry, matches }) => `${entry.id}: ${matches.length} matches`),
+      resolved
+        .filter(({ matches }) => matches.length !== 1)
+        .map(({ entry, matches }) => `${entry.id}: ${matches.length} matches`),
       [],
       'an unresolved entry would make its rule below hold over nothing'
     );
@@ -238,8 +236,8 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
     assert.deepEqual(
       wrong,
       [],
-      'a genuine-absence field that drops `allowUnset` starts persisting 0 where null was the '
-        + 'value; a cosmetic-zero field that gains it starts persisting null where 0 was'
+      'a genuine-absence field that drops `allowUnset` starts persisting 0 where null was the ' +
+        'value; a cosmetic-zero field that gains it starts persisting null where 0 was'
     );
     // Not vacuous in either direction: the table has to contain both kinds for the `iff` to bite.
     for (const kind of ['genuine-absence', 'cosmetic-zero']) {
@@ -309,7 +307,9 @@ describe('no <label> implicitly binds a Stepper (issue 1050)', () => {
       'a caption followed by a Stepper is reported'
     );
     assert.deepEqual(
-      labelsBindingAStepper('<label class="f">\n<span>DC</span>\n<select></select>\n<Stepper />\n</label>'),
+      labelsBindingAStepper(
+        '<label class="f">\n<span>DC</span>\n<select></select>\n<Stepper />\n</label>'
+      ),
       [],
       'and a label whose first labelable descendant is a real control is not'
     );
@@ -333,8 +333,8 @@ describe('no <label> implicitly binds a Stepper (issue 1050)', () => {
     assert.deepEqual(
       offenders,
       [],
-      'wrap the caption and the Stepper in a `<div>` instead — the Stepper\'s own `ariaLabel` is '
-        + 'the accessible name, and an implicit label here binds to the `−` button'
+      "wrap the caption and the Stepper in a `<div>` instead — the Stepper's own `ariaLabel` is " +
+        'the accessible name, and an implicit label here binds to the `−` button'
     );
   });
 });

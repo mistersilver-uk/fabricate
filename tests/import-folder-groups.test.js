@@ -23,7 +23,12 @@ test('groups items by folder, preserves first-seen order, omits empty folders', 
       { uuid: 'Item.b', folderId: 'f2' },
       { uuid: 'Item.c', folderId: 'f1' },
     ],
-    { folderNames: new Map([['f1', 'Metals'], ['f2', 'Herbs']]) }
+    {
+      folderNames: new Map([
+        ['f1', 'Metals'],
+        ['f2', 'Herbs'],
+      ]),
+    }
   );
   assert.deepEqual(groups, [
     { folderId: 'f1', folderName: 'Metals', itemCount: 2, itemUuids: ['Item.a', 'Item.c'] },
@@ -33,11 +38,7 @@ test('groups items by folder, preserves first-seen order, omits empty folders', 
 
 test('files folderless items under the unfiled group and skips uuid-less rows', () => {
   const groups = buildFolderGroupsFromItems(
-    [
-      { uuid: 'Item.a', folderId: null },
-      { uuid: '', folderId: 'f1' },
-      { uuid: 'Item.b' },
-    ],
+    [{ uuid: 'Item.a', folderId: null }, { uuid: '', folderId: 'f1' }, { uuid: 'Item.b' }],
     { unfiledName: '(No folder)' }
   );
   assert.deepEqual(groups, [
@@ -151,10 +152,30 @@ function fakePack() {
 test('whole pack: every folder is a row, plus an unfiled row for pack-root items', () => {
   const groups = collectPackFolderGroups(fakePack(), { unfiledName: '(No folder)' });
   assert.deepEqual(groups, [
-    { folderId: 'metals', folderName: 'Metals', itemCount: 1, itemUuids: ['Compendium.world.smithing.Item.a'] },
-    { folderId: 'ores', folderName: 'Ores', itemCount: 1, itemUuids: ['Compendium.world.smithing.Item.b'] },
-    { folderId: 'herbs', folderName: 'Herbs', itemCount: 1, itemUuids: ['Compendium.world.smithing.Item.c'] },
-    { folderId: null, folderName: '(No folder)', itemCount: 1, itemUuids: ['Compendium.world.smithing.Item.d'] },
+    {
+      folderId: 'metals',
+      folderName: 'Metals',
+      itemCount: 1,
+      itemUuids: ['Compendium.world.smithing.Item.a'],
+    },
+    {
+      folderId: 'ores',
+      folderName: 'Ores',
+      itemCount: 1,
+      itemUuids: ['Compendium.world.smithing.Item.b'],
+    },
+    {
+      folderId: 'herbs',
+      folderName: 'Herbs',
+      itemCount: 1,
+      itemUuids: ['Compendium.world.smithing.Item.c'],
+    },
+    {
+      folderId: null,
+      folderName: '(No folder)',
+      itemCount: 1,
+      itemUuids: ['Compendium.world.smithing.Item.d'],
+    },
   ]);
 });
 

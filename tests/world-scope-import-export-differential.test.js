@@ -32,9 +32,8 @@ import {
 } from './helpers/worldScopeCorpus.js';
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
-const { buildExportPayload, prepareForImport } = await import(
-  '../src/systems/CraftingSystemExporter.js'
-);
+const { buildExportPayload, prepareForImport } =
+  await import('../src/systems/CraftingSystemExporter.js');
 
 const SOURCE_SYSTEM_ID = 'sys-source';
 

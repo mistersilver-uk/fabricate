@@ -47,7 +47,7 @@ function makeIngredientState(opts = {}) {
     need: opts.need ?? 1,
     have: opts.have ?? 0,
     satisfied: (opts.have ?? 0) >= (opts.need ?? 1),
-    ...opts
+    ...opts,
   };
 }
 
@@ -57,7 +57,7 @@ function makeEssenceState(opts = {}) {
     need: opts.need ?? 1,
     have: opts.have ?? 0,
     satisfied: (opts.have ?? 0) >= (opts.need ?? 1),
-    ...opts
+    ...opts,
   };
 }
 
@@ -67,19 +67,21 @@ function makeToolState(opts = {}) {
     name: opts.name ?? 'Mortar & Pestle',
     available: opts.available ?? false,
     satisfied: opts.available ?? false,
-    ...opts
+    ...opts,
   };
 }
 
 function makeRecipeManager(recipes = [], evaluationFn = null) {
-  const recipeMap = new Map(recipes.map(r => [r.id, r]));
+  const recipeMap = new Map(recipes.map((r) => [r.id, r]));
   return {
     getRecipe: (id) => recipeMap.get(id) ?? null,
-    evaluateCraftability: evaluationFn ?? (() => ({
-      ingredientStates: [],
-      essenceStates: [],
-      toolStates: []
-    }))
+    evaluateCraftability:
+      evaluationFn ??
+      (() => ({
+        ingredientStates: [],
+        essenceStates: [],
+        toolStates: [],
+      })),
   };
 }
 
@@ -88,7 +90,6 @@ function makeRecipeManager(recipes = [], evaluationFn = null) {
 // ---------------------------------------------------------------------------
 
 describe('aggregateShoppingList', () => {
-
   it('empty list returns default empty result', () => {
     const result = aggregateShoppingList([], makeRecipeManager(), []);
     assert.deepEqual(result, {
@@ -97,7 +98,7 @@ describe('aggregateShoppingList', () => {
       tools: [],
       allSatisfied: true,
       totalRecipes: 0,
-      totalQuantity: 0
+      totalQuantity: 0,
     });
   });
 
@@ -110,9 +111,11 @@ describe('aggregateShoppingList', () => {
   it('single recipe single ingredient: have >= need => satisfied', () => {
     const recipe = makeRecipe('r1', 'Healing Potion');
     const manager = makeRecipeManager([recipe], () => ({
-      ingredientStates: [makeIngredientState({ componentId: 'iron-ore', description: 'Iron Ore', need: 2, have: 3 })],
+      ingredientStates: [
+        makeIngredientState({ componentId: 'iron-ore', description: 'Iron Ore', need: 2, have: 3 }),
+      ],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
@@ -133,7 +136,7 @@ describe('aggregateShoppingList', () => {
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [makeIngredientState({ componentId: 'iron-ore', need: 2, have: 10 })],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 3 }], manager, ['actor1']);
@@ -147,21 +150,31 @@ describe('aggregateShoppingList', () => {
 
     const evaluations = {
       r1: {
-        ingredientStates: [makeIngredientState({ componentId: 'iron', description: 'Iron', need: 2, have: 5 })],
+        ingredientStates: [
+          makeIngredientState({ componentId: 'iron', description: 'Iron', need: 2, have: 5 }),
+        ],
         essenceStates: [],
-        toolStates: []
+        toolStates: [],
       },
       r2: {
-        ingredientStates: [makeIngredientState({ componentId: 'iron', description: 'Iron', need: 3, have: 5 })],
+        ingredientStates: [
+          makeIngredientState({ componentId: 'iron', description: 'Iron', need: 3, have: 5 }),
+        ],
         essenceStates: [],
-        toolStates: []
-      }
+        toolStates: [],
+      },
     };
 
-    const manager = makeRecipeManager([recipeA, recipeB], (_actors, recipe) => evaluations[recipe.id]);
+    const manager = makeRecipeManager(
+      [recipeA, recipeB],
+      (_actors, recipe) => evaluations[recipe.id]
+    );
 
     const result = aggregateShoppingList(
-      [{ recipeId: 'r1', quantity: 1 }, { recipeId: 'r2', quantity: 1 }],
+      [
+        { recipeId: 'r1', quantity: 1 },
+        { recipeId: 'r2', quantity: 1 },
+      ],
       manager,
       ['actor1']
     );
@@ -180,27 +193,37 @@ describe('aggregateShoppingList', () => {
 
     const evaluations = {
       r1: {
-        ingredientStates: [makeIngredientState({ componentId: 'iron', description: 'Iron', need: 2, have: 0 })],
+        ingredientStates: [
+          makeIngredientState({ componentId: 'iron', description: 'Iron', need: 2, have: 0 }),
+        ],
         essenceStates: [],
-        toolStates: []
+        toolStates: [],
       },
       r2: {
-        ingredientStates: [makeIngredientState({ componentId: 'copper', description: 'Copper', need: 3, have: 0 })],
+        ingredientStates: [
+          makeIngredientState({ componentId: 'copper', description: 'Copper', need: 3, have: 0 }),
+        ],
         essenceStates: [],
-        toolStates: []
-      }
+        toolStates: [],
+      },
     };
 
-    const manager = makeRecipeManager([recipeA, recipeB], (_actors, recipe) => evaluations[recipe.id]);
+    const manager = makeRecipeManager(
+      [recipeA, recipeB],
+      (_actors, recipe) => evaluations[recipe.id]
+    );
 
     const result = aggregateShoppingList(
-      [{ recipeId: 'r1', quantity: 1 }, { recipeId: 'r2', quantity: 1 }],
+      [
+        { recipeId: 'r1', quantity: 1 },
+        { recipeId: 'r2', quantity: 1 },
+      ],
       manager,
       ['actor1']
     );
 
     assert.equal(result.ingredients.length, 2);
-    const ids = result.ingredients.map(i => i.componentId);
+    const ids = result.ingredients.map((i) => i.componentId);
     assert.ok(ids.includes('iron'));
     assert.ok(ids.includes('copper'));
   });
@@ -210,7 +233,7 @@ describe('aggregateShoppingList', () => {
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [makeIngredientState({ componentId: 'iron', need: 5, have: 2 })],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
@@ -225,10 +248,10 @@ describe('aggregateShoppingList', () => {
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [
         makeIngredientState({ componentId: 'iron', need: 2, have: 5 }),
-        makeIngredientState({ componentId: 'wood', need: 1, have: 3 })
+        makeIngredientState({ componentId: 'wood', need: 1, have: 3 }),
       ],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
@@ -240,10 +263,10 @@ describe('aggregateShoppingList', () => {
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [
         makeIngredientState({ componentId: 'iron', need: 2, have: 5 }),
-        makeIngredientState({ componentId: 'gold', need: 3, have: 1 })
+        makeIngredientState({ componentId: 'gold', need: 3, have: 1 }),
       ],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
@@ -258,19 +281,25 @@ describe('aggregateShoppingList', () => {
       r1: {
         ingredientStates: [],
         essenceStates: [makeEssenceState({ type: 'fire', need: 2, have: 3 })],
-        toolStates: []
+        toolStates: [],
       },
       r2: {
         ingredientStates: [],
         essenceStates: [makeEssenceState({ type: 'fire', need: 1, have: 3 })],
-        toolStates: []
-      }
+        toolStates: [],
+      },
     };
 
-    const manager = makeRecipeManager([recipeA, recipeB], (_actors, recipe) => evaluations[recipe.id]);
+    const manager = makeRecipeManager(
+      [recipeA, recipeB],
+      (_actors, recipe) => evaluations[recipe.id]
+    );
 
     const result = aggregateShoppingList(
-      [{ recipeId: 'r1', quantity: 1 }, { recipeId: 'r2', quantity: 2 }],
+      [
+        { recipeId: 'r1', quantity: 1 },
+        { recipeId: 'r2', quantity: 2 },
+      ],
       manager,
       ['actor1']
     );
@@ -278,7 +307,7 @@ describe('aggregateShoppingList', () => {
     assert.equal(result.essences.length, 1);
     const [ess] = result.essences;
     assert.equal(ess.type, 'fire');
-    assert.equal(ess.totalNeed, 4);  // 2*1 + 1*2
+    assert.equal(ess.totalNeed, 4); // 2*1 + 1*2
     assert.equal(ess.have, 3);
     assert.equal(ess.missing, 1);
     assert.equal(ess.satisfied, false);
@@ -321,8 +350,7 @@ describe('aggregateShoppingList', () => {
         manager,
         ['actor1']
       );
-      const [state] =
-        channel === 'ingredientStates' ? result.ingredients : result.essences;
+      const [state] = channel === 'ingredientStates' ? result.ingredients : result.essences;
       assert.equal(state.isEssence, true);
       assert.equal(state.icon, 'fas fa-heart');
     });
@@ -345,11 +373,9 @@ describe('aggregateShoppingList', () => {
       ],
       toolStates: [],
     }));
-    const result = aggregateShoppingList(
-      [{ recipeId: recipe.id, quantity: 1 }],
-      manager,
-      ['actor1']
-    );
+    const result = aggregateShoppingList([{ recipeId: recipe.id, quantity: 1 }], manager, [
+      'actor1',
+    ]);
     assert.equal(result.ingredients[0].icon, null);
     assert.equal(result.essences[0].icon, null);
   });
@@ -362,19 +388,25 @@ describe('aggregateShoppingList', () => {
       r1: {
         ingredientStates: [],
         essenceStates: [],
-        toolStates: [makeToolState({ componentId: 'mortar', name: 'Mortar', available: true })]
+        toolStates: [makeToolState({ componentId: 'mortar', name: 'Mortar', available: true })],
       },
       r2: {
         ingredientStates: [],
         essenceStates: [],
-        toolStates: [makeToolState({ componentId: 'mortar', name: 'Mortar', available: true })]
-      }
+        toolStates: [makeToolState({ componentId: 'mortar', name: 'Mortar', available: true })],
+      },
     };
 
-    const manager = makeRecipeManager([recipeA, recipeB], (_actors, recipe) => evaluations[recipe.id]);
+    const manager = makeRecipeManager(
+      [recipeA, recipeB],
+      (_actors, recipe) => evaluations[recipe.id]
+    );
 
     const result = aggregateShoppingList(
-      [{ recipeId: 'r1', quantity: 1 }, { recipeId: 'r2', quantity: 1 }],
+      [
+        { recipeId: 'r1', quantity: 1 },
+        { recipeId: 'r2', quantity: 1 },
+      ],
       manager,
       ['actor1']
     );
@@ -392,19 +424,25 @@ describe('aggregateShoppingList', () => {
       r1: {
         ingredientStates: [],
         essenceStates: [],
-        toolStates: [makeToolState({ componentId: 'mortar', name: 'Mortar', available: true })]
+        toolStates: [makeToolState({ componentId: 'mortar', name: 'Mortar', available: true })],
       },
       r2: {
         ingredientStates: [],
         essenceStates: [],
-        toolStates: [makeToolState({ componentId: 'mortar', name: 'Mortar', available: false })]
-      }
+        toolStates: [makeToolState({ componentId: 'mortar', name: 'Mortar', available: false })],
+      },
     };
 
-    const manager = makeRecipeManager([recipeA, recipeB], (_actors, recipe) => evaluations[recipe.id]);
+    const manager = makeRecipeManager(
+      [recipeA, recipeB],
+      (_actors, recipe) => evaluations[recipe.id]
+    );
 
     const result = aggregateShoppingList(
-      [{ recipeId: 'r1', quantity: 1 }, { recipeId: 'r2', quantity: 1 }],
+      [
+        { recipeId: 'r1', quantity: 1 },
+        { recipeId: 'r2', quantity: 1 },
+      ],
       manager,
       ['actor1']
     );
@@ -421,32 +459,38 @@ describe('aggregateShoppingList', () => {
       r1: {
         ingredientStates: [makeIngredientState({ componentId: 'iron', need: 2, have: 0 })],
         essenceStates: [],
-        toolStates: []
+        toolStates: [],
       },
       r2: {
         ingredientStates: [makeIngredientState({ componentId: 'iron', need: 3, have: 0 })],
         essenceStates: [],
-        toolStates: []
-      }
+        toolStates: [],
+      },
     };
 
-    const manager = makeRecipeManager([recipeA, recipeB], (_actors, recipe) => evaluations[recipe.id]);
+    const manager = makeRecipeManager(
+      [recipeA, recipeB],
+      (_actors, recipe) => evaluations[recipe.id]
+    );
 
     const result = aggregateShoppingList(
-      [{ recipeId: 'r1', quantity: 2 }, { recipeId: 'r2', quantity: 1 }],
+      [
+        { recipeId: 'r1', quantity: 2 },
+        { recipeId: 'r2', quantity: 1 },
+      ],
       manager,
       ['actor1']
     );
 
     const [ing] = result.ingredients;
     assert.equal(ing.recipeBreakdown.length, 2);
-    const r1entry = ing.recipeBreakdown.find(b => b.recipeId === 'r1');
-    const r2entry = ing.recipeBreakdown.find(b => b.recipeId === 'r2');
+    const r1entry = ing.recipeBreakdown.find((b) => b.recipeId === 'r1');
+    const r2entry = ing.recipeBreakdown.find((b) => b.recipeId === 'r2');
     assert.equal(r1entry.need, 2);
     assert.equal(r1entry.quantity, 2);
     assert.equal(r2entry.need, 3);
     assert.equal(r2entry.quantity, 1);
-    assert.equal(ing.totalNeed, 7);  // 2*2 + 3*1
+    assert.equal(ing.totalNeed, 7); // 2*2 + 3*1
   });
 
   it('entry with quantity 0 is skipped', () => {
@@ -454,7 +498,7 @@ describe('aggregateShoppingList', () => {
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [makeIngredientState({ componentId: 'iron', need: 2, have: 0 })],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 0 }], manager, ['actor1']);
@@ -465,7 +509,9 @@ describe('aggregateShoppingList', () => {
   it('recipe not found in manager is skipped without error', () => {
     const manager = makeRecipeManager([], () => null);
 
-    const result = aggregateShoppingList([{ recipeId: 'nonexistent', quantity: 1 }], manager, ['actor1']);
+    const result = aggregateShoppingList([{ recipeId: 'nonexistent', quantity: 1 }], manager, [
+      'actor1',
+    ]);
     assert.equal(result.ingredients.length, 0);
     assert.equal(result.totalRecipes, 0);
   });
@@ -475,7 +521,7 @@ describe('aggregateShoppingList', () => {
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [makeIngredientState({ componentId: 'iron', need: 3, have: 0 })],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, []);
@@ -487,11 +533,23 @@ describe('aggregateShoppingList', () => {
     const recipe = makeRecipe('r1');
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [
-        makeIngredientState({ componentId: null, itemUuid: 'uuid-abc', description: 'Special Item', need: 1, have: 0 }),
-        makeIngredientState({ componentId: null, itemUuid: 'uuid-abc', description: 'Special Item', need: 2, have: 1 })
+        makeIngredientState({
+          componentId: null,
+          itemUuid: 'uuid-abc',
+          description: 'Special Item',
+          need: 1,
+          have: 0,
+        }),
+        makeIngredientState({
+          componentId: null,
+          itemUuid: 'uuid-abc',
+          description: 'Special Item',
+          need: 2,
+          have: 1,
+        }),
       ],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     // Same item uuid in two different ingredient states from same recipe — should merge
@@ -505,10 +563,16 @@ describe('aggregateShoppingList', () => {
     const recipe = makeRecipe('r1');
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [
-        makeIngredientState({ componentId: null, itemUuid: null, description: 'Any Metal', need: 2, have: 1 })
+        makeIngredientState({
+          componentId: null,
+          itemUuid: null,
+          description: 'Any Metal',
+          need: 2,
+          have: 1,
+        }),
       ],
       essenceStates: [],
-      toolStates: []
+      toolStates: [],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
@@ -520,12 +584,23 @@ describe('aggregateShoppingList', () => {
     const recipe = makeRecipe('r1');
     const manager = makeRecipeManager([recipe], () => ({
       ingredientStates: [
-        makeIngredientState({ componentId: 'c1', name: 'Iron', img: 'icons/iron.webp', need: 2, have: 0 })
+        makeIngredientState({
+          componentId: 'c1',
+          name: 'Iron',
+          img: 'icons/iron.webp',
+          need: 2,
+          have: 0,
+        }),
       ],
       essenceStates: [makeEssenceState({ type: 'fire', name: 'Fire', need: 2, have: 0 })],
       toolStates: [
-        makeToolState({ name: 'Anvil', img: 'icons/anvil.webp', available: false, needsRepair: true })
-      ]
+        makeToolState({
+          name: 'Anvil',
+          img: 'icons/anvil.webp',
+          available: false,
+          needsRepair: true,
+        }),
+      ],
     }));
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
@@ -542,20 +617,33 @@ describe('aggregateShoppingList', () => {
     const manager = {
       getRecipe: () => recipe,
       evaluateCraftability: () => ({
-        ingredientStates: [makeIngredientState({ componentId: 'wrong', description: 'One set only', need: 9, have: 0 })],
+        ingredientStates: [
+          makeIngredientState({
+            componentId: 'wrong',
+            description: 'One set only',
+            need: 9,
+            have: 0,
+          }),
+        ],
         essenceStates: [],
-        toolStates: []
+        toolStates: [],
       }),
       evaluateShoppingRequirement: () => ({
-        ingredientStates: [makeIngredientState({ componentId: 'c1', description: 'Any set', need: 2, have: 0 })],
+        ingredientStates: [
+          makeIngredientState({ componentId: 'c1', description: 'Any set', need: 2, have: 0 }),
+        ],
         essenceStates: [],
-        toolStates: []
-      })
+        toolStates: [],
+      }),
     };
 
     const result = aggregateShoppingList([{ recipeId: 'r1', quantity: 1 }], manager, ['actor1']);
     assert.equal(result.ingredients.length, 1);
-    assert.equal(result.ingredients[0].description, 'Any set', 'used the shopping requirement path');
+    assert.equal(
+      result.ingredients[0].description,
+      'Any set',
+      'used the shopping requirement path'
+    );
   });
 });
 

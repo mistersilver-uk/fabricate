@@ -34,9 +34,8 @@ globalThis.foundry = {
 };
 globalThis.game = { user: { isGM: true, name: 'Test' }, fabricate: null };
 
-const { HANDLERS, getMatchHandler, getIngredientComponentId, normalizeMatch } = await import(
-  '../src/models/match/matchTypes.js'
-);
+const { HANDLERS, getMatchHandler, getIngredientComponentId, normalizeMatch } =
+  await import('../src/models/match/matchTypes.js');
 const { Ingredient } = await import('../src/models/Ingredient.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
@@ -69,7 +68,10 @@ test('getMatchHandler resolves each known type', () => {
 test('getMatchHandler aliases systemItem to the component handler', () => {
   const handler = getMatchHandler({ type: 'systemItem', systemItemId: 'cmp-iron' });
   assert.equal(handler, HANDLERS.component);
-  assert.equal(handler.getComponentId({ type: 'systemItem', systemItemId: 'cmp-iron' }), 'cmp-iron');
+  assert.equal(
+    handler.getComponentId({ type: 'systemItem', systemItemId: 'cmp-iron' }),
+    'cmp-iron'
+  );
   assert.deepEqual(
     [...handler.expandToComponentIds({ type: 'systemItem', systemItemId: 'cmp-iron' }, [])],
     ['cmp-iron']
@@ -78,7 +80,10 @@ test('getMatchHandler aliases systemItem to the component handler', () => {
   // same as its normalized component form, so it is not dropped as incomplete
   // or unsignatured on paths that run before normalizeMatch.
   assert.equal(handler.isComplete({ type: 'systemItem', systemItemId: 'cmp-iron' }), true);
-  assert.equal(handler.signature({ type: 'systemItem', systemItemId: ' cmp-iron ' }), 'component:cmp-iron');
+  assert.equal(
+    handler.signature({ type: 'systemItem', systemItemId: ' cmp-iron ' }),
+    'component:cmp-iron'
+  );
 });
 
 test('getMatchHandler returns a safe fallback for null and unknown types', () => {
@@ -106,14 +111,24 @@ test('component handler: normalize/isComplete/signature/expand/getComponentId/de
   assert.equal(h.isComplete({ type: 'component', componentId: null }), false);
   assert.equal(h.signature({ type: 'component', componentId: ' cmp-iron ' }), 'component:cmp-iron');
   assert.equal(h.signature({ type: 'component', componentId: '' }), null);
-  assert.deepEqual([...h.expandToComponentIds({ type: 'component', componentId: 'cmp-iron' }, [])], [
-    'cmp-iron',
-  ]);
+  assert.deepEqual(
+    [...h.expandToComponentIds({ type: 'component', componentId: 'cmp-iron' }, [])],
+    ['cmp-iron']
+  );
   assert.equal(h.getComponentId({ type: 'component', componentId: 'cmp-iron' }), 'cmp-iron');
   // Component matching is owned upstream, so the handler never matches an item.
-  assert.equal(h.matchesItem({ type: 'component', componentId: 'cmp-iron' }, fakeItem(), {}), false);
-  assert.equal(h.describe({ type: 'component', componentId: 'cmp-iron' }, { quantity: 3 }), '3x component');
-  assert.deepEqual(h.validate({ type: 'component', componentId: null }, { requireComplete: true }), []);
+  assert.equal(
+    h.matchesItem({ type: 'component', componentId: 'cmp-iron' }, fakeItem(), {}),
+    false
+  );
+  assert.equal(
+    h.describe({ type: 'component', componentId: 'cmp-iron' }, { quantity: 3 }),
+    '3x component'
+  );
+  assert.deepEqual(
+    h.validate({ type: 'component', componentId: null }, { requireComplete: true }),
+    []
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -133,7 +148,10 @@ test('tags handler: normalize trims/filters and defaults tagMatch', () => {
 
 test('tags handler: signature sorts tags and appends tagMatch', () => {
   const h = HANDLERS.tags;
-  assert.equal(h.signature({ type: 'tags', tags: ['sharp', 'metal'], tagMatch: 'all' }), 'tags:metal,sharp|all');
+  assert.equal(
+    h.signature({ type: 'tags', tags: ['sharp', 'metal'], tagMatch: 'all' }),
+    'tags:metal,sharp|all'
+  );
   assert.equal(h.signature({ type: 'tags', tags: [], tagMatch: 'any' }), null);
 });
 
@@ -145,13 +163,18 @@ test('tags handler: expandToComponentIds filters components by any/all', () => {
     { id: 'c', tags: ['wood'] },
   ];
   assert.deepEqual(
-    [...h.expandToComponentIds({ type: 'tags', tags: ['metal'], tagMatch: 'any' }, components)].sort((x, y) =>
-      x.localeCompare(y),
-    ),
+    [
+      ...h.expandToComponentIds({ type: 'tags', tags: ['metal'], tagMatch: 'any' }, components),
+    ].sort((x, y) => x.localeCompare(y)),
     ['a', 'b']
   );
   assert.deepEqual(
-    [...h.expandToComponentIds({ type: 'tags', tags: ['metal', 'sharp'], tagMatch: 'all' }, components)],
+    [
+      ...h.expandToComponentIds(
+        { type: 'tags', tags: ['metal', 'sharp'], tagMatch: 'all' },
+        components
+      ),
+    ],
     ['a']
   );
 });
@@ -159,17 +182,38 @@ test('tags handler: expandToComponentIds filters components by any/all', () => {
 test('tags handler: matchesItem honors enableTags and any/all', () => {
   const h = HANDLERS.tags;
   const item = fakeItem({ tags: ['metal', 'sharp'] });
-  assert.equal(h.matchesItem({ type: 'tags', tags: ['metal'], tagMatch: 'any' }, item, { features: { enableTags: true } }), true);
-  assert.equal(h.matchesItem({ type: 'tags', tags: ['metal', 'wood'], tagMatch: 'all' }, item, { features: { enableTags: true } }), false);
+  assert.equal(
+    h.matchesItem({ type: 'tags', tags: ['metal'], tagMatch: 'any' }, item, {
+      features: { enableTags: true },
+    }),
+    true
+  );
+  assert.equal(
+    h.matchesItem({ type: 'tags', tags: ['metal', 'wood'], tagMatch: 'all' }, item, {
+      features: { enableTags: true },
+    }),
+    false
+  );
   // Tags disabled → never matches.
-  assert.equal(h.matchesItem({ type: 'tags', tags: ['metal'], tagMatch: 'any' }, item, { features: { enableTags: false } }), false);
+  assert.equal(
+    h.matchesItem({ type: 'tags', tags: ['metal'], tagMatch: 'any' }, item, {
+      features: { enableTags: false },
+    }),
+    false
+  );
 });
 
 test('tags handler: getComponentId is null; describe joins tags', () => {
   const h = HANDLERS.tags;
   assert.equal(h.getComponentId({ type: 'tags', tags: ['metal'] }), null);
-  assert.equal(h.describe({ type: 'tags', tags: ['metal', 'sharp'], tagMatch: 'all' }, { quantity: 2 }), '2x metal & sharp');
-  assert.equal(h.describe({ type: 'tags', tags: ['metal', 'sharp'], tagMatch: 'any' }, { quantity: 1 }), '1x metal | sharp');
+  assert.equal(
+    h.describe({ type: 'tags', tags: ['metal', 'sharp'], tagMatch: 'all' }, { quantity: 2 }),
+    '2x metal & sharp'
+  );
+  assert.equal(
+    h.describe({ type: 'tags', tags: ['metal', 'sharp'], tagMatch: 'any' }, { quantity: 1 }),
+    '1x metal | sharp'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -195,8 +239,16 @@ test('currency handler: isComplete/signature/expand/matchesItem/getComponentId',
   assert.equal(h.isComplete({ type: 'currency', unit: 'gp', amount: 0 }), false);
   assert.equal(h.signature({ type: 'currency', unit: 'gp', amount: 100 }), 'currency:gp:100');
   assert.equal(h.signature({ type: 'currency', unit: '', amount: 100 }), null);
-  assert.deepEqual([...h.expandToComponentIds({ type: 'currency', unit: 'gp', amount: 100 }, [{ id: 'a' }])], []);
-  assert.equal(h.matchesItem({ type: 'currency', unit: 'gp', amount: 100 }, fakeItem(), { features: { enableTags: true } }), false);
+  assert.deepEqual(
+    [...h.expandToComponentIds({ type: 'currency', unit: 'gp', amount: 100 }, [{ id: 'a' }])],
+    []
+  );
+  assert.equal(
+    h.matchesItem({ type: 'currency', unit: 'gp', amount: 100 }, fakeItem(), {
+      features: { enableTags: true },
+    }),
+    false
+  );
   assert.equal(h.getComponentId({ type: 'currency', unit: 'gp', amount: 100 }), null);
 });
 
@@ -221,7 +273,11 @@ test('normalizeMatch folds legacy systemItem/componentId/systemItemId into compo
     tags: ['a', 'b'],
     tagMatch: 'all',
   });
-  assert.deepEqual(normalizeMatch({ tag: 'solo' }), { type: 'tags', tags: ['solo'], tagMatch: 'any' });
+  assert.deepEqual(normalizeMatch({ tag: 'solo' }), {
+    type: 'tags',
+    tags: ['solo'],
+    tagMatch: 'any',
+  });
   assert.equal(normalizeMatch({}), null);
 });
 
@@ -232,20 +288,38 @@ test('plan-review 1: an incomplete tags match stacks both the shared and tag err
   const ingredient = new Ingredient({ quantity: 1, match: { type: 'tags', tags: [] } });
   const { valid, errors } = ingredient.validate({ requireComplete: true });
   assert.equal(valid, false);
-  assert.ok(errors.includes('Ingredient must include a match rule or specific item UUID'), errors.join(', '));
-  assert.ok(errors.includes('Tag-based ingredient match requires at least one tag'), errors.join(', '));
+  assert.ok(
+    errors.includes('Ingredient must include a match rule or specific item UUID'),
+    errors.join(', ')
+  );
+  assert.ok(
+    errors.includes('Tag-based ingredient match requires at least one tag'),
+    errors.join(', ')
+  );
 });
 
 test('plan-review 1: an incomplete currency match stacks both the shared and currency errors', () => {
-  const ingredient = new Ingredient({ quantity: 1, match: { type: 'currency', unit: '', amount: 0 } });
+  const ingredient = new Ingredient({
+    quantity: 1,
+    match: { type: 'currency', unit: '', amount: 0 },
+  });
   const { valid, errors } = ingredient.validate({ requireComplete: true });
   assert.equal(valid, false);
-  assert.ok(errors.includes('Ingredient must include a match rule or specific item UUID'), errors.join(', '));
-  assert.ok(errors.includes('Currency ingredient match requires a unit and a positive amount'), errors.join(', '));
+  assert.ok(
+    errors.includes('Ingredient must include a match rule or specific item UUID'),
+    errors.join(', ')
+  );
+  assert.ok(
+    errors.includes('Currency ingredient match requires a unit and a positive amount'),
+    errors.join(', ')
+  );
 });
 
 test('plan-review 1: requireComplete:false waives both completeness errors', () => {
-  for (const match of [{ type: 'tags', tags: [] }, { type: 'currency', unit: '', amount: 0 }]) {
+  for (const match of [
+    { type: 'tags', tags: [] },
+    { type: 'currency', unit: '', amount: 0 },
+  ]) {
     const ingredient = new Ingredient({ quantity: 1, match });
     const { valid, errors } = ingredient.validate({ requireComplete: false });
     assert.equal(valid, true, errors.join(', '));
@@ -291,26 +365,40 @@ test('plan-review 2: _matchesIngredient — currency is terminal false; tags gat
   const item = fakeItem({ tags: ['metal'] });
 
   assert.equal(
-    manager._matchesIngredient({ match: { type: 'currency', unit: 'gp', amount: 1 } }, item, { enableTags: true }),
+    manager._matchesIngredient({ match: { type: 'currency', unit: 'gp', amount: 1 } }, item, {
+      enableTags: true,
+    }),
     false
   );
   assert.equal(
-    manager._matchesIngredient({ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }, item, { enableTags: false }),
+    manager._matchesIngredient(
+      { match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } },
+      item,
+      { enableTags: false }
+    ),
     false
   );
   assert.equal(
-    manager._matchesIngredient({ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }, item, { enableTags: true }),
+    manager._matchesIngredient(
+      { match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } },
+      item,
+      { enableTags: true }
+    ),
     true
   );
 });
 
 test('plan-review 2: currency terminal matchesItem is always false; tags with enableTags:false is false', () => {
   assert.equal(
-    HANDLERS.currency.matchesItem({ type: 'currency', unit: 'gp', amount: 1 }, fakeItem(), { features: { enableTags: true } }),
+    HANDLERS.currency.matchesItem({ type: 'currency', unit: 'gp', amount: 1 }, fakeItem(), {
+      features: { enableTags: true },
+    }),
     false
   );
   assert.equal(
-    HANDLERS.tags.matchesItem({ type: 'tags', tags: ['metal'] }, fakeItem({ tags: ['metal'] }), { features: { enableTags: false } }),
+    HANDLERS.tags.matchesItem({ type: 'tags', tags: ['metal'] }, fakeItem({ tags: ['metal'] }), {
+      features: { enableTags: false },
+    }),
     false
   );
 });
@@ -379,7 +467,10 @@ test('plan-review 4: null and bogus matches resolve a no-op handler', () => {
     const handler = getMatchHandler(match);
     assert.equal(handler.isComplete(match), false);
     assert.deepEqual([...handler.expandToComponentIds(match, [{ id: 'a' }])], []);
-    assert.equal(handler.matchesItem(match, fakeItem({ tags: ['x'] }), { features: { enableTags: true } }), false);
+    assert.equal(
+      handler.matchesItem(match, fakeItem({ tags: ['x'] }), { features: { enableTags: true } }),
+      false
+    );
     assert.equal(handler.getComponentId(match), null);
     assert.equal(handler.signature(match), null);
   }

@@ -18,7 +18,7 @@ describe('createMountedComponentHarness event-loop yield', () => {
       repoRoot,
       tmpPrefix: 'fabricate-svelte-harness-yield-',
       compiledModules: ['src/ui/svelte/apps/manager/EmptyState.svelte'],
-      componentPath: 'src/ui/svelte/apps/manager/EmptyState.svelte'
+      componentPath: 'src/ui/svelte/apps/manager/EmptyState.svelte',
     });
     await harness.setup();
 

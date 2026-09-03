@@ -56,7 +56,10 @@ test('renders an unregistered LABELLED directive as its authored label', () => {
   // Reached only after resolution, so nothing here still has a referent to lose:
   // every resolvable @UUID is already an anchor. What is left belongs to a system or
   // module that registered no enricher for it.
-  assert.equal(plainTextDescription('@Check[ability=dex dc=15]{DC 15 Dexterity}'), 'DC 15 Dexterity');
+  assert.equal(
+    plainTextDescription('@Check[ability=dex dc=15]{DC 15 Dexterity}'),
+    'DC 15 Dexterity'
+  );
   assert.equal(plainTextDescription('@Damage[2d6]{2d6 fire}'), '2d6 fire');
   assert.equal(plainTextDescription('&Reference[prone]{Prone}'), 'Prone');
   // `embeds: false` is deliberate — an @Embed would otherwise inline a whole page.
@@ -145,7 +148,7 @@ for (const generation of [13, 14]) {
   });
 }
 
-test('broken anchor: core\'s own createAnchor probe wins over the key list', async (t) => {
+test("broken anchor: core's own createAnchor probe wins over the key list", async (t) => {
   setupDOM();
   // A non-English world, where NEITHER known key's English value would match. Asking
   // core for its own placeholder is what makes this work — and what keeps working when
@@ -351,7 +354,9 @@ test('strips markup around resolved anchors', () => {
 test('extracts the candidate from Foundry-style description objects', () => {
   assert.equal(descriptionTextCandidate({ value: '  hello  ' }), 'hello');
   assert.equal(
-    plainTextDescription({ value: '<p><a class="content-link">Acid</a>, <a class="content-link">Oil</a></p>' }),
+    plainTextDescription({
+      value: '<p><a class="content-link">Acid</a>, <a class="content-link">Oil</a></p>',
+    }),
     'Acid, Oil'
   );
   assert.equal(plainTextDescription({ unexpected: 'shape' }), '');

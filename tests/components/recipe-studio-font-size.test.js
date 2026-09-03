@@ -406,7 +406,9 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
     const p = await browser.newPage({ viewport: { width: 1200, height: 900 } });
     await p.setContent(page(), { waitUntil: 'load' });
 
-    const rootPx = await p.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
+    const rootPx = await p.evaluate(() =>
+      parseFloat(getComputedStyle(document.documentElement).fontSize)
+    );
     assert.equal(rootPx, 16, 'html root font-size is the 16px rem anchor');
 
     const measured = await p.evaluate(() => {
@@ -449,7 +451,11 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
       measured['stage-picker'],
       'the flat and progressive component pickers share a rule, so they share a size'
     );
-    assert.notEqual(measured['flat-picker'], 14, 'the flat component picker must not bleed to the Foundry base');
+    assert.notEqual(
+      measured['flat-picker'],
+      14,
+      'the flat component picker must not bleed to the Foundry base'
+    );
   } finally {
     await browser.close();
   }

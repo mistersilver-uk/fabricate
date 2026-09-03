@@ -16,7 +16,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js',
     // The inspector's lifted roster view-state (issue 1438).
-    'src/utils/managerBrowserViewState.js'
+    'src/utils/managerBrowserViewState.js',
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -29,9 +29,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/RosterRow.svelte',
-    'src/ui/svelte/apps/manager/GrantAccessInspector.svelte'
+    'src/ui/svelte/apps/manager/GrantAccessInspector.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/GrantAccessInspector.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/GrantAccessInspector.svelte',
 });
 
 function makeRecipe(access = { characterIds: [], playerIds: [] }) {
@@ -43,8 +43,8 @@ function makeRecipe(access = { characterIds: [], playerIds: [] }) {
     access,
     accessSummary: {
       characterCount: access.characterIds.length,
-      playerCount: access.playerIds.length
-    }
+      playerCount: access.playerIds.length,
+    },
   };
 }
 
@@ -57,7 +57,7 @@ function makePlayers(n) {
     id: `p${i + 1}`,
     name: `Player ${i + 1}`,
     role: i === 0 ? 'Game Master' : 'Player',
-    color: '#3366cc'
+    color: '#3366cc',
   }));
 }
 
@@ -70,7 +70,7 @@ describe('GrantAccessInspector (mounted)', () => {
     const root = await harness.mount({
       recipe: makeRecipe(),
       characters: makeCharacters(2),
-      players: makePlayers(2)
+      players: makePlayers(2),
     });
 
     assert.ok(root.querySelector('[data-access-roster="characters"]'));
@@ -80,18 +80,23 @@ describe('GrantAccessInspector (mounted)', () => {
     // Players show the user's human-readable role as the subtitle and tint the
     // leading icon with the user's colour.
     assert.equal(
-      root.querySelector('[data-access-roster="players"] .manager-roster-subtitle').textContent.trim(),
+      root
+        .querySelector('[data-access-roster="players"] .manager-roster-subtitle')
+        .textContent.trim(),
       'Game Master'
     );
     const playerIcon = root.querySelector('[data-access-roster="players"] .manager-roster-icon i');
-    assert.ok(playerIcon.getAttribute('style')?.includes('#3366cc'), 'player icon tinted with the user colour');
+    assert.ok(
+      playerIcon.getAttribute('style')?.includes('#3366cc'),
+      'player icon tinted with the user colour'
+    );
   });
 
   it('shows the "no one has access yet" summary when nothing is granted', async () => {
     const root = await harness.mount({
       recipe: makeRecipe(),
       characters: makeCharacters(1),
-      players: makePlayers(1)
+      players: makePlayers(1),
     });
     const summary = root.querySelector('[data-access-summary]');
     assert.equal(summary.querySelector('span').textContent.trim(), 'No one has access yet');
@@ -104,7 +109,7 @@ describe('GrantAccessInspector (mounted)', () => {
       recipe: makeRecipe({ characterIds: [], playerIds: ['p2'] }),
       characters: makeCharacters(2),
       players: makePlayers(2),
-      onSaveAccess: (recipeId, access) => calls.push({ recipeId, access })
+      onSaveAccess: (recipeId, access) => calls.push({ recipeId, access }),
     });
 
     // Toggle the first character on; the existing player grant must be preserved.
@@ -123,7 +128,7 @@ describe('GrantAccessInspector (mounted)', () => {
       recipe: makeRecipe({ characterIds: ['c1'], playerIds: [] }),
       characters: makeCharacters(2),
       players: makePlayers(2),
-      onSaveAccess: (recipeId, access) => calls.push({ recipeId, access })
+      onSaveAccess: (recipeId, access) => calls.push({ recipeId, access }),
     });
 
     const playerToggle = root.querySelector('[data-access-player-row] .manager-status-toggle');
@@ -140,7 +145,7 @@ describe('GrantAccessInspector (mounted)', () => {
       recipe: makeRecipe({ characterIds: ['c7'], playerIds: [] }),
       characters: makeCharacters(8),
       players: makePlayers(2),
-      onSaveAccess: (recipeId, access) => calls.push({ recipeId, access })
+      onSaveAccess: (recipeId, access) => calls.push({ recipeId, access }),
     });
 
     // Page 1 shows 6 of 8 characters.
@@ -154,7 +159,9 @@ describe('GrantAccessInspector (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-access-character-row]').length, 2);
     // c7 (granted) is on page 2 and its toggle reflects the granted state.
     const toggles = root.querySelectorAll('[data-access-character-row] .manager-status-toggle');
-    const grantedToggle = Array.from(toggles).find((t) => t.getAttribute('aria-pressed') === 'true');
+    const grantedToggle = Array.from(toggles).find(
+      (t) => t.getAttribute('aria-pressed') === 'true'
+    );
     assert.ok(grantedToggle, 'the granted character on page 2 keeps its on state');
 
     // Granting c8 on page 2 sends the full snapshot including the pre-existing c7 grant.
@@ -168,7 +175,7 @@ describe('GrantAccessInspector (mounted)', () => {
     const root = await harness.mount({
       recipe: makeRecipe(),
       characters: makeCharacters(8),
-      players: makePlayers(2)
+      players: makePlayers(2),
     });
 
     // Search is shown because the roster exceeds the page size.
@@ -196,8 +203,9 @@ describe('GrantAccessInspector (mounted)', () => {
     mountProps: (imageOverrides) => ({
       recipe: { ...makeRecipe(), ...imageOverrides },
       characters: makeCharacters(1),
-      players: makePlayers(1)
+      players: makePlayers(1),
     }),
-    selectImg: (root) => root.querySelector('.manager-inspector-icon img.manager-recipe-thumb').getAttribute('src')
+    selectImg: (root) =>
+      root.querySelector('.manager-inspector-icon img.manager-recipe-thumb').getAttribute('src'),
   });
 });

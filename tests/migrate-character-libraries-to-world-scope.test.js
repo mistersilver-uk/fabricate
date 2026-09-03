@@ -15,7 +15,13 @@ import {
   stripSystemCharacterLibraries,
 } from '../src/migration/migrateCharacterLibrariesToWorldScope.js';
 
-const SMITH = { id: 'smithsTools', name: "Smith's Tools", path: 'tools.smith.value', op: 'gte', value: 1 };
+const SMITH = {
+  id: 'smithsTools',
+  name: "Smith's Tools",
+  path: 'tools.smith.value',
+  op: 'gte',
+  value: 1,
+};
 const MED = { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' };
 
 function system(id, overrides = {}) {
@@ -26,7 +32,9 @@ test('unions both libraries across systems, keyed by id, first system winning', 
   const built = buildWorldCharacterLibraries([
     system('a', { characterPrerequisites: [SMITH], modifiers: [MED] }),
     system('b', {
-      characterPrerequisites: [{ id: 'arcana', name: 'Arcana', path: 'skills.arc.rank', op: 'gte', value: 1 }],
+      characterPrerequisites: [
+        { id: 'arcana', name: 'Arcana', path: 'skills.arc.rank', op: 'gte', value: 1 },
+      ],
       modifiers: [{ id: 'sur', label: 'Survival', expression: '@skills.sur.mod' }],
     }),
   ]);
@@ -64,14 +72,23 @@ test('a colliding entry that MEANS something different is reported by name', () 
   assert.equal(built.characterPrerequisites.length, 1);
   assert.equal(built.characterPrerequisites[0].value, 1, 'the first system wins');
   assert.deepEqual(built._collisions, [
-    { library: 'characterPrerequisites', entryId: 'smithsTools', keptFrom: 'a', discardedFrom: 'b' },
+    {
+      library: 'characterPrerequisites',
+      entryId: 'smithsTools',
+      keptFrom: 'a',
+      discardedFrom: 'b',
+    },
   ]);
 });
 
 test('sameness is judged on the NORMALIZED entry, so key order is not a disagreement', () => {
   const built = buildWorldCharacterLibraries([
-    system('a', { modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }] }),
-    system('b', { modifiers: [{ expression: '  @abilities.med.mod  ', id: 'med', label: 'Medicine' }] }),
+    system('a', {
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    }),
+    system('b', {
+      modifiers: [{ expression: '  @abilities.med.mod  ', id: 'med', label: 'Medicine' }],
+    }),
   ]);
   assert.equal(built._collisions, undefined);
 });

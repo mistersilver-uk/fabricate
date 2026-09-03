@@ -16,10 +16,7 @@ import test from 'node:test';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
-import {
-  awardedQuantityOf,
-  createOrStackComponentItem,
-} from '../src/systems/componentStacking.js';
+import { awardedQuantityOf, createOrStackComponentItem } from '../src/systems/componentStacking.js';
 
 // ---------------------------------------------------------------------------
 // Foundry-ish globals (dotted get/set only; no cascade needed here)
@@ -80,12 +77,18 @@ function makeItem(id, name, quantity = 1, { roles = null } = {}) {
       return flags[ns]?.[key] ?? null;
     },
     toObject() {
-      return { id: this.id, name: this.name, type: 'loot', system: { quantity: this.system.quantity } };
+      return {
+        id: this.id,
+        name: this.name,
+        type: 'loot',
+        system: { quantity: this.system.quantity },
+      };
     },
     async update(payload) {
       this.updateCalled = true;
       this.updatePayloads.push({ ...payload });
-      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      if (payload['system.quantity'] !== undefined)
+        this.system.quantity = payload['system.quantity'];
     },
     async delete() {
       this.deleteCalled = true;
@@ -267,7 +270,12 @@ function makeSalvageWorld({ existingRecovered = null, recoverQuantity = 2 } = {}
   const actor = makeActor('actor-1', items);
   const salvageRunManager = setupSalvageGame(system, actor);
   const engine = makeEngine(salvageRunManager);
-  engine._runSalvageCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+  engine._runSalvageCraftingCheck = async () => ({
+    success: true,
+    outcome: null,
+    value: null,
+    data: {},
+  });
   return { engine, actor, system, source };
 }
 
@@ -327,7 +335,11 @@ test('salvage() reports the SAME component listed in two result rows once, with 
     roles: { 'sys-1': { componentId: 'recovered' } },
   });
   const systemId = 'sys-1';
-  const recovered = { id: 'recovered', name: 'Scrap Metal', registeredItemUuid: 'Item.recovered-src' };
+  const recovered = {
+    id: 'recovered',
+    name: 'Scrap Metal',
+    registeredItemUuid: 'Item.recovered-src',
+  };
   const source = {
     id: 'source',
     name: 'Broken Widget',
@@ -358,7 +370,12 @@ test('salvage() reports the SAME component listed in two result rows once, with 
   };
   const actor = makeActor('actor-1', [makeItem('broken', 'Broken Widget', 1), existing]);
   const engine = makeEngine(setupSalvageGame(system, actor));
-  engine._runSalvageCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+  engine._runSalvageCraftingCheck = async () => ({
+    success: true,
+    outcome: null,
+    value: null,
+    data: {},
+  });
 
   const result = await engine.salvage(actor.uuid, system.id, source.id);
 
@@ -367,7 +384,11 @@ test('salvage() reports the SAME component listed in two result rows once, with 
   assert.equal(existing.system.quantity, 9, '5 held + 2 + 2 recovered');
   const records = result.salvageRun.createdResults.filter((r) => r.componentId === 'recovered');
   assert.equal(records.length, 1, 'the merged component is recorded ONCE, not per result row');
-  assert.equal(records[0].quantity, 4, 'the single record sums both awards (2 + 2), not the stack total');
+  assert.equal(
+    records[0].quantity,
+    4,
+    'the single record sums both awards (2 + 2), not the stack total'
+  );
   assert.equal(
     result.results.filter((item) => item === existing).length,
     1,

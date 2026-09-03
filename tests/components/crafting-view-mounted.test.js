@@ -5,14 +5,14 @@ import { resolve } from 'node:path';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
-  CRAFTING_APP_COMPILED_MODULES
+  CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import {
   craftability,
   essenceCraftability,
   fakeCraftingStore,
   listing,
-  recipe
+  recipe,
 } from '../helpers/crafting-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -22,7 +22,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-crafting-view-',
   rawModules: CRAFTING_APP_RAW_MODULES,
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
-  componentPath: 'src/ui/svelte/apps/crafting/CraftingView.svelte'
+  componentPath: 'src/ui/svelte/apps/crafting/CraftingView.svelte',
 });
 
 function services(store, extra = {}) {
@@ -48,7 +48,10 @@ describe('CraftingView mounted behavior', () => {
   });
 
   it('renders the no-actor state when the listing has no selected actor', async () => {
-    const store = fakeCraftingStore({ recipes: [], listing: listing([], { selectedActorId: null }) });
+    const store = fakeCraftingStore({
+      recipes: [],
+      listing: listing([], { selectedActorId: null }),
+    });
     const target = await harness.mount({ services: services(store) });
     assert.ok(target.querySelector('[data-crafting-state="no-actor"]'), 'no-actor state shown');
     assert.equal(target.querySelector('[data-crafting-state="empty"]'), null);
@@ -70,36 +73,57 @@ describe('CraftingView mounted behavior', () => {
     assert.ok(target.querySelector('.crafting-view-column-center'), 'center column present');
     assert.ok(target.querySelector('.crafting-view-column-right'), 'right column present');
     // The browser lists the recipe and the detail dispatcher resolves the body.
-    assert.ok(target.querySelector('[data-recipe-id="recipe-1"]'), 'recipe row rendered in browser');
-    assert.ok(target.querySelector('[data-crafting-detail-state="selected"]'), 'detail shows the selected recipe');
+    assert.ok(
+      target.querySelector('[data-recipe-id="recipe-1"]'),
+      'recipe row rendered in browser'
+    );
+    assert.ok(
+      target.querySelector('[data-crafting-detail-state="selected"]'),
+      'detail shows the selected recipe'
+    );
   });
 
   it('shows the shopping list in the right column by default (no completed run)', async () => {
     const store = fakeCraftingStore({ recipes: [recipe()] });
     const target = await harness.mount({ services: services(store) });
     assert.ok(target.querySelector('[data-crafting-shopping]'), 'shopping list rendered');
-    assert.equal(target.querySelector('[data-crafting-run-summary]'), null, 'no run summary without a result');
+    assert.equal(
+      target.querySelector('[data-crafting-run-summary]'),
+      null,
+      'no run summary without a result'
+    );
   });
 
   it('swaps the right column to the run summary once the selected recipe has a roll result', async () => {
     const built = recipe();
     const store = fakeCraftingStore({
       recipes: [built],
-      lastRollResult: { 'recipe-1': { success: true, items: [{ name: 'Healing Potion', qty: 1 }] } }
+      lastRollResult: {
+        'recipe-1': { success: true, items: [{ name: 'Healing Potion', qty: 1 }] },
+      },
     });
     const target = await harness.mount({ services: services(store) });
-    assert.ok(target.querySelector('[data-crafting-run-summary]'), 'run summary rendered for a completed run');
-    assert.equal(target.querySelector('[data-crafting-shopping]'), null, 'shopping list hidden while the run summary is shown');
+    assert.ok(
+      target.querySelector('[data-crafting-run-summary]'),
+      'run summary rendered for a completed run'
+    );
+    assert.equal(
+      target.querySelector('[data-crafting-shopping]'),
+      null,
+      'shopping list hidden while the run summary is shown'
+    );
   });
 
   it('disables the run summary "Craft another" when the selection is no longer craftable (non-progressive)', async () => {
     const built = recipe({
-      ingredientSets: [{ id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) }]
+      ingredientSets: [
+        { id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) },
+      ],
     });
     const store = fakeCraftingStore({
       recipes: [built],
       selectedCraftability: craftability({ canCraft: false }),
-      lastRollResult: { 'recipe-1': { success: true, items: [] } }
+      lastRollResult: { 'recipe-1': { success: true, items: [] } },
     });
     const target = await harness.mount({ services: services(store) });
     const button = target.querySelector('[data-crafting-run-summary] [data-crafting-craft]');
@@ -115,12 +139,14 @@ describe('CraftingView mounted behavior', () => {
     const built = recipe({
       modeToken: 'progressive',
       modeLabel: 'Progressive',
-      ingredientSets: [{ id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) }]
+      ingredientSets: [
+        { id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) },
+      ],
     });
     const store = fakeCraftingStore({
       recipes: [built],
       selectedCraftability: craftability({ canCraft: false }),
-      lastRollResult: { 'recipe-1': { success: true, items: [] } }
+      lastRollResult: { 'recipe-1': { success: true, items: [] } },
     });
     const target = await harness.mount({ services: services(store) });
     const button = target.querySelector('[data-crafting-run-summary] [data-crafting-craft]');
@@ -141,11 +167,11 @@ describe('CraftingView mounted behavior', () => {
   function railRecipe(overrides = {}) {
     return recipe({
       ingredientSets: [
-        { id: 'set-a', label: 'Option A', craftability: essenceCraftability(), products: [] }
+        { id: 'set-a', label: 'Option A', craftability: essenceCraftability(), products: [] },
       ],
       activeStepId: 'step-1',
       displayedStepId: 'step-1',
-      ...overrides
+      ...overrides,
     });
   }
 
@@ -153,10 +179,7 @@ describe('CraftingView mounted behavior', () => {
     const store = fakeCraftingStore({ recipes: [railRecipe()] });
     const target = await harness.mount({ services: services(store) });
     assert.ok(target.querySelector('[data-recipe-section="requirement-rail"]'), 'rail rendered');
-    assert.ok(
-      !target.querySelector('[data-requirement-rail-readonly]'),
-      'and it is not read-only'
-    );
+    assert.ok(!target.querySelector('[data-requirement-rail-readonly]'), 'and it is not read-only');
     assert.ok(target.querySelector('[data-recipe-section="essence-pool"]'), 'the pool auto-opened');
   });
 
@@ -174,7 +197,7 @@ describe('CraftingView mounted behavior', () => {
   // re-resolves ingredients, so the allocation controls would be a lie.
   it('renders the rail read-only while the active step time gate is armed', async () => {
     const store = fakeCraftingStore({
-      recipes: [railRecipe({ activeStepTimeGateArmed: true })]
+      recipes: [railRecipe({ activeStepTimeGateArmed: true })],
     });
     const target = await harness.mount({ services: services(store) });
     assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
@@ -186,7 +209,7 @@ describe('CraftingView mounted behavior', () => {
       recipes: [railRecipe()],
       openSlot: (slotId) => calls.openSlot.push(slotId),
       setEssenceAllocation: (itemKey, units) => calls.allocate.push([itemKey, units]),
-      pickForMe: (announcement) => calls.pickForMe.push(announcement)
+      pickForMe: (announcement) => calls.pickForMe.push(announcement),
     });
     const target = await harness.mount({ services: services(store) });
 

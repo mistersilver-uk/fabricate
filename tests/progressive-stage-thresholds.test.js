@@ -107,7 +107,7 @@ test('equal: the threshold IS the running cumulative sum (the only mode where it
   );
 });
 
-test("exceed: STRICT `>` puts the threshold one ABOVE the sum, and the error compounds", () => {
+test('exceed: STRICT `>` puts the threshold one ABOVE the sum, and the error compounds', () => {
   // A naive sum would say [3, 6, 9]; every one is wrong, not just the first.
   assert.deepEqual(
     progressiveStageThresholds({ results: stages(3, 3, 3), costFor: costOf, awardMode: 'exceed' }),
@@ -138,10 +138,7 @@ test('skip: an invalid-cost stage neither takes a threshold nor advances the tot
 // ---------------------------------------------------------------------------
 
 test('returns one entry per result, in order', () => {
-  assert.equal(
-    progressiveStageThresholds({ results: stages(1, 2, 3), costFor: costOf }).length,
-    3
-  );
+  assert.equal(progressiveStageThresholds({ results: stages(1, 2, 3), costFor: costOf }).length, 3);
 });
 
 test('defaults to the `equal` mode', () => {

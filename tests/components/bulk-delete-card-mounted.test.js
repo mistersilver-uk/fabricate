@@ -294,7 +294,11 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     assert.notEqual(document.activeElement, button(root), 'the write really did drop focus');
 
     await harness.setProps(
-      props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
+      props({
+        armed: false,
+        busy: false,
+        outcomeAnnouncement: 'Failed to delete the selected recipes.',
+      })
     );
 
     // ── AND IN THAT ORDER (issue 1157, review round) ────────────────────────────────
@@ -343,14 +347,18 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     assert.ok(document.activeElement === elsewhere, 'pre-condition: the GM is in the field');
 
     await harness.setProps(
-      props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
+      props({
+        armed: false,
+        busy: false,
+        outcomeAnnouncement: 'Failed to delete the selected recipes.',
+      })
     );
     assert.equal(
       live(root).textContent.trim(),
       'Failed to delete the selected recipes.',
-      'the outcome is still announced — the guard is about focus, not about speech — and it is '
-        + 'announced IMMEDIATELY, because a sentence with no focus utterance to queue behind has '
-        + 'nothing to wait for'
+      'the outcome is still announced — the guard is about focus, not about speech — and it is ' +
+        'announced IMMEDIATELY, because a sentence with no focus utterance to queue behind has ' +
+        'nothing to wait for'
     );
 
     await Promise.resolve();
@@ -388,7 +396,11 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     document.body.focus();
 
     await harness.setProps(
-      props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
+      props({
+        armed: false,
+        busy: false,
+        outcomeAnnouncement: 'Failed to delete the selected recipes.',
+      })
     );
     // Inside the delay, before the sentence has been written: the GM arms again.
     await harness.setProps(props({ armed: true, outcomeAnnouncement: '' }));
@@ -443,9 +455,7 @@ describe('1132 BulkDeleteCard — the two-step arm', () => {
     assert.deepEqual(armed, ['delete-recipes'], 'the first click ARMS');
     assert.deepEqual(confirmed, [], 'and writes nothing — this is the whole point of the pattern');
 
-    await harness.setProps(
-      props({ armed: true, onConfirm: (token) => confirmed.push(token) })
-    );
+    await harness.setProps(props({ armed: true, onConfirm: (token) => confirmed.push(token) }));
     button(root).click();
     flushSync();
     assert.deepEqual(confirmed, ['delete-recipes'], 'the second click executes');
@@ -454,7 +464,9 @@ describe('1132 BulkDeleteCard — the two-step arm', () => {
 
   it('is inert, and stays a real button, when the caller disables it', async () => {
     const armed = [];
-    const root = await harness.mount(props({ disabled: true, onArm: (token) => armed.push(token) }));
+    const root = await harness.mount(
+      props({ disabled: true, onArm: (token) => armed.push(token) })
+    );
 
     assert.equal(button(root).tagName, 'BUTTON');
     assert.equal(button(root).getAttribute('type'), 'button', 'and never submits a host form');
@@ -499,14 +511,14 @@ describe('1132 BulkDeleteCard — the busy face', () => {
     assert.equal(
       button(root).querySelector('span').textContent.trim(),
       'Deleting…',
-      'the busy face is the caller\'s own flag, so a disarm underneath it changes nothing'
+      "the busy face is the caller's own flag, so a disarm underneath it changes nothing"
     );
     assert.equal(button(root).getAttribute('data-armed'), 'false', 'and it really is disarmed');
     assert.equal(button(root).getAttribute('data-busy'), 'true');
     harness.remount();
   });
 
-  it('ignores a blur while busy, so an in-flight write cannot clear the owner\'s arm token', async () => {
+  it("ignores a blur while busy, so an in-flight write cannot clear the owner's arm token", async () => {
     // The other half of the same race, driven by the event happy-dom will not raise on its own.
     // Without the guard the owner's `deleteArmed` is cleared by the write it is running, and a
     // failed delete then returns to an idle card with no memory of what the GM confirmed.

@@ -281,7 +281,9 @@ for (const requireComplete of [true, false]) {
   test(`routedByCheck — valid WITH a system routed formula (requireComplete: ${requireComplete})`, () => {
     const system = buildRoutedCheckSystem({ craftingCheck: { routed: { rollFormula: '1d20' } } });
     const service = buildService(system);
-    const result = service.validateRecipe(buildRecipe([buildRoutedNamedStep()]), { requireComplete });
+    const result = service.validateRecipe(buildRecipe([buildRoutedNamedStep()]), {
+      requireComplete,
+    });
     assert.equal(result.valid, true, result.errors.join(', '));
   });
 
@@ -291,7 +293,9 @@ for (const requireComplete of [true, false]) {
       craftingCheck: { enabled: false, outcomes: [], routed: { rollFormula: '' } },
     });
     const service = buildService(system);
-    const result = service.validateRecipe(buildRecipe([buildRoutedNamedStep()]), { requireComplete });
+    const result = service.validateRecipe(buildRecipe([buildRoutedNamedStep()]), {
+      requireComplete,
+    });
     assert.equal(
       result.valid,
       true,
@@ -637,13 +641,18 @@ for (const mode of ['routedByIngredients', 'routedByCheck']) {
     const system = buildSystem({ resolutionMode: mode });
     const service = buildService(system);
     const step = buildStep({ ingredientSets: [], resultGroups: [], resultSelection: null });
-    assert.equal(service.validateRecipe(buildRecipe([step]), { requireComplete: false }).valid, true);
+    assert.equal(
+      service.validateRecipe(buildRecipe([step]), { requireComplete: false }).valid,
+      true
+    );
   });
 
   test(`${mode} — an empty shell still fails the cardinality check under the strict default`, () => {
     const system = buildSystem({ resolutionMode: mode });
     const service = buildService(system);
-    const result = service.validateRecipe(buildRecipe([buildStep({ ingredientSets: [], resultGroups: [] })]));
+    const result = service.validateRecipe(
+      buildRecipe([buildStep({ ingredientSets: [], resultGroups: [] })])
+    );
     assert.equal(result.valid, false);
     assert.ok(result.errors.length > 0);
   });

@@ -28,15 +28,24 @@ const rootSource = readFileSync(
 describe('InteractableBrowserApp singleton window', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
     assert.ok(appSource.includes('SvelteApplicationMixin('), 'uses the SvelteApplicationMixin');
-    assert.ok(appSource.includes('foundry.applications.api.ApplicationV2'), 'extends ApplicationV2');
-    assert.ok(appSource.includes('static SVELTE_COMPONENT = InteractableBrowserRoot'), 'mounts the browser root');
+    assert.ok(
+      appSource.includes('foundry.applications.api.ApplicationV2'),
+      'extends ApplicationV2'
+    );
+    assert.ok(
+      appSource.includes('static SVELTE_COMPONENT = InteractableBrowserRoot'),
+      'mounts the browser root'
+    );
     assert.ok(appSource.includes("id: 'fabricate-interactable-browser'"), 'stable window id');
   });
 
   it('tracks a single shared instance and re-focuses on show()', () => {
     assert.ok(appSource.includes('static _instance = null'), 'tracks a single instance');
     assert.ok(appSource.includes('static async show()'), 'exposes a static show()');
-    assert.ok(appSource.includes('existing.bringToFront()'), 're-show brings the existing window to front');
+    assert.ok(
+      appSource.includes('existing.bringToFront()'),
+      're-show brings the existing window to front'
+    );
     assert.ok(appSource.includes('app.render(true)'), 'a fresh show renders the window');
   });
 
@@ -44,9 +53,18 @@ describe('InteractableBrowserApp singleton window', () => {
     // The scene-control button fires the launch handler 2–3× per activation; a
     // second show() mid-render must NOT construct a competing instance (which
     // collided in ApplicationV2 _updatePosition → "el.parentElement is null").
-    assert.ok(appSource.includes('static _renderPromise = null'), 'tracks an in-flight render promise');
-    assert.ok(appSource.includes('if (existing) {'), 'show() returns early whenever ANY instance exists');
-    assert.ok(appSource.includes('await InteractableBrowserApp._renderPromise'), 'an in-flight render is awaited');
+    assert.ok(
+      appSource.includes('static _renderPromise = null'),
+      'tracks an in-flight render promise'
+    );
+    assert.ok(
+      appSource.includes('if (existing) {'),
+      'show() returns early whenever ANY instance exists'
+    );
+    assert.ok(
+      appSource.includes('await InteractableBrowserApp._renderPromise'),
+      'an in-flight render is awaited'
+    );
     const newIdx = appSource.indexOf('new InteractableBrowserApp()');
     const guardIdx = appSource.indexOf('if (existing) {');
     assert.ok(newIdx > guardIdx, 'the only construct sits after the existing-instance guard');
@@ -57,13 +75,22 @@ describe('InteractableBrowserApp singleton window', () => {
     const onCloseIdx = appSource.indexOf('_onClose(options)');
     assert.ok(closeIdx >= 0 && onCloseIdx >= 0, 'both close paths exist');
     const closeBody = appSource.slice(closeIdx, onCloseIdx);
-    assert.ok(closeBody.includes('InteractableBrowserApp._instance = null;'), 'close() clears the singleton');
+    assert.ok(
+      closeBody.includes('InteractableBrowserApp._instance = null;'),
+      'close() clears the singleton'
+    );
     const onCloseBody = appSource.slice(onCloseIdx);
-    assert.ok(onCloseBody.includes('InteractableBrowserApp._instance = null;'), '_onClose clears it too');
+    assert.ok(
+      onCloseBody.includes('InteractableBrowserApp._instance = null;'),
+      '_onClose clears it too'
+    );
   });
 
   it('self-registers via the app factory (no hard import where avoidable)', () => {
-    assert.ok(appSource.includes('registerInteractableBrowserApp(InteractableBrowserApp)'), 'registers with the factory');
+    assert.ok(
+      appSource.includes('registerInteractableBrowserApp(InteractableBrowserApp)'),
+      'registers with the factory'
+    );
   });
 
   it('services bag reuses the SHARED interactableSourceLibrary enumeration (no local re-walk)', () => {
@@ -76,15 +103,20 @@ describe('InteractableBrowserApp singleton window', () => {
       'listSystems delegates to the shared system enumeration'
     );
     assert.ok(
-      appSource.includes('listToolsForSystem: (systemId) => listSystemTools(this._sourceDeps(), systemId)'),
+      appSource.includes(
+        'listToolsForSystem: (systemId) => listSystemTools(this._sourceDeps(), systemId)'
+      ),
       'listToolsForSystem delegates to the shared Tool enumeration'
     );
     assert.ok(
-      appSource.includes('listTasksForSystem: (systemId) => listSystemTasks(this._sourceDeps(), systemId)'),
+      appSource.includes(
+        'listTasksForSystem: (systemId) => listSystemTasks(this._sourceDeps(), systemId)'
+      ),
       'listTasksForSystem delegates to the shared Task enumeration'
     );
     assert.ok(
-      appSource.includes('getCraftingSystemManager: () =>') && appSource.includes('getGatheringConfig: () => getSetting(SETTING_KEYS.GATHERING_CONFIG)'),
+      appSource.includes('getCraftingSystemManager: () =>') &&
+        appSource.includes('getGatheringConfig: () => getSetting(SETTING_KEYS.GATHERING_CONFIG)'),
       'the shared deps bag wires the live manager + persisted gathering config'
     );
   });
@@ -110,21 +142,42 @@ describe('InteractableBrowserApp singleton window', () => {
 
 describe('InteractableBrowserRoot body', () => {
   it('lists Tools and Gathering Tasks sections', () => {
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.ToolsHeading'), 'renders a Tools section');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.TasksHeading'), 'renders a Gathering Tasks section');
+    assert.ok(
+      rootSource.includes('FABRICATE.Canvas.Browser.ToolsHeading'),
+      'renders a Tools section'
+    );
+    assert.ok(
+      rootSource.includes('FABRICATE.Canvas.Browser.TasksHeading'),
+      'renders a Gathering Tasks section'
+    );
   });
 
   it('splits Tools and Gathering Tasks into an accessible two-tab switcher', () => {
     // A real tablist of two keyboard-operable <button> tabs, each with
     // aria-selected reflecting the active tab and a controlled tabpanel.
-    assert.ok(rootSource.includes("let activeTab = $state('tools')"), 'tracks the active tab in runes state');
+    assert.ok(
+      rootSource.includes("let activeTab = $state('tools')"),
+      'tracks the active tab in runes state'
+    );
     assert.ok(rootSource.includes('role="tablist"'), 'renders a tablist container');
     assert.ok((rootSource.match(/role="tab"/g) || []).length === 2, 'exactly two tabs');
-    assert.ok(rootSource.includes("aria-selected={activeTab === 'tools'}"), 'tools tab reflects selection');
-    assert.ok(rootSource.includes("aria-selected={activeTab === 'tasks'}"), 'tasks tab reflects selection');
+    assert.ok(
+      rootSource.includes("aria-selected={activeTab === 'tools'}"),
+      'tools tab reflects selection'
+    );
+    assert.ok(
+      rootSource.includes("aria-selected={activeTab === 'tasks'}"),
+      'tasks tab reflects selection'
+    );
     assert.ok(rootSource.includes('role="tabpanel"'), 'each section is a tabpanel');
-    assert.ok(rootSource.includes('onkeydown={onTabKeydown}'), 'tabs are keyboard-operable (arrow/Home/End)');
-    assert.ok(rootSource.includes("{#if activeTab === 'tools'}"), 'only the active tab section renders');
+    assert.ok(
+      rootSource.includes('onkeydown={onTabKeydown}'),
+      'tabs are keyboard-operable (arrow/Home/End)'
+    );
+    assert.ok(
+      rootSource.includes("{#if activeTab === 'tools'}"),
+      'only the active tab section renders'
+    );
   });
 
   it('filters BOTH tools and tasks by the shared search box', () => {
@@ -155,7 +208,10 @@ describe('InteractableBrowserRoot body', () => {
       rootSource.includes("from '../util/systemDisambiguation.js'"),
       'uses the shared system-disambiguation helper'
     );
-    assert.ok(rootSource.includes('buildSystemLabelMap(systems)'), 'builds the disambiguated label map');
+    assert.ok(
+      rootSource.includes('buildSystemLabelMap(systems)'),
+      'builds the disambiguated label map'
+    );
     assert.ok(
       rootSource.includes('systemDisplayLabel(system, systemLabels)'),
       'renders the disambiguated label in the system picker'
@@ -167,17 +223,35 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   it('each row is a drag source emitting the dropCanvasData-compatible payload', () => {
-    assert.ok(rootSource.includes("import { dragSource }"), 'imports the net-new drag-source action');
-    assert.ok(rootSource.includes('use:dragSource={{ getPayload: () => dragPayload(') , 'rows are drag sources');
-    assert.ok(rootSource.includes('buildInteractableDragPayload'), 'the payload is built via the shared builder');
+    assert.ok(
+      rootSource.includes('import { dragSource }'),
+      'imports the net-new drag-source action'
+    );
+    assert.ok(
+      rootSource.includes('use:dragSource={{ getPayload: () => dragPayload('),
+      'rows are drag sources'
+    );
+    assert.ok(
+      rootSource.includes('buildInteractableDragPayload'),
+      'the payload is built via the shared builder'
+    );
   });
 
   it('each row exposes a keyboard-actionable Place-on-scene button (a11y fallback)', () => {
     assert.ok(rootSource.includes('class="fab-ib-place"'), 'rows carry the place button');
-    assert.ok(rootSource.includes('<button'), 'place affordance is a real button (keyboard-actionable)');
+    assert.ok(
+      rootSource.includes('<button'),
+      'place affordance is a real button (keyboard-actionable)'
+    );
     assert.ok(rootSource.includes("place('tool', tool.id)"), 'tool rows place tools');
-    assert.ok(rootSource.includes("place('gatheringTask', task.id)"), 'task rows place gathering tasks');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.PlaceOnScene'), 'localized place label');
+    assert.ok(
+      rootSource.includes("place('gatheringTask', task.id)"),
+      'task rows place gathering tasks'
+    );
+    assert.ok(
+      rootSource.includes('FABRICATE.Canvas.Browser.PlaceOnScene'),
+      'localized place label'
+    );
   });
 
   it('renders the place button icon-only (fa-cubes) with the PlaceOnScene title + aria-label, no visible text', () => {
@@ -188,14 +262,17 @@ describe('InteractableBrowserRoot body', () => {
     for (const block of placeButtonBlocks) {
       const button = block.slice(0, block.indexOf('</button>'));
       assert.ok(
-        button.includes('title={text(\'FABRICATE.Canvas.Browser.PlaceOnScene'),
+        button.includes("title={text('FABRICATE.Canvas.Browser.PlaceOnScene"),
         'place button uses PlaceOnScene as the tooltip'
       );
       assert.ok(
         /aria-label=\{text\(\s*'FABRICATE\.Canvas\.Browser\.PlaceOnScene/.test(button),
         'place button uses PlaceOnScene as the accessible name'
       );
-      assert.ok(button.includes('<i class="fas fa-cubes" aria-hidden="true">'), 'face is the cubes icon');
+      assert.ok(
+        button.includes('<i class="fas fa-cubes" aria-hidden="true">'),
+        'face is the cubes icon'
+      );
       assert.ok(
         !/\{text\('FABRICATE\.Canvas\.Browser\.PlaceOnScene[^}]*\)\}\s*<\/button>/.test(button),
         'no visible PlaceOnScene text rendered on the button face'
@@ -204,10 +281,22 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   it('each row exposes a region-only (no marker) placement affordance routing the same spawn', () => {
-    assert.ok(rootSource.includes('class="fab-ib-place-region"'), 'rows carry the region-only button');
-    assert.ok(rootSource.includes("place('tool', tool.id, 'none')"), 'tool rows can place region-only');
-    assert.ok(rootSource.includes("place('gatheringTask', task.id, 'none')"), 'task rows can place region-only');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Browser.PlaceRegionOnly'), 'localized region-only label');
+    assert.ok(
+      rootSource.includes('class="fab-ib-place-region"'),
+      'rows carry the region-only button'
+    );
+    assert.ok(
+      rootSource.includes("place('tool', tool.id, 'none')"),
+      'tool rows can place region-only'
+    );
+    assert.ok(
+      rootSource.includes("place('gatheringTask', task.id, 'none')"),
+      'task rows can place region-only'
+    );
+    assert.ok(
+      rootSource.includes('FABRICATE.Canvas.Browser.PlaceRegionOnly'),
+      'localized region-only label'
+    );
   });
 
   it('threads visualMode through placeOnScene to the shared spawn pipeline', () => {
@@ -222,7 +311,7 @@ describe('InteractableBrowserRoot body', () => {
     // managed component's name/img (mirroring ToolsBrowserView), NOT the
     // list-empty title with a single hardcoded icon for every tool.
     assert.ok(
-      !rootSource.includes("FABRICATE.Admin.Manager.Tools.EmptyTitle"),
+      !rootSource.includes('FABRICATE.Admin.Manager.Tools.EmptyTitle'),
       'does not reuse the list-empty title as a row label'
     );
     assert.ok(
@@ -267,7 +356,7 @@ describe('InteractableBrowserRoot body', () => {
     );
     // "No image" = empty OR the DEFAULT_GATHERING_TASK_IMG placeholder → leaf.
     assert.ok(
-      rootSource.includes("import { DEFAULT_GATHERING_TASK_IMG }"),
+      rootSource.includes('import { DEFAULT_GATHERING_TASK_IMG }'),
       'references the shared default-image constant rather than hardcoding the string'
     );
     assert.ok(
@@ -276,7 +365,8 @@ describe('InteractableBrowserRoot body', () => {
     );
     // The row renders <img> when a custom image is present, else the fa-leaf.
     assert.ok(
-      rootSource.includes('{#if task.img}') && rootSource.includes('<img class="fab-ib-row-thumb" src={task.img}'),
+      rootSource.includes('{#if task.img}') &&
+        rootSource.includes('<img class="fab-ib-row-thumb" src={task.img}'),
       'task row renders <img> for a custom image'
     );
     assert.ok(
@@ -287,6 +377,9 @@ describe('InteractableBrowserRoot body', () => {
 
   it('surfaces a search filter and the Alt-override discoverability hint', () => {
     assert.ok(rootSource.includes('type="search"'), 'search input present');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.DropModifierHint'), 'Alt-override hint shown in the browser');
+    assert.ok(
+      rootSource.includes('FABRICATE.Canvas.Interactable.DropModifierHint'),
+      'Alt-override hint shown in the browser'
+    );
   });
 });

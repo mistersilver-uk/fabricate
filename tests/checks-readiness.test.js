@@ -33,7 +33,10 @@ function check(checks, id) {
   return checks.find((entry) => entry.id === id);
 }
 
-function routedWithTargets(tierIds, outcomes = [{ id: 'a', name: 'Success', success: true, dc: 0 }]) {
+function routedWithTargets(
+  tierIds,
+  outcomes = [{ id: 'a', name: 'Success', success: true, dc: 0 }]
+) {
   return {
     type: 'relative',
     rollFormula: '1d20',
@@ -205,15 +208,22 @@ describe('evaluateCheckReadiness: tier-step targets (issue 975)', () => {
 
   it('warns as GUIDANCE when two or more triggers set a target', () => {
     const { checks, issues } = evaluateCheckReadiness(
-      routedWithTargets(['a', 'b'], [
-        { id: 'a', name: 'Ruined', success: false, dc: -5 },
-        { id: 'b', name: 'Fine', success: true, dc: 0 },
-      ]),
+      routedWithTargets(
+        ['a', 'b'],
+        [
+          { id: 'a', name: 'Ruined', success: false, dc: -5 },
+          { id: 'b', name: 'Fine', success: true, dc: 0 },
+        ]
+      ),
       { mode: 'routed' }
     );
     const ambiguous = issues.find((i) => i.id === 'multipleTierStepTargets');
     assert.ok(ambiguous, 'the count is reported');
-    assert.equal(ambiguous.severity, 'warning', 'as a warning, never critical — it is a static count');
+    assert.equal(
+      ambiguous.severity,
+      'warning',
+      'as a warning, never critical — it is a static count'
+    );
     assert.equal(check(checks, 'tierStepTargetsResolve').satisfied, false);
   });
 
@@ -403,7 +413,10 @@ describe('retired placeholder readiness', () => {
   // `checkUsable` every other surface dispatches on, or the Validation tab ticks
   // "Has a roll formula" green next to a check that cannot roll.
   it('reads hasRollFormula POST-shim, so it cannot disagree with checkUsable', () => {
-    for (const [label, rollFormula] of [['placeholder only', '@craftingmod'], ...RETIRED_PLACEMENT_CORPUS]) {
+    for (const [label, rollFormula] of [
+      ['placeholder only', '@craftingmod'],
+      ...RETIRED_PLACEMENT_CORPUS,
+    ]) {
       const { checks, issues } = evaluateCheckReadiness({ rollFormula });
       assert.equal(
         check(checks, 'hasRollFormula').satisfied,
@@ -464,10 +477,7 @@ describe('retired placeholder readiness', () => {
 // surfaces need the whole set (the Validation route buckets each id to a section), and a
 // hand-copied mirror of an unprovable list is how those two drift.
 describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', () => {
-  const readinessPath = resolve(
-    repoRoot,
-    'src/ui/svelte/apps/manager/checks/checksReadiness.js'
-  );
+  const readinessPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js');
   const source = readFileSync(readinessPath, 'utf8');
 
   it('is frozen, non-empty and free of duplicates', () => {
@@ -490,15 +500,15 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     // built in memory and imported as a data: URL, so nothing on disk is touched.
     const mutated = source.replace("  'noRollFormula',\n", '');
     assert.notEqual(mutated, source, 'the mutation must actually change the module');
-    return import(`data:text/javascript;base64,${Buffer.from(rewriteImports(mutated)).toString('base64')}`).then(
-      (module) => {
-        assert.throws(
-          () => module.evaluateCheckReadiness({ rollFormula: '' }),
-          /unregistered issue id "noRollFormula"/,
-          'an id the registry does not carry must not reach the returned list'
-        );
-      }
-    );
+    return import(
+      `data:text/javascript;base64,${Buffer.from(rewriteImports(mutated)).toString('base64')}`
+    ).then((module) => {
+      assert.throws(
+        () => module.evaluateCheckReadiness({ rollFormula: '' }),
+        /unregistered issue id "noRollFormula"/,
+        'an id the registry does not carry must not reach the returned list'
+      );
+    });
   });
 
   // The other half: nothing may build an issue by direct `push`, bypassing the funnel.
@@ -510,7 +520,8 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       literals,
       [],
       'these issues are built as literals rather than through `pushIssue`, so the registry ' +
-        'cannot refuse them:\n  ' + literals.join('\n  ')
+        'cannot refuse them:\n  ' +
+        literals.join('\n  ')
     );
   });
 
@@ -617,7 +628,10 @@ function rewriteImports(text) {
   const base = pathToFileURL(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js')
   ).href;
-  return text.replaceAll(/from '(\.[^']+)'/g, (_match, specifier) => `from '${new URL(specifier, base).href}'`);
+  return text.replaceAll(
+    /from '(\.[^']+)'/g,
+    (_match, specifier) => `from '${new URL(specifier, base).href}'`
+  );
 }
 
 // ── rangeGap: the third range rule, which nothing reported before (issue 1095, DN6) ──
@@ -643,15 +657,24 @@ describe('rangeGap', () => {
     );
     // PROVEN TO RAISE NOTHING AGAINST THE PRE-CHANGE EVALUATOR: the two rules that DID
     // exist both stay silent on this set, which is exactly why the gap was unreported.
-    assert.equal(issues.find((issue) => issue.id === 'rangeInvalid'), undefined);
-    assert.equal(issues.find((issue) => issue.id === 'rangeOverlap'), undefined);
+    assert.equal(
+      issues.find((issue) => issue.id === 'rangeInvalid'),
+      undefined
+    );
+    assert.equal(
+      issues.find((issue) => issue.id === 'rangeOverlap'),
+      undefined
+    );
   });
 
   it('stays silent on a contiguous set', () => {
     const contiguous = structuredClone(gapped);
     contiguous.fixedOutcomes[1].start = 10;
     const { issues } = evaluateCheckReadiness(contiguous, { mode: 'routed' });
-    assert.equal(issues.find((issue) => issue.id === 'rangeGap'), undefined);
+    assert.equal(
+      issues.find((issue) => issue.id === 'rangeGap'),
+      undefined
+    );
   });
 
   it('measures the set’s own span, so a deliberate window is not a gap', () => {
@@ -718,10 +741,7 @@ describe('check-modifier readiness', () => {
     const issue = issues.find((entry) => entry.id === 'modifierBoundsInverted');
     assert.ok(issue, 'an inverted pair is reported');
     assert.equal(issue.severity, 'critical', 'BLOCKING — the entry silently contributes 0');
-    assert.equal(
-      checks.find((check) => check.id === 'modifierBoundsValid')?.satisfied,
-      false
-    );
+    assert.equal(checks.find((check) => check.id === 'modifierBoundsValid')?.satisfied, false);
   });
 
   // The second blocking bounds fault, and a SEPARATE id: "your minimum is above your
@@ -789,10 +809,9 @@ describe('check-modifier readiness', () => {
       { rollFormula: '1d20' },
       { mode: 'simple', modifierContext: context(['ok', 'inverted', 'huge']) }
     );
-    assert.deepEqual(
-      issues.find((entry) => entry.id === 'modifierBoundsInverted')?.data,
-      { names: 'Inverted' }
-    );
+    assert.deepEqual(issues.find((entry) => entry.id === 'modifierBoundsInverted')?.data, {
+      names: 'Inverted',
+    });
     assert.deepEqual(
       issues.find((entry) => entry.id === 'modifierBoundsUnsafe')?.data,
       { names: 'Huge' },
@@ -940,7 +959,10 @@ describe('check-modifier readiness', () => {
       { rollFormula: '1d20' },
       { mode: 'simple', modifierContext: context(['ok']) }
     );
-    assert.equal(issues.find((entry) => entry.id === 'modifierBoundsInverted'), undefined);
+    assert.equal(
+      issues.find((entry) => entry.id === 'modifierBoundsInverted'),
+      undefined
+    );
   });
 
   it('reports noModifierSupport under gathering d100 — the ONE owned path for that state', () => {
@@ -958,7 +980,10 @@ describe('check-modifier readiness', () => {
       'd100 DOES roll a check, so the mode-rolls-nothing sentence would be false here'
     );
     // …and the d100 branch still validates nothing else: there is nothing authored.
-    assert.equal(issues.find((entry) => entry.id === 'noRollFormula'), undefined);
+    assert.equal(
+      issues.find((entry) => entry.id === 'noRollFormula'),
+      undefined
+    );
   });
 
   it('keeps the mode-rolls-nothing reading for alchemy none, which really rolls nothing', () => {
@@ -979,7 +1004,10 @@ describe('check-modifier readiness', () => {
       { mode: 'simple', modifierContext: context(['ok']) }
     );
     assert.ok(issues.find((entry) => entry.id === 'modifiersInertNoFormula'));
-    assert.equal(issues.find((entry) => entry.id === 'modifiersInertNoCheck'), undefined);
+    assert.equal(
+      issues.find((entry) => entry.id === 'modifiersInertNoCheck'),
+      undefined
+    );
   });
 
   it('says nothing at all when the activity selects no modifier', () => {
@@ -1067,8 +1095,11 @@ describe('the issue-to-section map is exhaustive against the frozen registry', (
 
   it('FAILS when a bucket names an id the registry does not carry', async () => {
     const module = await loadMutated(
-      mapSource.replace(BUCKET_ANCHOR, `${BUCKET_ANCHOR}  ghostIssue: 'roll',
-`)
+      mapSource.replace(
+        BUCKET_ANCHOR,
+        `${BUCKET_ANCHOR}  ghostIssue: 'roll',
+`
+      )
     );
     assert.notDeepEqual(
       Object.keys(module.CHECK_ISSUE_SECTIONS).sort(),
@@ -1125,7 +1156,11 @@ describe('readinessModeForSlot', () => {
       'none',
       'alchemy + none rolls NOTHING; coercing it to simple demanded a formula it has no field for'
     );
-    assert.equal(readinessModeForSlot(slotFor('somethingNew')), 'none', 'an unknown mode rolls nothing');
+    assert.equal(
+      readinessModeForSlot(slotFor('somethingNew')),
+      'none',
+      'an unknown mode rolls nothing'
+    );
   });
 
   it('is what makes a routedByCheck tier fault reportable AT ALL', () => {

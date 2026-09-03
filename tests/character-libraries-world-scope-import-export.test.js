@@ -18,7 +18,13 @@ import { importerOverSettings } from './helpers/worldConfigImporterHarness.js';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const KEY = 'characterLibraries';
 
-const SMITH = { id: 'smithsTools', name: "Smith's Tools", path: 'tools.smith.value', op: 'gte', value: 1 };
+const SMITH = {
+  id: 'smithsTools',
+  name: "Smith's Tools",
+  path: 'tools.smith.value',
+  op: 'gte',
+  value: 1,
+};
 const MED = { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' };
 
 test('seeds both libraries into a world that has none', async () => {
@@ -27,8 +33,14 @@ test('seeds both libraries into a world that has none', async () => {
     characterPrerequisites: [SMITH],
     modifiers: [MED],
   });
-  assert.deepEqual(settings[KEY].characterPrerequisites.map((e) => e.id), ['smithsTools']);
-  assert.deepEqual(settings[KEY].modifiers.map((e) => e.id), ['med']);
+  assert.deepEqual(
+    settings[KEY].characterPrerequisites.map((e) => e.id),
+    ['smithsTools']
+  );
+  assert.deepEqual(
+    settings[KEY].modifiers.map((e) => e.id),
+    ['med']
+  );
 });
 
 // DESTINATION WINS, exactly as the currency and realm merges do. An id already in this world keeps
@@ -43,7 +55,11 @@ test('an id the destination already holds keeps the DESTINATION’s definition',
     modifiers: [],
   });
   assert.equal(settings[KEY].characterPrerequisites.length, 1);
-  assert.equal(settings[KEY].characterPrerequisites[0].value, 5, 'the local rule is not overwritten');
+  assert.equal(
+    settings[KEY].characterPrerequisites[0].value,
+    5,
+    'the local rule is not overwritten'
+  );
 });
 
 test('appends only genuinely new entries, preserving destination order', async () => {
@@ -54,7 +70,10 @@ test('appends only genuinely new entries, preserving destination order', async (
     characterPrerequisites: [],
     modifiers: [MED, { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' }],
   });
-  assert.deepEqual(settings[KEY].modifiers.map((e) => e.id), ['med', 'alch']);
+  assert.deepEqual(
+    settings[KEY].modifiers.map((e) => e.id),
+    ['med', 'alch']
+  );
 });
 
 // THE PER-KEY MERGE, and the reason it cannot be one object-level destination-wins. The two lists
@@ -68,7 +87,10 @@ test('merges the two libraries INDEPENDENTLY', async () => {
     characterPrerequisites: [SMITH],
     modifiers: [MED],
   });
-  assert.deepEqual(settings[KEY].characterPrerequisites.map((e) => e.id), ['smithsTools']);
+  assert.deepEqual(
+    settings[KEY].characterPrerequisites.map((e) => e.id),
+    ['smithsTools']
+  );
   assert.deepEqual(
     settings[KEY].modifiers.map((e) => e.id),
     ['med'],
@@ -80,7 +102,10 @@ test('a destination whose setting is absent, empty, or one-list-only all merge c
   for (const seed of [undefined, {}, { modifiers: [MED] }]) {
     const { importer, settings } = importerOverSettings(seed === undefined ? {} : { [KEY]: seed });
     await importer._persistCharacterLibraries({ characterPrerequisites: [SMITH], modifiers: [] });
-    assert.deepEqual(settings[KEY].characterPrerequisites.map((e) => e.id), ['smithsTools']);
+    assert.deepEqual(
+      settings[KEY].characterPrerequisites.map((e) => e.id),
+      ['smithsTools']
+    );
     assert.ok(Array.isArray(settings[KEY].modifiers), 'both keys are always written');
   }
 });
@@ -115,10 +140,7 @@ test('ignores a malformed or absent payload rather than throwing', async () => {
 // created while the incoming entries are still only in the payload has every tool prerequisite
 // reference and every `defaultModifierIds` pruned against a basis that cannot yet see them.
 test('the merge is ordered BEFORE the system create/update, unlike currency and travel', () => {
-  const source = readFileSync(
-    resolve(repoRoot, 'src/systems/CompendiumImporter.js'),
-    'utf8'
-  );
+  const source = readFileSync(resolve(repoRoot, 'src/systems/CompendiumImporter.js'), 'utf8');
   const merge = source.indexOf('await this._persistCharacterLibraries(');
   const create = source.indexOf('await this._craftingSystemManager.createSystem(');
   const currency = source.indexOf('await this._persistCurrencyConfig(');
@@ -139,10 +161,7 @@ test('the merge is ordered BEFORE the system create/update, unlike currency and 
 // reload the manager goes on deriving its basis from the pre-import libraries for the rest of the
 // session — which is the same failure the ordering above prevents, arriving one step later.
 test('republishes the store after writing, so the manager’s basis is not stale', () => {
-  const source = readFileSync(
-    resolve(repoRoot, 'src/systems/CompendiumImporter.js'),
-    'utf8'
-  );
+  const source = readFileSync(resolve(repoRoot, 'src/systems/CompendiumImporter.js'), 'utf8');
   const body = source.slice(
     source.indexOf('async _persistCharacterLibraries('),
     source.indexOf('async _persistCurrencyConfig(')

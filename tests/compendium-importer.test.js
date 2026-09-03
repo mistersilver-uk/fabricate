@@ -25,13 +25,13 @@ let _idCounter = 0;
 globalThis.foundry = {
   utils: {
     randomID: () => `id-${++_idCounter}`,
-    getProperty: (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj) ?? undefined
-  }
+    getProperty: (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj) ?? undefined,
+  },
 };
 globalThis.game = {
   packs: [],
   fabricate: null,
-  user: { isGM: true }
+  user: { isGM: true },
 };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 globalThis.fromUuid = async () => null; // default: uuid not found
@@ -40,9 +40,8 @@ globalThis.fromUuid = async () => null; // default: uuid not found
 // Module import
 // ---------------------------------------------------------------------------
 
-const { CompendiumImporter, createDefaultProgressReporter } = await import(
-  '../src/systems/CompendiumImporter.js'
-);
+const { CompendiumImporter, createDefaultProgressReporter } =
+  await import('../src/systems/CompendiumImporter.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,7 +53,7 @@ function makeComponent(overrides = {}) {
     name: 'Iron Ore',
     originItemUuid: 'Compendium.source.items.iron-ore',
     aliasItemUuids: [],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -64,7 +63,7 @@ function makePackData(overrides = {}) {
       id: 'test-system',
       name: 'Test System',
       components: [makeComponent()],
-      recipes: []
+      recipes: [],
     },
     recipes: [
       {
@@ -73,10 +72,10 @@ function makePackData(overrides = {}) {
         craftingSystemId: '__SYSTEM_ID__',
         ingredientSets: [],
         resultGroups: [],
-        enabled: true
-      }
+        enabled: true,
+      },
     ],
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -92,7 +91,7 @@ function makeMockSystemManager({ systems = [], createdSystems = [], updatedSyste
       const sys = { ...data, id };
       updatedSystems.push(sys);
       return sys;
-    }
+    },
   };
 }
 
@@ -118,7 +117,7 @@ function makeMockRecipeManager({
   cleanupCalls = [],
   // Optionally make specific recipe ids throw on create/update to exercise the
   // per-recipe error-isolation path.
-  throwOnRecipeIds = []
+  throwOnRecipeIds = [],
 } = {}) {
   const store = new Map();
   for (const [id, recipe] of Object.entries(existingRecipes)) {
@@ -171,7 +170,7 @@ function makeMockRecipeManager({
     // loop; the spy records each call so tests can pin the save-once invariant.
     save: async () => {
       saveCalls.push(Date.now());
-    }
+    },
   };
 }
 
@@ -180,7 +179,7 @@ function makeMockRecipeManager({
 // ---------------------------------------------------------------------------
 
 test('T-097: successful import creates system and recipes', async () => {
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? {} : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'Compendium.source.items.iron-ore' ? {} : null);
 
   const createdSystems = [];
   const createdRecipes = [];
@@ -197,12 +196,17 @@ test('T-097: successful import creates system and recipes', async () => {
   assert.equal(summary.system.skipped, false, 'System should not be skipped');
   assert.equal(createdSystems.length, 1, 'One system should be created');
   assert.equal(summary.recipes.imported, 1, 'One recipe should be imported');
-  assert.deepEqual(createdRecipeOptions, [{ notify: false, emitChange: false, persist: false }], 'Batch import should suppress per-recipe create notifications and change hooks, and defer persistence to a single batch save');
+  assert.deepEqual(
+    createdRecipeOptions,
+    [{ notify: false, emitChange: false, persist: false }],
+    'Batch import should suppress per-recipe create notifications and change hooks, and defer persistence to a single batch save'
+  );
   assert.equal(summary.recipes.errors.length, 0, 'No recipe errors');
 });
 
 test('T-097: exact UUID match retains UUID, method=exact', async () => {
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? { id: 'found' } : null;
+  globalThis.fromUuid = async (uuid) =>
+    uuid === 'Compendium.source.items.iron-ore' ? { id: 'found' } : null;
 
   const createdSystems = [];
   const systemManager = makeMockSystemManager({ createdSystems });
@@ -221,15 +225,23 @@ test('T-097: exact UUID match retains UUID, method=exact', async () => {
   // System component should have unchanged originItemUuid
   const createdSystem = createdSystems[0];
   const comp = createdSystem.components[0];
-  assert.equal(comp.originItemUuid, 'Compendium.source.items.iron-ore', 'originItemUuid unchanged on exact match');
+  assert.equal(
+    comp.originItemUuid,
+    'Compendium.source.items.iron-ore',
+    'originItemUuid unchanged on exact match'
+  );
 });
 
 test('exact match snapshots live img/description onto an SRD-backed component that omitted them', async () => {
   // Mirrors a pre-built premium system: the component references a foreign
   // (SRD) pack by UUID but ships no img/description; the live item supplies both.
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.dnd5e.items.Item.smiths'
-    ? { img: 'icons/tools/smithing/hammer.webp', system: { description: { value: '<p>Smithing tools.</p>' } } }
-    : null;
+  globalThis.fromUuid = async (uuid) =>
+    uuid === 'Compendium.dnd5e.items.Item.smiths'
+      ? {
+          img: 'icons/tools/smithing/hammer.webp',
+          system: { description: { value: '<p>Smithing tools.</p>' } },
+        }
+      : null;
 
   const createdSystems = [];
   const extractCalls = [];
@@ -240,7 +252,7 @@ test('exact match snapshots live img/description onto an SRD-backed component th
       // Plain string strip (no regex) keeps this mock free of the ReDoS hotspot
       // the analyzer flags on `<[^>]+>`; the fixture only carries <p> tags.
       return source?.system?.description?.value?.replaceAll('<p>', '').replaceAll('</p>', '') || '';
-    }
+    },
   };
   const recipeManager = makeMockRecipeManager();
 
@@ -250,15 +262,29 @@ test('exact match snapshots live img/description onto an SRD-backed component th
     system: {
       id: 'test-system',
       name: 'Test System',
-      components: [makeComponent({ id: 'smiths', name: "Smith's Tools", originItemUuid: 'Compendium.dnd5e.items.Item.smiths' })]
-    }
+      components: [
+        makeComponent({
+          id: 'smiths',
+          name: "Smith's Tools",
+          originItemUuid: 'Compendium.dnd5e.items.Item.smiths',
+        }),
+      ],
+    },
   });
 
   await importer.importFromPackData(packData);
 
   const comp = createdSystems[0].components[0];
-  assert.equal(comp.img, 'icons/tools/smithing/hammer.webp', 'img snapshotted from the live SRD item');
-  assert.equal(comp.description, 'Smithing tools.', 'description snapshotted from the live SRD item');
+  assert.equal(
+    comp.img,
+    'icons/tools/smithing/hammer.webp',
+    'img snapshotted from the live SRD item'
+  );
+  assert.equal(
+    comp.description,
+    'Smithing tools.',
+    'description snapshotted from the live SRD item'
+  );
   assert.equal(extractCalls.length, 1, 'description extraction reused the manager helper');
 
   globalThis.fromUuid = async () => null;
@@ -266,12 +292,15 @@ test('exact match snapshots live img/description onto an SRD-backed component th
 
 test('exact match preserves baked img and does not overwrite an authored description', async () => {
   // In-module (contentRef) component: build already baked art; live item must not clobber it.
-  globalThis.fromUuid = async () => ({ img: 'icons/live/other.webp', system: { description: { value: 'live desc' } } });
+  globalThis.fromUuid = async () => ({
+    img: 'icons/live/other.webp',
+    system: { description: { value: 'live desc' } },
+  });
 
   const createdSystems = [];
   const systemManager = {
     ...makeMockSystemManager({ createdSystems }),
-    _extractSourceDescription: (source) => source?.system?.description?.value || ''
+    _extractSourceDescription: (source) => source?.system?.description?.value || '',
   };
   const recipeManager = makeMockRecipeManager();
 
@@ -281,8 +310,10 @@ test('exact match preserves baked img and does not overwrite an authored descrip
     system: {
       id: 'test-system',
       name: 'Test System',
-      components: [makeComponent({ img: 'icons/baked/iron-ore.webp', description: 'authored copy' })]
-    }
+      components: [
+        makeComponent({ img: 'icons/baked/iron-ore.webp', description: 'authored copy' }),
+      ],
+    },
   });
 
   await importer.importFromPackData(packData);
@@ -306,9 +337,9 @@ test('T-097: source+name match remaps UUID, old UUID added to fallbacks', async 
       {
         _id: 'newIronOreId',
         name: 'Iron Ore',
-        _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
-      }
-    ]
+        _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+      },
+    ],
   };
   globalThis.game = { ...globalThis.game, packs: [mockPack] };
 
@@ -324,13 +355,19 @@ test('T-097: source+name match remaps UUID, old UUID added to fallbacks', async 
   assert.equal(summary.components.remapped.length, 1, 'One component remapped');
   const remap = summary.components.remapped[0];
   assert.equal(remap.method, 'sourceName', 'Method should be sourceName');
-  assert.equal(remap.newUuid, 'Compendium.world.items.newIronOreId', 'UUID should be remapped to new item');
+  assert.equal(
+    remap.newUuid,
+    'Compendium.world.items.newIronOreId',
+    'UUID should be remapped to new item'
+  );
   assert.equal(remap.oldUuid, 'Compendium.source.items.iron-ore', 'Old UUID recorded');
 
   // Old UUID should be in fallbacks
   const comp = createdSystems[0].components[0];
-  assert.ok(comp.aliasItemUuids.includes('Compendium.source.items.iron-ore'),
-    'Old UUID should be added to aliasItemUuids');
+  assert.ok(
+    comp.aliasItemUuids.includes('Compendium.source.items.iron-ore'),
+    'Old UUID should be added to aliasItemUuids'
+  );
 
   // Reset
   globalThis.game = { ...globalThis.game, packs: [] };
@@ -366,9 +403,9 @@ test('T-097: fallback IDs retained on re-import when retainFallbackIds=true', as
         id: 'comp1',
         name: 'Iron Ore',
         registeredItemUuid: 'Compendium.source.items.iron-ore',
-        aliasItemUuids: ['Item.existing-fallback-id']
-      }
-    ]
+        aliasItemUuids: ['Item.existing-fallback-id'],
+      },
+    ],
   };
 
   const createdSystems = [];
@@ -376,7 +413,7 @@ test('T-097: fallback IDs retained on re-import when retainFallbackIds=true', as
   const systemManager = makeMockSystemManager({
     systems: [existingSystem],
     createdSystems,
-    updatedSystems
+    updatedSystems,
   });
   const recipeManager = makeMockRecipeManager();
 
@@ -386,21 +423,29 @@ test('T-097: fallback IDs retained on re-import when retainFallbackIds=true', as
   // Re-import with overwriteExisting:true and retainFallbackIds:true
   const summary = await importer.importFromPackData(packData, {
     overwriteExisting: true,
-    retainFallbackIds: true
+    retainFallbackIds: true,
   });
 
-  assert.equal(summary.system.created, false, 'System should not be marked as created (it was overwritten)');
-  assert.ok(updatedSystems.length > 0 || createdSystems.length > 0,
-    'System should be created or updated');
+  assert.equal(
+    summary.system.created,
+    false,
+    'System should not be marked as created (it was overwritten)'
+  );
+  assert.ok(
+    updatedSystems.length > 0 || createdSystems.length > 0,
+    'System should be created or updated'
+  );
 
   const updatedSystem = updatedSystems[0] || createdSystems[0];
   const comp = updatedSystem.components[0];
-  assert.ok(comp.aliasItemUuids.includes('Item.existing-fallback-id'),
-    'Existing fallback ID should be retained on re-import');
+  assert.ok(
+    comp.aliasItemUuids.includes('Item.existing-fallback-id'),
+    'Existing fallback ID should be retained on re-import'
+  );
 });
 
 test('T-097: additional fallback IDs merged from options', async () => {
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? {} : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'Compendium.source.items.iron-ore' ? {} : null);
   globalThis.game = { ...globalThis.game, packs: [] };
 
   const createdSystems = [];
@@ -412,15 +457,19 @@ test('T-097: additional fallback IDs merged from options', async () => {
 
   await importer.importFromPackData(packData, {
     additionalFallbackIds: {
-      'comp1': ['Item.manual-fallback-1', 'Item.manual-fallback-2']
-    }
+      comp1: ['Item.manual-fallback-1', 'Item.manual-fallback-2'],
+    },
   });
 
   const comp = createdSystems[0].components[0];
-  assert.ok(comp.aliasItemUuids.includes('Item.manual-fallback-1'),
-    'Additional fallback 1 should be merged');
-  assert.ok(comp.aliasItemUuids.includes('Item.manual-fallback-2'),
-    'Additional fallback 2 should be merged');
+  assert.ok(
+    comp.aliasItemUuids.includes('Item.manual-fallback-1'),
+    'Additional fallback 1 should be merged'
+  );
+  assert.ok(
+    comp.aliasItemUuids.includes('Item.manual-fallback-2'),
+    'Additional fallback 2 should be merged'
+  );
 });
 
 test('T-097: overwriteExisting:false skips existing system', async () => {
@@ -441,7 +490,7 @@ test('T-097: overwriteExisting:false skips existing system', async () => {
 });
 
 test('T-097: __SYSTEM_ID__ placeholder replaced in all recipes', async () => {
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? {} : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'Compendium.source.items.iron-ore' ? {} : null);
 
   const createdRecipes = [];
   const systemManager = makeMockSystemManager();
@@ -450,61 +499,87 @@ test('T-097: __SYSTEM_ID__ placeholder replaced in all recipes', async () => {
   const importer = new CompendiumImporter(systemManager, recipeManager);
   const packData = makePackData({
     recipes: [
-      { id: 'r1', name: 'Recipe 1', craftingSystemId: '__SYSTEM_ID__', ingredientSets: [], resultGroups: [], enabled: true },
-      { id: 'r2', name: 'Recipe 2', craftingSystemId: '__SYSTEM_ID__', ingredientSets: [], resultGroups: [], enabled: true }
-    ]
+      {
+        id: 'r1',
+        name: 'Recipe 1',
+        craftingSystemId: '__SYSTEM_ID__',
+        ingredientSets: [],
+        resultGroups: [],
+        enabled: true,
+      },
+      {
+        id: 'r2',
+        name: 'Recipe 2',
+        craftingSystemId: '__SYSTEM_ID__',
+        ingredientSets: [],
+        resultGroups: [],
+        enabled: true,
+      },
+    ],
   });
 
   await importer.importFromPackData(packData);
 
   assert.equal(createdRecipes.length, 2, 'Two recipes should be created');
   for (const r of createdRecipes) {
-    assert.notEqual(r.craftingSystemId, '__SYSTEM_ID__',
-      `Recipe "${r.name}" should not have __SYSTEM_ID__ placeholder`);
-    assert.ok(r.craftingSystemId && r.craftingSystemId.length > 0,
-      `Recipe "${r.name}" should have a real system ID`);
+    assert.notEqual(
+      r.craftingSystemId,
+      '__SYSTEM_ID__',
+      `Recipe "${r.name}" should not have __SYSTEM_ID__ placeholder`
+    );
+    assert.ok(
+      r.craftingSystemId && r.craftingSystemId.length > 0,
+      `Recipe "${r.name}" should have a real system ID`
+    );
   }
 });
 
 test('T-097: existing recipe generates collision entry when skipped', async () => {
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? {} : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'Compendium.source.items.iron-ore' ? {} : null);
 
   const systemManager = makeMockSystemManager();
   const createdRecipes = [];
   const recipeManager = makeMockRecipeManager({
     existingRecipes: {
-      'recipe1': { id: 'recipe1', name: 'Iron Bar' }
+      recipe1: { id: 'recipe1', name: 'Iron Bar' },
     },
-    createdRecipes
+    createdRecipes,
   });
 
   const importer = new CompendiumImporter(systemManager, recipeManager);
   const packData = makePackData({
     recipes: [
-      { id: 'recipe1', name: 'Iron Bar', craftingSystemId: '__SYSTEM_ID__', ingredientSets: [], resultGroups: [], enabled: true }
-    ]
+      {
+        id: 'recipe1',
+        name: 'Iron Bar',
+        craftingSystemId: '__SYSTEM_ID__',
+        ingredientSets: [],
+        resultGroups: [],
+        enabled: true,
+      },
+    ],
   });
 
   const summary = await importer.importFromPackData(packData, { overwriteExisting: false });
 
   assert.equal(summary.recipes.skipped, 1, 'Recipe should be skipped');
   assert.equal(createdRecipes.length, 0, 'Recipe should not be created');
-  const recipeCollision = summary.collisions.find(c => c.type === 'recipe');
+  const recipeCollision = summary.collisions.find((c) => c.type === 'recipe');
   assert.ok(recipeCollision, 'Recipe collision should be reported');
   assert.equal(recipeCollision.resolution, 'skipped');
 });
 
 test('batch import suppresses per-recipe update notifications when overwriting recipes', async () => {
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? {} : null;
+  globalThis.fromUuid = async (uuid) => (uuid === 'Compendium.source.items.iron-ore' ? {} : null);
 
   const existingSystem = { id: 'test-system', name: 'Test System', components: [] };
   const updatedRecipeOptions = [];
   const systemManager = makeMockSystemManager({ systems: [existingSystem] });
   const recipeManager = makeMockRecipeManager({
     existingRecipes: {
-      'recipe1': { id: 'recipe1', name: 'Iron Bar' }
+      recipe1: { id: 'recipe1', name: 'Iron Bar' },
     },
-    updatedRecipeOptions
+    updatedRecipeOptions,
   });
 
   const importer = new CompendiumImporter(systemManager, recipeManager);
@@ -513,13 +588,14 @@ test('batch import suppresses per-recipe update notifications when overwriting r
   assert.equal(summary.recipes.imported, 1);
   assert.deepEqual(updatedRecipeOptions, [{ notify: false, emitChange: false, persist: false }]);
   assert.equal(
-    summary.collisions.some(c => c.type === 'recipe' && c.resolution === 'overwritten'),
+    summary.collisions.some((c) => c.type === 'recipe' && c.resolution === 'overwritten'),
     true
   );
 });
 
 test('import rejects gathering task drops with unknown component ids before persisting the system', async () => {
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? { documentName: 'Item' } : null;
+  globalThis.fromUuid = async (uuid) =>
+    uuid === 'Compendium.source.items.iron-ore' ? { documentName: 'Item' } : null;
 
   const createdSystems = [];
   const systemManager = makeMockSystemManager({ createdSystems });
@@ -532,15 +608,25 @@ test('import rejects gathering task drops with unknown component ids before pers
       gatheringConfig: {
         systems: {
           'test-system': {
-            tasks: [{
-              id: 'task-ore',
-              name: 'Mine Ore',
-              dropRows: [{ id: 'drop-stale', name: 'Missing Reward', componentId: 'missing-component', quantity: 1, dropRate: 50 }]
-            }]
-          }
-        }
-      }
-    }
+            tasks: [
+              {
+                id: 'task-ore',
+                name: 'Mine Ore',
+                dropRows: [
+                  {
+                    id: 'drop-stale',
+                    name: 'Missing Reward',
+                    componentId: 'missing-component',
+                    quantity: 1,
+                    dropRate: 50,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    },
   });
 
   await assert.rejects(
@@ -551,7 +637,8 @@ test('import rejects gathering task drops with unknown component ids before pers
 });
 
 test('import rejects gathering task drops with unresolved item UUIDs', async () => {
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? { documentName: 'Item' } : null;
+  globalThis.fromUuid = async (uuid) =>
+    uuid === 'Compendium.source.items.iron-ore' ? { documentName: 'Item' } : null;
 
   const systemManager = makeMockSystemManager();
   const recipeManager = makeMockRecipeManager();
@@ -563,15 +650,25 @@ test('import rejects gathering task drops with unresolved item UUIDs', async () 
       gatheringConfig: {
         systems: {
           'test-system': {
-            tasks: [{
-              id: 'task-ore',
-              name: 'Mine Ore',
-              dropRows: [{ id: 'drop-item', name: 'Lost Reward', itemUuid: 'Item.missing', quantity: 1, dropRate: 50 }]
-            }]
-          }
-        }
-      }
-    }
+            tasks: [
+              {
+                id: 'task-ore',
+                name: 'Mine Ore',
+                dropRows: [
+                  {
+                    id: 'drop-item',
+                    name: 'Lost Reward',
+                    itemUuid: 'Item.missing',
+                    quantity: 1,
+                    dropRate: 50,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    },
   });
 
   await assert.rejects(
@@ -598,18 +695,32 @@ test('import accepts gathering task drops with valid component or item UUID targ
       gatheringConfig: {
         systems: {
           'test-system': {
-            tasks: [{
-              id: 'task-ore',
-              name: 'Mine Ore',
-              dropRows: [
-                { id: 'drop-component', name: 'Ore', componentId: 'comp1', quantity: 1, dropRate: 50 },
-                { id: 'drop-item', name: 'Reward', itemUuid: 'Item.reward', quantity: 1, dropRate: 25 }
-              ]
-            }]
-          }
-        }
-      }
-    }
+            tasks: [
+              {
+                id: 'task-ore',
+                name: 'Mine Ore',
+                dropRows: [
+                  {
+                    id: 'drop-component',
+                    name: 'Ore',
+                    componentId: 'comp1',
+                    quantity: 1,
+                    dropRate: 50,
+                  },
+                  {
+                    id: 'drop-item',
+                    name: 'Reward',
+                    itemUuid: 'Item.reward',
+                    quantity: 1,
+                    dropRate: 25,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    },
   });
 
   await importer.importFromPackData(packData);
@@ -638,7 +749,10 @@ test('T-097: null pack data throws error', async () => {
   await assert.rejects(
     () => importer.importFromPackData(null),
     (err) => {
-      assert.ok(err.message.includes('Invalid pack data'), 'Error should mention invalid pack data');
+      assert.ok(
+        err.message.includes('Invalid pack data'),
+        'Error should mention invalid pack data'
+      );
       return true;
     }
   );
@@ -692,21 +806,32 @@ test('#492 F1: importing system B keeps system A environments; overwrite does no
 
   const packData = makePackData({
     recipes: [],
-    gatheringEnvironments: [{ id: 'env-b', craftingSystemId: '__SYSTEM_ID__', name: 'B Env', enabled: false }],
+    gatheringEnvironments: [
+      { id: 'env-b', craftingSystemId: '__SYSTEM_ID__', name: 'B Env', enabled: false },
+    ],
   });
 
   await importer.importFromPackData(packData);
 
   let all = store._all();
-  assert.ok(all.some((e) => e.id === 'env-a'), 'system A environment survives');
-  assert.ok(all.some((e) => e.id === 'env-b'), 'system B environment added');
+  assert.ok(
+    all.some((e) => e.id === 'env-a'),
+    'system A environment survives'
+  );
+  assert.ok(
+    all.some((e) => e.id === 'env-b'),
+    'system B environment added'
+  );
   assert.equal(all.length, 2, 'no accumulation on first import');
 
   // Overwrite re-import of B must not duplicate/accumulate stale B environments.
   await importer.importFromPackData(packData, { overwriteExisting: true });
   all = store._all();
   assert.equal(all.filter((e) => e.id === 'env-b').length, 1, 'B not duplicated on re-import');
-  assert.ok(all.some((e) => e.id === 'env-a'), 'A still present after overwrite');
+  assert.ok(
+    all.some((e) => e.id === 'env-a'),
+    'A still present after overwrite'
+  );
   assert.equal(all.length, 2, 'still exactly two environments');
 });
 
@@ -760,14 +885,15 @@ function makeLegacyComponent(overrides = {}) {
     sourceItemUuid: 'Compendium.source.items.iron-ore',
     sourceUuid: 'Compendium.source.items.iron-ore',
     fallbackItemIds: ['Item.legacy-alias-1', 'Item.legacy-alias-2'],
-    ...overrides
+    ...overrides,
   };
 }
 
 test('#700: a legacy-named component upcasts alias uuids and takes the resolution path', async () => {
   // Source item resolves exactly, so the component is remapped (method=exact) —
   // proving the legacy component reached resolution rather than the id-less exit.
-  globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? { id: 'found' } : null;
+  globalThis.fromUuid = async (uuid) =>
+    uuid === 'Compendium.source.items.iron-ore' ? { id: 'found' } : null;
   globalThis.game = { ...globalThis.game, packs: [], user: { isGM: true } };
 
   const createdSystems = [];
@@ -775,16 +901,24 @@ test('#700: a legacy-named component upcasts alias uuids and takes the resolutio
   const recipeManager = makeMockRecipeManager();
   const importer = new CompendiumImporter(systemManager, recipeManager, { isGM: () => true });
 
-  const summary = await importer.importFromPackData(makePackData({
-    recipes: [],
-    system: { id: 'test-system', name: 'Test System', components: [makeLegacyComponent()] }
-  }));
+  const summary = await importer.importFromPackData(
+    makePackData({
+      recipes: [],
+      system: { id: 'test-system', name: 'Test System', components: [makeLegacyComponent()] },
+    })
+  );
 
   const comp = createdSystems[0].components[0];
   // Legacy fallbackItemIds became aliasItemUuids, and fallbackItemIds is gone.
-  assert.deepEqual(comp.aliasItemUuids, ['Item.legacy-alias-1', 'Item.legacy-alias-2'],
-    'aliasItemUuids populated from the legacy fallbackItemIds');
-  assert.ok(!('fallbackItemIds' in comp), 'legacy fallbackItemIds is not persisted (shadowing bug fixed)');
+  assert.deepEqual(
+    comp.aliasItemUuids,
+    ['Item.legacy-alias-1', 'Item.legacy-alias-2'],
+    'aliasItemUuids populated from the legacy fallbackItemIds'
+  );
+  assert.ok(
+    !('fallbackItemIds' in comp),
+    'legacy fallbackItemIds is not persisted (shadowing bug fixed)'
+  );
   assert.ok(!('sourceItemUuid' in comp), 'legacy sourceItemUuid renamed away');
   assert.ok(!('sourceUuid' in comp), 'legacy sourceUuid renamed away');
 
@@ -803,13 +937,19 @@ test('#700: an unresolvable legacy source ref yields a SOURCE_ITEM unresolvedRef
   const recipeManager = makeMockRecipeManager();
   const importer = new CompendiumImporter(systemManager, recipeManager, { isGM: () => true });
 
-  const summary = await importer.importFromPackData(makePackData({
-    recipes: [],
-    system: { id: 'test-system', name: 'Test System', components: [makeLegacyComponent()] }
-  }));
+  const summary = await importer.importFromPackData(
+    makePackData({
+      recipes: [],
+      system: { id: 'test-system', name: 'Test System', components: [makeLegacyComponent()] },
+    })
+  );
 
   // The legacy component is classified as unresolved (not silently omitted).
-  assert.equal(summary.components.unresolved.length, 1, 'legacy component classified as unresolved');
+  assert.equal(
+    summary.components.unresolved.length,
+    1,
+    'legacy component classified as unresolved'
+  );
   assert.equal(summary.components.unresolved[0].componentId, 'legacy-comp');
   assert.equal(summary.components.unresolved[0].originItemUuid, 'Compendium.source.items.iron-ore');
 
@@ -834,25 +974,36 @@ test('#700: new names win when both legacy and renamed source fields are present
   const recipeManager = makeMockRecipeManager();
   const importer = new CompendiumImporter(systemManager, recipeManager, { isGM: () => true });
 
-  await importer.importFromPackData(makePackData({
-    recipes: [],
-    system: {
-      id: 'test-system',
-      name: 'Test System',
-      components: [makeLegacyComponent({
-        // Post-rename fields also present — they must win, legacy discarded.
-        originItemUuid: 'Compendium.new.items.iron-ore',
-        registeredItemUuid: 'Compendium.new.items.iron-ore',
-        aliasItemUuids: ['Item.new-alias']
-      })]
-    }
-  }));
+  await importer.importFromPackData(
+    makePackData({
+      recipes: [],
+      system: {
+        id: 'test-system',
+        name: 'Test System',
+        components: [
+          makeLegacyComponent({
+            // Post-rename fields also present — they must win, legacy discarded.
+            originItemUuid: 'Compendium.new.items.iron-ore',
+            registeredItemUuid: 'Compendium.new.items.iron-ore',
+            aliasItemUuids: ['Item.new-alias'],
+          }),
+        ],
+      },
+    })
+  );
 
   const comp = createdSystems[0].components[0];
   assert.equal(comp.originItemUuid, 'Compendium.new.items.iron-ore', 'new originItemUuid wins');
-  assert.equal(comp.registeredItemUuid, 'Compendium.new.items.iron-ore', 'new registeredItemUuid wins');
-  assert.deepEqual(comp.aliasItemUuids, ['Item.new-alias'],
-    'new aliasItemUuids wins, legacy fallbackItemIds discarded');
+  assert.equal(
+    comp.registeredItemUuid,
+    'Compendium.new.items.iron-ore',
+    'new registeredItemUuid wins'
+  );
+  assert.deepEqual(
+    comp.aliasItemUuids,
+    ['Item.new-alias'],
+    'new aliasItemUuids wins, legacy fallbackItemIds discarded'
+  );
   assert.ok(!('fallbackItemIds' in comp));
   assert.ok(!('sourceItemUuid' in comp));
   assert.ok(!('sourceUuid' in comp));
@@ -874,7 +1025,7 @@ function makeImportRecipe(id, overrides = {}) {
     ingredientSets: [],
     resultGroups: [],
     enabled: true,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -889,14 +1040,20 @@ test('#776: batched import flushes exactly one recipeManager.save() for a multi-
   const importer = new CompendiumImporter(systemManager, recipeManager);
 
   const summary = await importer.importFromPackData(
-    makePackData({ recipes: [makeImportRecipe('r1'), makeImportRecipe('r2'), makeImportRecipe('r3')] })
+    makePackData({
+      recipes: [makeImportRecipe('r1'), makeImportRecipe('r2'), makeImportRecipe('r3')],
+    })
   );
 
   assert.equal(summary.recipes.imported, 3, 'all three recipes imported');
   assert.equal(saveCalls.length, 1, 'exactly one batched save for the whole recipe phase');
   assert.equal(createdRecipeOptions.length, 3);
   for (const options of createdRecipeOptions) {
-    assert.equal(options.persist, false, 'each per-recipe create defers persistence to the batch save');
+    assert.equal(
+      options.persist,
+      false,
+      'each per-recipe create defers persistence to the batch save'
+    );
   }
 });
 
@@ -911,7 +1068,11 @@ test('#776: an all-skipped / empty recipe phase writes nothing (no batch save)',
 
   await importer.importFromPackData(makePackData({ recipes: [] }));
 
-  assert.equal(saveCalls.length, 0, 'zero recipes persisted means zero writes, matching the unbatched behaviour');
+  assert.equal(
+    saveCalls.length,
+    0,
+    'zero recipes persisted means zero writes, matching the unbatched behaviour'
+  );
 });
 
 test('#776: composite overwrite=true fixture preserves counts and ordered collisions', async () => {
@@ -929,7 +1090,7 @@ test('#776: composite overwrite=true fixture preserves counts and ordered collis
   const recipeManager = makeMockRecipeManager({
     saveCalls,
     existingRecipes: { 'r-exist': { id: 'r-exist', name: 'Existing Recipe' } },
-    throwOnRecipeIds: ['r-bad']
+    throwOnRecipeIds: ['r-bad'],
   });
   const importer = new CompendiumImporter(systemManager, recipeManager);
 
@@ -938,19 +1099,23 @@ test('#776: composite overwrite=true fixture preserves counts and ordered collis
       recipes: [
         makeImportRecipe('r-new', { name: 'New Recipe' }),
         makeImportRecipe('r-exist', { name: 'Existing Recipe' }),
-        makeImportRecipe('r-bad', { name: 'Broken Recipe' })
-      ]
+        makeImportRecipe('r-bad', { name: 'Broken Recipe' }),
+      ],
     }),
     { overwriteExisting: true }
   );
 
   assert.equal(summary.recipes.imported, 2, 'new create + existing overwrite counted as imported');
   assert.equal(summary.recipes.skipped, 0);
-  assert.equal(summary.recipes.errors.length, 1, 'the validation-error recipe is isolated into errors[]');
+  assert.equal(
+    summary.recipes.errors.length,
+    1,
+    'the validation-error recipe is isolated into errors[]'
+  );
   assert.equal(summary.recipes.errors[0].recipeId, 'r-bad');
   assert.deepEqual(summary.collisions, [
     { type: 'system', id: 'test-system', name: 'Test System', resolution: 'overwritten' },
-    { type: 'recipe', id: 'r-exist', name: 'Existing Recipe', resolution: 'overwritten' }
+    { type: 'recipe', id: 'r-exist', name: 'Existing Recipe', resolution: 'overwritten' },
   ]);
   assert.equal(saveCalls.length, 1, 'the batch still flushes once');
 });
@@ -966,13 +1131,16 @@ test('#776: composite overwrite=false fixture skips the existing recipe and repo
   const systemManager = makeMockSystemManager({});
   const recipeManager = makeMockRecipeManager({
     saveCalls,
-    existingRecipes: { 'r-exist': { id: 'r-exist', name: 'Existing Recipe' } }
+    existingRecipes: { 'r-exist': { id: 'r-exist', name: 'Existing Recipe' } },
   });
   const importer = new CompendiumImporter(systemManager, recipeManager);
 
   const summary = await importer.importFromPackData(
     makePackData({
-      recipes: [makeImportRecipe('r-new', { name: 'New Recipe' }), makeImportRecipe('r-exist', { name: 'Existing Recipe' })]
+      recipes: [
+        makeImportRecipe('r-new', { name: 'New Recipe' }),
+        makeImportRecipe('r-exist', { name: 'Existing Recipe' }),
+      ],
     }),
     { overwriteExisting: false }
   );
@@ -997,7 +1165,7 @@ test('#776: a mid-loop recipe throw still yields exactly one save and isolates t
 
   const summary = await importer.importFromPackData(
     makePackData({
-      recipes: [makeImportRecipe('r-ok1'), makeImportRecipe('r-bad'), makeImportRecipe('r-ok2')]
+      recipes: [makeImportRecipe('r-ok1'), makeImportRecipe('r-bad'), makeImportRecipe('r-ok2')],
     })
   );
 
@@ -1007,7 +1175,11 @@ test('#776: a mid-loop recipe throw still yields exactly one save and isolates t
     ['r-bad'],
     'only the throwing recipe lands in errors[]'
   );
-  assert.equal(saveCalls.length, 1, 'the loop always reaches the single batch save despite the mid-loop throw');
+  assert.equal(
+    saveCalls.length,
+    1,
+    'the loop always reaches the single batch save despite the mid-loop throw'
+  );
 });
 
 test('#776: the per-run pack lookup is method-local and re-derived on a second import (no stale cache)', async () => {
@@ -1018,7 +1190,7 @@ test('#776: the per-run pack lookup is method-local and re-derived on a second i
     getIndex: async () => {
       getIndexCalls += 1;
       return []; // no matching entry: component stays unresolved, exercising the scan path
-    }
+    },
   };
   resetGame({ packs: [pack] });
   globalThis.fromUuid = async () => null; // exact miss: source+name search runs
@@ -1031,7 +1203,11 @@ test('#776: the per-run pack lookup is method-local and re-derived on a second i
   assert.equal(getIndexCalls, 1, 'run 1 builds the pack lookup once');
 
   await importer.importFromPackData(makePackData({ recipes: [] }));
-  assert.equal(getIndexCalls, 2, 'run 2 re-invokes getIndex, so the lookup did not leak across runs');
+  assert.equal(
+    getIndexCalls,
+    2,
+    'run 2 re-invokes getIndex, so the lookup did not leak across runs'
+  );
 });
 
 test('#776: the pack lookup resolves a source+name match with a single getIndex per pack', async () => {
@@ -1042,9 +1218,13 @@ test('#776: the pack lookup resolves a source+name match with a single getIndex 
     getIndex: async () => {
       getIndexCalls += 1;
       return [
-        { _id: 'abc', name: 'Iron Ore', _stats: { compendiumSource: 'Compendium.source.items.iron-ore' } }
+        {
+          _id: 'abc',
+          name: 'Iron Ore',
+          _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+        },
       ];
-    }
+    },
   };
   resetGame({ packs: [pack] });
   globalThis.fromUuid = async () => null;
@@ -1060,13 +1240,17 @@ test('#776: the pack lookup resolves a source+name match with a single getIndex 
       system: {
         id: 'test-system',
         name: 'Test System',
-        components: [makeComponent(), makeComponent({ id: 'comp2', name: 'Iron Ore' })]
-      }
+        components: [makeComponent(), makeComponent({ id: 'comp2', name: 'Iron Ore' })],
+      },
     })
   );
 
   assert.equal(getIndexCalls, 1, 'the pack index is built once and reused across both components');
-  assert.equal(summary.components.remapped.length, 2, 'both components resolved via the source+name lookup');
+  assert.equal(
+    summary.components.remapped.length,
+    2,
+    'both components resolved via the source+name lookup'
+  );
   for (const remap of summary.components.remapped) {
     assert.equal(remap.method, 'sourceName');
     assert.equal(remap.newUuid, 'Compendium.world.items.abc');
@@ -1099,9 +1283,9 @@ test('#776: default progress reporter degrades safely for stub / undefined / thr
         info: () => ({
           update: () => {
             throw new Error('not yet rendered');
-          }
-        })
-      }
+          },
+        }),
+      },
     };
     const r3 = createDefaultProgressReporter();
     assert.doesNotThrow(() => {
@@ -1129,8 +1313,8 @@ test('#776: default progress reporter opens one toast and drives it to pct:1', (
         info: (msg, opts) => {
           infoCalls.push({ msg, opts });
           return handle;
-        }
-      }
+        },
+      },
     };
 
     const report = createDefaultProgressReporter();
@@ -1166,7 +1350,7 @@ test('#776: import emits progress at phase boundaries, ticks through recipes, an
   const systemManager = makeMockSystemManager({});
   const recipeManager = makeMockRecipeManager({ saveCalls });
   const importer = new CompendiumImporter(systemManager, recipeManager, {
-    reportProgress: (u) => updates.push(u)
+    reportProgress: (u) => updates.push(u),
   });
 
   const recipes = Array.from({ length: 12 }, (_, i) => makeImportRecipe(`r${i}`));
@@ -1200,7 +1384,7 @@ function makeRejectingSystemManager(bootError) {
     },
     updateSystem: async () => {
       throw new Error('updateSystem should not run on a fresh-system import');
-    }
+    },
   };
 }
 
@@ -1214,7 +1398,7 @@ test('#794: a throw after the pct:0 start emit dismisses the toast and re-throws
     update: () => {},
     remove: () => {
       removeCalls.push(Date.now());
-    }
+    },
   };
   globalThis.ui = { notifications: { info: () => handle, warn() {}, error() {} } };
 
@@ -1235,8 +1419,16 @@ test('#794: a throw after the pct:0 start emit dismisses the toast and re-throws
 
     // Both effects proven on one run: the toast is dismissed AND the original error
     // instance propagates. Asserting only rejection would survive removing the fix.
-    assert.equal(removeCalls.length, 1, 'the still-open progress toast was dismissed exactly once on the throw path');
-    assert.equal(caught, bootError, 'the ORIGINAL error instance propagates unchanged (not wrapped)');
+    assert.equal(
+      removeCalls.length,
+      1,
+      'the still-open progress toast was dismissed exactly once on the throw path'
+    );
+    assert.equal(
+      caught,
+      bootError,
+      'the ORIGINAL error instance propagates unchanged (not wrapped)'
+    );
   } finally {
     globalThis.ui = savedUi;
   }
@@ -1253,11 +1445,11 @@ test('#794: a removal throw during dismissal does not mask the original import e
         update: () => {},
         remove: () => {
           throw new Error('remove blew up');
-        }
+        },
       }),
       warn() {},
-      error() {}
-    }
+      error() {},
+    },
   };
 
   try {
@@ -1293,7 +1485,7 @@ test('#794: reporter dismiss() is a no-op on the completed (pct:1) path and when
       update: () => {},
       remove: () => {
         removeCalls.push(1);
-      }
+      },
     };
     globalThis.ui = { notifications: { info: () => handle } };
 
@@ -1323,7 +1515,7 @@ test('#794: reporter dismiss() removes an incomplete toast exactly once across r
       update: () => {},
       remove: () => {
         removeCalls.push(1);
-      }
+      },
     };
     globalThis.ui = { notifications: { info: () => handle } };
 
@@ -1333,7 +1525,11 @@ test('#794: reporter dismiss() removes an incomplete toast exactly once across r
     reporter.dismiss();
     reporter.dismiss();
     reporter.dismiss();
-    assert.equal(removeCalls.length, 1, 'an incomplete toast is removed once; dismiss() is idempotent');
+    assert.equal(
+      removeCalls.length,
+      1,
+      'an incomplete toast is removed once; dismiss() is idempotent'
+    );
   } finally {
     globalThis.ui = savedUi;
   }
@@ -1361,9 +1557,9 @@ test('#794: reporter dismiss() degrades safely for undefined / remove-less / thr
           update: () => {},
           remove: () => {
             throw new Error('not yet rendered');
-          }
-        })
-      }
+          },
+        }),
+      },
     };
     const r3 = createDefaultProgressReporter();
     r3({ pct: 0 });
@@ -1391,8 +1587,8 @@ test('#776: the default progress reporter opens a FRESH toast on each run of a r
         return undefined; // stub handle: exercises the undefined-handle guard too
       },
       warn() {},
-      error() {}
-    }
+      error() {},
+    },
   };
 
   try {
@@ -1430,8 +1626,8 @@ test('#776: a nonzero run where every recipe is skipped writes nothing (imported
     saveCalls,
     existingRecipes: {
       'r-a': { id: 'r-a', name: 'A' },
-      'r-b': { id: 'r-b', name: 'B' }
-    }
+      'r-b': { id: 'r-b', name: 'B' },
+    },
   });
   const importer = new CompendiumImporter(systemManager, recipeManager);
 
@@ -1449,11 +1645,21 @@ test('#776: a nonzero run where every recipe is skipped writes nothing (imported
 // #775 — provenance-aware pruning of recipes removed from import payloads
 // ---------------------------------------------------------------------------
 
-const PRUNE_DELETE_OPTIONS = { notify: false, emitChange: false, persist: false, cleanupFlags: false };
+const PRUNE_DELETE_OPTIONS = {
+  notify: false,
+  emitChange: false,
+  persist: false,
+  cleanupFlags: false,
+};
 
 // Shared overwrite scenario builder so the per-test setup does not repeat the
 // existing-system + stateful-manager wiring (keeps new-code duplication down).
-function makeOverwriteScenario({ systemId = 'test-system', persistedRecipes = [], payloadRecipeIds = [], throwOnRecipeIds = [] } = {}) {
+function makeOverwriteScenario({
+  systemId = 'test-system',
+  persistedRecipes = [],
+  payloadRecipeIds = [],
+  throwOnRecipeIds = [],
+} = {}) {
   const existingSystem = { id: systemId, name: 'Test System', components: [] };
   const recorders = {
     createdRecipes: [],
@@ -1463,14 +1669,14 @@ function makeOverwriteScenario({ systemId = 'test-system', persistedRecipes = []
     getRecipesCalls: [],
     notifyDetails: [],
     saveCalls: [],
-    cleanupCalls: []
+    cleanupCalls: [],
   };
   const systemManager = makeMockSystemManager({ systems: [existingSystem] });
   const recipeManager = makeMockRecipeManager({ persistedRecipes, throwOnRecipeIds, ...recorders });
   const importer = new CompendiumImporter(systemManager, recipeManager);
   const packData = makePackData({
     system: { id: systemId, name: 'Test System', components: [] },
-    recipes: payloadRecipeIds.map((id) => makeImportRecipe(id))
+    recipes: payloadRecipeIds.map((id) => makeImportRecipe(id)),
   });
   return { importer, packData, recipeManager, recorders, systemId };
 }
@@ -1484,9 +1690,14 @@ test('#775 Q1: unprovenanced and foreign-provenance orphans are reported, never 
     systemId,
     persistedRecipes: [
       { id: 'gm-authored', name: 'GM Authored', craftingSystemId: systemId, importSource: null },
-      { id: 'from-other-pack', name: 'Other Pack', craftingSystemId: systemId, importSource: { systemId: 'other-pack', importedAt: 5 } }
+      {
+        id: 'from-other-pack',
+        name: 'Other Pack',
+        craftingSystemId: systemId,
+        importSource: { systemId: 'other-pack', importedAt: 5 },
+      },
     ],
-    payloadRecipeIds: [] // the payload ships nothing: both persisted recipes are orphan candidates
+    payloadRecipeIds: [], // the payload ships nothing: both persisted recipes are orphan candidates
   });
 
   const summary = await importer.importFromPackData(packData, { overwriteExisting: true });
@@ -1496,12 +1707,25 @@ test('#775 Q1: unprovenanced and foreign-provenance orphans are reported, never 
   assert.deepEqual(
     summary.orphans.sort((a, b) => a.recipeId.localeCompare(b.recipeId)),
     [
-      { recipeId: 'from-other-pack', recipeName: 'Other Pack', disposition: 'reported', reason: 'foreignProvenance' },
-      { recipeId: 'gm-authored', recipeName: 'GM Authored', disposition: 'reported', reason: 'unprovenanced' }
+      {
+        recipeId: 'from-other-pack',
+        recipeName: 'Other Pack',
+        disposition: 'reported',
+        reason: 'foreignProvenance',
+      },
+      {
+        recipeId: 'gm-authored',
+        recipeName: 'GM Authored',
+        disposition: 'reported',
+        reason: 'unprovenanced',
+      },
     ]
   );
   // Non-deletion asserted directly: both remain enumerable.
-  const remainingIds = recipeManager.getRecipes({ craftingSystemId: systemId }).map((r) => r.id).sort();
+  const remainingIds = recipeManager
+    .getRecipes({ craftingSystemId: systemId })
+    .map((r) => r.id)
+    .sort();
   assert.deepEqual(remainingIds, ['from-other-pack', 'gm-authored']);
 });
 
@@ -1513,22 +1737,35 @@ test('#775 Q2: pruning is idempotent — a second identical reinstall prunes not
   const { importer, packData, recipeManager, recorders } = makeOverwriteScenario({
     systemId,
     persistedRecipes: [
-      { id: 'keep', name: 'Keep', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } },
-      { id: 'drop', name: 'Drop', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } }
+      {
+        id: 'keep',
+        name: 'Keep',
+        craftingSystemId: systemId,
+        importSource: { systemId, importedAt: 1 },
+      },
+      {
+        id: 'drop',
+        name: 'Drop',
+        craftingSystemId: systemId,
+        importSource: { systemId, importedAt: 1 },
+      },
     ],
-    payloadRecipeIds: ['keep'] // 'drop' is a provenance-matched orphan on the first run
+    payloadRecipeIds: ['keep'], // 'drop' is a provenance-matched orphan on the first run
   });
 
   const first = await importer.importFromPackData(packData, { overwriteExisting: true });
   assert.equal(first.recipes.pruned, 1, 'the provenance-matched dropped recipe is pruned once');
   assert.deepEqual(first.orphans, [
-    { recipeId: 'drop', recipeName: 'Drop', disposition: 'pruned', reason: 'provenanceMatched' }
+    { recipeId: 'drop', recipeName: 'Drop', disposition: 'pruned', reason: 'provenanceMatched' },
   ]);
   assert.deepEqual(recorders.deletedRecipeIds, ['drop']);
   // F1 guard: the prune delete uses the batch-fold option shape.
   assert.deepEqual(recorders.deleteRecipeOptions, [PRUNE_DELETE_OPTIONS]);
   assert.equal(recipeManager.getRecipe('drop'), null, 'the pruned recipe is gone from the map');
-  assert.ok(recipeManager.getRecipe('keep'), 'the payload-present provenance-matched recipe survives');
+  assert.ok(
+    recipeManager.getRecipe('keep'),
+    'the payload-present provenance-matched recipe survives'
+  );
 
   const second = await importer.importFromPackData(packData, { overwriteExisting: true });
   assert.equal(second.recipes.pruned, 0, 're-running the identical payload prunes nothing more');
@@ -1546,10 +1783,15 @@ test('#775 Q4: a payload recipe whose overwrite throws is never pruned (absent-s
     // Provenance-MATCHED so it would be pruned if the absent-set were (wrongly) derived
     // from the imported ids instead of ALL payload ids.
     persistedRecipes: [
-      { id: 'r-throwme', name: 'Throws', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } }
+      {
+        id: 'r-throwme',
+        name: 'Throws',
+        craftingSystemId: systemId,
+        importSource: { systemId, importedAt: 1 },
+      },
     ],
     payloadRecipeIds: ['r-throwme'],
-    throwOnRecipeIds: ['r-throwme']
+    throwOnRecipeIds: ['r-throwme'],
   });
 
   const summary = await importer.importFromPackData(packData, { overwriteExisting: true });
@@ -1573,7 +1815,9 @@ test('#775 Q6: the importer re-stamps a stale/foreign inbound importSource to th
 
   const summary = await importer.importFromPackData(
     makePackData({
-      recipes: [makeImportRecipe('r1', { importSource: { systemId: 'foreign-pack', importedAt: 999 } })]
+      recipes: [
+        makeImportRecipe('r1', { importSource: { systemId: 'foreign-pack', importedAt: 999 } }),
+      ],
     })
   );
 
@@ -1602,7 +1846,11 @@ test('#775 Q8: a copy-mode / fresh-system import never enters the prune path (no
 
   assert.equal(summary.recipes.pruned, 0);
   assert.deepEqual(summary.orphans, []);
-  assert.equal(getRecipesCalls.length, 0, 'no prune enumeration when there is no existing system to overwrite');
+  assert.equal(
+    getRecipesCalls.length,
+    0,
+    'no prune enumeration when there is no existing system to overwrite'
+  );
   assert.equal(deletedRecipeIds.length, 0);
 });
 
@@ -1621,7 +1869,11 @@ test('#775 Q8b: an existing system imported WITHOUT overwrite never enters the p
 
   assert.equal(summary.system.skipped, true, 'the existing system is skipped before Phase 4');
   assert.equal(summary.recipes.pruned, 0);
-  assert.equal(getRecipesCalls.length, 0, 'the other false-limb of the prune gate also never enumerates');
+  assert.equal(
+    getRecipesCalls.length,
+    0,
+    'the other false-limb of the prune gate also never enumerates'
+  );
   assert.equal(deletedRecipeIds.length, 0);
 });
 
@@ -1633,14 +1885,18 @@ test('#775 Q10: an overwrite that imports nothing and prunes nothing issues zero
   const { importer, packData, recorders } = makeOverwriteScenario({
     systemId,
     persistedRecipes: [], // nothing to prune
-    payloadRecipeIds: [] // nothing to import
+    payloadRecipeIds: [], // nothing to import
   });
 
   const summary = await importer.importFromPackData(packData, { overwriteExisting: true });
 
   assert.equal(summary.recipes.imported, 0);
   assert.equal(summary.recipes.pruned, 0);
-  assert.equal(recorders.saveCalls.length, 0, 'the widened gate still writes nothing when nothing changed');
+  assert.equal(
+    recorders.saveCalls.length,
+    0,
+    'the widened gate still writes nothing when nothing changed'
+  );
   assert.equal(recorders.cleanupCalls.length, 0, 'no bulk flag cleanup when nothing was pruned');
 });
 
@@ -1652,21 +1908,43 @@ test('#775 Q11 + prune-only reinstall: imported:0 & pruned>0 writes once, runs o
   const { importer, packData, recorders } = makeOverwriteScenario({
     systemId,
     persistedRecipes: [
-      { id: 'drop-1', name: 'Drop One', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } },
-      { id: 'drop-2', name: 'Drop Two', craftingSystemId: systemId, importSource: { systemId, importedAt: 1 } }
+      {
+        id: 'drop-1',
+        name: 'Drop One',
+        craftingSystemId: systemId,
+        importSource: { systemId, importedAt: 1 },
+      },
+      {
+        id: 'drop-2',
+        name: 'Drop Two',
+        craftingSystemId: systemId,
+        importSource: { systemId, importedAt: 1 },
+      },
     ],
-    payloadRecipeIds: [] // a prune-only reinstall: drops recipes, adds none
+    payloadRecipeIds: [], // a prune-only reinstall: drops recipes, adds none
   });
 
   const summary = await importer.importFromPackData(packData, { overwriteExisting: true });
 
   assert.equal(summary.recipes.imported, 0, 'a prune-only reinstall imports nothing');
   assert.equal(summary.recipes.pruned, 2, 'both provenance-matched dropped recipes are pruned');
-  assert.equal(recorders.saveCalls.length, 1, 'the widened gate persists the prune-only reinstall exactly once');
-  assert.equal(recorders.cleanupCalls.length, 1, 'exactly one bulk actor-flag cleanup pass for the whole prune batch');
+  assert.equal(
+    recorders.saveCalls.length,
+    1,
+    'the widened gate persists the prune-only reinstall exactly once'
+  );
+  assert.equal(
+    recorders.cleanupCalls.length,
+    1,
+    'exactly one bulk actor-flag cleanup pass for the whole prune batch'
+  );
   // Q11: the change notification carries the pruned count.
   assert.equal(recorders.notifyDetails.length, 1);
-  assert.equal(recorders.notifyDetails[0].pruned, 2, 'notifyRecipesChanged details carry the pruned count');
+  assert.equal(
+    recorders.notifyDetails[0].pruned,
+    2,
+    'notifyRecipesChanged details carry the pruned count'
+  );
 });
 
 test('#775 Q5: the reporter’s stale Mythwright ids — reported-only while unprovenanced, auto-pruned once provenance-stamped', async () => {
@@ -1682,27 +1960,46 @@ test('#775 Q5: the reporter’s stale Mythwright ids — reported-only while unp
   const recipeManager = makeMockRecipeManager({
     deletedRecipeIds,
     persistedRecipes: [
-      { id: 'myRcpSmeltIronIngot1', name: 'Smelt Iron Ingot', craftingSystemId: systemId, importSource: null },
-      { id: 'myRcpRefineSteelIngt', name: 'Refine Steel Ingot', craftingSystemId: systemId, importSource: null }
-    ]
+      {
+        id: 'myRcpSmeltIronIngot1',
+        name: 'Smelt Iron Ingot',
+        craftingSystemId: systemId,
+        importSource: null,
+      },
+      {
+        id: 'myRcpRefineSteelIngt',
+        name: 'Refine Steel Ingot',
+        craftingSystemId: systemId,
+        importSource: null,
+      },
+    ],
   });
   const importer = new CompendiumImporter(systemManager, recipeManager);
 
-  const dropAllPack = makePackData({ system: { id: systemId, name: 'Mythwright', components: [] }, recipes: [] });
+  const dropAllPack = makePackData({
+    system: { id: systemId, name: 'Mythwright', components: [] },
+    recipes: [],
+  });
   const shipBothPack = makePackData({
     system: { id: systemId, name: 'Mythwright', components: [] },
-    recipes: [makeImportRecipe('myRcpSmeltIronIngot1'), makeImportRecipe('myRcpRefineSteelIngt')]
+    recipes: [makeImportRecipe('myRcpSmeltIronIngot1'), makeImportRecipe('myRcpRefineSteelIngt')],
   });
 
   // Reinstall #1 (D2 report-only limb): the payload no longer ships the two ids, but
   // they are still unprovenanced legacy rows, so they are reported-only, never removed.
   const first = await importer.importFromPackData(dropAllPack, { overwriteExisting: true });
-  assert.equal(first.recipes.pruned, 0, 'reinstall #1 prunes nothing (the stale ids are unprovenanced)');
+  assert.equal(
+    first.recipes.pruned,
+    0,
+    'reinstall #1 prunes nothing (the stale ids are unprovenanced)'
+  );
   assert.deepEqual(
-    first.orphans.map((o) => ({ recipeId: o.recipeId, disposition: o.disposition, reason: o.reason })).sort((a, b) => a.recipeId.localeCompare(b.recipeId)),
+    first.orphans
+      .map((o) => ({ recipeId: o.recipeId, disposition: o.disposition, reason: o.reason }))
+      .sort((a, b) => a.recipeId.localeCompare(b.recipeId)),
     [
       { recipeId: 'myRcpRefineSteelIngt', disposition: 'reported', reason: 'unprovenanced' },
-      { recipeId: 'myRcpSmeltIronIngot1', disposition: 'reported', reason: 'unprovenanced' }
+      { recipeId: 'myRcpSmeltIronIngot1', disposition: 'reported', reason: 'unprovenanced' },
     ],
     'both legacy ids are report-only on the first post-fix reinstall'
   );
@@ -1719,12 +2016,18 @@ test('#775 Q5: the reporter’s stale Mythwright ids — reported-only while unp
   const second = await importer.importFromPackData(dropAllPack, { overwriteExisting: true });
   assert.equal(second.recipes.pruned, 2, 'the now-provenanced dropped ids are auto-pruned');
   assert.deepEqual(
-    second.orphans.map((o) => ({ recipeId: o.recipeId, disposition: o.disposition, reason: o.reason })).sort((a, b) => a.recipeId.localeCompare(b.recipeId)),
+    second.orphans
+      .map((o) => ({ recipeId: o.recipeId, disposition: o.disposition, reason: o.reason }))
+      .sort((a, b) => a.recipeId.localeCompare(b.recipeId)),
     [
       { recipeId: 'myRcpRefineSteelIngt', disposition: 'pruned', reason: 'provenanceMatched' },
-      { recipeId: 'myRcpSmeltIronIngot1', disposition: 'pruned', reason: 'provenanceMatched' }
+      { recipeId: 'myRcpSmeltIronIngot1', disposition: 'pruned', reason: 'provenanceMatched' },
     ]
   );
   assert.deepEqual(deletedRecipeIds.sort(), ['myRcpRefineSteelIngt', 'myRcpSmeltIronIngot1']);
-  assert.equal(recipeManager.getRecipes({ craftingSystemId: systemId }).length, 0, 'both stale recipes are gone from the world');
+  assert.equal(
+    recipeManager.getRecipes({ craftingSystemId: systemId }).length,
+    0,
+    'both stale recipes are gone from the world'
+  );
 });

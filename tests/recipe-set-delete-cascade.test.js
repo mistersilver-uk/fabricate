@@ -55,7 +55,11 @@ function recipeData(id, overrides = {}) {
       {
         id: `${id}-set`,
         ingredientGroups: [
-          { id: `${id}-grp`, name: 'Ingredients', options: [{ componentId: 'comp-a', quantity: 1 }] },
+          {
+            id: `${id}-grp`,
+            name: 'Ingredients',
+            options: [{ componentId: 'comp-a', quantity: 1 }],
+          },
         ],
         essences: {},
       },
@@ -72,7 +76,10 @@ function multiSetRecipeData(id, overrides = {}) {
   const base = recipeData(id, overrides);
   return {
     ...base,
-    ingredientSets: [...base.ingredientSets, { id: `${id}-set-2`, ingredientGroups: [], essences: {} }],
+    ingredientSets: [
+      ...base.ingredientSets,
+      { id: `${id}-set-2`, ingredientGroups: [], essences: {} },
+    ],
   };
 }
 
@@ -87,7 +94,11 @@ function bookDefinition(id, recipeIds = []) {
   };
 }
 
-function systemData({ definitions = [bookDefinition('book-a'), bookDefinition('book-b')], marker = true, resolutionMode = 'simple' } = {}) {
+function systemData({
+  definitions = [bookDefinition('book-a'), bookDefinition('book-b')],
+  marker = true,
+  resolutionMode = 'simple',
+} = {}) {
   const system = {
     id: SYSTEM_ID,
     name: 'Arcana',
@@ -216,7 +227,10 @@ describe('CraftingSystemManager.deleteRecipes — the bounded write', () => {
   it('issues ONE write of each setting, ONE flag pass and BOTH change hooks', async () => {
     const fixture = makeFixture({
       system: systemData({
-        definitions: [bookDefinition('book-a', ['r1', 'r2', 'r3']), bookDefinition('book-b', ['r2'])],
+        definitions: [
+          bookDefinition('book-a', ['r1', 'r2', 'r3']),
+          bookDefinition('book-b', ['r2']),
+        ],
       }),
       actors: [learnerActor('a1', ['r1']), learnerActor('a2', ['r1', 'r2'])],
     });
@@ -356,7 +370,9 @@ describe('CraftingSystemManager.deleteRecipes — the membership prune', () => {
     // `persisted === true || some(def.recipeIds.length > 0)`, so after this prune the
     // inference yields FALSE and only the persisted `true` carries the basis forward.
     const fixture = makeFixture({
-      system: systemData({ definitions: [bookDefinition('book-a', ['r1']), bookDefinition('book-b')] }),
+      system: systemData({
+        definitions: [bookDefinition('book-a', ['r1']), bookDefinition('book-b')],
+      }),
     });
 
     await fixture.manager.deleteRecipes(SYSTEM_ID, ['r1']);
@@ -368,7 +384,11 @@ describe('CraftingSystemManager.deleteRecipes — the membership prune', () => {
       'the fixture shape is pinned: no non-empty array survives, so the inference would say false'
     );
     assert.equal(system.membershipResolvesByRecipeIds, true, 'the normalized in-memory marker');
-    assert.equal(fixture.persistedSystem().membershipResolvesByRecipeIds, true, 'and the persisted one');
+    assert.equal(
+      fixture.persistedSystem().membershipResolvesByRecipeIds,
+      true,
+      'and the persisted one'
+    );
   });
 
   it('does not FLIP a legacy-basis system, and rewrites nothing there', async () => {
@@ -492,7 +512,11 @@ describe('the resolution-mode migration calls the SET form once', () => {
     await fixture.manager.updateSystem(SYSTEM_ID, { resolutionMode: 'simple' });
 
     assert.deepEqual(fixture.persistedRecipeIds(), [], 'both un-migratable recipes went');
-    assert.equal(fixture.writesOf(SETTING_KEYS.RECIPES), 1, 'one `recipes` write for the whole set');
+    assert.equal(
+      fixture.writesOf(SETTING_KEYS.RECIPES),
+      1,
+      'one `recipes` write for the whole set'
+    );
     assert.equal(fixture.flagPasses(), 1, 'one learned-recipes flag pass for the whole set');
 
     // `updateSystem` persists the merged system BEFORE the migration runs, so the claim is

@@ -305,7 +305,10 @@ const SITE_MAPPING = [
     file: 'src/systems/CraftingEngine.js',
     accessor: 'setStackQuantity',
     sites: 2,
-    anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, result\.quantity\);/],
+    anchors: [
+      /setStackQuantity\(itemData, qty\);/,
+      /setStackQuantity\(itemData, result\.quantity\);/,
+    ],
   },
   {
     site: 'CraftingEngine decrement writes on the four delete sites',
@@ -466,9 +469,7 @@ const SITE_MAPPING = [
     // all, so the award creates a second document instead of authoring a count field on an
     // item type that has none.
     absentDefault: null,
-    anchors: [
-      /readStoredStackQuantity\(target, \{ absentDefault: null, path: quantityPath \}\)/,
-    ],
+    anchors: [/readStoredStackQuantity\(target, \{ absentDefault: null, path: quantityPath \}\)/],
   },
   {
     site: 'companionComponentAward stack write',
@@ -586,7 +587,10 @@ describe('the per-site accessor mapping', () => {
   it('matches live src/** occurrence-for-occurrence, in both directions', () => {
     // THE load-bearing assertion of this whole table. Un-routing a site, adding a new one
     // in a file the table does not name, or moving a site between files all red here.
-    assert.deepEqual(asSortedPairs(countAccessorCallSites()), asSortedPairs(declaredAccessorCallSites()));
+    assert.deepEqual(
+      asSortedPairs(countAccessorCallSites()),
+      asSortedPairs(declaredAccessorCallSites())
+    );
   });
 
   it('pins every row of a multi-row file to the source snippet it serves', () => {
@@ -1120,9 +1124,8 @@ describe('the accessor never reaches for a Foundry global', () => {
 // Registration: the per-system default overlay, and the player-write guardrail.
 // ---------------------------------------------------------------------------
 
-const { registerFabricateSettings, SETTING_KEYS, WORLD_SCOPED_SETTING_KEYS } = await import(
-  '../src/config/settings.js'
-);
+const { registerFabricateSettings, SETTING_KEYS, WORLD_SCOPED_SETTING_KEYS } =
+  await import('../src/config/settings.js');
 const { makeSettingsSeam } = await import('./helpers/settings.js');
 
 /** Register against a `game` stub and hand back the captured definitions. */
@@ -1155,7 +1158,11 @@ describe('the item stack-quantity path setting', () => {
     assert.equal(entry.definition.config, true);
     assert.equal(entry.definition.type, String);
     assert.equal(entry.definition.choices, undefined, 'free text, never a choices dropdown');
-    assert.equal(entry.definition.onChange, undefined, 'no onChange — the shared listener drives it');
+    assert.equal(
+      entry.definition.onChange,
+      undefined,
+      'no onChange — the shared listener drives it'
+    );
   });
 
   it('overlays the ACTIVE system default without mutating the frozen base definition', () => {
@@ -1213,12 +1220,14 @@ describe('the item stack-quantity path setting', () => {
   it('localizes every key the setting and its advisories use', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const lang = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8')
-    );
+    const lang = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
     const strings = lang.FABRICATE.Settings.ItemStackQuantityPath;
     for (const key of ['Name', 'Hint', 'Unresolved', 'UnresolvedAtDefault', 'SchemaDiscard']) {
-      assert.equal(typeof strings?.[key], 'string', `missing FABRICATE…ItemStackQuantityPath.${key}`);
+      assert.equal(
+        typeof strings?.[key],
+        'string',
+        `missing FABRICATE…ItemStackQuantityPath.${key}`
+      );
     }
     assert.match(strings.Hint, /\{default}/, 'the hint interpolates the active default');
     // The probe advisories are the remaining defence against a typo destroying stacks, so
@@ -1250,8 +1259,16 @@ describe('the item stack-quantity path setting', () => {
     assert.match(copy, /delete/i, 'and still names the consequence');
     // The two halves of the conditional, which is the whole point of this third string:
     // the benign reading has to be offered, and the destructive one has to be hedged.
-    assert.match(copy, /no stackable items yet|has no stackable items/i, 'offers the benign reading');
-    assert.match(copy, /\bif your items do carry stack counts\b/i, 'and hedges the destructive one');
+    assert.match(
+      copy,
+      /no stackable items yet|has no stackable items/i,
+      'offers the benign reading'
+    );
+    assert.match(
+      copy,
+      /\bif your items do carry stack counts\b/i,
+      'and hedges the destructive one'
+    );
     // The retired copy told a GM already on the default to change the setting to the
     // value it already had, and asserted destruction that was not happening.
     assert.equal(
@@ -1361,7 +1378,8 @@ describe('main.js wiring', () => {
 
   it('also runs the probe from the ready pass', async () => {
     const source = await mainSource;
-    const occurrences = source.split('applyItemStackQuantityPathSetting({ notify: true })').length - 1;
+    const occurrences =
+      source.split('applyItemStackQuantityPathSetting({ notify: true })').length - 1;
     assert.equal(occurrences, 2, 'the setting listener AND the ready pass');
   });
 });

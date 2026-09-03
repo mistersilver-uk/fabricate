@@ -5,14 +5,18 @@ import {
   buildLocationSummaryForViewer,
   buildRealmDisclosure,
   buildTravelGuidance,
-  evaluateLocationAvailability
+  evaluateLocationAvailability,
 } from '../src/systems/gatheringLocation.js';
 
 const secretRealm = { id: 'r-secret', name: 'Hidden Vale', secret: true };
 const openRealm = { id: 'r-open', name: 'Verdant Expanse', secret: false };
 
 test('secret undiscovered realm for a non-GM ⇒ id:null + placeholder, never the secret name/id', () => {
-  const disclosure = buildRealmDisclosure(secretRealm, { isGM: false, discovered: false, revealMode: 'manual' });
+  const disclosure = buildRealmDisclosure(secretRealm, {
+    isGM: false,
+    discovered: false,
+    revealMode: 'manual',
+  });
   assert.equal(disclosure.id, null);
   assert.equal(disclosure.placeholder, true);
   assert.equal(disclosure.secret, true);
@@ -23,28 +27,44 @@ test('secret undiscovered realm for a non-GM ⇒ id:null + placeholder, never th
 });
 
 test('GM sees the full secret realm', () => {
-  const disclosure = buildRealmDisclosure(secretRealm, { isGM: true, discovered: false, revealMode: 'manual' });
+  const disclosure = buildRealmDisclosure(secretRealm, {
+    isGM: true,
+    discovered: false,
+    revealMode: 'manual',
+  });
   assert.equal(disclosure.id, 'r-secret');
   assert.equal(disclosure.label, 'Hidden Vale');
   assert.equal(disclosure.placeholder, false);
 });
 
 test('discovered secret realm discloses its name to a non-GM', () => {
-  const disclosure = buildRealmDisclosure(secretRealm, { isGM: false, discovered: true, revealMode: 'manual' });
+  const disclosure = buildRealmDisclosure(secretRealm, {
+    isGM: false,
+    discovered: true,
+    revealMode: 'manual',
+  });
   assert.equal(disclosure.id, 'r-secret');
   assert.equal(disclosure.label, 'Hidden Vale');
   assert.equal(disclosure.placeholder, false);
 });
 
 test('alwaysVisible reveal mode discloses a secret realm without discovery', () => {
-  const disclosure = buildRealmDisclosure(secretRealm, { isGM: false, discovered: false, revealMode: 'alwaysVisible' });
+  const disclosure = buildRealmDisclosure(secretRealm, {
+    isGM: false,
+    discovered: false,
+    revealMode: 'alwaysVisible',
+  });
   assert.equal(disclosure.id, 'r-secret');
   assert.equal(disclosure.label, 'Hidden Vale');
   assert.equal(disclosure.placeholder, false);
 });
 
 test('non-secret realm always discloses', () => {
-  const disclosure = buildRealmDisclosure(openRealm, { isGM: false, discovered: false, revealMode: 'manual' });
+  const disclosure = buildRealmDisclosure(openRealm, {
+    isGM: false,
+    discovered: false,
+    revealMode: 'manual',
+  });
   assert.equal(disclosure.id, 'r-open');
   assert.equal(disclosure.label, 'Verdant Expanse');
 });
@@ -58,7 +78,7 @@ test('guidance state noCurrentRealm carries set-realm guidance and no destinatio
     currentRealmContext: { resolved: false, realms: [] },
     availability,
     discoveredRealmIds: new Set(),
-    isGM: false
+    isGM: false,
   });
   assert.equal(guidance.state, 'noCurrentRealm');
   assert.deepEqual(guidance.knownDestinations, []);
@@ -71,11 +91,14 @@ test('guidance distinguishes exclusion from travel and counts undiscovered secre
   const availability = evaluateLocationAvailability(env, context);
   const guidance = buildTravelGuidance({
     environment: env,
-    realmsById: new Map([[openRealm.id, openRealm], [secretRealm.id, secretRealm]]),
+    realmsById: new Map([
+      [openRealm.id, openRealm],
+      [secretRealm.id, secretRealm],
+    ]),
     currentRealmContext: context,
     availability,
     discoveredRealmIds: new Set(),
-    isGM: false
+    isGM: false,
   });
   assert.equal(guidance.state, 'excluded');
   assert.equal(guidance.knownDestinations.length, 1);
@@ -94,7 +117,7 @@ test('guidance lists known destination names when not excluded', () => {
     currentRealmContext: context,
     availability,
     discoveredRealmIds: new Set(),
-    isGM: false
+    isGM: false,
   });
   assert.equal(guidance.state, 'travel');
   assert.equal(guidance.knownDestinations[0].label, 'Verdant Expanse');
@@ -107,7 +130,7 @@ const summaryContext = {
   source: 'manualOverride',
   realms: [secretRealm, openRealm],
   realmIds: ['r-secret', 'r-open'],
-  staleRealmIds: ['r-stale']
+  staleRealmIds: ['r-stale'],
 };
 
 test('viewer summary for a non-GM redacts secret undiscovered realms and drops raw ids', () => {
@@ -115,7 +138,7 @@ test('viewer summary for a non-GM redacts secret undiscovered realms and drops r
     context: summaryContext,
     isGM: false,
     revealMode: 'manual',
-    discoveredRealmIds: new Set()
+    discoveredRealmIds: new Set(),
   });
   assert.equal(summary.resolved, true);
   assert.equal(summary.source, 'manualOverride');
@@ -123,11 +146,11 @@ test('viewer summary for a non-GM redacts secret undiscovered realms and drops r
   assert.deepEqual(summary.realmIds, []);
   assert.deepEqual(summary.staleRealmIds, []);
   // Realms come back as disclosure objects; the secret one is a placeholder.
-  const secret = summary.realms.find(realm => realm.placeholder === true);
+  const secret = summary.realms.find((realm) => realm.placeholder === true);
   assert.ok(secret, 'secret undiscovered realm must surface as a placeholder');
   assert.equal(secret.id, null);
   assert.equal(secret.label, undefined);
-  const open = summary.realms.find(realm => realm.id === 'r-open');
+  const open = summary.realms.find((realm) => realm.id === 'r-open');
   assert.equal(open.label, 'Verdant Expanse');
   // The secret name/id never appear anywhere in the serialized summary.
   assert.equal(JSON.stringify(summary).includes('Hidden Vale'), false);
@@ -140,9 +163,9 @@ test('viewer summary for a non-GM discloses a discovered secret realm but still 
     context: summaryContext,
     isGM: false,
     revealMode: 'manual',
-    discoveredRealmIds: new Set(['r-secret'])
+    discoveredRealmIds: new Set(['r-secret']),
   });
-  const secret = summary.realms.find(realm => realm.secret === true);
+  const secret = summary.realms.find((realm) => realm.secret === true);
   assert.equal(secret.id, 'r-secret');
   assert.equal(secret.label, 'Hidden Vale');
   assert.equal(secret.placeholder, false);
@@ -156,12 +179,15 @@ test('viewer summary for a GM exposes full ids and never redacts', () => {
     context: summaryContext,
     isGM: true,
     revealMode: 'manual',
-    discoveredRealmIds: new Set()
+    discoveredRealmIds: new Set(),
   });
   assert.deepEqual(summary.realmIds, ['r-secret', 'r-open']);
   assert.deepEqual(summary.staleRealmIds, ['r-stale']);
-  assert.equal(summary.realms.every(realm => realm.placeholder === false), true);
-  const secret = summary.realms.find(realm => realm.id === 'r-secret');
+  assert.equal(
+    summary.realms.every((realm) => realm.placeholder === false),
+    true
+  );
+  const secret = summary.realms.find((realm) => realm.id === 'r-secret');
   assert.equal(secret.label, 'Hidden Vale');
 });
 

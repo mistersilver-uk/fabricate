@@ -124,11 +124,7 @@ describe('ValidationBanner: renders error list', () => {
   });
 
   it('renders one list item per error', () => {
-    const errors = [
-      { message: 'Error one' },
-      { message: 'Error two' },
-      { message: 'Error three' }
-    ];
+    const errors = [{ message: 'Error one' }, { message: 'Error two' }, { message: 'Error three' }];
     const banner = buildValidationBanner(errors);
     const items = banner.querySelectorAll('.validation-error-list li');
     assert.equal(items.length, 3);
@@ -217,13 +213,19 @@ describe('IngredientGroupCard: group-error class', () => {
     const group = { id: 'group-1', name: 'Group 1' };
     const card = buildIngredientGroupCard(group, true);
     assert.ok(card.classList.contains('ingredient-group-card'), 'Base class should be present');
-    assert.ok(card.classList.contains('group-error'), 'group-error class should be present when hasError=true');
+    assert.ok(
+      card.classList.contains('group-error'),
+      'group-error class should be present when hasError=true'
+    );
   });
 
   it('does not add group-error class when hasError is false', () => {
     const group = { id: 'group-2', name: 'Group 2' };
     const card = buildIngredientGroupCard(group, false);
-    assert.ok(!card.classList.contains('group-error'), 'group-error class should not be present when hasError=false');
+    assert.ok(
+      !card.classList.contains('group-error'),
+      'group-error class should not be present when hasError=false'
+    );
   });
 
   it('has data-group-id attribute set to group id', () => {
@@ -245,13 +247,19 @@ describe('ResultGroupPanel: group-error class', () => {
     const group = { id: 'result-1', name: 'Results' };
     const panel = buildResultGroupPanel(group, true);
     assert.ok(panel.classList.contains('result-group-panel'), 'Base class should be present');
-    assert.ok(panel.classList.contains('group-error'), 'group-error class should be present when hasError=true');
+    assert.ok(
+      panel.classList.contains('group-error'),
+      'group-error class should be present when hasError=true'
+    );
   });
 
   it('does not add group-error class when hasError is false', () => {
     const group = { id: 'result-2', name: 'Results' };
     const panel = buildResultGroupPanel(group, false);
-    assert.ok(!panel.classList.contains('group-error'), 'group-error class should not be present when hasError=false');
+    assert.ok(
+      !panel.classList.contains('group-error'),
+      'group-error class should not be present when hasError=false'
+    );
   });
 
   it('has data-panel-id attribute set to group id', () => {

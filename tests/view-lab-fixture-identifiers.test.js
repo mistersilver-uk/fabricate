@@ -306,15 +306,15 @@ test('the lab seeds game.items from the document index, Items only', async () =>
   const roster = globalThis.game.items.contents;
   assert.ok(
     roster.length > 0,
-    'game.items is empty, so every linked-Item resolution in the lab silently falls back',
+    'game.items is empty, so every linked-Item resolution in the lab silently falls back'
   );
   assert.ok(
     roster.every((document) => String(document?.uuid ?? '').startsWith('Item.')),
-    'an Actor or Scene leaked into the world Item roster',
+    'an Actor or Scene leaked into the world Item roster'
   );
   assert.equal(
     roster.find((document) => document.uuid === 'Item.lab-tool-warped-crucible') ?? null,
     null,
-    'the dangling-link fixture must NOT resolve, or ItemDropZone can never draw `missing`',
+    'the dangling-link fixture must NOT resolve, or ItemDropZone can never draw `missing`'
   );
 });

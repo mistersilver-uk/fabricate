@@ -23,7 +23,7 @@ const harness = createMountedComponentHarness({
     // never renders the field. Membership follows the import graph, not the rendered tree.
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/utils/matchFolderVocabulary.js',
   ],
   compiledModules: [
@@ -54,7 +54,12 @@ const harness = createMountedComponentHarness({
 });
 
 const FOLDERS = [
-  { folderId: 'f1', folderName: 'Reagent', itemCount: 3, itemUuids: ['Item.a', 'Item.b', 'Item.c'] },
+  {
+    folderId: 'f1',
+    folderName: 'Reagent',
+    itemCount: 3,
+    itemUuids: ['Item.a', 'Item.b', 'Item.c'],
+  },
   { folderId: 'f2', folderName: 'Widgets', itemCount: 2, itemUuids: ['Item.d', 'Item.e'] },
 ];
 const VOCAB = { componentCategories: ['Reagent', 'Metal'], itemTags: ['herb', 'rare'] };
@@ -104,7 +109,10 @@ describe('ImportFolderMappingModal (mounted)', () => {
       folders: [{ folderId: 'solo', folderName: 'Solo', itemCount: 1, itemUuids: ['Item.z'] }],
       ...VOCAB,
     });
-    assert.equal(document.querySelector('[data-import-mapping-count]').textContent.trim(), '1 item');
+    assert.equal(
+      document.querySelector('[data-import-mapping-count]').textContent.trim(),
+      '1 item'
+    );
     assert.match(commitButton().textContent, /Import 1 item(?!s)/);
   });
 

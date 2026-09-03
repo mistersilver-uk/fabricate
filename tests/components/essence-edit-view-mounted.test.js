@@ -28,7 +28,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/dropUtils.js',
@@ -151,7 +151,8 @@ function dropMacro(root, payload) {
   Object.defineProperty(event, 'dataTransfer', {
     value: { getData: () => JSON.stringify(payload) },
   });
-  root.querySelector('[data-essence-section="macro"] [data-manager-item-drop-zone]')
+  root
+    .querySelector('[data-essence-section="macro"] [data-manager-item-drop-zone]')
     .dispatchEvent(event);
 }
 
@@ -272,9 +273,7 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
   });
 
   it('explains the both-gates-off state instead of rendering an empty tab', async () => {
-    const root = await harness.mount(
-      props({ showSourceUi: false, showPropertyMacroUi: false })
-    );
+    const root = await harness.mount(props({ showSourceUi: false, showPropertyMacroUi: false }));
     openTab(root, 'oncraft');
 
     assert.ok(root.querySelector('[data-essence-on-craft-empty]'));
@@ -328,7 +327,9 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     // 3. the duplicated `Drop or pick` zone under the linked card is gone. The card IS the
     //    drop target, which is exactly what `ToolOverviewTab` does with the same primitive.
     assert.equal(
-      root.querySelector('[data-essence-section="effect-source"] .manager-essence-source-drop-zone'),
+      root.querySelector(
+        '[data-essence-section="effect-source"] .manager-essence-source-drop-zone'
+      ),
       null,
       'no second drop zone says the same thing twice under the linked card'
     );
@@ -363,11 +364,15 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
 
     const card = root.querySelector('[data-essence-section="macro"] [data-manager-item-drop-zone]');
     const title = card.querySelector('.manager-item-drop-zone-copy strong').textContent.trim();
-    const sublines = [...card.querySelectorAll('.manager-item-drop-zone-copy small')].map(
-      (line) => line.textContent.trim()
+    const sublines = [...card.querySelectorAll('.manager-item-drop-zone-copy small')].map((line) =>
+      line.textContent.trim()
     );
 
-    assert.equal(title, 'Macro.binding', 'an unresolved macro is named by the uuid — its only name');
+    assert.equal(
+      title,
+      'Macro.binding',
+      'an unresolved macro is named by the uuid — its only name'
+    );
     assert.equal(
       sublines.includes(title),
       false,
@@ -392,9 +397,8 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     flushSync();
 
     assert.equal(
-      root
-        .querySelector('[data-essence-section="macro"] [data-manager-item-drop-zone]')
-        .dataset.itemDropState,
+      root.querySelector('[data-essence-section="macro"] [data-manager-item-drop-zone]').dataset
+        .itemDropState,
       'missing',
       'a broken link is otherwise indistinguishable from a working one — and at craft time it is skipped SILENTLY'
     );
@@ -406,14 +410,18 @@ describe('1036 EssenceEditView — tab badges', () => {
   it('counts CONFIGURED behaviours on the On-craft badge, not effects', async () => {
     const root = await harness.mount(props());
     assert.equal(
-      root.querySelector('[data-essence-tab="oncraft"] .manager-editor-tab-badge').textContent.trim(),
+      root
+        .querySelector('[data-essence-tab="oncraft"] .manager-editor-tab-badge')
+        .textContent.trim(),
       '2',
       'a linked source and a linked macro'
     );
 
     await harness.setProps(props({ showPropertyMacroUi: false }));
     assert.equal(
-      root.querySelector('[data-essence-tab="oncraft"] .manager-editor-tab-badge').textContent.trim(),
+      root
+        .querySelector('[data-essence-tab="oncraft"] .manager-editor-tab-badge')
+        .textContent.trim(),
       '1',
       'a gated-off capability cannot be configured from this tab, so it does not count'
     );
@@ -555,9 +563,7 @@ describe('1036 EssenceEditView — tab badges', () => {
 
   it('states the BLOCK when this system holds no membership record, and offers the one fix', async () => {
     globalThis.fromUuid = async () => null;
-    const root = await harness.mount(
-      props({ ...SCOPE_PROPS, scope: scopeWith({}, false) })
-    );
+    const root = await harness.mount(props({ ...SCOPE_PROPS, scope: scopeWith({}, false) }));
     for (let i = 0; i < 6; i += 1) await Promise.resolve();
     flushSync();
 

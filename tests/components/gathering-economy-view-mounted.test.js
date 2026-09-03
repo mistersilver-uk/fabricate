@@ -275,9 +275,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
   });
 
   it('persists config edits and reveals regen + actor controls when stamina is enabled', async () => {
-    const actors = [
-      actor(),
-    ];
+    const actors = [actor()];
     const { services, calls } = makeServices(
       {
         stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } },
@@ -466,9 +464,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
   // `saveAll` writes `Number(draftCurrent) || 0` and absence is simply not a value it can persist.
   // The two are asserted differently for exactly that reason.
   it('clears the max override to null, never hands Current a null, and still steps from the keyboard', async () => {
-    const actors = [
-      actor({ max: 5, maxOverride: 5 }),
-    ];
+    const actors = [actor({ max: 5, maxOverride: 5 })];
     const { services, calls } = makeServices(
       { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
       actors

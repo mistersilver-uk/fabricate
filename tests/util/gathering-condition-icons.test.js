@@ -9,16 +9,19 @@ import {
   WEATHER_ICONS,
   WEATHER_FALLBACK_ICON,
   getWeatherIcon,
-  getWeatherLabelKey
+  getWeatherLabelKey,
 } from '../../src/ui/svelte/util/gatheringConditionIcons.js';
 
 test('TIME_OF_DAY_ICONS maps the four known tags (preserved from adminStore)', () => {
-  assert.deepEqual({ ...TIME_OF_DAY_ICONS }, {
-    dawn: 'fas fa-cloud-sun',
-    day: 'fas fa-sun',
-    dusk: 'fas fa-cloud-moon',
-    night: 'fas fa-moon'
-  });
+  assert.deepEqual(
+    { ...TIME_OF_DAY_ICONS },
+    {
+      dawn: 'fas fa-cloud-sun',
+      day: 'fas fa-sun',
+      dusk: 'fas fa-cloud-moon',
+      night: 'fas fa-moon',
+    }
+  );
 });
 
 test('getTimeOfDayIcon returns the mapped icon for a known tag', () => {
@@ -48,15 +51,18 @@ test('getTimeOfDayLabelKey returns the Unknown key for unknown/absent tags', () 
 });
 
 test('WEATHER_ICONS maps the known tags (preserved from adminStore)', () => {
-  assert.deepEqual({ ...WEATHER_ICONS }, {
-    clear: 'fas fa-sun',
-    cloudy: 'fas fa-cloud',
-    rain: 'fas fa-cloud-rain',
-    storm: 'fas fa-bolt',
-    snow: 'fas fa-snowflake',
-    fog: 'fas fa-smog',
-    wind: 'fas fa-wind'
-  });
+  assert.deepEqual(
+    { ...WEATHER_ICONS },
+    {
+      clear: 'fas fa-sun',
+      cloudy: 'fas fa-cloud',
+      rain: 'fas fa-cloud-rain',
+      storm: 'fas fa-bolt',
+      snow: 'fas fa-snowflake',
+      fog: 'fas fa-smog',
+      wind: 'fas fa-wind',
+    }
+  );
 });
 
 test('getWeatherIcon returns the mapped icon or the cloud-sun fallback', () => {

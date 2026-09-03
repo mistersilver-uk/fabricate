@@ -271,7 +271,7 @@ describe('recipe bulk edit model — countRecipeBookMembership', () => {
   // which takes the basis as a parameter and is therefore basis-aware.
   // `tests/recipe-book-membership-basis.test.js` proves that projection against a real
   // legacy-basis store; this case proves the counter reads it rather than the definition.
-  it('reads each row\'s basis-aware recipeItemIds, never a definition\'s own recipeIds', () => {
+  it("reads each row's basis-aware recipeItemIds, never a definition's own recipeIds", () => {
     const legacyBasisDefinition = { id: 'tome', resolvedName: 'Forgecraft Folio', recipeIds: [] };
     const rows = [membershipRow('r1', ['tome']), membershipRow('r2', ['tome'])];
 

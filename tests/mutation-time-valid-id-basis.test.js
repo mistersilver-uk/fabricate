@@ -52,12 +52,10 @@ const { SETTING_KEYS } = await import('../src/config/settings.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 const { CraftingRunManager } = await import('../src/systems/CraftingRunManager.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
-const { MUTATION_CLEANUP_ENTITY_KINDS, runGatedMutationCleanup } = await import(
-  '../src/systems/mutationCleanupComposition.js'
-);
-const { STARTUP_PASS_ENTITY_KINDS, buildStartupPassList, WHOLE_CORPUS_ID_BASIS } = await import(
-  '../src/systems/startupMaintenance.js'
-);
+const { MUTATION_CLEANUP_ENTITY_KINDS, runGatedMutationCleanup } =
+  await import('../src/systems/mutationCleanupComposition.js');
+const { STARTUP_PASS_ENTITY_KINDS, buildStartupPassList, WHOLE_CORPUS_ID_BASIS } =
+  await import('../src/systems/startupMaintenance.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
@@ -382,7 +380,11 @@ test('an UNDECLARED mutation-time pass is omitted rather than run', async () => 
     warn: (message, detail) => warnings.push(detail),
   });
 
-  assert.deepEqual(ran, ['orphaned learned recipes'], 'the DECLARED pass ran, so the basis is complete');
+  assert.deepEqual(
+    ran,
+    ['orphaned learned recipes'],
+    'the DECLARED pass ran, so the basis is complete'
+  );
   assert.deepEqual(outcome.omitted, ['a pass nobody declared']);
   assert.deepEqual(warnings[0].omitted, [
     { label: 'a pass nobody declared', incompleteKinds: [], undeclared: true },
@@ -609,7 +611,10 @@ test('the preference pass is omitted when component ids are COMPLETE but not CUR
     onOmit: (omission) => omissions.push(omission),
   });
 
-  assert.deepEqual(emitted.map(([label]) => label), ['orphaned learned recipes']);
+  assert.deepEqual(
+    emitted.map(([label]) => label),
+    ['orphaned learned recipes']
+  );
   assert.deepEqual(omissions, [
     {
       label: 'orphaned crafting preferences',
@@ -706,7 +711,8 @@ test('every corpus-derived prune anywhere under src is reached through a gate', 
   // appear as the `sweep:` of a pass handed to a gate. Three exemptions, all narrow:
   // the two composition sites that ARE the gate, and the DEFINITION of each collaborator.
   const DESTRUCTIVE = /(cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
-  const DEFINITION = /^\s*(?:export\s+)?(?:async\s+)?(?:function\s+)?(?:cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
+  const DEFINITION =
+    /^\s*(?:export\s+)?(?:async\s+)?(?:function\s+)?(?:cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
   const root = resolve(HERE, '..');
   const ungated = [];
 
@@ -809,4 +815,3 @@ test('no caller anywhere under src invokes the orphan sweep without naming its i
     'the recipe-set delete must name its removed recipe ids'
   );
 });
-

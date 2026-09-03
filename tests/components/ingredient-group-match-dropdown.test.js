@@ -133,28 +133,40 @@ describe('IngredientGroupCard match dropdown: showItemTags=false', () => {
     const group = { options: [{ matchType: 'component', quantity: 1 }] };
     const table = buildIngredientOptionsTable(group, { showItemTags: false });
     const selects = table.querySelectorAll('select');
-    assert.equal(selects.length, 0, 'No <select> elements should be rendered when showItemTags=false');
+    assert.equal(
+      selects.length,
+      0,
+      'No <select> elements should be rendered when showItemTags=false'
+    );
   });
 
   it('renders no "Match" header <th> when showItemTags is false', () => {
     const group = { options: [{ matchType: 'component', quantity: 1 }] };
     const table = buildIngredientOptionsTable(group, { showItemTags: false });
     const headers = Array.from(table.querySelectorAll('thead th'));
-    const matchHeader = headers.find(th => th.textContent === 'Match');
-    assert.equal(matchHeader, undefined, '"Match" <th> should not be present when showItemTags=false');
+    const matchHeader = headers.find((th) => th.textContent === 'Match');
+    assert.equal(
+      matchHeader,
+      undefined,
+      '"Match" <th> should not be present when showItemTags=false'
+    );
   });
 
   it('OR separator uses colspan=3 when showItemTags is false', () => {
     const group = {
       options: [
         { matchType: 'component', quantity: 1 },
-        { matchType: 'component', quantity: 2 }
-      ]
+        { matchType: 'component', quantity: 2 },
+      ],
     };
     const table = buildIngredientOptionsTable(group, { showItemTags: false });
     const sep = table.querySelector('.or-separator td');
     assert.ok(sep, 'OR separator row should be present for 2 options');
-    assert.equal(sep.getAttribute('colspan'), '3', 'OR separator colspan should be 3 when match column is hidden');
+    assert.equal(
+      sep.getAttribute('colspan'),
+      '3',
+      'OR separator colspan should be 3 when match column is hidden'
+    );
   });
 
   it('option rows have 3 cells when showItemTags is false', () => {
@@ -162,7 +174,11 @@ describe('IngredientGroupCard match dropdown: showItemTags=false', () => {
     const table = buildIngredientOptionsTable(group, { showItemTags: false });
     const optionRow = table.querySelector('.option-row');
     assert.ok(optionRow, 'Option row should be present');
-    assert.equal(optionRow.querySelectorAll('td').length, 3, 'Option row should have 3 cells when match column is hidden');
+    assert.equal(
+      optionRow.querySelectorAll('td').length,
+      3,
+      'Option row should have 3 cells when match column is hidden'
+    );
   });
 });
 
@@ -178,14 +194,18 @@ describe('IngredientGroupCard match dropdown: showItemTags=true', () => {
     const group = { options: [{ matchType: 'component', quantity: 1 }] };
     const table = buildIngredientOptionsTable(group, { showItemTags: true });
     const selects = table.querySelectorAll('.option-row select');
-    assert.equal(selects.length, 1, 'One <select> should be rendered per option row when showItemTags=true');
+    assert.equal(
+      selects.length,
+      1,
+      'One <select> should be rendered per option row when showItemTags=true'
+    );
   });
 
   it('renders "Match" header <th> when showItemTags is true', () => {
     const group = { options: [{ matchType: 'component', quantity: 1 }] };
     const table = buildIngredientOptionsTable(group, { showItemTags: true });
     const headers = Array.from(table.querySelectorAll('thead th'));
-    const matchHeader = headers.find(th => th.textContent === 'Match');
+    const matchHeader = headers.find((th) => th.textContent === 'Match');
     assert.ok(matchHeader, '"Match" <th> should be present when showItemTags=true');
   });
 
@@ -193,7 +213,7 @@ describe('IngredientGroupCard match dropdown: showItemTags=true', () => {
     const group = { options: [{ matchType: 'component', quantity: 1 }] };
     const table = buildIngredientOptionsTable(group, { showItemTags: true });
     const sel = table.querySelector('.option-row select');
-    const values = Array.from(sel.querySelectorAll('option')).map(o => o.value);
+    const values = Array.from(sel.querySelectorAll('option')).map((o) => o.value);
     assert.ok(values.includes('component'), 'Select should include "component" option');
     assert.ok(values.includes('tags'), 'Select should include "tags" option');
     assert.equal(values.length, 2, 'Select should have exactly 2 options');
@@ -203,13 +223,17 @@ describe('IngredientGroupCard match dropdown: showItemTags=true', () => {
     const group = {
       options: [
         { matchType: 'component', quantity: 1 },
-        { matchType: 'tags', quantity: 2 }
-      ]
+        { matchType: 'tags', quantity: 2 },
+      ],
     };
     const table = buildIngredientOptionsTable(group, { showItemTags: true });
     const sep = table.querySelector('.or-separator td');
     assert.ok(sep, 'OR separator row should be present for 2 options');
-    assert.equal(sep.getAttribute('colspan'), '4', 'OR separator colspan should be 4 when match column is visible');
+    assert.equal(
+      sep.getAttribute('colspan'),
+      '4',
+      'OR separator colspan should be 4 when match column is visible'
+    );
   });
 
   it('option rows have 4 cells when showItemTags is true', () => {
@@ -217,7 +241,11 @@ describe('IngredientGroupCard match dropdown: showItemTags=true', () => {
     const table = buildIngredientOptionsTable(group, { showItemTags: true });
     const optionRow = table.querySelector('.option-row');
     assert.ok(optionRow, 'Option row should be present');
-    assert.equal(optionRow.querySelectorAll('td').length, 4, 'Option row should have 4 cells when match column is visible');
+    assert.equal(
+      optionRow.querySelectorAll('td').length,
+      4,
+      'Option row should have 4 cells when match column is visible'
+    );
   });
 });
 
@@ -240,8 +268,8 @@ describe('IngredientGroupCard OR separator count', () => {
     const group = {
       options: [
         { matchType: 'component', quantity: 1 },
-        { matchType: 'component', quantity: 1 }
-      ]
+        { matchType: 'component', quantity: 1 },
+      ],
     };
     const table = buildIngredientOptionsTable(group, { showItemTags: false });
     const seps = table.querySelectorAll('.or-separator');
@@ -253,8 +281,8 @@ describe('IngredientGroupCard OR separator count', () => {
       options: [
         { matchType: 'component', quantity: 1 },
         { matchType: 'component', quantity: 1 },
-        { matchType: 'component', quantity: 1 }
-      ]
+        { matchType: 'component', quantity: 1 },
+      ],
     };
     const table = buildIngredientOptionsTable(group, { showItemTags: false });
     const seps = table.querySelectorAll('.or-separator');

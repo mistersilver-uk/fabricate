@@ -55,7 +55,9 @@ function names(emitted) {
 function pressGrip(target, tierId, key) {
   const grip = target.querySelector(`[data-tier-grip="${tierId}"]`);
   assert.ok(grip, `a grip exists for ${tierId}`);
-  grip.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+  grip.dispatchEvent(
+    new globalThis.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+  );
   return grip;
 }
 
@@ -115,7 +117,11 @@ describe('the recipe difficulty tier list (issue 1096)', () => {
       'the row being dragged paints itself as travelling'
     );
     rows[0].dispatchEvent(new globalThis.Event('drop', { bubbles: true, cancelable: true }));
-    assert.deepEqual(names(emitted), ['t-hard', 't-easy', 't-mid'], 'the row lands where it was dropped');
+    assert.deepEqual(
+      names(emitted),
+      ['t-hard', 't-easy', 't-mid'],
+      'the row lands where it was dropped'
+    );
   });
 
   it("states the prototype's title and the sentence for the screen it is on", async () => {
@@ -147,10 +153,7 @@ describe('the recipe difficulty tier list (issue 1096)', () => {
     });
     const add = target.querySelector('[data-add-tier]');
     assert.ok(add.classList.contains('is-dashed'), 'it is the dashed add role');
-    assert.equal(
-      add.textContent.trim(),
-      lookup('FABRICATE.Admin.Manager.Checks.Crafting.AddTier')
-    );
+    assert.equal(add.textContent.trim(), lookup('FABRICATE.Admin.Manager.Checks.Crafting.AddTier'));
     add.click();
     assert.equal(emitted.at(-1).length, 4);
     assert.equal(emitted.at(-1).at(-1).dc, 14, 'a new tier is seeded from the base DC');
