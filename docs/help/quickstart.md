@@ -50,7 +50,7 @@ It is designed to sit closer to Foundry's default visual language, but it does n
 
 ## Step 1: Take a Quick Tour of Fabricate
 
-Open the **Items** sidebar on the left side of Foundry.
+Open the **Items** sidebar on the right-hand side of the Foundry UI.
 You'll see three new header buttons:
 
 - **Craft Item** (all users): opens the unified Fabricate window on the Crafting tab, where players browse recipes, pick an actor and component sources, and craft.
