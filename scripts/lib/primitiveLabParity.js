@@ -23,6 +23,14 @@
  * `scripts/primitive-lab-parity.mjs`'s in-page collector): its subtree is SUPPOSED to differ, and
  * comparing it would either report expected drift as a regression or (worse) hide a real one
  * behind the noise.
+ *
+ * THAT EXCLUSION IS ALSO A BLIND SPOT, and a first version of this oracle scored a perfect 0 style
+ * differences while every one of the 76 live specimens rendered as a clipped, opaque black bar —
+ * because every one of them sat inside a `.unit` the walk above deliberately skips.
+ * {@link evaluateSpecimen} closes it with two rules of its own, self-contained rather than
+ * reference-relative: an `<iframe>` must not be smaller than the component mounted inside it (that
+ * is clipping), and a specimen document must not paint an opaque backdrop over the library's own
+ * surface the drawing it replaced showed through to.
  */
 
 /**
@@ -152,10 +160,19 @@ export function tallyByProperty(diffs) {
  * @param {number} options.compared Lab elements that found a reference match.
  * @param {number} options.missingCount Lab elements with no reference match at all.
  * @param {object[]} options.diffs {@link diffSnapshots}'s `diffs`.
- * @param {number} [options.sample] How many individual diffs to print. Defaults to 30.
+ * @param {{count: number, problems: string[]}} options.specimens {@link evaluateSpecimens}'s
+ *   result.
+ * @param {number} [options.sample] How many individual diffs/problems to print. Defaults to 30.
  * @returns {string} The full report, newline-joined.
  */
-export function formatParityReport({ referenceCount, compared, missingCount, diffs, sample = 30 }) {
+export function formatParityReport({
+  referenceCount,
+  compared,
+  missingCount,
+  diffs,
+  specimens,
+  sample = 30,
+}) {
   const lines = [
     `reference elements: ${referenceCount}`,
     `lab elements compared: ${compared}   (unmatched keys: ${missingCount})`,
@@ -174,6 +191,102 @@ export function formatParityReport({ referenceCount, compared, missingCount, dif
       );
     }
   }
-  lines.push('', diffs.length === 0 ? 'PARITY: PASS' : 'PARITY: FAIL');
+
+  lines.push(
+    '',
+    `specimens: ${specimens.count} iframe(s), ${specimens.problems.length} problem(s)`
+  );
+  for (const problem of specimens.problems.slice(0, sample)) lines.push(`   ${problem}`);
+  if (specimens.problems.length > sample) {
+    lines.push(`   … and ${specimens.problems.length - sample} more`);
+  }
+
+  const ok = diffs.length === 0 && specimens.problems.length === 0;
+  lines.push('', ok ? 'PARITY: PASS' : 'PARITY: FAIL');
   return lines.join('\n');
+}
+
+/**
+ * Pixels of slack a size comparison tolerates before it is a real defect rather than sub-pixel
+ * rounding between `getBoundingClientRect` (fractional) and the integer size `mount.js` writes
+ * onto the `<iframe>` element from a `ResizeObserver`'s rounded report.
+ *
+ * @type {number}
+ */
+const SIZE_TOLERANCE_PX = 2;
+
+/**
+ * A backdrop this oracle accepts as "shows the library's own surface through" — `rgba(0, 0, 0, 0)`
+ * is what a plain `background: transparent` computes to in every engine that runs this oracle, and
+ * `transparent` covers a keyword read straight off an inline style in a defect fixture.
+ *
+ * @type {readonly string[]}
+ */
+const TRANSPARENT_BACKGROUNDS = Object.freeze(['rgba(0, 0, 0, 0)', 'transparent']);
+
+/**
+ * Judge one specimen against the two rules an excluded `.unit` can otherwise hide entirely:
+ *
+ *   1. The `<iframe>` element must not be SMALLER than the component mounted inside it, in either
+ *      dimension — a smaller iframe is `overflow: hidden` clipping the very thing it exists to
+ *      show, and `mount.js` sizing the iframe FROM a wrong measurement is exactly how a fixed
+ *      regression here would recur silently.
+ *   2. The specimen document's own `<body>` must not paint an opaque backdrop. `foundry2.css`
+ *      gives `body` a solid background (right for a game view, wrong for a pane excerpt), and
+ *      painting over it hides the very drawing surface the specimen replaced.
+ *
+ * Self-contained rather than reference-relative, unlike {@link diffSnapshots}: there is no
+ * reference iframe to compare against, only an internal consistency the specimen has to keep with
+ * itself.
+ *
+ * @param {object} specimen One specimen's measurements.
+ * @param {string} specimen.path The catalogue row's `path`, for the message.
+ * @param {boolean} specimen.mounted Whether the specimen document reported a mounted root at all.
+ * @param {number} specimen.frameWidth The `<iframe>` element's own rendered width.
+ * @param {number} specimen.frameHeight The `<iframe>` element's own rendered height.
+ * @param {number} specimen.contentWidth The mounted component's own rendered width.
+ * @param {number} specimen.contentHeight The mounted component's own rendered height.
+ * @param {string} specimen.backgroundColor The specimen document's `<body>` computed background.
+ * @returns {string|null} A problem sentence, or null when the specimen is sound.
+ */
+export function evaluateSpecimen(specimen) {
+  const { path, mounted, frameWidth, frameHeight, contentWidth, contentHeight, backgroundColor } =
+    specimen;
+  if (!mounted) return `${path}: nothing mounted inside the specimen document`;
+
+  if (
+    contentWidth > frameWidth + SIZE_TOLERANCE_PX ||
+    contentHeight > frameHeight + SIZE_TOLERANCE_PX
+  ) {
+    return (
+      `${path}: the iframe clips its component — frame ${frameWidth}x${frameHeight}, ` +
+      `content ${contentWidth}x${contentHeight}`
+    );
+  }
+
+  const background = String(backgroundColor ?? '')
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+  if (!TRANSPARENT_BACKGROUNDS.includes(background)) {
+    return `${path}: the specimen document paints an opaque backdrop (body background ${backgroundColor})`;
+  }
+
+  return null;
+}
+
+/**
+ * Judge every specimen, collecting rather than stopping at the first defect — the same reasoning
+ * `inject.js`'s `resolveSlots` gives for collecting every catalogue problem: a page that only ever
+ * reports the first clipped iframe hides the other 149.
+ *
+ * @param {object[]} specimens Every specimen's measurements, shaped as {@link evaluateSpecimen}
+ *   reads them.
+ * @returns {{count: number, problems: string[]}} How many specimens were checked, and every
+ *   problem found.
+ */
+export function evaluateSpecimens(specimens) {
+  const problems = specimens
+    .map((specimen) => evaluateSpecimen(specimen))
+    .filter((problem) => problem !== null);
+  return { count: specimens.length, problems };
 }
