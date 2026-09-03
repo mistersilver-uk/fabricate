@@ -228,6 +228,32 @@ export function collectLiveClassSources() {
 }
 
 /**
+ * The index of the quote closing the string literal that opens at `from`.
+ *
+ * The two delimiter scanners below — {@link matchingDelimiter} and {@link statementEnd} — each ran
+ * their own copy of this loop, differing only in what they counted OUTSIDE a string. Shared so the
+ * escape rule is stated once: a backslash consumes the next character whatever it is, which is what
+ * stops `'it{s'` and `"a;b"` from being read as structure.
+ *
+ * Callers pass the index of the opening quote and assign the result back to their own cursor, whose
+ * own increment then steps past the closer. An UNTERMINATED literal answers with the last index
+ * rather than throwing, so the caller's loop still ends at `text.length` and reports the same
+ * "ran off the end" answer it did before.
+ *
+ * @param {string} text
+ * @param {number} from Index of the opening quote character.
+ * @returns {number} The index of the closing quote, or the last index when there is none.
+ */
+function skipQuotedRun(text, from) {
+  const quote = text[from];
+  for (let scan = from + 1; scan < text.length; scan += 1) {
+    if (text[scan] === '\\') scan += 1;
+    else if (text[scan] === quote) return scan;
+  }
+  return text.length - 1;
+}
+
+/**
  * The index just past the delimiter closing the one that opens at `from`.
  *
  * Quote-aware and nesting-aware, so a brace inside a string and a nested object literal both close
@@ -241,16 +267,13 @@ export function collectLiveClassSources() {
  */
 function matchingDelimiter(text, from, open, close) {
   let depth = 0;
-  let quote = null;
   for (let scan = from; scan < text.length; scan += 1) {
     const character = text[scan];
-    if (quote) {
-      if (character === '\\') scan += 1;
-      else if (character === quote) quote = null;
+    if (QUOTE_CHARACTERS.has(character)) {
+      scan = skipQuotedRun(text, scan);
       continue;
     }
-    if (QUOTE_CHARACTERS.has(character)) quote = character;
-    else if (character === open) depth += 1;
+    if (character === open) depth += 1;
     else if (character === close) {
       depth -= 1;
       if (depth === 0) return scan + 1;
@@ -422,16 +445,13 @@ function constantDefinitions(text) {
  */
 function statementEnd(text, from) {
   let depth = 0;
-  let quote = null;
   for (let scan = from; scan < text.length; scan += 1) {
     const character = text[scan];
-    if (quote) {
-      if (character === '\\') scan += 1;
-      else if (character === quote) quote = null;
+    if (QUOTE_CHARACTERS.has(character)) {
+      scan = skipQuotedRun(text, scan);
       continue;
     }
-    if (QUOTE_CHARACTERS.has(character)) quote = character;
-    else if ('([{'.includes(character)) depth += 1;
+    if ('([{'.includes(character)) depth += 1;
     else if (')]}'.includes(character)) {
       if (depth === 0) return scan;
       depth -= 1;
