@@ -78,9 +78,12 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   // on every lab build, and its per-pair guard skips an entity whose default is already present,
   // so this record survives the pass rather than being overwritten by it.
   //
-  // ORDER MATTERS AGAINST THE SETTING REGISTRATION, not against the other puts: the shim's `get`
-  // falls back to the REGISTERED default, so `worldVocabulary` reads back `{}` on any build where
-  // `src/config/settings.js` has not registered the key.
+  // POSITION AMONG THE PUTS IS COSMETIC. The shim's settings map answers a SEEDED key with its
+  // seed whether or not `registerSettings()` has declared it, so nothing here depends on the
+  // registration landing first. What DOES depend on it is production, where
+  // `ClientSettings#assertSetting` throws on an unregistered key — and that ordering is pinned
+  // by the source-order assertions in `tests/scoped-definition-read-and-basis.test.js`, not by
+  // this file.
   put('componentScope', content.componentScope);
   put('worldVocabulary', content.worldVocabulary);
   // FIVE parties, and every one of them earns its place in the World > Parties card list:

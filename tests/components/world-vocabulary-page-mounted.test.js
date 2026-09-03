@@ -343,16 +343,164 @@ describe('the world Tags & Categories screen', () => {
     assert.deepEqual(namesNow(), ['Spare', 'Reagent', 'Curios'], 'and the toggle reverses it');
   });
 
-  it('reports a deletion that did not land, rather than failing silently', async () => {
+  it('reports a deletion that did not land, from a live region that existed before it', async () => {
     const root = await harness.mount(
       mountProps({ actions: { addEntry: async () => true, removeEntry: async () => false } })
     );
+    // THE REGION IS IN THE DOCUMENT AT MOUNT, AND EMPTY. A live region inserted at the same
+    // moment as its content is not reliably announced: the assistive technology has nothing to
+    // observe the change against. So the element is rendered from the start and filled later.
+    const before = root.querySelector('[data-wvocab-status]');
+    assert.ok(Boolean(before), 'the live region exists before there is anything to announce');
+    assert.equal(before.textContent.trim(), '', 'and it is empty until then');
+    assert.equal(
+      before.getAttribute('role'),
+      'alert',
+      'a deletion the GM asked for and did not get is an interruption, not a progress note'
+    );
+
     categoryCard(root, 'spare').querySelector('.manager-icon-button').click();
     await Promise.resolve();
     await Promise.resolve();
     flushSync();
     const status = root.querySelector('[data-wvocab-status]');
-    assert.ok(Boolean(status), 'a refused deletion is stated on the page');
-    assert.equal(status.getAttribute('role'), 'status');
+    assert.equal(status, before, 'the SAME element is filled, never a replacement one');
+    assert.ok(status.textContent.trim().length > 0, 'a refused deletion is stated on the page');
+  });
+
+  it('states the reference count ALONE when a deletion rewrites nothing', async () => {
+    // The common case for both component vocabularies is that nothing cascades, and a single
+    // sentence then reads "clears it from 0 world components, which 0 crafting systems inherit"
+    // — three numbers where the honest answer is one.
+    const root = await harness.mount(mountProps());
+    categoryCard(root, 'reagent').querySelector('.manager-icon-button').click();
+    flushSync();
+    const copy = root
+      .querySelector('[data-vocabulary-confirm="reagent"] .manager-vocabulary-confirm-copy')
+      .textContent.trim();
+    assert.ok(copy.includes('3'), 'it still states the reference count');
+    assert.equal(copy.includes('{'), false, 'and every token is substituted');
+    assert.equal(
+      / 0 /.test(copy),
+      false,
+      `a row that rewrites nothing must not state a zero: ${copy}`
+    );
+  });
+
+  it('drives the add form: a duplicate is blocked, a valid value is normalized', async () => {
+    const added = [];
+    const root = await harness.mount(
+      mountProps({
+        actions: {
+          addEntry: async (kind, value) => {
+            added.push(`${kind}:${value}`);
+            return true;
+          },
+          removeEntry: async () => true,
+        },
+      })
+    );
+    const panel = root.querySelector(panelSelector('componentTags'));
+    const input = panel.querySelector('input#world-vocabulary-component-tag-add');
+    assert.ok(Boolean(input), 'the tag panel owns its own add field');
+
+    const type = (value) => {
+      input.value = value;
+      input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+      flushSync();
+    };
+
+    // A DUPLICATE, in the OTHER case. De-duplication is on the derived id, so the hint has to
+    // catch `HERB` against the shipped `herb` before the write path refuses it silently.
+    type('HERB');
+    const blockedHint = panel.querySelector('.manager-vocabulary-hint');
+    assert.ok(Boolean(blockedHint), 'the add form states a hint');
+    assert.ok(
+      blockedHint.textContent.toLowerCase().includes('already'),
+      `a duplicate is refused before submit: ${blockedHint.textContent}`
+    );
+    panel.querySelector('[data-inline-vocabulary-add]')?.dispatchEvent(
+      new globalThis.Event('submit', { bubbles: true, cancelable: true })
+    );
+    flushSync();
+    assert.deepEqual(added, [], 'and a blocked hint refuses the submit');
+
+    // A VALID VALUE, submitted, and handed over LOWERCASED — the tag vocabulary's own rule.
+    type('  Moss  ');
+    panel.querySelector('[data-inline-vocabulary-add]').dispatchEvent(
+      new globalThis.Event('submit', { bubbles: true, cancelable: true })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    flushSync();
+    assert.deepEqual(
+      added,
+      ['componentTags:moss'],
+      'the value reaching the write path is the NORMALIZED one, not the raw input'
+    );
+  });
+
+  it('draws each vocabulary’s OWN empty state when it has no entries', async () => {
+    const root = await harness.mount(
+      mountProps({
+        vocabulary: {
+          available: true,
+          total: 0,
+          componentCategories: [],
+          componentTags: [],
+          recipeCategories: [],
+        },
+      })
+    );
+    const titles = ['componentCategories', 'componentTags', 'recipeCategories'].map((kind) =>
+      root.querySelector(`${panelSelector(kind)} .manager-empty`)?.textContent.trim()
+    );
+    for (const title of titles) {
+      assert.ok(title && title.length > 0, 'every empty panel states something');
+    }
+    assert.equal(
+      new Set(titles).size,
+      3,
+      'and each states its OWN copy — three identical empty states would mean the per-kind ' +
+        'lang table had collapsed to one entry'
+    );
+  });
+
+  it('states a search MISS with the query the GM typed', async () => {
+    const root = await harness.mount(mountProps());
+    const panel = root.querySelector(panelSelector('componentCategories'));
+    const search = panel.querySelector('.manager-search input');
+    search.value = 'zzz';
+    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    flushSync();
+
+    const miss = panel.querySelector('.manager-empty');
+    assert.ok(Boolean(miss), 'a query with no surviving rows renders the search-miss state');
+    assert.ok(miss.textContent.includes('zzz'), `the query is substituted: ${miss.textContent}`);
+    assert.equal(miss.textContent.includes('{query}'), false);
+    assert.equal(
+      panel.querySelectorAll('[data-component-category-id]').length,
+      0,
+      'and no row survives it'
+    );
+  });
+
+  it('sorts by References, and the direction toggle reverses that too', async () => {
+    const root = await harness.mount(mountProps());
+    const panel = root.querySelector(panelSelector('componentCategories'));
+    const select = panel.querySelector('select[data-wvocab-sort]');
+    select.value = 'references';
+    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    const namesNow = () =>
+      [...panel.querySelectorAll('[data-component-category-id] .manager-vocabulary-main strong')].map(
+        (el) => el.textContent
+      );
+    // 0, 0, 3 ascending, with the two zeroes tie-broken by name.
+    assert.deepEqual(namesNow(), ['Curios', 'Spare', 'Reagent']);
+    panel.querySelector('button[data-wvocab-direction]').click();
+    flushSync();
+    assert.deepEqual(namesNow(), ['Reagent', 'Curios', 'Spare']);
   });
 });

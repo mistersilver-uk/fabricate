@@ -286,6 +286,24 @@ test('the reference count is real on all three vocabularies, including the world
   assert.equal(tags.get('herb').totalUsage, 2, 'a component AND a recipe tag placeholder');
   assert.equal(recipeCategories.get('potions').totalUsage, 4);
   assert.equal(tags.get('moss').totalUsage, 1, 'exactly one — the world default, counted once');
+
+  // THE SECOND NUMBER, WHICH NOTHING ELSE PRODUCES. `confirmTokensFor`'s `componentTags` branch
+  // can answer `{}` with every other assertion in this repository green, and the only symptom is
+  // that the GM reads a literal `{components}` in a destructive confirm.
+  assert.deepEqual(
+    tags.get('moss').confirmTokens,
+    { components: 1 },
+    'a tag carried by one world component default states that one in its confirm'
+  );
+  assert.deepEqual(
+    tags.get('herb').confirmTokens,
+    { components: 0 },
+    'and the POSITIVE CONTROL: a tag no world default carries states a zero, not an absent token'
+  );
+  // THE CATEGORY KIND STATES BOTH OF ITS OWN, and they are independent: this world default
+  // carries `Reagent` and has no membership record, so one default is affected and nothing
+  // inherits it. A branch that derived the second number from the first would read 1 here.
+  assert.deepEqual(categories.get('reagent').confirmTokens, { defaults: 1, inheriting: 0 });
 });
 
 test('silentlyDeletable is COMPUTED from the corpus, and is narrower than the count', () => {

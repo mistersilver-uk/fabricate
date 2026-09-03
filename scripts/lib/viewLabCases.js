@@ -1461,7 +1461,18 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-component-tag-id] .manager-icon-button',
       },
     ],
-    position: { width: 1280, height: 900 },
+    // TALLER THAN THE WORLD SCOPED-ENTITY CASES, and the extra 140px is the FULL-WIDTH TAG BAND
+    // (issue 1392). This screen stacks a 2-up grid over a third panel rather than filling one
+    // pane, so the tag vocabulary's own head, control row, add card, search row and first row all
+    // sit below the taller of the two category panels. Measured in Chromium against the real
+    // sheet: the tag panel's first row ends 898px below the top of `.manager-body`, which a
+    // 900px frame cuts through — and the `moss` row this screen's whole count asymmetry exists to
+    // show is the one it cuts. `tests/components/world-vocabulary-control-row-cascade.test.js`
+    // asserts the fit against THIS number, so the frame and the assertion cannot drift apart.
+    //
+    // Lab-only, and safe: this case has no smoke label and never runs in the Foundry harness, so
+    // the `max-height` clamp Foundry applies to a real window does not bear on it.
+    position: { width: 1280, height: 1040 },
     kinds: ['manager', 'world', 'scoped'],
     // THE `ScopedPlaceholderPage` CLAIM IS DELETED HERE, not merely joined by the new patterns
     // (issue 1392). The shared placeholder body is claimed by every case that RENDERS it, and
