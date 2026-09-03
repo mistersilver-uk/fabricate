@@ -2463,8 +2463,8 @@ async function assertToolStudioEditorLayout(page, { stacked = false } = {}) {
     ['previewNameType', 17, 'Tool preview name'],
   ]);
   if (!stacked) {
-    if (!report.preview || report.preview.width < 318 || report.preview.width > 322) {
-      throw new Error(`Tool preview is not the complete 320px rail: ${JSON.stringify(report.preview)}`);
+    if (!report.preview || report.preview.width < 338 || report.preview.width > 342) {
+      throw new Error(`Tool preview is not the complete 340px rail: ${JSON.stringify(report.preview)}`);
     }
     if (report.preview.top < report.composition.top - 1 || report.preview.bottom > report.composition.bottom + 1) {
       throw new Error(`Tool preview escapes wide vertical containment: ${JSON.stringify(report.preview)}`);
