@@ -268,13 +268,22 @@ describe('the three world scope settings', () => {
     );
   });
 
-  it('are the three keys this change registers, and worldVocabulary is NOT among them', () => {
-    // `fabricate.worldVocabulary` is deferred to epic 1357's PR 7: a persisted key whose values
-    // carry no canonical meaning is a live shape with no description.
+  it('are the three keys this change registers, beside a FOURTH that is not one of them', () => {
     assert.equal(SETTING_KEYS.COMPONENT_SCOPE, 'componentScope');
     assert.equal(SETTING_KEYS.ESSENCE_SCOPE, 'essenceScope');
     assert.equal(SETTING_KEYS.TOOL_SCOPE, 'toolScope');
-    assert.equal(SETTING_KEYS.WORLD_VOCABULARY, undefined);
+    // `fabricate.worldVocabulary` EXISTS since issue 1392, and this assertion INVERTS with it —
+    // deliberately, because the claim was never "it does not exist" but "it is not one of these
+    // three". `## Scoped Entity Definitions` requirement 13 enumerates the three SCOPED-ENTITY
+    // layers, and the World Vocabulary is a fourth world setting of the same registration shape
+    // modelled by `## World Vocabulary`. It carries no entity roster, no world defaults and no
+    // membership records, so no `createScopedDefinitionStore` call site takes its key.
+    assert.equal(SETTING_KEYS.WORLD_VOCABULARY, 'worldVocabulary');
+    assert.equal(
+      SCOPES.some((scope) => scope.settingKey === SETTING_KEYS.WORLD_VOCABULARY),
+      false,
+      'the scoped-definition shell must not acquire a fourth key'
+    );
   });
 
   it('are registered at WORLD scope, which the rest of this suite cannot see', () => {
@@ -287,6 +296,10 @@ describe('the three world scope settings', () => {
     assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.COMPONENT_SCOPE), true);
     assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.ESSENCE_SCOPE), true);
     assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.TOOL_SCOPE), true);
+    // Issue 1392: the vocabulary key is admitted to the DERIVED set by its own `scope: 'world'`,
+    // which is what enrols it into the shared SETTINGS_MODIFY permission seam every test that
+    // models a refused write reads.
+    assert.equal(WORLD_SCOPED_SETTING_KEYS.has(SETTING_KEYS.WORLD_VOCABULARY), true);
   });
 });
 

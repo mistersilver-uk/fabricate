@@ -1434,28 +1434,48 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [{ selector: '#manager-world-nav-vocabulary' }],
     expectView: 'world-vocabulary',
     expectSelector: '[data-scoped-page="world-vocabulary"]',
+    // THE THREE DELETE CONTROLS, ONE PER PANEL, EACH KEYED ON ITS OWN PANEL (issue 1392).
+    //
+    // This is the CLIPPING criterion, and it is mechanical rather than visual. `VocabularyPanel`
+    // draws its rows on a `repeat(auto-fill, minmax(340px, 1fr))` track and this route's
+    // `.manager-main` keeps `overflow-x: hidden`, so a panel column narrower than that track
+    // CLIPS rather than scrolls — and the element it clips first is the row's trailing
+    // `.manager-icon-button`, the delete. At 1280x900 the 2-up grid clears the track by about
+    // 130px; a third column would not, and nothing else in this registry could see that.
+    //
+    // BOTH SIDES ARE KEYED PER KIND, on the panel's own `rowAttr`, and that is required rather
+    // than tidy: `expectContained` resolves each side with `document.querySelector` and is
+    // first-match and document-wide, so an unkeyed `.manager-icon-button` target would send all
+    // three entries to the same button and two of the three would assert nothing.
+    expectContained: [
+      {
+        container: '[data-wvocab-panel="recipeCategories"]',
+        target: '[data-recipe-category-id] .manager-icon-button',
+      },
+      {
+        container: '[data-wvocab-panel="componentCategories"]',
+        target: '[data-component-category-id] .manager-icon-button',
+      },
+      {
+        container: '[data-wvocab-panel="componentTags"]',
+        target: '[data-component-tag-id] .manager-icon-button',
+      },
+    ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // THE SHARED PLACEHOLDER BODY IS CLAIMED BY EVERY CASE THAT RENDERS IT (issue 1374), which
-    // is this one and the four other world scoped cases, not by one nominated case.
+    // THE `ScopedPlaceholderPage` CLAIM IS DELETED HERE, not merely joined by the new patterns
+    // (issue 1392). The shared placeholder body is claimed by every case that RENDERS it, and
+    // this route no longer does — so a claim left behind would publish this screen as evidence
+    // of a change to a component it does not contain, the exact inversion
+    // `manager-scoped-prop-contract.test.js` reds on in both directions. The remaining claim
+    // lives on `world-component-catalogue`, whose page still delegates.
     //
-    // A SINGLE CLAIM CANNOT BE PLACED SAFELY, because neither coverage test can see a claim
-    // whose case no longer renders the component: the shared body stays inside the lab
-    // closure through the remaining pages and stays claimed by SOME case whatever happens, so a
-    // claim on a route whose body has been replaced goes stale in silence and publishes that
-    // route's real screen as evidence of a placeholder-body change. Nominating the
-    // longest-lived route only works if the four lanes land in a predicted order, and nothing
-    // enforces one — PR 7 may ship before 6c.
-    //
-    // Claiming it everywhere it renders removes the ordering assumption entirely: whichever
-    // route is replaced last, a case that still renders the component still claims it, and the
-    // lane that replaces that last route deletes the component and every claim together. The
-    // three entry routes hold no case at all — a case cannot assert a route that no shipped
-    // screen can reach — so "every case that renders it" is the honest form of "all seven
-    // routes". The cost is a handful of frames per edit to a component the epic deletes.
+    // `VocabularyPanel.svelte` is claimed here as well as by the system-scope vocabulary cases:
+    // this screen renders three of it, and an edit to the primitive changes this frame.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/worldVocabularyStudio\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
     ],
   }),
   // ── The two world ESSENCE screens, REAL bodies from issue 1372 ─────────────────────────────

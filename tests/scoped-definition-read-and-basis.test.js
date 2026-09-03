@@ -717,7 +717,17 @@ describe('src/main.js construction order', () => {
     return index;
   };
 
-  for (const store of ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore']) {
+  // FOUR STORES SINCE ISSUE 1392. The World Vocabulary store is not a scoped-entity store and
+  // is wired into no prune basis, so a mis-order for IT degrades to a permanently unseeded
+  // vocabulary, an empty screen and a rail badge reading 0 — visible rather than destructive.
+  // It is pinned here anyway, and beside the three, because its own HARD constraint is the same
+  // one: `ClientSettings#assertSetting` throws on an unregistered key, and `load()` is guarded.
+  for (const store of [
+    'componentScopeStore',
+    'essenceScopeStore',
+    'toolScopeStore',
+    'worldVocabularyStore',
+  ]) {
     it(`constructs and loads ${store} after settings and migrations, before both managers`, () => {
       const construction = at(`this.${store} = create`);
       const load = at(`this.${store}.load();`);
@@ -740,6 +750,9 @@ describe('src/main.js construction order', () => {
       'getComponentScopeStore',
       'getEssenceScopeStore',
       'getToolScopeStore',
+      // Issue 1392. Its NAME is fixed by `adminStore`'s read and write legs, both of which
+      // shipped ahead of it inside a gateway file this lane may not open.
+      'getVocabularyScopeStore',
     ]) {
       const body = MAIN_SOURCE.slice(at(`  ${accessor}() {`), at(`  ${accessor}() {`) + 200);
       assert.equal(
@@ -750,9 +763,14 @@ describe('src/main.js construction order', () => {
     }
   });
 
-  it('hands all three stores to the setting-change bridge', () => {
+  it('hands all four stores to the setting-change bridge', () => {
     // Without this the legs receive `undefined` and NO-OP silently.
-    for (const store of ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore']) {
+    for (const store of [
+      'componentScopeStore',
+      'essenceScopeStore',
+      'toolScopeStore',
+      'worldVocabularyStore',
+    ]) {
       assert.match(MAIN_SOURCE, new RegExp(`${store}: fabricate\\.${store},`));
     }
   });

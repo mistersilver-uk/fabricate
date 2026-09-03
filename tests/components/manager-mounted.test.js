@@ -971,6 +971,14 @@ function compileManagerRoot() {
     'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
     'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
     'src/utils/scopedEntityListModel.js',
+    // Issue 1392 (epic 1357, PR 7a): the world Tags & Categories screen is a real body now, so
+    // its pure leaf is in this root's static graph — and so is the World Vocabulary's own core,
+    // which that leaf AND `worldScopeProjection.js` both import. `vocabularyUsage.js`,
+    // `componentCategories.js` and `recipeCategories.js` are already above and must not be
+    // re-added. Omitting either of these two does not fail one test: it HANGS the whole file
+    // behind one ERR_MODULE_NOT_FOUND, reported as `# cancelled`.
+    'src/systems/worldVocabulary.js',
+    'src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -26964,11 +26972,14 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Component catalogue',
         '[data-scoped-placeholder="world-components"]',
       ],
+      // Issue 1392: the real world vocabulary screen. Its body hook is one of the three panel
+      // wrappers rather than the page hook, for this row's stated reason — a route wired into
+      // the shell with no body still carries `data-scoped-page`.
       [
         'vocabulary',
         'world-vocabulary',
         'Tags & Categories',
-        '[data-scoped-placeholder="world-vocabulary"]',
+        '[data-wvocab-panel="componentCategories"]',
       ],
       ['essence-catalogue', 'world-essences', 'Essence Catalogue', '[data-scoped-list]'],
       // Issue 1373: the real catalogue. `data-scoped-list` is the shell's own hook, and the

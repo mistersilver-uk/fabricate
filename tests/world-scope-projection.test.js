@@ -456,7 +456,7 @@ test('copyMembership clones sections independently and stamps NO provenance key'
 // composition root, where the root is the only thing production reaches. PRs 6a-c build
 // directly on `store.worldScope`, so it is asserted here as its own subject.
 
-test('the composition builds all three entity types and wires each to its own store', async () => {
+test('the composition builds all four families and wires each to its own store', async () => {
   const stores = {
     component: storeFor('component'),
     essence: storeFor('essence'),
@@ -470,7 +470,9 @@ test('the composition builds all three entity types and wires each to its own st
     },
   });
 
-  assert.deepEqual(Object.keys(actions).sort(), ['component', 'essence', 'tool']);
+  // FOUR FAMILIES SINCE ISSUE 1392: the three scoped-entity types from `WRITE_DESCRIPTORS`,
+  // plus the World Vocabulary, which is attached after that loop by its own builder.
+  assert.deepEqual(Object.keys(actions).sort(), ['component', 'essence', 'tool', 'vocabulary']);
 
   // EACH IS WIRED TO ITS OWN STORE, and that is the half a shape check cannot see: three
   // action families all pointed at one store would satisfy every key assertion while writing
@@ -512,18 +514,19 @@ test('the composition preserves each type\'s KEY SET, which is part of the contr
   );
 });
 
-// ── THE FOURTH LEG MINTS NOTHING, AND THAT IS THE POINT (issue 1374) ─────────────────────────
+// ── THE FOURTH FAMILY IS NOT A FOURTH DESCRIPTOR (issue 1374, then issue 1392) ───────────────
 //
-// `adminStore` supplies `getStores` with four legs now, matching the read path's four. The
-// vocabulary lane needs the LEG because it lives in a gateway file it may not open; it declares
-// the FAMILY itself, in `worldScopeActions.js`, which it owns.
+// `adminStore` supplied a fourth `getStores` leg from issue 1374, matching the read path's
+// four, because that file is a gateway `### GM World Scoped Entity Routes` requirement 7 closes
+// to the vocabulary lane. Issue 1392 declared the FAMILY, here, in a file that lane owns.
 //
-// So the leg has to be INERT until that family is declared, and this is the guard that says so:
-// a composition that minted a family per supplied leg rather than per declared descriptor would
-// hand every consumer a `worldScope.vocabulary` whose actions write into a store whose corpus
-// shape nothing has defined yet.
+// IT IS ATTACHED AFTER THE DESCRIPTOR LOOP RATHER THAN ADDED TO `WRITE_DESCRIPTORS`, and this
+// is the guard on that: every verb the generic builder mints presupposes an entity roster,
+// world defaults and membership records, and the World Vocabulary has none of the three. A
+// fourth descriptor would publish `createEntity`, `addToSystem` and `setSection` on a family
+// where none of them can mean anything.
 
-test('a supplied vocabulary leg mints NO family until a descriptor declares one', () => {
+test('the vocabulary family mints its OWN key set, not the scoped-entity one', () => {
   const actions = createWorldScopeActions({
     getStores: {
       component: () => null,
@@ -534,10 +537,17 @@ test('a supplied vocabulary leg mints NO family until a descriptor declares one'
   });
   assert.deepEqual(
     Object.keys(actions).sort(),
-    ['component', 'essence', 'tool'],
-    'families come from WRITE_DESCRIPTORS, never from the legs the caller happened to supply'
+    ['component', 'essence', 'tool', 'vocabulary'],
+    'the three scoped-entity families come from WRITE_DESCRIPTORS; the vocabulary is attached'
   );
-  assert.equal('vocabulary' in actions, false);
+  assert.equal(typeof actions.vocabulary.addEntry, 'function');
+  assert.equal(typeof actions.vocabulary.removeEntry, 'function');
+  // THE ABSENCES ARE THE ASSERTION. `createEntity` on the vocabulary family is what declaring
+  // it as a fourth `WRITE_DESCRIPTORS` entry would produce, and `addEntry` on the component
+  // family is what folding the two builders into one would produce.
+  assert.equal('createEntity' in actions.vocabulary, false);
+  assert.equal('addToSystem' in actions.vocabulary, false);
+  assert.equal('addEntry' in actions.component, false);
 });
 
 test('the composition tolerates an absent getStores map without throwing', async () => {

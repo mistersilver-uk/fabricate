@@ -57,6 +57,80 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** The fixture world, for checks that must derive a case's truth rather than trust its author. */
 const content = buildLabContent();
 
+// ── THE LAB'S WORLD VOCABULARY SEED (issue 1392, epic 1357, PR 7a) ──────────────────────────
+//
+// The `world-vocabulary` case photographs ONE resting state and types nothing, so everything the
+// frame has to show has to be in the fixture. A seed that were merely non-empty would publish a
+// screen whose three rows all render the same affordance — which is precisely the picture the
+// one-click gate's conjunction exists to falsify.
+test('the lab seeds a world vocabulary carrying all three delete affordances', () => {
+  const settingsSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
+  assert.match(
+    settingsSource,
+    /put\('worldVocabulary', content\.worldVocabulary\)/,
+    'the lab world must actually PUT the vocabulary; the shim falls back to the registered ' +
+      'default, so an unseeded key photographs an empty screen'
+  );
+  assert.match(settingsSource, /put\('componentScope', content\.componentScope\)/);
+
+  const vocabulary = content.worldVocabulary;
+  assert.ok(vocabulary, 'the fixture builds one');
+  const kinds = ['componentCategories', 'componentTags', 'recipeCategories'];
+  for (const kind of kinds) {
+    assert.ok(vocabulary[kind]?.length >= 1, `${kind} carries at least one entry`);
+  }
+  assert.ok(
+    kinds.some((kind) => vocabulary[kind].length >= 3),
+    'at least one vocabulary carries three entries, so a panel is photographed with a real list'
+  );
+
+  const defaults = Object.values(content.componentScope?.defaults ?? {});
+  assert.ok(
+    defaults.some((record) => typeof record.category === 'string' && record.category),
+    'a world component default carries a world CATEGORY, so a zero-reference entry can still be ' +
+      'confirm-gated'
+  );
+  assert.ok(
+    defaults.some((record) => Array.isArray(record.tags) && record.tags.length > 0),
+    'and one carries a world TAG, which is the half of the count no membership record mirrors'
+  );
+
+  // The three affordances, derived from the fixture rather than trusted from its author.
+  const categoryNames = new Set(
+    content.components.map((component) => String(component.category ?? '').toLowerCase())
+  );
+  const componentTagNames = new Set(
+    content.components.flatMap((component) => (component.tags ?? []).map((tag) => tag.toLowerCase()))
+  );
+  const recipeCategoryNames = new Set(
+    content.recipes.map((entry) => String(entry.category ?? '').toLowerCase())
+  );
+  const defaultCategories = new Set(
+    defaults.map((record) => String(record.category ?? '').toLowerCase())
+  );
+  const defaultTags = new Set(defaults.flatMap((record) => (record.tags ?? []).map((tag) => tag.toLowerCase())));
+
+  assert.ok(
+    vocabulary.componentCategories.some((entry) => categoryNames.has(entry.id)),
+    'a REFERENCED component category, so the reference chip is in the frame'
+  );
+  assert.ok(
+    vocabulary.componentCategories.some(
+      (entry) => !categoryNames.has(entry.id) && defaultCategories.has(entry.id)
+    ),
+    'a ZERO-REFERENCE component category that a world default still carries, so the frame shows ' +
+      'a confirm-gated row rendering `0 references` rather than `Unused`'
+  );
+  assert.ok(
+    vocabulary.componentTags.some((entry) => !componentTagNames.has(entry.id) && defaultTags.has(entry.id)),
+    'a component tag whose ONLY reference is a world default, which is the count asymmetry'
+  );
+  assert.ok(
+    vocabulary.recipeCategories.some((entry) => !recipeCategoryNames.has(entry.id)),
+    'and a genuinely unused entry, so the `Unused` chip and the destructive delete are in the frame'
+  );
+});
+
 /** The viewport the capture driver uses; asserted here so the arithmetic is gated, not just run. */
 const CAPTURE_VIEWPORT = { width: 1920, height: 1080 };
 

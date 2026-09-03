@@ -170,6 +170,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/stores/worldScopeProjection.js',
+    // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
+      // per-entry references now, so its own static closure reaches the vocabulary core and the
+      // shipped counter. The harness validates this closure and names the miss, unlike the
+      // hand-rolled trees elsewhere.
+    'src/systems/worldVocabulary.js',
+    'src/utils/vocabularyUsage.js',
+    'src/utils/componentCategories.js',
+    'src/utils/recipeCategories.js',
     'src/systems/componentScope.js',
     'src/systems/essenceScope.js',
     'src/systems/toolScope.js',

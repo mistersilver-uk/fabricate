@@ -106,6 +106,14 @@ export const WORLD_TOOL_SCOPE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
+  // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
+  // per-entry references now, so its own static closure reaches the vocabulary core and the
+  // shipped counter. The harness validates this closure and names the miss, unlike the
+  // hand-rolled trees elsewhere.
+  'src/systems/worldVocabulary.js',
+  'src/utils/vocabularyUsage.js',
+  'src/utils/componentCategories.js',
+  'src/utils/recipeCategories.js',
   // The shared list frame's LIFTED VIEW-STATE (issue 1438), reached through
   // `EntityCatalogueShell` -> `EntityListInspectorFrame`. Declared here because omitting a
   // module the tree imports throws in `before()`, and node reports that as `# cancelled`

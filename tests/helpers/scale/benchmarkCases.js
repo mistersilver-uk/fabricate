@@ -36,6 +36,13 @@ import { INVENTORY_SERIES } from './scaleInventory.js';
 import { COMPONENT_LIBRARY_SERIES } from './scaleProfiles.js';
 import { createBenchWorld, hydrateRecipes, useHydratedRecipes } from './scaleWorld.js';
 
+// STATICALLY IMPORTED, unlike `worldScopeStores` and `scopedEntityReads`, which the module bag
+// loads lazily because they reach `src/config/settings.js` and that must not be evaluated before
+// `installFoundryEnv()`. Neither of these two does: the World Vocabulary store takes its settings
+// seams by injection with no module-level default, and the projection is pure.
+import { createWorldVocabularyStore } from '../../../src/systems/WorldVocabularyStore.js';
+import { buildWorldScopeState } from '../../../src/ui/svelte/stores/worldScopeProjection.js';
+
 /** How many rows a bulk salvage/destroy run is simulated at. Bounded: the run is O(rows x items x components). */
 const BULK_ROWS = 5;
 
@@ -138,6 +145,36 @@ function scopedManager(world) {
   manager.systems = new Map([[world.system.id, world.system]]);
   manager.initialized = true;
   return { manager, store };
+}
+
+/**
+ * How many times the world-scope publish is measured (issue 1392, epic 1357, PR 7a).
+ *
+ * The manager republishes `worldScope` on every settings-bridge reload and on every crafting
+ * data change, so the cost that matters is per publish rather than per session. Five is enough
+ * to make a per-publish regression visible in the timing without turning an untimed
+ * 2,500-entity setup into the dominant term.
+ */
+const WORLD_SCOPE_PUBLISHES = 5;
+
+/**
+ * The world vocabulary payload for one bench world, derived from the fixture's OWN vocabulary.
+ *
+ * Derived rather than synthesised, because a vocabulary of invented names would join against
+ * nothing: every reference count would be 0 and the case would measure the degenerate branch of
+ * exactly the pass it exists to measure.
+ *
+ * @param {object} world
+ * @returns {object}
+ */
+function worldVocabularyPayload(world) {
+  const entry = (name) => ({ id: String(name).trim().toLowerCase(), name: String(name) });
+  const distinct = (values) => [...new Set(values.filter(Boolean))];
+  return {
+    componentCategories: distinct(world.fixture.components.map((c) => c.category)).map(entry),
+    componentTags: distinct(world.fixture.components.flatMap((c) => c.tags ?? [])).map(entry),
+    recipeCategories: distinct(world.fixture.recipes.map((r) => r.category)).map(entry),
+  };
 }
 
 /** Rows the alchemy workbench listing is bounded to. */
@@ -573,6 +610,74 @@ function simpleCorpusCases() {
       }),
       teardown: ({ world }) => {
         world.settings.delete('componentScope');
+      },
+    },
+    // APPENDED, never inserted ahead of the cases above — see the append rule stated on the
+    // issue-1370 case earlier in this profile. A profile's FIRST case absorbs a one-off index
+    // build over the fixture's shared arrays, and several committed counts here depend on which
+    // case warmed which array first.
+    {
+      id: 'worldScopeProjection.buildWorldScopeState',
+      profile: 'simple-corpus',
+      description:
+        'THE MANAGER WORLD PUBLISH (issue 1392). `buildWorldScopeState` runs on every ' +
+        'settings-bridge reload and every crafting data change, and the World Vocabulary leg ' +
+        `added a reference count over the whole world to it. Measured ${WORLD_SCOPE_PUBLISHES} ` +
+        'times against a SEEDED 2,500-entity world component corpus, the 5,000-component ' +
+        'in-system library and the whole 10,000-recipe corpus. The pass is O(records) against a ' +
+        'shipped `_worldEssenceUsage` that is O(essences x records), but it is MEASURED rather ' +
+        'than assumed — and `referencedVocabularyRows` is what stops the number being reported ' +
+        'for a join that matched nothing.',
+      setup: (context) => {
+        const world = worldFor(context);
+        world.settings.set('componentScope', worldComponentScope(world));
+        const component = world.modules.worldScopeStores.createComponentScopeStore();
+        component.load();
+        world.settings.set('worldVocabulary', worldVocabularyPayload(world));
+        // The SAME `Map` the scope store above reads through `game.settings`, bound explicitly
+        // because this store takes its seams by injection and has no module-level default.
+        const vocabulary = createWorldVocabularyStore({
+          getSetting: (key) => world.settings.get(key),
+          setSetting: async (key, value) => world.settings.set(key, value),
+        });
+        vocabulary.load();
+        return { world, stores: { component, vocabulary } };
+      },
+      run: ({ world, stores }) => {
+        let published = null;
+        for (let publish = 0; publish < WORLD_SCOPE_PUBLISHES; publish++) {
+          published = buildWorldScopeState({
+            stores,
+            systems: [world.system],
+            recipes: world.fixture.recipes,
+          });
+        }
+        return published;
+      },
+      counts: ({ world }, published) => {
+        const vocabulary = published.worldScope.vocabulary;
+        const rows = [
+          ...vocabulary.componentCategories,
+          ...vocabulary.componentTags,
+          ...vocabulary.recipeCategories,
+        ];
+        return {
+          worldScopePublishes: WORLD_SCOPE_PUBLISHES,
+          worldVocabularyTotal: vocabulary.total,
+          worldVocabularyRows: rows.length,
+          // NON-DEGENERACY. The row count alone is blind: it is the same whether the reference
+          // counter matched every entry or none of them.
+          referencedVocabularyRows: rows.filter((entry) => entry.totalUsage > 0).length,
+          gatedVocabularyRows: rows.filter((entry) => entry.silentlyDeletable === false).length,
+          worldScopeEntries: published.worldScope.component.entries.length,
+          worldVocabularyBytes: settingBytes(world.settings, 'worldVocabulary'),
+        };
+      },
+      teardown: ({ world }) => {
+        // The harness shares ONE settings map across a profile, so a case that left either key
+        // behind would change what every later case measures.
+        world.settings.delete('componentScope');
+        world.settings.delete('worldVocabulary');
       },
     },
   ];

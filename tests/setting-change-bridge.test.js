@@ -314,10 +314,51 @@ describe('main.js settings hook wiring', () => {
 // the in-system arrays, that client has an unseeded world corpus AND an empty legacy corpus, so
 // its union read answers NOTHING and it sees no components, essences or tools at all until reload.
 describe('the world scope legs', () => {
+  // FOUR LEGS SINCE ISSUE 1392, and the fourth is not a scoped-entity store. Each row carries
+  // its own factory, its own replicated payload and its own probe, because the World Vocabulary
+  // has no `entities` sub-key and no entity roster to read back — parameterising those three is
+  // what lets one loop state one claim about all four rather than a fourth hand-written copy.
   const SCOPES = [
-    { name: 'componentScope', key: 'fabricate.componentScope', target: 'componentScopeStore' },
-    { name: 'essenceScope', key: 'fabricate.essenceScope', target: 'essenceScopeStore' },
-    { name: 'toolScope', key: 'fabricate.toolScope', target: 'toolScopeStore' },
+    {
+      name: 'componentScope',
+      key: 'fabricate.componentScope',
+      target: 'componentScopeStore',
+      module: '../src/systems/worldScopeStores.js',
+      factory: 'createComponentScopeStore',
+      subKey: 'entities',
+      payload: { entities: [{ id: 'w1', name: 'Replicated' }] },
+      ids: (store) => store.listEntities().map((entity) => entity.id),
+    },
+    {
+      name: 'essenceScope',
+      key: 'fabricate.essenceScope',
+      target: 'essenceScopeStore',
+      module: '../src/systems/worldScopeStores.js',
+      factory: 'createEssenceScopeStore',
+      subKey: 'entities',
+      payload: { entities: [{ id: 'w1', name: 'Replicated' }] },
+      ids: (store) => store.listEntities().map((entity) => entity.id),
+    },
+    {
+      name: 'toolScope',
+      key: 'fabricate.toolScope',
+      target: 'toolScopeStore',
+      module: '../src/systems/worldScopeStores.js',
+      factory: 'createToolScopeStore',
+      subKey: 'entities',
+      payload: { entities: [{ id: 'w1', name: 'Replicated' }] },
+      ids: (store) => store.listEntities().map((entity) => entity.id),
+    },
+    {
+      name: 'worldVocabulary',
+      key: 'fabricate.worldVocabulary',
+      target: 'worldVocabularyStore',
+      module: '../src/systems/WorldVocabularyStore.js',
+      factory: 'createWorldVocabularyStore',
+      subKey: 'componentTags',
+      payload: { componentTags: [{ id: 'w1', name: 'w1' }] },
+      ids: (store) => store.list('componentTags').map((entry) => entry.id),
+    },
   ];
 
   for (const scope of SCOPES) {
@@ -327,33 +368,24 @@ describe('the world scope legs', () => {
       // Proven by a consumer that reads from INSIDE the announcement, rather than by asserting a
       // call order — a `['load','emit']` order assertion passes against a `load()` that read the
       // wrong key.
-      const { createComponentScopeStore, createEssenceScopeStore, createToolScopeStore } =
-        await import('../src/systems/worldScopeStores.js');
-      const factories = {
-        componentScope: createComponentScopeStore,
-        essenceScope: createEssenceScopeStore,
-        toolScope: createToolScopeStore,
-      };
+      const module = await import(scope.module);
       const values = new Map();
-      const store = factories[scope.name]({
+      const store = module[scope.factory]({
         getSetting: (key) => values.get(key),
         setSetting: async (key, value) => values.set(key, value),
       });
       store.load();
-      assert.equal(store.isSeeded('entities'), false, 'unwritten before the replicated write');
+      assert.equal(store.isSeeded(scope.subKey), false, 'unwritten before the replicated write');
 
       // The replicated write lands in the settings store first; the hook fires afterwards.
-      values.set(scope.name, { entities: [{ id: 'w1', name: 'Replicated' }] });
+      values.set(scope.name, scope.payload);
 
       const observed = [];
       const handled = handleFabricateSettingChange(scope.key, {
         [scope.target]: store,
         craftingSystemManager: { getSystems: () => [{ id: 's1' }] },
         callAll: () => {
-          observed.push({
-            seeded: store.isSeeded('entities'),
-            ids: store.listEntities().map((entity) => entity.id),
-          });
+          observed.push({ seeded: store.isSeeded(scope.subKey), ids: scope.ids(store) });
         },
       });
 
@@ -369,4 +401,62 @@ describe('the world scope legs', () => {
       assert.equal(handleFabricateSettingChange(scope.key, { callAll: () => {} }), true);
     });
   }
+
+  it('drives EVERY store `src/main.js` hands the bridge, with the exemptions stated inline', () => {
+    // ── THE MIRROR THIS CLOSES ────────────────────────────────────────────────────────────
+    // `WORLD_STORE_LEGS` is an unexported frozen array, and the `SCOPES` table above is a
+    // hand-maintained copy of part of it. Before this, a store registered, constructed, loaded
+    // and handed to the bridge with NO leg was invisible: the key is not handled, nothing
+    // reports the miss, and the client's corpus stays at whatever it read at boot for the whole
+    // session. That is the exact failure the three issue-1359 legs exist to prevent, and it was
+    // reachable again for every later store.
+    //
+    // KEYED ON `fabricateSettingChangeTargets()` AND NOT ON `WORLD_SCOPED_SETTING_KEYS`. The
+    // targets factory is the actual enumeration of stores the bridge can drive; the key set has
+    // 27 members against 6 legs and carries no store information at all, so keying on it would
+    // need a ~21-entry hand-maintained exemption list — a second unguarded mirror in place of
+    // the first.
+    const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/main.js'), 'utf8');
+    const bridgeSource = readFileSync(
+      resolve(import.meta.dirname, '..', 'src/config/settingChangeBridge.js'),
+      'utf8'
+    );
+    const targetsStart = mainSource.indexOf('const fabricateSettingChangeTargets = () => ({');
+    assert.notEqual(targetsStart, -1, 'the targets factory is still present');
+    const targetsBody = mainSource.slice(
+      targetsStart,
+      mainSource.indexOf('\n  });', targetsStart) + 6
+    );
+    const targets = [...targetsBody.matchAll(/\n {4}(\w+): /g)].map((match) => match[1]);
+    const legsSource = bridgeSource.slice(
+      bridgeSource.indexOf('const WORLD_STORE_LEGS = Object.freeze(['),
+      bridgeSource.indexOf(']);', bridgeSource.indexOf('const WORLD_STORE_LEGS = Object.freeze(['))
+    );
+    const legs = [...legsSource.matchAll(/store: '(\w+)'/g)].map((match) => match[1]);
+
+    // POSITIVE CONTROLS, because both slices are `indexOf` reads that answer an empty string on
+    // a miss and would make the subtraction below compare two empty sets.
+    assert.ok(targets.length > 5, 'the targets slice found the factory body');
+    assert.ok(targets.includes('componentScopeStore'), 'and it reaches the world-store block');
+    for (const known of ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore']) {
+      assert.ok(legs.includes(known), `the legs slice found ${known}`);
+    }
+
+    const EXEMPT = new Set([
+      // Not stores. The manager and the recipe manager have their own branches above the leg
+      // lookup, and `callAll` is the bound hook emitter every leg is handed.
+      'craftingSystemManager',
+      'recipeManager',
+      'callAll',
+      // Driven by its own listener branch rather than by a leg, because its announcement is a
+      // single dedicated hook rather than the systems-scoped invalidation the legs emit.
+      'gatheringEnvironmentStore',
+    ]);
+    assert.deepEqual(
+      targets.filter((name) => !EXEMPT.has(name)).sort(),
+      legs.slice().sort(),
+      'every store `src/main.js` hands the bridge must have a leg that reloads it, or be ' +
+        'exempted above with its reason. A store with no leg NO-OPS silently.'
+    );
+  });
 });

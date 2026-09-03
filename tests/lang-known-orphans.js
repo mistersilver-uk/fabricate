@@ -562,7 +562,6 @@ export const KNOWN_ORPHANS = [
   'FABRICATE.Admin.Manager.TagsCategories.Kicker',
   'FABRICATE.Admin.Manager.TagsCategories.Library',
   'FABRICATE.Admin.Manager.TagsCategories.LibraryHint',
-  'FABRICATE.Admin.Manager.TagsCategories.References',
   'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirm',
   'FABRICATE.Admin.Manager.TagsCategories.RemoveCategoryConfirmTitle',
   'FABRICATE.Admin.Manager.TagsCategories.RemoveComponentCategoryConfirm',
