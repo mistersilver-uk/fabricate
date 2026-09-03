@@ -28,7 +28,6 @@ import { join, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 import { argv, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { bareVersion } from './lib/semver.js';
 import { verifyManagerChunkSplit } from './verify-manager-chunk-split.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -86,13 +85,11 @@ export function rewriteModuleJson(manifest) {
  * openspec/specs/release-and-distribution/spec.md.
  *
  * @param {object} manifest - dist/-ready manifest (post rewriteModuleJson). Mutated in place.
- * @param {string} releaseVersion - the version, with or without a leading `v`. The tag and the
- *   pinned download are built from the BARE form, so either shape yields `v1.5.0`, never
- *   `vv1.5.0` — which would 404 the download for every client that took the update.
+ * @param {string} releaseVersion - the bare version, no leading `v` (e.g. `1.5.0`).
  * @returns {object} The same manifest, for chaining.
  */
 export function applyReleaseUrls(manifest, releaseVersion) {
-  const tag = `v${bareVersion(releaseVersion)}`;
+  const tag = `v${releaseVersion}`;
   const releasesBase = 'https://github.com/mistersilver-uk/fabricate/releases';
   manifest.manifest = `${releasesBase}/latest/download/module.json`;
   manifest.download = `${releasesBase}/download/${tag}/fabricate-${tag}.zip`;
@@ -250,25 +247,17 @@ async function main() {
   const manifestRaw = await readFile(manifestPath, 'utf8');
   let manifest = JSON.parse(manifestRaw);
 
-  // The PUBLISHED manifest version carries the `v` prefix (issue 1407), so what Foundry shows
-  // and what the tag says are one string. Semantic-release still hands us the BARE version, and
-  // everything derived from it below — the tag, the pinned download URL, the zip name — stays
-  // bare-derived through `bareVersion`, so this prefix can never reach a URL as `vv`.
-  const manifestVersion = (value) => `v${bareVersion(value)}`;
-
   // --version: update module.json on disk before building
   if (sourceVersion) {
-    console.log(`Injecting version ${manifestVersion(sourceVersion)} into module.json...`);
-    manifest = { ...manifest, version: manifestVersion(sourceVersion) };
+    console.log(`Injecting version ${sourceVersion} into module.json...`);
+    manifest = { ...manifest, version: sourceVersion };
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
   } else if (distVersion) {
-    console.log(`Injecting version ${manifestVersion(distVersion)} into dist/module.json only...`);
-    manifest = { ...manifest, version: manifestVersion(distVersion) };
+    console.log(`Injecting version ${distVersion} into dist/module.json only...`);
+    manifest = { ...manifest, version: distVersion };
   }
 
-  // BARE, always: the artefact names and URLs below derive from it, and the tracked module.json
-  // this falls back to when no release flag was passed carries no prefix either.
-  const version = bareVersion(manifest.version);
+  const { version } = manifest;
 
   if (validateOnly) {
     console.log('Validating existing dist/...');

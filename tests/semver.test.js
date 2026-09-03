@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  bareVersion,
   compareSemver,
   foundryIsNewerVersion,
   isNumeric,
@@ -171,51 +170,4 @@ test('parseSemver splits prerelease identifiers and refuses build metadata', () 
   assert.deepEqual(parseSemver('1.5.0'), { major: 1, minor: 5, patch: 0, prerelease: [] });
   assert.equal(parseSemver('1.5.0-beta.7+abc123'), null, 'build metadata is not accepted');
   assert.equal(parseSemver('v1.5.0'), null, 'a tag is not a version');
-});
-
-// ───────────────────────────────────────────────────────────────────────────
-// bareVersion — the reader-side normaliser for the `v`-prefixed PUBLISHED manifest (issue 1407)
-// ───────────────────────────────────────────────────────────────────────────
-
-test('bareVersion strips exactly one leading v, and tolerates either shape', () => {
-  assert.equal(bareVersion('v1.9.1'), '1.9.1');
-  assert.equal(bareVersion('1.9.1'), '1.9.1', 'an unprefixed version is returned unchanged');
-  assert.equal(bareVersion('v1.10.0-beta.23'), '1.10.0-beta.23');
-  assert.equal(bareVersion('  v1.9.1  '), '1.9.1', 'surrounding whitespace is trimmed');
-  assert.equal(bareVersion(null), '', 'a null head normalises to empty, never "null"');
-  // ONE prefix only: a doubled `v` is a bug in whoever built the string, and leaving the second
-  // one in place is what makes `parseSemver` reject it instead of silently absorbing it.
-  assert.equal(bareVersion('vv1.2.3'), 'v1.2.3');
-  assert.equal(parseSemver(bareVersion('vv1.2.3')), null, 'a doubled prefix must not parse');
-});
-
-test('bareVersion feeds parseSemver without widening it', () => {
-  // The division of labour: the PARSER stays strict (a tag is not a version — see above), and the
-  // READER of a published manifest normalises before parsing.
-  assert.equal(parseSemver('v1.9.1'), null, 'parseSemver itself still refuses a tag');
-  assert.deepEqual(parseSemver(bareVersion('v1.9.1')), {
-    major: 1,
-    minor: 9,
-    patch: 1,
-    prerelease: []
-  });
-});
-
-test('foundryIsNewerVersion does NOT strip the prefix — it must predict the real client', () => {
-  // Foundry compares part-wise and only numerically when BOTH parts are numeric, so `v1` vs `1`
-  // falls back to a string compare where 'v' > '1'. These are the transition's real consequences,
-  // and the guards must see them rather than a tidied-up version of them.
-  assert.equal(foundryIsNewerVersion('v1.9.1', '1.9.0'), true, 'the switchover is offered');
-  assert.equal(
-    foundryIsNewerVersion('1.9.2', 'v1.9.1'),
-    false,
-    'ONE-WAY DOOR: after prefixing, a later BARE version is never offered as an update'
-  );
-  assert.equal(
-    foundryIsNewerVersion('v1.10.0', 'v1.10.0-beta.23'),
-    false,
-    'a stable still does not supersede its own prerelease, so private cohorts stay put'
-  );
-  assert.equal(foundryIsNewerVersion('v1.10.0-beta.23', 'v1.10.0-beta.7'), true);
-  assert.equal(foundryIsNewerVersion('v1.10.0', 'v1.9.1'), true);
 });
