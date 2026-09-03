@@ -19,6 +19,7 @@ import { DND5E_CURRENCY_PRESETS, PF2E_CURRENCY_PRESETS } from '../src/config/cur
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { ActorInventoryCoinSpender, ActorPropertyCoinSpender } from '../src/systems/CoinSpenders.js';
 import { Pf2eInventoryCoinAdapter } from '../src/systems/Pf2eInventoryCoinAdapter.js';
+import { CURRENCY_SETUP_INCOMPLETE_MESSAGE } from '../src/systems/currencyAffordance.js';
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -1195,12 +1196,13 @@ function brokenPathSystem() {
 
 const HAVE_NEED_RATIO = /have \d+, need \d+/;
 
-// The constant, action-first sentence `_formatMissingItems` now renders for EVERY currency
-// misconfiguration cause (issue 1493 round-2 follow-up) — replacing the composed, per-cause
-// sentence that read as a skippable paragraph once there were three or more validator errors,
-// with the sole actionable clause landing last past the toast's autodismiss.
-const CURRENCY_SETUP_MESSAGE =
-  "Currency setup is incomplete, so this cost can't be priced — a GM needs to finish it in Crafting Systems → World → Currency.";
+// The SAME constant, action-first sentence `_formatMissingItems` (and, for the defensive-only
+// `context.error` guard, `checkCurrencySpends`) renders for EVERY currency misconfiguration cause
+// (issue 1493 round-2 follow-up) — replacing the composed, per-cause sentence that read as a
+// skippable paragraph once there were three or more validator errors, with the sole actionable
+// clause landing last past the toast's autodismiss. Imported rather than re-typed so this test
+// cannot silently drift from the literal the source actually renders.
+const CURRENCY_SETUP_MESSAGE = CURRENCY_SETUP_INCOMPLETE_MESSAGE;
 
 /**
  * Stub `console.warn`, run the (possibly async) `run()`, and return its result alongside the

@@ -49,14 +49,14 @@ const SPEND_UNAVAILABLE_FALLBACK =
  *
  * `validateCurrencyProfile` returns one error per malformed unit, so an unbounded join renders a
  * whole paragraph wherever a caller surfaces it directly: the requirement rail's fact (an
- * accessible name), and `checkCurrencySpends`'s own guard branches, which return straight into
- * the toast `CraftingEngine.craft` shows the player. It is NOT what
- * `CraftingEngine._formatMissingItems` composes for a cost refused at SELECTION — since issue
- * 1493's round-2 follow-up that surface renders a fixed, action-first sentence instead and only
- * logs this text for diagnosis (see that method's own comment). 3 was chosen by reading the
- * actual output at each count: it names enough faults that a GM fixing the FIRST reported problem
- * is not left guessing whether there are more, while a dozen broken units still collapses to one
- * line ("...; and 9 more issues.") instead of a wall of text.
+ * accessible name) and the GM editor's own validation surface. It no longer reaches any
+ * player-facing toast at all (issue 1493 round-2 follow-up): both toast-reaching readers of
+ * `context.error` — `CraftingEngine._formatMissingItems` and `checkCurrencySpends`'s own
+ * `context.error` guard — render {@link CURRENCY_SETUP_INCOMPLETE_MESSAGE} instead now and only
+ * `console.warn` this text for diagnosis. 3 was chosen by reading the actual output at each
+ * count: it names enough faults that a GM fixing the FIRST reported problem is not left guessing
+ * whether there are more, while a dozen broken units still collapses to one line ("...; and 9
+ * more issues.") instead of a wall of text.
  */
 const MAX_LISTED_PROFILE_ERRORS = 3;
 
@@ -93,10 +93,13 @@ const CURRENCY_SETUP_DIRECTIVE =
 /**
  * Append {@link CURRENCY_SETUP_DIRECTIVE} to a player-facing currency-refusal reason.
  *
- * Called only by {@link checkCurrencySpends}'s two guard branches in this module, which return
- * straight into `CraftingEngine.craft`'s result — the crafting player's own read.
+ * Called only by {@link checkCurrencySpends}'s `spenderUnavailableReason` guard branch, which
+ * returns straight into `CraftingEngine.craft`'s result — the crafting player's own read.
+ * `spenderUnavailableReason` is always a single short sentence (`describeUnavailableCoinSpender`
+ * composes it from ONE cause, never a joined validator list), so appending the directive there
+ * does not risk the paragraph problem `context.error` had (issue 1493 round-2 follow-up).
  *
- * Two other readers of the SAME `error`/`spenderUnavailableReason` fields must NOT use this:
+ * Three other readers of the SAME `error`/`spenderUnavailableReason` fields must NOT use this:
  *
  *   - `spendCurrencySpends`/`refundCurrencySpends` compose from the same fields but only ever
  *     `console.error` the result (the deduction/refund never abort or surface a message a caller
@@ -104,16 +107,19 @@ const CURRENCY_SETUP_DIRECTIVE =
  *   - `CraftingEngine._formatMissingItems`, the OTHER path a refused currency cost reaches (when
  *     selection swallows it before any spend is ever handed to `checkCurrencySpends`), no longer
  *     composes this reason into its own message at all (issue 1493 round-2 follow-up): its player
- *     toast now renders one constant, action-first sentence and only tests this reason's
+ *     toast now renders {@link CURRENCY_SETUP_INCOMPLETE_MESSAGE} and only tests the reason's
  *     presence — see `_missingItemsCurrencyReason`'s doc comment.
+ *   - `checkCurrencySpends`'s OWN `context.error` guard branch, for the same reason: it renders
+ *     {@link CURRENCY_SETUP_INCOMPLETE_MESSAGE} too now, not this directive — see that branch's
+ *     own comment for why a real craft is not known to reach it with a non-empty spend list at
+ *     all.
  *
  * `resolveCurrencyContext`'s raw fields also stay undirected for the GM editor's own validation
  * report — a GM-only surface. The requirement rail is NOT the same kind of surface, though, and a
  * previous version of this comment mischaracterised it as one: `RecipeManager
  * ._resolveCurrencyIssue` hands the SAME raw, undirected reason to `RequirementRail.svelte`,
  * which renders on the crafting PLAYER's own recipe view, not a GM or display-only one. Any
- * directive for that surface belongs in the rail's own render path, not here — this function
- * serves only the two `checkCurrencySpends` branches above.
+ * directive for that surface belongs in the rail's own render path, not here.
  *
  * @param {string|null|undefined} reason
  * @returns {string|null|undefined}
@@ -121,6 +127,28 @@ const CURRENCY_SETUP_DIRECTIVE =
 export function withCurrencySetupDirective(reason) {
   return reason ? `${reason} ${CURRENCY_SETUP_DIRECTIVE}` : reason;
 }
+
+/**
+ * The constant, action-first sentence a currency refusal caused by an INVALID profile renders as
+ * to the crafting player, regardless of how many units {@link formatProfileErrors} would have
+ * joined (issue 1493 round-2 follow-up).
+ *
+ * Shared by BOTH toast-reaching readers of `resolveCurrencyContext`'s `error` field, so they
+ * cannot drift apart: `CraftingEngine._formatMissingItems` (a currency option refused at
+ * SELECTION — the reported defect's actual path) and `checkCurrencySpends`'s own `context.error`
+ * guard below (see that branch's own comment for why a real craft is not known to reach it with a
+ * non-empty spend list at all).
+ *
+ * A message composed from the joined validator text read as one skippable paragraph in the
+ * player's toast — a client-local `ui.notifications.warn` call (`foundryBridge.js`) that
+ * auto-dismisses after 5000ms and whose core CSS (`.notification`) collapses `\n` separators to
+ * spaces — once there were three or more broken units, with the sole actionable clause ("ask your
+ * GM") landing last. This sentence is constant length regardless of cause and puts the action
+ * first; the raw validator detail is still `console.warn`ed for diagnosis and rendered in full by
+ * the GM editor's own validation note and the requirement rail.
+ */
+export const CURRENCY_SETUP_INCOMPLETE_MESSAGE =
+  "Currency setup is incomplete, so this cost can't be priced — a GM needs to finish it in Crafting Systems → World → Currency.";
 
 /**
  * Resolve the effective currency config for a recipe, composed from TWO scopes.
@@ -427,9 +455,26 @@ export async function checkCurrencySpends(craftingActor, recipe, currencySpends,
   const context = resolveCurrencyContext(recipe, seams);
   if (!context.enabled) return { valid: true };
   // Both branches return DIRECTLY to `CraftingEngine.craft`'s result, which is what the crafting
-  // player reads — the directive belongs here (issue 1493).
+  // player reads.
+  //
+  // `context.error` truthy ALSO makes `buildCurrencyAffordProbe` constant-`false` (see its
+  // neighbour above), which makes `IngredientSet.resolveIngredientSelection` refuse to ever
+  // choose a currency option for its group. So a real craft against an INVALID profile never
+  // reaches here with a non-empty `currencySpends` at all — it fails earlier, in
+  // `CraftingEngine._formatMissingItems`, which is the reported defect's actual path. Traced both
+  // `CraftingEngine.craft` call sites (issue 1493 round-2 follow-up): neither has a
+  // macrotask-crossing `await` between resolving the selection and this call (only a same-tick
+  // microtask resumption through `_validateTools`, which performs no I/O), so the two
+  // `resolveCurrencyContext` reads in one craft cannot observe a config change in between — a live
+  // `updateSetting` replication (`settingChangeBridge.js`) cannot land inside that gap. Every place
+  // in THIS codebase that reaches this branch with `context.error` set does so by constructing
+  // `currencySpends` directly rather than through selection (see
+  // `tests/currency-two-scope-composition.test.js`). Kept as a defensive guard regardless, and
+  // rendered with the SAME constant sentence `_formatMissingItems` uses, so the message shape
+  // matches if it is ever reached.
   if (context.error) {
-    return { valid: false, message: withCurrencySetupDirective(context.error) };
+    console.warn('Fabricate | Currency requirement could not be priced:', context.error);
+    return { valid: false, message: CURRENCY_SETUP_INCOMPLETE_MESSAGE };
   }
   const { profile, config, spender, spenderUnavailableReason } = context;
   if (!spender?.check) {

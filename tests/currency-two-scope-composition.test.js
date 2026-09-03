@@ -19,6 +19,7 @@ import { ActorInventoryCoinSpender } from '../src/systems/CoinSpenders.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
+  CURRENCY_SETUP_INCOMPLETE_MESSAGE,
   getCurrencyRequirementConfig,
   refundCurrencySpends,
   resolveCurrencyContext,
@@ -297,28 +298,61 @@ describe('the joined profile-error list caps its listed faults (issue 1493)', ()
 });
 
 /**
- * A player-facing currency refusal carries a directive naming who can fix it and where
- * (issue 1493 follow-up). `checkCurrencySpends` returns its message DIRECTLY as
- * `CraftingEngine.craft`'s result, which is what the crafting player reads, so both of its
- * refusal branches must carry it.
+ * A player-facing currency refusal reads consistently regardless of cause (issue 1493 follow-up),
+ * and `checkCurrencySpends`'s two refusal branches now diverge on HOW, following a reachability
+ * finding traced for issue 1493's round-2 follow-up:
+ *
+ *   - The `spenderUnavailableReason` branch is a real production path — a valid profile whose
+ *     spender turns out to be unusable is not detected until here — and
+ *     `spenderUnavailableReason` is always a single short sentence (never a joined validator
+ *     list), so it still carries {@link withCurrencySetupDirective}'s "ask your GM" suffix.
+ *   - The `context.error` branch renders the SAME constant sentence
+ *     `CraftingEngine._formatMissingItems` uses instead now, dropping the composed validator
+ *     detail (and the directive) entirely. `context.error` truthy ALSO makes
+ *     `buildCurrencyAffordProbe` constant-`false`, which makes
+ *     `IngredientSet.resolveIngredientSelection` refuse to ever choose a currency option for its
+ *     group — so a REAL craft against an invalid profile never reaches `checkCurrencySpends` with
+ *     a non-empty spend list at all; it fails earlier, at `_formatMissingItems`, which is the
+ *     reported defect's actual path. The test below drives `checkCurrencySpends` directly with a
+ *     hand-built `SPENDS` array specifically BECAUSE no real selection can produce that
+ *     combination: it exercises the branch as a defensive guard, not as evidence the path is
+ *     live — do not read it as proof of a reachable production state.
  *
  * `spendCurrencySpends` and `refundCurrencySpends` compose from the SAME context fields but only
  * ever `console.error` the result (the deduction/refund neither abort nor surface to a caller a
  * player can read), so they — and the raw context fields themselves, read by the GM editor's
- * validation report and the requirement rail — must NOT carry it. Both are pinned as negative
- * controls below.
+ * validation report and the requirement rail — must NOT carry the directive. Both are pinned as
+ * negative controls below.
  */
 describe('the player-facing currency setup directive (issue 1493)', () => {
   const DIRECTIVE = /Ask your GM to finish the world's currency setup \(Crafting Systems/;
   const SPENDS = [{ unit: 'gp', amount: 1 }];
 
-  it('appends the directive when checkCurrencySpends refuses on an INVALID profile', async () => {
-    const seams = seamsFor({ spendStrategy: 'actorProperty', units: [{ id: 'gp', label: 'Gold' }] });
-    const result = await checkCurrencySpends(null, RECIPE, SPENDS, seams);
+  it('renders the constant, action-first sentence (not the directive) when checkCurrencySpends refuses on an INVALID profile', async () => {
+    const original = console.warn;
+    const warnings = [];
+    console.warn = (...args) => warnings.push(args.map(String).join(' '));
+    let result;
+    try {
+      const seams = seamsFor({
+        spendStrategy: 'actorProperty',
+        units: [{ id: 'gp', label: 'Gold' }],
+      });
+      result = await checkCurrencySpends(null, RECIPE, SPENDS, seams);
+    } finally {
+      console.warn = original;
+    }
 
     assert.equal(result.valid, false);
-    assert.match(result.message, /Currency configuration is invalid/);
-    assert.match(result.message, DIRECTIVE);
+    // Whole-message assertion: this branch composes NOTHING from the validator detail into the
+    // player-facing message anymore.
+    assert.equal(result.message, CURRENCY_SETUP_INCOMPLETE_MESSAGE);
+    assert.ok(!/Currency configuration is invalid/.test(result.message));
+    assert.ok(!DIRECTIVE.test(result.message), 'the directive sentence belongs to the OTHER branch');
+    assert.ok(
+      warnings.some((call) => /Currency configuration is invalid/.test(call)),
+      'the raw validator detail is still logged for diagnosis'
+    );
   });
 
   it('appends the directive when checkCurrencySpends refuses on a valid profile with NO spender', async () => {

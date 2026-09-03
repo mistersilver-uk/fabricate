@@ -52,6 +52,7 @@ import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
+  CURRENCY_SETUP_INCOMPLETE_MESSAGE,
   getCurrencyRequirementConfig,
   refundCurrencySpends,
   resolveCurrencyContext,
@@ -5477,16 +5478,18 @@ export class CraftingEngine {
         //      after 5000ms and core's `.notification` CSS collapses the reason's `\n` separators to
         //      spaces, so a composed, per-cause sentence rendered as one wrapped paragraph — and at
         //      three or more validator errors the sole actionable clause ("ask your GM") landed
-        //      last, past where a skimming reader has already stopped reading. The sentence below is
-        //      constant-length and action-first regardless of cause; the raw reason is still logged
-        //      for diagnosis and rendered in full by the GM editor's validation note and the
-        //      requirement rail.
+        //      last, past where a skimming reader has already stopped reading.
+        //      `CURRENCY_SETUP_INCOMPLETE_MESSAGE` is constant-length and action-first regardless
+        //      of cause, and is the SAME literal `checkCurrencySpends`'s own `context.error` guard
+        //      renders (so the two toast-reaching readers of that field cannot drift apart); the
+        //      raw reason is still logged for diagnosis and rendered in full by the GM editor's
+        //      validation note and the requirement rail.
         const cost = formatCurrencyRequirement(ingredient.match, currencyUnits);
         if (currencyReason) {
           console.warn('Fabricate | Currency requirement could not be priced:', currencyReason);
         }
         line = currencyReason
-          ? `Requires ${cost}. Currency setup is incomplete, so this cost can't be priced — a GM needs to finish it in Crafting Systems → World → Currency.`
+          ? `Requires ${cost}. ${CURRENCY_SETUP_INCOMPLETE_MESSAGE}`
           : `Insufficient currency. Requires ${cost}.`;
       }
       if (!line) {
