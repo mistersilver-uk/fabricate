@@ -314,6 +314,10 @@ function compileManagerRoot() {
   // page imports it statically, so it is in this root's graph whether or not anything ticks a
   // row — and an omission HANGS this file rather than failing one test in it.
   writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte');
+  // The world COMPONENT catalogue's bulk panel (issue 1371), on the same rule as its tool twin
+  // above: the page imports it statically, so it is in this root's graph whether or not
+  // anything ticks a row, and an omission HANGS this file rather than failing one test in it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte');
   // The two cards the system Essence Rules editor opens and closes with (issue 1372). Both are
   // in `EssenceEditView`'s STATIC graph, so an omission does not fail this file — it HANGS it,
   // reported as `# cancelled` with no message.
@@ -973,6 +977,13 @@ function compileManagerRoot() {
     'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
     'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
     'src/ui/svelte/apps/manager/scoped/worldToolStudio.js',
+    // Issue 1371 (epic 1357, PR 6a-ii): the two world COMPONENT screens are real bodies now, so
+    // the component presentation leaf and the pure validation model are in this root's static
+    // graph. THIS LIST HAS NO VALIDATOR — `assertCompiledSvelteClosure` walks `.svelte` only —
+    // so an omission here dies later on `ERR_MODULE_NOT_FOUND` with the module named only in a
+    // stack, and every blocked test is reported as `# cancelled` rather than failing.
+    'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+    'src/utils/componentScopeValidation.js',
     'src/utils/scopedEntityListModel.js',
     // Issue 1392 (epic 1357, PR 7a): the world Tags & Categories screen is a real body now, so
     // its pure leaf is in this root's static graph — and so is the World Vocabulary's own core,
@@ -14409,8 +14420,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       field.querySelector(
         `[data-gathering-task-availability-pill="${kind}"][data-condition-id="${conditionId}"]`
       );
-    const availabilityTrigger = (field) =>
-      field.querySelector('.manager-availability-menu-button');
+    const availabilityTrigger = (field) => field.querySelector('.manager-availability-menu-button');
     const openAvailabilityMenu = async (field) => {
       availabilityTrigger(field).click();
       await tick();
@@ -14507,10 +14517,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'true',
         'the trigger should announce the menu as expanded'
       );
-      assert.ok(
-        availabilityOptions(kind).length > 0,
-        'picker menu should open on trigger click'
-      );
+      assert.ok(availabilityOptions(kind).length > 0, 'picker menu should open on trigger click');
       document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
       await tick();
       flushSync();
@@ -20683,12 +20690,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       Array.from(inheritance.querySelectorAll('[data-tool-inspector-inherit]')).map(
         (row) => `${row.dataset.toolInspectorInherit}:${row.dataset.toolInspectorInheritState}`
       ),
-      [
-        'breakage:overridden',
-        'onBreak:overridden',
-        'prerequisites:overridden',
-        'bonus:overridden',
-      ],
+      ['breakage:overridden', 'onBreak:overridden', 'prerequisites:overridden', 'bonus:overridden'],
       'all four world-default sections, each with its own state'
     );
     // `overridden` FOUR TIMES IS THE LOAD-BEARING HALF. An absent inherit key reads as
@@ -26980,7 +26982,11 @@ describe('CraftingSystemManager mounted behavior', () => {
         'component-catalogue',
         'world-components',
         'Component catalogue',
-        '[data-scoped-placeholder="world-components"]',
+        // Issue 1371: the real catalogue. `data-scoped-list` is the shell's own hook and the
+        // route token pins it to THIS screen rather than to any scoped list, exactly as the tool
+        // row below does — and swapping the placeholder selector for it is what makes this row
+        // fail again if the body ever reverts to delegating.
+        '[data-scoped-list="world-components"]',
       ],
       // Issue 1392: the real world vocabulary screen. Its body hook is one of the three panel
       // wrappers rather than the page hook, for this row's stated reason — a route wired into
@@ -28114,11 +28120,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         await goToToolCatalogue();
         await dropItem(AWL.uuid);
 
-        assert.equal(
-          worldToolIds().length,
-          2,
-          'a different source Item is a different world Tool'
-        );
+        assert.equal(worldToolIds().length, 2, 'a different source Item is a different world Tool');
         assert.equal(entryName(), AWL.name, 'and the GM lands on the one they just made');
       });
     });
@@ -28456,10 +28458,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     it('Recipes -> Components clears the library searches', async () => {
       const calls = [];
       await openRecipeLibrary(calls);
-      const outcome = await clickForClearDelta(calls, () => navButton('Component Rules'), 'Component Rules');
+      const outcome = await clickForClearDelta(
+        calls,
+        () => navButton('Component Rules'),
+        'Component Rules'
+      );
 
       assert.equal(outcome.view, 'components');
-      assert.equal(outcome.delta, 1, 'a different browser is a different scope, so the term is cleared');
+      assert.equal(
+        outcome.delta,
+        1,
+        'a different browser is a different scope, so the term is cleared'
+      );
     });
 
     it('Recipes -> Books & Scrolls clears the library searches', async () => {
@@ -28501,7 +28511,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       const calls = [];
       await openRecipeLibrary(calls, { selectedSystemOverrides: { visibilityMode: 'restricted' } });
       const toAccess = await clickForClearDelta(calls, () => craftingSubitem('Access'), 'Access');
-      assert.equal(toAccess.view, 'access', 'arranged: the GM is on Access, where a term is typable');
+      assert.equal(
+        toAccess.view,
+        'access',
+        'arranged: the GM is on Access, where a term is typable'
+      );
 
       const outcome = await clickForClearDelta(
         calls,
@@ -28539,4 +28553,3 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
   });
 });
-

@@ -158,230 +158,6 @@
   // pair with their rendered count MUST be counted over the FILTERED COHORT, and once row
   // projection is page-scoped a pipeline assembled at the call site is exactly where
   // "count the array in scope" — the page — gets written.
-  const model = $derived(
-    buildComponentBrowserModel(cohortCards(), {
-      category: ui.categoryFilter,
-      essence: ui.essenceFilter,
-      // Not applied as a filter here (the store searches before projecting); it feeds the
-      // active-filter chip run only.
-      search: itemSearchTerm,
-      sortKey: ui.sortKey,
-      sortDirection: ui.sortDirection,
-      pageIndex: ui.pageIndex,
-      pageSize: ui.pageSize,
-      groupByCategory: ui.groupByCategory,
-    })
-  );
-  const filteredComponents = $derived(model.filtered);
-  // The expensive half of a component card — its linked source document, the "Missing"
-  // badge and the live description fallback — is resolved for the PAGE and nothing else
-  // (issue 1081). The store projects every card cheaply and only this view knows which of
-  // them are on screen, so the request has to originate here.
-  //
-  // `hydrate()` is idempotent and memoized per card, so re-running this effect on every
-  // re-render (including the store's own republish once the cards fill) costs nothing. The
-  // returned promise is deliberately not awaited: the card fills itself in place and the
-  // store republishes, which is what re-renders the rows.
-  //
-  // Called off the card rather than through the projection's `hydrateItemCards` helper on
-  // purpose: importing `stores/adminComponentRowProjection.js` here would pull that module
-  // (and its own imports) into the dependency closure of every mounted-component suite that
-  // renders this tree, where a module missing from the harness allowlist HANGS the suite as
-  // `# cancelled` rather than failing. A card with no `hydrate` — an isolated mount's plain
-  // fixture — is simply left as it is.
-  //
-  // The rejection is swallowed deliberately rather than left to become an unhandled
-  // rejection on every render: a card that could not resolve keeps its un-hydrated reading,
-  // which renders correctly rather than blankly, and the projection drops its memo on
-  // rejection so the next render retries.
-  $effect(() => {
-    for (const card of model.page) card?.hydrate?.()?.catch?.(() => {});
-  });
-  const page = $derived({
-    components: model.page,
-    pageIndex: model.pageIndex,
-    pageCount: model.pageCount,
-    totalCount: model.totalCount,
-    // The 1-based inclusive window the pager renders as "1–25 of 30". Dropping these makes
-    // the count read "undefined–undefined of 30" and nothing else fails.
-    rangeStart: model.rangeStart,
-    rangeEnd: model.rangeEnd,
-  });
-  const groups = $derived(model.groups);
-
-  // ── Bulk selection (issue 772) ───────────────────────────────────────────────────
-  // `pageIds` is the set of RENDERED row ids, NOT `page.components`: with grouping on
-  // (the default) a COLLAPSED group renders no rows at all, so a naive page list would let
-  // the toolbar's tri-state box select rows the GM cannot see and report a count exceeding
-  // the visible ones. `filteredIds` is the whole filtered set, which the results link
-  // reaches and the page box deliberately cannot.
-  const bulkSelectedIds = $derived(ui.bulkSelectedComponentIds ?? new Set());
-  const filteredIds = $derived(filteredComponents.map((item) => item.id));
-  const pageIds = $derived(
-    ui.groupByCategory
-      ? groups
-          .filter((group) => !isCategoryCollapsed(group.category))
-          .flatMap((group) => group.components.map((item) => item.id))
-      : page.components.map((item) => item.id)
-  );
-  const selectionSummary = $derived(
-    describeComponentSelection({
-      pageIds,
-      filteredIds,
-      selectedIds: bulkSelectedIds,
-    })
-  );
-
-  // A delete, an unlink or a store refresh must never leave a phantom id in the count or
-  // in an `Apply`. Only assigned when something actually dropped — the pruned set is a
-  // subset, so equal sizes mean an identical set — so this cannot loop.
-  $effect(() => {
-    const current = ui.bulkSelectedComponentIds ?? new Set();
-    if (current.size === 0) return;
-    const pruned = pruneComponentSelection(
-      current,
-      (itemCards || []).map((item) => item.id)
-    );
-    if (pruned.size !== current.size) ui.bulkSelectedComponentIds = pruned;
-  });
-
-  // Every mutation assigns a NEW Set rather than mutating in place, so the bound lifted
-  // state propagates back to the manager root — the rule `collapsedCategories` above
-  // already documents.
-  function toggleComponentBulkSelected(id) {
-    ui.bulkSelectedComponentIds = toggleComponentSelection(bulkSelectedIds, id);
-  }
-
-  function setPageSelected(on) {
-    ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, pageIds, on);
-  }
-
-  function selectAllResults() {
-    ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, filteredIds, true);
-  }
-
-  // The write is FIRST, so the owner's callback runs with Svelte's flush already ahead of the
-  // focus hop it schedules.
-  function clearBulkSelection() {
-    ui.bulkSelectedComponentIds = new Set();
-    onSelectionCleared?.();
-  }
-
-  // The active-filter chips, derived by the pure model so the run and the "is anything
-  // on?" question can never disagree.
-  const chips = $derived(model.chips);
-
-  const sortOptions = $derived(
-    COMPONENT_SORT_KEYS.map((key) => ({
-      key,
-      label: sortLabel(key),
-    }))
-  );
-
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
-  function format(key, fallback, replacements) {
-    let result = text(key, fallback);
-    for (const [token, value] of Object.entries(replacements)) {
-      result = result.replace(`{${token}}`, value);
-    }
-    return result;
-  }
-
-  const CHIP_LABELS = {
-    category: ['FABRICATE.Admin.Manager.Component.ChipCategory', 'Category: {value}'],
-    essence: ['FABRICATE.Admin.Manager.Component.ChipEssence', 'Essence: {value}'],
-    search: ['FABRICATE.Admin.Manager.Component.ChipSearch', 'Search: {value}'],
-  };
-
-  function chipLabel(chip) {
-    const [labelKey, fallback] = CHIP_LABELS[chip.id];
-    const value = chip.id === 'category' ? categoryLabel(chip.value) : chip.value;
-    return format(labelKey, fallback, { value });
-  }
-
-  function clearChip(chipId) {
-    if (chipId === 'category') setCategoryFilter('all');
-    if (chipId === 'essence') setEssenceFilter('all');
-    if (chipId === 'search') onSearchChange('');
-  }
-
-  function sortLabel(key) {
-    const labels = {
-      name: text('FABRICATE.Admin.Manager.Component.SortName', 'Name'),
-      category: text('FABRICATE.Admin.Manager.Component.SortCategory', 'Category'),
-      essences: text('FABRICATE.Admin.Manager.Component.SortEssences', 'Essences'),
-      salvage: text('FABRICATE.Admin.Manager.Component.SortSalvage', 'Salvage'),
-    };
-    return labels[key] || key;
-  }
-
-  function categoryLabel(category) {
-    return getComponentCategoryLabel(category, localize);
-  }
-
-  // Suppressed for `general`: no redundant "General" chip on every uncategorized row.
-  // `general` remains a selectable FILTER option, pinned last as the catch-all — the
-  // same badge-vs-filter asymmetry the Recipe Studio settled on.
-  function categoryBadgeFor(item) {
-    const category = item?.category || GENERAL_COMPONENT_CATEGORY;
-    return category === GENERAL_COMPONENT_CATEGORY ? '' : categoryLabel(category);
-  }
-
-  function uniqueSorted(values) {
-    return Array.from(
-      new Set(values.map((value) => String(value || '').trim()).filter(Boolean))
-    ).sort((a, b) => a.localeCompare(b));
-  }
-
-  // Where the component's linked item lives — a real state, so it reads as a StatusPill
-  // (the shared vehicle the Recipe Studio's row states use) rather than a raw chip.
-  // A resolved link (compendium / world) is ACCENT; an unresolved stored source is the
-  // one WARNING, because a component whose source no longer exists is a thing the GM
-  // must be able to scan a library for.
-  function componentSourceOrigin(item) {
-    if (item?.sourceMissing) {
-      return {
-        id: 'missing',
-        label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing'),
-        tone: 'warning',
-        icon: 'fas fa-link-slash',
-      };
-    }
-    const origin = item?.sourceOrigin || '';
-    if (origin === 'compendium') {
-      return {
-        id: 'compendium',
-        label:
-          item?.sourceOriginLabel ||
-          text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium'),
-        tone: 'accent',
-        icon: 'fas fa-book-atlas',
-      };
-    }
-    if (origin === 'world') {
-      return {
-        id: 'world',
-        label:
-          item?.sourceOriginLabel ||
-          text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory'),
-        tone: 'accent',
-        icon: 'fas fa-box-archive',
-      };
-    }
-    return {
-      id: 'unknown',
-      label:
-        item?.sourceOriginLabel ||
-        text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'),
-      tone: 'subtle',
-      icon: 'fas fa-circle-question',
-    };
-  }
-
   // ── THE WORLD PROJECTION'S PER-SYSTEM JOIN, indexed by world entity id ──────────────────
   // Read as a Map rather than scanned per row: `scope` republishes a NEW object on every
   // world-scope edit, and a `find` per row would walk the whole corpus once per component on
@@ -533,6 +309,235 @@
       worldEntriesById.get(String(cohortRows[0]?.id ?? '')) ??
       null
   );
+
+  const model = $derived(
+    buildComponentBrowserModel(cohortCards(), {
+      category: ui.categoryFilter,
+      essence: ui.essenceFilter,
+      // Not applied as a filter here (the store searches before projecting); it feeds the
+      // active-filter chip run only.
+      search: itemSearchTerm,
+      sortKey: ui.sortKey,
+      sortDirection: ui.sortDirection,
+      pageIndex: ui.pageIndex,
+      pageSize: ui.pageSize,
+      groupByCategory: ui.groupByCategory,
+    })
+  );
+  const filteredComponents = $derived(model.filtered);
+  // The expensive half of a component card — its linked source document, the "Missing"
+  // badge and the live description fallback — is resolved for the PAGE and nothing else
+  // (issue 1081). The store projects every card cheaply and only this view knows which of
+  // them are on screen, so the request has to originate here.
+  //
+  // `hydrate()` is idempotent and memoized per card, so re-running this effect on every
+  // re-render (including the store's own republish once the cards fill) costs nothing. The
+  // returned promise is deliberately not awaited: the card fills itself in place and the
+  // store republishes, which is what re-renders the rows.
+  //
+  // Called off the card rather than through the projection's `hydrateItemCards` helper on
+  // purpose: importing `stores/adminComponentRowProjection.js` here would pull that module
+  // (and its own imports) into the dependency closure of every mounted-component suite that
+  // renders this tree, where a module missing from the harness allowlist HANGS the suite as
+  // `# cancelled` rather than failing. A card with no `hydrate` — an isolated mount's plain
+  // fixture — is simply left as it is.
+  //
+  // The rejection is swallowed deliberately rather than left to become an unhandled
+  // rejection on every render: a card that could not resolve keeps its un-hydrated reading,
+  // which renders correctly rather than blankly, and the projection drops its memo on
+  // rejection so the next render retries.
+  $effect(() => {
+    for (const card of model.page) card?.hydrate?.()?.catch?.(() => {});
+  });
+  const page = $derived({
+    components: model.page,
+    pageIndex: model.pageIndex,
+    pageCount: model.pageCount,
+    totalCount: model.totalCount,
+    // The 1-based inclusive window the pager renders as "1–25 of 30". Dropping these makes
+    // the count read "undefined–undefined of 30" and nothing else fails.
+    rangeStart: model.rangeStart,
+    rangeEnd: model.rangeEnd,
+  });
+  const groups = $derived(model.groups);
+
+  // ── Bulk selection (issue 772) ───────────────────────────────────────────────────
+  // `pageIds` is the set of RENDERED row ids, NOT `page.components`: with grouping on
+  // (the default) a COLLAPSED group renders no rows at all, so a naive page list would let
+  // the toolbar's tri-state box select rows the GM cannot see and report a count exceeding
+  // the visible ones. `filteredIds` is the whole filtered set, which the results link
+  // reaches and the page box deliberately cannot.
+  const bulkSelectedIds = $derived(ui.bulkSelectedComponentIds ?? new Set());
+  const filteredIds = $derived(filteredComponents.map((item) => item.id));
+  const pageIds = $derived(
+    ui.groupByCategory
+      ? groups
+          .filter((group) => !isCategoryCollapsed(group.category))
+          .flatMap((group) => group.components.map((item) => item.id))
+      : page.components.map((item) => item.id)
+  );
+  const selectionSummary = $derived(
+    describeComponentSelection({
+      pageIds,
+      filteredIds,
+      selectedIds: bulkSelectedIds,
+    })
+  );
+
+  // A delete, an unlink or a store refresh must never leave a phantom id in the count or
+  // in an `Apply`. Only assigned when something actually dropped — the pruned set is a
+  // subset, so equal sizes mean an identical set — so this cannot loop.
+  $effect(() => {
+    const current = ui.bulkSelectedComponentIds ?? new Set();
+    if (current.size === 0) return;
+    const pruned = pruneComponentSelection(
+      current,
+      (itemCards || []).map((item) => item.id)
+    );
+    if (pruned.size !== current.size) ui.bulkSelectedComponentIds = pruned;
+  });
+
+  // Every mutation assigns a NEW Set rather than mutating in place, so the bound lifted
+  // state propagates back to the manager root — the rule `collapsedCategories` above
+  // already documents.
+  function toggleComponentBulkSelected(id) {
+    ui.bulkSelectedComponentIds = toggleComponentSelection(bulkSelectedIds, id);
+  }
+
+  function setPageSelected(on) {
+    ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, pageIds, on);
+  }
+
+  function selectAllResults() {
+    ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, filteredIds, true);
+  }
+
+  // The write is FIRST, so the owner's callback runs with Svelte's flush already ahead of the
+  // focus hop it schedules.
+  function clearBulkSelection() {
+    ui.bulkSelectedComponentIds = new Set();
+    onSelectionCleared?.();
+  }
+
+  // The active-filter chips, derived by the pure model so the run and the "is anything
+  // on?" question can never disagree.
+  const chips = $derived(model.chips);
+
+  const sortOptions = $derived(
+    COMPONENT_SORT_KEYS.map((key) => ({
+      key,
+      label: sortLabel(key),
+    }))
+  );
+
+  function text(key, fallback) {
+    const translated = localize(key);
+    return translated && translated !== key ? translated : fallback;
+  }
+
+  // `replacements` TOLERATES ABSENCE (issue 1371). It was a bare `Object.entries(replacements)`,
+  // which THROWS on a two-argument call — and this helper is now handed to the shared
+  // component-scope model as its localizer, where several strings carry no token at all. A throw
+  // inside a render kills the whole route: the manager falls back to the systems library, so the
+  // symptom is a navigation that silently does not happen rather than an error anyone can read.
+  function format(key, fallback, replacements) {
+    let result = text(key, fallback);
+    for (const [token, value] of Object.entries(replacements ?? {})) {
+      result = result.replace(`{${token}}`, value);
+    }
+    return result;
+  }
+
+  const CHIP_LABELS = {
+    category: ['FABRICATE.Admin.Manager.Component.ChipCategory', 'Category: {value}'],
+    essence: ['FABRICATE.Admin.Manager.Component.ChipEssence', 'Essence: {value}'],
+    search: ['FABRICATE.Admin.Manager.Component.ChipSearch', 'Search: {value}'],
+  };
+
+  function chipLabel(chip) {
+    const [labelKey, fallback] = CHIP_LABELS[chip.id];
+    const value = chip.id === 'category' ? categoryLabel(chip.value) : chip.value;
+    return format(labelKey, fallback, { value });
+  }
+
+  function clearChip(chipId) {
+    if (chipId === 'category') setCategoryFilter('all');
+    if (chipId === 'essence') setEssenceFilter('all');
+    if (chipId === 'search') onSearchChange('');
+  }
+
+  function sortLabel(key) {
+    const labels = {
+      name: text('FABRICATE.Admin.Manager.Component.SortName', 'Name'),
+      category: text('FABRICATE.Admin.Manager.Component.SortCategory', 'Category'),
+      essences: text('FABRICATE.Admin.Manager.Component.SortEssences', 'Essences'),
+      salvage: text('FABRICATE.Admin.Manager.Component.SortSalvage', 'Salvage'),
+    };
+    return labels[key] || key;
+  }
+
+  function categoryLabel(category) {
+    return getComponentCategoryLabel(category, localize);
+  }
+
+  // Suppressed for `general`: no redundant "General" chip on every uncategorized row.
+  // `general` remains a selectable FILTER option, pinned last as the catch-all — the
+  // same badge-vs-filter asymmetry the Recipe Studio settled on.
+  function categoryBadgeFor(item) {
+    const category = item?.category || GENERAL_COMPONENT_CATEGORY;
+    return category === GENERAL_COMPONENT_CATEGORY ? '' : categoryLabel(category);
+  }
+
+  function uniqueSorted(values) {
+    return Array.from(
+      new Set(values.map((value) => String(value || '').trim()).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
+  }
+
+  // Where the component's linked item lives — a real state, so it reads as a StatusPill
+  // (the shared vehicle the Recipe Studio's row states use) rather than a raw chip.
+  // A resolved link (compendium / world) is ACCENT; an unresolved stored source is the
+  // one WARNING, because a component whose source no longer exists is a thing the GM
+  // must be able to scan a library for.
+  function componentSourceOrigin(item) {
+    if (item?.sourceMissing) {
+      return {
+        id: 'missing',
+        label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing'),
+        tone: 'warning',
+        icon: 'fas fa-link-slash',
+      };
+    }
+    const origin = item?.sourceOrigin || '';
+    if (origin === 'compendium') {
+      return {
+        id: 'compendium',
+        label:
+          item?.sourceOriginLabel ||
+          text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium'),
+        tone: 'accent',
+        icon: 'fas fa-book-atlas',
+      };
+    }
+    if (origin === 'world') {
+      return {
+        id: 'world',
+        label:
+          item?.sourceOriginLabel ||
+          text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory'),
+        tone: 'accent',
+        icon: 'fas fa-box-archive',
+      };
+    }
+    return {
+      id: 'unknown',
+      label:
+        item?.sourceOriginLabel ||
+        text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'),
+      tone: 'subtle',
+      icon: 'fas fa-circle-question',
+    };
+  }
 
   function isSelectedComponent(item) {
     return !!selectedComponentId && item.id === selectedComponentId;

@@ -892,7 +892,7 @@
   // could show neither the live name nor the live art. Those two screens are exactly where the
   // link is authored, so they are the ones that most need to resolve it.
   // THE TWO WORLD COMPONENT SCREENS JOIN THE SET (issue 1371), for exactly the reason the two
-  // world Tool screens did: both AUTHOR the link between a world record and a game-world Item —
+  // world Tool screens did: both AUTHOR the link between a world record and a world-scoped Item —
   // the catalogue's create-from-drop zone resolves one, the entry's card re-points one — and a
   // `worldItems` prop handed over without extending this derived is an EMPTY ARRAY, which is the
   // defect the note above records rather than a hypothetical.
@@ -8561,7 +8561,7 @@
    *
    * ── IT RESOLVES BEFORE IT MINTS ─────────────────────────────────────────────────────────
    * `worldScopeActions.createEntity` dedupes on the entity id and the id is fresh every time, so
-   * an unresolved drop turns one game-world Item into two world components with identical
+   * an unresolved drop turns one world-scoped Item into two world components with identical
    * identity, and nothing on any screen says which one a recipe means. A MATCH navigates and says
    * so, rather than silently doing nothing.
    *
@@ -8630,7 +8630,7 @@
   }
 
   /**
-   * RE-POINT a world component at a different game-world Item, from the entry's own card.
+   * RE-POINT a world component at a different world-scoped Item, from the entry's own card.
    *
    * @param {object} data The raw drag payload.
    * @returns {Promise<boolean>}
@@ -8663,7 +8663,7 @@
   }
 
   /**
-   * UNLINK a world component from its game-world Item.
+   * UNLINK a world component from its world-scoped Item.
    *
    * The three source-link fields are cleared and the SNAPSHOT is kept: `name`, `img` and
    * `description` are what the catalogue and every system row render, so blanking them would turn
