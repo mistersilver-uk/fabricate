@@ -78,12 +78,18 @@ import {
 } from './spacing-known-literals.js';
 
 /**
- * Floors with deliberate headroom below the roughly 1737 and 1642 they were chosen against, so
+ * Floors with deliberate headroom below the roughly 1445 and 1642 they were chosen against, so
  * deleting a screen does not red this while a broken extractor — which takes a corpus to
  * roughly zero — still does. These are the enforced figures; the reference counts they quote
  * are not, and say so.
+ *
+ * The stylesheet floor was 1550 against 1737 until issue 1498 deleted the 367 rule blocks that
+ * matched no element, at base `0eff5b36e`, taking the corpus to 1445 and breaching it. It is
+ * RE-DERIVED at the ratio it was originally chosen at — 1550/1737 of 1445 is 1289 — rather than
+ * lowered to whatever clears the new count, so the headroom it was given still means the same
+ * thing: a corpus that has shrunk by a tenth is a scan that has stopped reading the sheet.
  */
-const STYLESHEET_SPACING_DECLARATION_FLOOR = 1550;
+const STYLESHEET_SPACING_DECLARATION_FLOOR = 1289;
 const SVELTE_SPACING_DECLARATION_FLOOR = 1450;
 
 /** The corpus is walked once. Lazily, so a walk failure is reported as a test rather than as an
