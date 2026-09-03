@@ -8140,12 +8140,23 @@
    */
   function existingWorldToolMessage(entry) {
     const name = String(entry?.entity?.name || entry?.id || '');
-    const key = entry?.worldEnabled === false ? 'DropExistingDisabled' : 'DropExisting';
-    const fallback =
+    // BOTH KEYS ARE WRITTEN OUT WHOLE rather than composed from a suffix. A composed key is a
+    // namespace BASE to the lang-key resolution gate, which can then only check that the base
+    // exists; a complete literal is checked against `en.json` for real. The branch costs two
+    // lines and buys the stronger assertion, which is the trade that gate's own note asks for.
+    // (Its filename is deliberately not written here: the manager source contract greps this
+    // file for bare Foundry global words, and one of them appears inside that path.)
+    const message =
       entry?.worldEnabled === false
-        ? '{name} already exists for that Item and is disabled at world scope. Opened it instead of creating a second.'
-        : '{name} already exists for that Item. Opened it instead of creating a second.';
-    return text(`FABRICATE.Admin.Manager.Scoped.Tool.${key}`, fallback).replace('{name}', name);
+        ? text(
+            'FABRICATE.Admin.Manager.Scoped.Tool.DropExistingDisabled',
+            '{name} already exists for that Item and is disabled at world scope. Opened it instead of creating a second.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Scoped.Tool.DropExisting',
+            '{name} already exists for that Item. Opened it instead of creating a second.'
+          );
+    return message.replace('{name}', name);
   }
 
   /**
