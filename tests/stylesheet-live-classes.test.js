@@ -214,6 +214,13 @@ test('a state class is live through the base class a dynamic site writes it onto
     1,
     'no site writes a dynamic state class onto .pi-card, so .is-hazardous there matches nothing'
   );
+  assert.deepEqual(
+    deadRuleBlocks('.is-nowhere { color: red; }', live),
+    [],
+    'a compound with no base class at all has nothing to judge its state against, so rule 4'
+      + ' abstains rather than condemning it: an element type carries `strong.is-disabled` with no'
+      + ' Fabricate class beside it, and a deletion is the direction a later gate cannot undo'
+  );
 });
 
 test('a selector list with one live item keeps the whole block', () => {
