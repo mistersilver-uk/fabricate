@@ -48,10 +48,15 @@ const SPEND_UNAVAILABLE_FALLBACK =
  * summarising the rest by count (issue 1493).
  *
  * `validateCurrencyProfile` returns one error per malformed unit, so an unbounded join renders a
- * whole paragraph into a single chat message and, via the requirement rail, into an accessible
- * name. 3 was chosen by reading the actual output at each count: it names enough faults that a GM
- * fixing the FIRST reported problem is not left guessing whether there are more, while a dozen
- * broken units still collapses to one line ("...; and 9 more issues.") instead of a wall of text.
+ * whole paragraph wherever a caller surfaces it directly: the requirement rail's fact (an
+ * accessible name), and `checkCurrencySpends`'s own guard branches, which return straight into
+ * the toast `CraftingEngine.craft` shows the player. It is NOT what
+ * `CraftingEngine._formatMissingItems` composes for a cost refused at SELECTION — since issue
+ * 1493's round-2 follow-up that surface renders a fixed, action-first sentence instead and only
+ * logs this text for diagnosis (see that method's own comment). 3 was chosen by reading the
+ * actual output at each count: it names enough faults that a GM fixing the FIRST reported problem
+ * is not left guessing whether there are more, while a dozen broken units still collapses to one
+ * line ("...; and 9 more issues.") instead of a wall of text.
  */
 const MAX_LISTED_PROFILE_ERRORS = 3;
 
@@ -88,13 +93,27 @@ const CURRENCY_SETUP_DIRECTIVE =
 /**
  * Append {@link CURRENCY_SETUP_DIRECTIVE} to a player-facing currency-refusal reason.
  *
- * PLAYER-FACING CALL SITES ONLY. `spendCurrencySpends` and `refundCurrencySpends` compose from
- * the SAME `error`/`spenderUnavailableReason` fields, but only ever `console.error` the result
- * (the deduction/refund never abort or surface to a caller a player can read) — a GM reading
- * their own console does not need to be told to ask themselves, so those two call sites must not
- * use this. `resolveCurrencyContext`'s raw fields stay undirected for the same reason: other
- * readers (the GM editor's validation report, the requirement rail) are GM- or display-only
- * surfaces outside this function's audience.
+ * Called only by {@link checkCurrencySpends}'s two guard branches in this module, which return
+ * straight into `CraftingEngine.craft`'s result — the crafting player's own read.
+ *
+ * Two other readers of the SAME `error`/`spenderUnavailableReason` fields must NOT use this:
+ *
+ *   - `spendCurrencySpends`/`refundCurrencySpends` compose from the same fields but only ever
+ *     `console.error` the result (the deduction/refund never abort or surface a message a caller
+ *     reads) — a GM reading their own console does not need to be told to ask themselves.
+ *   - `CraftingEngine._formatMissingItems`, the OTHER path a refused currency cost reaches (when
+ *     selection swallows it before any spend is ever handed to `checkCurrencySpends`), no longer
+ *     composes this reason into its own message at all (issue 1493 round-2 follow-up): its player
+ *     toast now renders one constant, action-first sentence and only tests this reason's
+ *     presence — see `_missingItemsCurrencyReason`'s doc comment.
+ *
+ * `resolveCurrencyContext`'s raw fields also stay undirected for the GM editor's own validation
+ * report — a GM-only surface. The requirement rail is NOT the same kind of surface, though, and a
+ * previous version of this comment mischaracterised it as one: `RecipeManager
+ * ._resolveCurrencyIssue` hands the SAME raw, undirected reason to `RequirementRail.svelte`,
+ * which renders on the crafting PLAYER's own recipe view, not a GM or display-only one. Any
+ * directive for that surface belongs in the rail's own render path, not here — this function
+ * serves only the two `checkCurrencySpends` branches above.
  *
  * @param {string|null|undefined} reason
  * @returns {string|null|undefined}

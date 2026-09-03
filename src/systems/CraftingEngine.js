@@ -56,7 +56,6 @@ import {
   refundCurrencySpends,
   resolveCurrencyContext,
   spendCurrencySpends,
-  withCurrencySetupDirective,
 } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import {
@@ -5407,17 +5406,20 @@ export class CraftingEngine {
    * `spenderUnavailableReason` a valid profile with no usable coin spender. Never fails a craft
    * message — an unresolvable read degrades to the shortfall wording that shipped before.
    *
-   * This message is what the crafting player reads (this method's own doc above), so the
-   * misconfiguration reason gets {@link withCurrencySetupDirective}'s "ask your GM" sentence here
-   * (issue 1493) — unlike the raw context fields, which other, non-player-facing readers also
-   * consume undirected.
+   * The returned reason is used by {@link _formatMissingItems} only as a presence flag, not
+   * composed into the rendered message (issue 1493 round-2 follow-up). A composed, per-cause
+   * sentence read as one skippable paragraph in the player's toast once there were three or more
+   * validator errors, and the single actionable clause ("ask your GM") landed last — past where
+   * the toast's 5-second autodismiss loses a skimming reader. `_formatMissingItems` now renders a
+   * constant, action-first sentence regardless of cause; the raw reason here is `console.warn`ed
+   * for diagnosis and still rendered in full by the GM editor's own validation note and the
+   * requirement rail.
    * @private
    */
   _missingItemsCurrencyReason(recipe) {
     try {
       const context = resolveCurrencyContext(recipe, this._currencySeams());
-      const reason = context?.error || context?.spenderUnavailableReason || null;
-      return withCurrencySetupDirective(reason);
+      return context?.error || context?.spenderUnavailableReason || null;
     } catch {
       return null;
     }
@@ -5461,7 +5463,7 @@ export class CraftingEngine {
         // resolved (issue 1410): the shipped message shape is asserted by an existing contract
         // test, and that hotfix was fixing an opaque id, not rewording a player-facing message.
         //
-        // Two departures from the item branch, both issue 1493:
+        // Three departures from the item branch, all issue 1493:
         //
         //   1. A configuration reason REPLACES the shortfall framing. "Insufficient currency" is a
         //      claim about the player's purse, and it is false when the refusal came from a ladder
@@ -5470,9 +5472,21 @@ export class CraftingEngine {
         //      selection's occurrence counts (`have 0, need 1` for a hundred-gold cost), not coins:
         //      the quantity is not the price and a coin balance is not an item count, so the ratio
         //      states neither the price nor the shortfall. The sentence already states the cost.
+        //   3. (round-2 follow-up) The reason is NOT composed into the sentence. This is a toast
+        //      (`foundryBridge.js` → `ui.notifications.warn`), not a chat message: it auto-dismisses
+        //      after 5000ms and core's `.notification` CSS collapses the reason's `\n` separators to
+        //      spaces, so a composed, per-cause sentence rendered as one wrapped paragraph — and at
+        //      three or more validator errors the sole actionable clause ("ask your GM") landed
+        //      last, past where a skimming reader has already stopped reading. The sentence below is
+        //      constant-length and action-first regardless of cause; the raw reason is still logged
+        //      for diagnosis and rendered in full by the GM editor's validation note and the
+        //      requirement rail.
         const cost = formatCurrencyRequirement(ingredient.match, currencyUnits);
+        if (currencyReason) {
+          console.warn('Fabricate | Currency requirement could not be priced:', currencyReason);
+        }
         line = currencyReason
-          ? `Requires ${cost}. ${currencyReason}`
+          ? `Requires ${cost}. Currency setup is incomplete, so this cost can't be priced — a GM needs to finish it in Crafting Systems → World → Currency.`
           : `Insufficient currency. Requires ${cost}.`;
       }
       if (!line) {
