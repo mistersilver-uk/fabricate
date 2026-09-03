@@ -7737,6 +7737,73 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
+    id: 'manager-tool-zero-state-browse-world-1280x720',
+    label: 'Manager — Tool zero state, world Tools browsed 1280x720',
+    // BEYOND: the live smoke walks no widened Tool rules list on a system holding none.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // WHAT PRESSING THE ZERO STATE'S PRIMARY ROUTE ACTUALLY DRAWS (issue 1373), and until this
+    // case it was unproducible. `manager-tool-zero-state-empty-library-1280x720` above ends at
+    // the panel and asserts the button EXISTS; nothing anywhere pressed it. The list body gated
+    // its zero state on this system's own adopted Tools rather than on the cohort the segment
+    // selects, so the button set a filter whose result the panel then hid — the ghost rows were
+    // derived, counted, sorted and paged, and thrown away by one boolean. The maintainer found
+    // that by hand on a real world, through a surface that had passed every gate.
+    //
+    // `lab-jewelry` is the same system its sibling above uses and for the same reason: it holds
+    // `tools: []` while the lab world holds twelve world Tools, so it lands in the panel with
+    // something to widen TO.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-empty-browse-world]' },
+    ],
+    expectView: 'tools',
+    // A NON-MEMBER ROW CARRYING ITS ONE ACTION. `data-tool-add-to-system` and
+    // `data-tool-edit-rules` are the two halves of one `{#if entry.member}`, so naming the first
+    // inside a row marked `absent` states both that the row rendered and that it rendered as a
+    // Tool this system has not adopted — which is the whole point of the widened cohort.
+    expectSelector: '.manager-tools-row[data-tool-row-member="absent"] [data-tool-add-to-system]',
+    expectContained: [
+      {
+        container: '.manager-tools-library-list',
+        target: '.manager-tools-row[data-tool-row-member="absent"]',
+      },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
+    id: 'manager-tool-zero-state-membership-all-1280x720',
+    label: 'Manager — Tool zero state, membership widened to all 1280x720',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE SECOND ROUTE TO THE SAME STATE, AND IT IS NOT INFERABLE FROM THE FIRST (issue 1373).
+    // The maintainer reported two symptoms — the button did nothing AND the middle segment did
+    // nothing — and they are separate call sites: the segment sets the membership filter
+    // directly, while the button sets it from INSIDE the panel the filter was supposed to leave.
+    // A GM who reads `All world tools (12)` in the toolbar and clicks it never touches the
+    // button at all, so a case covering only the button would leave that route photographed by
+    // nothing.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-membership-option="all"]' },
+    ],
+    expectView: 'tools',
+    expectSelector: '.manager-tools-row[data-tool-row-member="absent"] [data-tool-add-to-system]',
+    expectContained: [
+      {
+        container: '.manager-tools-library-list',
+        target: '.manager-tools-row[data-tool-row-member="absent"]',
+      },
+    ],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [...TOOL_LIST_MATCHES],
+  }),
+  managerCase({
     // THE INHERITING STATE OF THE RULES EDITOR (issue 1373), and the only frame that shows it.
     //
     // `beyond` with no smoke label, for the same reason its sibling adoption case is: the live

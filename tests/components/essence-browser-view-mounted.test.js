@@ -281,6 +281,49 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     harness.remount();
   });
 
+  it('widens to the world essences when this system has adopted NONE of them', async () => {
+    // ── THE COHORT'S ZERO POINT, HELD RATHER THAN ASSUMED (issue 1373) ───────────────────────
+    // The Tool rules list shipped this exact shape broken: its zero-state branch was gated on
+    // the raw per-system array while its counts, rows and pager were all computed over the
+    // widened cohort, so a system that had adopted nothing could not reach the world records by
+    // the membership segment OR by the zero state's own button — the one route in the product to
+    // adopting one. This studio is already correct, because `isEmpty` is fed `listCards`, which
+    // is `essenceCards` PLUS `absentCards`.
+    //
+    // Zero members is the only place those two can disagree, so the sibling case above — which
+    // mounts two adopted essences — cannot fail on this defect however the predicate is written.
+    // Without this case, "essences happen to be right" is all that is held.
+    const root = await harness.mount(
+      props([], {
+        scope: {
+          available: true,
+          entityType: 'essence',
+          enableable: true,
+          entries: [
+            { id: 'aether', entity: { name: 'Aether' }, systems: [] },
+            { id: 'water', entity: { name: 'Water' }, systems: [] },
+          ],
+        },
+      })
+    );
+
+    assert.equal(
+      root.querySelectorAll('.manager-essence-row').length,
+      0,
+      '`In this system` on a system holding none is a real zero state'
+    );
+
+    root.querySelector('[data-essence-membership-option="all"] input').click();
+    flushSync();
+
+    assert.deepEqual(
+      [...root.querySelectorAll('.manager-essence-row')].map((row) => row.dataset.essenceId),
+      ['aether', 'water'],
+      'widening past a membership of none must draw the world essences, not the zero state'
+    );
+    harness.remount();
+  });
+
   it('states an enabled row and a disabled row through the same pill treatment', async () => {
     // ── ONE STATE, ONE SHAPE (issue 1372, maintainer parity round 8) ─────────────────────────
     // The row's Disabled badge is a `StatusPill`, and it passed `tone="neutral"` — a tone that

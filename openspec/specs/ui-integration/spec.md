@@ -1371,7 +1371,17 @@ The required-for region lists this system's recipes and gathering tasks that ref
 The row and inspector derive `Ready` or `Needs attention` from the canonical `Tool.validate()` result rather than from enabled state or a UI-only approximation; the inspector also exposes the validation issue count.
 Both surfaces pair localized text and an icon with their status colour, so the state is neither colour-only nor an internal validation token.
 When Tools exist and the current selection is absent or stale, the library selects the first Tool exactly once; a valid current selection is preserved and an empty library emits no selection.
-The result list scrolls independently above a persistent, full-width pagination footer that remains outside the scrolling region for both one-page and multi-page result sets.
+The result list scrolls independently above a full-width pagination footer that remains outside the scrolling region, and that footer's bar renders only for a multi-page result set, so a single page draws no pagination band.
+
+**The membership segment selects the list's COHORT, and the zero state is a fact about that cohort rather than about the system's own Tool array.**
+`In this system` lists the Tools this crafting system has adopted.
+`All world tools` widens the same list with every world Tool this system holds no rules record for, each drawn as a non-member row whose only action is `Add to system`.
+`Overriding` narrows it to the members whose world join reports an overridden section.
+The `No Tools yet` panel and its two routes render only when the SELECTED cohort is empty, never when the system's own array is.
+A system that has adopted nothing while the world holds Tools is exactly the state that panel's own primary route — `Show the {count} world Tools you can add` — exists to leave, so gating the panel on the system's array makes both that button and the segment beside it change a filter whose result the panel then hides.
+That widened cohort is the only route on this screen to a Tool the GM has not adopted, and therefore the only thing the inspector's `Add {tool} to {system}` action can act on: with it unreachable, a GM cannot adopt a world Tool into a system from this screen at all.
+A cohort that is non-empty before the search term and empty after it is the FILTERED state, not the zero state.
+The foot pager's presence follows the selected cohort, on the same cohort the list draws.
 
 Each row exposes selection through a keyboard-focusable identity target with explicit selected semantics and Enter/Space activation.
 Selection, Edit, and enabled toggle are distinct localized named hit targets.
