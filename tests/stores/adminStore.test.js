@@ -3766,6 +3766,102 @@ describe('createAdminStore', () => {
       assert.ok(!vs.recipes.some((r) => r.id === 'r2'));
     });
 
+    // --- Leaving a library's route clears its search (issue 1462) --------------
+    //
+    // The route effect in `CraftingSystemManagerRoot` calls this on EVERY manager
+    // navigation and lets the store decide, so the short-circuit is what stands between
+    // that and a full `refresh()` per rail click. It is therefore asserted as a COST, by
+    // counting refreshes, rather than assumed from the return value.
+    //
+    // `services.getWorldActors` is called exactly once per `refresh()` — the learned-recipe
+    // index is rebuilt at the top of it, before its first `await` — so it is the cheapest
+    // honest refresh counter available from outside the store.
+    function storeWithRefreshCounter(extraOverrides = {}) {
+      const counter = { refreshes: 0 };
+      const services = createMockServices({
+        getWorldActors: () => {
+          counter.refreshes += 1;
+          return [];
+        },
+        ...extraOverrides,
+      });
+      return { store: createAdminStore(services), counter, services };
+    }
+
+    it('exposes clearLibrarySearches as a real store action', () => {
+      // The component calls it optionally (`store.clearLibrarySearches?.()`), which throws
+      // nothing if the real store never exported it, and the mounted suite asserts against a
+      // hand-written fake that mirrors the component. Only this can see a missing export.
+      const { store } = storeWithRefreshCounter();
+      assert.equal(typeof store.clearLibrarySearches, 'function');
+    });
+
+    it('clearLibrarySearches is a no-op, with no refresh, when both terms are already empty', async () => {
+      const { store, counter } = storeWithRefreshCounter();
+      await store.selectSystem('sys1');
+
+      const before = counter.refreshes;
+      assert.equal(await store.clearLibrarySearches(), false, 'it reports that nothing was cleared');
+      assert.equal(counter.refreshes, before, 'and costs no refresh, so a navigation is free');
+    });
+
+    it('clearLibrarySearches clears a recipe term set on its own, in exactly one refresh', async () => {
+      const { store, counter } = storeWithRefreshCounter();
+      await store.selectSystem('sys1');
+      await store.setRecipeSearch('healing');
+
+      const before = counter.refreshes;
+      assert.equal(await store.clearLibrarySearches(), true);
+      assert.equal(counter.refreshes, before + 1, 'exactly one refresh');
+      const vs = get(store.viewState);
+      assert.equal(vs.recipeSearchTerm, '');
+      assert.equal(vs.itemSearchTerm, '');
+    });
+
+    it('clearLibrarySearches clears a component term set on its own, in exactly one refresh', async () => {
+      // The mirror case, and it is not ceremony. A GM has typed in ONE library, never both,
+      // so an implementation written with `||` instead of `&&` short-circuits on the empty
+      // sibling, passes both-empty and both-set, and never clears anything in real use.
+      const { store, counter } = storeWithRefreshCounter();
+      await store.selectSystem('sys1');
+      await store.setItemSearch('iron');
+
+      const before = counter.refreshes;
+      assert.equal(await store.clearLibrarySearches(), true);
+      assert.equal(counter.refreshes, before + 1, 'exactly one refresh');
+      assert.equal(get(store.viewState).itemSearchTerm, '');
+    });
+
+    it('clearLibrarySearches republishes the unfiltered recipe list before it is awaited', async () => {
+      // The caller is a route effect that does NOT await it, and the destination route
+      // renders in the same task. `refresh()` reaches its phase-1 publish with no preceding
+      // `await`, and that publish carries both keys the Tags & Categories counts read, so the
+      // destination never paints the filtered numbers. This fails loudly if anyone later
+      // moves work above that publish.
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [
+            makeRecipe({ id: 'r1', name: 'Healing Potion', craftingSystemId: 'sys1' }),
+            makeRecipe({ id: 'r2', name: 'Fire Sword', craftingSystemId: 'sys1' }),
+          ].filter((r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.setRecipeSearch('healing');
+      assert.equal(get(store.viewState).recipes.length, 1, 'control: the search is live');
+
+      const pending = store.clearLibrarySearches();
+      assert.equal(
+        get(store.viewState).recipes.length,
+        2,
+        'the unfiltered list is published synchronously, before the promise is awaited'
+      );
+      await pending;
+    });
+
     it('setItemSearch filters viewState item cards', async () => {
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();

@@ -738,14 +738,29 @@ function _countRecipeCategories(roster) {
  * present and reads identically; the detail half simply computes on first access, so a caller
  * that renders 25 of 10,000 rows performs 25 rows' worth of expensive projection.
  *
- * ONE cohort fetch, TWO derivations (issue 1081). This used to call `getRecipes` twice — once
- * for the rows and once for the category counts — and the admin store called it a third time
- * for the essence cards, so a GM refresh copied the whole recipe corpus three times.
- * `options.roster` lets that caller supply the array it already holds. The two derivations
- * stay DISTINCT: the counts are over the unfiltered roster (a category chip that disappeared
- * when the GM typed in the search box would be a different feature) and the rows are over the
- * search-filtered subset. Collapsing them into one would be a silent correctness regression,
- * not a cleanup.
+ * ONE cohort fetch, THREE derivations (issues 1081 and 1462). This used to call `getRecipes`
+ * twice — once for the rows and once for the category counts — and the admin store called it a
+ * third time for the essence cards, so a GM refresh copied the whole recipe corpus three times.
+ * `options.roster` lets that caller supply the array it already holds. The derivations stay
+ * DISTINCT, and each one answers a different question:
+ *
+ * - `recipeCategories` counts the UNFILTERED roster (a category chip that disappeared when the
+ *   GM typed in the search box would be a different feature);
+ * - `recipes` is the SEARCH-FILTERED row cohort — what the GM library lists, and the only
+ *   cohort whose shown/total counts are allowed to move with the search box;
+ * - `rosterRecipes` is every projected row, unfiltered. It exists because a search-filtered
+ *   list is a valid COHORT but never a valid RESOLUTION TABLE: `enrichRecipeItemLibrary` maps a
+ *   book's stored `recipeIds` through it, so filtering it does not report a different number,
+ *   it reports a false one (issue 1462 — every book read `Incomplete` while a non-matching
+ *   search was live).
+ *
+ * With no search term the two row arrays are THE SAME ARRAY, not a copy, so the no-search cost
+ * is unchanged; a live search adds only the projection of the non-matching rows, whose detail
+ * tier stays lazy. Neither array is ever mutated in place, by anything.
+ *
+ * The predicate stays over the MODELS rather than the projected rows. A row's `description` is
+ * trimmed by `_createRecipeRow`, so filtering rows instead would silently change which recipes
+ * a term with significant leading or trailing whitespace selects.
  *
  * @param {object} systemManager unused here; kept for call-site symmetry with the sibling
  *   projections.
@@ -765,6 +780,7 @@ export function buildRecipeList(
   if (!selectedSystem) {
     return {
       recipes: [],
+      rosterRecipes: [],
       recipeCategories: [],
       recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
@@ -780,18 +796,35 @@ export function buildRecipeList(
 
   const recipeCategories = _countRecipeCategories(roster);
 
-  let recipes = roster;
+  const context = _createRecipeRowContext(recipeManager, selectedSystem);
+  const rosterRecipes = roster.map((recipe) => _createRecipeRow(recipe, context));
+
+  // The filter selects an INDEX MASK over the roster and both arrays are read positionally,
+  // rather than keying the rows by id. Recipe ids are not guaranteed unique or non-empty in a
+  // hand-authored or imported system, and an id-keyed map would collapse a duplicate into one
+  // row referenced twice — changing the length, the order and the row identities the browser
+  // renders today. Positional selection reproduces `filtered.map(project)` exactly.
+  let matched = roster;
+  let recipes = rosterRecipes;
   if (recipeSearchTerm) {
     const lower = recipeSearchTerm.toLowerCase();
-    recipes = recipes.filter(
-      (r) =>
-        r.name.toLowerCase().includes(lower) || (r.description || '').toLowerCase().includes(lower)
-    );
+    const matches = (r) =>
+      r.name.toLowerCase().includes(lower) || (r.description || '').toLowerCase().includes(lower);
+    const mask = [];
+    for (let index = 0; index < roster.length; index += 1) {
+      if (matches(roster[index])) mask.push(index);
+    }
+    matched = mask.map((index) => roster[index]);
+    recipes = mask.map((index) => rosterRecipes[index]);
   }
 
-  const context = _createRecipeRowContext(recipeManager, selectedSystem);
   return {
-    recipes: recipes.map((recipe) => _createRecipeRow(recipe, context)),
+    recipes,
+    // Consumed INSIDE `refresh()` only and deliberately not published to `viewState`: a second
+    // recipe array on the published projection is an ambiguity a future consumer would have to
+    // resolve correctly without being told there was a choice, which is the shape this change
+    // exists to reduce rather than duplicate.
+    rosterRecipes,
     recipeCategories,
     // The recipe half of the Tags & Categories reference count, folded here off the RECIPE
     // MODELS (issue 1081). Its consumer is the manager's persistent left nav rail, which is
@@ -802,11 +835,12 @@ export function buildRecipeList(
     // the two tiers exist to remove. Counted here instead, where the models are already in
     // hand and the fields are ordinary properties.
     //
-    // Over `recipes`, NOT `roster`: the count the screen renders today is over the
-    // SEARCH-FILTERED cohort, the same array the rows are projected from. Whether it should
+    // Over the SEARCH-FILTERED models, NOT the roster: the count the screen renders today is
+    // over the filtered cohort, the same models `recipes` is selected from. Whether it should
     // instead be roster-wide is a real question about that screen and a change to a rendered
-    // number, so it is deliberately not decided by a performance change.
-    recipeTagPlaceholderCounts: countRecipeTagPlaceholderUsage(recipes),
+    // number, so it is deliberately not decided here — issue 1191 owns it, and issue 1462
+    // deliberately left it alone while re-cohorting the book membership above it.
+    recipeTagPlaceholderCounts: countRecipeTagPlaceholderUsage(matched),
     showVisibilitySummary,
   };
 }

@@ -87,7 +87,12 @@
   // over filters the new library down to nothing. Mirrors ComponentsBrowserView. The
   // status/lock filters are NOT reset: enabled and locked mean the same thing in every
   // system, so they are preferences like sort/page-size, not a stale vocabulary. The
-  // search term is cleared by the store on selectSystem (it is shared state).
+  // search term is not preserved here at all, and that asymmetry is deliberate rather than an
+  // omission: it is cleared by the STORE, on a system switch and on leaving this library's
+  // route scope alike (issue 1462), because it is the one control here whose effect is not
+  // confined to this browser — an active term also changes counts on screens that render no
+  // search box for it, and page, filters, sort, grouping and collapse do not. So returning
+  // from the editor restores every one of those and leaves the search box empty.
   //
   // The sentinel is `ui.systemId`, PERSISTED on the lifted browser state — NOT a
   // component-local `$state`. A local sentinel re-initialised to '' on every mount, so
