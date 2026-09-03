@@ -62,6 +62,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import VocabularyPanel from '../VocabularyPanel.svelte';
   import {
+    cascadeClause,
     describeVocabularyInput,
     inputNormalizer,
     panelKey,
@@ -135,7 +136,13 @@
   }
 
   function rowsOf(panel) {
-    return panelRows(vocabulary, panel);
+    // The projection publishes the NUMBERS; the copy that states them is the page's. Each row
+    // carries its own already-substituted cascade clause, so a deletion that rewrites nothing
+    // says so instead of stating two zeroes. See `cascadeClause`.
+    return panelRows(vocabulary, panel).map((row) => {
+      const cascade = cascadeClause(panel, row, text);
+      return cascade ? { ...row, confirmTokens: { ...row.confirmTokens, cascade } } : row;
+    });
   }
 
   function sortedRowsOf(panel) {
@@ -262,9 +269,12 @@
      interpolated form would drop this route out of a seven-route assertion. -->
 <main class="manager-main" data-scoped-page="world-vocabulary" aria-label={title}>
   <div class="wvocab" data-scoped-vocabulary={PAGE_ID}>
-    {#if statusMessage}
-      <p class="wvocab-status" role="status" data-wvocab-status>{statusMessage}</p>
-    {/if}
+    <!-- ALWAYS RENDERED, EMPTY UNTIL IT HAS SOMETHING TO SAY. `role="alert"` rather than
+         `status`: a deletion the GM asked for and did not get is an interruption, not a
+         progress note. -->
+    <p class="wvocab-status" role="alert" aria-live="assertive" data-wvocab-status>
+      {statusMessage}
+    </p>
     <div class="wvocab-grid">
       {#each gridPanels as panel (panel.kind)}
         {@render vocabularyPanel(panel)}
@@ -306,11 +316,63 @@
     }
   }
 
+  /* THE PANEL WEARS THE CARD, and it is the PANEL rather than the add form inside it.
+     `styles/fabricate.css`'s `.manager-vocabulary-form` paints a card too, but that rule belongs
+     to the primitive's ADD FORM; with nothing on the panel the screen rendered a bordered add
+     card floating on the bare pane, which is the inverse of the reference's own nesting.
+
+     The rungs, stated rather than measured into literals: the reference's panel fill is this
+     theme's `--fab-bg-1` exactly under the one-rung ramp shift the manager applies, the edge is
+     the shared `--fab-border` hairline, and the radius is the vocabulary family's own 11px
+     (`.manager-vocabulary-form` and `.manager-vocabulary-card` both sit there) rather than the
+     reference's 12. */
   .wvocab-panel {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
     min-width: 0;
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 11px;
+    background: var(--fab-bg-1);
+  }
+
+  /* ── THE TWO CONTROL-ROW REPAIRS, BOTH `:global`, BOTH SCOPED TO THIS ROUTE ──────────────
+     `<ManagerToolbar class="manager-scoped-list-toolbar">` puts the class on a COMPONENT tag, so
+     Svelte stamps this component's hash on nothing that carries it and a plain scoped rule would
+     be emitted matching nothing. Both are chained onto `.manager-toolbar`, the class the
+     primitive writes itself, so each sits at the same (0,3,0) the route attribute plus that pair
+     gives — never a bare `:global(.manager-scoped-list-toolbar)`, which would be (0,1,0) and
+     would start losing ties it has no business winning. Neither reaches another screen: the
+     route attribute is on this page's own `<main>`. */
+
+  /* THE SELECT WIDTH, AND WHY IT CANNOT BE LEFT TO THE SHEET. Foundry core sizes every
+     `<select>` to `width: 100%`, and the global `.fabricate-manager .manager-scoped-list-toolbar
+     select` block sets no width at all. The only shipped repair lives in
+     `EntityListInspectorFrame.svelte`'s scoped block, which is injected only once that component
+     renders — and this route never renders it. Measured: the sort select opened at 481px on a
+     cold open of this screen (1002px on the full-width tag panel), wrapping the control row onto
+     three lines, and "fixed" itself to 62px for the rest of the session as soon as the GM
+     visited a world entity catalogue first. A screen whose layout depends on which route was
+     opened before it is not a layout. */
+  :global(
+    [data-scoped-page='world-vocabulary'] .manager-toolbar.manager-scoped-list-toolbar select
+  ) {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* THE BAND IS FLATTENED. `.manager-toolbar` paints an `--fab-overlay-light-03` fill and a
+     full-bleed bottom hairline, which inside a panel card reads as a lit raised strip the
+     reference does not draw (`proto:3054` runs the control row flush, with no fill and no
+     divider). Issue 1373 already flattened the same band on `world-tools`, `world-essences` and
+     the system essence browser; this states it for one more route. The overlay is REMOVED rather
+     than replaced, so the panel's own fill shows through and no theme's ramp is frozen in. */
+  :global([data-scoped-page='world-vocabulary'] .manager-toolbar.manager-scoped-list-toolbar) {
+    padding: 0;
+    border-bottom: 0;
+    background: transparent;
   }
 
   /* The head the primitive does not draw: on the shipped tabbed screen the tab label names the
@@ -334,7 +396,10 @@
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-3);
-    color: var(--fab-text-muted);
+    /* THE ACCENT ROLE, not muted ink. The reference gives each panel head's glyph the accent
+       (`proto:3045`, `:3075`), and `--fab-accent` is that value. The tag head's own distinct hue
+       is a different question and stays with the change that draws the tag pill. */
+    color: var(--fab-accent);
   }
 
   .wvocab-head-text {
@@ -380,11 +445,20 @@
     cursor: pointer;
   }
 
-  /* The failure line for a deletion that did not land. It renders only in that state, so it has
-     no resting appearance to design. */
+  /* The failure line for a deletion that did not land. It is rendered at MOUNT and filled
+     later, never created together with its text: a live region inserted into the document at the
+     same moment as its content is not reliably announced, because the assistive technology has
+     nothing to observe a change against. */
   .wvocab-status {
     margin: 0;
     color: var(--fab-danger-text);
     font-size: 0.72rem;
+  }
+
+  /* An empty region is a zero-height flex item that still earns the column's gap, so the gap is
+     cancelled rather than the element hidden — `display: none` would take the region out of the
+     accessibility tree and undo the whole point of rendering it early. */
+  .wvocab-status:empty {
+    margin-block-end: calc(-1 * var(--fab-space-4));
   }
 </style>

@@ -31,8 +31,12 @@ import { normalizeWorldVocabularyEntries, WORLD_VOCABULARY_KINDS } from './world
  *
  * Nothing destructive rides on that predicate today — `CraftingSystemManager._vocabularyBasis`
  * deliberately does not consult this store (`## World Vocabulary` requirement 6) — but the shape
- * is what makes issue 1411 able to add an `optOuts` sub-key later with no migration and no
- * round-trip loss.
+ * is what lets issue 1411 add an `optOuts` sub-key with NO MIGRATION: an unwritten key stays
+ * absent on disk, so an older client and a newer one read the same payload. That is not the same
+ * as free. `carriedKinds`, `_normalize` and `_persistedShape` all iterate
+ * `WORLD_VOCABULARY_KINDS`, and `_normalize` is an allowlist rebuild, so a sub-key outside that
+ * list is DROPPED on the next load rather than round-tripped: adding one means extending both
+ * rebuilds as well as the list.
  *
  * ## The rules it shares with `ScopedDefinitionStore`
  *
@@ -145,7 +149,7 @@ class WorldVocabularyStore {
   load() {
     let raw;
     try {
-      raw = this.getSetting?.(this.settingKey);
+      raw = this.getSetting(this.settingKey);
     } catch {
       raw = null;
     }
@@ -268,7 +272,10 @@ class WorldVocabularyStore {
   async _persist(next, seeded) {
     this._publish(next);
     this.seeded = seeded;
-    await this.setSetting?.(this.settingKey, cloneJson(this._persistedShape(next, seeded)));
+    // NOT OPTIONAL-CHAINED, matching `ScopedDefinitionStore#_persist`. `await undefined?.()` is
+    // `undefined`, so a store built without a write seam would report EVERY write as a success
+    // and hand `worldScopeActions` a `true` it then reports to the GM as a landed deletion.
+    await this.setSetting(this.settingKey, cloneJson(this._persistedShape(next, seeded)));
     return this._corpus;
   }
 

@@ -1996,8 +1996,19 @@ class Fabricate {
   }
 
   /**
-   * Get the world VOCABULARY store (issue 1392, epic 1357, PR 7a). Ungated, for
-   * {@link Fabricate#getComponentScopeStore}'s reason.
+   * Get the world VOCABULARY store (issue 1392, epic 1357, PR 7a).
+   *
+   * DELIBERATELY UNGATED, and for its OWN reason rather than the borrowed one above. (The
+   * readiness helper is not named here in full: `scoped-definition-read-and-basis.test.js` reads
+   * a fixed-length slice after each accessor, so the token would land inside its NEIGHBOUR's
+   * window and redden a guard about a different method.) Nothing normalizes against this store,
+   * so the issue-970 shape the three entity accessors guard against does not apply.
+   * What does apply is `worldScopeProjection`'s `readCorpus`, which reaches it through
+   * `adminStore` inside a `try`/`catch` that converts ANY throw into `{corpus: null}` — and that
+   * publishes as `{available: false, total: 0}`, a legitimate shape with no error, no console
+   * line and no failing test. A readiness throw here would therefore not surface as a crash; it
+   * would silently blank the world Tags & Categories screen and its rail badge on any client
+   * that opened the manager a moment early.
    *
    * THE NAME IS FIXED BY ITS CONSUMER. `adminStore`'s read and write legs both resolve it as
    * `services.getVocabularyScopeStore?.() ?? null`, and both shipped ahead of this store inside

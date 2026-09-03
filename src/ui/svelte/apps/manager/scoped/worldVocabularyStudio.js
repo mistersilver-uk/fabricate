@@ -32,7 +32,6 @@
 
 import {
   normalizeWorldVocabularyEntries,
-  WORLD_VOCABULARY_KINDS,
   worldVocabularyEntryId,
 } from '../../../../../systems/worldVocabulary.js';
 import { isGeneralComponentCategory } from '../../../../../utils/componentCategories.js';
@@ -182,6 +181,50 @@ function refusesGeneral(kind, value) {
 }
 
 /**
+ * The number a kind's deletion warning states BESIDE the reference count, and `''` for a kind
+ * that has none.
+ *
+ * @param {object} panel
+ * @param {object} row
+ * @returns {number|null}
+ */
+function cascadeCount(panel, row) {
+  if (panel.kind === 'componentCategories') return Number(row?.confirmTokens?.defaults) || 0;
+  if (panel.kind === 'componentTags') return Number(row?.confirmTokens?.components) || 0;
+  return null;
+}
+
+/**
+ * The confirm sentence's cascade clause for one row, already localized and already substituted.
+ *
+ * ── WHY THE CLAUSE IS A TOKEN AND NOT A SECOND PANEL PROP ───────────────────────────────
+ * `removeConfirmHint` is per PANEL and the clause is per ROW: the common case for both component
+ * vocabularies is that NOTHING cascades, and a single sentence then reads "clears it from 0 world
+ * components, which 0 crafting systems inherit" — three numbers where the honest answer is one.
+ * `row.confirmTokens` is the shipped per-row seam for exactly this, so the clause travels as a
+ * token rather than as a third additive prop on a primitive this change is bounded to two of.
+ *
+ * IT IS SUBSTITUTED HERE rather than left for the panel's own merge, because the panel walks the
+ * token map ONCE: a clause inserted with its own `{defaults}` still in it would depend on key
+ * insertion order to be filled, and would render a literal brace the day that order changed.
+ *
+ * @param {object} panel
+ * @param {object} row
+ * @param {(key: string, fallback: string) => string} text
+ * @returns {string}
+ */
+export function cascadeClause(panel, row, text) {
+  const count = cascadeCount(panel, row);
+  if (count === null) return '';
+  if (count === 0) return text(panelKey(panel, 'CascadeNone'), '');
+  let clause = text(panelKey(panel, 'CascadeSome'), '');
+  for (const [token, value] of Object.entries(row?.confirmTokens ?? {})) {
+    clause = clause.split(`{${token}}`).join(String(value));
+  }
+  return clause;
+}
+
+/**
  * The value handed to `onAdd`, per kind.
  *
  * Tags are lowercased before submit, matching the system-scope screen; categories keep their
@@ -249,14 +292,4 @@ export function describeVocabularyInput(panel, rows, text) {
       blocked: false,
     };
   };
-}
-
-/**
- * A defensive guard for a kind the page was handed that this vocabulary does not carry.
- *
- * @param {unknown} kind
- * @returns {boolean}
- */
-export function isPanelKind(kind) {
-  return WORLD_VOCABULARY_KINDS.includes(kind);
 }
