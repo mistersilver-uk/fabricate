@@ -6057,7 +6057,6 @@
             "CheckUnlinkedDetail": "This record names no game-world Item, so nothing in an inventory resolves to it.",
             "CheckMembership": "In at least one system",
             "CheckMembershipDetail": "No crafting system has this Tool, so its world defaults reach nothing.",
-            "ValidationIntro": "What this world record still needs before every system that has it reads a complete answer.",
             "ValidationReady": "Ready",
             "ValidationBlocked": "Needs attention",
             "ValidationSub": "{count} checks over this world record",

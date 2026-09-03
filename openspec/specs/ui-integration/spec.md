@@ -2239,6 +2239,17 @@ The two world tool screens and the system-scope Tool Rules list share one break-
    `.manager-header` is a sibling of `.manager-main`, so the page cannot render into that band: it reports an ACTION DESCRIPTOR — the token, the two labels, the two consequence strings and the write — and the shell draws the shipped two-step control from it.
    The verb, the copy and the ordering the write needs stay with the page that owns the record.
    The two facts the header band states about the record, its NAME and whether it names a game-world Item, are reported UP by the page: the page already resolves both, and deriving them again in the shell would let the band and the page disagree about one record.
+6. **The world Tool entry offers FOUR breakage choices, because `limitedUses` carries two answers.**
+   `breakage.mode: 'limitedUses'` with `maxUses: null` IS the unlimited state — `## Tool Definition Model` defines the null that way, `Tool#evaluateBreakage` short-circuits on it, and the retired `mode: 'immune'` reads forward onto it — so a control offering the three MODES cannot express one of the four answers a GM authors.
+   The choices are `unlimited`, `limitedUses`, `breakageChance` and `diceExpression`, resolved by the one shared helper both scopes read rather than by either screen keying off `breakage.mode`, and `unlimited` leads them because it is the model's default and the state a Tool made by dropping an Item opens in.
+   **Selecting `Limited uses` SEEDS `maxUses` at 1 and selecting `Unlimited uses` writes the null explicitly**, so the choice a GM makes is the one that persists rather than a merge onto the value they just left.
+   The uses stepper renders under `limitedUses` alone and takes NO fallback: gated on the choice, it is only ever handed a non-null value, and the fallback it used to carry could fire only for the unlimited state — which it drew as `1` against a `min` of 1, so the screen stated `Limited uses`, `1`, `Unlimited uses` and a validation warning about one field at once, and no reachable stepper value put the null back.
+   That made a stepper nudge convert an unlimited world default into a one-use one for every system inheriting it.
+   **An authored `Unlimited uses` is a COMPLETE answer to the breakage-value check**, never a warning: the check reports a mode with nothing behind it, and this mode's answer is the absence of a mechanic.
+   The value editor is ABSENT rather than empty for it, since it configures nothing.
+7. **The world Tool entry's Validation tab draws no heading and no intro.**
+   The design opens that tab on its summary head and counts; a title above it restates the tab label a GM has just clicked, one line under it.
+   The system Tool Rules editor's Validation tab already takes that opt-out, and a shared surface whose title default is `Validation` is opted out of by omitting the prop, not by passing it empty.
 
 ### Scoped entity editor patterns
 

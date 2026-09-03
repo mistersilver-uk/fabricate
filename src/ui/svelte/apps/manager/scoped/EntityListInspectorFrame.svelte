@@ -689,6 +689,16 @@
       : text('FABRICATE.Admin.Manager.Scoped.List.SortDesc', 'Desc')
   );
 
+  // AND THE GLYPH TURNS WITH IT (issue 1373). `proto:1971` binds this icon to `d.tl.dirIcon`,
+  // a per-direction value, and the system Tool Rules list one screen away already swaps the
+  // identical pair (`ToolsBrowserView`). This toggle drew `arrow-down-a-z` in BOTH positions,
+  // so the only thing that moved under a click was the three-letter word beside it - and the
+  // descending state was never photographed, which is why nothing caught a glyph asserting the
+  // opposite of the order on screen.
+  const directionIcon = $derived(
+    sortDirection === 'asc' ? 'fas fa-arrow-down-a-z' : 'fas fa-arrow-up-a-z'
+  );
+
   // `{shown} of {total} {unit}` — the prototype's `6 of 6 essences`, right-aligned on the toolbar
   // row. It states the FILTERED count against the corpus total, which is the pair a GM needs to
   // tell "this world holds six" from "four are hidden by a filter I forgot".
@@ -870,7 +880,7 @@
               )}
               onclick={toggleSortDirection}
             >
-              <i class="fas fa-arrow-down-a-z" aria-hidden="true"></i>
+              <i class={directionIcon} aria-hidden="true"></i>
               <span>{directionLabel}</span>
             </button>
 
