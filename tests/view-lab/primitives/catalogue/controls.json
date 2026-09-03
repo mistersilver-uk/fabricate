@@ -1,835 +1,801 @@
 [
   {
-    "path": "src/ui/svelte/apps/manager/RadioCardGroup.svelte",
-    "root": "manager",
-    "note": "The `<OptionCards>` entry's own specimen: three tool-breaking modes, one of them disabled with a stated reason rather than dimmed silently. It renders through `<Field as=\"fieldset\">`, which is the single shipped fieldset host in the corpus, so a `disabled` group here is also the proof that a fieldset disables every descendant control. THE `legend` KNOB DRAWS NOTHING and that is correct: `.manager-resolution-mode-legend` is `position: absolute` at 1x1px in the global sheet, so the legend is the group's ACCESSIBLE name and never a visible heading. The visible line above the cards is `hint`.",
-    "states": {
-      "rest": true,
-      "hover": "No prop. `:hover` is not settable from a prop at all — read the plinth's live pseudo-class readout instead.",
-      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium. Tab into the group on the plinth: the radios are real and take the ring.",
-      "disabled": true,
-      "loading": "No prop. The option set is passed in already resolved, so the group never awaits anything.",
-      "invalid": "No prop. A radio group whose members are a closed set cannot hold an invalid value, and the group commits on change rather than on submit, so there is no rejected entry to mark.",
-      "readonly": "No prop. `disabled` is the only off state, and a per-option `disabled` is the only way to make one card unchoosable while the rest stay live.",
-      "empty": "`options: []` renders the legend and hint over an empty grid. That is a group with nothing in it rather than a stated empty state — the component draws no `<Empty>` of its own, so the absence is silent."
-    },
-    "knobs": [
-      {
-        "prop": "legend",
-        "type": "text",
-        "value": "When the check fails",
-        "default": ""
-      },
-      {
-        "prop": "hint",
-        "type": "text",
-        "value": "Degrading is not built yet, so its card states why rather than dimming without a reason.",
-        "default": ""
-      },
-      {
-        "prop": "options",
-        "type": "json",
-        "default": [],
-        "value": [
-          {
-            "value": "breakable",
-            "label": "Breakable",
-            "icon": "fas fa-hammer",
-            "description": "The tool can break based on the crafting check result."
-          },
-          {
-            "value": "immune",
-            "label": "Immune",
-            "icon": "fas fa-shield-halved",
-            "description": "The tool never breaks, whatever the check returns."
-          },
-          {
-            "value": "degrading",
-            "label": "Degrading",
-            "icon": "fas fa-arrow-trend-down",
-            "description": "Quality drops with each failed check.",
-            "disabled": true,
-            "badgeFallback": "Coming soon"
-          }
-        ]
-      },
-      {
-        "prop": "selectedValue",
-        "type": "text",
-        "value": "breakable",
-        "default": ""
-      },
-      {
-        "prop": "groupName",
-        "type": "text",
-        "value": "pl-tool-break-mode",
-        "default": ""
-      },
-      {
-        "prop": "columns",
-        "type": "number",
-        "value": 2,
-        "default": 2,
-        "min": 1,
-        "max": 4
-      },
-      {
-        "prop": "configCards",
-        "type": "boolean",
-        "value": true,
-        "default": true
-      },
-      {
-        "prop": "disabled",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "onChange",
-        "type": "event",
-        "writes": "selectedValue"
-      }
-    ],
-    "unknobbed": [
-      {
-        "prop": "cardId",
-        "why": "The fieldset's `id`, for a caller that labels the group from outside it. It has no rendered consequence and the lab would have to invent a value no call site uses."
-      },
-      {
-        "prop": "legendKey",
-        "why": "A localization key consulted BEFORE `legend`, which is driven. Driving both would let the lab render a legend from one source while the invocation beside it names the other."
-      },
-      {
-        "prop": "hintKey",
-        "why": "The same, for `hint`."
-      },
-      {
-        "prop": "dataGroup",
-        "why": "The value stamped into `data-radio-card-group` for a caller's own selectors. No visual consequence at all."
-      },
-      {
-        "prop": "dataAttr",
-        "why": "An arbitrary `data-*` attribute NAME stamped `true` on the fieldset, for a host's test hooks. Naming an attribute is not a state of the control."
-      },
-      {
-        "prop": "optionDataAttr",
-        "why": "The same, per option row."
-      }
-    ],
-    "stories": [
-      {
-        "title": "Column count",
-        "matrix": {
-          "columns": [1, 2, 3]
-        }
-      },
-      {
-        "title": "Config cards, and the whole group off",
-        "matrix": {
-          "configCards": "*",
-          "disabled": "*"
-        }
-      }
-    ],
-    "context": [
-      {
-        "ancestor": "src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte",
-        "site": "CheckDifficultyCard.svelte:134",
-        "width": 758,
-        "props": {
-          "dc": 15,
-          "thresholdMode": "meet",
-          "dcMode": "static",
-          "showDcSource": true,
-          "recordNoun": "recipe"
-        },
-        "why": "The Difficulty card of the Checks studio. Six plain scalars, and every prop the primitive receives is then computed by the card itself — `selectedValue={resolvedDcMode}` is a `$derived` of `dcMode`, which is the kind of expression no static extractor can resolve. `showDcSource` is `true` because the chooser renders only on the SIMPLE slot, where the model carries `dcMode`."
-      },
-      {
-        "ancestor": "src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte",
-        "site": "CheckFailurePolicy.svelte:19",
-        "width": 758,
-        "props": {
-          "value": "perRecord",
-          "activity": "crafting",
-          "recordNoun": "recipe",
-          "recordNounPlural": "Recipes",
-          "inertNote": "This system resolves crafting progressively, so the policy is recorded and never applied."
-        },
-        "why": "A second real card, on the same route, so the two are comparable: the same primitive drawn beside a `Callout` in a card whose own copy is parameterised on the record noun. `inertNote` is authored non-empty because it is the branch that puts the callout on screen."
-      }
-    ]
-  },
-  {
-    "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
-    "root": "manager",
-    "note": "The complications severity picker its own docblock names: three tinted segments across the info / warning / danger ramp, each carrying the trailing tally `count` renders. `severe` is authored disabled, because a per-OPTION off state is the only off state this control has.",
-    "states": {
-      "rest": true,
-      "hover": "No prop; see the plinth's pseudo-class readout. The sheet's own hover rule excludes `.is-active` and `.is-disabled` by name, so only a resting, choosable segment lifts.",
-      "focus-visible": "No prop. The track is real radios and its focus rule is `:has(:focus-visible)` precisely so a mouse click leaves no ring — tab into it on the plinth.",
-      "disabled": "No component-level prop. `disabled` is a key on each OPTION, carried onto that segment's radio, so a whole track cannot be switched off from one place; the fixture's third option carries it.",
-      "loading": "No prop. The segments are passed in already resolved.",
-      "invalid": "No prop. A closed set of segments cannot hold an invalid value; a `value` matching no option simply lights nothing.",
-      "readonly": "No prop, and no host that is not a control — unlike `StatusToggle`, which answers the same need with its `indicator` host.",
-      "empty": "`options: []` renders the empty well: a bordered track with no segments in it. That is the container drawn around nothing rather than a stated empty state."
-    },
-    "knobs": [
-      {
-        "prop": "options",
-        "type": "json",
-        "default": [],
-        "value": [
-          {
-            "value": "minor",
-            "fallback": "Minor",
-            "icon": "fas fa-circle-info",
-            "variant": "info",
-            "count": 4
-          },
-          {
-            "value": "major",
-            "fallback": "Major",
-            "icon": "fas fa-triangle-exclamation",
-            "variant": "warning",
-            "count": 2
-          },
-          {
-            "value": "severe",
-            "fallback": "Severe",
-            "icon": "fas fa-skull",
-            "variant": "danger",
-            "count": 1,
-            "disabled": true
-          }
-        ]
-      },
-      {
-        "prop": "value",
-        "type": "text",
-        "value": "major",
-        "default": ""
-      },
-      {
-        "prop": "groupName",
-        "type": "text",
-        "value": "pl-complication-severity",
-        "default": ""
-      },
-      {
-        "prop": "ariaLabel",
-        "type": "text",
-        "value": "Complication severity",
-        "default": ""
-      },
-      {
-        "prop": "density",
-        "type": "select",
-        "options": ["default", "compact", "field"],
-        "value": "default",
-        "default": "default"
-      },
-      {
-        "prop": "fill",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "iconOnly",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "onChange",
-        "type": "event",
-        "writes": "value"
-      }
-    ],
-    "unknobbed": [
-      {
-        "prop": "dataAttr",
-        "why": "An arbitrary `data-*` attribute NAME stamped `true` on the track, for a host's own selectors. Naming an attribute is not a state of the control."
-      },
-      {
-        "prop": "optionDataAttr",
-        "why": "The same, per segment."
-      }
-    ],
-    "stories": [
-      {
-        "title": "Every density",
-        "matrix": {
-          "density": "*"
-        }
-      },
-      {
-        "title": "Icon-only against full width",
-        "matrix": {
-          "iconOnly": "*",
-          "fill": "*"
-        }
-      }
-    ],
-    "context": [
-      {
-        "ancestor": "src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte",
-        "site": "CheckDifficultyCard.svelte:171",
-        "width": 758,
-        "props": {
-          "dc": 15,
-          "thresholdMode": "meet",
-          "dcMode": "static",
-          "showDcSource": true,
-          "recordNoun": "recipe"
-        },
-        "why": "The COMPARISON control on the Difficulty card — meet-or-exceed against exceed — which is a two-segment track beside a `Stepper` and a `RadioCardGroup`. The same ancestor answers for three catalogued primitives at once, and that is the argument for mounting an ancestor rather than extracting props: one modest fixture makes every primitive in the card real."
-      }
-    ]
-  },
-  {
-    "path": "src/ui/svelte/components/Field.svelte",
-    "root": "manager",
-    "note": "`as` opens on `div` rather than on the majority `label` host for one reason: the `field` filler is itself a `<Field as=\"label\">`, and a label inside a label is invalid HTML with an ambiguous click target. The host story pins `children` to plain text so all three hosts stay valid.",
-    "states": {
-      "rest": true,
-      "hover": "No prop, and none is wanted: the field is a column, not a control, and what hovers inside it is the caller's own input.",
-      "focus-visible": "No prop. The ring belongs to whatever control the field wraps; tab into the specimen on the plinth to see it.",
-      "disabled": true,
-      "loading": "No prop. A field shell renders whatever it is handed, synchronously.",
-      "invalid": "No prop. `library.html:646` specifies `invalid` and `error` on the 38px control shell, and that shell is NOT built — only this column is — so there is nowhere for an error line to be rendered and nothing to mark.",
-      "readonly": "No prop, for the same reason: `readonly` belongs to the unbuilt control, and a `readonly` attribute passed through the rest spread would land on a `<div>` and do nothing.",
-      "empty": "Not applicable: a field is a shell around a caller's control, so it holds no collection that could be empty. Clearing `children` renders an empty box, which is a missing control rather than an empty state."
-    },
-    "knobs": [
-      {
-        "prop": "as",
-        "type": "select",
-        "options": ["label", "div", "fieldset"],
-        "value": "div",
-        "default": null
-      },
-      {
-        "prop": "disabled",
-        "type": "boolean",
-        "via": "rest",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "children",
-        "type": "snippet",
-        "value": "field",
-        "default": ""
-      }
-    ],
-    "unknobbed": [
-      {
-        "prop": "class",
-        "why": "An EXTRA class appended to `manager-field`, never a replacement. Driving it would let the lab paint a field the design system does not draw, which is the one thing this page must never do."
-      },
-      {
-        "prop": "...rest",
-        "why": "Every other attribute — `id`, `data-*` hooks, `aria-*`, and `disabled` on the fieldset — is forwarded verbatim onto the host element. The set is open, so it is accounted for as a whole here and one member of it, `disabled`, is driven above through `via: \"rest\"` because it is the fieldset host's whole point."
-      }
-    ],
-    "stories": [
-      {
-        "title": "Every host",
-        "matrix": {
-          "as": "*",
-          "children": ["text"]
-        }
-      },
-      {
-        "title": "A disabled fieldset disables its descendants",
-        "matrix": {
-          "as": ["fieldset"],
-          "disabled": "*"
-        }
-      }
-    ]
-  },
-  {
-    "path": "src/ui/svelte/components/IconButton.svelte",
-    "root": "manager",
-    "note": "The whole subject of this primitive is a prop with no pixels: `ariaLabel`. Clearing it renders a control that is IDENTICAL on screen and anonymous to a screen reader, which is exactly why the component makes it required-shaped — and the glyph story shows why the box is sized for one glyph and nothing else.",
-    "states": {
-      "rest": true,
-      "hover": "No prop; see the plinth's pseudo-class readout.",
-      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium. Tab to the button on the plinth.",
-      "disabled": true,
-      "loading": "No `loading` prop. `aria-busy` can only arrive through the rest spread, so the primitive states nothing at all about a pending icon action and every caller has to spell it — which the spec requires of a loading control.",
-      "invalid": "Not applicable: a button holds no value that could be invalid.",
-      "readonly": "Not applicable: a button holds no value that could be read-only.",
-      "empty": "Not applicable: it renders its glyph, never a collection."
-    },
-    "knobs": [
-      {
-        "prop": "ariaLabel",
-        "type": "text",
-        "value": "Delete recipe",
-        "default": ""
-      },
-      {
-        "prop": "disabled",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "children",
-        "type": "snippet",
-        "value": "icon",
-        "default": ""
-      },
-      {
-        "prop": "onclick",
-        "type": "event"
-      }
-    ],
-    "unknobbed": [
-      {
-        "prop": "class",
-        "why": "An EXTRA class appended to `manager-icon-button`. It is also where this primitive's whole modifier vocabulary lives — `is-danger`, `is-ghost`, `is-locked`, `is-roll-needed` — because that vocabulary mixes roles with states and is a design ruling left open. Driving it would have the lab publish a role set the component deliberately does not declare."
-      },
-      {
-        "prop": "element",
-        "why": "A `bind:this` handle on the rendered `<button>`, for a caller that must measure or refocus it. The lab hands props DOWN, so binding it here would give the node two owners; it has no rendered consequence."
-      },
-      {
-        "prop": "...rest",
-        "why": "Every other attribute — `data-*` hooks, `aria-haspopup`, `aria-expanded`, `title`, `data-tooltip`, `onkeydown` — is forwarded onto the `<button>`. The set is open and every member of it is either a caller's own selector or announced rather than drawn, so none is worth a control."
-      }
-    ],
-    "stories": [
-      {
-        "title": "Disabled",
-        "matrix": {
-          "disabled": "*"
-        }
-      },
-      {
-        "title": "The glyph is the whole content",
-        "matrix": {
-          "children": ["icon", "short-text", "icon-text"]
-        }
-      }
-    ]
-  },
-  {
-    "path": "src/ui/svelte/components/ManagerButton.svelte",
-    "root": "manager",
-    "note": "Six roles, each naming a VERB rather than a colour, and a role set that is closed on purpose — the drift this component ended was a destructive verb painted neutral. The role-and-disabled story is where that matters: the sheet's ghost rule once out-specified `:disabled`, so a disabled ghost button kept its switched-on colours for a whole save.",
-    "states": {
-      "rest": true,
-      "hover": "No prop. `:hover` is not settable from a prop at all — read the plinth's live pseudo-class readout instead.",
-      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium, so a knob would render nothing and read as a missing focus ring.",
-      "disabled": true,
-      "loading": "No `loading` prop, and no way to set `aria-busy` — which the spec requires of a loading control, because Foundry's Font Awesome kills `fa-spin` under reduced motion.",
-      "invalid": "Not applicable: a button holds no value that could be invalid.",
-      "readonly": "Not applicable: a button holds no value that could be read-only.",
-      "empty": "Not applicable: a button renders its children, never a collection."
-    },
-    "knobs": [
-      {
-        "prop": "role",
-        "type": "select",
-        "options": ["neutral", "primary", "ghost", "danger", "dashed", "warning"],
-        "value": "primary",
-        "default": "neutral"
-      },
-      {
-        "prop": "tag",
-        "type": "select",
-        "options": ["button", "a"],
-        "value": "button",
-        "default": "button"
-      },
-      {
-        "prop": "type",
-        "type": "select",
-        "options": ["button", "submit", "reset"],
-        "value": "button",
-        "default": "button"
-      },
-      {
-        "prop": "fullWidth",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "disabled",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "aria-label",
-        "type": "text",
-        "via": "rest",
-        "value": "",
-        "default": ""
-      },
-      {
-        "prop": "children",
-        "type": "snippet",
-        "value": "icon-text",
-        "default": ""
-      },
-      {
-        "prop": "onclick",
-        "type": "event"
-      }
-    ],
-    "unknobbed": [
-      {
-        "prop": "href",
-        "why": "Only reachable with `tag=\"a\"`, and the component deliberately falls back to a button when an anchor has no href — so a driven href would silently change which element renders."
-      },
-      {
-        "prop": "target",
-        "why": "An anchor concern, and navigating away from the lab is not a state worth reaching."
-      },
-      {
-        "prop": "rel",
-        "why": "An anchor concern with no visual consequence: it changes the referrer policy and nothing on screen."
-      },
-      {
-        "prop": "class",
-        "why": "An EXTRA class appended to the primitive's own. Driving it would let the lab paint a button the design system does not draw, which is the one thing this page must never do."
-      },
-      {
-        "prop": "...rest",
-        "why": "Every other attribute — `data-*` hooks, `aria-*`, `title`, `data-tooltip` — is forwarded onto the rendered element. The set is open, so it is accounted for as a whole here, and its one member with a real consequence is driven above: a labelled button names itself from its children, so an `aria-label` OVERRIDES the visible words and announces something the screen does not say."
-      }
-    ],
-    "stories": [
-      {
-        "title": "Every role",
-        "matrix": {
-          "role": "*"
-        }
-      },
-      {
-        "title": "Every role, switched off",
-        "matrix": {
-          "role": "*",
-          "disabled": "*"
-        }
-      },
-      {
-        "title": "Full width",
-        "matrix": {
-          "fullWidth": "*"
-        }
-      }
-    ]
-  },
-  {
-    "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
-    "root": "manager",
-    "note": "The tri-state is the point: `indeterminate` is a DOM PROPERTY with no HTML attribute, so a hand-rolled box that set it in markup set nothing at all, silently. The states story is where a reader confirms that a box which is both checked and indeterminate reads as indeterminate — \"some of these\", which is what a selection header needs.",
-    "states": {
-      "rest": true,
-      "hover": "No prop; see the plinth's pseudo-class readout. The wrapper carries `cursor: pointer` and `is-disabled` swaps it for `not-allowed`.",
-      "focus-visible": "No prop. The real input is 1px and transparent, so its ring is drawn on the visible box through `:has(.fab-selection-input:focus-visible)` — tab to it on the plinth.",
-      "disabled": true,
-      "loading": "No prop. A selection box has no pending state; its edits are synchronous and the host owns whatever they trigger.",
-      "invalid": "No prop. A checkbox holds a tri-state and `indeterminate` means \"some of these\" rather than \"this is wrong\", so the component has no way to mark an entry as rejected.",
-      "readonly": "No prop. `disabled` is the only off state, and a `readonly` attribute forwarded through the rest spread would land on the input and do nothing — `readonly` has no effect on a checkbox.",
-      "empty": "Not applicable: it renders one box, never a collection."
-    },
-    "knobs": [
-      {
-        "prop": "checked",
-        "type": "boolean",
-        "value": true,
-        "default": false
-      },
-      {
-        "prop": "indeterminate",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "disabled",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "size",
-        "type": "select",
-        "options": ["sm", "md", "lg"],
-        "value": "lg",
-        "default": "md"
-      },
-      {
-        "prop": "wrapper",
-        "type": "select",
-        "options": ["label", "contents"],
-        "value": "label",
-        "default": "label"
-      },
-      {
-        "prop": "ariaLabel",
-        "type": "text",
-        "value": "Select Iron ingot",
-        "default": ""
-      },
-      {
-        "prop": "onChange",
-        "type": "event",
-        "writes": "checked"
-      }
-    ],
-    "unknobbed": [
-      {
-        "prop": "input",
-        "why": "A `bind:this` handle on the visually hidden `<input>`, so a host can move focus to it — the import mapping dialog does. The lab hands props DOWN, so binding it here would give the node two owners, and it has no rendered consequence."
-      },
-      {
-        "prop": "...rest",
-        "why": "Every other attribute — `value`, `data-*` hooks, `title` — is forwarded onto the INPUT, which is what a pointer hits and what a test drives. The set is open and none of its members is drawn."
-      }
-    ],
-    "stories": [
-      {
-        "title": "The three states",
-        "matrix": {
-          "checked": "*",
-          "indeterminate": "*"
-        }
-      },
-      {
-        "title": "Every size",
-        "matrix": {
-          "size": "*"
-        }
-      }
-    ]
-  },
-  {
-    "path": "src/ui/svelte/components/StatusToggle.svelte",
-    "root": "manager",
-    "note": "THE WRITE-BACK ONLY CLOSES ON THE `checkbox` HOST, and that is a fact about the component rather than a gap in this row. `onChange(checked)` carries the next state and is fired by the checkbox host alone; the `button` host — 32 of the 37 sites this replaced — fires `onclick` with a MouseEvent, so nothing in the call carries a boolean to write back. Move the switch from its own `on` knob, or select `as=\"checkbox\"` and press the specimen.",
-    "states": {
-      "rest": true,
-      "hover": "No prop; see the plinth's pseudo-class readout. The sheet's hover rule excludes `.is-locked` BY NAME, because `:disabled` cannot match the indicator host's `<span>`.",
-      "focus-visible": "No prop, and a scripted `.focus()` does not match `:focus-visible` in Chromium. Tab to the switch on the plinth; the indicator host is a `<span role=\"img\">` and is deliberately not focusable at all.",
-      "disabled": true,
-      "loading": "No prop. The switch takes effect immediately by definition — that is what separates it from a control that commits — so there is no pending state to draw.",
-      "invalid": "Not applicable: a binary state cannot hold an invalid value.",
-      "readonly": "No `readonly` prop, and none is wanted: the `indicator` host IS the answer. It draws the same track and knob as a labelled image with nothing to press, which is a different construct rather than a state of the button.",
-      "empty": "Not applicable: it renders one switch, never a collection."
-    },
-    "knobs": [
-      {
-        "prop": "as",
-        "type": "select",
-        "options": ["button", "indicator", "checkbox"],
-        "value": "button",
-        "default": "button"
-      },
-      {
-        "prop": "on",
-        "type": "boolean",
-        "value": true,
-        "default": false
-      },
-      {
-        "prop": "label",
-        "type": "text",
-        "value": "Enabled",
-        "default": ""
-      },
-      {
-        "prop": "ariaLabel",
-        "type": "text",
-        "value": "Enable this recipe",
-        "default": ""
-      },
-      {
-        "prop": "disabled",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "trailing",
-        "type": "snippet",
-        "value": "",
-        "default": ""
-      },
-      {
-        "prop": "onChange",
-        "type": "event",
-        "writes": "on"
-      },
-      {
-        "prop": "onclick",
-        "type": "event"
-      }
-    ],
-    "unknobbed": [
-      {
-        "prop": "class",
-        "why": "An EXTRA class appended to the primitive's own, never a replacement. Driving it would let the harness paint a switch the design system does not draw."
-      },
-      {
-        "prop": "...rest",
-        "why": "Every other attribute — `data-*` hooks, `aria-labelledby`, `title`, `onkeydown` — is forwarded onto whichever element the chosen host makes interactive: the `<button>`, the indicator `<span>`, or the checkbox's `<input>`. The set is open and none of its members is drawn."
-      }
-    ],
-    "stories": [
-      {
-        "title": "Every host, on and off",
-        "matrix": {
-          "as": "*",
-          "on": "*"
-        }
-      },
-      {
-        "title": "The track-only form",
-        "matrix": {
-          "label": ["", "Enabled"]
-        }
-      }
-    ]
-  },
-  {
+    "spec": "<Stepper>",
+    "cap": "integer",
+    "draws": ".k-step",
     "path": "src/ui/svelte/components/Stepper.svelte",
-    "root": "manager",
-    "note": "`onChange` declares `writes: \"value\"`, so pressing the component's OWN plus and minus buttons moves the rendered number and typing in the field commits through the same path. Without it the specimen would log and never move. The primary control is the input, not the adjuncts: a click-only stepper is a documented keyboard regression.",
-    "states": {
-      "rest": true,
-      "hover": "No prop; see the plinth's pseudo-class readout.",
-      "focus-visible": "No prop; the input's own ring is reachable by tabbing to it on the plinth.",
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 2,
+      "ariaLabel": "Quantity"
+    }
+  },
+  {
+    "spec": "<Stepper>",
+    "cap": "with unit",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 250,
+      "ariaLabel": "Amount in gold pieces"
+    }
+  },
+  {
+    "spec": "<Stepper>",
+    "cap": "signed",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 3,
+      "ariaLabel": "Modifier"
+    }
+  },
+  {
+    "spec": "<Stepper>",
+    "cap": "at min · unset",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": null,
+      "min": 0,
+      "allowUnset": true,
+      "placeholder": "Any",
+      "ariaLabel": "Minimum tier"
+    }
+  },
+  {
+    "spec": "<Stepper>",
+    "cap": "coarse rail",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 40,
+      "step": 10,
+      "ariaLabel": "Free floor"
+    }
+  },
+  {
+    "spec": "<Stepper>",
+    "cap": "comfortable",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 2,
+      "density": "comfortable",
+      "ariaLabel": "Quantity, comfortable density"
+    }
+  },
+  {
+    "spec": "<Stepper>",
+    "cap": "vertical",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 4,
+      "orientation": "vertical",
+      "ariaLabel": "Duration in hours"
+    }
+  },
+  {
+    "spec": "<Stepper>",
+    "cap": "disabled",
+    "draws": ".k-step",
+    "path": "src/ui/svelte/components/Stepper.svelte",
+    "props": {
+      "decrementLabel": "Decrease",
+      "incrementLabel": "Increase",
+      "value": 0,
       "disabled": true,
-      "loading": "No prop. A stepper has no pending state — its edits are synchronous.",
-      "invalid": "No prop. Out-of-range entry is CLAMPED on blur rather than marked invalid, which is a deliberate difference from a validated field: there is never a moment at which the field displays a value the model rejects.",
-      "readonly": "No prop. `disabled` is the only off state, and the header records that `inputProps.disabled` is the wrong way to reach it — it would disable the input and leave the adjuncts live.",
-      "empty": "Reachable through `allowUnset`, which makes absence a real value in the field's domain rather than a blank that coerces back to the model."
+      "ariaLabel": "Quantity, disabled"
+    }
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "page 38 · the header pair only",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "primary"
     },
-    "knobs": [
+    "content": ["Save recipe"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "page 38 · the header pair only",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "primary"
+    },
+    "content": ["New template"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "page 38 · the header pair only",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "content": [
       {
-        "prop": "value",
-        "type": "number",
-        "value": 3,
-        "default": null,
-        "allowUnset": true,
-        "min": -50,
-        "max": 50
-      },
-      {
-        "prop": "min",
-        "type": "number",
-        "value": 0,
-        "default": null,
-        "allowUnset": true
-      },
-      {
-        "prop": "max",
-        "type": "number",
-        "value": 10,
-        "default": null,
-        "allowUnset": true
-      },
-      {
-        "prop": "step",
-        "type": "number",
-        "value": 1,
-        "default": 1,
-        "min": 1,
-        "max": 10
-      },
-      {
-        "prop": "allowUnset",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "disabled",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "fill",
-        "type": "boolean",
-        "value": false,
-        "default": false
-      },
-      {
-        "prop": "orientation",
-        "type": "select",
-        "options": ["horizontal", "vertical"],
-        "value": "horizontal",
-        "default": "horizontal"
-      },
-      {
-        "prop": "density",
-        "type": "select",
-        "options": ["default", "comfortable"],
-        "value": "default",
-        "default": "default"
-      },
-      {
-        "prop": "ariaLabel",
-        "type": "text",
-        "value": "Quantity",
-        "default": ""
-      },
-      {
-        "prop": "decrementLabel",
-        "type": "text",
-        "value": "Decrease quantity",
-        "default": ""
-      },
-      {
-        "prop": "incrementLabel",
-        "type": "text",
-        "value": "Increase quantity",
-        "default": ""
-      },
-      {
-        "prop": "placeholder",
-        "type": "text",
-        "value": "inherited",
-        "default": ""
-      },
-      {
-        "prop": "inputProps",
-        "type": "json",
-        "value": {},
-        "default": {}
-      },
-      {
-        "prop": "onChange",
-        "type": "event",
-        "writes": "value"
-      }
-    ],
-    "stories": [
-      {
-        "title": "Absence is a value",
-        "matrix": {
-          "allowUnset": "*"
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-chevron-left",
+          "aria-hidden": "true"
         }
       },
+      "Back"
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "page 38 · the header pair only",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "ghost"
+    },
+    "content": ["Cancel"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "page 38 · the header pair only",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "danger"
+    },
+    "content": [
       {
-        "title": "Orientation against density",
-        "matrix": {
-          "orientation": "*",
-          "density": "*"
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-trash",
+          "aria-hidden": "true"
+        }
+      },
+      "Delete"
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "row 30 · everything in the body",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "content": ["Open editor"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "row 30 · everything in the body",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "content": ["Apply to all"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "row 30 · everything in the body",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "warning"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-triangle-exclamation",
+          "aria-hidden": "true"
+        }
+      },
+      "Review"
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "row 30 · everything in the body",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "danger"
+    },
+    "content": ["Delete"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "row 30 · everything in the body",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "disabled": true
+    },
+    "content": ["Unavailable"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "icon 28",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/IconButton.svelte",
+    "props": {
+      "ariaLabel": "Link a world item"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-link",
+          "aria-hidden": "true"
         }
       }
     ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "icon 28",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/IconButton.svelte",
+    "props": {
+      "ariaLabel": "More actions"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-ellipsis",
+          "aria-hidden": "true"
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "icon 28",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/IconButton.svelte",
+    "props": {
+      "ariaLabel": "Remove this row"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-xmark",
+          "aria-hidden": "true"
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "dashed role · adds to the collection it sits in",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "dashed"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-plus",
+          "aria-hidden": "true"
+        }
+      },
+      "Add component"
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "dashed role · adds to the collection it sits in",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "dashed"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-plus",
+          "aria-hidden": "true"
+        }
+      },
+      "Add tag requirement"
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "dashed role · adds to the collection it sits in",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "dashed"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-plus",
+          "aria-hidden": "true"
+        }
+      },
+      "Add currency"
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "dashed · block adder closes a list",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "dashed",
+      "fullWidth": true
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-plus",
+          "aria-hidden": "true"
+        }
+      },
+      "Add another tier"
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "danger"
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-trash",
+          "aria-hidden": "true"
+        }
+      },
+      "Delete essence"
+    ]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "danger"
+    },
+    "content": ["Confirm delete"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "ghost"
+    },
+    "content": ["Cancel"]
+  },
+  {
+    "spec": "<Button> <IconButton>",
+    "cap": "destructive — arm, then confirm (row carve-out only)",
+    "draws": ".k-btn",
+    "path": "src/ui/svelte/components/ManagerButton.svelte",
+    "props": {
+      "role": "danger",
+      "disabled": true
+    },
+    "content": [
+      {
+        "tag": "i",
+        "attrs": {
+          "class": "fas fa-clock",
+          "aria-hidden": "true"
+        }
+      },
+      "Deleting…"
+    ]
+  },
+  {
+    "spec": "<Toggle>",
+    "cap": "on · accent",
+    "draws": ".k-tog",
+    "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "props": {
+      "on": true,
+      "ariaLabel": "Enabled"
+    }
+  },
+  {
+    "spec": "<Toggle>",
+    "cap": "off",
+    "draws": ".k-tog",
+    "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "props": {
+      "on": false,
+      "ariaLabel": "Enabled"
+    }
+  },
+  {
+    "spec": "<Toggle>",
+    "cap": "on · success",
+    "draws": ".k-tog",
+    "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "props": {
+      "on": true,
+      "ariaLabel": "Enabled"
+    }
+  },
+  {
+    "spec": "<Toggle>",
+    "cap": "disabled",
+    "draws": ".k-tog",
+    "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "props": {
+      "on": false,
+      "disabled": true,
+      "ariaLabel": "Enabled"
+    }
+  },
+  {
+    "spec": "<Toggle>",
+    "cap": "on · with its reading — 28 of 37 shipped sites",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "props": {
+      "on": true,
+      "label": "On",
+      "ariaLabel": "Enabled"
+    }
+  },
+  {
+    "spec": "<Toggle>",
+    "cap": "locked · an indicator, not a control",
+    "draws": ".k-tog",
+    "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "props": {
+      "as": "indicator",
+      "on": true,
+      "ariaLabel": "Required by the mode"
+    }
+  },
+  {
+    "spec": "<Toggle>",
+    "cap": "in a settings row — the standard composition",
+    "draws": ".k-tog",
+    "path": "src/ui/svelte/components/StatusToggle.svelte",
+    "props": {
+      "on": true,
+      "ariaLabel": "Catch up missed ticks"
+    }
+  },
+  {
+    "spec": "<Segmented>",
+    "cap": "default · in a well",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
+    "props": {
+      "options": [
+        {
+          "value": "flat",
+          "fallback": "Flat"
+        },
+        {
+          "value": "market",
+          "fallback": "Full market"
+        },
+        {
+          "value": "sim",
+          "fallback": "Deep sim"
+        }
+      ],
+      "value": "market",
+      "groupName": "pl-pricing",
+      "ariaLabel": "Pricing model"
+    }
+  },
+  {
+    "spec": "<Segmented>",
+    "cap": "bare · no well",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
+    "props": {
+      "options": [
+        {
+          "value": "any",
+          "fallback": "Any of"
+        },
+        {
+          "value": "all",
+          "fallback": "All of"
+        }
+      ],
+      "value": "any",
+      "groupName": "pl-match",
+      "ariaLabel": "Tag match"
+    }
+  },
+  {
+    "spec": "<Segmented>",
+    "cap": "grow",
+    "draws": ".k-seg",
+    "path": "src/ui/svelte/apps/manager/SegmentedControl.svelte",
+    "props": {
+      "options": [
+        {
+          "value": "list",
+          "fallback": "List"
+        },
+        {
+          "value": "grid",
+          "fallback": "Card grid"
+        }
+      ],
+      "value": "list",
+      "groupName": "pl-layout",
+      "ariaLabel": "Browse layout",
+      "fill": true
+    }
+  },
+  {
+    "spec": "<OptionCards>",
+    "cap": "stacked — three or more, with the reveal",
+    "draws": ":scope > div:not(.k-well)",
+    "path": "src/ui/svelte/apps/manager/RadioCardGroup.svelte",
+    "props": {
+      "legend": "When the tool breaks",
+      "groupName": "pl-tool-breakage",
+      "selectedValue": "breakable",
+      "columns": 3,
+      "options": [
+        {
+          "value": "breakable",
+          "fallback": "Breakable",
+          "icon": "fas fa-hammer",
+          "descFallback": "The tool can break based on the crafting check result."
+        },
+        {
+          "value": "immune",
+          "fallback": "Immune",
+          "icon": "fas fa-lock",
+          "descFallback": "The tool never breaks, whatever the check returns."
+        },
+        {
+          "value": "degrading",
+          "fallback": "Degrading",
+          "icon": "fas fa-star",
+          "disabled": true,
+          "badgeFallback": "Coming soon",
+          "descFallback": "Quality drops with each failed check."
+        }
+      ]
+    }
+  },
+  {
+    "spec": "<Field> <Select> <Search>",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/Field.svelte",
+    "props": {
+      "as": "label"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Template name"
+      },
+      {
+        "tag": "input",
+        "attrs": {
+          "type": "text",
+          "value": "Frontier Outpost",
+          "readonly": true
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Field> <Select> <Search>",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/Field.svelte",
+    "props": {
+      "as": "label"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Resolution"
+      },
+      {
+        "tag": "select",
+        "children": [
+          {
+            "tag": "option",
+            "attrs": {
+              "value": "simple"
+            },
+            "text": "Simple"
+          },
+          {
+            "tag": "option",
+            "attrs": {
+              "value": "routed",
+              "selected": true
+            },
+            "text": "Routed by check"
+          },
+          {
+            "tag": "option",
+            "attrs": {
+              "value": "progressive"
+            },
+            "text": "Progressive"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "spec": "<Field> <Select> <Search>",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/Field.svelte",
+    "props": {
+      "as": "label"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Break expression"
+      },
+      {
+        "tag": "input",
+        "attrs": {
+          "type": "text",
+          "value": "1d20 + @str.mod",
+          "readonly": true
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Field> <Select> <Search>",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/Field.svelte",
+    "props": {
+      "as": "label"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Search"
+      },
+      {
+        "tag": "input",
+        "attrs": {
+          "type": "search",
+          "placeholder": "Search the catalogue…"
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Field> <Select> <Search>",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/Field.svelte",
+    "props": {
+      "as": "label"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Focused"
+      },
+      {
+        "tag": "input",
+        "attrs": {
+          "type": "text",
+          "value": "Ironvale",
+          "readonly": true
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Field> <Select> <Search>",
+    "draws": ".k-lbl",
+    "path": "src/ui/svelte/components/Field.svelte",
+    "props": {
+      "as": "label"
+    },
+    "content": [
+      {
+        "tag": "span",
+        "text": "Invalid"
+      },
+      {
+        "tag": "input",
+        "attrs": {
+          "type": "text",
+          "value": "Ironvale",
+          "readonly": true,
+          "aria-invalid": "true"
+        }
+      }
+    ]
+  },
+  {
+    "spec": "<Checkbox>",
+    "cap": "off",
+    "draws": ".k-cb",
+    "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "props": {
+      "checked": false,
+      "ariaLabel": "Select this row"
+    }
+  },
+  {
+    "spec": "<Checkbox>",
+    "cap": "on",
+    "draws": ".k-cb",
+    "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "props": {
+      "checked": true,
+      "ariaLabel": "Select this row"
+    }
+  },
+  {
+    "spec": "<Checkbox>",
+    "cap": "indeterminate",
+    "draws": ".k-cb",
+    "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "props": {
+      "checked": false,
+      "indeterminate": true,
+      "ariaLabel": "Select every row"
+    }
+  },
+  {
+    "spec": "<Checkbox>",
+    "cap": "disabled",
+    "draws": ".k-cb",
+    "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "props": {
+      "checked": false,
+      "disabled": true,
+      "ariaLabel": "Select this row"
+    }
+  },
+  {
+    "spec": "<Checkbox>",
+    "cap": "gate list — opt into shared prerequisites",
+    "draws": ".k-cb",
+    "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "props": {
+      "checked": true,
+      "ariaLabel": "Proficient with Smith’s Tools"
+    }
+  },
+  {
+    "spec": "<Checkbox>",
+    "cap": "gate list — opt into shared prerequisites",
+    "draws": ".k-cb",
+    "path": "src/ui/svelte/components/SelectionCheckbox.svelte",
+    "props": {
+      "checked": false,
+      "ariaLabel": "Expert Crafter"
+    }
   }
 ]

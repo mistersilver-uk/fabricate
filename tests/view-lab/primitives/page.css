@@ -1,0 +1,56 @@
+/*
+ * The Primitive Lab's own chrome — all four rules of it.
+ *
+ * The page draws nothing for itself. Its layout, its type, its palette and every one of its
+ * surfaces come from `openspec/specs/design-system/library.html`, injected at load time by
+ * `library.js`; its specimens come from `styles/fabricate.css` and each component's own block.
+ * What is left for this file is the seam between them, and a seam is not a design system: there is
+ * no `.pl-` rail, no `.pl-` card, no `.pl-` notice and no colour anywhere below.
+ *
+ * That is the difference the maintainer's redirect asked for, stated as a file size. The version
+ * this replaces was 400 lines and declared four surfaces of its own, each with a note explaining
+ * which unbuilt primitive would have owned it — which is a design system the lab invented so it
+ * could have a workbench.
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+ * THE LIVE SLOT, AND THE ONE DISCLOSED FIDELITY DEVIATION ON THIS PAGE.
+ *
+ * A specimen has to be painted the way production paints it, which means it has to sit inside
+ * `.application.fabricate.crafting-system-manager > .window-content > .fabricate-manager` — see
+ * the block comment in `mount.js` for the four things a bare root loses against the harvested
+ * chrome, none of which announces itself.
+ *
+ * But `.application` is a WINDOW: `foundry2.css:6985` gives it `position: absolute`, a 200px
+ * `min-width`, a `min-height`, a 1px border, a 6px radius, a `0 0 10px #000` shadow and
+ * `overflow: hidden`, and `.window-content` adds `var(--spacer-16)` of padding. Nested inside a
+ * library `.unit` — which is a caption above a row of bare controls — that draws a bordered,
+ * shadowed, 200px-wide box around every specimen on the page, and the result stops being a
+ * re-render of the library at all.
+ *
+ * `display: contents` resolves it exactly. The elements generate no boxes, so they contribute no
+ * chrome and no layout; they remain in the DOM, so every selector that needs them still matches,
+ * and they remain in the INHERITANCE chain, so `.application`'s `font-size: var(--font-size-14)`,
+ * its ten custom properties and the theme's whole `--fab-*` block still reach the specimen. The
+ * component's own root becomes the element the library's layout lays out, which is what puts a
+ * live control precisely where the drawing it replaced stood.
+ *
+ * WHAT IT COSTS, stated rather than discovered later: an element with no principal box is not a
+ * containing block and is not a query container. `.application` therefore does not position an
+ * overlay (`src/ui/svelte/util/overlayHost.js` lists it as an overlay host BECAUSE it is
+ * positioned) and `.fabricate-manager`'s `container-type: inline-size` does not fire, so its
+ * 1320px / 1120px / 680px breakpoints are unreachable here. Neither is judgeable from this page,
+ * and no Controls entry reaches either. A future entry that does — a popover, a panel that
+ * restyles at a breakpoint — needs a real box and therefore a different slot, not a wider
+ * exception to this rule.
+ *
+ * Written unlayered, so it beats `foundry2.css` (which is layered end to end), and keyed on
+ * classes only this page writes.
+ * ───────────────────────────────────────────────────────────────────────────────────────────── */
+.pl-live,
+.pl-live .application,
+.pl-live .window-content,
+.pl-live .fabricate-manager,
+.pl-live .pl-specimen {
+  display: contents;
+}

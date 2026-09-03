@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Fabricate Primitive Lab</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fabricate Build Reference — live</title>
     <!--
       Foundry serves the game view from the web ROOT, so module code that references an asset the
       Foundry way - `icons/svg/item-bag.svg`, no leading slash - resolves against `/`. This page
@@ -14,7 +15,7 @@
       STYLESHEET ORDER IS THE SAME ORDER AS index.html, AND IT IS LOAD-BEARING. It reproduces
       Foundry's own game view (templates/views/layouts/main.hbs plus Express.CORE_VIEW_STYLES):
 
-        1. foundry2.css   - UNLAYERED, and unlayered beats every layer.
+        1. foundry2.css   - UNLAYERED as a file, but layered end to end INTERNALLY.
         2. Font Awesome   - layer "variables", via cascade.css.
         3. fabricate.css  - layer "modules", via cascade.css. Loading it unlayered would let
                             rules win here that LOSE in production.
@@ -23,47 +24,55 @@
 
       A primitive drawn under any other order is a primitive drawn under a cascade production does
       not have, which would make this page confidently wrong rather than merely empty.
+
+      THE LIBRARY'S OWN STYLESHEET IS NOT LINKED HERE. `library.js` reads it out of
+      `openspec/specs/design-system/library.html` at load time, drops the `--fab-*` copy of the
+      palette from its `:root` so `fabricate.css` supplies those instead, and appends it to <head>
+      after these links - which is where an unlayered page stylesheet has to sit to beat Foundry's
+      layers, exactly as it does in the standalone file.
+
+      NO GOOGLE FONTS LINK, either, and none is needed. The library asks for three faces and all
+      three arrive locally: Signika comes from the harvested chrome (`@font-face` in foundry2.css),
+      and Spectral and JetBrains Mono come from `styles/fabricate.css`, whose own `@font-face`
+      rules point at `assets/fonts/*.woff2` in this repository. The one face the shipped sheet does
+      not carry is ITALIC Spectral, so the `.standfirst` is synthesised - which is also what
+      production does, and is therefore the honest rendering rather than a defect.
     -->
     <link rel="stylesheet" href="/@foundry-chrome/css/foundry2.css" media="all" />
     <link rel="stylesheet" href="/@view-lab/cascade.css" />
     <!--
-      The harness's own chrome, LAST and unlayered. It has to be unlayered for one rule: the plinth
-      override, which beats `.application { position: absolute }` from Foundry's own sheet. Every
-      other rule in it is `pl-` prefixed, so its position in the cascade changes nothing.
+      The harness's own chrome, LAST and unlayered. It has to be unlayered for its one rule: the
+      live-slot override, which beats `.application { position: absolute }` and the rest of the
+      window treatment from Foundry's own sheet.
 
       Served raw through the `/@view-lab/` mount rather than imported, so the browser rather than
-      Vite's PostCSS pipeline resolves it — the same reason `cascade.css` is served raw.
+      Vite's PostCSS pipeline resolves it - the same reason `cascade.css` is served raw.
     -->
-    <link rel="stylesheet" href="/@view-lab/primitives/lab.css" />
+    <link rel="stylesheet" href="/@view-lab/primitives/page.css" />
     <style>
       /*
         NOT index.html's backdrop block. That page pins `html, body` to the viewport and sets
         `overflow: hidden`, because it draws exactly one window and clips the capture to it. This
-        page is a catalogue: it is taller than the viewport by design and it SCROLLS.
+        page is the design library: it is far taller than the viewport by design and it SCROLLS.
 
         `margin: 0; padding: 0` still has to be stated, because foundry2.css:13930 gives `body` a
-        `padding: 1rem` and a black background. The padding is the harness's to decide (`.pl-page`
-        owns it, so the page gutter is one number in one place), and the backdrop is deliberately
-        NOT black: every plinth on this page paints its own opaque surface, and a black page behind
-        them makes an unstyled region indistinguishable from a correctly dark one.
+        `padding: 1rem`. The library's own `body` rule owns the gutter and the backdrop, and it
+        arrives later than this block, so nothing here needs to state a colour.
       */
       html,
       body {
         margin: 0;
         padding: 0;
-        background: #0b0a13;
       }
 
       /*
-        AND THE PAGE HAS TO BE ALLOWED TO SCROLL, which the comment above asserted and nothing
-        delivered. `configureLabPage()` stamps Foundry's own body classes — `FOUNDRY_CHROME_SPEC`
-        declares them `['vtt', 'game']` — and foundry2.css:15257 answers `body.game` with
-        `position: fixed; display: flex; overflow: hidden`. That is exactly right for a VTT game
-        view, which is one viewport-sized surface, and exactly wrong for a catalogue. Measured
-        before this rule existed: 9376px of content in a 1080px viewport, `document.body`
-        computing `position: fixed`, and `window.scrollBy(0, 3000)` moving nothing. Roughly 88%
-        of the page — every plinth past the first screen — was unreachable by wheel, keyboard or
-        scrollbar.
+        AND THE PAGE HAS TO BE ALLOWED TO SCROLL. `configureLabPage()` stamps Foundry's own body
+        classes - `FOUNDRY_CHROME_SPEC` declares them `['vtt', 'game']` - and foundry2.css:15257
+        answers `body.game` with `position: fixed; display: flex; overflow: hidden`. That is
+        exactly right for a VTT game view, which is one viewport-sized surface, and exactly wrong
+        for a reference page. Measured before this rule existed: 9376px of content in a 1080px
+        viewport, `document.body` computing `position: fixed`, and `window.scrollBy(0, 3000)`
+        moving nothing. Roughly 88% of the page was unreachable by wheel, keyboard or scrollbar.
 
         `npm run lab:check` was green throughout, and correctly so: it reads the DOM, and every
         specimen genuinely had mounted. Nothing it asserts is about pixels. This is the class of

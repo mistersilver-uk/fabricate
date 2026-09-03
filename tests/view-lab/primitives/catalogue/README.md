@@ -1,165 +1,102 @@
 # The Primitive Lab catalogue
 
-One JSON file per group, each an array of catalogue rows.
-`model.js` globs this directory, so adding a group file is not also an edit there.
+One JSON file per library section, each an array of catalogue rows.
+`catalogue.js` globs this directory, so adding a section file is not also an edit
+there.
 
-A row says how to DRIVE one component — which is the only thing about a primitive
-the lab cannot derive.
-Its name, its section, its prose, its manifest evidence and its caller count all
-come from `scripts/lib/designSystemPrimitives.json` and
-`openspec/specs/design-system/library.html` at load time, and must never be copied
-into a row.
+A row answers one question and only one: **which real component stands where the
+library drew a specimen, and with what props.**
+It answers nothing else.
+The entry's name, the section it belongs to, the sentence under its heading, the
+canonical geometry in its caption, both the `Canonical spec` and `Svelte API`
+columns and every `delta` block are `openspec/specs/design-system/library.html`'s
+own content, rendered from that file at load time and never copied into a row.
+A copy of normative content is a copy nothing can tell has stopped matching, and
+this programme has already measured what happens to those.
 
 ## Row shape
 
-<!-- markdownlint-disable MD013 markdownlint-sentences-per-line -->
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Field        | Meaning                                                                                                                                                                                       |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `path`       | Repository-relative POSIX path, exactly as the manifest writes it. The join key.                                                                                                              |
-| `root`       | `manager` or `app` — which Fabricate root the plinth wears, because that decides both the cascade the component is painted by and the element `resolveOverlayHost` portals its popovers into. |
-| `knobs`      | One entry per prop the lab drives. See the knob types in `../knobs.js`.                                                                                                                       |
-| `unknobbed`  | Props deliberately not driven, each with a `why`. The coverage gate requires every declared prop to be in one list or the other.                                                              |
-| `states`     | Which of the eight spec states this component's own props can express. See below.                                                                                                             |
-| `stories`    | Named state matrices, rendered side by side under the plinth.                                                                                                                                 |
-| `fixedProps` | Props passed verbatim on every render, for values a control cannot express.                                                                                                                   |
-| `note`       | Anything a reader needs that the library does not already say. Optional. Rendered under `Note` in the harness window's detail strip, open by default.                                         |
-| `width`      | The isolated plinth's width in pixels. Optional; the default is 420. Raise it for a component that is a screen region rather than a control.                                                  |
-| `fill`       | `true` when the specimen genuinely fills its container by STRETCH. Optional; see below.                                                                                                       |
-| `context`    | Where this primitive actually ships, one entry per call site worth drawing. Optional; see below.                                                                                              |
+| Field     | Required | Meaning                                                                                                                                                                                                                                                                                                                                                                       |
+| --------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec`    | yes      | The library entry's heading, verbatim and decoded — `"<Button> <IconButton>"`. Matched against `div.spec-head > h4`, the anchor `tests/helpers/designLibrary.js` and the coverage gate both use.                                                                                                                                                                              |
+| `cap`     | no       | A `.unit` caption in that entry, decoded and whitespace-collapsed — `"page 38 · the header pair only"`. It scopes `draws` to that one unit, which is what makes a caption like `"disabled"` unambiguous. Omit it to scope to the whole entry, for a specimen group the library drew with no `.unit` wrapper — `<Field>`'s six labelled columns are the only such group today. |
+| `draws`   | yes      | A CSS selector for the hand-drawn element this row replaces, evaluated inside the scope above. Usually a kit class: `.k-btn`, `.k-step`, `.k-tog`, `.k-cb`, `.k-seg`.                                                                                                                                                                                                         |
+| `path`    | yes      | Repository-relative POSIX path to the component, exactly as `scripts/lib/designSystemPrimitives.json` and a `git diff` write it. Also the identity `npm run lab:check` compares the page against.                                                                                                                                                                             |
+| `props`   | no       | A plain object, passed to the component verbatim. Plain JSON only — no functions, no state, no knobs.                                                                                                                                                                                                                                                                         |
+| `content` | no       | The `children` snippet, as a node array. See below.                                                                                                                                                                                                                                                                                                                           |
 
-<!-- markdownlint-enable MD013 markdownlint-sentences-per-line -->
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-## `context` — the primitive in its screen recipe
+## `draws` — one drawing, one component
 
-The stage draws the selected primitive INSIDE a real ancestor, at the width that
-ancestor has at its call site, with the primitive itself outlined.
-The ancestor passes the primitive its own props, so the props are real by
-construction: nothing here restates a call site, and nothing can drift from one.
+The replacement swaps a single hand-drawn element for a single live one, in
+place.
+Everything else in the unit survives: the caption above it, the hint below it,
+the `k-pair` that holds a stepper and its `gp` label, the `→` arrows between the
+three faces of the destructive button, the Wells the gate list is built from.
+Emptying the whole `.unit` instead would have destroyed all four of those in the
+Controls section alone, and each one is what its caption is about.
 
-Contexts are the tabs the stage opens on; the isolated plinth is the last tab.
-A row with no `context` has only the isolated view and no tab strip is drawn.
+Rows sharing a `(spec, cap, draws)` address are paired **positionally** against
+the elements that selector matches, in document order.
+Three `.k-btn` rows under `"icon 28"` therefore replace the first, second and
+third button in that unit, in the order the rows appear in the file — so row
+order is load-bearing, not cosmetic.
 
-<!-- markdownlint-disable MD013 markdownlint-sentences-per-line -->
+The count is the guard, and it is exact: the number of rows sharing an address
+must equal the number of elements the selector matches.
+`draws` is a hand-written mirror of markup in a file this page may not edit, so a
+library edit that adds a button to a unit, renames a kit class or moves a
+specimen to another caption fails loudly on the next page load, naming both
+numbers.
+The alternative is a page that silently draws three live buttons and one drawing
+with nothing saying which is which, which is worse than no page at all.
 
-| Field       | Meaning                                                                                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ancestor`  | Repository-relative POSIX path of the component to MOUNT. A real importer of this primitive, or a component one level out or in from one.               |
-| `site`      | The call site, `File.svelte:NNN`. It is the tab's label. Prose, not a resolved reference: a moved line number is a stale citation, never a broken page. |
-| `props`     | The fixture the ancestor is mounted with. Plain JSON only — no functions, no stores, no world.                                                          |
-| `width`     | The plinth's width in pixels: the width the ANCESTOR has where it ships, not the manager's.                                                             |
-| `why`       | Which ancestor was chosen and why that one. Rendered under `Note`.                                                                                      |
-| `highlight` | Optional selector override. Omit it — the lab derives one; see below.                                                                                   |
-| `root`      | Optional `manager` / `app` override, when the ancestor's window differs from the primitive's row.                                                       |
-| `fill`      | Optional, default `true`: an ancestor is a screen region and fills its plinth. Set `false` for an ancestor that should draw at its intrinsic width.     |
+## `content` — what a call site puts inside
 
-<!-- markdownlint-enable MD013 markdownlint-sentences-per-line -->
+For a primitive that takes children — `<Button>`, `<IconButton>`, `<Field>` —
+`content` is the markup a real call site would supply, written as a node array
+rather than as a markup string.
 
-### Choosing an ancestor
+Each entry is either a plain string, rendered as text, or an object:
 
-Prefer one that is (a) a real caller, (b) mountable from a modest plain-data
-fixture, and (c) recognisable as a piece of the product.
-`scripts/lib/componentImporters.js` exports `measureImporters(repoRoot)`, which
-answers who imports what; read the candidate's `$props()` block and take the one
-whose props are scalars and arrays.
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-An ancestor needing a booted world, a store, or a services bag is NOT mountable
-honestly.
-Go one level out or one level in and record which you chose in `why`.
-A context that cannot be mounted honestly must be ABSENT with a stated reason,
-never approximated: a fixture that pretends to be a store puts a screen on the
-page that no GM could ever see.
+| Key        | Meaning                                                               |
+| ---------- | --------------------------------------------------------------------- |
+| `tag`      | The element name.                                                     |
+| `attrs`    | Attributes, spread verbatim. A `true` value renders a bare attribute. |
+| `text`     | A text child.                                                         |
+| `children` | Nested nodes, same shape, any depth.                                  |
 
-### Deriving the width
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-The manager window is 1280x940 (`SvelteCraftingSystemManagerApp.svelte.js:146`).
-Measured in the lab against the real cascade at that size: the manager root is
-1278px, `.manager-body`'s `220px minmax(0, 1fr) 300px` gives `.manager-main`
-758px, and an `InspectorCard` in a checks editor is 758px too.
-So 758 is the number for a card or a route in the manager's main pane.
-Measure rather than guess for anything else — the browser is right there.
+Omit both `text` and `children` for a void element — `input`, `br`, `img` —
+because Svelte refuses children on one and the catalogue should not have to know
+which tags those are.
 
-### The highlight selector is derived, so do not write one
+## What a row deliberately cannot say
 
-Every row is also mounted in isolation on its own catalogue plinth, and that
-specimen's rendered root IS the primitive's root.
-`Plinth.svelte` publishes its class list and `contexts.js` drops the `is-*` state
-tokens, which leaves the component's identity classes.
-`EmptyState` derives `.manager-empty` and `InspectorCard` derives
-`.manager-inspector-card`; `RadioCardGroup` derives all three of the identity
-classes its `Field` host emits.
+There is no `knobs`, no `stories`, no `states`, no `fillers`, no `context` and no
+`theme`.
+Those fields existed to drive a workbench, and a workbench is not what this page
+is.
 
-The stage draws the selector and the number of nodes it matched, so a wrong one
-is visible rather than silent.
-Declare `highlight` only for the two shapes the reading cannot cover: a root with
-no class at all, and a root that is a BRANCH — `ThresholdBandStrip` renders its
-fallback first, so its isolated root is the fallback's.
+There is also no write-back: a specimen's props are fixed, so a Stepper's `+`
+reports through `onChange` and the value does not move — exactly as the library's
+own `readonly` inputs do not move.
+What IS live is everything a drawing could never show: real geometry from
+`styles/fabricate.css`, real `:hover` and `:focus-visible` from the shipped
+rules, real font metrics, and the real element tree a screen reader would walk.
+Adding write-back would mean declaring, per row, which prop an event feeds —
+which is a knob under another name.
 
-## `fill` — the isolated plinth does not stretch its specimen
+## When a specimen has no row
 
-`.fabricate-manager` is a `display: grid`, so a specimen mounted as its only
-child used to take the whole column: `Callout`, `EmptyState`, `InspectorCard`,
-`ThresholdBandStrip`, `BulkSelectionToolbar` and `ManagerColorPopover` all drew
-at exactly 418px, which is a width not one of them has anywhere.
-The plinth root now carries `justify-items: start`, so a specimen draws at its
-intrinsic width.
-
-That is a no-op for anything that fills by declaring `width: 100%` — a percentage
-still resolves against the whole grid area — so most rows need nothing.
-`fill: true` is for the ones that filled by STRETCH alone.
-Measured: `ManagerSearchField` fell 418 to 212 and `ManagerToolbar` 418 to 181
-without it, and `EditorValidationSurface`, `BulkSelectionToolbar` and
-`ManagerColorPopover` were unchanged and therefore carry no flag.
-
-## Knob types
-
-`select` `boolean` `text` `number` `colour` `json` `snippet` `event`
-
-An `event` knob may declare `writes` — the knob its argument is written back into
-— so a controlled primitive behaves in the lab the way it behaves at a real call
-site.
-Without it a `Stepper` renders, logs its `onChange`, and never moves.
-It may also declare `arg` when the value is not the first argument.
-
-## `value` starts the knob; `default` is what the component declares
-
-These are different facts, and conflating them puts a wrong answer on screen.
-A row opens on `role: "primary"` because that is the interesting state, but
-`ManagerButton`'s own declared default is `neutral`.
-An invocation that omitted every prop equal to its STARTING value would therefore
-paste `<ManagerButton>` with no `role`, which renders a neutral button under a
-specimen showing a primary one.
-
-So `value` seeds the control and `default` states the value a call site gets by
-omission.
-Declare `default` only where it differs from the type's own zero.
-
-## `states`
-
-An object keyed on the eight states the design system's state-set requirement
-names: `rest`, `hover`, `focus-visible`, `disabled`, `loading`, `invalid`,
-`readonly` and `empty`.
-
-Each value is either `true`, meaning the component's own props can reach that
-state, or a sentence saying why they cannot.
-`unknobbed` covers "this prop is not driven"; nothing covered "this state has no
-prop", and the difference matters.
-`ManagerButton` has no `loading` prop and cannot set `aria-busy`, which the spec
-requires of a loading control, and that is a finding rather than a gap in the
-catalogue.
-
-Two states are never `true` on any row and must not be claimed.
-`:hover` is not settable from a prop, and a scripted `.focus()` does not match
-`:focus-visible` in Chromium.
-The plinth's live pseudo-class readout is where those two are observed instead.
-
-## Files
-
-`harness-proof.json` is TEMPORARY.
-It carries the three rows Phase 1 proved the harness with — `ManagerButton`,
-`Stepper` and `SearchablePopover` — because a harness with no catalogue cannot be
-shown to work.
-All three belong to the Controls and Pickers sections, so the lane that writes
-those group files must move these rows into them and delete this file.
-Two catalogue files claiming one `path` is a gate failure rather than a merge
-conflict, and it is meant to be.
+Nothing happens, which is the point.
+An entry for a primitive that is not built, a specimen whose shipped equivalent
+has no prop for what the drawing shows, and a composition the library drew to
+explain an arrangement rather than a control, all render exactly as authored.
+The page is the library either way; a row only makes one drawing real.
