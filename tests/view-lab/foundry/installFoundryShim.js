@@ -386,7 +386,30 @@ export function installFoundryShim(world) {
         return actor;
       },
     }),
-    items: createCollection([]),
+    // THE WORLD ITEM ROSTER, SEEDED FROM THE DOCUMENT INDEX RATHER THAN LEFT EMPTY.
+    //
+    // This started as `createCollection([])`, so `game.items.contents` held only the Items a
+    // frame created at runtime through `Item.createDocuments`. Every screen that resolves a
+    // linked game-world Item reads this collection — `getWorldItemOptions` in
+    // `SvelteCraftingSystemManagerApp.svelte.js` maps it directly — so the world Tool and
+    // Component screens were photographed against a roster no GM has: an EMPTY one.
+    //
+    // Two consequences, and both were invisible. `toolSourceSnapshot` falls back
+    // `worldItem || managedItem || tool`, so a linked tile drew the TOOL's own name and art and
+    // looked entirely correct while never once exercising the resolved-Item path it exists for.
+    // And `sourceMissing` requires a non-empty roster on purpose — a roster that has not loaded
+    // must not be mistaken for a broken link — so `ItemDropZone`'s `missing` face was
+    // unreachable in the lab by construction, which is what made a case for it fail the whole
+    // capture rather than one frame.
+    //
+    // The index already mints an Item per component, tool and recipe item (`buildDocumentIndex`);
+    // it was simply never wired to the collection the product reads. Actors and scenes share the
+    // index and are filtered out by uuid prefix.
+    items: createCollection(
+      Array.from(world.documents?.values?.() ?? []).filter((document) =>
+        String(document?.uuid ?? '').startsWith('Item.')
+      )
+    ),
     scenes: Object.assign(createCollection(world.scenes ?? []), {
       current: world.scenes?.[0] ?? null,
     }),

@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
-import { buildLabActors } from './view-lab/world/labActors.js';
+import { buildLabActors, buildDocumentIndex } from './view-lab/world/labActors.js';
 
 const content = buildLabContent();
 const actors = buildLabActors(content);
@@ -270,4 +270,51 @@ test('the identity sources are populated, so the checks above are not vacuous', 
     assert.ok(values.size > 0, `no lab fixture supplies values for ${name}`);
   }
   assert.ok(Object.values(LAB_SYSTEM_IDS).length >= 5, 'expected one system per resolution mode');
+});
+
+/**
+ * The lab world Item roster reaches `game.items`, which is the collection the product reads.
+ *
+ * `buildDocumentIndex` has always minted an Item per component, tool and recipe item, but the
+ * shim built `game.items` as an EMPTY collection and only appended what a frame created at
+ * runtime. `getWorldItemOptions` in `SvelteCraftingSystemManagerApp.svelte.js` maps that
+ * collection directly, so every screen resolving a linked game-world Item was photographed
+ * against a roster no GM has.
+ *
+ * It was invisible in both directions. `toolSourceSnapshot` falls back
+ * `worldItem || managedItem || tool`, so a linked tile drew the TOOL's own name and art and
+ * looked entirely correct while never exercising the resolved-Item path. And `sourceMissing`
+ * requires a NON-EMPTY roster by design — a roster that has not loaded must not read as a broken
+ * link — so `ItemDropZone`'s `missing` face could not render in the lab at all, and the case
+ * written for it failed the whole capture rather than one frame.
+ *
+ * This asserts the wiring, not a count: a non-empty roster, every entry an Item, and a uuid the
+ * index does not mint answering nothing. The third is what the `missing` face depends on.
+ */
+test('the lab seeds game.items from the document index, Items only', async () => {
+  const { installFoundryShim } = await import('./view-lab/foundry/installFoundryShim.js');
+  const documents = buildDocumentIndex(content, actors);
+  installFoundryShim({
+    documents,
+    content,
+    actorList: actors,
+    scenes: [],
+    settings: new Map(),
+    i18n: { localize: (key) => key },
+    seed: {},
+  });
+  const roster = globalThis.game.items.contents;
+  assert.ok(
+    roster.length > 0,
+    'game.items is empty, so every linked-Item resolution in the lab silently falls back',
+  );
+  assert.ok(
+    roster.every((document) => String(document?.uuid ?? '').startsWith('Item.')),
+    'an Actor or Scene leaked into the world Item roster',
+  );
+  assert.equal(
+    roster.find((document) => document.uuid === 'Item.lab-tool-warped-crucible') ?? null,
+    null,
+    'the dangling-link fixture must NOT resolve, or ItemDropZone can never draw `missing`',
+  );
 });
