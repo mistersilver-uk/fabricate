@@ -103,19 +103,6 @@ The scheme MUST NOT be changed without re-deriving that argument: under a scheme
 The prerelease counter MUST be its own dot-separated numeric part; a fused counter would be compared as text, ordering the tenth build below the seventh, and the channel would silently stop offering updates at the tenth build.
 The scheme does not by itself guarantee that a channel keeps offering updates within itself, because the comparison is part-by-part; the monotonic-heads requirement is what catches that.
 
-The version a published manifest advertises MUST carry a `v` prefix, matching the tag that names it.
-The prefix is presentation on the artefact and is not part of a version's precedence: every derived name — the tag, the version-pinned download URL, the archive — MUST be built from the bare version, so a doubled prefix can never reach a URL.
-Re-deriving the argument this requirement demands, against Foundry's own comparator (part-by-part, numeric only when BOTH parts are numeric, else a string compare):
-a prefixed version compares as newer than any bare one, because `v1` and `1` are compared as text; so the switchover is offered to every client on a bare version, and the prerelease property is untouched, because the prefix sits in the first part and prereleases are decided by the later ones.
-The consequence that MUST be accepted before adopting it is that the change is one-way: after a channel advertises a prefixed version, a later bare version compares as OLDER and is never offered, stranding that cohort silently — the same defection this requirement exists to prevent.
-Reverting the prefix is therefore not a rollback but a new defection, and MUST NOT be treated as one.
-Comparisons that decide publish safety MUST read the literal published strings rather than normalising the prefix away, because that is what a player's client compares; only SemVer arithmetic over our own version numbers may normalise it first.
-
-#### Scenario: publishing the first prefixed version over a bare channel head
-
-- **WHEN** a `v`-prefixed version is published to a channel whose head is a bare version of the same line
-- **THEN** Foundry considers it newer, the cohort is offered the update, and the version-pinned download resolves under a single `v`
-
 #### Scenario: publishing a stable version while a private cohort is on a prerelease of it
 
 - **WHEN** a stable version is published while private clients are installed on prereleases of that same version
