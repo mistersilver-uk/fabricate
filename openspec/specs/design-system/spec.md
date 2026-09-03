@@ -10,6 +10,7 @@ The set itself is ENUMERATED in `openspec/specs/design-system/library.html`, one
 That file is part of this capability rather than a companion to it: it is the same normative content with specimens attached, and it is the artifact to open when a written geometry needs to be seen rather than read.
 The machine-readable half is `scripts/lib/designSystemPrimitives.json`, one row per SHIPPED primitive keyed on the implementation path a diff names.
 `tests/design-system-coverage.test.js` reads both and fails when they describe different vocabularies.
+`npm run lab` opens a live harness that renders `library.html` itself with every shipped member drawn as the real component it ships, derived from these same two artifacts rather than a third record of them.
 
 ### Corpus and authority
 

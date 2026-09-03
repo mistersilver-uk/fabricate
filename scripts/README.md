@@ -641,3 +641,21 @@ Where the two disagree about the same view, the smoke is right.
 | Chrome is one Foundry build | Frames carry the harvested version in their manifest; a reviewer on a newer Foundry may see small differences. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+## The Primitive Lab (`npm run lab`)
+
+A second page in the same Vite app, at `/tests/view-lab/primitives.html`, sharing this harness's stylesheet order, Foundry shim and shipped-string localizer.
+It is not a capture surface and no frame is published from it.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Fact | Detail |
+|---|---|
+| It renders `library.html`, it does not reimplement it | `tests/view-lab/primitives/library.js` fetches `openspec/specs/design-system/library.html` through the `/@design-library/` raw mount and adopts its body; `inject.js` replaces individual hand-drawn specimens with real mounted components. Prose, captions, `Canonical spec` and `Svelte API` notes, `delta` blocks and cites all render as authored. An entry whose primitive is not built keeps its drawing. |
+| The raw mount is not optional | Vite's HTML transform rewrites the file — measured at 402,550 bytes served against 404,440 on disk, a 1,890-byte delta across 1,882 lines, because it collapses the CRLF endings. Reading the spec artifact through the transform means reading a rewritten copy. |
+| The library's own palette is stripped on purpose | Its inlined `:root` `--fab-*` block is removed and `styles/fabricate.css` supplies the tokens instead, so drift between the palette the library hardcodes and the palette that ships becomes visible on the page. All 67 names exist in both; only two font-fallback chains differ today. |
+| `body.game` has to be overridden | `configureLabPage()` stamps Foundry's real `['vtt', 'game']` body classes and `foundry2.css:15257` answers `body.game` with `position: fixed; display: flex; overflow: hidden`. Correct for a VTT game view, fatal for a catalogue: measured before the override, 9,376px of content in a 1,080px viewport with `window.scrollBy` moving nothing, and roughly 88% of the page unreachable. `npm run lab:check` was green throughout, correctly — it reads the DOM, never pixels. |
+| `lab:check` is a maintainer gate, not CI | `scripts/primitive-lab-smoke.mjs` calls `resolveChromeCache` and refuses without a harvest, the same fail-closed rule this file records for the View Lab. A missing harvest answers with HTTP 503 and a text body, so a `<link>` that 503s neither throws nor logs — without the refusal the smoke would pass over a page with no Foundry cascade at all. |
+| It does not boot the runtime | `installFoundryShim` is driven with a minimal world rather than `buildLabWorld()`, so `src/main.js` never runs and no migration runs. A warn-level migration notice would redden the whole page. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->

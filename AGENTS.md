@@ -514,6 +514,14 @@ When renaming variables, refactoring markup, or removing i18n keys, grep these a
 
 - `game`, `ui`, `Hooks`, and `CONFIG` are runtime globals.
 Never import them.
+- **`.application` is not just chrome — it is the type base, the text colour, the containing block, and a ten-token custom-property scope** (verified against the harvested V14.365 `public/css/foundry2.css`; grep the selectors named here to locate them).
+Its rule in `@layer applications` declares `font-size: var(--font-size-14)` while the `body` rule in `@layer layouts.full` declares `var(--font-size-15)`, so a harness that mounts Fabricate UI without an `.application` ancestor renders every unsized string one step larger than production does.
+The same rule declares `position: absolute`, which is the ONLY thing making `.fabricate-app` a containing block — `styles/fabricate.css` gives that root no `position` of its own, so a frameless mount silently reproduces the mispositioned-popover defect `src/ui/svelte/util/overlayHost.js` was written to fix.
+A separate `.application` block declares ten custom properties (`--color-fieldset-border`, `--color-form-label`, `--color-data-background` and seven more) that `styles/fabricate.css` never references, so their loss is invisible to any Fabricate-side grep while `RadioCardGroup`'s `fieldset` quietly loses its border colour.
+Mounting a Fabricate root without that ancestor is a different page from production and reports no error.
+- **`--font-primary` is declared only inside core's `body.game .app` rule**, the ApplicationV1 selector, so it is unset on every Fabricate ApplicationV2 window in production.
+`styles/fabricate.css` reads it in three places, all of which therefore resolve to the guaranteed-invalid value and fall back to inheritance.
+That happens to be the intended result for the heading reset, but it means those three declarations are inert as written and would change meaning the moment someone "fixed" the token.
 - The module declares `minimum: "13"` and `verified: "14"`, and the smoke harness boots the pinned V14.365.
 Account for both API shapes when touching Foundry-facing code, and treat a note below that cites a specific build as verified against that build rather than as a claim about every supported one.
 - V13 **animates token movement**: at the `updateToken` hook the document is already at the destination, but the placeable (`token.object.center`) and `TokenDocument#getCenterPoint()` still report the *animating* position — the spot the token just left.
