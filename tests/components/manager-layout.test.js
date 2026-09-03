@@ -274,11 +274,15 @@ test('Tool library renders 210px and 340px fixed columns through the 832px produ
   assert.equal(stacked.overflow, false);
 });
 
-test('Tool editor header spans the 210px/editor/320px triptych and stacks only below 832px', async () => {
+// The rail track is 340, not 320 (issue 1373). The Tool Rules list holds its inspector at 340
+// against `proto:2496`'s 326, and that deviation justifies itself on the figure being shared
+// with the collapsed variant AND the editor route — which it was not, because this route was
+// 320, so the rail jumped 20px every time a GM opened a Tool from the list and came back.
+test('Tool editor header spans the 210px/editor/340px triptych and stacks only below 832px', async () => {
   for (const width of [1212, 832]) {
     const report = await readRenderedToolGeometry(width, 'tool-edit');
     assert.equal(Math.round(report.rail.width), 210);
-    assert.equal(Math.round(report.preview.width), 320);
+    assert.equal(Math.round(report.preview.width), 340);
     assert.ok(Math.abs(report.header.left - report.root.left) <= 1);
     assert.ok(Math.abs(report.header.right - report.root.right) <= 1);
     assert.ok(report.tabs.left >= report.rail.right - 1);
@@ -6005,18 +6009,55 @@ test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions f
   }
 });
 
-test('recipe tag chips keep a zero margin and one height, whatever the host rhythm says', async () => {
-  // Regression: chips WERE `<li>`s in a `<ul>` on a second line, and a host (Foundry) global
-  // list rule giving non-last items a margin-bottom inflated only the first chip's box — it
-  // rendered 34px tall against the last chip's 30px. Issue 1373's maintainer round 5 moved the
-  // chips onto the ROW itself (`proto:2254`), so they are `<span>`s and that particular host
-  // rule can no longer reach them.
-  //
-  // The GUARD is kept and re-aimed rather than deleted, because the declaration it was written
-  // for is still doing work: `.manager-chip.manager-recipe-tag-chip` zeroes its margin and pins
-  // its height, and it is now an inline member of a wrapping flex row where an inherited margin
-  // or a stretched box would misalign it against the policy word and `+ Tag` beside it. The
-  // hostile `li` rule stays in the fixture as the negative half: it must reach nothing.
+// ── EVERY DECLARATION ON THE TAG CHIP'S RULE ACTUALLY WINS (issue 1373) ────────────────────
+//
+// Regression it started as: chips WERE `<li>`s in a `<ul>` on a second line, and a host
+// (Foundry) global list rule giving non-last items a margin-bottom inflated only the first
+// chip's box — 34px against the last chip's 30px. Maintainer round 5 moved the chips onto the
+// ROW itself (`proto:2254`), so they are `<span>`s and that particular host rule can no longer
+// reach them. The hostile `li` rule stays in the fixture as the negative half: it must reach
+// nothing.
+//
+// == WHY THE OLD FIXTURE COULD NOT FAIL, AND WHAT REPAIRED IT ==============================
+// It injected `styles/fabricate.css` UNLAYERED and stamped no scoping hash on its chips, which
+// is a cascade production has never had. `module.json` registers the sheet with no explicit
+// `layer`, so Foundry imports it at `layer(modules)`; `Chip.svelte` ships `css: 'injected'`,
+// which lands its block in `document.head` unlayered — and an unlayered author declaration
+// beats every layered one at ANY specificity. Unlayered, the sheet's three-class rule won
+// everything it declared and the fixture measured a chip nobody renders; layered, four of that
+// rule's eight declarations were being discarded in the product with nothing able to say so.
+//
+// Both halves are needed and both are here now: `@layer modules { … }` around the sheet
+// reproduces Foundry's import, `chipCss` after it reproduces the injection order, and
+// `withChipHash` stamps the real `svelte-<hash>` so the specificity matches too. Svelte 5 puts
+// that hash on the LEADING compound as a real class, which is what makes the primitive's block
+// (0,2,0) rather than (0,1,0).
+//
+// == WHAT IT ASSERTS, AND WHY THAT CANNOT GO VACUOUS =======================================
+// Not a hand-listed set of values: it reads the sheet rule's OWN declarations and requires each
+// one to win in the composed cascade. A value is compared against a probe carrying that exact
+// declaration inline, so `var(--fab-space-chip)` and `4.5rem` resolve the same way for both
+// sides and no token is frozen into this file. Add a fifth declaration the primitive already
+// owns and this goes red naming the property; delete the rule and the loop reads zero
+// declarations, so an explicit floor refuses that too.
+test('every declaration on the recipe tag chip rule wins the real cascade', async () => {
+  const selector = '.fabricate-manager .manager-chip.manager-recipe-tag-chip {';
+  const ruleStart = css.indexOf(selector);
+  assert.ok(ruleStart >= 0, 'the tag chip rule is still in the sheet');
+  const body = css.slice(ruleStart + selector.length, css.indexOf('}', ruleStart));
+  const declarations = body
+    .split(';')
+    .map((declaration) => declaration.trim())
+    .filter(Boolean)
+    .map((declaration) => {
+      const colon = declaration.indexOf(':');
+      return { property: declaration.slice(0, colon).trim(), value: declaration.slice(colon + 1).trim() };
+    });
+  assert.ok(
+    declarations.length >= 4,
+    'the rule still states the position and size the primitive has no opinion about'
+  );
+
   const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 320 },
     deviceScaleFactor: 1,
@@ -6030,8 +6071,14 @@ test('recipe tag chips keep a zero margin and one height, whatever the host rhyt
         <head>
           <meta charset="utf-8">
           <style>
-            ${css}
+            @layer modules {
+              ${css}
+            }
+          </style>
+          <style>
             ${chipCss}
+          </style>
+          <style>
             body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
             /* Simulate a host global list rhythm declared after our stylesheet. */
             li:not(:last-child) { margin-bottom: 4px; }
@@ -6042,28 +6089,58 @@ test('recipe tag chips keep a zero margin and one height, whatever the host rhyt
           <main class="fabricate-manager">
             <span class="manager-recipe-option-tags" data-recipe-option-tags>
               <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>
-              <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
-              <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
+              ${withChipHash(
+                '<span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="reagent"><span>reagent</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>' +
+                  '<span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="rare"><span>rare</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>'
+              )}
             </span>
           </main>
         </body>
       </html>
     `);
 
-    const report = await page.evaluate(() => {
+    const report = await page.evaluate((wanted) => {
       const chips = Array.from(document.querySelectorAll('.manager-recipe-tag-chip'));
-      return chips.map((chip) => {
-        const style = getComputedStyle(chip);
-        return {
-          marginTop: style.marginTop,
-          marginBottom: style.marginBottom,
-          height: chip.getBoundingClientRect().height,
-        };
+      const chip = chips[0];
+      // The probe is a CLONE of the chip carrying one declaration inline, so both sides resolve
+      // the same tokens in the same place and the comparison is of used values, not of strings.
+      const declared = wanted.map(({ property, value }) => {
+        const probe = chip.cloneNode(true);
+        probe.style.setProperty(property, value);
+        chip.parentElement.appendChild(probe);
+        const won = getComputedStyle(chip).getPropertyValue(property);
+        const asked = getComputedStyle(probe).getPropertyValue(property);
+        probe.remove();
+        return { property, won, asked };
       });
-    });
+      return {
+        declared,
+        chips: chips.map((each) => {
+          const style = getComputedStyle(each);
+          return {
+            marginTop: style.marginTop,
+            marginBottom: style.marginBottom,
+            height: each.getBoundingClientRect().height,
+          };
+        }),
+      };
+    }, declarations);
 
-    assert.equal(report.length, 2, 'both tag chips should render');
-    for (const [index, chip] of report.entries()) {
+    for (const { property, won, asked } of report.declared) {
+      // A property Chromium cannot serialise would compare '' against '' and pass over an empty
+      // domain, which is the failure mode a cascade gate is most likely to acquire silently.
+      assert.notEqual(asked, '', `\`${property}\` resolves to a comparable used value`);
+      assert.equal(
+        won,
+        asked,
+        `the sheet declares \`${property}\` on the tag chip and it must WIN — the primitive's ` +
+          'unlayered block discards a layered declaration of any specificity, so a property ' +
+          'this rule and `Chip.svelte` both name is a rule that reads as covered and is not'
+      );
+    }
+
+    assert.equal(report.chips.length, 2, 'both tag chips should render');
+    for (const [index, chip] of report.chips.entries()) {
       assert.equal(
         chip.marginBottom,
         '0px',
@@ -6071,7 +6148,11 @@ test('recipe tag chips keep a zero margin and one height, whatever the host rhyt
       );
       assert.equal(chip.marginTop, '0px', `chip ${index} should have no top margin`);
     }
-    assert.equal(report[0].height, report[1].height, 'both chips should derive the same height');
+    assert.equal(
+      report.chips[0].height,
+      report.chips[1].height,
+      'both chips should derive the same height'
+    );
   } finally {
     await context.close();
   }
@@ -8422,82 +8503,149 @@ test('the small selection box is the reference box', () => {
   );
 });
 
-// ── NO TOOL SCREEN RESTATES THE SHARED KICKER'S TYPE (issue 1373) ───────────────────────────
+// ── THE EYEBROW IS THE REFERENCE'S, AND IT IS THE SHARED CLASS THAT SAYS SO (issue 1373) ──
 //
-// `proto:2324`, `:2356`, `:2550`, `:2556` and `:2566` state every eyebrow the reference draws
-// with ONE string — `font: 700 8.5px var(--sans); letter-spacing: .11em; text-transform:
-// uppercase; color: var(--subtle)` — so it is `.manager-kicker`'s value and belongs on
-// `.manager-kicker`. Three tool components had each re-achieved it locally instead, which left
-// the shared class rendering 11.52px untracked in the muted ink on every screen nobody had
-// patched: the world Tool entry drew `PREREQUISITES` at 8.5px and `LINKED ITEM` at 11.52px on
-// one screen, one tab apart. The value is stated once now, at the source.
+// `proto:2324` states every section eyebrow on this tab as `font: 700 8.5px var(--sans);
+// letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`, and 63 further
+// eyebrows across the reference state it identically. The shared `.manager-kicker` shipped at
+// `0.72rem` — 11.52px, 35% over — with NO tracking and the MUTED ink, so every head that drew
+// one read as a small heading rather than as the quiet rule it is.
 //
-// THIS TEST IS THE GUARD AGAINST THE FOURTEENTH NARROWING RULE, and it has to read the COMPILED
-// scoped CSS rather than the source, because that is what the browser gets. It also has to be
-// stated as an ABSENCE: `styles/fabricate.css` is imported at `layer(modules)` while a
-// component's block is injected UNLAYERED, so a single type declaration in one of these blocks
-// silently discards the shared class's rule for that property, at any specificity, with no
-// error and no other failing test.
-test('no Tool screen restates the shared kicker type in its own scoped block', () => {
-  // The three blocks that used to narrow it, each named with the classes it is anchored on.
-  const eyebrowBlocks = [
-    {
-      file: 'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
-      selector: '.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow',
-      // The card head is a three-row grid placed by rule rather than by source order, so this
-      // block still has to place the eyebrow's row. That is LAYOUT, and it stays.
-      keeps: ['grid-column: 1', 'grid-row: 1'],
-    },
-    {
-      file: 'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
-      selector: '.manager-tool-inspector-kicker,',
-      keeps: ['min-width: 0'],
-    },
-    {
-      file: 'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
-      selector: '.manager-tool-bonus-kicker {',
-      // `proto:2355`-`2357` puts a hairline beside this one, which needs the row to be a flex
-      // line. Also layout, also stays.
-      keeps: ['display: flex'],
-    },
-  ];
+// FIXED ON THE SHARED CLASS. Three tool screens had each re-achieved the value locally, and the
+// world Tool entry still rendered two uppercase micro-labels at two sizes one tab apart. This
+// test now pins the shared class itself; a component that still restates the same figures is
+// harmless duplication, but a component that restates a DIFFERENT one is the defect returning.
+//
+// The cascade happens to favour a scoped rule in the card (the sheet is layered, the component
+// block is not), but the component assertions read the COMPILED scoped CSS rather than the
+// source, so what they pin is what Svelte emits.
+test('the Tool rule card eyebrow carries the reference type, not the shared kicker size', () => {
+  const start = css.indexOf('.fabricate-manager .manager-kicker {');
+  assert.ok(start >= 0, 'the shared eyebrow keeps a block of its own');
+  const declarations = css.slice(start, css.indexOf('}', start));
+  assert.match(declarations, /font-size: 8\.5px/, '`proto:2324` sets the eyebrow at 8.5px');
+  assert.match(declarations, /letter-spacing: 0\.11em/, 'and tracks it at .11em');
+  assert.match(declarations, /font-weight: 700/, 'at the reference weight');
+  assert.match(declarations, /text-transform: uppercase/, 'and the reference casing');
+  assert.match(
+    declarations,
+    /color: var\(--fab-text-subtle\)/,
+    'and inks it `--subtle`, one rung quieter than the muted this shipped with'
+  );
 
-  for (const block of eyebrowBlocks) {
-    const { css: blockCss } = scopedComponentCss(resolve(__dirname, '../..', block.file));
-    const flat = blockCss.replace(/\.svelte-[a-z0-9]+/g, '');
-    const start = flat.indexOf(block.selector);
-    assert.ok(start >= 0, `${block.file} keeps a block for ${block.selector}`);
-    const declarations = flat.slice(start, flat.indexOf('}', start));
-
-    for (const kept of block.keeps) {
-      assert.ok(
-        declarations.includes(kept),
-        `${block.file} keeps ${kept}, which is layout rather than type`
-      );
-    }
-    for (const property of ['font-size', 'font-weight', 'letter-spacing', 'text-transform']) {
-      assert.ok(
-        !declarations.includes(`${property}:`),
-        `${block.file} states no ${property} — the shared kicker owns the eyebrow's type`
-      );
-    }
+  // AND NOTHING RESTATES A SECOND SIZE FOR IT. The eyebrow was 35% oversized for as long as it
+  // took three tool screens to narrow it locally, one at a time, which is how the world entry
+  // came to draw two uppercase micro-labels at two sizes one tab apart. A local block may still
+  // carry the eyebrow's GEOMETRY — its grid cell, its margin, its flex rule — and one still has
+  // to restate the size where a heading rule out-specifies the shared class. What none of them
+  // may do is name a DIFFERENT figure, which is the defect returning under a new address.
+  const kickerFontSize = /font-size: ([^;]+);/;
+  for (const [file, selector] of [
+    ['tools/ToolInheritCard.svelte', '.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow'],
+    ['tools/ToolBrowserInspector.svelte', '.manager-tool-inspector-kicker'],
+    ['tools/ToolRequirementsTab.svelte', '.manager-tool-bonus-kicker {'],
+  ]) {
+    const { css: componentCss } = scopedComponentCss(
+      resolve(__dirname, `../../src/ui/svelte/apps/manager/${file}`)
+    );
+    const flat = componentCss.replace(/\.svelte-[a-z0-9]+/g, '');
+    const blockStart = flat.indexOf(selector);
+    assert.ok(blockStart >= 0, `${file} keeps a block for its eyebrow`);
+    const block = flat.slice(blockStart, flat.indexOf('}', blockStart));
+    const stated = kickerFontSize.exec(block);
     assert.ok(
-      !declarations.includes('color:'),
-      `${block.file} states no colour — the shared kicker owns the eyebrow's ink`
+      !stated || stated[1] === '8.5px',
+      `${file} either defers to the shared eyebrow or restates its exact size, not ${stated?.[1]}`
     );
   }
 
-  // AND THE MARKUP STILL CARRIES THE SHARED CLASS, or the absences above would be an eyebrow
-  // that has simply stopped being one. Both files write it into the class attribute directly.
-  for (const file of [
-    'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
-    'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
-    'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
+  // The sheet's own two restatements answer to the same rule. `.manager-tool-rule-card-title h3`
+  // out-specifies the shared class at (0,2,1), so the world entry's card head HAS to repeat the
+  // size; the Tool Studio rail does not, and its retired 0.66rem was a third figure with no
+  // reference behind it (`proto:2404`, `:2409`, `:2418`, `:2436`, `:2466` are all 8.5px).
+  for (const selector of [
+    '.fabricate-manager .manager-tool-rule-card-title h3.manager-kicker {',
+    '.fabricate-manager .manager-tool-preview > .manager-kicker {',
   ]) {
-    const source = readFileSync(resolve(__dirname, '../..', file), 'utf8');
+    const blockStart = css.indexOf(selector);
+    assert.ok(blockStart >= 0, `${selector} keeps a block of its own`);
+    const block = css.slice(blockStart, css.indexOf('}', blockStart));
+    const stated = kickerFontSize.exec(block);
     assert.ok(
-      source.includes('manager-kicker'),
-      `${file} still renders its eyebrows through the shared class`
+      !stated || stated[1] === '8.5px',
+      `${selector} states no size of its own, or the shared one, not ${stated?.[1]}`
+    );
+  }
+});
+
+// ── THE VALIDATION SUMMARY'S CLASSES AND THE SHEET'S RULES ARE ONE SET (issue 1373) ────────
+//
+// `EditorValidationSurface` emitted `is-${summary.status}` verbatim, and `summary.status` is the
+// CALL SITE's word: four of the six sites spell it `pass`/`warn`/`block` and two spell it
+// `clear`/`warning`/`blocked`. The sheet painted the second spelling only, plus one route-scoped
+// `is-pass` for the Checks Studio — so on the Tool editor's Validation tab, at both scopes, a
+// blocked record and a clean one rendered the same neutral card. The component's own doc
+// asserted the sheet painted both.
+//
+// TWO DIRECTIONS, because one alone is half a guard. A sheet rule for a class the surface cannot
+// emit is dead cascade; an emittable class with no rule is an unpainted status. Both were true
+// at once here, which is exactly how it survived: each half looked deliberate beside the other.
+//
+// The canonical set is read out of the COMPONENT's own source rather than re-typed, so widening
+// the vocabulary widens the gate and neither half can be greened by editing this file.
+test('the validation summary paints every status class it can emit, and only those', () => {
+  const surface = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/EditorValidationSurface.svelte'),
+    'utf8'
+  );
+
+  const declared = /const SUMMARY_STATUSES = \[([^\]]+)\];/.exec(surface);
+  assert.ok(declared, 'the surface declares its status vocabulary as a closed list');
+  const statuses = declared[1].match(/'([a-z-]+)'/g).map((quoted) => quoted.slice(1, -1));
+  assert.deepEqual(statuses, ['pass', 'warn', 'block'], 'and it is the ROW vocabulary, once');
+
+  // The template may interpolate ONLY the resolved word. An `is-${summary.status}` here is the
+  // defect itself: it lets a call site put any word it likes into a class name.
+  assert.ok(
+    surface.includes('`manager-recipe-rail-summary is-${summaryStatusClass}`'),
+    'the summary class comes from the resolved status, never from the raw prop'
+  );
+  assert.ok(
+    !/manager-recipe-rail-summary is-\$\{summary[.?]/.test(surface),
+    'so the raw prop cannot reach a class name'
+  );
+
+  // Every alias resolves INTO the canonical set, so no call site's word escapes it.
+  const aliasBlock = /const SUMMARY_STATUS_ALIASES = \{([^}]+)\};/.exec(surface);
+  assert.ok(aliasBlock, 'the surface records the spellings its call sites reached it with');
+  const aliasTargets = aliasBlock[1].match(/: '([a-z-]+)'/g).map((quoted) => quoted.slice(3, -1));
+  assert.ok(aliasTargets.length >= 3, 'all three of the second spelling are mapped');
+  for (const target of aliasTargets) {
+    assert.ok(statuses.includes(target), `the alias resolves to \`${target}\`, a painted status`);
+  }
+
+  // DIRECTION ONE: every emittable class has a rule.
+  for (const status of statuses) {
+    assert.ok(
+      css.includes(`.manager-recipe-rail-summary.is-${status} {`),
+      `\`is-${status}\` is painted — an emittable status with no rule is an invisible one`
+    );
+    assert.ok(
+      css.includes(
+        `.manager-recipe-rail-summary.is-${status} .manager-recipe-rail-summary-medallion {`
+      ),
+      `\`is-${status}\` tones its medallion`
+    );
+  }
+
+  // DIRECTION TWO: no rule anchors this element on a class the surface cannot emit.
+  const painted = new Set(
+    [...css.matchAll(/\.manager-recipe-rail-summary\.is-([a-z-]+)/g)].map((match) => match[1])
+  );
+  for (const status of painted) {
+    assert.ok(
+      statuses.includes(status),
+      `the sheet paints \`is-${status}\`, which the surface can never emit`
     );
   }
 });

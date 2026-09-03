@@ -59,7 +59,11 @@ describe('RecipeItemValidationTab (mounted)', () => {
     // Summary card reads blocked; the two count tiles reflect 1 passing / 2 blocking,
     // and the critical-count observable now lives on the blocking tile.
     assert.equal(summary(root).getAttribute('data-recipe-item-validation-summary'), 'blocked');
-    assert.ok(summary(root).classList.contains('is-blocked'));
+    // The HOOK keeps this editor's own word; the CLASS is the surface's, and there are only
+    // three of those (issue 1373). `is-blocked` was painted by nothing on four of the six
+    // editors that draw this card, so the surface now resolves any caller's word to one of
+    // `is-pass`/`is-warn`/`is-block` — the same three the check ROWS above already assert.
+    assert.ok(summary(root).classList.contains('is-block'));
     assert.equal(root.querySelector('[data-recipe-item-count-passing]').textContent.trim(), '1');
     assert.equal(blockingTile(root).textContent.trim(), '2');
     assert.equal(blockingTile(root).getAttribute('data-critical-count'), '2');
@@ -79,7 +83,7 @@ describe('RecipeItemValidationTab (mounted)', () => {
     assert.equal(check(root, 'usesValid').getAttribute('data-ok'), 'true');
     assert.ok(check(root, 'itemLinked').querySelector('.manager-recipe-val-pill.is-pass'));
     assert.equal(summary(root).getAttribute('data-recipe-item-validation-summary'), 'clear');
-    assert.ok(summary(root).classList.contains('is-clear'));
+    assert.ok(summary(root).classList.contains('is-pass'));
     assert.equal(root.querySelector('[data-recipe-item-count-passing]').textContent.trim(), '3');
     assert.equal(blockingTile(root).textContent.trim(), '0');
     assert.equal(blockingTile(root).getAttribute('data-critical-count'), '0');
