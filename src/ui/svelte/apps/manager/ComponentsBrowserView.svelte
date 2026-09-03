@@ -304,11 +304,13 @@
     )
   );
 
-  const bannerEntry = $derived(
-    worldEntriesById.get(String(selectedComponentId || '')) ??
-      worldEntriesById.get(String(cohortRows[0]?.id ?? '')) ??
-      null
-  );
+  // THE BANNER'S SUBJECT IS THE SELECTED COMPONENT, AND NOTHING ELSE. It used to fall back to
+  // `cohortRows[0]`, so at rest it named whichever component sorted first and offered ITS exit -
+  // a count and a navigation about a record the GM had not chosen. `### GM World Component
+  // Screens` requirement 7 says the banner links to "that component's world entry", and on a list
+  // at rest there is no "that component". The layout is unchanged either way, because the head
+  // wrapper below keeps `.manager-main`'s child count constant.
+  const bannerEntry = $derived(worldEntriesById.get(String(selectedComponentId || '')) ?? null);
 
   const model = $derived(
     buildComponentBrowserModel(cohortCards(), {
@@ -688,61 +690,81 @@
   aria-label={text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}
 >
   <!--
-    THE CATALOGUE ATTRIBUTION BANNER. Everything a GM reads on this screen names a component
-    whose identity is authored ONE ROUTE AWAY, in the world catalogue, and shared with every
-    other system that has rules for it — so without this the screen offers no signal at all that
-    a name here is not a name this system owns.
+    ONE HEAD, TWO CONTENTS, AND THE CHILD COUNT IS THE POINT (issue 1371, round 2).
 
-    It does NOT claim the displayed name comes from the catalogue, because under the read union
-    it does not: identity is re-derived from the in-system record on every row. It states where
-    identity is AUTHORED, and the count of other systems is CLAMPED at zero — a component with no
-    membership record would otherwise read as shared with negative one.
+    `.manager-main` on this route is a FOUR-TRACK grid — `auto auto minmax(0, 1fr) auto` at
+    `styles/fabricate.css:2373-2375` — for four children: this head, the toolbar, the list and the
+    pager. The banner shipped as a FIFTH, direct child, which pushed every child down one track:
+    the toolbar landed in `minmax(0, 1fr)`, whose min is 0, collapsed, and painted its filter row,
+    its inherit summary and its count on top of rows 1 to 3.
+
+    A FIVE-TRACK TEMPLATE IS NOT THE FIX. The banner is conditional — a system whose components
+    the world corpus has no record of renders none, and so does a list at rest — so a static fifth
+    track misplaces the list in exactly the states the banner is absent. Wrapping keeps the count
+    at four in BOTH states and needs no sheet edit at all.
+
+    The sheet's own comments record this same off-by-one twice already, once for this very route
+    (`:2369-2372`, issue 676) and once for `books-scrolls` (`:2386-2392`). `manager-layout.test.js`
+    now carries a children-vs-tracks guard for this route so it cannot be recorded a fourth time.
   -->
-  {#if bannerEntry}
-    <SharedDefinitionCallout
-      name={bannerEntry.entity?.name || bannerEntry.id}
-      icon="fas fa-cube"
-      pillLabel={text('FABRICATE.Admin.Manager.Scoped.Component.WorldPill', 'World definition')}
-      note={componentAttributionNote(
-        { surface: 'list', memberCount: Number(bannerEntry.membershipCount) || 0 },
-        format
-      )}
-      actionLabel={text(
-        'FABRICATE.Admin.Manager.Component.OpenSharedDefinition',
-        'Edit shared definition'
-      )}
-      onOpen={() => onOpenWorldEntry(WORLD_ENTRY_ROUTE, bannerEntry.id)}
-    />
-  {/if}
+  <div class="manager-component-head">
+    <!--
+      THE CATALOGUE ATTRIBUTION BANNER. Everything a GM reads on this screen names a component
+      whose identity is authored ONE ROUTE AWAY, in the world catalogue, and shared with every
+      other system that has rules for it — so without this the screen offers no signal at all that
+      a name here is not a name this system owns.
 
-  <section
-    class="manager-component-drop-zone"
-    use:dragDrop={{
-      onDrop: onDropComponent,
-      disabled: !dropEnabled,
-      activeClass: 'is-drop-active',
-    }}
-    aria-label={text(
-      'FABRICATE.Admin.Manager.Component.DropZoneLabel',
-      'Drop Foundry items to add components'
-    )}
-  >
-    <i class="fas fa-download" aria-hidden="true"></i>
-    <span>
-      <strong
-        >{text(
-          'FABRICATE.Admin.Manager.Component.DropZoneTitle',
-          'Drop items to add components'
-        )}</strong
-      >
-      <small
-        >{text(
-          'FABRICATE.Admin.Manager.Component.DropZoneHint',
-          'World, compendium, pack, or folder drops use the existing component import flow for the selected system.'
-        )}</small
-      >
-    </span>
-  </section>
+      It does NOT claim the displayed name comes from the catalogue, because under the read union
+      it does not: identity is re-derived from the in-system record on every row. It states where
+      identity is AUTHORED, and the count of other systems is CLAMPED at zero — a component with
+      no membership record would otherwise read as shared with negative one.
+    -->
+    {#if bannerEntry}
+      <SharedDefinitionCallout
+        name={bannerEntry.entity?.name || bannerEntry.id}
+        icon="fas fa-cube"
+        pillLabel={text('FABRICATE.Admin.Manager.Scoped.Component.WorldPill', 'World definition')}
+        note={componentAttributionNote(
+          { surface: 'list', memberCount: Number(bannerEntry.membershipCount) || 0 },
+          format
+        )}
+        actionLabel={text(
+          'FABRICATE.Admin.Manager.Component.OpenSharedDefinition',
+          'Edit shared definition'
+        )}
+        onOpen={() => onOpenWorldEntry(WORLD_ENTRY_ROUTE, bannerEntry.id)}
+      />
+    {/if}
+
+    <section
+      class="manager-component-drop-zone"
+      use:dragDrop={{
+        onDrop: onDropComponent,
+        disabled: !dropEnabled,
+        activeClass: 'is-drop-active',
+      }}
+      aria-label={text(
+        'FABRICATE.Admin.Manager.Component.DropZoneLabel',
+        'Drop Foundry items to add components'
+      )}
+    >
+      <i class="fas fa-download" aria-hidden="true"></i>
+      <span>
+        <strong
+          >{text(
+            'FABRICATE.Admin.Manager.Component.DropZoneTitle',
+            'Drop items to add components'
+          )}</strong
+        >
+        <small
+          >{text(
+            'FABRICATE.Admin.Manager.Component.DropZoneHint',
+            'World, compendium, pack, or folder drops use the existing component import flow for the selected system.'
+          )}</small
+        >
+      </span>
+    </section>
+  </div>
 
   <!--
     The three-row filter bar, adopted from the Recipe Studio (ruling 1). Row one is
@@ -768,7 +790,11 @@
     ariaLabel={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
   >
     <div class="manager-component-filter-row">
+      <!-- The capture registry's narrowing hook (issue 1371, round 2). A case that has to reach
+           a specific component types into this field rather than depending on where that
+           component happens to sort; the primitive routes an unknown `data-*` onto its label. -->
       <ManagerSearchField
+        data-component-search
         value={itemSearchTerm || ''}
         onInput={(next) => onSearchChange(next)}
         placeholder={text(
@@ -1069,6 +1095,7 @@
         {#if visibleGhostRows.length > 0}
           <ul
             class="manager-component-group-body manager-component-ghost-body"
+            data-component-ghost-body
             role="list"
             aria-label={text(
               'FABRICATE.Admin.Manager.Component.GhostListLabel',
@@ -1126,6 +1153,16 @@
      where a per-component override belongs — a component's `css: 'injected'` block lands
      UNLAYERED and therefore beats the host sheet at any specificity, so a rule authored in both
      places would silently resolve here anyway. */
+
+  /* THE HEAD WRAPPER (issue 1371, round 2). It exists to hold `.manager-main`'s child count at
+     four whether or not the attribution banner renders; the column and the gap are what the two
+     children had as siblings of the grid, so nothing moves in the state that already worked. */
+  .manager-component-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
 
   .manager-component-inherit-summary {
     margin-left: auto;

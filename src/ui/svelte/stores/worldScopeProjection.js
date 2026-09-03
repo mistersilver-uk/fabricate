@@ -598,6 +598,17 @@ function buildEntry(descriptor, entity, worldDefault, systems, membershipIndex, 
     // surface with no system context, so it cannot re-derive the list from a selection. Supplied
     // by the caller for the same reason the counts are, and an absent `usage` answers `[]`.
     requiredBy: Array.isArray(entityUsage?.requiredBy) ? [...entityUsage.requiredBy] : [],
+    // AND WHAT PRODUCES IT (issue 1371). The component family's usage leg answers two axes — a
+    // recipe or a gathering task that CONSUMES the component, and one that MAKES it — because the
+    // world entry states them as two lists: "Used by" is what a GM checks before removing a
+    // component, and "Produced by" before deleting the thing that makes it.
+    //
+    // IT IS PROJECTED EVEN THOUGH NO SURFACE DRAWS IT YET, and that is deliberate rather than
+    // premature. Round 1 computed it and stopped here, which made the leg unobservable from
+    // anywhere — and the gathering half of it was reading a key stored tasks never carry, so it
+    // reported nothing on every world and no test could have said so. An absent `usage` answers
+    // `[]`, exactly as `requiredBy` does, so no other entity type moves.
+    producedBy: Array.isArray(entityUsage?.producedBy) ? [...entityUsage.producedBy] : [],
     // WHETHER THE WORLD MASTER SWITCH LEAVES THIS ENTITY ON. Read through `isWorldEnabled`, so
     // an ABSENT flag — every record in every world that has never touched the switch — answers
     // `true` here and the screens draw the state they always drew.

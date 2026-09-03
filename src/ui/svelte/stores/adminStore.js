@@ -5500,8 +5500,15 @@ export function createAdminStore(services) {
    * ── WHY A GATHERING TASK'S CONSUMPTION IS RESOLVED THROUGH THE TOOL LIBRARY ───────────────
    * A gathering task names TOOLS by id, and a library Tool names the component it is sourced
    * from. So the component a task requires is one join away, and reading `task.toolIds` as
-   * component ids would key every reference by a Tool id no component carries. A task's RESULT
-   * drops are direct, and they are production rather than consumption.
+   * component ids would key every reference by a Tool id no component carries.
+   *
+   * ── AND WHY ITS PRODUCTION IS READ OFF `dropRows`, NOT `resultGroups` ─────────────────────
+   * A STORED gathering task carries `dropRows` — `_normalizeGatheringTask` is an allowlist rebuild
+   * that emits it from `task.dropRows ?? task.itemDrops` and emits no `resultGroups` at all.
+   * `resultGroups` is minted at COMPOSITION time, with `results: []`, and stays empty until issue
+   * 683. A `resultGroups` read therefore compiles, runs, iterates nothing, and reports no gathering
+   * production on any world — which is what this leg did until round 2, invisibly, because the
+   * projection does not yet render `producedBy`.
    *
    * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>,
    *   requiredBy: Array<object>, producedBy: Array<object>}>} keyed by world component id.
@@ -5564,11 +5571,14 @@ export function createAdminStore(services) {
           const componentId = componentIdByToolId.get(String(raw ?? '').trim());
           if (componentId) reference(componentId, 'requiredBy', named);
         }
-        for (const group of Array.isArray(task?.resultGroups) ? task.resultGroups : []) {
-          for (const result of Array.isArray(group?.results) ? group.results : []) {
-            const componentId = String(result?.componentId ?? result?.systemItemId ?? '').trim();
-            if (componentId) reference(componentId, 'producedBy', named);
-          }
+        // `itemDrops` is the legacy alias the normalizer itself accepts, so a corpus written
+        // before the rename still answers here rather than reporting nothing.
+        const dropRows = task?.dropRows ?? task?.itemDrops;
+        for (const row of Array.isArray(dropRows) ? dropRows : []) {
+          // `componentId ?? systemItemId` is the pair `normalizeItemDrop` coalesces, so a row
+          // authored under either name reaches the same component.
+          const componentId = String(row?.componentId ?? row?.systemItemId ?? '').trim();
+          if (componentId) reference(componentId, 'producedBy', named);
         }
       }
     }

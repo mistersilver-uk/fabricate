@@ -6768,6 +6768,73 @@ test('the Tags & Categories route names one grid track per section and grows the
   );
 });
 
+// The SAME defect family, a third time, on the Component Rules route (issue 1371).
+//
+// The two guards above cover `books-scrolls` and `tags`. `components` had none, and issue 1371
+// added a fifth top-level child to a four-track template: the attribution banner went in as the
+// FIRST child, every child shifted one track down, the toolbar landed in `minmax(0, 1fr)` — whose
+// min is 0 — collapsed, and painted its filter row, its inherit summary and its count on top of
+// rows 1 to 3 of the list. The sheet's own comments at `:2369-2372` record this exact off-by-one
+// for this exact route, from issue 676; it happened again because nothing measured it.
+//
+// THE CHILD MATCHER IS THE GENERAL ONE the tags guard uses, not the books-scrolls alternation.
+// A hand-listed alternation does not fail on an unknown tag — it silently stops counting one, and
+// the track assertion then compares a short count against a short template and passes. On this
+// route that is not hypothetical: `SharedDefinitionCallout` and `Pagination` are both capitalised
+// component tags, and the alternation would have counted NEITHER, so the defect this test exists
+// for would have been invisible to it.
+test('the Component Rules route names one grid track per child and grows the list', () => {
+  const source = readFileSync(resolve(managerComponentDir, 'ComponentsBrowserView.svelte'), 'utf8');
+  const mainStart = source.indexOf('<main');
+  assert.notEqual(mainStart, -1, 'the view must render a `.manager-main` grid');
+  const main = source.slice(mainStart);
+
+  const children = main.match(/^ {2}<[A-Za-z][\w-]*(?=[\s>])/gm) || [];
+  assert.equal(
+    children.length,
+    4,
+    `expected four unconditional top-level grid children, got ${children.length}: ${children.join(', ')}`
+  );
+  // AND THE COUNT IS UNCONDITIONAL, which is the whole repair. The banner is rendered inside a
+  // `.manager-component-head` wrapper precisely so a null `bannerEntry` — a system whose
+  // components the world corpus has no record of — leaves the same four children. A banner
+  // hoisted back out to be a direct child would make this five, and a template widened to five
+  // tracks would misplace the list in the state the banner is absent.
+  assert.ok(
+    main.includes('class="manager-component-head"'),
+    'the banner and the drop zone share one head wrapper, so the child count does not depend on ' +
+      'whether a component is selected'
+  );
+  assert.equal(
+    main.includes('manager-section-header'),
+    false,
+    'the view must not render a second page header (issue 676/785/878)'
+  );
+
+  const block = blockFor('.fabricate-manager[data-manager-view="components"] .manager-main');
+  const template = block.match(/grid-template-rows:([^;]+);/)?.[1]?.trim();
+  assert.ok(template, 'the components route must declare its own grid-template-rows');
+
+  const tracks = template.match(/[a-z-]+\([^)]*\)|\S+/g) || [];
+  assert.equal(
+    tracks.length,
+    children.length,
+    `expected ${children.length} tracks for ${children.length} children, got "${template}"`
+  );
+  // THE LIST IS THE THIRD OF FOUR, not the last: the pager is a real child below it. So the
+  // growing track is asserted by POSITION rather than by `at(-1)`, which is what the two guards
+  // above can do because their scroller genuinely is last.
+  assert.equal(
+    tracks[2],
+    'minmax(0, 1fr)',
+    'the scrolling list takes the slack; the head, the toolbar and the pager are content-sized'
+  );
+  assert.ok(
+    [tracks[0], tracks[1], tracks[3]].every((track) => track === 'auto'),
+    `only the list may grow; head/toolbar/pager must be auto, got "${template}"`
+  );
+});
+
 // Rendered-geometry guard for the reserved General row (issue 878). Its explanatory
 // sentence used to stack under the name, making it the one card in an `align-items: start`
 // grid whose content exceeded the 34px icon tile — so it stood visibly taller than every

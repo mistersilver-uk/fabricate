@@ -23977,3 +23977,13 @@
 .fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row.is-bulk-selected {
   background: var(--fab-surface-active);
 }
+
+/* THE MEMBERSHIP SELECT SIZES LIKE ITS SIBLING (issue 1371, round 2), and without this it did
+   not: only the shared `.manager-component-toolbar select` treatment applied, so the widest
+   option — `All world components (67)` — sized the control and pushed the filter row onto a
+   second toolbar line. `.manager-component-category-filter` beside it carries exactly this pair
+   for exactly this reason; an appended rule, editing none. */
+.fabricate-manager .manager-component-membership-filter {
+  flex: 0 0 auto;
+  max-width: 180px;
+}

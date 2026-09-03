@@ -634,3 +634,146 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     assert.deepEqual(calls, [['w-2', 'sys-1']]);
   });
 });
+
+// ── THE ATTRIBUTION BANNER AND THE INHERIT SUMMARY, ON THIS SCREEN (issue 1371, round 2) ─────
+//
+// AC-13 says "Mounted on `ComponentsBrowserView` AND `ComponentEditView`", and AC-16's mounted
+// half names both system screens. Round 1 realised neither on this one, so deleting the banner and
+// the summary outright left the whole tree green — and that gap is what let the layout collapse
+// ship: the banner had no mounted reader at all.
+//
+// It is also the fixture that reaches the `format` two-argument path. Every direct `format(...)`
+// call in the view passes a data object; the only two-argument caller is `componentInheritState`,
+// which returns `null` BEFORE calling its localizer unless the row is a MEMBER. So a scope with no
+// membership — which is every fixture round 1 had — never executes the line that silently killed
+// the route.
+describe('ComponentsBrowserView world banner and inherit summary (issue 1371)', () => {
+  const SYSTEMS = [{ id: 'sys-1', name: 'Forge' }];
+
+  /**
+   * A scope where THIS system holds both rows: one inheriting its category, one overriding.
+   *
+   * @param {number} members how many systems hold `c-inherit`, for the banner's clamped count.
+   * @returns {object}
+   */
+  function memberScope(members = 1) {
+    const roster = Array.from({ length: Math.max(members, 1) }, (_, index) => ({
+      id: index === 0 ? 'sys-1' : `sys-${index + 1}`,
+      name: index === 0 ? 'Forge' : `System ${index + 1}`,
+    }));
+    return projectComponentScope({
+      entityType: 'component',
+      corpus: {
+        entities: [
+          { id: 'c-inherit', name: 'Iron Ingot', originItemUuid: 'Item.ingot' },
+          { id: 'c-override', name: 'Coal', originItemUuid: 'Item.coal' },
+        ],
+        defaults: [{ id: 'c-inherit', category: 'Refined' }],
+        membership: [
+          ...roster.map((system) => ({
+            entityId: 'c-inherit',
+            systemId: system.id,
+            inherit: { category: true },
+          })),
+          { entityId: 'c-override', systemId: 'sys-1', inherit: { category: false } },
+        ],
+      },
+      systems: roster,
+    });
+  }
+
+  const CARDS = [
+    makeComponent({ id: 'c-inherit', name: 'Iron Ingot', category: 'Refined' }),
+    makeComponent({ id: 'c-override', name: 'Coal', category: 'Raw' }),
+  ];
+
+  async function open({ members = 1, selectedComponentId = 'c-inherit', opened = [] } = {}) {
+    const root = await browser.mount({
+      itemCards: CARDS,
+      scope: memberScope(members),
+      systemId: 'sys-1',
+      selectedSystemId: 'sys-1',
+      selectedComponentId,
+      onOpenWorldEntry: (route, entityId) => opened.push([route, entityId]),
+    });
+    return root;
+  }
+
+  it('names the SELECTED component, and says nothing at rest', async () => {
+    // The banner used to fall back to whichever row sorted first, so at rest it stated a count and
+    // an exit about a component nobody had chosen.
+    const resting = await open({ selectedComponentId: '' });
+    assert.ok(
+      !resting.querySelector('[data-scoped-shared-definition]'),
+      'no selection, no subject, no banner'
+    );
+
+    const selected = await open({ selectedComponentId: 'c-override' });
+    const note = selected.querySelector('[data-scoped-shared-definition-note]');
+    assert.ok(Boolean(note), 'a selected component brings the banner with it');
+    assert.match(
+      selected.querySelector('.manager-scoped-entity-title').textContent,
+      /Coal/,
+      'and the banner names the component the GM chose'
+    );
+  });
+
+  it('clamps the shared-system count at zero on THIS screen', async () => {
+    // AC-13's `ComponentsBrowserView` half. `c-override` is held by one system, so "0 other" —
+    // and the prototype's own unclamped string would render "-1 other systems" here.
+    const root = await open({ selectedComponentId: 'c-override' });
+    const note = root.querySelector('[data-scoped-shared-definition-note]').textContent;
+    assert.match(note, /0 other systems/);
+    assert.ok(!note.includes('-1'), 'and never a negative count');
+  });
+
+  it('and states two other systems when three hold it', async () => {
+    const root = await open({ members: 3, selectedComponentId: 'c-inherit' });
+    assert.match(
+      root.querySelector('[data-scoped-shared-definition-note]').textContent,
+      /2 other systems/
+    );
+  });
+
+  it('its exit invokes the navigation prop with the ROUTE TOKEN and the entity', async () => {
+    // AC-16's mounted half on this screen. The prop defaults to a no-op at the call site, so an
+    // unwired exit is silently inert rather than an error — a source assertion alone cannot say
+    // the click reaches it.
+    const opened = [];
+    const root = await open({ selectedComponentId: 'c-override', opened });
+    root.querySelector('[data-scoped-shared-definition-open]').click();
+    flushSync();
+    assert.deepEqual(opened, [['world-component-entry', 'c-override']]);
+  });
+
+  it('states the inherit summary, which is what replaced the per-row line', async () => {
+    // D-20's substitute surface. It renders only when the world corpus knows at least one of this
+    // system's components, and round 1 had no fixture that reached it — so both the summary and
+    // the `format` two-argument path were unexecuted.
+    const root = await open();
+    const summary = root.querySelector('[data-component-inherit-summary]');
+    assert.ok(Boolean(summary), 'the summary renders once the world layer knows these rows');
+    assert.equal(
+      summary.textContent.trim(),
+      '1 inherit the world category · 1 override it',
+      'one of each, counted off the projection join rather than off the in-system record'
+    );
+  });
+
+  it('and the Overriding filter narrows to the overriding row', async () => {
+    // The third membership option, and the only one round 1 never selected. It is also the branch
+    // that calls `componentInheritState` per row, which is the two-argument `format` path.
+    const root = await open();
+    assert.equal(root.querySelectorAll('.manager-component-row').length, 2);
+
+    const filter = root.querySelector('[data-component-membership-filter]');
+    filter.value = 'over';
+    filter.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+
+    const rows = [...root.querySelectorAll('.manager-component-row')].map((row) =>
+      row.getAttribute('data-component-id')
+    );
+    assert.deepEqual(rows, ['c-override'], 'only the row whose switch is off survives');
+  });
+});

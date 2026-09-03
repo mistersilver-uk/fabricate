@@ -28168,20 +28168,28 @@ describe('CraftingSystemManager mounted behavior', () => {
         img: 'icons/commodities/materials/salt-pile-white.webp',
         description: '',
       });
-      // The COMPENDIUM positive control. A compendium drag carries `{pack, id}` and no `uuid` at
-      // all, so it resolves to `Compendium.<pack>.<id>` — which has NO `.Item.` segment and is
-      // therefore not embedded. It is supplied as the RAW payload rather than as a uuid string,
-      // because that is what the zone forwards.
+      // THE TWO COMPENDIUM SHAPES, and the resolver has to answer BOTH.
+      //
+      // `PACKED` is what a 14.365 GM drags: a full `Compendium.<scope>.<pack>.Item.<id>` uuid.
+      // Note it HAS an `.Item.` segment in the middle — that is the primary document's own pair,
+      // and reading it as an embedded pair is precisely the mistake a fixed-offset segmenter
+      // makes.
+      //
+      // `PACKED_LEGACY` is the pre-v10 `{pack, id}` pair, which `resolveDropUuid` still resolves
+      // to `Compendium.<pack>.<id>`. Round 1 covered only this one, so the shape a GM can actually
+      // produce was uncovered.
       const PACKED = Object.freeze({
-        uuid: 'Compendium.p.b',
+        uuid: 'Compendium.p.q.Item.b',
         name: 'Packed Ore',
         img: 'icons/commodities/stone/ore-chunk-brown.webp',
         description: '',
       });
+      const PACKED_LEGACY = Object.freeze({ ...PACKED, uuid: 'Compendium.p.b', name: 'Older Ore' });
       const COMPONENT_SOURCES = Object.freeze({
         [RESIN.uuid]: RESIN,
         [SALT.uuid]: SALT,
         [PACKED.uuid]: PACKED,
+        [PACKED_LEGACY.uuid]: PACKED_LEGACY,
       });
 
       async function settleDrop() {
@@ -28248,18 +28256,35 @@ describe('CraftingSystemManager mounted behavior', () => {
           ...(previousFoundry ?? {}),
           utils: {
             ...(previousFoundry?.utils ?? {}),
+            // A DOUBLE THAT MATCHES CORE'S EDGE SEMANTICS, NOT JUST ITS HAPPY PATH.
+            //
+            // Two corrections, and each of them was producing a false pass:
+            //
+            //  1. IT RETURNS `null` RATHER THAN THROWING. Real `parseUuid` never throws for a
+            //     malformed uuid — it answers `null`. A stub that threw made the gate's `catch`
+            //     look like the branch under test, when in a live client that catch is
+            //     unreachable and the null branch is the only thing standing between this zone
+            //     and an unparseable payload. A double STRICTER than core is exactly how a
+            //     fail-open gate ships behind a green fail-closed assertion.
+            //  2. THE COMPENDIUM PREFIX IS SPLICED, NOT COUNTED. This assumed a fixed offset of
+            //     three for a compendium uuid, which is right only for the legacy
+            //     `Compendium.<pack>.<id>` shape. A 14.365 compendium drag carries
+            //     `Compendium.<scope>.<pack>.Item.<id>` — five segments — and the fixed offset
+            //     read its `Item.<id>` primary pair as an EMBEDDED pair, reporting the one
+            //     compendium shape a GM can actually produce as an embedded Item. Core splices
+            //     the pack triple first and then the primary pair; so does this.
             parseUuid: (uuid) => {
-              const parts = String(uuid).split('.');
-              if (parts.length < 2) throw new Error(`unparseable uuid: ${uuid}`);
-              // Every `<Type>.<id>` pair AFTER the primary document is an embedded one, which is
-              // what makes all three embedded shapes report a non-empty list and a compendium
-              // uuid report an empty one.
-              const primary = parts[0] === 'Compendium' ? 3 : 2;
-              const embedded = [];
-              for (let index = primary; index + 1 < parts.length + 1; index += 2) {
-                if (parts[index] !== undefined) embedded.push(parts[index], parts[index + 1]);
-              }
-              return { embedded };
+              if (typeof uuid !== 'string') return null;
+              const parts = uuid.split('.');
+              if (parts.length < 2) return null;
+              // The pack triple — `Compendium`, scope, pack — comes off first when present.
+              if (parts[0] === 'Compendium') parts.splice(0, 3);
+              // Then the PRIMARY document's own `<Type>.<id>` pair.
+              parts.splice(0, 2);
+              // Whatever remains is embedded, in `<Type>, <id>` order. An odd remainder is
+              // malformed, and core answers `null` for it rather than half-reading it.
+              if (parts.length % 2 !== 0) return null;
+              return { embedded: parts };
             },
           },
         };
@@ -28331,30 +28356,44 @@ describe('CraftingSystemManager mounted behavior', () => {
         }
       });
 
-      it('and still MINTS from a compendium drag, which carries no uuid at all', async () => {
-        // THE POSITIVE CONTROL for the refusal, and it is the payload shape rather than a uuid
-        // string: `ItemDropZone` forwards the raw drag data, and a compendium drag carries
-        // `{pack, id}` — so a handler reading `data.uuid` refuses every compendium drop while a
-        // uuid-string fixture stays green.
+      it('and still MINTS from a compendium drag, in BOTH shapes core has emitted', async () => {
+        // THE POSITIVE CONTROL for the refusal, and it needs both shapes because they fail
+        // differently.
+        //
+        // The FULL uuid is what a 14.365 GM actually drags: `Compendium#_getEntryDragData` returns
+        // `{type, uuid}` and `CompendiumCollection#getUuid` composes
+        // `Compendium.<scope>.<pack>.Item.<id>`. It has an `.Item.` segment in the middle, so a
+        // segmenter that counts a fixed offset instead of splicing the pack triple reads its
+        // primary pair as an embedded one and REFUSES the commonest compendium drop there is.
+        //
+        // The `{pack, id}` pair is the pre-v10 legacy shape `resolveDropUuid` still tolerates. It
+        // carries no `uuid` at all, so a handler reading `data.uuid` refuses it while a
+        // uuid-string fixture stays green. Round 1 covered only this one.
         await openComponentCatalogue([]);
 
-        const minted = await dropPayload({ type: 'Item', pack: 'p', id: 'b' });
-
+        const modern = await dropPayload({ type: 'Item', uuid: 'Compendium.p.q.Item.b' });
         assert.equal(worldComponentIds().length, 1, 'a compendium Item is a world component');
-        assert.deepEqual(minted.warn, [], 'and nothing refused it');
+        assert.deepEqual(modern.warn, [], 'and nothing refused it');
         assert.equal(managerView(), 'world-component-entry');
+
+        await goToComponentCatalogue();
+        const legacy = await dropPayload({ type: 'Item', pack: 'p', id: 'b' });
+        assert.equal(worldComponentIds().length, 2, 'and so is one dragged the legacy way');
+        assert.deepEqual(legacy.warn, []);
       });
 
-      it('and REFUSES an unparseable uuid, because the gate fails CLOSED', async () => {
-        // The snapshot helper's fail-open idiom is right for a snapshot and wrong for a refusal:
-        // a parse that threw and was read as "not embedded" would admit exactly the payloads this
-        // gate exists to turn away.
+      it('and REFUSES a uuid the parser cannot read, because the gate fails CLOSED', async () => {
+        // THE BRANCH THIS MEASURES IS THE NULL RETURN, not a throw. Real `parseUuid` answers
+        // `null` for a malformed uuid and never throws, so the gate's `catch` is unreachable in a
+        // live client — and a gate that only caught throws would ACCEPT every one of these while
+        // this assertion stayed green against a stricter double.
         await openComponentCatalogue([]);
 
-        const refused = await dropPayload({ type: 'Item', uuid: 'nonsense' });
-
-        assert.deepEqual(worldComponentIds(), [], 'nothing was minted');
-        assert.equal(refused.warn.length, 1);
+        for (const uuid of ['nonsense', 'Actor.a.Item']) {
+          const refused = await dropPayload({ type: 'Item', uuid });
+          assert.deepEqual(worldComponentIds(), [], `${uuid} minted nothing`);
+          assert.equal(refused.warn.length, 1, `${uuid} told the GM why`);
+        }
       });
     });
 

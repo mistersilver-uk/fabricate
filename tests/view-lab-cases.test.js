@@ -4838,6 +4838,83 @@ test('every world component id the capture cases click exists in the lab world',
       `${caseId} clicks the world component row "${id}", which the lab world does not hold`
     );
   }
+});
+
+// ── EXISTENCE IS NOT REACHABILITY (issue 1371, round 2) ─────────────────────────────────────
+//
+// The guard above proves a clicked id is IN THE CORPUS. That is a different question from
+// whether its row hook is in the DOM, and the difference cost this lane a whole capture run: the
+// shared frame pages at ten rows and sorts `name-asc`, the lab world holds 68 world components,
+// and three of the four ids the component cases click sort onto pages 2, 4 and 7. Every one of
+// their row hooks was absent, the driver threw by name on a selector that matched nothing, and
+// because an abort takes the WHOLE run down, no case in the registry published a frame.
+//
+// So a case that clicks a scoped-list row must either land inside the first page under the
+// frame's own sort, or NARROW the list first. `fill` is the narrowing the frame offers a GM, and
+// it is the one this registry can check for without re-implementing the list model.
+test('a capture case that clicks a scoped-list row can actually reach it', async () => {
+  const { buildLabContent } = await import('./view-lab/world/labContent.js');
+  const content = buildLabContent();
+
+  // THE FRAME'S OWN CONSTANTS, read from its source rather than restated. A hard-coded 10 here
+  // would go on passing the day the window changes, which is the drift this file exists to stop.
+  const frame = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte'),
+    'utf8'
+  );
+  const pageSize = Number(frame.match(/const DEFAULT_PAGE_SIZE = (\d+);/)?.[1]);
+  assert.ok(pageSize > 0, 'the frame declares a default page size; the read is broken');
+
+  // The world component corpus as the catalogue orders it: every in-system component the
+  // migration lifts, plus the fixture's world-only records, by NAME ascending.
+  const byName = [
+    ...new Map(
+      [
+        ...(content.systems ?? []).flatMap((system) =>
+          (system.components ?? []).map((component) => [
+            String(component?.id ?? ''),
+            String(component?.name ?? ''),
+          ])
+        ),
+        ...(content.componentScope?.entities ?? []).map((entity) => [
+          String(entity?.id ?? ''),
+          String(entity?.name ?? ''),
+        ]),
+      ].filter(([id]) => id)
+    ),
+  ].sort((left, right) => left[1].localeCompare(right[1]));
+
+  assert.ok(
+    byName.length > pageSize,
+    `the corpus must be longer than one page or this guard proves nothing; got ${byName.length}`
+  );
+
+  let checked = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (!String(viewCase.expectView || '').startsWith('world-component')) continue;
+    const steps = viewCase.steps || [];
+    for (const [index, step] of steps.entries()) {
+      const row = String(step.selector || '').match(
+        /\[data-scoped-list-(?:row|inspect|select)="([^"]+)"\]/
+      );
+      if (!row) continue;
+      checked += 1;
+      const position = byName.findIndex(([id]) => id === row[1]);
+      if (position >= 0 && position < pageSize) continue;
+      // Not on page one, so SOME earlier step must have narrowed the list.
+      const narrowed = steps
+        .slice(0, index)
+        .some((earlier) => 'fill' in earlier && String(earlier.selector).includes('list-search'));
+      assert.ok(
+        narrowed,
+        `${viewCase.id} clicks "${row[1]}", which sorts at position ${position} of ` +
+          `${byName.length} — past the ${pageSize}-row first page — and no earlier step fills the ` +
+          'list search. The capture driver throws by name on a selector that matches nothing and ' +
+          'aborts the WHOLE run, so this publishes nothing and takes every other case with it.'
+      );
+    }
+  }
+  assert.ok(checked > 0, 'the scan found no clicked rows to check; it is broken');
 
   // THE SEEDED WORLD STATES ARE LIVE, each named by the frame it exists for. An entry that
   // stopped describing anything would be a fixture the cases silently no longer photograph.

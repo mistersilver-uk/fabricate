@@ -1454,8 +1454,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     //
     // `sm-iron-ingot` is the row whose world default is SEEDED and whose smithing membership
     // record INHERITS it, which is the state the card's inherit count exists to state.
+      // NARROW THE LIST FIRST, OR THE ROW HAS NO HOOK AT ALL (issue 1371, round 2).
+      //
+      // The shared frame PAGES at ten rows and sorts `name-asc`, and the lab world holds 68 world
+      // components — so `sm-coal` is on page 2, `sm-iron-ingot` on page 4 and `lab-unbound-salt`
+      // on page 7, and none of their row hooks is in the DOM at rest. The capture driver throws
+      // by name on a selector that matches nothing and aborts the WHOLE run, so these four cases
+      // published nothing and took every other case's frame down with them.
+      //
+      // A search `fill` is the narrowing the frame already offers a GM. Renaming the fixture rows
+      // to sort onto page one was the alternative and is worse: it would bend the corpus around
+      // the capture rather than driving the screen the way the screen is driven.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Iron Ingot' },
       { selector: '[data-scoped-list-inspect="sm-iron-ingot"]' },
     ],
     expectView: 'world-components',
@@ -1506,9 +1518,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Component catalogue, bulk selection',
     reaches: 'beyond',
     smokeLabels: [],
+    // TWO SEARCHES, ONE PER ROW, and the selection SURVIVES the second one: the frame holds the
+    // ticked set on the browser view-state rather than on the rendered page, which is what makes a
+    // selection spanning two searches — and, in the product, two pages — a real state.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Iron Ingot' },
       { selector: '[data-scoped-list-select="sm-iron-ingot"]' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
       { selector: '[data-scoped-list-select="sm-coal"]' },
     ],
     expectView: 'world-components',
@@ -1536,14 +1553,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     // against itself.
     //
     // `sm-coal` is the subject because it is the ONE lab component carrying world tags AND a
-    // per-system mute, so the world tag list, its note and the N-by-M mute grid are all in one
-    // frame rather than spread across three that each show one of them.
+    // per-system mute — which is what the SIBLING case below photographs, after scrolling to it.
+    //
+    // THIS FRAME PROMISES ONLY WHAT IT SHOWS (issue 1371, round 2). It used to claim "the world
+    // tag list, its note and the N-by-M mute grid … all in one frame", and no frame at 1280x900
+    // can deliver that: the Definition tab's card stack puts the World tags card below the panel's
+    // scroll fold, so the containment test could never be satisfied and the case failed on an
+    // assertion rather than on a defect. The evidence is SPLIT rather than weakened — this case
+    // holds the identity, linked-item and category cards, and `world-component-entry-tags` scrolls
+    // to the tag card and the mute grid.
     id: 'world-component-entry-definition',
     label: 'Manager — World Component entry',
     reaches: 'beyond',
     smokeLabels: [],
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
       { selector: '[data-scoped-list-inspect="sm-coal"]' },
       { selector: '[data-scoped-component-open-entry]' },
     ],
@@ -1552,15 +1577,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-scoped-page="world-component-entry"]',
-        target: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-identity="sm-coal"]',
       },
       {
         container: '[data-scoped-page="world-component-entry"]',
-        target: '[data-scoped-entry-tags="sm-coal"]',
+        target: '[data-scoped-entry-source="sm-coal"]',
       },
       {
-        container: '[data-scoped-entry-tags="sm-coal"]',
-        target: '[data-scoped-entry-tag-note]',
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-category="sm-coal"]',
+      },
+      {
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-category-note]',
       },
     ],
     position: { width: 1280, height: 900 },
@@ -1570,6 +1599,44 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
     ],
+  }),
+  managerCase({
+    // THE OTHER HALF OF THE ENTRY'S DEFINITION TAB (issue 1371, round 2), reached by SCROLLING.
+    //
+    // The driver's `scroll` verb exists for exactly this: `frame.screenshot()` on the outer
+    // application does NOT scroll a nested overflow container, so a card below the panel fold is
+    // absent from the frame while every assertion still passes. Scrolling the tag card into view
+    // moves the identity and linked-item cards off the top, which is why this is a second case
+    // rather than two more steps on the first.
+    //
+    // `sm-coal` again: it is the one lab component with world tags AND a member muting one, so
+    // the tag list, its note and the N-by-M mute grid are all here.
+    id: 'world-component-entry-tags',
+    label: 'Manager — World Component entry, world tags',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Coal' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-tags="sm-coal"]', scroll: true },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-entry-tags="sm-coal"]',
+    expectContained: [
+      {
+        container: '[data-scoped-entry-tags="sm-coal"]',
+        target: '[data-scoped-entry-tag-note]',
+      },
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-mutes="lab-smithing"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/],
   }),
   managerCase({
     // THE VALIDATION TAB, on the ONE lab component that fails a blocking check: `lab-unbound-salt`
@@ -1582,6 +1649,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-search]', fill: 'Unbound Salt' },
       { selector: '[data-scoped-list-inspect="lab-unbound-salt"]' },
       { selector: '[data-scoped-component-open-entry]' },
       { selector: '[data-scoped-entry-tab="validation"]' },
@@ -4881,6 +4949,63 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
     ],
+  }),
+  managerCase({
+    // THE INHERITING RULES EDITOR (issue 1371, round 2), and it is the ONLY state that renders the
+    // category note in its info tone — the pixel behind E-4's `tone: 'info'`, which round 1
+    // shipped as a unit-tested constant no frame could contain. `manager-component-edit-normal`
+    // opens the FIRST row, which overrides, so it photographs the warning branch and can never
+    // show this one.
+    //
+    // `sm-iron-ingot` is the pair the lab fixture seeds for exactly this: a membership record that
+    // inherits `category`, PAIRED with an explicit world default, because a refused election
+    // photographs the third branch and looks like a correct inheriting frame.
+    id: 'manager-component-edit-inheriting',
+    label: 'Manager — Component edit inheriting',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-search] input', fill: 'Iron Ingot' },
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+    ],
+    expectView: 'component-edit',
+    expectSelector: '[data-scoped-inherit-row="category"]',
+    expectContained: [
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-scoped-inherit-note="category"]',
+      },
+      {
+        container: 'main.manager-component-edit-main',
+        target: '[data-scoped-shared-definition]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/InheritRow\.svelte$/],
+  }),
+  managerCase({
+    // THE WIDENED MEMBERSHIP COHORT (issue 1371, round 2): the ghost rows, their Add, and the
+    // toolbar counting the widened set. It is the ONE route in the product to adopt a world
+    // component into a crafting system, and round 1 shipped it with no frame at all.
+    id: 'manager-components-world-cohort',
+    label: 'Manager — Components world cohort',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-membership-filter]', select: 'all' },
+    ],
+    expectView: 'components',
+    expectSelector: '[data-component-ghost-row]',
+    expectContained: [
+      {
+        container: '.manager-table-scroll',
+        target: '[data-component-ghost-body]',
+      },
+    ],
+    kinds: ['manager', 'components'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
   }),
   managerCase({
     id: 'manager-components-bulk-edit',

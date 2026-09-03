@@ -19,6 +19,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { get } from 'svelte/store';
 
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
@@ -217,4 +218,75 @@ test('1371: the component family publishes setWorldTags and setMutedTags, and it
   // And the shape they DO share, so the two absences are not a family that failed to mint at all.
   assert.equal(typeof store.worldScope.essence.addToSystem, 'function');
   assert.equal(typeof store.worldScope.tool.addToSystem, 'function');
+});
+
+// ── THE WORLD-SCOPE USAGE LEG (issue 1371, round 2) ────────────────────────────────────────
+//
+// Round 1 shipped this leg with NO store unit at all, and its gathering-production half read
+// `task.resultGroups` — a key a STORED gathering task never carries. `_normalizeGatheringTask` is
+// an allowlist rebuild emitting `dropRows` (from `dropRows ?? itemDrops`) and no `resultGroups` at
+// all; `resultGroups` is minted at COMPOSITION time with `results: []` and stays empty until issue
+// 683. So the loop compiled, ran, iterated nothing, and reported no gathering production on any
+// world — invisibly, because the projection did not publish `producedBy` either.
+//
+// Both halves are closed here: the leg reads `dropRows`, and the projection publishes the answer,
+// which is what makes this assertion an observation rather than a restatement of the source.
+test('1371: a gathering task contributes its DROPS to producedBy, off dropRows', async () => {
+  const harness = makeEssenceStoreHarness({ components: [] });
+  const shippedGetSetting = harness.services.getSetting;
+  harness.services.getSetting = (key) =>
+    key === 'gatheringConfig'
+      ? {
+          systems: {
+            sys1: {
+              tasks: [
+                {
+                  id: 'task-forage',
+                  name: 'Forage the reach',
+                  // THE SHAPE THE NORMALIZER EMITS, with `componentId` on one row and the legacy
+                  // `systemItemId` on the other — the pair `normalizeItemDrop` coalesces, so a leg
+                  // reading only the first would silently drop half a real corpus.
+                  dropRows: [
+                    { id: 'drop-1', componentId: 'ingot', quantity: 1 },
+                    { id: 'drop-2', systemItemId: 'coal', quantity: 2 },
+                  ],
+                  // AND THE KEY THE DEAD LEG READ, populated. It is the NEGATIVE control: a
+                  // `resultGroups` implementation would answer `never-read` here and answer
+                  // NOTHING for the two rows above, so the assertions below tell the two apart.
+                  resultGroups: [{ id: 'rg', results: [{ componentId: 'never-read' }] }],
+                },
+              ],
+            },
+          },
+        }
+      : shippedGetSetting(key);
+
+  const { store } = await openStore(harness, [
+    LINKED,
+    { id: 'coal', name: 'Coal', originItemUuid: 'Item.coal' },
+  ]);
+
+  const entries = get(store.viewState).worldScope.component.entries;
+  const producedBy = (id) => entries.find((entry) => entry.id === id)?.producedBy ?? [];
+
+  assert.deepEqual(
+    producedBy('ingot').map((reference) => [reference.kind, reference.id]),
+    [['gathering', 'task-forage']],
+    'a drop row naming the component by `componentId` reaches producedBy'
+  );
+  assert.deepEqual(
+    producedBy('coal').map((reference) => [reference.kind, reference.id]),
+    [['gathering', 'task-forage']],
+    'and so does one naming it by the legacy `systemItemId`'
+  );
+  assert.deepEqual(
+    entries.flatMap((entry) => entry.producedBy).filter((r) => r.id === 'never-read'),
+    [],
+    'and nothing reads `resultGroups`, which a stored task does not carry'
+  );
+
+  // THE STAT DOES NOT MOVE. A gathering reference is production, not a recipe, and the row's stat
+  // is labelled `Recipes` — so a leg that counted it there would make the number disagree with
+  // its own label, which is the failure the tool leg's own note records.
+  assert.equal(entries.find((entry) => entry.id === 'ingot')?.recipeCount, 0);
 });

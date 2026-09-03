@@ -8507,11 +8507,17 @@
    * — COPY rather than a world-addressable definition source: its uuid dies with its parent, while
    * a compendium Item resolves on every client.
    *
-   * ── IT FAILS CLOSED ─────────────────────────────────────────────────────────────────────
-   * An unparseable uuid is REFUSED, not accepted. The fail-open idiom is right for a snapshot and
-   * wrong for a refusal: a parse that threw and was read as "not embedded" would admit exactly the
-   * payloads this gate exists to turn away. The parser reads three globals unguarded, which is why
-   * this lives here rather than in a pure module.
+   * ── IT FAILS CLOSED, AND THE FAILURE IT GUARDS IS A NULL RETURN RATHER THAN A THROW ────
+   * The real parser does not throw. It RETURNS `null` — for a non-string input, for a relative
+   * uuid with no `relative` option, and for an odd embedded-part count — so a gate written as
+   * `Number(parse(uuid)?.embedded?.length) > 0` inside a try/catch reads every one of those as
+   * "not embedded" and ACCEPTS it, while the catch it relies on is unreachable in a live client:
+   * every global the parser dereferences is present, and its prefix-tree lookup always answers a
+   * node. That is fail-OPEN wearing a fail-closed comment.
+   *
+   * So the null result is branched on explicitly, and the try/catch stays as the outer floor for
+   * a parser that does throw on some future build. The parser reads three globals unguarded,
+   * which is why this lives here rather than in a pure module.
    *
    * @param {string} uuid
    * @returns {boolean}
@@ -8520,7 +8526,9 @@
     const parseUuid = globalThis.foundry?.utils?.parseUuid;
     if (typeof parseUuid !== 'function') return true;
     try {
-      return Number(parseUuid(uuid)?.embedded?.length) > 0;
+      const parsed = parseUuid(uuid);
+      if (!parsed || typeof parsed !== 'object') return true;
+      return Number(parsed.embedded?.length) > 0;
     } catch {
       return true;
     }
@@ -8530,8 +8538,16 @@
    * The world component whose source-link fields already name one Item, or `null`.
    *
    * Matched through `getItemMatchUuids` over the record's THREE source fields, never by comparing
-   * `registeredItemUuid` alone: a re-pointed link keeps the previous uuid as an ALIAS, so an
-   * equality test on one field mints a duplicate for exactly the records a GM has already tidied.
+   * `registeredItemUuid` alone. A record can name its Item through any of the three: the alias
+   * list is authored on the entry's own alias editor, and the `1.30.0` migration UNIONS all three
+   * across a merge group — so a component grouped with another under one elected id carries the
+   * other's uuid as an alias. An equality test on one field mints a duplicate for exactly those
+   * records.
+   *
+   * RE-POINTING IS NOT ONE OF THOSE ROUTES, and an earlier version of this note said it was:
+   * `relinkWorldComponentSource` writes `aliasItemUuids: []`, discarding the previous uuid, which
+   * is byte-identical to the merged tool handler. The behaviour here is right either way; the
+   * reason had to be corrected so a later lane does not rely on an invariant nothing maintains.
    *
    * @param {string} uuid The resolved source Item uuid.
    * @returns {object|null}
@@ -8575,8 +8591,12 @@
    */
   async function createWorldComponentFromItemDrop(data) {
     if (!data) return false;
-    // The payload arrives UNRESOLVED — a compendium drag carries `{pack, id}` and no `uuid` at
-    // all — so the drop shape is normalised before anything reads it.
+    // The payload arrives UNRESOLVED, so the drop shape is normalised before anything reads it.
+    // A 14.365 compendium drag carries a FULL uuid — `Compendium.<scope>.<pack>.Item.<id>`, from
+    // `Compendium#_getEntryDragData` through `CompendiumCollection#getUuid` to `buildUuid` — and
+    // `{pack, id}` is the pre-v10 legacy shape `resolveDropUuid` still tolerates. Both reach here,
+    // and neither is embedded: the parser splices the pack triple AND the primary pair off before
+    // it reads `embedded`.
     const uuid = resolveDropUuid(data);
     if (!uuid) return false;
     if (isEmbeddedItemUuid(uuid)) {
