@@ -2336,7 +2336,6 @@ test('the typographic contract sets names in the serif and numerics in the mono 
   );
 });
 
-
 test('Tool replacement Component picker resists Foundry button height and image overrides', () => {
   const triggerBlock = blockFor(
     '.fabricate-manager .manager-button.manager-salvage-component-trigger,\n' +
