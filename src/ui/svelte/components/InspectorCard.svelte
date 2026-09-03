@@ -35,12 +35,12 @@
   `.is-rail-list` compaction (`:3447`), the first of which is keyed on an ANCESTOR
   (`.manager-checks-rail`) and reaches cards carrying no modifier at all. A fourth,
   `.is-sticky`, had no call site anywhere under `src/` — measured, not assumed — and
-  was deleted from the sheet in issue 1498. A closed `variant`
-  set spanning three different anchors is a design
-  ruling; landing one inside an 80-site sweep whose entire acceptance bar is that no
-  frame moves puts it exactly where nobody can review it. Every modifier therefore
-  travels as a pass-through on `class`, spelled as it is spelled today, and the
-  ruling is left open — see the manifest row's `why` and `ui-integration/spec.md`.
+  was deleted from the sheet in issue 1498. A closed `variant` set spanning two
+  different anchors is a design ruling; landing one inside an 80-site sweep whose
+  entire acceptance bar is that no frame moves puts it exactly where nobody can
+  review it. Every modifier therefore travels as a pass-through on `class`, spelled
+  as it is spelled today, and the ruling is left open — see the manifest row's `why`
+  and `ui-integration/spec.md`.
 
   It deliberately has no scoped `<style>`, for `ManagerButton.svelte`'s and
   `IconButton.svelte`'s reason: the shell is painted by `styles/fabricate.css` under
