@@ -2978,6 +2978,11 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
   This is the one place `owned` is reported as `have` (see §Per-Set Craftability), because `delivered` is capped at `need` and a shortage shopped against it would always read satisfied.
 - The aggregation SHALL evaluate against the selected crafting actor, not against the component-source actors alone.
   The currency affordance probe is actor-bound, so an aggregation that supplies no crafting actor reports every currency requirement as missing regardless of the actor's balance.
+- A currency requirement's affordability verdict is scoped to a **single craft of a single recipe**, because that is the only question the affordance probe answers.
+  The aggregation SHALL NOT report an affirmative verdict for an aggregate that exceeds one craft's cost; such a row stays visible, states how many times the cost recurs, and presents no affordability verdict.
+  A negative verdict is exempt and SHALL stand for any aggregate, because an actor who cannot pay for one craft cannot pay for more.
+- A currency row that presents no affordability verdict — whether because the world's configuration refused it or because the aggregate was never established — SHALL NOT count toward the missing-components total.
+  That total names components the player can go and acquire, and neither row is one.
 
 #### Right Rail (Run Summary or Shopping List)
 
