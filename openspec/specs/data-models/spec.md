@@ -2063,13 +2063,20 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > The three vocabulary LISTS have a destination since issue 1392 — `fabricate.worldVocabulary`, modelled by `## World Vocabulary` — and nothing reads it until the consumer sweep; the two vocabulary ICON MAPS still have no destination at all.
 > `## Component`, `## EssenceDefinition` and `## Tool` therefore still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does — with the single addition that a reader's row also carries the resolver's `member` and `inherited` keys.
 >
-> **REACHABLE FOR ESSENCES, EXPOSED BUT UNREACHABLE FOR COMPONENTS AND TOOLS**, as of issue 1372.
+> **REACHABILITY, DERIVED RATHER THAN ASSERTED.** As of issue 1371 the set of scoped-entity types with no reachable world-scope screen is EMPTY: components, essences and tools each render a real world catalogue and a real world entry, and the only world route still delegating to `ScopedPlaceholderPage` is `world-vocabulary`, which is not a scoped-entity corpus at all (see `### GM World Vocabulary Route`).
 > `src/ui/svelte/stores/worldScopeActions.js` implements the whole per-entity-type action family — create, update and delete a world entity, write a world-default section, add to and remove from a system, flip a section's inherit switch, write a membership override, copy a membership, and (component only) the additive tag and per-tag mute writes — and `adminStore` exposes it as `store.worldScope`.
-> **The ESSENCE family is now called from `src/`.** `world-essences` and `world-essence-entry` render real screens: a GM can create a world essence, edit its identity, write and clear both world defaults, add it to a system, remove it, enable and disable it there, and flip either inherit switch.
-> The COMPONENT and TOOL families remain uncalled, because `world-components`, `world-component-entry`, `world-tools` and `world-tool-entry` are still placeholders, and the vocabulary leg still mints no family at all.
-> The line this note draws is therefore per entity type rather than across the whole family, and naming which types are on which side of it is the point: a reader who takes "unreachable" as a property of the module would conclude a world essence cannot be authored today, and it can be.
-> The READ union is untouched by this: no world scoped-entity WRITER is reachable by a GM, so the union's world half is empty on every world that has not been migrated and equal to the in-system records on every world that has.
-> Stated explicitly because the difference matters to the next reader in exactly one direction: a GM cannot author a world entity today, and code that could is nevertheless present and binding.
+> Every leg of it now has a caller in `src/`.
+>
+> **THE STALENESS OF THIS PARAGRAPH IS MECHANICAL RATHER THAN A MERGE CONVENTION.**
+> A `node --test` assertion DERIVES the unreachable set from which world scoped-entity pages under `scoped/` still import the shared placeholder body, and asserts this paragraph names exactly those types.
+> It reds in a lane that replaces a body without amending this text, and it reds the other way in a lane that amends this text while still delegating.
+> The paragraph was stale for TOOLS for a whole release before that assertion existed, because prose is not a gate.
+>
+> **A REACHABLE WRITER DOES NOT MAKE THE CORPUS CONSUMED, AND THE TWO MUST NOT BE READ AS ONE FACT.**
+> A component's world `category` IS consumed: requirement 15 clause 1a makes the read union answer an inheriting section from the world default, so every system whose switch is on resolves from the value the world catalogue authors.
+> A component's world IDENTITY and its world `tags` are NOT: the union re-derives identity from the in-system record unconditionally, and `tags` is not a section, carries no inherited-section writer, and is emitted by the in-system normalizer unconditionally — so the resolver's additive merge is discarded by the union's trailing in-system re-spread.
+> Both are authored, read back by their own screens, and consumed by nothing until the merge is routed through the union.
+> The screens that author them say so, and the disclosure names per-system tag MUTING explicitly, because a mute is a membership write the identity-and-tags sentence does not cover.
 
 ### Purpose
 
@@ -2281,7 +2288,9 @@ SystemMembershipRecord = {
     **WHILE THE LIFTED FIELDS HAVE NOT BEEN SHED.**
     `## CraftingSystem` requirement 36 keeps each system's in-system `components` / `essenceDefinitions` / `tools` array LIVE AND AUTHORITATIVE for everything it still decides, and this requirement declares its world-wins precedence binding NOW.
     Both are true: the world-wins precedence above is the TARGET contract, and it is SUSPENDED rather than consumed for the duration.
-    The two copies are known-EQUAL only at migration time, by construction — the migration writes the merged identity back onto every in-system record — and they diverge on the GM's first post-migration identity edit, because every shipped identity writer writes the in-system copy and no identity writer writes the world one.
+    The two copies are known-EQUAL only at migration time, by construction — the migration writes the merged identity back onto every in-system record — and they diverge on the first post-migration identity edit on EITHER SIDE.
+    **A WORLD-SCOPE IDENTITY WRITER HAS SHIPPED, as of issue 1371**, so divergence is now reachable in both directions: an in-system edit the world snapshot has not seen, or a world catalogue edit no crafting system reads.
+    Clause 1a still resolves it in favour of the in-system record, so the writer's effect is confined to the catalogue's own screens and no craft changes.
     Without the clauses below, repointing a reader at this union would make the STALE snapshot beat the FRESH record and silently revert every identity edit made since `1.30.0`.
     **CLAUSE 1 WAS RETIRED AT ISSUE 1372 AND IS REPLACED BY CLAUSE 1a; CLAUSES 2, 3 AND 4 ARE KEPT** and retire with the shed, not with the read repointing that made them necessary.
 
@@ -2312,7 +2321,8 @@ SystemMembershipRecord = {
        Read-time re-derivation is free (the in-system record is already in hand at the merge), total (it is correct on a player client, with no write and no replication), and needs no GM gate.
 
     **THE DIVERGENCE IS ALSO REPORTED, AND THAT IS A DISCLOSURE OBLIGATION RATHER THAN A CORRECTNESS ONE.**
-    Clauses 1 to 3 resolve every divergence in the safe direction whether or not it is reported; the report tells the GM which of their own edits the world snapshot no longer reflects, before a world-scope identity WRITER ships.
+    Clauses 1 to 3 resolve every divergence in the safe direction whether or not it is reported; the report tells the GM where their own two copies of one identity no longer agree.
+    It was written while every identity writer wrote the in-system copy, so it described one direction; since issue 1371 shipped the world catalogue's entry editor it covers BOTH, and the detector's behaviour is unchanged because it reports a divergence and never a direction.
     It runs once per session on the ACTIVE GM alone — not on every assistant — after the three scope stores load and before any manager is constructed, and it NAMES the diverged `(entity, field)` pairs rather than counting them.
     It is INFORMATIONAL: nothing is wrong, and nothing is changed by it.
     **Its scope is narrow, and the notice says so.**
@@ -2369,9 +2379,18 @@ That hazard is independent of which system authored the list, which is why no do
    **The `general` prohibition binds an IMPORT-TIME write of a carried world default as well as the migration's election**, because since issue 1364 the migration is no longer the only writer: an import carries world defaults elected in another world, and every constraint on them is RE-DECIDED against the DESTINATION's merged corpus rather than the corpus the value was elected in (`import-export/spec.md` -> World-default constraint re-check on import).
    An authored category is a token matched against `CraftingSystem.componentCategories`, so BOTH normalizers trim it and coerce a whitespace-only or non-string one to ABSENCE (requirement 11's shape-rule clause).
    That belongs at the normalizer and not on the inheriting branch: the overriding branch answers the stored value verbatim, so a rule stated only on the fallback path would let one system's `"  ingot  "` resolve to an unmatchable token while another's resolved trimmed.
+   **The prohibition binds a THIRD writer as of issue 1371: the world catalogue's own category PICKER**, which is a GM-facing control and therefore the enforcement point — the store writes a section value opaquely and the normalizer coerces SHAPE rather than reserved-token membership, so no layer below the picker can refuse the bucket.
+   The picker refuses by the SHIPPED CASE-INSENSITIVE PREDICATE and never by string equality: `General` and ` GENERAL ` are the same category downstream, so a `!== 'general'` implementation lets both through, the resolver treats either as authored, and every inheriting system resets on the next read.
+   **Since issue 1372 that failure is REACHABLE AT READ TIME rather than latent.** Under the retired blanket form of `## Scoped Entity Definitions` requirement 15 clause 1 an inheriting section resolved from the in-system record anyway, so a world `general` was inert; clause 1a makes it apply.
 3. **`tags` is ADDITIVE and is not a section**: the effective set is the world tags MINUS the record's muted list, PLUS the record's own tags.
    There is no inherit switch on this path at all, because muting is per tag and one per-section switch cannot express it.
    The record's muted list is `mutedTags`; both it and `tags` normalize to trimmed, de-duplicated, order-preserving labels, and an authored EMPTY list normalizes to ABSENT on the `complications` doctrine (`## Component` requirement 20), because it carries no meaning distinct from absence.
+   **Per-tag muting is authored through `setMutedTags`, which the COMPONENT family alone publishes.** Its absence on the essence and tool families is `taggable: false` on their write descriptors — a per-type capability flag — and is NOT requirement 4's structural `enabled` reasoning; conflating the two would suggest a later lane could add muting to a tool by relaxing a structural rule, when what it would actually need is a tag model those types do not have.
+   **A world tag list is stated WITH ITS MEMBER COUNT before the write lands**, which is what binds the world catalogue EDITOR rather than the migration: the merge is granted to every member system at once, so the reach is the fact a GM is deciding on.
+   **THE ADDITIVE MERGE STAYS RESOLVER-ONLY.**
+   `## Scoped Entity Definitions` requirement 15 clause 1a switches SECTIONS, and `tags` is not one — it carries no inherited-section writer and the in-system normalizer emits it unconditionally — so the union's trailing in-system re-spread discards the resolver's answer.
+   Routing it through the union is deferred, and the reason is not effort: the resolver's system half is the MEMBERSHIP record's migration-time `tags` copy while the in-system record's own `tags` is edited live, so routing it today would revert every member system's live tag list to its migration-time state on the first read.
+   It becomes routable once the live in-system `tags` is the system half.
 4. **A component membership record carries NO `enabled` flag**, and the component path exposes no enable/disable API.
    Component membership is binary — present or absent.
    Essence enabling toggles effect transfer and macros and tool enabling evokes a drained leyline or a seasonal workshop; component enabling serves no purpose and is deliberately not implemented, and an `enabled` key in adversarial or hand-edited input is DROPPED by the component normalizer rather than carried.

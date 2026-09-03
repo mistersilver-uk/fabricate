@@ -2131,11 +2131,14 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
    A screen and its capture case ship TOGETHER: the change that ships a screen registers its case, adjusts the source claims on the components that screen renders, and removes any standing coverage exemption it makes stale.
    **A gateway closure is a claim that an enumeration is COMPLETE, and it is void for a seam the enumeration does not name.**
    Reopening a gateway file to supply a NAMED missing seam is a correction that extends this requirement; reopening one to build a screen is a violation of it.
-   The distinction is not decidable from a diff's file names, so a correction claim is EVIDENCED on the reopening change's own diff — by an unchanged-render or import-surface assertion — rather than asserted in its description.
+   The distinction is not decidable from a diff's file names, so the `git diff --name-only` test above evaluates a change reopening a gateway file TO BUILD A SCREEN, while a change reopening one for a NAMED MISSING SEAM is evaluated on the diff-borne evidence this clause requires — an unchanged-render or import-surface assertion — rather than on its description or its file names.
    **THE RULE COVERS THE CLASS AND NOT ONLY ITS FIRST INSTANCE.**
    Three separate one-line omissions in these files surfaced within one release, which is evidence that the enumeration was written against the SCREENS that existed rather than against the SEAMS later lanes need — so the correction path is a standing part of this requirement rather than a one-off dispensation.
    A lane taking it states the seam, bounds the diff, evidences the bound, and amends this requirement with what the instance teaches; a lane that merely wants a file open does not qualify.
-   The three are recorded with their outcomes so the next lane inherits the ledger rather than re-deriving it: the system vocabulary view's world-scope prop bundle is owned by the `svocab` change; the `toolBreakage` allowlist gap is CLOSED unconditionally in the admin store's published system projection; and the world-wide recipe corpus is the World Vocabulary change's ONE added executable line at the world-scope projection's call site.
+   **THE ENUMERATION IS AMENDED TO NAME THE FIVE SEAMS THE COMPONENT FAMILY NEEDED AND IT DID NOT CARRY** (issue 1371), each supplied as a correction under this clause:
+   the world entry editor's header ACTION PAIR and its participation in the route-exit guard; the entry's draft, dirty and identity REPORTING WIRES; the catalogue's LIFTED LIST VIEW-STATE, its SYSTEM-RULES DEEP LINK and its GAME-WORLD ITEM ROSTER; the world-scope `usage` LEG for the component family; and the COMPOSED two-write join and part verbs on the published component write path.
+   Three of the five post-date the enumeration outright — the list-state lift and the drop resolution both shipped after it was written — and the other two are values no file outside the two gateways can supply: the action pair is structurally unreachable from a page because `.manager-header` is a sibling of `.manager-main`, and the usage counts are over corpora the projection is not handed.
+   The three earlier instances are recorded with their outcomes so the next lane inherits the ledger rather than re-deriving it: the system vocabulary view's world-scope prop bundle is owned by the `svocab` change; the `toolBreakage` allowlist gap is CLOSED unconditionally in the admin store's published system projection; and the world-wide recipe corpus is the World Vocabulary change's ONE added executable line at the world-scope projection's call site.
 8. **At the collapsed 56px rail width no leaf renders its count badge.**
    `.manager-nav-count` is suppressed under `.is-rail-collapsed`, where every entry is reduced to its glyph, so the count cannot be part of a collapsed button's accessible name and the collapsed rail's evidence shows contained glyphs and the active leaf rather than a badge.
    Each world leaf therefore carries an explicit `aria-label` naming its screen, at both rail widths.
@@ -2179,6 +2182,39 @@ It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the sepa
    The page's panel is the card; the primitive's add form runs flush inside it, because a form authored to float on the bare pane draws its own card and two nested cards invert the reference's own nesting.
    The page states no entry count in the head, because the primitive already publishes one.
    A panel column is never narrower than the primitive's own row-card track, so the grid collapses to one column before that floor is crossed; the row's trailing delete control is the element a violation clips, and the released full-width body clips horizontally rather than scrolling.
+
+### GM World Component Screens
+
+The four component screens of epic 1357 — the world Component catalogue, the world Component entry, the system Component Rules list and the system Component Rules editor.
+They are stated here rather than left to `### Scoped entity editor patterns` because the component family is the one whose world-scope writes are consumed UNEVENLY, and every requirement below turns on which half of that split a field falls in.
+
+1. **The world Component catalogue and entry are the first surfaces in this repository that WRITE world-scope component identity, and what they write is consumed unevenly.**
+   The world default `category` IS consumed: `## Scoped Entity Definitions` requirement 15 clause 1a makes the read union answer an inheriting section from the world default, so every system whose switch is on resolves from the value these screens author.
+   The world IDENTITY fields and the world `tags` are NOT, because the union re-derives identity from the in-system record unconditionally, and `tags` is not a section and carries no inherit switch.
+   Both screens STATE that split rather than reassuring in either direction: a note claiming nothing here is read would be false about `category`, and one claiming everything is read would be false about the other four.
+   `DOMAIN.md`'s **World Identity Snapshot** entry no longer claims nothing writes the snapshot, and the drift detector's session notice covers BOTH directions of divergence rather than only in-system edits.
+2. **The catalogue's row carries the entity's membership count as `{members}/{systems}` and an `Unused` flag when that count is zero.**
+   It carries NO category chip and NO tag run, because `category` is one system's resolved answer rather than the world record's, and because everything a row could say about behaviour is a MEMBERSHIP fact.
+   Both stats are reach counts and both are set as muted text with tabular numerals rather than as chips, on the rule the sibling Tool row states: a chip beside a name reads as something the entity DOES.
+3. **The world Component entry authors identity, the ONE world default `category` and the additive world `tags`, and it states how many member systems are affected BEFORE the change lands.**
+   Its identity edit is BUFFERED and saved explicitly under `### Scoped entity editor patterns` requirement 14, through that requirement's shared module and shared action pair; membership, the tag writes, the mutes and the delete are NOT buffered, on that requirement's own rule.
+4. **A world-defaults `category` picker may never offer the reserved general bucket, and refuses it by the shipped case-insensitive predicate rather than by string equality**, because the two spellings are the same category downstream and an unauthored category that minted the bucket now RESETS every inheriting system on the first resolve.
+   This is `### Scoped entity editor patterns` requirement 7's second instance.
+5. **Per-system tag muting is authored on the world entry's per-system rows, is gated on membership, and is AUTHORED-AND-UNCONSUMED; the system Component Rules editor shows it READ-ONLY.**
+   It is GATED because the write path returns `false` with no membership record, so an ungated control would be a silent no-op.
+   It is UNCONSUMED because the additive merge is resolver-only: the resolver's answer is overwritten by the read union's trailing in-system re-spread, since `tags` is not a section and the in-system record emits it unconditionally.
+   So neither a world tag nor a mute changes any system's effective tag list yet.
+   **Both screens that draw the state disclose that, and the disclosure names MUTING explicitly**, because a per-system mute is a membership WRITE that requirement 1's identity-and-world-`tags` sentence does not cover, and because a control that reads back its own state looks live to a GM in a way an unwritten field does not.
+6. **The system-scope Component screens carry the full membership model.**
+   The rules list offers three membership filters over a cohort that widens to world components this system has no record for, and a non-member row states NO behaviour, because everything a row says about behaviour is a membership fact and inventing one from the world default would claim rules that do not exist there.
+   **Adopting a world Component into a crafting system is TWO writes and the IN-SYSTEM one is what makes it exist there**, on the rule `### Tool scope` requirement 6 already states: the read union's row set is the in-system array's, so a membership record written alone names a component no reader can see.
+   The composed verb is published UNDER the family's existing `addToSystem` key, never beside it, because every membership control in the product reaches the family through that one key; `removeFromSystem` is composed for the mirror reason, since deleting the membership record alone leaves an in-system record the union pushes through unchanged.
+   The in-system seed carries the world entity's SOURCE-LINK fields, because component-to-Item matching falls through to the raw source-reference union and a seed carrying none matches at no tier — a component that cannot be matched to an Item exists in no inventory.
+7. **Both system screens carry a CATALOGUE ATTRIBUTION BANNER** naming the Component catalogue as where identity is authored, with a link to that component's world entry.
+   It does NOT claim the displayed NAME comes from the catalogue, because under requirement 1 it does not; and it states its shared-system count CLAMPED AT ZERO, because a component with no membership record otherwise reads as shared with negative one.
+8. **The rules editor renders the `category` inherit switch and LOCKS the value card read-only while the section is inherited**, on the shape `### GM World Essence Screens` requirement 5 states, and its note names both what the section resolves to now and what the switch would change that to.
+   The note branches on the WORLD VALUE first and never on the switch: a system marked inheriting with no world value authored is NOT following a world value, and the `Inherit from world` affordance is WITHHELD entirely in that state rather than offered against an empty one.
+   A component draws exactly one such row and NO group chrome.
 
 ### GM World Essence Screens
 
@@ -2355,6 +2391,8 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
    The world Tool entry's two on-break arguments are bound the same way: the REPLACEMENT COMPONENT names a world component, and a repair group names world components, world essences and world tags.
    Each is offered from the corresponding WORLD corpus and from no system's roster, which is what makes a world default that a second system inherits resolve to the same referent it resolved to in the first.
    A drop onto the replacement zone is resolved against that same offered set — a dragged document matched on the world record's own source-link uuids — so an Item this scope does not manage names nothing and writes nothing, rather than storing an id no reader resolves.
+   **A WORLD-DEFAULTS PICKER IS LIKEWISE THE ENFORCEMENT POINT FOR A RESERVED TOKEN** (issue 1371), on identical reasoning: the store writes section values opaquely and the normalizer coerces SHAPE rather than reserved-token membership, so no layer below the picker can refuse one.
+   The world component category picker therefore refuses the reserved `general` bucket, and refuses it by the SHIPPED CASE-INSENSITIVE PREDICATE rather than by string equality — `General` and ` GENERAL ` are the same category downstream, so an equality test admits both and every inheriting system resets to the bucket on the next read.
 8. **The validation tab and the player preview are shared shells**, and the six editors are callers rather than authors of them.
    The validation shell renders the shipped editor-validation surface and owns the count and pass/warn status labels both existing sites already agreed on; only the BLOCK label differs, because an essence always saves while a Tool refuses to.
 9. **Requirement rows introduce NO new component:** the shipped tool repair-requirement editor is the recipe-free ingredient editor, already rendered chromeless.
@@ -2389,6 +2427,15 @@ Each is stated here because the shape of each is decided by the `## Scoped Entit
     A component and a tool carry a source-item link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`) and an `img`; an ESSENCE carries neither, and carries a `colorToken` instead.
     A shared catalogue or entry shell therefore treats the source link, the item thumbnail, the unlinked flag and the missing-source blocking check as OPTIONAL CAPABILITIES of the entity type rather than as shell furniture, read from the scope descriptor rather than tested at a call site — and an essence screen renders none of them.
     A shell that rendered one unconditionally would paint a permanently-false badge on every essence, which is a stated fact that is never true rather than a missing one.
+16. **DELETING A WORLD ENTITY ANY SYSTEM HAS A MEMBERSHIP RECORD FOR IS REFUSED, and the refusal NAMES the affected systems.**
+    The write path does not refuse: it removes the entity, its world defaults and every membership record naming it, unconditionally.
+    The refusal is therefore AUTHORED BY THE SCREEN, in the header band between Back and Save on requirement 14's placement rule, and the armed control stays ENABLED — a disabled button satisfies any assertion that the delete did not happen while leaving the GM no explanation at all, and the reach belongs in the armed control's accessible name where a consequence belongs on a control that has one.
+    **On a migrated world the refusal is the NORMAL state rather than an edge case**, because the `1.30.0` migration writes a membership record for every definition in every contributing system — so every entity a GM can reach is a member somewhere.
+    The screen therefore states what to do INSTEAD, naming the first few systems to remove it from.
+17. **A COPY-MEMBERSHIP AFFORDANCE IS OFFERED ONLY WHERE ITS SOURCE IS UNAMBIGUOUS AND ITS PAYLOAD IS OBSERVABLE.**
+    Both conditions bind.
+    The system a GM is editing is an unambiguous source; a per-system row in a WORLD catalogue is not, because that row is the DESTINATION — the system that already has the entity — and nothing on that screen asks which other system was meant.
+    The second condition is not satisfied by section inheritance alone: a copied OVERRIDING section is answered from the destination's own in-system record while the lifted fields are unshed, so a card promising to copy that section would copy its SWITCH and not its value.
 
 ### Scoped entity list shells
 
