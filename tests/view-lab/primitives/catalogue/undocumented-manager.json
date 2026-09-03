@@ -902,6 +902,7 @@
   {
     "path": "src/ui/svelte/apps/manager/environment/CompositionList.svelte",
     "root": "manager",
+    "width": 758,
     "note": "THE HEAVIEST SPECIMEN ON THE PAGE, and it mounts against props alone: it imports two `src/systems/` modules, the gathering image defaults and seven sibling components, all of which are pure browser modules. It renders FOUR sections and never all four at once — `automatic` draws Included, Excluded and Non-matching, `manual` replaces the last two with Available to add — which is the measurement its manifest row makes against `<ListRow>`. `onSelect(kind, id)` reports the id as its SECOND argument, so `arg: 1` is what makes row selection actually move; every other callback reports `(kind, id)` or `(kind, from, to)` and can write nothing back into `records`, so include, exclude, restore, force-add and reorder log and leave the list where it was. The row images are real harvested Foundry core art, because the lab may not invent an asset path.",
     "states": {
       "rest": true,

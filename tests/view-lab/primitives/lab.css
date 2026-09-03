@@ -24,7 +24,11 @@
  *      `data-pl-surface="<the member that would own it>"` attribute so the count is mechanical
  *      rather than a claim: `.pl-rail`, `.pl-notice`, `.pl-args` and `.pl-json-editor`. A fifth is
  *      a defect, not a judgement call.
- *   3. THE ONE PLINTH OVERRIDE, disclosed below.
+ *   3. THE PLINTH OVERRIDES AND THE ONE ANNOTATION, each disclosed where it is written: the frame
+ *      override that makes a window FLOW, the root override that stops it stretching its specimen,
+ *      and the highlight outline that says which box in a mounted ancestor is the primitive. All
+ *      three are keyed on a `data-primitive-lab-*` attribute this page writes, so none of them can
+ *      reach an element the harness did not build.
  *
  * The four surfaces DO read `--fab-*` tokens. They must: a harness surface painted from its own
  * palette beside a specimen painted from the theme's is a colour comparison nobody can trust. What
@@ -52,6 +56,46 @@
   position: relative;
   max-height: none;
   min-width: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+ * THE SECOND DISCLOSED DEVIATION: the plinth root does not STRETCH its specimen.
+ *
+ * `styles/fabricate.css:1440` makes `.fabricate-manager` a `display: grid`, so the one child a
+ * plinth puts inside it is a grid item and takes the whole column. Measured on the page before
+ * this rule existed: `Callout`, `EmptyState`, `InspectorCard`, `ThresholdBandStrip`,
+ * `BulkSelectionToolbar` and `ManagerColorPopover` ALL drew at exactly 418px. Six components with
+ * nothing in common rendering to the pixel is not six coincidences — it is the plinth's width
+ * being reported as theirs, at a number not one of them has at any call site.
+ *
+ * In production none of them is ever a direct child of this root; each sits several boxes in, at
+ * the width its own container gives it. `justify-items: start` restores the intrinsic width, and
+ * it is deliberately an OPT-OUT: a percentage width still resolves against the whole grid area,
+ * so a component that fills by declaring `width: 100%` is untouched by this. `fill` is for the
+ * ones that fill by stretch alone — a whole screen region, a toolbar that spans its bar.
+ *
+ * Nothing else about the root is touched. In particular `overflow: clip` still stands (see
+ * `Plinth.svelte`), so a popover the product cuts off is still cut off here.
+ * ───────────────────────────────────────────────────────────────────────────────────────────── */
+[data-primitive-lab-slot='intrinsic'] {
+  justify-items: start;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────────────────────
+ * THE HIGHLIGHT. A lab ANNOTATION on a specimen, and the only rule in this file that paints one.
+ *
+ * A context plinth mounts a real ancestor so the primitive inside it gets real props, which makes
+ * the primitive one of forty boxes on screen. This says which. `outline` rather than `border`
+ * because an outline is drawn outside the box and takes no space at all: the specimen is measured
+ * and laid out exactly as it would be without it, which is the whole reason the plinth exists.
+ *
+ * The attribute is written by `Plinth.svelte` from a selector, and both the selector and the
+ * number of nodes it matched are drawn beside the plinth — an outline that is missing and one that
+ * is round the wrong box look the same from here, and neither may be silent.
+ * ───────────────────────────────────────────────────────────────────────────────────────────── */
+[data-primitive-lab-highlight] {
+  outline: 2px dashed var(--fab-accent);
+  outline-offset: 3px;
 }
 
 .pl-body {
@@ -278,6 +322,17 @@
  * else — and in particular no border, background, colour or font, which is what would make one of
  * these a surface rather than a box.
  * ───────────────────────────────────────────────────────────────────────────────────────────── */
+/*
+ * REGION 1. The stage is the first thing on the page and it is layout and nothing else: a chip
+ * row carrying the row's name, the view tabs and the context readout, then the plinth.
+ */
+.pl-stage {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
 .pl-workbench,
 .pl-sections {
   display: grid;

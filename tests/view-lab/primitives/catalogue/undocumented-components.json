@@ -556,6 +556,7 @@
   {
     "path": "src/ui/svelte/components/ManagerSearchField.svelte",
     "root": "manager",
+    "fill": true,
     "note": "`value` IS `$bindable` AND THE LAB PASSES IT ONE-WAY. Ten of the nineteen converted call sites write `bind:value`, and the harness cannot: it holds knob values in its own state and hands them down through a spread, so there is no binding for the component's internal `value = next` to reach. Nothing is broken by that — Svelte lets a `$bindable` prop be assigned locally when no binding exists, so the field still shows what is typed — and the `onInput(next, event)` write-back is what returns the string to the knob, so the loop closes through the CALLBACK half of the API rather than the binding half. That is the shape the nine callback sites already use. It is a MANAGER primitive with no scoped style at all: dropped under `.fabricate-app` it renders as an unstyled `<label>`, which is why this plinth wears the manager root.",
     "states": {
       "rest": true,

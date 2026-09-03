@@ -71,6 +71,44 @@
   extending past a boundary the product clips it at, which is worse than useless: it would make a
   clipping bug look fixed. HEIGHT is a control instead, with a stated minimum, so the clip is
   observable on purpose rather than by accident.
+
+  ── AND THE ROOT DOES NOT STRETCH ITS SPECIMEN, WHICH IS `fill` ─────────────────────────────────
+
+  `styles/fabricate.css:1440` makes `.fabricate-manager` a `display: grid`, so a specimen mounted
+  as its only child is a GRID ITEM and takes the whole column. Measured on the page before this
+  prop existed: `Callout`, `EmptyState`, `InspectorCard`, `ThresholdBandStrip`,
+  `BulkSelectionToolbar` and `ManagerColorPopover` all drew at exactly 418px — not one of them a
+  width it has at any call site, and all six identical, which is the tell that the number belonged
+  to the plinth and not to any of them.
+
+  In production none of those is ever a direct child of this root; they sit several boxes in, at
+  whatever width their own container gives them. So `justify-items: start` is written onto the
+  root and the specimen draws at its INTRINSIC width. It is an opt-out rather than an opt-in
+  because it is a no-op for the components that genuinely fill: a percentage width still resolves
+  against the whole grid area, so anything declaring `width: 100%` is unaffected. `fill` is for
+  the ones that fill by STRETCH alone — `ManagerToolbar`, and any row whose specimen is a whole
+  screen region rather than a control.
+
+  ── THE HIGHLIGHT IS A LAB ANNOTATION, AND ITS SELECTOR IS MEASURED RATHER THAN WRITTEN ─────────
+
+  A context plinth mounts a real ANCESTOR so the primitive inside it receives real props, which
+  leaves the reader with the opposite problem: which of the forty boxes on screen is the primitive?
+  `highlight` is a selector; every descendant matching it takes `data-primitive-lab-highlight` and
+  the one outline rule in `lab.css` draws round it.
+
+  It is normally DERIVED rather than declared, and the derivation is exact because it reads the
+  same component's own output: this plinth publishes the class list of the rendered root of each
+  isolated catalogue specimen (`onRoot`), and `PrimitiveLab.svelte` turns that into a selector by
+  dropping the `is-*` state tokens. `styles/fabricate.css` and every component in `src/` spell
+  state classes that way by convention — see the implementer rule about `.is-disabled` over
+  `.disabled` — so what is left is the component's identity classes and nothing else. A row may
+  still declare `highlight` for the two shapes the reading cannot cover: a component whose root
+  carries no class at all, and one whose first rendered element is a branch (`ThresholdBandStrip`
+  renders its FALLBACK first).
+
+  Both the selector and the number of nodes it matched are reported to the caller and drawn on the
+  page, because a selector that matches nothing and one that matches the wrong thing look identical
+  from here and neither should be silent.
 -->
 <script>
   import Chip from '../../../src/ui/svelte/apps/manager/Chip.svelte';
@@ -83,6 +121,9 @@
   /** The smallest plinth that can show a popover opening downward from a trigger near the top. */
   const MIN_PLINTH_HEIGHT = 420;
 
+  /** Written onto every outlined node. Removed again the moment the selector stops matching it. */
+  const HIGHLIGHT_ATTRIBUTE = 'data-primitive-lab-highlight';
+
   let {
     root = 'manager',
     theme = FABRICATE_THEME_IDS.FABRICATE,
@@ -91,6 +132,10 @@
     label = '',
     probe = false,
     specimen = '',
+    fill = false,
+    highlight = '',
+    onRoot = null,
+    onHighlight = null,
     children,
   } = $props();
 
@@ -117,6 +162,7 @@
   const specimenPath = $derived(specimen || undefined);
 
   let frame = $state(null);
+  let mountRoot = $state(null);
   let observed = $state(null);
 
   /**
@@ -183,6 +229,69 @@
       node.removeEventListener('focusout', clear, true);
     };
   });
+
+  /**
+   * Read this plinth's specimen back out of the DOM, once per settled render.
+   *
+   * TWO READINGS, ONE OBSERVER, and they are both of the same subtree so they cannot disagree
+   * about which render they saw:
+   *
+   *   - the specimen's own rendered ROOT, published so the page can derive a highlight selector
+   *     from the component's real output rather than from a parse of its source. Only the
+   *     canonical isolated plinth passes `onRoot`; a context plinth's first child is the
+   *     ANCESTOR's root, which is not the primitive.
+   *   - the highlighted descendants, marked with an attribute the one outline rule keys off.
+   *
+   * A `MutationObserver` rather than a settle callback, because the specimen arrives from a LAZY
+   * import — so it is not there on the first pass — and then keeps changing as knobs are driven.
+   * `attributeFilter: ['class']` is what stops the marking from re-triggering the observer: the
+   * attribute this writes is not in the filter, so setting it is not an observed mutation and
+   * there is no loop.
+   *
+   * The write is deferred for the reason the pointer readout above records: an observer callback
+   * runs inside the same task as Svelte's own DOM work, and `$state` written from there is
+   * `state_unsafe_mutation`.
+   */
+  $effect(() => {
+    const node = mountRoot;
+    if (!node) return;
+    const selector = highlight;
+    const publishRoot = onRoot;
+    const publishHighlight = onHighlight;
+    if (!selector && !publishRoot) return;
+
+    let marked = [];
+    const read = () => {
+      if (!node.isConnected) return;
+      publishRoot?.([...(node.firstElementChild?.classList ?? [])]);
+      if (!selector) return;
+      let matches;
+      try {
+        matches = [...node.querySelectorAll(selector)];
+      } catch {
+        // An unparseable selector is a row's typo, not a page failure. It is reported as zero
+        // matched, beside the selector itself, which is what a reader needs to see to fix it.
+        matches = [];
+      }
+      for (const element of marked) {
+        if (!matches.includes(element)) element.removeAttribute(HIGHLIGHT_ATTRIBUTE);
+      }
+      for (const element of matches) element.setAttribute(HIGHLIGHT_ATTRIBUTE, '');
+      marked = matches;
+      publishHighlight?.({ selector, matched: matches.length });
+    };
+    const settle = () => {
+      queueMicrotask(read);
+    };
+
+    settle();
+    const observer = new MutationObserver(settle);
+    observer.observe(node, { childList: true, subtree: true, attributeFilter: ['class'] });
+    return () => {
+      observer.disconnect();
+      for (const element of marked) element.removeAttribute(HIGHLIGHT_ATTRIBUTE);
+    };
+  });
 </script>
 
 <div class="pl-plinth-cell">
@@ -198,7 +307,13 @@
     {...{ [FABRICATE_THEME_ATTRIBUTE]: normalizeFabricateTheme(theme) }}
   >
     <section class="window-content">
-      <div class={rootClass}>{@render children?.()}</div>
+      <div
+        bind:this={mountRoot}
+        class={rootClass}
+        data-primitive-lab-slot={fill ? 'fill' : 'intrinsic'}
+      >
+        {@render children?.()}
+      </div>
     </section>
   </div>
   {#if probe}

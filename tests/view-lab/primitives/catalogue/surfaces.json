@@ -58,6 +58,21 @@
           "icon": ["", "fas fa-clock"]
         }
       }
+    ],
+    "context": [
+      {
+        "ancestor": "src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte",
+        "site": "CheckFailurePolicy.svelte:17",
+        "width": 758,
+        "props": {
+          "value": "perRecord",
+          "activity": "crafting",
+          "recordNoun": "recipe",
+          "recordNounPlural": "Recipes",
+          "inertNote": "This system resolves crafting progressively, so the policy is recorded and never applied."
+        },
+        "why": "The inert-mode notice on the failure-consumption card. The sentence is passed in already localized by the surface that knows the mode, so the callout on the plinth carries the words the product carries rather than a lab fixture."
+      }
     ]
   },
   {
@@ -152,6 +167,17 @@
           "children": ["", "two-buttons"]
         }
       }
+    ],
+    "context": [
+      {
+        "ancestor": "src/ui/svelte/apps/manager/AccessTabView.svelte",
+        "site": "AccessTabView.svelte:90",
+        "width": 758,
+        "props": {
+          "recipes": []
+        },
+        "why": "A whole ROUTE rather than a card — its root IS `.manager-main` — and the fixture is one empty array, because an empty state is by definition what a screen draws when its data is empty. It is the only context here that shows the primitive under a real section header and a real filter bar, which is the thing an empty state is judged against."
+      }
     ]
   },
   {
@@ -192,6 +218,17 @@
         "matrix": {
           "children": ["field", "rows", "paragraph", "two-buttons"]
         }
+      }
+    ],
+    "context": [
+      {
+        "ancestor": "src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte",
+        "site": "CheckDcMacroCard.svelte:79",
+        "width": 758,
+        "props": {
+          "macroUuid": null
+        },
+        "why": "The DC macro card, at its unlinked default. One prop, and it exercises the shell the way the product does: `class=\"manager-checks-card\"` appended to `manager-inspector-card`, which is where this shell keeps its entire variant vocabulary."
       }
     ]
   }

@@ -43,6 +43,7 @@
     values = {},
     events = [],
     invocation = '',
+    contextNote = '',
     plinthWidth = 0,
     plinthHeight = 460,
     selectedPath = '',
@@ -54,6 +55,23 @@
   } = $props();
 
   let railOpen = $state({});
+
+  /**
+   * The detail strip's disclosures.
+   *
+   * COLLAPSED BY DEFAULT, apart from the note. The page's subject is the component and it was
+   * below the fold: this column opened on a title, a chip row, a paragraph of prose, eight state
+   * pills and a generated invocation block, all of it above anything drawn. Every one of those is
+   * worth reading and none of them is worth reading FIRST, so they are one click away and the
+   * stage is at the top of the page.
+   *
+   * `note` is the exception and opens, because it is the one thing here that was not merely below
+   * the fold: `catalogue/README.md` documents the field, thirty-eight of the fifty-seven rows
+   * carry one, and nothing on this page rendered it at all. Most of them explain why a control
+   * cannot be driven or what a specimen is deliberately not showing — which is exactly what a
+   * reader looking at the plinth above needs, and it was being written into a file nobody read.
+   */
+  let detailOpen = $state({ note: true, identity: false, invocation: false });
 
   /**
    * The rail lists what can be MOUNTED, which is a smaller set than the library names.
@@ -179,35 +197,75 @@
 
         <div class="manager-main pl-chrome-column">
           {#if selected}
-            <InspectorCard>
-              <h3>{selected.name}</h3>
-              <div class="pl-row">
-                <Chip mono>{selected.tag}</Chip>
-                <Chip mono tone="muted" truncate>{selected.path}</Chip>
-                <Chip tone={selected.member ? 'accent' : 'muted'}
-                  >{selected.member ? 'primitive' : 'below the caller bar'}</Chip
-                >
-                <Chip tone="neutral"
-                  >{selected.entry.root === 'app' ? 'app root' : 'manager root'}</Chip
-                >
-              </div>
-              <p>{selected.why}</p>
-              <div class="pl-row">
-                {#each SPEC_STATES as spec (spec.state)}
-                  <Chip
-                    mono
-                    tone={stateTone(selected.entry.states?.[spec.state])}
-                    title={stateTitle(spec.state, selected.entry.states?.[spec.state])}
-                    >{spec.state}</Chip
-                  >
-                {/each}
-              </div>
-            </InspectorCard>
+            {#if selected.entry.note || contextNote}
+              <CollapsibleGroupHeader
+                name="Note"
+                countText=""
+                expanded={detailOpen.note}
+                onToggle={() => (detailOpen = { ...detailOpen, note: !detailOpen.note })}
+              />
+              {#if detailOpen.note}
+                <InspectorCard>
+                  {#if contextNote}
+                    <!--
+                      The ACTIVE context's own sentence, first, because it describes the thing
+                      currently on the stage: which ancestor was chosen, and why that one. It is
+                      not on the stage itself — a two-line paragraph above the plinth is the
+                      prose-before-component arrangement this page was rearranged to end.
+                    -->
+                    <p>{contextNote}</p>
+                  {/if}
+                  {#if selected.entry.note}
+                    <p>{selected.entry.note}</p>
+                  {/if}
+                </InspectorCard>
+              {/if}
+            {/if}
 
-            <InspectorCard>
-              <h3>Invocation</h3>
-              <pre>{invocation}</pre>
-            </InspectorCard>
+            <CollapsibleGroupHeader
+              name="Identity, prose and states"
+              countText={`${SPEC_STATES.length}`}
+              expanded={detailOpen.identity}
+              onToggle={() => (detailOpen = { ...detailOpen, identity: !detailOpen.identity })}
+            />
+            {#if detailOpen.identity}
+              <InspectorCard>
+                <h3>{selected.name}</h3>
+                <div class="pl-row">
+                  <Chip mono>{selected.tag}</Chip>
+                  <Chip mono tone="muted" truncate>{selected.path}</Chip>
+                  <Chip tone={selected.member ? 'accent' : 'muted'}
+                    >{selected.member ? 'primitive' : 'below the caller bar'}</Chip
+                  >
+                  <Chip tone="neutral"
+                    >{selected.entry.root === 'app' ? 'app root' : 'manager root'}</Chip
+                  >
+                </div>
+                <p>{selected.why}</p>
+                <div class="pl-row">
+                  {#each SPEC_STATES as spec (spec.state)}
+                    <Chip
+                      mono
+                      tone={stateTone(selected.entry.states?.[spec.state])}
+                      title={stateTitle(spec.state, selected.entry.states?.[spec.state])}
+                      >{spec.state}</Chip
+                    >
+                  {/each}
+                </div>
+              </InspectorCard>
+            {/if}
+
+            <CollapsibleGroupHeader
+              name="Invocation"
+              countText=""
+              expanded={detailOpen.invocation}
+              onToggle={() => (detailOpen = { ...detailOpen, invocation: !detailOpen.invocation })}
+            />
+            {#if detailOpen.invocation}
+              <InspectorCard>
+                <pre>{invocation}</pre>
+              </InspectorCard>
+            {/if}
           {/if}
 
           <SectionList

@@ -454,6 +454,7 @@
   {
     "path": "src/ui/svelte/components/ManagerToolbar.svelte",
     "root": "manager",
+    "fill": true,
     "note": "`class` IS driven here, which is the opposite verdict to the one `ManagerButton`'s row reaches on the same prop name, and the difference is what the prop means at each site. On the button it is an arbitrary extra class and driving it would paint a button the design system does not draw. Here it is the only route the sheet's four further bar treatments travel by — the manifest records that this primitive deliberately takes NO variant prop — so the knob is a closed set of classes `styles/fabricate.css` already writes rules against, and it can draw no bar the product does not. The bar also has no scoped `<style>` of its own: it is painted entirely by `styles/fabricate.css` under `.fabricate-manager`, so the same specimen on an `app` plinth would render as a bare unstyled `<section>`.",
     "states": {
       "rest": true,

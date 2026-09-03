@@ -131,6 +131,34 @@
           "disabled": "*"
         }
       }
+    ],
+    "context": [
+      {
+        "ancestor": "src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte",
+        "site": "CheckDifficultyCard.svelte:134",
+        "width": 758,
+        "props": {
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "showDcSource": true,
+          "recordNoun": "recipe"
+        },
+        "why": "The Difficulty card of the Checks studio. Six plain scalars, and every prop the primitive receives is then computed by the card itself — `selectedValue={resolvedDcMode}` is a `$derived` of `dcMode`, which is the kind of expression no static extractor can resolve. `showDcSource` is `true` because the chooser renders only on the SIMPLE slot, where the model carries `dcMode`."
+      },
+      {
+        "ancestor": "src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte",
+        "site": "CheckFailurePolicy.svelte:19",
+        "width": 758,
+        "props": {
+          "value": "perRecord",
+          "activity": "crafting",
+          "recordNoun": "recipe",
+          "recordNounPlural": "Recipes",
+          "inertNote": "This system resolves crafting progressively, so the policy is recorded and never applied."
+        },
+        "why": "A second real card, on the same route, so the two are comparable: the same primitive drawn beside a `Callout` in a card whose own copy is parameterised on the record noun. `inertNote` is authored non-empty because it is the branch that puts the callout on screen."
+      }
     ]
   },
   {
@@ -243,6 +271,21 @@
           "iconOnly": "*",
           "fill": "*"
         }
+      }
+    ],
+    "context": [
+      {
+        "ancestor": "src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte",
+        "site": "CheckDifficultyCard.svelte:171",
+        "width": 758,
+        "props": {
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "showDcSource": true,
+          "recordNoun": "recipe"
+        },
+        "why": "The COMPARISON control on the Difficulty card — meet-or-exceed against exceed — which is a two-segment track beside a `Stepper` and a `RadioCardGroup`. The same ancestor answers for three catalogued primitives at once, and that is the argument for mounting an ancestor rather than extracting props: one modest fixture makes every primitive in the card real."
       }
     ]
   },
