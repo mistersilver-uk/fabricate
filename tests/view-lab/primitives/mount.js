@@ -2,9 +2,27 @@
  * Primitive Lab boot.
  *
  * Vite serves this module into `tests/view-lab/primitives.html`. It proves the harvested chrome is
- * being served, installs the Foundry globals a shared component reads, renders
- * `openspec/specs/design-system/library.html` as the page, and swaps each hand-drawn specimen the
- * catalogue has a mapping for for the real component.
+ * being served, renders `openspec/specs/design-system/library.html` as the page, and stands up an
+ * isolated `<iframe>` for every hand-drawn specimen the catalogue has a mapping for.
+ *
+ * ── THE PAGE LOADS NO FOUNDRY STYLESHEET AT ALL (issue 1487) ──────────────────────────────────
+ *
+ * `primitives.html` links the library's own stylesheet and `styles/fabricate.css` (for its
+ * `--fab-*` tokens ONLY — see `primitives.html` for why that file has no bare-element rule to
+ * repeat the mistake with) and nothing else. That is the whole fix for the regression this change
+ * addresses: `foundry2.css` loaded UNLAYERED alongside the library used to reach every one of the
+ * library's 948 hand-drawn elements — a bare `<table>`, a bare `<button>`, a bare heading —
+ * because `library.html` opened as a file never loads Foundry's stylesheet and its drawings are
+ * unstyled by core, but this page's foundry2.css link painted them anyway. A `<DataTable>` entry
+ * with no live specimen and no built component rendered with a header band and row striping the
+ * reference never has, for exactly that reason.
+ *
+ * The fix is not a reset that neutralises core across those 948 elements — that was considered and
+ * rejected: hand-derived, drifts as Foundry changes, and it would falsify the LIVE specimens in the
+ * same subtree too. It is this: stop loading `foundry2.css` on this page at all, and give every
+ * live specimen its OWN document that carries the production cascade itself. `specimen.html` is
+ * that document; `slot.js`'s docblock covers what moved there and why an iframe is structurally
+ * more faithful than the old shared-page `display: contents` slot, not less.
  *
  * ── THE PAGE SIGNALS COMPLETION WITH THREE ATTRIBUTES ON `<body>` ─────────────────────────────
  *
@@ -15,86 +33,55 @@
  *                                compared by equality against a number Node derives from the
  *                                catalogue, so a specimen that quietly stopped being rendered fails
  *                                rather than passing more quickly.
- *   data-primitive-lab-ready     ABSENT until the page has finished. Present with no value once it
- *                                has, success or failure.
+ *   data-primitive-lab-ready     ABSENT until every iframe has reported mounted or errored.
+ *                                Present with no value once it has, success or failure.
  *   data-primitive-lab-error     ABSENT while nothing has failed. Present, naming how many failed
  *                                and which, as soon as one has. Presence IS the failure signal —
  *                                it never reads `0`, because `'0'` is a truthy string and a
  *                                consumer testing the attribute would reject a healthy page.
- *                                Absence-means-well is also the convention
- *                                `tests/view-lab/mount.js` already uses for `data-view-lab-error`.
  *
- * ── EACH ROW'S SPECIMEN ALSO NAMES ITSELF ─────────────────────────────────────────────────────
+ * ── EACH SPECIMEN'S IFRAME ALSO NAMES ITSELF, ON ITSELF ───────────────────────────────────────
  *
- *   data-primitive-lab-specimen  the catalogue row's `path`, on exactly one wrapper per ROW. The
- *                                count above can then be checked for IDENTITY rather than only for
- *                                size, because a page that mounted the right NUMBER of the wrong
- *                                components reports a count indistinguishable from a correct one.
- *                                `describeMountFailure` compares the two sets by membership, so a
- *                                path drawn eleven times — `<Button>` alone is — is expected and
- *                                agrees, while the equality on the COUNT is what makes a missing
- *                                one fail. `LiveSpecimen.svelte` holds the one-element-per-row rule.
+ *   data-primitive-lab-specimen  the catalogue row's `path`, on the `<iframe>` element itself — not
+ *                                inside its document. `scripts/primitive-lab-smoke.mjs` reads this
+ *                                with `document.querySelectorAll` against the TOP-LEVEL document
+ *                                only (Playwright's `page.evaluate` does not reach into a child
+ *                                frame's DOM), so the identity marker has to live on the element
+ *                                standing IN the page, which is now the iframe rather than a
+ *                                mounted wrapper div. `LiveSpecimen.svelte` still stamps the same
+ *                                attribute on its own root inside the iframe's document, which
+ *                                keeps that half of the contract exactly as documented there — it
+ *                                is simply not the copy this smoke reads.
  *
  * ── AND IT FAILS CLOSED ON A MISSING CHROME HARVEST ───────────────────────────────────────────
  *
  * `scripts/lib/foundryChromeCache.js` already rules on this for the View Lab: it "never renders
  * half-chrome — a frame drawn without the real cascade is worse than no frame, because it looks
- * authoritative". The same rule binds here, and harder, because this page's whole subject is how
- * components are painted. A missing harvest 503s the entire `/@foundry-chrome/` prefix, which takes
- * out `foundry2.css` — so no `@layer reset`, plus all of Font Awesome, every `:root` custom
- * property Foundry sets, and `/icons/`. Every specimen would still render. Every one of them would
- * be wrong, and none would say so.
- *
- * So the stylesheet is PROBED before anything is mounted, and a non-2xx renders the harvest
- * instructions as the body and mounts nothing.
- *
- * ── WHY EACH LIVE SLOT CARRIES A PRODUCTION WINDOW SUBTREE THAT DRAWS NOTHING ─────────────────
- *
- * Every slot is `.application.fabricate.crafting-system-manager > section.window-content >
- * .fabricate-manager`. That is not ceremony: each one supplies something a bare root loses,
- * silently, against the harvested 14.365 chrome.
- *
- *   - `foundry2.css:6997` — `.application { font-size: var(--font-size-14) }`, against
- *     `foundry2.css:13936`'s `body { font-size: var(--font-size-15) }`. Without it every unsized
- *     Fabricate text renders at 15px where production renders 14px, and `styles/fabricate.css`
- *     names "Foundry's 14px `.application` base" by hand in five places.
- *   - `foundry2.css:351` — a ten-token custom-property block declared on `.application`
- *     (`--color-fieldset-border`, `--color-form-label`, …). `RadioCardGroup` renders a `fieldset`,
- *     which `foundry2.css:5290` borders with one of them, and `styles/fabricate.css` references
- *     none of the ten — so the loss is invisible to any Fabricate-side grep.
- *   - `styles/fabricate.css:1136` — the bare-heading reset is scoped
- *     `.fabricate :where(.window-content) h1…h6`, because core's `@layer elements` styles bare
- *     headings and core's own antidote is V1-only.
- *   - `.fabricate-manager` is what 2821 descendant selectors in `styles/fabricate.css` require, and
- *     `.fabricate[data-fabricate-theme]` is what puts the theme's tokens in scope on a subtree
- *     rather than on the document (`applyFabricateTheme()` writes the document root and would
- *     repaint the whole page).
- *
- * WHETHER THOSE FOUR ELEMENTS GENERATE BOXES IS THE ROW'S CHOICE, and it is the only choice a row
- * gets about its slot. By default they do not (`display: contents`), which is what puts a live
- * control in the library's own dense layout with no window chrome around it. A row that declares a
- * `slot` box gets the same subtree drawing real boxes at the size it states, which is what an
- * overlay or a container query needs. `slot.js` owns both shapes and `page.css` states, with the
- * measurement behind it, why the default cannot simply be widened to cover the second.
+ * authoritative". The same rule binds here: a missing harvest 503s the entire `/@foundry-chrome/`
+ * prefix, which every specimen iframe depends on to render correctly, so the stylesheet is PROBED
+ * before a single iframe is created and a non-2xx renders the harvest instructions as the body and
+ * mounts nothing.
  */
-import { mount } from 'svelte';
-
-import { FABRICATE_THEME_ATTRIBUTE, FABRICATE_THEME_IDS } from '../../../src/ui/theme.js';
-import { installFoundryShim } from '../foundry/installFoundryShim.js';
-import { createMinimalLabWorld } from '../foundry/minimalLabWorld.js';
-import { configureLabPage } from '../foundryFrame.js';
-import { createLocalizer, toI18nStub } from '../labI18n.js';
-
 import { CATALOGUE } from './catalogue.js';
-import { loadComponent } from './importers.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
-import LiveSpecimen from './LiveSpecimen.svelte';
-import { createLiveSlot, describeCollapsedSlot } from './slot.js';
+import {
+  SPECIMEN_ASSIGN,
+  SPECIMEN_ERROR,
+  SPECIMEN_MOUNTED,
+  SPECIMEN_READY,
+  SPECIMEN_RESIZE,
+} from './specimenProtocol.js';
 
 const MOUNTED_ATTRIBUTE = 'data-primitive-lab-mounted';
 const READY_ATTRIBUTE = 'data-primitive-lab-ready';
 const ERROR_ATTRIBUTE = 'data-primitive-lab-error';
+
+/** The identity marker `npm run lab:check` reads off each specimen's `<iframe>`. */
+const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
+
+/** Applied once an iframe's measured size has been read and applied. See `page.css`. */
+const SIZED_CLASS = 'pl-specimen-sized';
 
 /** The query parameter that says how much of the catalogue to mount. */
 const MOUNT_PARAMETER = 'mount';
@@ -102,11 +89,14 @@ const MOUNT_PARAMETER = 'mount';
 /** The only value it accepts — and what `scripts/primitive-lab-smoke.mjs` navigates with. */
 const MOUNT_ALL_VALUE = 'all';
 
-/** The stylesheet whose absence means no chrome. Probed, then linked by the page itself. */
+/** The stylesheet whose absence means no chrome. Probed, then linked by each specimen itself. */
 const CHROME_PROBE_URL = '/@foundry-chrome/css/foundry2.css';
 
 /** Where the dev server reports what it knows about the harvest. */
 const CHROME_STATUS_URL = '/@primitive-lab/chrome-status';
+
+/** The document one specimen's `<iframe>` navigates to. Carries no row of its own in its URL. */
+const SPECIMEN_URL = '/tests/view-lab/primitives/specimen.html';
 
 /**
  * Confirm the harvested chrome is being served.
@@ -194,9 +184,10 @@ function requireSupportedMountMode() {
 /**
  * Adopt the library's own body into this document, and install its stylesheet.
  *
- * The `<style>` is appended to `<head>` AFTER the three cascade links, so the library's unlayered
- * kit beats Foundry's layered sheet exactly as it does in the standalone file. Svelte's own
- * injected component blocks land later still, which is also production's order.
+ * The `<style>` is appended to `<head>` after the library's own load — there is nothing else to
+ * beat, since this page links no other stylesheet at all. Svelte's own injected component blocks
+ * only ever land inside a specimen's OWN document now, so there is no ordering concern with them
+ * here either.
  *
  * @param {{body: HTMLElement, css: string}} library The parsed library.
  */
@@ -211,44 +202,68 @@ function renderLibrary(library) {
   while (library.body.firstChild) document.body.append(document.adoptNode(library.body.firstChild));
 }
 
-/** The frame chrome every slot carries, passed to `slot.js` rather than imported by it. */
-const SLOT_CHROME = Object.freeze({
-  liveClass: LIVE_CLASS,
-  themeAttribute: FABRICATE_THEME_ATTRIBUTE,
-  themeId: FABRICATE_THEME_IDS.FABRICATE,
-});
-
 /**
- * Build one row's slot, reporting a bad `slot` declaration as a row defect.
+ * Apply a specimen's reported size to its `<iframe>`, and reveal it once sized.
  *
- * @param {object} row A catalogue row.
- * @param {string[]} problems The collector.
- * @returns {{live: HTMLElement, root: HTMLElement, boxed: boolean}|null} The slot, or null when
- *   the row declared a box this page cannot build.
+ * @param {HTMLIFrameElement} iframe The specimen's frame.
+ * @param {{width: number, height: number}} size The iframe's own report.
  */
-function toSlotElements(row, problems) {
-  try {
-    return createLiveSlot(row, SLOT_CHROME);
-  } catch (error) {
-    problems.push(`${row.spec} / ${row.path}: ${String(error?.message ?? error)}`);
-    return null;
-  }
+function applySize(iframe, { width, height }) {
+  iframe.style.width = `${width}px`;
+  iframe.style.height = `${height}px`;
+  iframe.classList.add(SIZED_CLASS);
 }
 
 /**
- * Resolve a row's component, reporting a bad path as a row defect rather than a page failure.
+ * Stand up one specimen: create its `<iframe>`, place it where the drawing stood, run the
+ * handshake `specimenProtocol.js` describes, and resolve once it has settled.
  *
- * @param {object} row A catalogue row.
+ * @param {{host: Element, row: object}} slot One resolved slot.
  * @param {string[]} problems The collector.
- * @returns {Promise<unknown|null>} The component, or null when the row named nothing.
+ * @param {{mounted: number}} results Mutated in place: `mounted` is incremented once per settled,
+ *   successfully-mounted iframe.
+ * @returns {Promise<void>} Resolves once this iframe has mounted or reported an error.
  */
-async function toComponent(row, problems) {
-  try {
-    return await loadComponent(row.path);
-  } catch (error) {
-    problems.push(`${row.spec} / ${row.path}: ${String(error?.message ?? error)}`);
-    return null;
-  }
+function standUpSpecimen(slot, problems, results) {
+  const iframe = document.createElement('iframe');
+  iframe.className = LIVE_CLASS;
+  iframe.setAttribute(SPECIMEN_ATTRIBUTE, slot.row.path);
+  iframe.title = `${slot.row.spec}: ${slot.row.path}`;
+
+  const settled = new Promise((resolve) => {
+    globalThis.addEventListener('message', function onMessage(event) {
+      if (event.source !== iframe.contentWindow) return;
+      const data = event.data ?? {};
+      if (data.type === SPECIMEN_READY) {
+        iframe.contentWindow.postMessage(
+          { type: SPECIMEN_ASSIGN, row: slot.row },
+          globalThis.location.origin
+        );
+        return;
+      }
+      if (data.type === SPECIMEN_MOUNTED) {
+        applySize(iframe, data);
+        results.mounted += 1;
+        globalThis.removeEventListener('message', onMessage);
+        resolve();
+        return;
+      }
+      if (data.type === SPECIMEN_RESIZE) {
+        applySize(iframe, data);
+        return;
+      }
+      if (data.type === SPECIMEN_ERROR) {
+        applySize(iframe, data);
+        problems.push(`${slot.row.spec} / ${slot.row.path}: ${data.message}`);
+        globalThis.removeEventListener('message', onMessage);
+        resolve();
+      }
+    });
+  });
+
+  iframe.src = SPECIMEN_URL;
+  slot.host.replaceWith(iframe);
+  return settled;
 }
 
 async function boot() {
@@ -258,57 +273,23 @@ async function boot() {
   requireSupportedMountMode();
   await requireChrome();
 
-  const i18n = toI18nStub(await createLocalizer());
-  installFoundryShim(createMinimalLabWorld({ i18n }));
-
-  // configureLabPage REPLACES `document.body.className` outright (it reproduces Foundry's own
-  // `<body class="vtt game system-… theme-…">`), so anything the page needs on the body has to be
-  // added AFTER it or it is silently discarded — and `PAGE_CLASS` is the `@scope` root every
-  // library rule hangs off, so losing it would leave the page unstyled.
-  configureLabPage();
+  // `PAGE_CLASS` is the `@scope` root every library rule hangs off, so it still has to be on
+  // `<body>` — see `primitives.html` for the one other stylesheet this page loads
+  // (`styles/fabricate.css`, for its `--fab-*` tokens only; it has no bare-element rule to scope
+  // against in the first place).
   document.body.classList.add(PAGE_CLASS);
 
   renderLibrary(await readLibrary());
 
   const { slots, problems } = resolveSlots(document.body, CATALOGUE);
-  // EVERY import is awaited before ANY slot is drawn. Mounting as each chunk lands would make the
-  // page settle in an order Vite's optimiser decides, so a run that timed out would be reporting
-  // the module graph rather than the catalogue — and readiness would have to be counted rather
-  // than simply reached.
-  const components = new Map(
-    await Promise.all(slots.map(async (slot) => [slot, await toComponent(slot.row, problems)]))
-  );
+  const results = { mounted: 0 };
+  // EVERY specimen settles before the report is published, exactly as every import used to be
+  // awaited before any slot was drawn: a page that stopped waiting after the first iframe would be
+  // reporting readiness in whatever order Chromium happened to schedule iframe navigations, not in
+  // an order anyone can reason about.
+  await Promise.all(slots.map((slot) => standUpSpecimen(slot, problems, results)));
 
-  let mounted = 0;
-  const boxed = [];
-  for (const slot of slots) {
-    const component = components.get(slot);
-    if (!component) continue;
-    const elements = toSlotElements(slot.row, problems);
-    if (!elements) continue;
-    slot.host.replaceWith(elements.live);
-    mount(LiveSpecimen, {
-      target: elements.root,
-      props: {
-        path: slot.row.path,
-        component,
-        props: slot.row.props ?? {},
-        content: slot.row.content ?? null,
-      },
-    });
-    if (elements.boxed) boxed.push({ row: slot.row, root: elements.root });
-    mounted += 1;
-  }
-
-  // AFTER every slot is in the document, so one layout answers for all of them rather than each
-  // measurement forcing its own. A boxed slot is the only kind that can fail this way, and it
-  // fails invisibly: see `describeCollapsedSlot`.
-  for (const slot of boxed) {
-    const problem = describeCollapsedSlot(slot.row, slot.root);
-    if (problem) problems.push(problem);
-  }
-
-  publishReport({ mounted, problems });
+  publishReport({ mounted: results.mounted, problems });
 }
 
 try {

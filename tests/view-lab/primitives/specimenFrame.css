@@ -1,0 +1,60 @@
+/*
+ * The seam between the harvested Foundry chrome and the ONE mounted component this document
+ * exists to show — the whole subject of `specimen.html`. Unlike the old page-wide `page.css`, this
+ * file never has to keep another cascade OUT: an iframe document has nothing else in it to
+ * protect, so `slot.js`'s docblock covers why the `@scope` machinery that used to live here is
+ * simply gone rather than moved.
+ *
+ * Written unlayered, so it beats `foundry2.css` (which is layered end to end), exactly as the old
+ * page-scoped rules did.
+ */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * DEFAULT (no `slot` declared on the row): the window subtree generates no boxes at all. The
+ * elements stay in the DOM and in the inheritance chain — so `.application`'s
+ * `font-size: var(--font-size-14)`, its ten custom properties and the theme's whole `--fab-*`
+ * block still reach the specimen — but they contribute no chrome and no layout, so the mounted
+ * component's own root is what this document lays out.
+ */
+body:not(.pl-boxed) .application,
+body:not(.pl-boxed) .window-content,
+body:not(.pl-boxed) .fabricate-manager {
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+  display: contents;
+}
+
+/*
+ * `LiveSpecimen.svelte`'s own wrapper is the one element in a default slot that MUST generate a
+ * real box: `mount.js` measures it (via a `ResizeObserver`) to size the `<iframe>` element from
+ * outside, and a `display: contents` element's measured box is not reliable across renderers. An
+ * `inline-block` shrink-wraps to the mounted component's natural size, which is what makes the
+ * measurement — and therefore the iframe — the same size the bare drawing would have been.
+ */
+body:not(.pl-boxed) .pl-specimen {
+  display: inline-block;
+}
+
+/*
+ * BOXED (`slot` declared): the same subtree, drawing real boxes at the size the row declares —
+ * see `slot.js` for why the box is stated rather than measured. What it reproduces is the
+ * window's BOX, not its CHROME: position, size, containment and the manager's own grid and
+ * surface are production's declarations, untouched. The border, radius, shadow and window
+ * `z-index` that draw a floating desktop window are dropped, because a specimen is a pane
+ * excerpt on a reference page, not a window standing on its own.
+ */
+body.pl-boxed .application {
+  inline-size: var(--pl-slot-inline-size, auto);
+  block-size: var(--pl-slot-block-size, auto);
+  position: relative;
+  z-index: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}

@@ -203,6 +203,11 @@ const GATE_TARGETS = [
   // because `unicorn/no-exports-in-scripts` is what forced them apart in the first place.
   'scripts/lib/primitiveLabSmoke.js',
   'scripts/primitive-lab-smoke.mjs',
+  // The Primitive Lab parity oracle (issue 1487): the same maintainer-only standing as the smoke
+  // above, and pinned together for the same reason — `unicorn/no-exports-in-scripts` is what
+  // forced the pure comparison apart from the CLI that runs it.
+  'scripts/lib/primitiveLabParity.js',
+  'scripts/primitive-lab-parity.mjs',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];

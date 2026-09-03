@@ -1,46 +1,57 @@
 /**
- * What a live slot IS: the production window subtree a specimen is painted inside, in the one of
- * its two shapes the catalogue row asked for.
+ * What a live slot IS: the production window subtree one specimen is painted inside, and how big
+ * a row asked that subtree to be.
  *
- * ── BOTH SHAPES CARRY THE SAME FOUR ELEMENTS, AND THAT IS NOT NEGOTIABLE ──────────────────────
+ * ── THIS USED TO BUILD A SUBTREE OF THE SHARED PAGE; NOW IT BUILDS A DOCUMENT'S WHOLE BODY ──────
+ *
+ * Every live specimen is its own `<iframe>` now (issue 1487), each running `specimen.html` /
+ * `specimenMount.js` as an isolated document that carries the full production cascade —
+ * `foundry2.css` UNLAYERED, Font Awesome and `styles/fabricate.css` layered, exactly as
+ * `index.html` and `primitives.html` load them. The library's own reference page therefore loads
+ * NO Foundry stylesheet at all, which is the whole fix: `foundry2.css` can no longer reach the 948
+ * elements the library draws by hand, because it is never linked into that document.
+ *
+ * This module used to build a `display: contents` wrapper that a shared `page.css` scoped with
+ * `@scope … to (.pl-live)` so the library's own kit CSS could not reach in. That machinery is
+ * GONE, not repurposed — an iframe is a separate document with its own CSSOM, so the library's
+ * rules cannot cross into it regardless of any scoping, the same way `foundry2.css` cannot leak
+ * out of it. What is left here is only the part that was never about scoping: reading a row's
+ * declared `slot` box, and building the four-element window subtree every specimen still needs to
+ * be painted correctly against the harvested chrome — see `mount.js`'s docblock for the four
+ * specific things a bare root loses without it.
+ *
+ * ── BOTH SHAPES CARRY THE SAME FOUR ELEMENTS, AND THAT IS STILL NOT NEGOTIABLE ────────────────
  *
  * `.application.fabricate.crafting-system-manager > section.window-content > .fabricate-manager`,
- * every time. Each one supplies something a bare root loses, silently, against the harvested
- * chrome — `mount.js` names all four with their line numbers. What the row chooses is not WHICH
- * elements are there but whether they generate BOXES.
+ * every time — now as the entire body of one specimen's own document. What a row chooses is still
+ * only whether those elements generate BOXES:
  *
- *   DEFAULT (no `slot`)  `display: contents`. The elements are in the DOM and in the inheritance
- *                        chain, but produce no boxes at all, so the component's own root is the
- *                        element the library's layout lays out and a live control stands exactly
- *                        where the drawing it replaced stood. That is what lets 52 Controls
- *                        specimens sit in a dense flex-wrapped stage with no window chrome
- *                        between them and the caption above them.
+ *   DEFAULT (no `slot`)  `display: contents`, applied by `specimenFrame.css` inside the iframe
+ *                        rather than by a page-wide `page.css`. The mounted component's own root
+ *                        is what the iframe's body lays out, and — because that root is wrapped in
+ *                        `LiveSpecimen.svelte`'s `.pl-specimen`, itself an `inline-block` — the
+ *                        DOCUMENT shrink-wraps to exactly the specimen's natural size. `mount.js`
+ *                        measures that (see its own docblock) and sizes the `<iframe>` element to
+ *                        match, so a live control still stands where the drawing it replaced stood
+ *                        with no window chrome around it.
  *
- *   BOXED (`slot`)       the same subtree, generating real boxes at a size the row declares. This
- *                        is what an overlay or a container query needs, and `page.css` states in
- *                        full why the default cannot be widened to cover them.
+ *   BOXED (`slot`)       the same subtree, generating real boxes at the size the row declares. See
+ *                        below for why the box is still declared rather than measured.
  *
- * ── WHY THE BOX IS DECLARED RATHER THAN MEASURED ──────────────────────────────────────────────
+ * ── WHY A BOXED SLOT IS STILL DECLARED RATHER THAN MEASURED ───────────────────────────────────
  *
- * The tempting alternative is to give every slot a box that shrink-wraps its specimen, so nothing
- * has to be declared and nothing can be declared wrongly. It cannot work, and the reason is the
- * feature itself: `styles/fabricate.css:1439` puts `container-type: inline-size` on
- * `.fabricate-manager`, and an inline-size container is INLINE-SIZE CONTAINED — its own width is
- * computed as if it had no contents. A boxed slot left to size itself from its specimen therefore
- * measures ZERO and takes its `.unit` down with it (measured: the whole unit collapses to the
- * width of its caption). A query container's width has to arrive from outside, always. That is
- * not a lab artifact; it is what makes container queries answerable at all.
- *
- * So a boxed row states the pane it needs, and {@link describeCollapsedSlot} re-reads the box
- * after layout and reports one that did not materialise — because a zero-width query container
- * answers every breakpoint the same way and looks, on the page, like a specimen that simply
- * failed to draw.
+ * `styles/fabricate.css:1439` puts `container-type: inline-size` on `.fabricate-manager`, and an
+ * inline-size container is INLINE-SIZE CONTAINED — its own width is computed as if it had no
+ * contents. A boxed slot left to size itself from its specimen therefore measures ZERO. That was
+ * true when the box lived in a shared page and it is equally true of an iframe's own body: nothing
+ * about isolating the document changes what a query container is. So a boxed row still STATES the
+ * pane it needs, and every catalogue row that declares one now states BOTH `width` and `height` —
+ * an isolated iframe has no surrounding library layout to inherit an omitted dimension from the
+ * way a subtree of the shared page once could, so "the `.unit`'s own width" is no longer an
+ * available fallback and the row has to say it explicitly instead.
  */
 
-/** Marks a slot whose window subtree generates boxes. Read by `page.css`, written only here. */
-export const BOXED_CLASS = 'pl-boxed';
-
-/** The declared box, as custom properties `page.css` reads with an `auto` fallback. */
+/** The declared box, as custom properties `specimenFrame.css` reads. */
 const SIZE_PROPERTIES = Object.freeze({
   width: '--pl-slot-inline-size',
   height: '--pl-slot-block-size',
@@ -50,15 +61,15 @@ const SIZE_PROPERTIES = Object.freeze({
  * Read a row's `slot` declaration.
  *
  * REFUSES an unrecognised key rather than ignoring it, because every way of getting this wrong is
- * silent on the page: `{"heigth": 320}` boxes the slot, leaves its block size `auto`, and the
- * manager's `overflow: clip` then swallows the very overlay the row was written to show. A typo
- * that costs a comparison here costs a reader a rendering-fault hunt otherwise.
+ * silent on the page: `{"heigth": 320}` boxes the slot, leaves its block size unset, and the
+ * manager's own `overflow: clip` then swallows the very overlay the row was written to show. A
+ * typo that costs a comparison here costs a reader a rendering-fault hunt otherwise.
  *
  * @param {object} row A catalogue row.
  * @returns {{width?: number, height?: number}|null} The declared box, or null for a default slot.
  * @throws {Error} When `slot` is present but is not a box this page can build.
  */
-function readSlotBox(row) {
+export function readSlotBox(row) {
   const declared = row.slot;
   if (declared === undefined) return null;
   if (declared === null || typeof declared !== 'object' || Array.isArray(declared)) {
@@ -78,24 +89,15 @@ function readSlotBox(row) {
 }
 
 /**
- * Build one live slot: the production window subtree, ready for a specimen.
+ * Build one specimen's window subtree — the whole body of its iframe document.
  *
- * @param {object} row The catalogue row, read for its optional `slot` box.
  * @param {object} chrome The two attribute names the frame carries.
- * @param {string} chrome.liveClass The class the `@scope` limit is keyed on.
  * @param {string} chrome.themeAttribute `FABRICATE_THEME_ATTRIBUTE`.
  * @param {string} chrome.themeId The theme to put in scope on the subtree.
- * @returns {{live: HTMLElement, root: HTMLElement, boxed: boolean}} The slot, the element to mount
- *   into, and whether this one generates boxes.
- * @throws {Error} When the row's `slot` declaration is not a box this page can build.
+ * @returns {{frame: HTMLElement, root: HTMLElement}} `frame` is the `.application` element (append
+ *   it to `document.body`); `root` is the `.fabricate-manager` to mount the component into.
  */
-export function createLiveSlot(row, { liveClass, themeAttribute, themeId }) {
-  const box = readSlotBox(row);
-  const live = document.createElement('div');
-  live.className = box ? `${liveClass} ${BOXED_CLASS}` : liveClass;
-  for (const [key, property] of Object.entries(SIZE_PROPERTIES)) {
-    if (box?.[key] !== undefined) live.style.setProperty(property, `${box[key]}px`);
-  }
+export function buildSpecimenFrame({ themeAttribute, themeId }) {
   const frame = document.createElement('div');
   frame.className = 'application fabricate crafting-system-manager';
   frame.setAttribute(themeAttribute, themeId);
@@ -105,30 +107,41 @@ export function createLiveSlot(row, { liveClass, themeAttribute, themeId }) {
   root.className = 'fabricate-manager';
   content.append(root);
   frame.append(content);
-  live.append(frame);
-  return { live, root, boxed: Boolean(box) };
+  return { frame, root };
 }
 
 /**
- * Report a boxed slot whose manager root did not end up with a box.
+ * Apply a declared box to a specimen's `.application`, and mark the document boxed.
+ *
+ * @param {object} box The result of {@link readSlotBox}, non-null.
+ * @param {HTMLElement} frame The `.application` element {@link buildSpecimenFrame} returned.
+ */
+export function applySlotBox(box, frame) {
+  document.body.classList.add('pl-boxed');
+  for (const [key, property] of Object.entries(SIZE_PROPERTIES)) {
+    if (box[key] !== undefined) frame.style.setProperty(property, `${box[key]}px`);
+  }
+}
+
+/**
+ * Report a boxed slot whose `.application` did not end up with a box.
  *
  * Read AFTER layout, from the element itself, rather than derived from the declaration — the
- * declaration is exactly the thing that can be wrong. An omitted `width` is legitimate and common
- * (the library's own `.unit` carries one, and a stretched slot should inherit it rather than
- * restate it), so the only way to know whether one arrived is to ask the box.
+ * declaration is exactly the thing that can be wrong. Both dimensions are now required on a boxed
+ * row (see the module docblock), so a collapse here means the CSS custom property was not applied,
+ * not that a dimension was legitimately omitted.
  *
  * @param {object} row The catalogue row, for the message.
- * @param {Element} root The slot's `.fabricate-manager`.
+ * @param {Element} frame The specimen's `.application`.
  * @returns {string|null} The failure, or null when the slot has a box.
  */
-export function describeCollapsedSlot(row, root) {
-  const rect = root.getBoundingClientRect();
+export function describeCollapsedSlot(row, frame) {
+  const rect = frame.getBoundingClientRect();
   if (rect.width > 0 && rect.height > 0) return null;
   return (
     `${row.spec} / ${row.path}: its boxed slot measured ` +
     `${Math.round(rect.width)}x${Math.round(rect.height)}. ` +
     'A `.fabricate-manager` is an inline-size CONTAINER, so it is sized as if it had no ' +
-    "contents and cannot shrink-wrap its specimen: state the missing dimension in the row's " +
-    "`slot`, or place the row where the library's own layout supplies it."
+    "contents and cannot shrink-wrap its specimen: check the row's `slot` declaration."
   );
 }
