@@ -326,28 +326,58 @@
       );
     }
     const muteCount = Array.isArray(row.mutedTags) ? row.mutedTags.length : 0;
-    // THE RESOLVED VALUE, WHICH IS THE ROW OVERRIDE ONLY WHEN THERE IS ONE. A membership record
-    // carries `category` only for a system that OVERRIDES it — an inheriting record omits the key
-    // entirely rather than copying the world value — so reading the row alone made every
-    // inheriting system report `No world category` over a world record that plainly has one, on
-    // the row that had just said `Inherits world category` beside it.
-    const resolved =
-      row.inherited?.category === false ? String(row.category ?? '').trim() : worldCategory;
-    const category =
-      resolved ||
-      text('FABRICATE.Admin.Manager.Scoped.Component.NoWorldCategory', 'No world category');
+    return `${categoryClauseFor(row)}${muteClauseFor(muteCount)}`;
+  }
+
+  /**
+   * The category half of a member row's summary.
+   *
+   * ONLY THE INHERITING BRANCH NAMES A VALUE, and that is a limit of what this screen can see
+   * rather than a stylistic choice. The published system row carries `member`, `inherited`,
+   * `recipeCount` and `mutedTags` — it does NOT carry the resolved category, because an
+   * overriding system's value lives in its own in-system record and the world projection is not
+   * handed those. Reading `row.category` anyway produced `Resolves No world category` on a system
+   * whose chip beside it said `Overrides world category`: a sentence that is not merely vague but
+   * false, and the worst of the three possible answers. So the override branch says what it knows
+   * — that the value is the system's own — and the `Open rules` link under it is where the value
+   * itself is.
+   *
+   * @param {object} row
+   * @returns {string}
+   */
+  function categoryClauseFor(row) {
+    if (row.inherited?.category === false) {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Component.SystemSummaryOwn',
+        'Supplies its own category in its rules'
+      );
+    }
+    if (!worldCategory) {
+      return text(
+        'FABRICATE.Admin.Manager.Scoped.Component.SystemSummaryUnset',
+        'No world category to inherit, so its rules supply one'
+      );
+    }
+    return phrase('FABRICATE.Admin.Manager.Scoped.Component.SystemSummary', 'Resolves {category}', {
+      category: worldCategory,
+    });
+  }
+
+  /**
+   * The muting half, appended to whichever category clause the row took. Pluralised on its own,
+   * because a composed sentence a translator cannot reorder is the trap the tag merge note hit.
+   *
+   * @param {number} count
+   * @returns {string}
+   */
+  function muteClauseFor(count) {
+    if (count < 1) return '';
     return phrase(
-      muteCount === 1
+      count === 1
         ? 'FABRICATE.Admin.Manager.Scoped.Component.SystemSummaryMutedOne'
-        : muteCount > 1
-          ? 'FABRICATE.Admin.Manager.Scoped.Component.SystemSummaryMuted'
-          : 'FABRICATE.Admin.Manager.Scoped.Component.SystemSummary',
-      muteCount === 1
-        ? 'Resolves {category} · mutes {count} world tag'
-        : muteCount > 1
-          ? 'Resolves {category} · mutes {count} world tags'
-          : 'Resolves {category}',
-      { category, count: muteCount }
+        : 'FABRICATE.Admin.Manager.Scoped.Component.SystemSummaryMuted',
+      count === 1 ? ' · mutes {count} world tag' : ' · mutes {count} world tags',
+      { count }
     );
   }
   const memberRows = $derived(systemRows.filter((row) => row?.member === true));

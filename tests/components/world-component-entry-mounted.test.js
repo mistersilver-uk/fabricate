@@ -463,9 +463,17 @@ describe('world Component entry editor (issue 1371)', () => {
         /Refined/,
         'the inheriting row resolves the world value'
       );
-      assert.match(
-        target.querySelector('[data-scoped-entry-system-summary="sys-alchemy"]').textContent,
-        /Resolves/
+      // THE OVERRIDE BRANCH NAMES NO VALUE, and that is the assertion rather than an omission:
+      // the published system row does not carry an overriding system's category, so a summary
+      // that stated one would be stating `row.category ?? ''` — which renders as `Resolves No
+      // world category` beside a chip reading `Overrides world category`.
+      const overrideSummary = target.querySelector(
+        '[data-scoped-entry-system-summary="sys-alchemy"]'
+      ).textContent;
+      assert.match(overrideSummary, /own category in its rules/);
+      assert.ok(
+        !/No world category/.test(overrideSummary),
+        'and it never says the system resolves nothing over a world record that HAS a category'
       );
     });
 

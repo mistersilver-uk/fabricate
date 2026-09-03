@@ -4995,13 +4995,24 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '[data-component-membership-filter]', select: 'all' },
+      // SCROLL TO THE COHORT, because it sits below every member row: the lab world's smithing
+      // system holds a handful of components and the world corpus holds sixty-five, so the ghost
+      // list starts well past the fold and an unscrolled frame photographs the member rows this
+      // case is not about.
+      { selector: '[data-component-ghost-row]', scroll: true },
     ],
     expectView: 'components',
     expectSelector: '[data-component-ghost-row]',
     expectContained: [
+      // A ROW, NOT THE WHOLE `<ul>`. The ghost body is a sixty-row list inside a SCROLLING
+      // container, so it legitimately extends past its own scroller and the containment check
+      // reads that as clipping — an assertion that can only pass on a world small enough for the
+      // whole cohort to fit, which is not a property this case is about. Containing the row the
+      // frame is scrolled to is the real claim: the cohort renders inside the table rather than
+      // spilling out of it.
       {
         container: '.manager-table-scroll',
-        target: '[data-component-ghost-body]',
+        target: '[data-component-ghost-row]',
       },
     ],
     kinds: ['manager', 'components'],

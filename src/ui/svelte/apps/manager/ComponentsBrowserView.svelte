@@ -985,15 +985,19 @@
           start: page.rangeStart,
           end: page.rangeEnd,
           total: page.totalCount,
-        })}{#if visibleGhostRows.length > 0}<span data-component-ghost-count
+        })}{#if visibleGhostRows.length > 0}<!--
+          ONE KEY, NOT A PLURAL PAIR. Every other count on this screen pluralises, and this one
+          does not have to: the noun is `{count}` itself and the rest of the clause is invariant in
+          English, so a singular branch would be two keys holding the same string — a translator
+          reading them as a distinction that exists, and a reviewer reading a copy-paste.
+        --><span
+            data-component-ghost-count
             >{format(
-              visibleGhostRows.length === 1
-                ? 'FABRICATE.Admin.Manager.Component.GhostCountOne'
-                : 'FABRICATE.Admin.Manager.Component.GhostCount',
-              visibleGhostRows.length === 1
-                ? ' · {count} not in this system'
-                : ' · {count} not in this system',
-              { count: visibleGhostRows.length }
+              'FABRICATE.Admin.Manager.Component.GhostCount',
+              ' · {count} not in this system',
+              {
+                count: visibleGhostRows.length,
+              }
             )}</span
           >{/if}
       </span>
