@@ -1,0 +1,125 @@
+[
+  {
+    "path": "src/ui/svelte/apps/manager/Chip.svelte",
+    "root": "manager",
+    "note": "The highest-traffic primitive in the codebase, and the one whose CSS is SCOPED and injected — so `.manager-chip.svelte-<hash>` lands UNLAYERED while `styles/fabricate.css` imports at `layer(modules)`. That is why the tone story is worth looking at rather than reading: a caller's own rule cannot be assumed to reach this chip, and an editor header is a 34px button beside a ~20px pill for exactly that reason.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; see the plinth's pseudo-class readout. A `span` chip has no hover treatment at all — only `tag=\"button\"` gives it one, and then from the caller's own class.",
+      "focus-visible": "No prop. It is focusable only as `tag=\"button\"`; tab to it on the plinth after switching the host.",
+      "disabled": "No prop. `tone=\"disabled\"` is a COLOUR FAMILY and not a state — the sheet joins it to the WARNING ramp — so it paints amber and sets no attribute, and nothing announces the chip as unavailable. A `tag=\"button\"` chip can take a real `disabled` through the rest spread, which is the caller's to spell.",
+      "loading": "No prop. A chip states a fact that is already resolved; there is nothing for it to await.",
+      "invalid": "Not applicable: a chip carries a reading, never an entry that could be rejected.",
+      "readonly": "Not applicable: a `span` chip is read-only by construction, which is what a mark is.",
+      "empty": "Not applicable: it renders one mark, never a collection. Clearing `children` renders an empty pill, which is a missing reading rather than an empty state."
+    },
+    "knobs": [
+      {
+        "prop": "tag",
+        "type": "select",
+        "options": ["span", "li", "button", "div"],
+        "value": "span",
+        "default": "span"
+      },
+      {
+        "prop": "tone",
+        "type": "select",
+        "options": [
+          "",
+          "active",
+          "positive",
+          "disabled",
+          "warning",
+          "info",
+          "danger",
+          "neutral",
+          "negative",
+          "accent",
+          "muted",
+          "tag"
+        ],
+        "value": "accent",
+        "default": ""
+      },
+      {
+        "prop": "density",
+        "type": "select",
+        "options": ["default", "row", "action"],
+        "value": "default",
+        "default": "default"
+      },
+      {
+        "prop": "icon",
+        "type": "text",
+        "value": "fas fa-cube",
+        "default": ""
+      },
+      {
+        "prop": "swatch",
+        "type": "select",
+        "options": ["", "sage", "mist", "lavender", "rose", "peach", "butter", "aqua", "mauve"],
+        "value": "",
+        "default": ""
+      },
+      {
+        "prop": "mono",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "truncate",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "children",
+        "type": "snippet",
+        "value": "short-text",
+        "default": ""
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "class",
+        "why": "An EXTRA class appended to the primitive's own. It is how a caller reaches layout context from the global sheet — `manager-editor-tab-badge` positions a badge inside a tab button — and those rules sit at a higher specificity than this scoped block. Driving it would let the lab paint a chip the design system does not draw."
+      },
+      {
+        "prop": "element",
+        "why": "A `bind:this` handle on the rendered node, because `bind:this` on a COMPONENT yields the instance rather than the element. `SearchablePopover` needs it to measure its chip-shaped trigger and to restore focus to it. The lab hands props DOWN, so binding it here would give the node two owners."
+      },
+      {
+        "prop": "...rest",
+        "why": "Every other attribute — `title`, `aria-label`, `role`, `data-*` hooks, `onclick`, `type`, `disabled` — is forwarded onto the rendered element. The set is open and its members are either a caller's own selector or only meaningful once `tag=\"button\"` has changed what the chip is, which is already driven."
+      }
+    ],
+    "stories": [
+      {
+        "title": "Every tone",
+        "matrix": {
+          "tone": "*"
+        }
+      },
+      {
+        "title": "Every density",
+        "matrix": {
+          "density": "*"
+        }
+      },
+      {
+        "title": "The mono face, and the leading glyph",
+        "matrix": {
+          "mono": "*",
+          "icon": ["", "fas fa-lock"]
+        }
+      },
+      {
+        "title": "The colour pill",
+        "matrix": {
+          "swatch": ["sage", "rose", "aqua", "mauve"]
+        }
+      }
+    ]
+  }
+]

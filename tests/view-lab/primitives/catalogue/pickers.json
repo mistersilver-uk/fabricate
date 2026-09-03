@@ -1,0 +1,742 @@
+[
+  {
+    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "root": "manager",
+    "note": "The linked card carries NO `img`. That is deliberate and is the rule the library states in this very section: never invent a Foundry asset path, because an unvalidated `img` 404s silently — and the lab's own boot listener fails on a 400. With `item.img` absent the zone draws `emptyIcon` in the tile, which is the shape every unresolved link renders anyway. The `uuid` is a COMPENDIUM address rather than the library specimen's shorter world one, because that is the common case for a module-shipped document and because it is long enough to show what the card does with one: measured on a 418px card the `<code>` line renders 321px wide inside a 252px column and runs under the copy and unlink buttons.",
+    "states": {
+      "rest": true,
+      "hover": "No prop. The empty prompt tints accent under the pointer and again while a document is dragged over it; neither is settable, so read the plinth's pseudo-class readout.",
+      "focus-visible": "No prop. The zone itself is a `<div>` and takes no focus; its two actions are `IconButton`s and do, so tab into a linked card on the plinth.",
+      "disabled": true,
+      "loading": "No prop. The caller resolves the document and hands over a plain record, so the zone never awaits anything and cannot show that it is resolving one.",
+      "invalid": true,
+      "readonly": "No prop. `disabled` blocks the drop and dims the card, but nothing renders the link as a settled read-only fact — the system-scope essence editor reaches that state by not rendering this component at all.",
+      "empty": true
+    },
+    "knobs": [
+      {
+        "prop": "item",
+        "type": "json",
+        "default": null,
+        "value": {
+          "name": "Blacksmith's Compendium"
+        }
+      },
+      {
+        "prop": "title",
+        "type": "text",
+        "value": "Drop a game-world item here",
+        "default": ""
+      },
+      {
+        "prop": "hint",
+        "type": "text",
+        "value": "or click to search the catalogue",
+        "default": ""
+      },
+      {
+        "prop": "uuid",
+        "type": "text",
+        "value": "Compendium.fabricate.tools.Item.kR3nQ8sT1vW2xY4z",
+        "default": ""
+      },
+      {
+        "prop": "subline",
+        "type": "text",
+        "value": "Consumed when the recipe is crafted.",
+        "default": ""
+      },
+      {
+        "prop": "emptyIcon",
+        "type": "text",
+        "value": "fas fa-download",
+        "default": "fas fa-download"
+      },
+      {
+        "prop": "state",
+        "type": "select",
+        "options": ["linked", "missing"],
+        "value": "linked",
+        "default": "linked"
+      },
+      {
+        "prop": "kind",
+        "type": "select",
+        "options": ["", "tool-source", "tool-create", "recipe-item", "check-macro"],
+        "value": "",
+        "default": ""
+      },
+      {
+        "prop": "disabled",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "copyLabel",
+        "type": "text",
+        "value": "Copy this document's uuid",
+        "default": ""
+      },
+      {
+        "prop": "unlinkLabel",
+        "type": "text",
+        "value": "Unlink this document",
+        "default": ""
+      },
+      {
+        "prop": "onDrop",
+        "type": "event"
+      },
+      {
+        "prop": "onCopy",
+        "type": "event"
+      },
+      {
+        "prop": "onUnlink",
+        "type": "event"
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "documentType",
+        "why": "Matched against the DRAG PAYLOAD's `data.type`, so it has no rendered consequence at all. The only way to observe it is to drop a document of the wrong type onto the zone, which the lab cannot synthesize — a real DataTransfer carrying a Foundry document is what the smoke harness is for."
+      },
+      {
+        "prop": "unlinkAttr",
+        "why": "An arbitrary `data-*` attribute NAME stamped on the unlink button, so a caller's own absence assertion has a selector to miss. Naming an attribute is not a state of the control."
+      }
+    ],
+    "stories": [
+      {
+        "title": "A link that resolves, and one that does not",
+        "matrix": {
+          "state": "*",
+          "disabled": "*"
+        }
+      },
+      {
+        "title": "Every caller kind",
+        "matrix": {
+          "kind": "*"
+        }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
+    "root": "manager",
+    "note": "The overlay path: the panel portals into its OWN plinth's `.fabricate-manager` and is clipped by it exactly as the product clips it (issue 1286). The option list is long enough that the panel exceeds a minimum-height plinth, so the clip is observable on purpose rather than by accident, and long enough that the search field is doing something. Thirty-eight props reach this component; seventeen are driven and the other twenty-one are waived in groups, because eighteen of them are trigger presentation a caller sets once and never varies.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; see the plinth's pseudo-class readout.",
+      "focus-visible": "No prop. The trigger and every option row take a ring; tab to them on the plinth.",
+      "disabled": true,
+      "loading": "No prop. The option list is passed in already resolved, so the component never awaits anything — which is a divergence from `library.html:764`, where an async `source` carries `loading`, `error` and `emptyText` together.",
+      "invalid": "No prop. A closed set cannot hold an invalid value; an unmatched `value` simply marks nothing.",
+      "readonly": "No prop. `disabled` and `triggerAriaDisabled` are the two off states and neither is read-only.",
+      "empty": true
+    },
+    "fixedProps": {
+      "searchPlaceholder": "Search ingredients…",
+      "emptyHint": "No ingredient matches",
+      "emptyDetail": "Clear the query, or add the item to this crafting system first.",
+      "dialogAriaLabel": "Choose an ingredient",
+      "searchAriaLabel": "Search ingredients"
+    },
+    "knobs": [
+      {
+        "prop": "options",
+        "type": "json",
+        "default": [],
+        "value": [
+          {
+            "id": "iron",
+            "label": "Iron ingot",
+            "icon": "fas fa-cube"
+          },
+          {
+            "id": "oak",
+            "label": "Oak haft",
+            "icon": "fas fa-tree"
+          },
+          {
+            "id": "cord",
+            "label": "Waxed cord",
+            "icon": "fas fa-link"
+          },
+          {
+            "id": "leather",
+            "label": "Boiled leather",
+            "icon": "fas fa-shield"
+          },
+          {
+            "id": "quartz",
+            "label": "Clear quartz",
+            "icon": "fas fa-gem"
+          },
+          {
+            "id": "resin",
+            "label": "Pine resin",
+            "icon": "fas fa-droplet"
+          },
+          {
+            "id": "silver",
+            "label": "Silver wire",
+            "icon": "fas fa-bolt"
+          },
+          {
+            "id": "ash",
+            "label": "Ash bark",
+            "icon": "fas fa-leaf"
+          },
+          {
+            "id": "chitin",
+            "label": "Beetle chitin",
+            "icon": "fas fa-bug"
+          },
+          {
+            "id": "ember",
+            "label": "Banked ember",
+            "icon": "fas fa-fire"
+          },
+          {
+            "id": "brine",
+            "label": "Deep brine",
+            "icon": "fas fa-water"
+          },
+          {
+            "id": "obsidian",
+            "label": "Obsidian shard",
+            "icon": "fas fa-mountain"
+          },
+          {
+            "id": "vellum",
+            "label": "Scraped vellum",
+            "icon": "fas fa-scroll"
+          },
+          {
+            "id": "amber",
+            "label": "Fossil amber",
+            "icon": "fas fa-circle"
+          },
+          {
+            "id": "sinew",
+            "label": "Dried sinew",
+            "icon": "fas fa-link-slash"
+          },
+          {
+            "id": "salt",
+            "label": "Rock salt",
+            "icon": "fas fa-snowflake"
+          },
+          {
+            "id": "tallow",
+            "label": "Rendered tallow",
+            "icon": "fas fa-jar"
+          },
+          {
+            "id": "loam",
+            "label": "River loam",
+            "icon": "fas fa-seedling"
+          }
+        ]
+      },
+      {
+        "prop": "value",
+        "type": "text",
+        "value": "iron",
+        "default": ""
+      },
+      {
+        "prop": "triggerLabel",
+        "type": "text",
+        "value": "Iron ingot",
+        "default": ""
+      },
+      {
+        "prop": "triggerIcon",
+        "type": "text",
+        "value": "fas fa-cube",
+        "default": ""
+      },
+      {
+        "prop": "triggerChip",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "disabled",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "showChevron",
+        "type": "boolean",
+        "value": true,
+        "default": true
+      },
+      {
+        "prop": "showSearch",
+        "type": "boolean",
+        "value": true,
+        "default": true
+      },
+      {
+        "prop": "compactOptionRows",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "showFilteredCount",
+        "type": "boolean",
+        "value": true,
+        "default": false
+      },
+      {
+        "prop": "popoverTitle",
+        "type": "text",
+        "value": "Choose an ingredient",
+        "default": ""
+      },
+      {
+        "prop": "maxHeight",
+        "type": "number",
+        "value": 0,
+        "default": 0,
+        "min": 0,
+        "max": 600
+      },
+      {
+        "prop": "minWidth",
+        "type": "number",
+        "value": 240,
+        "default": 240,
+        "min": 120,
+        "max": 600
+      },
+      {
+        "prop": "maxWidth",
+        "type": "number",
+        "value": 340,
+        "default": 340,
+        "min": 160,
+        "max": 800
+      },
+      {
+        "prop": "header",
+        "type": "snippet",
+        "value": "",
+        "default": ""
+      },
+      {
+        "prop": "footer",
+        "type": "snippet",
+        "value": "",
+        "default": ""
+      },
+      {
+        "prop": "onChoose",
+        "type": "event",
+        "writes": "value"
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "optionGroups",
+        "why": "A second, mutually exclusive shape for the same data. Driving both from one panel would let the lab render a combination no call site can produce."
+      },
+      {
+        "prop": "triggerClass",
+        "why": "An EXTRA class on the trigger. Driving it would let the harness paint a trigger the design system does not draw."
+      },
+      {
+        "prop": "valueClass",
+        "why": "The same, on the value span."
+      },
+      {
+        "prop": "pickerClass",
+        "why": "The same, on the picker root."
+      },
+      {
+        "prop": "popoverClass",
+        "why": "The same, on the portaled panel."
+      },
+      {
+        "prop": "triggerImg",
+        "why": "An image URL. The lab must never invent a Foundry asset path — an unvalidated `img` 404s silently — and a real one would be fixture data rather than a knob."
+      },
+      {
+        "prop": "triggerData",
+        "why": "Arbitrary `data-*` attributes for a caller's own selectors. No visual consequence at all."
+      },
+      {
+        "prop": "triggerAddMarker",
+        "why": "A caller's marker attribute, read by the recipe editor's own tests. No visual consequence."
+      },
+      {
+        "prop": "triggerTitle",
+        "why": "A pointer tooltip. Real, but it renders outside the plinth and cannot be captured with the specimen."
+      },
+      {
+        "prop": "triggerHasPopup",
+        "why": "An ARIA relationship, not a rendering. The value states what OPENS — `dialog` for a panel with a query field, `listbox` for a bare option list — so driving it apart from `showSearch` would announce a panel this component does not open."
+      },
+      {
+        "prop": "triggerAriaDisabled",
+        "why": "The announced half of `disabled`, which is already driven. Driving them apart would let the lab render a control that says one thing and does another."
+      },
+      {
+        "prop": "triggerAriaLabel",
+        "why": "An accessible name emitted only when non-empty. Left unset, so the trigger is named by its own visible `triggerLabel` and `value` — an aria-label that disagreed with the words on screen is a defect rather than a state worth exploring."
+      },
+      {
+        "prop": "dialogAriaLabel",
+        "why": "The panel's accessible name. Set verbatim through `fixedProps` rather than driven: an unnamed dialog is a localization gap, not a presentation this component offers."
+      },
+      {
+        "prop": "searchAriaLabel",
+        "why": "The search field's accessible name; same reason, same route."
+      },
+      {
+        "prop": "searchPlaceholder",
+        "why": "Placeholder text inside the panel. Set through `fixedProps` to a realistic string, because an empty placeholder is a localization gap rather than a state worth exploring."
+      },
+      {
+        "prop": "emptyHint",
+        "why": "Feeds `EmptyState`'s TITLE slot when the query matches nothing, which is reached by TYPING rather than by a knob — the honest route to that state is the search field itself. Set through `fixedProps` so the state says something when you get there."
+      },
+      {
+        "prop": "emptyDetail",
+        "why": "The same state and the same route, feeding `EmptyState`'s hint slot beneath it."
+      },
+      {
+        "prop": "filteredCountTemplate",
+        "why": "A format string for the matched/total readout. `showFilteredCount` is driven; the template is localization."
+      },
+      {
+        "prop": "inlineSearchTrigger",
+        "why": "Replaces the trigger with an inline field, which is a different component shape rather than a state of this one. It belongs in a story once this row has a caller that uses it."
+      },
+      {
+        "prop": "inlineCloseLabel",
+        "why": "Only reachable through `inlineSearchTrigger`."
+      },
+      {
+        "prop": "open",
+        "why": "`$bindable`. The lab holds knob values in its own state and hands them down, so binding a two-way handle here would give the open state two owners that disagree."
+      }
+    ],
+    "stories": [
+      {
+        "title": "Trigger shapes",
+        "matrix": {
+          "triggerChip": "*",
+          "showChevron": "*"
+        }
+      },
+      {
+        "title": "The search row and its tally",
+        "matrix": {
+          "showSearch": "*",
+          "showFilteredCount": "*"
+        }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/components/ManagerColorPopover.svelte",
+    "root": "manager",
+    "note": "THE WRITE-BACK CANNOT BE WIRED HERE, and that is a fact about the callback rather than a gap in this row. `onChange` emits a COMPOSITE `{colorToken, customColor}` from both the preset grid and the hex field, and `writes` names a knob to receive one ARGUMENT — there is no way to project a field out of the payload, so writing it back would replace `colorToken` with the whole object. Every call site disambiguates the two halves itself; the lab's own knob panel does it in `tintValue()`. Move the palette from its `colorToken` knob instead.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; see the plinth's pseudo-class readout.",
+      "focus-visible": "No prop. Every preset is a real `<button>` and the selected one is a 2px accent outline at 2px offset — never a tick, which would fight the swatch. Tab into the grid on the plinth.",
+      "disabled": "No prop at all. The palette has no off state: every preset stays pressable, and a caller that must lock the colour renders something else instead of this panel.",
+      "loading": "No prop. The palette is the shared `MANAGER_COLOR_TOKENS` constant, resolved at module scope, so there is nothing to await.",
+      "invalid": "No prop, and no treatment: `validCustomHex` DROPS an unparseable entry silently, so typing `#12` leaves the swatch on the last valid colour with nothing on screen saying the entry was rejected.",
+      "readonly": "No prop. There is no off state to be the read-only half of.",
+      "empty": "Not applicable: the palette is a fixed eight-token set plus an optional ninth No-colour cell, so it can never be empty."
+    },
+    "knobs": [
+      {
+        "prop": "colorToken",
+        "type": "select",
+        "options": ["sage", "mist", "lavender", "rose", "peach", "butter", "aqua", "mauve"],
+        "value": "mauve",
+        "default": "sage"
+      },
+      {
+        "prop": "customColor",
+        "type": "colour",
+        "value": "#8B6F47",
+        "default": ""
+      },
+      {
+        "prop": "layout",
+        "type": "select",
+        "options": ["popover", "inline"],
+        "value": "inline",
+        "default": "popover"
+      },
+      {
+        "prop": "allowCustom",
+        "type": "boolean",
+        "value": true,
+        "default": true
+      },
+      {
+        "prop": "allowNone",
+        "type": "boolean",
+        "value": true,
+        "default": false
+      },
+      {
+        "prop": "unset",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "presetGridLabel",
+        "type": "text",
+        "value": "Essence colour presets",
+        "default": "Colour presets"
+      },
+      {
+        "prop": "customHexLabel",
+        "type": "text",
+        "value": "Custom hex",
+        "default": "Custom hex"
+      },
+      {
+        "prop": "noneLabel",
+        "type": "text",
+        "value": "No colour",
+        "default": "No colour"
+      },
+      {
+        "prop": "onChange",
+        "type": "event"
+      },
+      {
+        "prop": "onClear",
+        "type": "event"
+      },
+      {
+        "prop": "onDismiss",
+        "type": "event"
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "noneSelected",
+        "why": "A THREE-valued flag: `true`, `false`, or `null` to derive it from `unset`. A checkbox cannot express the third value and `null` is the shipped default, so a boolean knob would silently take every render out of the default behaviour — which is the case three of the four call sites use."
+      },
+      {
+        "prop": "manageDismiss",
+        "why": "Gates the outside-click and Escape listener. It has no rendered consequence: `onDismiss` is the caller's to act on, and the lab holds the panel open unconditionally, so switching it would change only which events appear in the log."
+      },
+      {
+        "prop": "popoverStyle",
+        "why": "The absolute `left`/`top` the TRIGGER computes for the panel. Driving it would let the lab position the panel somewhere no measurement puts it, which is the one thing an overlay specimen must not do."
+      },
+      {
+        "prop": "portalTarget",
+        "why": "The element the panel portals into, resolved by the caller from its own trigger. The plinth is the host here, and the lab passes no target so the panel stays where it is mounted — moving it out of the plinth would put it outside the frame the specimen is measured in."
+      },
+      {
+        "prop": "registerPopoverNode",
+        "why": "A callback handing the panel's DOM node back to a trigger that must include it in its own outside-click test. There is no trigger here, and it has no rendered consequence."
+      }
+    ],
+    "stories": [
+      {
+        "title": "Both layouts",
+        "matrix": {
+          "layout": "*"
+        }
+      },
+      {
+        "title": "The ninth cell, and nothing chosen",
+        "matrix": {
+          "allowNone": "*",
+          "unset": "*"
+        }
+      },
+      {
+        "title": "With and without the free hex",
+        "matrix": {
+          "allowCustom": "*"
+        }
+      }
+    ]
+  },
+  {
+    "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
+    "root": "manager",
+    "note": "THE WRITE-BACK CANNOT BE WIRED HERE EITHER, and for a sharper reason than the tint picker's. `onChange` emits an authored PATCH keyed on the caller's own array — `{binding, index, dc}` for relative, `{binding, index, end, nextIndex, start}` for fixed, `{binding, dc}` for simple — never a new `bands` array. It is a VISUALISATION and never the authority: the numeric steppers in the tier rows below it are the control of record, and applying a patch is their work. So dragging a handle here logs the patch and the strip stays put, which is what a caller that ignored the patch would also see.",
+    "states": {
+      "rest": true,
+      "hover": "No prop; see the plinth's pseudo-class readout.",
+      "focus-visible": "No prop. Each handle is a real `role=\"slider\"` with `tabindex=0` and `data-keyboard-focus=\"true\"`; tab to one on the plinth and drive it with the arrow, Page, Home and End keys.",
+      "disabled": true,
+      "loading": "No prop. The bands are authored data handed over resolved, so the strip never awaits anything.",
+      "invalid": "No prop and no MARK. An overlapping or gapped authored set is refused rather than drawn — the strip renders `fallbackNote` alone and leaves the tier rows as the only editor — so nothing is outlined and nothing says which band is wrong.",
+      "readonly": "No prop. `library.html:714` specifies a `readonly` flag for exactly this component, on the ground that the strip is a visualisation; the shipped control has `disabled` instead, which also blanks `tabindex` and drops the handles out of the tab order.",
+      "empty": "No prop. Fewer than two bands takes the same non-contiguous fallback path as bad data, so \"nothing has been authored yet\" and \"what you authored cannot be drawn\" render as one sentence."
+    },
+    "knobs": [
+      {
+        "prop": "binding",
+        "type": "select",
+        "options": ["relative", "fixed", "simple"],
+        "value": "relative",
+        "default": "relative"
+      },
+      {
+        "prop": "bands",
+        "type": "json",
+        "default": [],
+        "value": [
+          {
+            "id": "fumble",
+            "name": "Fumble",
+            "from": 1,
+            "to": 9,
+            "index": 0,
+            "color": "var(--fab-danger-soft)",
+            "ink": "var(--fab-danger-text)"
+          },
+          {
+            "id": "failure",
+            "name": "Failure",
+            "from": 10,
+            "to": 14,
+            "index": 1,
+            "color": "var(--fab-warning-soft)",
+            "ink": "var(--fab-warning-text)"
+          },
+          {
+            "id": "success",
+            "name": "Success",
+            "from": 15,
+            "to": 19,
+            "index": 2,
+            "color": "var(--fab-success-soft)",
+            "ink": "var(--fab-success-text)"
+          },
+          {
+            "id": "critical",
+            "name": "Critical",
+            "from": 20,
+            "index": 3,
+            "color": "var(--fab-accent-soft)",
+            "ink": "var(--fab-accent-text)"
+          }
+        ]
+      },
+      {
+        "prop": "previewDc",
+        "type": "number",
+        "value": 15,
+        "default": 0,
+        "min": 0,
+        "max": 40
+      },
+      {
+        "prop": "previewLabel",
+        "type": "text",
+        "value": "Uncommon Craft",
+        "default": ""
+      },
+      {
+        "prop": "step",
+        "type": "number",
+        "value": 1,
+        "default": 1,
+        "min": 1,
+        "max": 5
+      },
+      {
+        "prop": "pageStep",
+        "type": "number",
+        "value": 5,
+        "default": 5,
+        "min": 1,
+        "max": 10
+      },
+      {
+        "prop": "min",
+        "type": "number",
+        "value": null,
+        "default": null,
+        "allowUnset": true,
+        "min": -20,
+        "max": 40
+      },
+      {
+        "prop": "max",
+        "type": "number",
+        "value": null,
+        "default": null,
+        "allowUnset": true,
+        "min": 0,
+        "max": 60
+      },
+      {
+        "prop": "groupLabel",
+        "type": "text",
+        "value": "Outcome bands",
+        "default": "Outcome bands"
+      },
+      {
+        "prop": "fallbackNote",
+        "type": "text",
+        "value": "These tiers overlap or leave a gap, so the strip cannot draw them. Edit the tier rows below.",
+        "default": ""
+      },
+      {
+        "prop": "disabled",
+        "type": "boolean",
+        "value": false,
+        "default": false
+      },
+      {
+        "prop": "onChange",
+        "type": "event"
+      }
+    ],
+    "unknobbed": [
+      {
+        "prop": "boundaryLabel",
+        "why": "A FUNCTION — `(band, nextBand) => string` — that names each handle for a screen reader. No knob type carries a function, and the shipped default already joins the two band names, which is the announcement the component's own contract describes."
+      },
+      {
+        "prop": "dataAttr",
+        "why": "An arbitrary `data-*` attribute NAME stamped on the strip root, for a host's own selectors. Naming an attribute is not a state of the control."
+      },
+      {
+        "prop": "dataValue",
+        "why": "The value that attribute carries; same reason. It is `true` when unset, so the pair is one hook rather than two knobs."
+      }
+    ],
+    "stories": [
+      {
+        "title": "Every binding",
+        "matrix": {
+          "binding": "*"
+        }
+      },
+      {
+        "title": "Switched off",
+        "matrix": {
+          "disabled": "*"
+        }
+      }
+    ]
+  }
+]
