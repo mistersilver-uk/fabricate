@@ -69,6 +69,7 @@ import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { assertPublishSafety, fetchPublishState } from './lib/publishGuard.js';
+import { bareVersion } from './lib/semver.js';
 import { zipDirectory } from './lib/zip.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -823,7 +824,7 @@ async function reportHeads({ config, version, channel, deps, env: envMap, log })
  * @param {{moduleId: string, version: string}} expected What was asked for.
  * @returns {void}
  */
-function assertBuiltManifest(built, { moduleId, version }) {
+export function assertBuiltManifest(built, { moduleId, version }) {
   for (const field of ['id', 'title', 'version', 'compatibility']) {
     if ([undefined, null, ''].includes(built[field])) {
       fail(`built module.json is missing required field "${field}"`);
@@ -832,7 +833,12 @@ function assertBuiltManifest(built, { moduleId, version }) {
   if (built.id !== moduleId) {
     fail(`config moduleId "${moduleId}" does not match built module.json id "${built.id}"`);
   }
-  if (built.version !== version) {
+  // Compared BARE on both sides. A published manifest version carries a `v` prefix (issue 1407)
+  // while `--version` is the bare number semantic-release minted, so a literal comparison refuses
+  // every release after that change — which is exactly how v1.9.3 came to be minted, drafted with
+  // both assets, and never published. The prefix is presentation on the artefact and is not part of
+  // a version's identity, so the identity check must not read it.
+  if (bareVersion(built.version) !== bareVersion(version)) {
     fail(`version mismatch: requested ${version} built ${built.version}`);
   }
 }
@@ -1078,7 +1084,9 @@ async function verifyReadBack({ s3, staged, version, log }) {
     } catch {
       fail(`post-publish read-back of ${target.label} returned a manifest that is not valid JSON.`);
     }
-    if (manifest?.version !== version) {
+    // Bare on both sides, for the same reason as the built-manifest check above: this reads back a
+    // PUBLISHED manifest, which carries the prefix.
+    if (bareVersion(manifest?.version) !== bareVersion(version)) {
       fail(
         `post-publish read-back of ${target.label} advertises ${manifest?.version}, expected ` +
           `${version}. A publish that established some targets and not others must fail, not report ` +

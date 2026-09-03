@@ -11,6 +11,7 @@ const {
   redactSegment,
   provenanceMetadata,
   assertUniformBuildProfile,
+  assertBuiltManifest,
   buildCopyObjectParams,
   CACHE_IMMUTABLE,
   main,
@@ -741,4 +742,58 @@ test('a zip backfilled with an "unknown" sha is treated by the guard as absent (
     ],
   });
   assert.equal(verdict.ok, false);
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// assertBuiltManifest() — the v-prefix identity check (issue 1479)
+// ───────────────────────────────────────────────────────────────────────────
+
+// A PUBLISHED manifest version carries a `v` prefix (issue 1407) while `--version` is the bare
+// number semantic-release minted. A literal comparison therefore refuses EVERY release after that
+// change: v1.9.3 was minted, tagged and drafted with both assets, and the S3 publish failed with
+// `version mismatch: requested 1.9.3 built v1.9.3`. Nothing caught it, because this function had
+// no test and no export — the release path is only exercised by an actual release.
+const builtManifest = (overrides = {}) => ({
+  id: 'fabricate',
+  title: 'Fabricate',
+  version: 'v1.9.3',
+  compatibility: { minimum: '13', verified: '14' },
+  ...overrides,
+});
+
+test('assertBuiltManifest accepts a prefixed built version against the bare version requested', () => {
+  assert.doesNotThrow(() =>
+    assertBuiltManifest(builtManifest(), { moduleId: 'fabricate', version: '1.9.3' })
+  );
+});
+
+test('assertBuiltManifest still refuses a genuinely different version', () => {
+  assert.throws(
+    () => assertBuiltManifest(builtManifest(), { moduleId: 'fabricate', version: '1.9.2' }),
+    /version mismatch: requested 1\.9\.2 built v1\.9\.3/,
+    'normalising the prefix must not make the identity check vacuous'
+  );
+});
+
+test('assertBuiltManifest refuses a doubled prefix rather than absorbing it', () => {
+  assert.throws(
+    () =>
+      assertBuiltManifest(builtManifest({ version: 'vv1.9.3' }), {
+        moduleId: 'fabricate',
+        version: '1.9.3',
+      }),
+    /version mismatch/,
+    'only ONE leading v is stripped — a doubled prefix is a bug in whoever built the string'
+  );
+});
+
+test('assertBuiltManifest still refuses a manifest missing its version', () => {
+  assert.throws(
+    () =>
+      assertBuiltManifest(builtManifest({ version: '' }), {
+        moduleId: 'fabricate',
+        version: '1.9.3',
+      }),
+    /missing required field "version"/
+  );
 });
