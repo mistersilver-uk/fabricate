@@ -1,5 +1,12 @@
 /*
- * THE WORLD TOOLS CATALOGUE'S ROW STATES, ARBITRATED IN A REAL BROWSER (issue 1373).
+ * THE FLATTENED LIST ROUTES' ROW STATES, ARBITRATED IN A REAL BROWSER (issue 1373).
+ *
+ * Three routes flatten their list rows to `background: transparent` so that a 1px border is what
+ * makes a row a row — the reference's own construction on all of them. Each then has to restate
+ * the two feedback states the flattening took away, and each got that partly wrong in the same
+ * way. This file is named for the world Tools catalogue because that is where the defect was
+ * found; it measures `world-tools`, `world-essences` and `essences`, because the second and third
+ * carried it verbatim and a fix proved on one route by symmetry is not proved at all.
  *
  * ── THE GAP THIS CLOSES IS AN ASSERTION GAP, NOT A COVERAGE GAP ─────────────────────────────
  * `world-tool-catalogue-bulk` already photographs four ticked rows. What it cannot do is say
@@ -10,20 +17,18 @@
  * list also looks like.
  *
  * The arbitration is a pure specificity question and the sheet reads as though both states are
- * declared: `[data-manager-view='world-tools'] .manager-scoped-list-row:hover` is (0,4,0) and
- * `.fabricate-manager .manager-scoped-list-row.is-bulk-selected` is (0,3,0), so hover wins and a
- * row a GM has just ticked loses its marking for as long as the pointer stays on it. The system
- * half of exactly this rule was repaired one round earlier with `:not(.is-selected)`, and its
- * comment recorded the world half as "deliberately untouched" because the world `.is-selected`
- * paints the same value the hover does — true for `.is-selected`, and false for
- * `.is-bulk-selected`, which paints `--fab-surface-active`.
+ * declared. A route's `:hover` is (0,4,0) and the shared `.is-bulk-selected` is (0,3,0), so hover
+ * wins and a row a GM has just ticked loses its marking for as long as the pointer stays on it.
+ * And the route's own `background: transparent` is (0,3,0) — a TIE with that shared rule, decided
+ * by source order in its favour — so a ticked row painted nothing even at rest, on every route
+ * that restated `.is-selected` and forgot its twin.
  *
  * ── WHY A BROWSER, AND WHY NOT A MOUNTED TEST ───────────────────────────────────────────────
  * happy-dom computes no cascade at all, so a mounted suite can state that the row carries
  * `is-bulk-selected` and never which declaration wins. And no frame can photograph a hover: the
  * View Lab has five step verbs and none of them is one, so the state the capture accidentally
  * produces is a state the registry has no way to assert about. `tool-rules-list-parity.test.js`
- * is the same argument for the system list one route away.
+ * is the same argument for the system rules list one route away.
  *
  * ── THE LAYERING IS THE PRODUCT'S, AND THE FIRST TEST BELOW PROVES IT ───────────────────────
  * `module.json` registers `styles/fabricate.css` with no explicit `layer`, and Foundry imports an
@@ -41,67 +46,98 @@ import { chromium } from 'playwright';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const FRAME = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte';
 const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+
+const FRAME = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte';
+const ESSENCE_ROW = 'src/ui/svelte/apps/manager/essences/EssenceRow.svelte';
+
 /*
- * The frame's own block, loaded UNLAYERED exactly as the runtime injects it.
+ * THE THREE ROUTES, AS DATA RATHER THAN AS THREE COPIES OF THE SAME FILE.
  *
- * It declares no row background today, so every assertion below is decided by the global sheet.
- * It is loaded anyway, and that is the point: if it ever grows one, this fixture arbitrates the
- * pair the way production does rather than reporting the sheet's answer over a rule that has
- * stopped applying.
+ * `component` is the `.svelte` whose own block is injected UNLAYERED over the sheet when that
+ * route's row renders, so the fixture arbitrates the same pair production does. Neither declares
+ * a row background today and every assertion below is therefore decided by the global sheet —
+ * they are loaded, and the scope hash stamped onto the fixture's rows, so that the day one grows
+ * one this file reports the winner rather than the sheet's opinion of a rule that has stopped
+ * applying.
  */
-const frameCss = scopedComponentCss(resolve(repoRoot, FRAME)).css;
+const ROUTES = [
+  { view: 'world-tools', rowClass: 'manager-scoped-list-row', component: FRAME, subject: 'Tool' },
+  {
+    view: 'world-essences',
+    rowClass: 'manager-scoped-list-row',
+    component: FRAME,
+    subject: 'world Essence',
+  },
+  {
+    view: 'essences',
+    rowClass: 'manager-essence-row',
+    component: ESSENCE_ROW,
+    subject: 'system Essence',
+  },
+];
+
+const components = new Map();
+for (const { component } of ROUTES) {
+  if (!components.has(component)) {
+    components.set(component, scopedComponentCss(resolve(repoRoot, component)));
+  }
+}
 
 /** One row, in whatever combination of the two independent state classes it is asked for. */
-function row(probe, classes) {
+function row(route, probe, classes) {
+  const { hashClass } = components.get(route.component);
   return (
-    `<li class="manager-scoped-list-row ${classes}" data-probe="${probe}">` +
+    `<li class="${route.rowClass} ${classes} ${hashClass}" data-probe="${route.view}-${probe}">` +
     `<span class="manager-scoped-list-identity">${probe}</span></li>`
   );
 }
 
-/*
- * FOUR ROWS, WHICH IS THE SMALLEST SET THAT SETTLES THE QUESTION.
- *
- * The pointer can only be on one of them, so each state needs a twin the pointer is NOT on — a
- * single hovered row would report a colour with nothing to compare it against, and the obvious
- * wrong repair (deleting the hover rule) would pass. `plain` is what proves hover still paints
- * anything at all.
- */
-const ROUTE_ROWS =
-  '<ul class="manager-scoped-list">' +
-  row('bulk-hovered', 'is-bulk-selected') +
-  row('bulk-resting', 'is-bulk-selected') +
-  row('inspected-hovered', 'is-selected') +
-  row('plain-hovered', '') +
-  '</ul>';
+function container(view, rows) {
+  const routed = view ? ` data-manager-view="${view}"` : '';
+  return (
+    `<div class="fabricate fabricate-manager" data-fabricate-theme="dark"${routed}>` +
+    `<div class="manager-scoped-list-rows"><ul class="manager-scoped-list">${rows.join('')}` +
+    '</ul></div></div>'
+  );
+}
 
 /*
- * THE SAME ROW, OUTSIDE THE ROUTE, AND IT IS THE ORACLE RATHER THAN A FIFTH CASE.
+ * FOUR ROWS PER ROUTE, WHICH IS THE SMALLEST SET THAT SETTLES THE QUESTION, AND A FIFTH THAT IS
+ * THE ORACLE RATHER THAN A CASE.
  *
- * `.fabricate-manager .manager-scoped-list-row.is-bulk-selected` is the SHARED statement of what
- * a ticked row looks like, and every other scoped catalogue renders under it untouched. So the
- * question the world Tools route raises is not "what colour should this be" — which would want a
+ * The pointer can only be on one row, so each state needs a twin the pointer is NOT on — a single
+ * hovered row would report a colour with nothing to compare it against, and the obvious wrong
+ * repair (deleting the hover rule) would pass. `plain` is what proves hover still paints anything
+ * at all.
+ *
+ * The fifth row sits OUTSIDE the route. `.fabricate-manager .manager-scoped-list-row.is-bulk-
+ * selected` and its `.manager-essence-row` twin are the SHARED statement of what a ticked row
+ * looks like, and every browser that does not flatten its rows renders under them untouched. So
+ * the question a flattening route raises is not "what colour should this be" — which would want a
  * literal, and a literal is a second copy of a token — it is "does this route still say what the
  * shared rule says". Comparing the two containers asks exactly that, and it keeps answering it
  * through a theme change, a token rename or a ladder move.
  */
-const BASELINE_ROWS = `<ul class="manager-scoped-list">${row('bulk-baseline', 'is-bulk-selected')}</ul>`;
+function markup(route) {
+  return (
+    container(route.view, [
+      row(route, 'bulk-hovered', 'is-bulk-selected'),
+      row(route, 'bulk-resting', 'is-bulk-selected'),
+      row(route, 'inspected-hovered', 'is-selected'),
+      row(route, 'plain-hovered', ''),
+    ]) + container('', [row(route, 'bulk-baseline', 'is-bulk-selected')])
+  );
+}
 
 const PAGE =
   '<!doctype html><html><head><meta charset="utf-8">' +
   `<style id="layered-sheet">@layer modules { ${sheet} }</style>` +
-  `<style>${frameCss}</style>` +
+  `<style>${[...components.values()].map((entry) => entry.css).join('')}</style>` +
   '<style>:root { --font-primary: Arial, sans-serif; } html, body { margin: 0; padding: 0; }' +
   '.manager-scoped-list { list-style: none; margin: 0; padding: 0; width: 600px; }' +
-  '.manager-scoped-list-row { height: 40px; }</style></head>' +
-  '<body><div class="fabricate fabricate-manager" data-fabricate-theme="dark" ' +
-  `data-manager-view="world-tools"><div class="manager-scoped-list-rows">${ROUTE_ROWS}` +
-  '</div></div>' +
-  '<div class="fabricate fabricate-manager" data-fabricate-theme="dark">' +
-  `<div class="manager-scoped-list-rows">${BASELINE_ROWS}</div></div>` +
-  '</body></html>';
+  '.manager-scoped-list-row, .manager-essence-row { height: 40px; min-height: 0; }</style></head>' +
+  `<body>${ROUTES.map(markup).join('')}</body></html>`;
 
 let browser;
 
@@ -114,7 +150,7 @@ after(async () => {
 });
 
 async function open() {
-  const page = await browser.newPage({ viewport: { width: 900, height: 400 } });
+  const page = await browser.newPage({ viewport: { width: 900, height: 1400 } });
   await page.setContent(PAGE);
   return { page, close: () => page.close() };
 }
@@ -146,92 +182,94 @@ test('the fixture layers the sheet the way Foundry does, or it proves nothing', 
   }
 });
 
-test('a bulk-selected world Tool row is marked at all, which the route had stopped saying', async () => {
-  const { page, close } = await open();
-  try {
-    const routed = await page.evaluate(fillOf, 'bulk-resting');
-    const baseline = await page.evaluate(fillOf, 'bulk-baseline');
+for (const route of ROUTES) {
+  const probe = (name) => `${route.view}-${name}`;
 
-    // THE FIRST HALF, AND IT IS A SEPARATE DEFECT FROM THE HOVER ONE. The route strips every
-    // row's resting fill — `[data-manager-view='world-tools'] .manager-scoped-list-row {
-    // background: transparent }` — at (0,3,0), which is the SAME weight as the shared
-    // `.fabricate-manager .manager-scoped-list-row.is-bulk-selected` and stands LATER in the
-    // file. So a ticked row on this one screen paints nothing, and the tick in its checkbox is
-    // the only thing distinguishing it from an untouched row.
-    //
-    // `.is-selected` WAS RESTATED FOR THE ROUTE and `.is-bulk-selected` was not, which is why
-    // this reads as an oversight rather than a decision: the fix is the missing twin of a rule
-    // that is already there, five lines away.
-    assert.equal(
-      routed,
-      baseline,
-      'the world-tools route must restate the bulk-selected fill, as it already restates ' +
-        '.is-selected — otherwise a ticked row on this screen paints nothing at all'
-    );
-  } finally {
-    await close();
-  }
-});
+  test(`a bulk-selected ${route.subject} row is marked at all on ${route.view}`, async () => {
+    const { page, close } = await open();
+    try {
+      const routed = await page.evaluate(fillOf, probe('bulk-resting'));
+      const baseline = await page.evaluate(fillOf, probe('bulk-baseline'));
 
-test('hovering a bulk-selected world Tool row does not strip its selection marking', async () => {
-  const { page, close } = await open();
-  try {
-    await page.hover('[data-probe="bulk-hovered"]');
-    const hovered = await page.evaluate(fillOf, 'bulk-hovered');
-    const resting = await page.evaluate(fillOf, 'bulk-resting');
-    const baseline = await page.evaluate(fillOf, 'bulk-baseline');
+      // THE FIRST HALF, AND IT IS A SEPARATE DEFECT FROM THE HOVER ONE. The route strips every
+      // row's resting fill at (0,3,0), which is the SAME weight as the shared `.is-bulk-selected`
+      // rule and stands LATER in the file. So a ticked row on this screen paints nothing, and the
+      // tick in its checkbox is the only thing distinguishing it from an untouched row.
+      //
+      // `.is-selected` WAS RESTATED FOR THE ROUTE and `.is-bulk-selected` was not, on all three,
+      // which is why this reads as an oversight rather than a decision: the fix is the missing
+      // twin of a rule that is already there, five lines away.
+      assert.equal(
+        routed,
+        baseline,
+        `the ${route.view} route must restate the bulk-selected fill, as it already restates ` +
+          '.is-selected — otherwise a ticked row on this screen paints nothing at all'
+      );
+    } finally {
+      await close();
+    }
+  });
 
-    // THE SECOND HALF, AND THE ONE A FRAME ALREADY CONTAINS AND CANNOT SPEAK ABOUT. A ticked row
-    // and the pointer are two independent facts, and a GM sweeping the pointer down a list they
-    // have just ticked must not watch the marking follow the mouse off each row in turn.
-    assert.equal(
-      hovered,
-      resting,
-      'a bulk-selected row keeps its selection fill under the pointer'
-    );
+  test(`hovering a bulk-selected ${route.subject} row keeps its marking on ${route.view}`, async () => {
+    const { page, close } = await open();
+    try {
+      await page.hover(`[data-probe="${probe('bulk-hovered')}"]`);
+      const hovered = await page.evaluate(fillOf, probe('bulk-hovered'));
+      const resting = await page.evaluate(fillOf, probe('bulk-resting'));
+      const baseline = await page.evaluate(fillOf, probe('bulk-baseline'));
 
-    // AND IT IS THE BULK FILL RATHER THAN NOTHING. Without this the assertion above is satisfied
-    // by a repair that removed the bulk rule as well as the hover one, which would make every
-    // ticked row indistinguishable from an untouched one — a worse version of the same defect,
-    // and the state the route is in today.
-    assert.equal(hovered, baseline, 'and it is the shared bulk fill it keeps');
-  } finally {
-    await close();
-  }
-});
+      // THE SECOND HALF, AND THE ONE A FRAME ALREADY CONTAINS AND CANNOT SPEAK ABOUT. A ticked
+      // row and the pointer are two independent facts, and a GM sweeping the pointer down a list
+      // they have just ticked must not watch the marking follow the mouse off each row in turn.
+      assert.equal(
+        hovered,
+        resting,
+        'a bulk-selected row keeps its selection fill under the pointer'
+      );
 
-test('hover still paints an ordinary world Tool row, so deleting the rule is not a fix', async () => {
-  const { page, close } = await open();
-  try {
-    const before = await page.evaluate(fillOf, 'plain-hovered');
-    await page.hover('[data-probe="plain-hovered"]');
-    const after = await page.evaluate(fillOf, 'plain-hovered');
+      // AND IT IS THE BULK FILL RATHER THAN NOTHING. Without this the assertion above is
+      // satisfied by a repair that removed the bulk rule as well as the hover one, which would
+      // make every ticked row indistinguishable from an untouched one — a worse version of the
+      // same defect, and the state all three routes were in.
+      assert.equal(hovered, baseline, 'and it is the shared bulk fill it keeps');
+    } finally {
+      await close();
+    }
+  });
 
-    // THE NON-VACUITY CLAUSE FOR THE WHOLE FILE. The route strips the resting fill from every row
-    // — the 1px border is what makes a row a row on this screen — so hover is the ONLY thing that
-    // gives an unticked row a surface, and a repair that dropped the hover rule to win the
-    // argument above would leave the list with no pointer feedback at all and still pass.
-    assert.notEqual(before, after, 'an unticked row takes a fill under the pointer');
-  } finally {
-    await close();
-  }
-});
+  test(`hover still paints an ordinary ${route.subject} row on ${route.view}`, async () => {
+    const { page, close } = await open();
+    try {
+      const resting = await page.evaluate(fillOf, probe('plain-hovered'));
+      await page.hover(`[data-probe="${probe('plain-hovered')}"]`);
+      const hovered = await page.evaluate(fillOf, probe('plain-hovered'));
 
-test('hovering the inspected world Tool row does not strip its own marking either', async () => {
-  const { page, close } = await open();
-  try {
-    const resting = await page.evaluate(fillOf, 'inspected-hovered');
-    await page.hover('[data-probe="inspected-hovered"]');
-    const hovered = await page.evaluate(fillOf, 'inspected-hovered');
+      // THE NON-VACUITY CLAUSE FOR THE WHOLE FILE. Each route strips the resting fill from every
+      // row — the 1px border is what makes a row a row on these screens — so hover is the ONLY
+      // thing that gives an unticked row a surface, and a repair that dropped the hover rule to
+      // win the argument above would leave the list with no pointer feedback at all and pass.
+      assert.notEqual(resting, hovered, 'an unticked row takes a fill under the pointer');
+    } finally {
+      await close();
+    }
+  });
 
-    // THE SIBLING HALF, asserted even though the sheet's own comment records it as a zero-pixel
-    // arbitration today: the route's `.is-selected` and its `:hover` happen to paint the same
-    // value, so nothing MOVES when hover wins. That is a coincidence of two literals rather than
-    // a decision, and it is exactly the kind of coincidence a later theme or ladder change ends
-    // silently. Pinning it here means the day the two values diverge is the day this fails,
-    // rather than the day a GM notices.
-    assert.equal(hovered, resting, 'the inspected row keeps its accent fill under the pointer');
-  } finally {
-    await close();
-  }
-});
+  test(`hovering the inspected ${route.subject} row keeps its marking on ${route.view}`, async () => {
+    const { page, close } = await open();
+    try {
+      const resting = await page.evaluate(fillOf, probe('inspected-hovered'));
+      await page.hover(`[data-probe="${probe('inspected-hovered')}"]`);
+      const hovered = await page.evaluate(fillOf, probe('inspected-hovered'));
+
+      // THE SIBLING HALF, asserted even though the sheet's own comment records it as a zero-pixel
+      // arbitration today: each route's `.is-selected` and its `:hover` happen to paint the same
+      // value, so nothing MOVES when hover wins. That is a coincidence of two literals rather
+      // than a decision, and it is exactly the kind of coincidence a later theme or ladder change
+      // ends silently. Pinning it here means the day the two values diverge is the day this
+      // fails, rather than the day a GM notices.
+      assert.equal(hovered, resting, 'the inspected row keeps its accent fill under the pointer');
+    } finally {
+      await close();
+    }
+  });
+}
