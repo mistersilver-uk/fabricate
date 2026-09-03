@@ -2013,6 +2013,92 @@ const TOOL_WORLD_REQUIREMENT_DEFAULTS = Object.freeze({
   },
 });
 
+/**
+ * The world Tool records that belong to NO crafting system, and the world defaults they carry.
+ *
+ * `lab-tool-unlinked` is the first of them and predates this block; these are the two states the
+ * corpus could not otherwise reach, both of them world-scope facts that no in-system tool
+ * definition can express.
+ *
+ * ── WHY THEY SORT LAST, AND WHY THAT IS LOAD-BEARING ────────────────────────────────────────
+ * The catalogue's default order is `name-asc` over `scopedEntryName`, its page window is ten,
+ * and six capture cases open `Smith's Hammer` from PAGE ONE. So a world-only record whose name
+ * sorts before `S` pushes the hammer onto page two and its row selector matches nothing — which
+ * fails the whole capture and publishes no frames at all rather than one wrong one. `Warped
+ * Crucible` sorts after `Unclaimed Bellows`, so page one is byte-for-byte the set it already
+ * was and page two grows from one row to two.
+ *
+ * `world-tool-catalogue-page-two` and `world-tool-entry-source-missing` both walk the pager to
+ * reach these records, and `world-tool-entry-unlinked` already did.
+ *
+ * ── WHAT EACH ONE IS FOR ────────────────────────────────────────────────────────────────────
+ * `lab-tool-warped-crucible` is the DANGLING SOURCE LINK: it names
+ * `Item.lab-tool-warped-crucible`, and `buildDocumentIndex` mints an Item only for the crafting
+ * systems' own component, tool and recipe-item definitions — so this uuid resolves to nothing.
+ * That is the one route to `ItemDropZone`'s `missing` face, which is the third of its three and
+ * had no frame at either scope: a record with no uuid at all draws the UNLINKED face instead,
+ * and `sourceMissing` deliberately requires a non-empty Item roster so that a roster which has
+ * simply not loaded cannot be mistaken for a broken link.
+ *
+ * ITS `0%` BREAK CHANCE IS A SECOND FACT AND IT IS PAIRED WITH A CASE. A break chance of zero is
+ * a mode with no usable value, which is what the world entry's Validation tab warns about — and
+ * `worldToolSorts` labels it `0% break`, which sorts FIRST of the twelve under the catalogue's
+ * one lane sort. `world-tool-catalogue-sort-lane-inert` asserts exactly that row on page one,
+ * because a lane sort composed with a direction falls back to name order silently and a frame
+ * showing a disabled toggle over an unreordered list would look identical to a working one.
+ */
+const WORLD_ONLY_TOOL_ENTITIES = [
+  {
+    id: 'lab-tool-warped-crucible',
+    name: 'Warped Crucible',
+    // A REAL FOUNDRY PATH, verified against the harvested `icons/` tree rather than inferred from
+    // the naming convention — see `lab-tool-unlinked`'s note for what an invented one costs.
+    img: `${ICON_BASE}/tools/smithing/crucible-steel.webp`,
+    description: 'Slumped out of true in a runaway heat, and the Item behind it is long deleted.',
+    // NAMED, AND UNRESOLVABLE. Both halves are the point: `entryHasSourceLink` reads this field,
+    // so the record reports itself LINKED, and nothing in the Item index answers the uuid.
+    registeredItemUuid: 'Item.lab-tool-warped-crucible',
+    originItemUuid: 'Item.lab-tool-warped-crucible',
+    aliasItemUuids: [],
+  },
+];
+
+/**
+ * The world defaults for the world-ONLY records, as `Object.fromEntries` pairs.
+ *
+ * `lab-tool-unlinked` gets one for the first time here, and `enabled: false` is the whole reason:
+ * no Tool in the corpus was disabled at world scope, so the master switch — the one control that
+ * reaches every crafting system at once — was photographed exclusively ON, on all three of the
+ * surfaces that draw it (the catalogue row's toggle, the catalogue inspector's pill and the
+ * entry's own switch card).
+ *
+ * IT IS THIS RECORD RATHER THAN A REAL TOOL, and that is the cheapest honest place for it. The
+ * world switch is a VETO — `resolveScopedDefinition` ANDs it with each system's own — so
+ * disabling any Tool a system actually has would switch it off in that system, and every recipe
+ * requiring it would stop being craftable, which reaches the player crafting and gathering frames.
+ * `lab-tool-unlinked` has no membership and no system, so the veto reaches the three world-scope
+ * surfaces it is evidence for and nothing else.
+ */
+const WORLD_ONLY_TOOL_DEFAULT_ENTRIES = [
+  [
+    'lab-tool-unlinked',
+    {
+      id: 'lab-tool-unlinked',
+      breakage: { mode: 'limitedUses', maxUses: null },
+      onBreak: { mode: 'destroy' },
+      enabled: false,
+    },
+  ],
+  [
+    'lab-tool-warped-crucible',
+    {
+      id: 'lab-tool-warped-crucible',
+      breakage: { mode: 'breakageChance', breakageChance: 0 },
+      onBreak: { mode: 'destroy' },
+    },
+  ],
+];
+
 const SMITHING_TOOLS = [
   {
     id: 'sm-tool-hammer',
@@ -4015,9 +4101,10 @@ export function buildLabContent() {
           img: `${ICON_BASE}/tools/smithing/furnace-boiler-steel.webp`,
           description: 'A world record no game-world Item stands behind yet.',
         },
+        ...WORLD_ONLY_TOOL_ENTITIES,
       ],
-      defaults: Object.fromEntries(
-        [...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => [
+      defaults: Object.fromEntries([
+        ...[...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => [
           tool.id,
           {
             id: tool.id,
@@ -4062,8 +4149,12 @@ export function buildLabContent() {
             // is authored for and no roll anywhere.
             ...(TOOL_WORLD_REQUIREMENT_DEFAULTS[tool.id] ?? {}),
           },
-        ])
-      ),
+        ]),
+        // The two world-ONLY records' defaults, appended rather than merged over the top: they
+        // name no crafting system tool, so the map above cannot produce them and there is nothing
+        // for them to override.
+        ...WORLD_ONLY_TOOL_DEFAULT_ENTRIES,
+      ]),
       membership: Object.fromEntries(
         [
           ...SMITHING_TOOLS.map((tool) => [tool.id, LAB_SYSTEM_IDS.SMITHING]),

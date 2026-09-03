@@ -37,6 +37,8 @@ import {
   parsePlayerMountRegions,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
+  WORLD_TOOL_SEARCH_MISS_TERM,
+  WORLD_TOOL_SEARCH_TERM,
 } from '../scripts/lib/viewLabCases.js';
 
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
@@ -1220,6 +1222,83 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   assert.match(mountSource, /noParties: params\.get\('noParties'\) === '1'/);
   assert.match(mountSource, /noParties: params\.noParties/);
   assert.match(worldSource, /noParties\s*\n?\s*\? \[\]/);
+});
+
+test('the World Tools Catalogue search terms match exactly the rows their frames claim', async () => {
+  // WHY THIS EXISTS AT ALL is the reason its parties counterpart above does: an over-match is
+  // INVISIBLE in a screenshot. A frame showing four rows where two were meant looks like a frame,
+  // and the catalogue's filter does not search only names — `worldToolSearchText` concatenates the
+  // entity's name, its description AND both of its Item uuids, so a term chosen by reading the
+  // fixture's names can be answered by a uuid nobody looked at.
+  const [{ buildLabContent }, { worldToolSearchText }] = await Promise.all([
+    import('./view-lab/world/labContent.js'),
+    import('../src/ui/svelte/apps/manager/scoped/worldToolStudio.js'),
+  ]);
+  const content = buildLabContent();
+
+  // THE DOMAIN IS THE UNION, and that is what makes the derivation honest rather than
+  // convenient. The catalogue's twelve rows come from two places: the seven records the fixture
+  // seeds into `toolScope.entities`, and the five the `1.30.0` world-scope pass LIFTS out of the
+  // crafting systems' own `tools[]` — the lab seeds no `migrationVersion`, so every migration
+  // runs on every build. Deriving over the seeded set alone would leave the five migrated rows
+  // out of the check, and both of the rows this term is chosen for are migrated ones.
+  const seeded = new Map(content.toolScope.entities.map((entity) => [entity.id, entity]));
+  const domain = [
+    ...content.toolScope.entities,
+    ...content.tools
+      .filter((tool) => !seeded.has(tool.id))
+      // The shape the lift produces, in the fields the search reads. `label` is the authored
+      // display override and it is what the row draws when a tool carries one.
+      .map((tool) => ({
+        id: tool.id,
+        name: tool.label ?? tool.name,
+        description: tool.description ?? '',
+        originItemUuid: tool.originItemUuid,
+        registeredItemUuid: tool.registeredItemUuid,
+      })),
+  ];
+  assert.equal(domain.length, 12, 'the lab catalogue holds twelve rows');
+
+  const survivors = (term) =>
+    domain
+      .filter((entity) => worldToolSearchText({ entity }).includes(term.toLowerCase()))
+      .map((entity) => entity.id)
+      .sort();
+
+  assert.deepEqual(
+    survivors(WORLD_TOOL_SEARCH_TERM),
+    ['rw-tool-punch', 'rw-tool-stylus'],
+    'the search frame claims exactly these two rows'
+  );
+  assert.deepEqual(
+    survivors(WORLD_TOOL_SEARCH_MISS_TERM),
+    [],
+    'and the filtered-empty frame claims a term nothing answers'
+  );
+
+  // NON-VACUITY: a `searchOf` that answered the empty string for everything would satisfy both
+  // assertions above, and so would a domain the filter reads nothing from.
+  assert.ok(
+    survivors('tool').length > 0,
+    'the search text is non-empty; the two assertions above are answering something'
+  );
+
+  // AND THE CASES ACTUALLY TYPE THEM. The constants are exported so the two ends cannot drift,
+  // which only holds while the cases still read them.
+  assert.deepEqual(getCaseById('world-tool-catalogue-search').steps.at(-1), {
+    selector: '[data-scoped-list-search]',
+    fill: WORLD_TOOL_SEARCH_TERM,
+  });
+  assert.deepEqual(getCaseById('world-tool-catalogue-filtered-empty').steps.at(-1), {
+    selector: '[data-scoped-list-search]',
+    fill: WORLD_TOOL_SEARCH_MISS_TERM,
+  });
+  assert.ok(
+    getCaseById('world-tool-catalogue-search').expectContained.some(
+      (rule) => rule.target === '[data-scoped-list-row="rw-tool-punch"]'
+    ),
+    'the second survivor is asserted, so a filter that widened to one row fails the capture'
+  );
 });
 
 test('World Downtime publishes four tabs plus narrow/collapsed frames with generic browser assertions', () => {
@@ -4392,7 +4471,19 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
  *
  * @type {Set<string>}
  */
-const MEMBERLESS_ROW_CASES = new Set(['world-tool-entry-unlinked|lab-tool-unlinked']);
+const MEMBERLESS_ROW_CASES = new Set([
+  'world-tool-entry-unlinked|lab-tool-unlinked',
+  // The DANGLING SOURCE LINK record (issue 1373). Like `lab-tool-unlinked` above it, it is a
+  // world-ONLY entity: the state it exists to draw — `ItemDropZone`'s `missing` face, which
+  // renders only when a record NAMES an Item and that Item does not resolve — is a fact about a
+  // world record and about nothing a crafting system holds, and giving it a membership would put
+  // an unresolvable Tool into a system's rules list on every other frame of that list.
+  'world-tool-entry-source-missing|lab-tool-warped-crucible',
+  // The same record on its Validation tab. Its memberlessness is not incidental there — it is one
+  // of the two warnings the frame exists to photograph, and the check that reports it says so in
+  // as many words: `No crafting system has this Tool, so its world defaults reach nothing.`
+  'world-tool-entry-validation|lab-tool-warped-crucible',
+]);
 
 test('every world tool id the capture cases click exists in the lab world, projected', async () => {
   const [{ buildLabContent }, { createToolScopeStore }, { projectWorldScopeEntity }] =
