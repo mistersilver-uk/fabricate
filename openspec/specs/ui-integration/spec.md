@@ -692,6 +692,9 @@ Routed keeps its multi-group list and Add group; progressive is unchanged.
   **Known defect, recorded rather than implied correct (issue 1191):** every reference count on this screen is taken over the recipe and component cohorts as the two library searches currently filter them, not over the system's roster.
   A recipe or component that an active library search excludes therefore contributes nothing, so a vocabulary entry can read `Unused` while the system still references it — and an `Unused` row deletes in **one click**, because the confirm strip's copy reassigns references and is skipped for a zero-reference row.
   The intended contract is that `Unused` means unused _in this system_; issue 1081 preserved the existing cohort deliberately rather than change a rendered number under a performance heading.
+  As of issue 1462, leaving the recipe or component library clears that library's search term (see **GM Recipe Library**), so a search can no longer be carried into this screen and left applied there.
+  The clear republishes both cohorts this screen counts before the destination route renders, so the wrong counts are not shown even for one frame.
+  The cohort choice itself is unchanged and issue 1191 stays open against it: a consumer reading this projection from outside the manager's route scope would still be counting the filtered cohort.
 - Item tag list editor
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
@@ -1280,7 +1283,13 @@ These defaults are load-bearing: a default that hid rows would leave the GM star
 A group header is a tight left cluster — chevron, folder, name, count — not a full-width bar with the count flung to the far edge, which reads as a table header.
 
 The library's view-state — current page, category / status / lock filters, sort key and direction, group-by-category toggle, page size, and per-category collapse state — is **preserved across an editor round-trip**: opening a recipe editor and returning to the library restores the exact page, filters, sort, grouping, and collapsed groups the GM left, rather than resetting them to defaults.
-The name/description search term is likewise preserved across the round-trip.
+The name/description search term is preserved across that round-trip **and across that round-trip only**.
+Navigating out of the library's scope — to any route other than the library and its own detail editor — clears the term, so a filter can never stay applied on a screen that renders no search box for it.
+The scope is derived from the same browser↔detail-editor map the manager already uses for a crafting-system scope change, so it cannot drift from it.
+This applies identically to the Component Studio's library; the Access surface is its own scope and clears on entry, and it renders its own search box so the cleared term is visible there.
+Knowledge, Essences, Tools, Environments, Gathering and Systems keep their own in-screen search, which no other surface reads, so it is unaffected; so is the crafting graph's search, which is scoped to a tab rather than a route.
+Returning to the library from outside its scope therefore restores page, filters, sort, grouping and collapse but not the search term, because the search term is the only one of them that was cleared on the way out.
+It is cleared because its effect is not confined to the library — an active term also changes counts on screens that render no search box for it, and those controls do not.
 A genuine **crafting-system switch** (selecting a different system) resets the vocabulary-scoped filters (category) and the page and collapse position, because a category names a vocabulary the next system does not share, while keeping sort, group-by-category, page size, and the status / lock filters as cross-system preferences; the search term is cleared on a system switch.
 When the restored page no longer exists because rows were added or removed while editing, the page index is **clamped** to the last valid page; a restored filter that now matches nothing shows the filtered-empty state with its Clear-filters control rather than being silently dropped.
 
@@ -1450,6 +1459,11 @@ The single-recipe delete states the same arithmetic in its confirmation, from th
 It is a display name only: the surface manages every recipe item in the selected system regardless of the item's Foundry item type (book, scroll, ring, wand, gem, note), and `recipe item` remains the canonical noun.
 
 The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes it contains (its canonical `recipeIds[]` membership) as a count plus the linked recipe names, and that item's OWN use/learn caps (read from `item.caps`) as read-only chips: a use-cap chip (craft charges) and a learn-cap chip.
+
+Each item's member recipes, its derived `Book` / `Scroll` / `Incomplete` type, and its "learned by" count are resolved against the selected system's **whole recipe roster**, never against the recipe library's search-filtered rows.
+These are membership facts about the item, so an active search in another library must not be able to empty a book, retype it as `Incomplete`, or drop its learned-by count to zero.
+The GM recipe browser's own row list and its shown/total counts remain filtered, per **GM Recipe Library**; the two cohorts are distinct.
+The rule this states generally: a search-filtered collection may be used as a **cohort** — to list, or to count — but never as a **resolution table** for stored ids, because a filtered lookup does not return a different number, it returns a false statement.
 
 Which basis resolves membership is recorded on the system, not inferred per read.
 A system carries a monotonic `membershipResolvesByRecipeIds` marker: it is set by the first write to any definition's `recipeIds` and is never cleared, and on load it is set for any system that does not already carry it and has at least one definition with a non-empty `recipeIds`, so an existing marker is preserved rather than recomputed.
