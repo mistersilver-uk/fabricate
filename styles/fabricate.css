@@ -4018,19 +4018,20 @@
    16px/19-20px/11px on `--fab-bg-2` against `var(--fab-space-3)`/12px on the page fill, the
    count tile 34px and radius 9 against the shared padding pair and radius 7, the group label
    9px/0.11em against 0.62rem/0.08em, the row list radius 11 against 10, and the row 11px/13-14px.
-   `.is-pass` is not a refinement at all — it is the Checks Studio's own summary vocabulary,
-   which the recipe editors spell `is-clear`/`is-warning`/`is-blocked`, so the global block has
-   no counterpart to duplicate. Deleting it would silently re-metric the whole studio, and
-   hoisting it would re-metric the four other studios instead. */
+   Deleting it would silently re-metric the whole studio, and hoisting it would re-metric the
+   four other studios instead.
+
+   ITS SIXTH RULE IS GONE (issue 1373). `.is-pass` was here because the global block spelled the
+   same state `is-clear` and therefore "had no counterpart to duplicate" — but the surface emits
+   `is-pass` on every editor that draws this card, not only this one, so the global block was
+   painting a class nothing wrote and this rule was the only reason the Checks Studio looked
+   right. With the global rules on the emitted spelling, this one states exactly the same
+   `--fab-success-border` the global `.is-pass` rule states, one rung more specific. */
 .fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary {
   gap: 16px;
   padding: 19px 20px;
   border-radius: 11px;
   background: var(--fab-bg-2);
-}
-
-.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary.is-pass {
-  border-color: var(--fab-success-border);
 }
 
 .fabricate-manager .manager-checks-validation-route .manager-recipe-rail-count {
@@ -10077,9 +10078,18 @@
 /* TWO INDEPENDENT STATES, AND A ROW CARRIES BOTH. `.is-selected` is "you are here" — an identity
    cue, so it reads in the accent family rather than in success or amber; `.is-bulk-selected` is
    "this row is in the set the next Apply writes to", one surface step forward. Written as two
-   rules in this order so a row that is both renders the active surface. */
+   rules in this order so a row that is both renders the active surface.
+
+   TWO SIGNALS FOR TWO STATES (issue 1373). Both rules stated the SAME edge, so the only thing
+   separating the row a GM is inspecting from the rows a GM has ticked was the fill — and on the
+   tool catalogue the route flattens one fill and used to cancel the other outright, which left
+   the checkbox as the entire difference. They are orthogonal questions and now carry orthogonal
+   marks: the ticked SET keeps the brighter fill it always had, and the single inspected row
+   takes the definite accent edge. `--fab-accent` rather than a second family, because the
+   paragraph above is right that identity belongs to the accent and success and amber are spoken
+   for by the enable switch sitting in the same row. */
 .fabricate-manager .manager-scoped-list-row.is-selected {
-  border-color: var(--fab-accent-border);
+  border-color: var(--fab-accent);
   background: var(--fab-surface-soft);
 }
 
@@ -11849,30 +11859,39 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-clear .manager-recipe-rail-summary-medallion {
+/* THE SUMMARY'S THREE STATUS FACES, ON THE CLASSES THE SURFACE ACTUALLY EMITS (issue 1373).
+
+   These were `is-clear`, `is-warning` and `is-blocked`, and `EditorValidationSurface` emits
+   `is-pass`, `is-warn` and `is-block` — so every rule below matched nothing on four of the six
+   editors that draw this card, and the Tool editor's Validation tab rendered a blocked record
+   and a clean one identically. The surface now resolves any caller's word to one of these
+   three; `SUMMARY_STATUS_ALIASES` in that component records the whole reconciliation, and
+   `tests/components/manager-layout.test.js` pins the two sets against each other in both
+   directions so neither half can move alone. */
+.fabricate-manager .manager-recipe-rail-summary.is-pass .manager-recipe-rail-summary-medallion {
   color: var(--fab-success);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-warning .manager-recipe-rail-summary-medallion {
+.fabricate-manager .manager-recipe-rail-summary.is-warn .manager-recipe-rail-summary-medallion {
   color: var(--fab-warning);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-blocked .manager-recipe-rail-summary-medallion {
+.fabricate-manager .manager-recipe-rail-summary.is-block .manager-recipe-rail-summary-medallion {
   color: var(--fab-danger);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-clear {
+.fabricate-manager .manager-recipe-rail-summary.is-pass {
   border-color: var(--fab-success-border);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-warning {
+.fabricate-manager .manager-recipe-rail-summary.is-warn {
   border-color: var(--fab-warning-border);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-blocked {
+.fabricate-manager .manager-recipe-rail-summary.is-block {
   border-color: var(--fab-danger-border);
 }
 
@@ -13473,22 +13492,43 @@
    length; and the pinned height keeps every chip the same box despite tag glyphs
    or sub-pixel rounding. */
 
-/* Three classes: `justify-content` and `min-height` collide with the chip primitive,
-   and this pill carries a remove button so it is deliberately taller (issue 883).
+/* WHAT THIS RULE MAY STATE, AND WHAT IT CANNOT (issue 1373, the layer trap's 4th site).
 
-   `flex: 0 0 auto` because the chip is an inline member of the tag ROW now rather than of a
-   wrapping `<ul>` beneath it, and a flexible chip would give up its width to the name field
-   beside it. `min-width` still floors a short tag so `rare` is not a near-square pill next to
-   `reagent`. */
+   It stated eight declarations and four of them were discarded before they reached anything.
+   `module.json` registers this sheet with no explicit layer, so Foundry imports it at
+   `layer(modules)`; `Chip.svelte` ships `css: 'injected'`, which lands its scoped block in
+   `document.head` UNLAYERED — and an unlayered author declaration beats every layered one at
+   ANY specificity. Three classes did not help and could not have. `Chip`'s own block declares
+   `gap`, `box-sizing`, `justify-content` and `min-height`, so all four were dead here:
+
+     - `gap` and `box-sizing` restated the primitive's own values, so removing them is visible
+       to nobody.
+     - `min-height: 28px` was subsumed anyway — `height: 28px` below is live, because the
+       primitive declares no `height`, and a 20px floor cannot clamp a fixed 28px box.
+     - `justify-content: space-between` is the one that meant something. It was written to put
+       the label at the left edge and the remove button at the right of the 4.5rem floor; the
+       primitive's `center` has been winning since issue 883 converted this pill, so the
+       centred pair is what has shipped and what seven rounds of hand testing signed off. The
+       intent is not smuggled back in under a dead-code removal: restoring it needs a variant
+       on the primitive and one line at its call site, which is recorded as follow-up rather
+       than taken here.
+
+   WHAT REMAINS IS WHAT THE PRIMITIVE DOES NOT DECLARE — the chip's POSITION in its parent and
+   the one size the primitive has no opinion about. `flex: 0 0 auto` because the chip is an
+   inline member of the tag ROW rather than of a wrapping `<ul>` beneath it, and a flexible
+   chip would give up its width to the name field beside it. `margin: 0` zeroes a host list
+   rhythm. `min-width` floors a short tag so `rare` is not a near-square pill next to
+   `reagent`. `height` makes the pill carrying a remove button deliberately taller.
+
+   `tests/components/manager-layout.test.js` now renders this rule against a REAL cascade —
+   the sheet layered as Foundry layers it, the primitive's block after it, the scope hash on
+   the fixture's chips — and asserts that every property declared here wins. A fifth dead
+   declaration cannot be added silently. */
 .fabricate-manager .manager-chip.manager-recipe-tag-chip {
   flex: 0 0 auto;
-  gap: var(--fab-space-chip);
-  box-sizing: border-box;
   margin: 0;
-  justify-content: space-between;
   min-width: 4.5rem;
   height: 28px;
-  min-height: 28px;
 }
 
 .fabricate-manager .manager-recipe-tag-remove {
@@ -18598,7 +18638,24 @@
   color: var(--fab-danger-text);
 }
 
-.fabricate-manager .manager-tool-editor-tabs .manager-editor-tab-badge {
+/* THE TOOL STRIP'S BADGE IS A SQUARE, AND THIS RULE HAD TO SAY SO OUT LOUD (issue 1373).
+
+   `min-width: 18px` was here at (0,3,0), and the shared badge rule further down this file
+   states `min-width: 1.4rem` — 22.4px — at (0,3,0) as well, standing LATER. So this lost on
+   source order and rendered 22.4px: the declaration matched, applied, and changed nothing,
+   which is the worst of the three possible outcomes because it reads as covered.
+
+   IT WINS NOW, at (0,4,0), by qualifying on `.manager-chip` — the same move the shared rule
+   itself records making, and for the same reason. `proto:4566` is the reference's shared tab
+   strip and gives every badge on it `min-width: 17px; height: 17px`, a circle around a single
+   digit; 18px is the nearest whole pixel and is already the shared rule's own `min-height`, so
+   restoring it here squares the badge rather than inventing a figure.
+
+   SCOPED TO THIS STRIP, not fixed on the shared rule. That rule's wider `min-width` is a
+   recorded decision from the recipe editor's own audit — "a min-width wider than their height
+   keeps a single digit reading as a small pill rather than a circle" — measured against that
+   screen's reference, and this change re-litigates none of it. */
+.fabricate-manager .manager-tool-editor-tabs .manager-chip.manager-editor-tab-badge {
   min-width: 18px;
   text-align: center;
 }
@@ -26488,19 +26545,42 @@
    are different questions about the same row, and the honest statement is that a selected row
    has no hover paint of its own, not that its paint happens to be written more specifically.
 
-   The world catalogue's half is deliberately untouched. Its selected rule paints
-   `--fab-bg-1` — the same value this one does — so the arbitration there is zero-pixel, and
-   that route belongs to another lane.
+   THE WORLD HALF NEEDED THE SAME GUARD AFTER ALL (issue 1373). It was left alone on the
+   grounds that its `.is-selected` paints `--fab-bg-1` — the same value this rule does — so the
+   arbitration was zero-pixel. That is true of `.is-selected` and FALSE of `.is-bulk-selected`,
+   which paints `--fab-surface-active`: this rule is (0,4,0) and the bulk rule is (0,3,0), so
+   moving the pointer across a ticked row took its marking off for as long as the pointer stayed
+   there — and `world-tool-catalogue`'s own frame photographs exactly that, three rows painted
+   and a fourth under the cursor that is not. Both states are excluded here rather than the
+   selected one alone.
 
    SELECTION IS RESTATED ONLY FOR THE WORLD CATALOGUE, because the system rules row is painted
    by the `.manager-tools-library-list > article.is-selected` rule above. */
-.fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row:hover,
+.fabricate-manager[data-manager-view='world-tools']
+  .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover,
 .fabricate-manager[data-manager-view='tools'] .manager-tools-row:not(.is-selected):hover {
   background: var(--fab-bg-1);
 }
 
 .fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row.is-selected {
   background: var(--fab-bg-1);
+}
+
+/* AND THE TICKED ROW IS RESTATED TOO, for the reason the block above the hover rule gives: the
+   route's own `background: transparent` is (0,3,0) and stands LATER in this file than the
+   shared `.is-bulk-selected` rule at the same specificity, so it won on source order and a
+   ticked row on this one route rendered with no fill at all. `.is-selected` was restated for
+   the route when the rows were flattened; this was not, and a dead state reads as covered.
+   `--fab-surface-active` is the shared rule's own value, not a route-local answer to it.
+
+   THE ESSENCE ROUTES ABOVE STILL CARRY THE SAME DEFECT, and it is left standing deliberately
+   rather than overlooked: `world-essences` and `essences` flatten their rows and restate hover
+   and `.is-selected` in exactly this shape, and neither restates `.is-bulk-selected` either. It
+   is one edit each, but it repaints a ticked row on two screens this issue did not measure and
+   has no frame for, so it is recorded here for the lane that owns them rather than taken on the
+   way past. */
+.fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row.is-bulk-selected {
+  background: var(--fab-surface-active);
 }
 
 /* THE SYSTEM RULES LIST SHARES THE MANAGER’S OWN INSPECTOR ASIDE, exactly as the system essence
@@ -26589,17 +26669,21 @@
   font-size: 0.85rem;
 }
 
+/* And the three status faces this overrides are named by the spelling the surface emits
+   (issue 1373). Written against `is-clear`/`is-warning`/`is-blocked`, all three selectors
+   matched nothing on this tab — which is the same defect the global block carried, arriving
+   here as a tile that kept whichever fill the rule above gave it. */
 .fabricate-manager
   [data-tool-validation-tab]
-  .manager-recipe-rail-summary.is-clear
+  .manager-recipe-rail-summary.is-pass
   .manager-recipe-rail-summary-medallion,
 .fabricate-manager
   [data-tool-validation-tab]
-  .manager-recipe-rail-summary.is-warning
+  .manager-recipe-rail-summary.is-warn
   .manager-recipe-rail-summary-medallion,
 .fabricate-manager
   [data-tool-validation-tab]
-  .manager-recipe-rail-summary.is-blocked
+  .manager-recipe-rail-summary.is-block
   .manager-recipe-rail-summary-medallion {
   background: var(--fab-bg-1);
 }

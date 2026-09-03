@@ -27,9 +27,11 @@
 
   Props:
    - title / intro: the tab heading and its one-line explanation.
-   - summary: `{ status, icon, title, sub }`. `status` is interpolated into `is-<status>` and is
-     the site's own vocabulary (`pass` for the Checks studio, `clear|warning|blocked` for the
-     recipe editors), because the sheet paints both.
+   - summary: `{ status, icon, title, sub }`. `status` is the site's own domain word and reaches
+     the DOM verbatim on the site's own summary hook; the CLASS it resolves to is one of this
+     surface's three — `is-pass`, `is-warn`, `is-block` — through {@link SUMMARY_STATUS_ALIASES}.
+     It used to be interpolated raw, on the claim that the sheet painted both vocabularies; see
+     that constant for what the sheet actually painted and what a GM saw instead.
    - counts / countLabels: the count tiles. See {@link COUNT_ORDER} for which tiles are drawn.
    - groups: `{ id, icon, label, rows, dataAttrs? }[]`; each row is
      `{ id, status, title, detail?, target?, dataAttrs? }`.
@@ -69,6 +71,40 @@
     warn: 'fas fa-triangle-exclamation',
     block: 'fas fa-circle-exclamation',
   };
+
+  /**
+   * THE SUMMARY'S ONE STATUS VOCABULARY, and the aliases the call sites reached this surface
+   * with (issue 1373).
+   *
+   * The doc above used to say `status` "is the site's own vocabulary (`pass` for the Checks
+   * studio, `clear|warning|blocked` for the recipe editors), because the sheet paints both".
+   * The sheet did not paint both. It painted `is-clear`, `is-warning` and `is-blocked`, the
+   * minority spelling, plus one route-scoped `is-pass` for the Checks Studio — while FOUR of
+   * the six call sites spell it `pass`/`warn`/`block`, the same three words this surface's own
+   * `statusIcons`, `statusLabels` and every ROW already use. So on the Tool editor's Validation
+   * tab, at both scopes, a blocked record and a clean one rendered the same neutral card: the
+   * one thing a GM opens that tab to learn was the one thing it did not say.
+   *
+   * NORMALISED HERE rather than by rewriting six call sites to one word list. `status` is the
+   * caller's domain word — it is also what the site's own `data-*-validation-summary` hook
+   * carries, which suites and the smoke harness read — and translating a domain word into this
+   * surface's presentation class is this surface's job. The tile row two blocks down already
+   * does exactly this for `warnings` -> `is-warning`. Doing it at the boundary also closes the
+   * class of defect rather than this instance of it: a seventh caller cannot invent a spelling
+   * the sheet has no rule for, because there are only three classes this can emit.
+   *
+   * `pass` is the fallback for an unknown or absent word, which is the behaviour the template
+   * already had, and `tests/components/manager-layout.test.js` pins the emitted set against the
+   * sheet's own rules in both directions so the two cannot drift apart again.
+   */
+  const SUMMARY_STATUSES = ['pass', 'warn', 'block'];
+  const SUMMARY_STATUS_ALIASES = { clear: 'pass', warning: 'warn', blocked: 'block' };
+
+  const summaryStatusClass = $derived.by(() => {
+    const stated = summary?.status;
+    const resolved = SUMMARY_STATUS_ALIASES[stated] ?? stated;
+    return SUMMARY_STATUSES.includes(resolved) ? resolved : 'pass';
+  });
 
   /**
    * The count vocabulary, closed and ORDERED here rather than taken from the caller.
@@ -147,7 +183,7 @@
   {/if}
   <section class="manager-recipe-validation-summary-row" {...hooksFor('summaryRow')}>
     <div
-      class={`manager-recipe-rail-summary is-${summary.status || 'pass'}`}
+      class={`manager-recipe-rail-summary is-${summaryStatusClass}`}
       data-editor-validation-summary={summary.status || 'pass'}
       {...hooksFor('summary')}
     >

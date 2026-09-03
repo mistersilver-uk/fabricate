@@ -113,7 +113,7 @@ const FIXTURE = `
              enshrines the implementation. Only the rail's LAYOUT changed here (a 300px
              column became a ~1060px tab), never its type. -->
         <section class="manager-recipe-validation-summary-row">
-          <div class="manager-recipe-rail-summary is-blocked">
+          <div class="manager-recipe-rail-summary is-block">
             <span class="manager-recipe-rail-summary-medallion" data-m="summary-medallion"><i class="fas fa-circle-xmark"></i></span>
             <span class="manager-recipe-rail-summary-copy">
               <span class="manager-recipe-rail-summary-title" data-m="summary-title">Cannot be enabled</span>
