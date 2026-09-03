@@ -67,7 +67,9 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
     "props": {
-      "item": { "name": "Blacksmith's Compendium" },
+      "item": {
+        "name": "Blacksmith's Compendium"
+      },
       "uuid": "Item.kR3nQ8sT1vW2xY4z",
       "emptyIcon": "fas fa-book"
     }
@@ -78,7 +80,9 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
     "props": {
-      "item": { "name": "Untitled" },
+      "item": {
+        "name": "Untitled"
+      },
       "uuid": "Item.9pQr2sT4uV6wX8yZ",
       "state": "missing",
       "hint": "This document no longer resolves.",
@@ -90,7 +94,9 @@
     "cap": "list form",
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
-    "slot": { "height": 320 },
+    "slot": {
+      "height": 320
+    },
     "props": {
       "open": true,
       "value": "steel-ingot",
@@ -134,6 +140,17 @@
     "props": {
       "colorToken": "sage",
       "layout": "inline"
+    }
+  },
+  {
+    "spec": "<TintPicker> <ArtPathPicker> <Menu>",
+    "cap": "art path — the image, never the path",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/ImagePathPicker.svelte",
+    "props": {
+      "value": "icons/commodities/metal/ingot-worn-steel.webp",
+      "chooseLabel": "Choose image",
+      "unavailableLabel": "Image picker is not available."
     }
   }
 ]

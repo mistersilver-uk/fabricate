@@ -21,7 +21,9 @@
     "content": [
       {
         "tag": "button",
-        "attrs": { "type": "button" },
+        "attrs": {
+          "type": "button"
+        },
         "text": "New business"
       }
     ]
@@ -38,7 +40,9 @@
     "content": [
       {
         "tag": "button",
-        "attrs": { "type": "button" },
+        "attrs": {
+          "type": "button"
+        },
         "text": "Clear filters"
       }
     ]
@@ -86,5 +90,17 @@
         "text": "2 ingredients"
       }
     ]
+  },
+  {
+    "spec": "<Card> <Well> <RowDisclosure>",
+    "cap": "row disclosure — not the same primitive",
+    "draws": ":scope .k-row > svg",
+    "path": "src/ui/svelte/components/RowDisclosure.svelte",
+    "props": {
+      "expanded": false,
+      "controls": "pl-steel-ingot-ingredients",
+      "label": "Show the ingredients for Steel Ingot",
+      "side": "leading"
+    }
   }
 ]
