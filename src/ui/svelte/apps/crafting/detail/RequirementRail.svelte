@@ -46,10 +46,65 @@
     [SLOT_STATE.SHORT]: 'FABRICATE.App.Crafting.Slots.TileShort',
   };
 
+  // Fallbacks so this component is correct before the keys land in `lang/en.json`
+  // (issue 1493). A missing key localizes to itself, which is the only signal available
+  // here, and an accessible name that reads as a dotted key is worse than English.
+  function text(key, data, fallback) {
+    const translated = localize(key, data);
+    return translated && !translated.startsWith(key) ? translated : fallback;
+  }
+
+  // A currency requirement has no have/need ratio to announce (issue 1493). The shared
+  // TileMet/TileShort keys interpolate BOTH — so leaving currency on them announced
+  // "100 gp needs 1 and you have 0", which is the very defect the pip was removed for,
+  // surviving in the one place a screen-reader user actually receives it (the pip is
+  // aria-hidden, and a fixed slot's `role="img"` exposes no inner text at all). Two whole
+  // literal keys mirroring STATE_LABEL_KEYS above, because a currency slot's state is
+  // binary by construction — `satisfied === true ? MET : SHORT`.
+  const CURRENCY_LABEL_KEYS = {
+    [SLOT_STATE.MET]: 'FABRICATE.App.Crafting.Slots.TileCurrencyMet',
+    [SLOT_STATE.SHORT]: 'FABRICATE.App.Crafting.Slots.TileCurrencyShort',
+  };
+
+  function currencyTileLabel(slot) {
+    // A cost the world's configuration cannot resolve is NOT a shortfall, and announcing
+    // "you cannot afford this" to a player carrying ten times the price is the original
+    // defect in a new voice. Composed rather than keyed: both halves are already
+    // non-localized here by design — the caption comes from `formatCurrencyRequirement`
+    // and the reason from the affordance layer — so this adds a separator, not copy.
+    if (slot.issue) return `${slot.name}. ${slot.issue}`;
+    if (slot.state === SLOT_STATE.MET) {
+      return text(
+        CURRENCY_LABEL_KEYS[SLOT_STATE.MET],
+        { name: slot.name },
+        `${slot.name} is affordable.`
+      );
+    }
+    return text(
+      CURRENCY_LABEL_KEYS[SLOT_STATE.SHORT],
+      { name: slot.name },
+      `${slot.name} is more than you can pay.`
+    );
+  }
+
   function tileLabel(slot) {
+    if (slot.isCurrency) return currencyTileLabel(slot);
     const key = STATE_LABEL_KEYS[slot.state] ?? STATE_LABEL_KEYS[SLOT_STATE.SHORT];
     return localize(key, { name: slot.name, have: slot.have, need: slot.need });
   }
+
+  // The world's currency configuration reason, rendered ONCE for the whole rail.
+  //
+  // It is a property of the WORLD's currency configuration, not of any one requirement,
+  // so per-tile rendering would assert it as a property of each and repeat it verbatim
+  // for a set with two currency options. It also cannot live in the tile: the column is
+  // 80px with no wrapping siblings, so a sentence there wraps to roughly ten lines and
+  // doubles the tile height — and a fixed currency tile renders the `role="img"` branch,
+  // inside which text is not exposed at all.
+  //
+  // Not localized, deliberately: it is composed in English by the affordance layer, as
+  // are every other currency sentence on this path and the cost caption beside it.
+  const currencyIssue = $derived(items.find((slot) => slot.isCurrency && slot.issue)?.issue ?? '');
 
   // Plurals are TWO whole literal keys chosen by a ternary. A concatenated suffix
   // credits only the prefix under the lang-key orphan guard and strands the leaf.
@@ -120,6 +175,12 @@
       </p>
     {:else}
       <p class="requirement-rail-hint">{localize('FABRICATE.App.Crafting.Slots.Hint')}</p>
+    {/if}
+
+    <!-- Before the tiles, so assistive tech reaches the cause in document order rather
+         than after every requirement it explains. -->
+    {#if currencyIssue}
+      <p class="requirement-rail-issue" data-requirement-rail-issue>{currencyIssue}</p>
     {/if}
 
     <div class="requirement-rail-slots" data-requirement-rail-slots>
@@ -197,6 +258,14 @@
     margin: 0;
     font-size: 12px;
     color: var(--fab-text-muted);
+  }
+
+  /* Same shape as the hint above it, in the danger-TEXT token rather than the base
+     `--fab-danger` fill hue: this is a sentence, not a fill. */
+  .requirement-rail-issue {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fab-danger-text);
   }
 
   /* Slots WRAP rather than shrink: below the tile's minimum the artwork and the pip

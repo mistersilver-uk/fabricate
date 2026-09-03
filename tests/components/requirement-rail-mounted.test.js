@@ -16,6 +16,95 @@ import { buildRequirementSlots } from '../../src/ui/svelte/util/requirementSlots
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
+// ---------------------------------------------------------------------------
+// Issue 1493 — the currency fixture is evaluated END TO END, not hand-written.
+//
+// The acceptance criterion is explicitly ONE test: a real `evaluateCraftability`
+// result, projected by the real `buildRequirementSlots`, rendered by the real rail. A
+// slot literal with an `issue` typed into it proves the projection and the markup, but
+// not that anything upstream ever produces the field — which is the whole capability.
+//
+// The Foundry globals and the manager import must therefore happen HERE, before the
+// harness replaces `game` with its i18n stub in `before()`; the craftability is a plain
+// object by then, so nothing below depends on these globals surviving.
+// ---------------------------------------------------------------------------
+globalThis.foundry = {
+  utils: {
+    randomID: () => 'fixed-id',
+    getProperty: (object, path) =>
+      String(path)
+        .split('.')
+        .reduce((value, key) => (value == null ? undefined : value[key]), object),
+  },
+};
+globalThis.game = { user: { isGM: true }, fabricate: null };
+
+const { RecipeManager } = await import('../../src/systems/RecipeManager.js');
+const { Recipe } = await import('../../src/models/Recipe.js');
+
+const CURRENCY_SYSTEM_ID = 'sys-1493-rail';
+
+/**
+ * Evaluate a two-requirement recipe — one held item, one 100 gp cost — against the
+ * given world ladder, with a player carrying both the plank and a thousand gold.
+ *
+ * @param {object[]} units The world's currency ladder. Omitting `actorPath` is the
+ *   misconfiguration under test: the unit exists but cannot be read off any actor.
+ */
+function craftabilityFor(units) {
+  const system = {
+    id: CURRENCY_SYSTEM_ID,
+    features: { itemTags: false, essences: false },
+    components: [],
+    managedItems: [],
+    tools: [],
+    essenceDefinitions: [],
+    requirements: { currency: { enabled: true } },
+  };
+  const manager = new RecipeManager({
+    getCraftingSystemManager: () => ({
+      getSystem: (id) => (id === CURRENCY_SYSTEM_ID ? system : null),
+    }),
+    currencyConfigStore: { get: () => ({ spendStrategy: 'actorProperty', units }) },
+  });
+  const recipe = new Recipe({
+    name: 'Toll Bridge Plank',
+    craftingSystemId: CURRENCY_SYSTEM_ID,
+    ingredientSets: [
+      {
+        ingredientGroups: [
+          { id: 'g-plank', name: 'Plank', options: [{ itemUuid: 'Item.plank', quantity: 2 }] },
+          {
+            id: 'g-toll',
+            name: 'Toll',
+            options: [{ match: { type: 'currency', unit: 'gp', amount: 100 }, quantity: 1 }],
+          },
+        ],
+        essences: {},
+      },
+    ],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const actor = {
+    items: [
+      {
+        uuid: 'Item.plank',
+        id: 'Item.plank',
+        system: { quantity: 2 },
+        flags: {},
+        getFlag: () => undefined,
+      },
+    ],
+    system: { currency: { gp: 1000 } },
+  };
+  return manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
+}
+
+const SPENDABLE_LADDER = [
+  { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp' },
+];
+const BROKEN_LADDER = [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }];
+
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-requirement-rail-',
@@ -250,6 +339,82 @@ describe('RequirementRail mounted behavior', () => {
       announcement: 'Picked for you.',
     });
     assert.equal(target.querySelector('[data-requirement-rail-live]').textContent.trim(), 'Picked for you.');
+  });
+
+  // -------------------------------------------------------------------------
+  // Issue 1493. Every case below renders a REAL craftability through the real
+  // projection: `buildRequirementSlots(evaluateCraftability(fixture))`.
+  // -------------------------------------------------------------------------
+
+  it('draws no have/need pip on a currency tile, affordable or not', async () => {
+    for (const ladder of [SPENDABLE_LADDER, BROKEN_LADDER]) {
+      const target = await harness.mount({ slots: buildRequirementSlots(craftabilityFor(ladder)) });
+      const [plank, toll] = tilesIn(target);
+      assert.ok(plank.querySelector('.requirement-slot-pip'), 'an item tile keeps its ratio');
+      // `have` is always 0 and `need` is a PRICE, so "0/100" would state a shortfall a
+      // player holding 1000 gp does not have. assert.ok(!el) rather than an equality
+      // check on the element, which OOMs happy-dom.
+      assert.ok(!toll.querySelector('.requirement-slot-pip'), 'a currency tile draws none');
+      assert.match(toll.querySelector('.requirement-slot-caption').textContent, /100 gp/);
+      harness.remount();
+    }
+  });
+
+  it('names a currency tile by its cost and verdict, never by a have/need ratio', async () => {
+    const target = await harness.mount({
+      slots: buildRequirementSlots(craftabilityFor(SPENDABLE_LADDER)),
+    });
+    const label = tilesIn(target)[1].getAttribute('aria-label');
+    // The pip is aria-hidden, so this sentence is what a screen-reader user actually
+    // receives. Left on the shared TileMet/TileShort keys it read "100 gp is ready with
+    // 0 of 100" — the removed pip surviving in the one place it is still spoken.
+    assert.ok(label.includes('100 gp'), 'the cost is named');
+    assert.ok(!/have/i.test(label), 'and no held count is interpolated into it');
+    assert.ok(!/\bneed\b/i.test(label));
+  });
+
+  it('names an unresolvable currency tile by its reason, never by a shortfall', async () => {
+    const target = await harness.mount({
+      slots: buildRequirementSlots(craftabilityFor(BROKEN_LADDER)),
+    });
+    const label = tilesIn(target)[1].getAttribute('aria-label');
+    // The player is carrying 1000 gp. Telling them they cannot afford 100 gp is the
+    // original defect wearing the redesign's clothes.
+    assert.ok(label.includes('100 gp'));
+    assert.match(label, /Currency configuration is invalid/);
+    assert.ok(!/afford|pay/i.test(label), 'and it makes no claim about their money');
+  });
+
+  it('renders the world currency reason ONCE for the rail, not once per tile', async () => {
+    const craftability = craftabilityFor(BROKEN_LADDER);
+    // Two currency requirements from one broken world: the reason is a property of the
+    // configuration, so repeating it per tile would assert it of each.
+    const doubled = {
+      ...craftability,
+      ingredientStates: [
+        ...craftability.ingredientStates,
+        { ...craftability.ingredientStates[1], groupId: 'g-toll-2' },
+      ],
+    };
+    const target = await harness.mount({ slots: buildRequirementSlots(doubled) });
+
+    const notes = target.querySelectorAll('[data-requirement-rail-issue]');
+    assert.equal(notes.length, 1, 'one reason for the whole rail');
+    assert.match(notes[0].textContent, /Currency configuration is invalid/);
+    assert.match(notes[0].textContent, /actor data path/, 'and it names what is unavailable');
+    // Before the tiles, so the cause is reached before the requirements it explains.
+    assert.equal(
+      notes[0].compareDocumentPosition(target.querySelector('[data-requirement-rail-slots]')) &
+        4 /* DOCUMENT_POSITION_FOLLOWING */,
+      4
+    );
+  });
+
+  it('renders no reason line for a rail whose currency resolves', async () => {
+    const target = await harness.mount({
+      slots: buildRequirementSlots(craftabilityFor(SPENDABLE_LADDER)),
+    });
+    assert.ok(!target.querySelector('[data-requirement-rail-issue]'));
   });
 
   it('keeps stable geometry for a long localized requirement name', async () => {

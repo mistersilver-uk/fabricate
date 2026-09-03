@@ -58,6 +58,22 @@ function essenceState(overrides = {}) {
   };
 }
 
+function currencyState(overrides = {}) {
+  return {
+    groupId: 'g-coin',
+    name: '100 gp',
+    description: '100 gp',
+    img: 'icons/svg/coins.svg',
+    need: 100,
+    have: 0,
+    satisfied: true,
+    isCurrency: true,
+    affordable: true,
+    issue: '',
+    ...overrides,
+  };
+}
+
 describe('buildRequirementSlots', () => {
   it('keys every slot to its group and marks only choice/essence slots interactive', () => {
     const slots = buildRequirementSlots({
@@ -144,6 +160,48 @@ describe('buildRequirementSlots', () => {
 
   it('returns an empty list for a null craftability', () => {
     assert.deepEqual(buildRequirementSlots(null), []);
+  });
+
+  // Issue 1493. The projection is a closed allowlist, so a field it does not name is
+  // dropped — and `isCurrency` is what tells the rail to omit the pip and to announce
+  // the slot without a have/need ratio.
+  it('projects a currency requirement as such, and every other slot as not currency', () => {
+    const slots = buildRequirementSlots({
+      ingredientStates: [fixedState(), currencyState(), essenceState()],
+    });
+    assert.deepEqual(
+      slots.map((slot) => slot.isCurrency),
+      [false, true, false]
+    );
+  });
+
+  it('projects the world currency configuration reason, defaulting to an empty string', () => {
+    const [withIssue, without] = buildRequirementSlots({
+      ingredientStates: [
+        currencyState({ issue: 'Currency configuration is invalid: no ladder.', satisfied: false }),
+        fixedState(),
+      ],
+    });
+    assert.equal(withIssue.issue, 'Currency configuration is invalid: no ladder.');
+    assert.equal(without.issue, '', 'a slot with no reason carries the empty string, never undefined');
+  });
+
+  // A currency slot is binary by construction — `satisfied` IS the affordability verdict
+  // — so the fixed branch's `satisfied ? met : short` is already the right answer and the
+  // numbers are never consulted. Asserted because the omitted pip means nothing else on
+  // the surface would notice if the state stopped tracking affordability.
+  it('states a currency slot from its affordability verdict, not from its numbers', () => {
+    assert.equal(
+      buildRequirementSlots({ ingredientStates: [currencyState()] })[0].state,
+      SLOT_STATE.MET,
+      'affordable is met even though have (0) is below need (100)'
+    );
+    assert.equal(
+      buildRequirementSlots({
+        ingredientStates: [currencyState({ satisfied: false, affordable: false })],
+      })[0].state,
+      SLOT_STATE.SHORT
+    );
   });
 });
 

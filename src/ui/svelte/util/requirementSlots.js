@@ -123,6 +123,15 @@ function buildSlot(state, index, chosenGroupIds) {
     owned: toCount(state?.owned ?? state?.have),
     choiceCount: toCount(state?.choiceCount),
     satisfied: state?.satisfied === true,
+    // A CURRENCY requirement (issue 1493). `have`/`need` are projected for shape parity
+    // with every other slot, but a currency slot reports neither: its `need` is a price
+    // and its `have` is always 0, so a "0/100" pip would state a shortfall the player may
+    // not have. The rail omits the pip for these and the caption states the cost.
+    isCurrency: state?.isCurrency === true,
+    // The world-scoped reason the currency could not be resolved at all, or ''. Carried
+    // per slot because that is the shape the projection has, but rendered ONCE per rail:
+    // the reason belongs to the world's configuration, not to any one requirement.
+    issue: toText(state?.issue),
   };
 }
 

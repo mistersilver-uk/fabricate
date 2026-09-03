@@ -1651,3 +1651,137 @@ test('_validateEssenceReferences flags an essence OPTION referencing a deleted e
     'the unknown-essence issue is raised for the essence OPTION shape'
   );
 });
+
+// ---------------------------------------------------------------------------
+// Issue 1493: a currency requirement states a COST, never a have/need ratio, and
+// carries the reason when the world's currency cannot be resolved at all.
+// ---------------------------------------------------------------------------
+
+/**
+ * A manager whose crafting system has currency ENABLED, over an injected world ladder.
+ *
+ * Both scopes go through the constructor seams rather than the `game.fabricate` global
+ * that `makeRecipeManagerWithSystem` installs, because these fixtures need to vary the
+ * WORLD half per test while every other suite in this file shares one global.
+ */
+function makeCurrencyManager(systemId, spendStrategy, units) {
+  const system = {
+    id: systemId,
+    features: { itemTags: false, essences: false },
+    components: [],
+    managedItems: [],
+    tools: [],
+    essenceDefinitions: [],
+    requirements: { currency: { enabled: true } },
+  };
+  return new RecipeManager({
+    getCraftingSystemManager: () => ({ getSystem: (id) => (id === systemId ? system : null) }),
+    currencyConfigStore: { get: () => ({ spendStrategy, units }) },
+  });
+}
+
+function makeCurrencyRecipe(systemId, options) {
+  return new Recipe({
+    name: 'Coin Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [makeIngredientSet([makeGroupData(options)]).toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+}
+
+const SPENDABLE_GOLD = [
+  { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp' },
+];
+// The same ladder with the actor path cleared: present but unusable, which is what
+// `validateCurrencyProfile` rejects and what the whole issue is about.
+const UNSPENDABLE_GOLD = [{ id: 'gp', label: 'Gold', abbreviation: 'gp' }];
+
+function makePurse(gp) {
+  return { items: [], system: { currency: { gp } } };
+}
+
+test('issue 1493: an affordable currency requirement reports its COST and no held count', () => {
+  const systemId = 'sys-1493-afford';
+  const manager = makeCurrencyManager(systemId, 'actorProperty', SPENDABLE_GOLD);
+  const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 100)]);
+
+  const purse = makePurse(500);
+  const [state] = manager.evaluateCraftability([purse], recipe, {
+    craftingActor: purse,
+  }).ingredientStates;
+
+  assert.equal(state.isCurrency, true);
+  assert.equal(state.satisfied, true, 'a player holding 500 gp can afford 100 gp');
+  assert.equal(state.affordable, true);
+  // The defect this replaces: the generic satisfied path reported `need` as the group's
+  // OCCURRENCE COUNT (1) and `have` as the number of matching inventory items (0), so a
+  // hundred-gold cost surfaced as "have 0, need 1" — neither the price nor a shortfall.
+  assert.equal(state.need, 100, 'need is the authored cost, never the occurrence count');
+  assert.equal(state.have, 0);
+  assert.equal(state.description, '100 gp', 'the caption is the only statement of the cost');
+  assert.equal(state.issue, '', 'a resolvable ladder carries no reason');
+});
+
+test('issue 1493: an unaffordable currency requirement still reports the cost, not a 0/1 ratio', () => {
+  const systemId = 'sys-1493-poor';
+  const manager = makeCurrencyManager(systemId, 'actorProperty', SPENDABLE_GOLD);
+  const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 100)]);
+
+  const purse = makePurse(3);
+  const [state] = manager.evaluateCraftability([purse], recipe, {
+    craftingActor: purse,
+  }).ingredientStates;
+
+  assert.equal(state.satisfied, false);
+  assert.equal(state.affordable, false);
+  assert.equal(state.need, 100);
+  assert.equal(state.have, 0);
+  assert.equal(state.issue, '', 'a genuine shortfall is not a configuration reason');
+});
+
+test('issue 1493: a currency requirement the world cannot resolve carries the reason, not a shortfall', () => {
+  const systemId = 'sys-1493-broken';
+  const manager = makeCurrencyManager(systemId, 'actorProperty', UNSPENDABLE_GOLD);
+  const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 100)]);
+
+  // A player who could pay ten times over. Without the reason the surface tells them
+  // they are poor, and tells the GM nothing at all.
+  const purse = makePurse(1000);
+  const result = manager.evaluateCraftability([purse], recipe, { craftingActor: purse });
+  const [state] = result.ingredientStates;
+
+  assert.equal(result.canCraft, false);
+  assert.equal(state.isCurrency, true);
+  assert.match(state.issue, /Currency configuration is invalid/);
+  assert.match(state.issue, /actor data path/, 'and it names what is unavailable');
+});
+
+test('issue 1493: the shopping requirement carries the same currency cost and reason', () => {
+  const systemId = 'sys-1493-shopping';
+  const manager = makeCurrencyManager(systemId, 'actorProperty', UNSPENDABLE_GOLD);
+  const recipe = makeCurrencyRecipe(systemId, [makeCurrencyIngredientData('gp', 250)]);
+
+  const purse = makePurse(1000);
+  const [state] = manager.evaluateShoppingRequirement([purse], recipe, {
+    craftingActor: purse,
+  }).ingredientStates;
+
+  assert.equal(state.need, 250, 'the max-need merge reads the cost, not the occurrence count');
+  assert.match(state.issue, /Currency configuration is invalid/);
+});
+
+test('issue 1493: a non-currency requirement is not marked as currency and carries no reason', () => {
+  const systemId = 'sys-1493-item';
+  const manager = makeCurrencyManager(systemId, 'actorProperty', UNSPENDABLE_GOLD);
+  const recipe = makeCurrencyRecipe(systemId, [makeIngredientData('Item.plank', 2)]);
+
+  const [state] = manager.evaluateCraftability(
+    [makeActor([makeItem('Item.plank', 2)])],
+    recipe
+  ).ingredientStates;
+
+  assert.equal(state.isCurrency, undefined, 'the currency shape is not spread onto item states');
+  assert.equal(state.issue, undefined);
+  assert.equal(state.need, 2, 'an item requirement still reports a quantity ratio');
+  assert.equal(state.have, 2);
+});
