@@ -2,48 +2,85 @@
  * The coverage gate over the Primitive Lab's catalogue.
  *
  * `tests/design-system-coverage.test.js` answers "do the library and the manifest describe the same
- * vocabulary". This file answers the next question down: does the LAB drive every member of it, and
- * does it drive them through props those components actually declare.
+ * vocabulary". This file answers the next question down: does the LAB replace the library's hand
+ * drawings with the real components, in the right places, driven through props those components
+ * actually declare.
  *
- * WHY A THIRD ARTIFACT NEEDS ITS OWN GATE
- * ---------------------------------------
- * The catalogue is the only part of the lab that is written rather than derived. Its section, its
- * prose, its evidence and its caller count all come from `library.html` and
- * `designSystemPrimitives.json` at load time. What a row says is how to DRIVE the component — which
- * props to put a control on, which to waive, which values to fix — and that is a claim about a
- * FILE. A knob naming `varaint` renders nothing, logs nothing and looks exactly like a prop with no
- * visible effect; a row that quietly stopped covering a component looks exactly like a component
- * with nothing to show.
+ * WHAT THE CATALOGUE IS NOW, AND WHY IT STILL NEEDS A GATE
+ * --------------------------------------------------------
+ * The page IS `openspec/specs/design-system/library.html`, re-rendered, with individual hand-drawn
+ * specimens swapped for mounted components. Everything a reader reads — the entry headings, the
+ * captions, the notes, the deltas — is the library's own content, rendered from that file at load
+ * time and never copied here. The one written artifact left is the catalogue, and a row says
+ * exactly one thing: WHICH real component stands where the library drew a specimen, and with what
+ * props.
  *
- * WHY THE RULES BELOW CARRY THEIR OWN ANTI-VACUITY ANCHOR
- * -------------------------------------------------------
+ * That claim is a hand-written mirror of markup in a file this page may not edit, which is the
+ * shape this repository requires a guard for. It rots silently in both directions. A `draws`
+ * selector that stopped matching leaves a drawing in place, and a drawing is what the page looks
+ * like when it is working. A `props` key the component does not declare is dropped by Svelte
+ * without a word, so the specimen renders — wrongly, and authoritatively, on the one page whose
+ * subject is how these components are painted.
+ *
+ * THE COVERAGE CLAIM THIS FILE MAKES, AND THE TWO IT REFUSES TO MAKE
+ * ------------------------------------------------------------------
+ * The gate this replaces demanded a catalogue row for every row in the manifest. That was the right
+ * claim for a workbench with a rail — the rail enumerated the manifest, so an uncatalogued
+ * primitive was a rail entry with nothing behind it. It is the WRONG claim for this page: the page
+ * is the library, so a primitive can only be catalogued where the library DRAWS it, and 32 of the
+ * 57 manifest rows are named by no library entry at all. Demanding a row for those would be
+ * demanding a specimen with nowhere to stand.
+ *
+ * The claim made instead is scoped by the library's own information architecture:
+ *
+ *   A library SECTION is catalogued once any row addresses an entry inside it. Within a catalogued
+ *   section, every primitive an entry names that SHIPS — one the manifest gives a path — must have
+ *   at least one row standing it up under that entry.
+ *
+ * Both halves are load-bearing. Section scope is what makes an entry that has no rows AT ALL fail:
+ * a per-entry rule would exempt exactly the entry that was forgotten, which is the one failure mode
+ * worth catching. And "that ships" is what keeps the rule honest in the other direction — the
+ * library names `<Select>` and `<Search>`, the manifest gives neither a path, and an unbuilt
+ * primitive's drawing is supposed to stay a drawing.
+ *
+ * Two nearby rules are deliberately NOT asserted, because each would red on something legitimate:
+ *
+ *   - "every drawing in a catalogued entry is replaced". `<Button>`'s specimen ladder draws a
+ *     `page 38` and a `row 30` size and the shipped control has no `size` prop, so those drawings
+ *     have no live equivalent and the library's own delta block says so. The unit of coverage is
+ *     the PRIMITIVE, not the drawing.
+ *   - "a row's `path` is the manifest path of a name in its own `spec`". The library composes: a
+ *     `<Toggle>` unit draws a Well, a title, a hint and a switch, and a row standing up the Well
+ *     inside that entry would be correct and would fail such a rule.
+ *
+ * WHAT IT IMPORTS FROM THE PAGE, AND WHY THAT IS THE POINT
+ * --------------------------------------------------------
+ * `tests/view-lab/primitives/library.js` and `inject.js`. Neither touches a DOM at module scope and
+ * neither uses `import.meta.glob`, so both load under `node --test` — which means this gate resolves
+ * addresses through the SAME `specBlocks`/`unitsOf`/`normalize` the browser resolves them through,
+ * rather than through a second reading of the same rules. `catalogue.js` is Vite-only (it globs), so
+ * the rows are read off disk by `scripts/lib/primitiveLabSmoke.js` — the same bytes Vite serves, and
+ * the same reader `npm run lab:check` derives its expected set from, so it is not a second record.
+ *
+ * The library is parsed TWICE, deliberately and once each. `parseDesignLibrary` yields the derived
+ * facts (headings, their sections, the name census) and closes its window; the local `Window` below
+ * keeps a live document, because a `draws` selector has to be EVALUATED and no derived summary can
+ * stand in for that. Both are built once at module scope: a `Window` per test is the shape `npm
+ * test` runs out of heap on.
+ *
+ * WHY EVERY RULE CARRIES ITS OWN ANTI-VACUITY ANCHOR
+ * --------------------------------------------------
  * Every correspondence here is a set comparison, and every set comparison passes over two empty
- * sets. An empty catalogue satisfies "no knob names a prop that does not exist", "every declared
- * prop is knobbed or waived" and "no two rows claim one path" simultaneously and perfectly. So the
- * catalogue's own size is pinned against the manifest's, the library corpus is checked for a pulse,
- * and the prop-name shape rule quantifies over the WHOLE component tree rather than over the
- * catalogued subset — which is also what makes it the rule that would have caught the parser defect
- * this change repairs.
+ * sets. An empty catalogue satisfies "every row addresses a real drawing", "no prop is undeclared"
+ * and "every catalogued section is fully covered" simultaneously and perfectly, over a page showing
+ * nothing but drawings. So the catalogue's size is pinned, the library corpus is checked for a
+ * pulse, the number of ADDRESSES resolved and DRAWINGS matched is pinned, and the prop-name shape
+ * rule quantifies over the whole component tree rather than the catalogued subset.
  *
- * WHAT IT MAY NOT IMPORT, AND WHY
- * -------------------------------
- * `knobs.js` and `fillers.js`. `knobs.js` imports nothing at all and `fillers.js` imports only
- * `createRawSnippet`, which builds a snippet from a render function and touches no DOM until
- * something renders it — so both load under `node --test` with no window in reach, and this gate
- * compares the SAME objects the lab resolves against rather than a reading of their source.
- * `model.js` needs a JSON import attribute and `importers.js` needs `import.meta.glob`, so both are
- * Vite-only. Everything else this gate needs is read through `node:fs`, which is the same set of
- * bytes the lab reads and therefore not a second record of it.
- *
- * THE FILLER RULE USED TO SCRAPE `fillers.js` AS TEXT, and it is the reason that paragraph is
- * worth stating precisely: the ids were read out of a named object literal, so renaming that
- * literal made the reader answer with an empty set — under which "every filler a catalogue row
- * selects exists" is true of every catalogue. The aliveness assertion is what turned that into a
- * named failure, and it is why the import is the repair rather than a better regular expression.
- *
- * `parseDesignLibrary` is called ONCE, at module scope. It builds and closes a happy-dom `Window`
- * per call, and this file would otherwise make one per test — the shape `npm test` runs out of heap
- * on here.
+ * The `data-primitive-lab-*` rule at the bottom of this file is why that paragraph is written in
+ * this tone. Its first draft asked whether a page file `includes` the attribute name, and it passed
+ * its own rename mutation — because both page files also DOCUMENT these attributes in prose, and the
+ * docblock still spelled the old name.
  *
  * WHY THE `$props()` PARSER'S OWN FIXTURE PROOF LIVES IN THIS FILE
  * ----------------------------------------------------------------
@@ -66,6 +103,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+import { Window } from 'happy-dom';
 
 import {
   CATALOGUE_DIRECTORY,
@@ -90,34 +129,32 @@ import {
   readDesignLibrary,
 } from './helpers/designLibrary.js';
 import { declaredPropNames } from './helpers/sveltePropsDeclaration.js';
-import {
-  COMPONENT_FILLER_IDS,
-  FILLER_IDS,
-  FILLER_MARKUP,
-  RAW_FILLERS,
-  describeFiller,
-  fillerIds,
-} from './view-lab/primitives/fillers.js';
-import {
-  accountedProps,
-  buildProps,
-  defaultValues,
-  expandMatrix,
-  renderInvocation,
-  tagFor,
-} from './view-lab/primitives/knobs.js';
+import { resolveSlots } from './view-lab/primitives/inject.js';
+import { normalize, specBlocks, unitsOf } from './view-lab/primitives/library.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The library, parsed once. See the docblock: a `Window` per call is what OOMs `npm test`. */
+/** The library's derived facts. See the docblock: a `Window` per call is what OOMs `npm test`. */
 const LIBRARY = parseDesignLibrary(readDesignLibrary());
+
+/**
+ * The library as a live document, because a `draws` selector has to be evaluated rather than
+ * summarised.
+ *
+ * Never mutated. `resolveSlots` only reads, and the injector's replacement step is the page's, not
+ * this file's — a gate that mounted into the document it is checking would be checking the second
+ * half of its own run.
+ */
+const LIBRARY_WINDOW = new Window();
+LIBRARY_WINDOW.document.write(readDesignLibrary());
+const LIBRARY_BODY = LIBRARY_WINDOW.document.body;
 
 /** The manifest, read as bytes rather than through its `.js` wrapper — the lab reads the JSON. */
 const MANIFEST = JSON.parse(
   readFileSync(path.join(REPO_ROOT, 'scripts/lib/designSystemPrimitives.json'), 'utf8')
 );
 
-/** Both manifest tables. The lab mounts near-members too; the register is why, not whether. */
+/** Both manifest tables. A near-member ships and is drawable; the register is why, not whether. */
 const MANIFEST_ROWS = [...MANIFEST.designSystemPrimitives, ...MANIFEST.notAPrimitive];
 
 /** Every catalogue row, each carrying the file and index it was written at. */
@@ -129,37 +166,41 @@ const SHIPPED_COMPONENTS = toRepositoryPaths(
   listSvelteComponents(path.join(REPO_ROOT, 'src'))
 );
 
+/** A library name, brackets included, to the component that ships it. Unbuilt names are absent. */
+const SHIPS_AS = new Map(
+  MANIFEST_ROWS.filter((row) => row.library !== null).map((row) => [row.library, row.path])
+);
+
 /**
  * A prop name as JavaScript spells one, plus the `...rest` form the parser reports verbatim.
  *
  * THIS IS THE RULE THAT WOULD HAVE CAUGHT THE PARSER DEFECT. Against `ThresholdBandStrip.svelte`
  * the old reader returned three names for fifteen props, and one of the three was a JSDoc comment
- * glued to `previewDc`. Nothing rejected it, so the only visible symptom was the coverage rule
- * below reporting `step`, `min`, `max` and `onChange` as knobs on props that "do not exist" — which
- * makes deleting those knobs the cheapest repair, and a gate whose cheapest repair REMOVES coverage
- * is worse than no gate.
+ * glued to `previewDc`. Nothing rejected it, so the only visible symptom was a coverage rule
+ * reporting real props as props that "do not exist" — which makes deleting the coverage the
+ * cheapest repair, and a gate whose cheapest repair REMOVES coverage is worse than no gate.
  */
 const PROP_NAME = /^(\.\.\.)?[A-Za-z_$][\w$]*$/;
 
-/** The largest matrix a story may expand to. `expandMatrix` builds an uncapped cartesian product. */
-const MAX_STORY_CELLS = 24;
+/**
+ * The literal `declaredPropNames` reports for a `...rest` collector.
+ *
+ * A component that destructures one has opened itself to arbitrary keys, so a `props` key it does
+ * not declare still reaches the element — through the spread, exactly as a real call site's would.
+ * Reported as a name rather than swallowed, so this file can tell the two cases apart instead of
+ * granting every row a blanket exemption.
+ */
+const REST_PROP = '...rest';
 
-/** Knob types that carry a value the user edits. `event` is the only other one. */
-const VALUE_KNOB_TYPES = new Set([
-  'select',
-  'boolean',
-  'text',
-  'number',
-  'colour',
-  'json',
-  'snippet',
-]);
+/** The prop `LiveSpecimen.svelte` passes a row's `content` as. Nothing else renders it. */
+const CHILDREN_PROP = 'children';
 
 /**
  * Where a row was written, for a message that names a position rather than a component.
  *
  * `catalogue/controls.json[3]` is a place someone can open. "the row for ManagerButton" is a search
- * across eight files, and the search is ambiguous exactly when the fault is a DUPLICATE row.
+ * across the catalogue, and the search is ambiguous exactly when the fault is one of eleven rows
+ * that all name the same component.
  *
  * @param {{file: string, index: number}} entry A catalogue entry.
  * @returns {string} A citation.
@@ -186,8 +227,7 @@ const byCodePoint = (left, right) => (left < right ? -1 : Number(left > right));
  * One side of a set equality: what `expected` holds that `present` does not.
  *
  * Returned as an array rather than asserted on, so the failure names the ids that DIVERGE instead
- * of printing two whole sets and leaving the reader to diff them — and so the same comparison can
- * be run in both directions, which is the only way a message can say which side is short.
+ * of printing two whole sets and leaving the reader to diff them.
  *
  * @param {Iterable<string>} present The side being checked.
  * @param {Iterable<string>} expected The side it is checked against.
@@ -205,15 +245,22 @@ const sourceCache = new Map();
  * The prop names a catalogue row's component declares.
  *
  * @param {string} componentPath Repository-relative POSIX path.
- * @returns {string[]|null} Declared names, or null when the file does not exist.
+ * @returns {string[]|null} Declared names, or null when the file does not exist or declares none.
  */
 function declaredFor(componentPath) {
   if (!sourceCache.has(componentPath)) {
     const absolute = path.join(REPO_ROOT, componentPath);
-    sourceCache.set(componentPath, existsSync(absolute) ? readFileSync(absolute, 'utf8') : null);
+    let declared = null;
+    if (existsSync(absolute)) {
+      try {
+        declared = declaredPropNames(readFileSync(absolute, 'utf8'));
+      } catch {
+        declared = null; // no `$props()` destructure at all
+      }
+    }
+    sourceCache.set(componentPath, declared);
   }
-  const source = sourceCache.get(componentPath);
-  return source === null ? null : declaredPropNames(source);
+  return sourceCache.get(componentPath);
 }
 
 /**
@@ -221,8 +268,7 @@ function declaredFor(componentPath) {
  *
  * A brace-balancing parser would be more precise and is not worth it: every literal read this way
  * is Prettier-formatted, so its top-level keys are exactly the key-shaped lines at the SMALLEST
- * indentation in the slice. Taking the minimum rather than a fixed width is what keeps this working
- * across the three literals it reads, which sit at three different depths.
+ * indentation in the slice.
  *
  * @param {string} slice Source text containing one object literal and nothing above it.
  * @returns {string[]} Key names, in source order.
@@ -240,103 +286,279 @@ function objectLiteralKeys(slice) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+// The addresses, resolved once against the library document
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Every `.spec` entry, keyed by its heading exactly as `inject.js` keys them. */
+const SPEC_BLOCKS = specBlocks(LIBRARY_BODY);
+
+/** Per-entry caption index, built on demand — `unitsOf` walks the whole block. */
+const unitCache = new Map();
+
+/**
+ * The captioned specimen groups of one entry.
+ *
+ * @param {Element} block A `.spec`.
+ * @returns {Map<string, Element>} Caption text to its `.unit`.
+ */
+function unitsFor(block) {
+  if (!unitCache.has(block)) unitCache.set(block, unitsOf(block));
+  return unitCache.get(block);
+}
+
+/**
+ * Group the catalogue by the address its rows share, preserving catalogue order within a group.
+ *
+ * The key is `(spec, cap, draws)`, spelled the way `byAddress` in `inject.js` spells it, because
+ * rows sharing one are paired POSITIONALLY against the drawings that selector matches. Grouping any
+ * other way would check a correspondence the page does not make.
+ *
+ * @returns {{spec: string, cap: string|null, draws: string, entries: object[]}[]} The addresses.
+ */
+function catalogueAddresses() {
+  const groups = new Map();
+  for (const entry of CATALOGUE) {
+    const { spec, cap = null, draws } = entry.row;
+    const key = JSON.stringify([spec ?? null, cap ?? null, draws ?? null]);
+    if (!groups.has(key)) groups.set(key, { spec, cap: cap ?? null, draws, entries: [] });
+    groups.get(key).entries.push(entry);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Resolve one address against the library, collecting rather than throwing.
+ *
+ * COLLECTING IS NOT A STYLE CHOICE. A throw at module scope escapes `node --test`'s failure count
+ * entirely — the run reports a crashed file rather than a failed assertion, and a `# fail 0`
+ * summary over a broken tree is the one output nobody re-reads.
+ *
+ * @param {{spec: string, cap: string|null, draws: string, entries: object[]}} address An address.
+ * @returns {{targets: Element[], problem: string|null}} What it matched, or why it did not.
+ */
+function resolveAddress(address) {
+  const cited = address.entries.map(where).join(', ');
+  const block = SPEC_BLOCKS.get(address.spec);
+  if (!block) {
+    return {
+      targets: [],
+      problem:
+        `${cited}: \`spec\` ${JSON.stringify(address.spec)} names no library entry. A row is ` +
+        'addressed to a `div.spec-head > h4`, decoded and verbatim, and the library heads no ' +
+        `entry with that text. The page would report it and draw the specimen as authored, which ` +
+        'looks exactly like a primitive that is not built yet.',
+    };
+  }
+  if (typeof address.draws !== 'string' || address.draws.length === 0) {
+    return { targets: [], problem: `${cited}: every row must name its drawing in \`draws\`` };
+  }
+  let scope = block;
+  if (address.cap !== null) {
+    const units = unitsFor(block);
+    scope = units.get(normalize(address.cap));
+    if (!scope) {
+      return {
+        targets: [],
+        problem:
+          `${cited}: entry ${address.spec} has no unit captioned ` +
+          `${JSON.stringify(address.cap)}. Its captions are: ${[...units.keys()].join(' | ')}.`,
+      };
+    }
+  }
+  const targets = [...scope.querySelectorAll(address.draws)];
+  if (targets.length !== address.entries.length) {
+    return {
+      targets,
+      problem:
+        `${cited}: \`draws\` ${JSON.stringify(address.draws)} matches ${targets.length} ` +
+        `element(s) and ${address.entries.length} row(s) claim them. Rows sharing an address are ` +
+        'paired POSITIONALLY against what the selector matches, so a partial match would leave ' +
+        'live components and hand drawings side by side with nothing on the page saying which is ' +
+        'which. Re-read the entry and correct the rows.',
+    };
+  }
+  return { targets, problem: null };
+}
+
+/** Every address with what it matched, resolved once. */
+const RESOLVED = catalogueAddresses().map((address) => ({ address, ...resolveAddress(address) }));
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 // The corpora
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-test('the corpora every property below quantifies over are alive', () => {
+test('the corpora every rule below quantifies over are alive', () => {
   assert.ok(LIBRARY.blockCount > 0, 'the library parser found no spec-head block; the anchor died');
-  assert.ok(
-    LIBRARY.headingSections.length === LIBRARY.headings.length,
+  assert.equal(
+    LIBRARY.headingSections.length,
+    LIBRARY.headings.length,
     'headingSections is positional against headings; a length mismatch reassigns every entry ' +
-      'after the gap to another section'
+      'after the gap to another section, and the coverage rule below is scoped BY section'
+  );
+  assert.ok(
+    SPEC_BLOCKS.size > 40,
+    `the live document yielded ${SPEC_BLOCKS.size} entries. Every address below is looked up in ` +
+      'it, so an empty index reports the whole catalogue as addressing nothing — and a nearly ' +
+      'empty one reports an arbitrary slice of it.'
   );
   assert.ok(MANIFEST_ROWS.length > 50, `the manifest holds ${MANIFEST_ROWS.length} rows`);
+  assert.ok(
+    SHIPS_AS.size > 20,
+    `only ${SHIPS_AS.size} manifest rows name a library entry, so the coverage rule below has ` +
+      'almost no domain'
+  );
   assert.ok(
     SHIPPED_COMPONENTS.length > 100,
     `the component walk found ${SHIPPED_COMPONENTS.length} files, so it is not walking`
   );
 });
 
-test('the catalogue is alive and covers exactly the two manifest tables', () => {
-  // THE ANTI-VACUITY ANCHOR for this whole file. Every other rule here is a set comparison, and a
-  // set comparison over an empty catalogue passes perfectly while the lab shows nothing.
+test('the catalogue is alive and every row carries an address', () => {
+  // THE ANTI-VACUITY ANCHOR for this whole file. Every rule here is a set comparison, and a set
+  // comparison over an empty catalogue passes perfectly while the page shows nothing but drawings.
   const files = catalogueFiles(REPO_ROOT);
   assert.ok(
-    files.length > 1,
-    `the catalogue holds ${files.length} file(s). One file per group is what makes two people ` +
-      'cataloguing different sections disjoint, and zero files makes every rule below vacuous.'
+    files.length > 0,
+    `the catalogue holds ${files.length} file(s), which makes every rule below vacuous. One file ` +
+      'per library section is what keeps two people cataloguing different sections disjoint.'
+  );
+  assert.ok(
+    CATALOGUE.length > 50,
+    `the catalogue holds ${CATALOGUE.length} rows. The Controls section alone is 52, so anything ` +
+      'near or below that is a catalogue that has lost a file rather than one being written.'
+  );
+  assert.ok(
+    RESOLVED.length > 10,
+    `${RESOLVED.length} distinct address(es) for ${CATALOGUE.length} rows. Every row grouped ` +
+      'under one address means the grouping key stopped distinguishing them, and positional ' +
+      'pairing would then be decided by catalogue order alone.'
+  );
+
+  for (const entry of CATALOGUE) {
+    const { spec, cap, draws, path: componentPath, props, content } = entry.row;
+    assert.ok(
+      typeof spec === 'string' && spec.length > 0,
+      `${where(entry)}: \`spec\` must be the library entry's heading, decoded and verbatim`
+    );
+    assert.ok(
+      typeof draws === 'string' && draws.length > 0,
+      `${where(entry)}: \`draws\` must be a CSS selector for the drawing this row replaces`
+    );
+    assert.ok(
+      typeof componentPath === 'string' && componentPath.length > 0,
+      `${where(entry)}: \`path\` must be the component's repository-relative POSIX path`
+    );
+    assert.ok(
+      cap === undefined || (typeof cap === 'string' && cap.length > 0),
+      `${where(entry)}: \`cap\` is optional, but an empty one addresses no unit. Omit it to scope ` +
+        'to the whole entry.'
+    );
+    assert.ok(
+      props === undefined || (typeof props === 'object' && props !== null && !Array.isArray(props)),
+      `${where(entry)}: \`props\` must be a plain object, passed to the component verbatim`
+    );
+    assert.ok(
+      content === undefined || Array.isArray(content),
+      `${where(entry)}: \`content\` must be a node ARRAY. \`LiveSpecimen.svelte\` iterates it, so ` +
+        'a bare object or a markup string renders nothing at all.'
+    );
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Every row addresses a drawing the library actually has
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+test('every catalogue row addresses a drawing the library actually has', () => {
+  for (const resolved of RESOLVED) {
+    // `assert.ok` rather than `assert.equal(problem, null)`: the message IS the problem, so an
+    // equality would print it and then print a diff of it against `null` underneath.
+    assert.ok(resolved.problem === null, resolved.problem ?? '');
+  }
+  // THE ANCHOR. The loop above is a conjunction over `RESOLVED`, and a conjunction over an empty
+  // list — or over a list every member of which matched nothing — is true. Both are reachable: the
+  // first from an empty catalogue, the second from a `.spec`/`.unit` class rename that empties
+  // every scope at once, which is exactly the library edit this rule exists to catch.
+  const matched = RESOLVED.reduce((total, resolved) => total + resolved.targets.length, 0);
+  assert.equal(
+    matched,
+    CATALOGUE.length,
+    `${CATALOGUE.length} rows resolved to ${matched} drawing(s). One row stands one drawing up, ` +
+      'so these are the same number or something above is reporting a match it did not make.'
+  );
+  assert.ok(matched > 50, `${matched} drawings matched, which is not the whole catalogue`);
+});
+
+test('no drawing a row claims contains a drawing another row claims', () => {
+  // THE DEFECT THIS EXISTS FOR IS SILENT AND IT IS NOT HYPOTHETICAL. `inject.js` resolves EVERY
+  // address before it replaces anything, so if one row's `draws` selects an ancestor of another
+  // row's, the outer replacement detaches the inner host — and `replaceWith` on a node with no
+  // parent does nothing. The inner component still mounts, still counts itself, and still carries
+  // its `data-primitive-lab-specimen` root, into a subtree that is not in the document. The
+  // drawing it was supposed to replace was destroyed by the outer component and NOTHING on the
+  // page says so.
+  const hosts = RESOLVED.flatMap((resolved) =>
+    resolved.targets.map((host, index) => ({ host, entry: resolved.address.entries[index] }))
+  );
+  assert.ok(hosts.length > 50, `${hosts.length} drawings claimed, so this rule has no domain`);
+  for (const outer of hosts) {
+    for (const inner of hosts) {
+      if (outer === inner) continue;
+      assert.ok(
+        !outer.host.contains(inner.host),
+        `${where(outer.entry)} claims a drawing that CONTAINS the one ${where(inner.entry)} ` +
+          'claims. The outer component replaces both, the inner one mounts into a detached ' +
+          'subtree, and the page renders one live component where the library drew two things.'
+      );
+    }
+  }
+});
+
+test('the page resolver reads the catalogue exactly as this gate does', () => {
+  // TWO READINGS OF ONE RULE, compared. The rules above are this file's; `resolveSlots` is the
+  // page's, and it is the one the reader's browser runs. They share `specBlocks`, `unitsOf` and
+  // `normalize`, so a disagreement is a disagreement about the RULE — and a page whose resolver
+  // silently dropped a row would otherwise fail only in `npm run lab:check`, which is not a CI
+  // gate and needs a Foundry chrome harvest nobody has in CI.
+  const { slots, problems } = resolveSlots(
+    LIBRARY_BODY,
+    CATALOGUE.map((entry) => entry.row)
+  );
+  assert.deepEqual(
+    problems,
+    [],
+    `the page's own resolver rejects ${problems.length} address(es) this gate accepted`
   );
   assert.equal(
+    slots.length,
     CATALOGUE.length,
-    MANIFEST_ROWS.length,
-    `the catalogue holds ${CATALOGUE.length} rows and the manifest holds ${MANIFEST_ROWS.length}`
+    `the page's resolver placed ${slots.length} of ${CATALOGUE.length} rows. A row it drops ` +
+      'without a problem is a specimen that never appears, on a page that reports no error.'
   );
-  assert.ok(CATALOGUE.length > 50, `${CATALOGUE.length} catalogued rows is not the whole set`);
-
-  const catalogued = new Set(CATALOGUE.map((entry) => entry.row.path));
-  const recorded = new Set(MANIFEST_ROWS.map((row) => row.path));
-  assert.deepEqual(
-    [...recorded].filter((entry) => !catalogued.has(entry)).sort(byCodePoint),
-    [],
-    'a manifest row has no catalogue row, so the lab does not mount it. Every member and every ' +
-      'recorded near-member is driveable or the lab is a partial picture presented as a whole one.'
-  );
-  assert.deepEqual(
-    [...catalogued].filter((entry) => !recorded.has(entry)).sort(byCodePoint),
-    [],
-    'a catalogue row names a component the manifest does not record. The lab draws its name, its ' +
-      'section and its prose from the manifest and the library, so an uncorded row renders as a ' +
-      'specimen with no identity.'
-  );
-
-  for (const entry of CATALOGUE) {
-    assert.ok(
-      accountedProps(entry.row).all.length > 0,
-      `${where(entry)}: ${entry.row.path} accounts for no props at all. A row that knobs nothing ` +
-        'and waives nothing satisfies every correspondence below without driving anything.'
-    );
-  }
 });
 
-test('every catalogue row names a component that exists', () => {
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// Every row names a component that exists, ships and is recorded
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+test('every catalogue row names a shipped component the manifest records', () => {
+  const recorded = new Set(MANIFEST_ROWS.map((row) => row.path));
+  const shipped = new Set(SHIPPED_COMPONENTS);
   for (const entry of CATALOGUE) {
+    const componentPath = entry.row.path;
     assert.ok(
-      existsSync(path.join(REPO_ROOT, entry.row.path)),
-      `${where(entry)}: no component at ${entry.row.path}. The importer glob would answer "no ` +
-        'component at" and the specimen would render as a mount failure, which reads as a broken ' +
+      shipped.has(componentPath),
+      `${where(entry)}: no component at ${componentPath}. \`importers.js\` globs the whole ` +
+        '`src/ui/svelte/` subtree, so a path outside it — or a renamed file — throws "no ' +
+        'component at" and the specimen renders as a mount failure, which reads as a broken ' +
         'component rather than as a row naming a file that is not there.'
     );
-  }
-});
-
-test('no two catalogue rows claim one path', () => {
-  const seen = new Map();
-  for (const entry of CATALOGUE) {
-    const first = seen.get(entry.row.path);
     assert.ok(
-      first === undefined,
-      `${entry.row.path} is catalogued twice: ${where(first ?? entry)} and ${where(entry)}. ` +
-        '`model.js` keys the catalogue by path into a Map, so the LAST row silently wins and the ' +
-        'other one is invisible — including its knobs, which is coverage that reads as present.'
-    );
-    seen.set(entry.row.path, entry);
-  }
-});
-
-test('the catalogue directory holds nothing the lab cannot see', () => {
-  const entries = readdirSync(path.join(REPO_ROOT, CATALOGUE_DIRECTORY), { withFileTypes: true });
-  assert.ok(entries.length > 0, 'the catalogue directory is gone');
-  for (const entry of entries) {
-    assert.ok(
-      entry.isFile(),
-      `${CATALOGUE_DIRECTORY}/${entry.name} is a directory. \`import.meta.glob\` is NOT ` +
-        'recursive here, so every row under it is invisible to the lab AND to the reader this ' +
-        'gate uses — identically, and with no error from either.'
-    );
-    assert.ok(
-      entry.name.endsWith('.json') || entry.name === CATALOGUE_README,
-      `${CATALOGUE_DIRECTORY}/${entry.name} is neither a catalogue file nor the README. The lab ` +
-        'globs `*.json` and reads nothing else.'
+      recorded.has(componentPath),
+      `${where(entry)}: ${componentPath} is in neither manifest table. \`AGENTS.md\` prohibits a ` +
+        'shared component that is not recorded, and the coverage rule below reads the manifest to ' +
+        'decide which library names ship — so an unrecorded row is a specimen the coverage claim ' +
+        'cannot see.'
     );
   }
 });
@@ -345,86 +567,46 @@ test('the catalogue directory holds nothing the lab cannot see', () => {
 // The props correspondence
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-/**
- * How `...rest` is accounted for, decided ONCE here rather than row by row.
- *
- * Eleven of the fifty-seven catalogued components destructure `...rest`, and
- * `declaredPropNames` reports the literal `...rest` — deliberately, so a component that opened
- * itself to arbitrary keys fails a set equality instead of passing under the name it collected them
- * into. Two things follow, and they are different questions:
- *
- *   - The NAME is accounted for like any other, as an `unknobbed` waiver written `"...rest"` with
- *     a `why`. It is not special-cased away, because "this component forwards everything else" is
- *     a fact about its API that a reader of the row should see stated.
- *   - A knob may additionally opt in with `via: "rest"`, which says the prop it drives is one of
- *     the arbitrary keys rather than a declared one. A `ManagerButton` `title` or `aria-label` knob
- *     is the case: those reach the element through the spread and there is no declaration to name.
- *     Permitted ONLY on a row whose component actually declares `...rest` — otherwise it is a
- *     blanket exemption from the rule below, available to any row that types two words.
- */
-const REST_PROP = '...rest';
-
-test('every declared prop is either knobbed or waived with a reason', () => {
+test('every prop a catalogue row passes is a prop the component declares', () => {
+  let checked = 0;
   for (const entry of CATALOGUE) {
     const declared = declaredFor(entry.row.path);
-    if (declared === null) continue; // reported by the row-names-a-real-component rule above
-    const accounted = new Set(accountedProps(entry.row).all);
-    for (const name of declared) {
+    if (declared === null) {
+      assert.deepEqual(
+        Object.keys(entry.row.props ?? {}),
+        [],
+        `${where(entry)}: ${entry.row.path} has no \`$props()\` destructure at all and the row ` +
+          'passes props to it. Svelte drops every one of them silently.'
+      );
+      continue;
+    }
+    const names = new Set(declared);
+    for (const prop of Object.keys(entry.row.props ?? {})) {
+      checked += 1;
       assert.ok(
-        accounted.has(name),
-        `${where(entry)}: ${tagFor(entry.row)} declares \`${name}\` and the row neither knobs it ` +
-          'nor waives it. A prop nothing drives is a prop the lab cannot show, and the lab is the ' +
-          'artifact that claims to show them.'
+        names.has(prop) || names.has(REST_PROP),
+        `${where(entry)}: \`${prop}\` is not a prop ${entry.row.path} declares, and it ` +
+          `destructures no \`${REST_PROP}\` for it to reach the element through. Its props are: ` +
+          `${declared.join(', ')}. Svelte drops an undeclared prop SILENTLY, so the specimen ` +
+          'renders, looks plausible, and is not showing what the row says it is showing.'
       );
     }
-    for (const waiver of entry.row.unknobbed ?? []) {
-      assert.ok(
-        typeof waiver.why === 'string' && waiver.why.trim().length > 0,
-        `${where(entry)}: \`${waiver.prop}\` is waived with no \`why\`. A waiver with no reason ` +
-          'is indistinguishable from an oversight, and is the cheapest way to green this rule.'
-      );
-    }
+    if (entry.row.content === undefined) continue;
+    assert.ok(
+      names.has(CHILDREN_PROP),
+      `${where(entry)}: the row supplies \`content\` and ${entry.row.path} declares no ` +
+        `\`${CHILDREN_PROP}\`. \`LiveSpecimen.svelte\` passes it as the children snippet, so a ` +
+        'component that does not render one draws an empty control where the library drew a ' +
+        'labelled one.'
+    );
   }
-});
-
-test('no knob names a prop the component does not declare', () => {
-  for (const entry of CATALOGUE) {
-    const declared = declaredFor(entry.row.path);
-    if (declared === null) continue;
-    const declaredSet = new Set(declared);
-    const spreads = declaredSet.has(REST_PROP);
-    for (const knob of entry.row.knobs ?? []) {
-      if (knob.via === 'rest') {
-        assert.ok(
-          spreads,
-          `${where(entry)}: knob \`${knob.prop}\` declares \`via: "rest"\` and ` +
-            `${tagFor(entry.row)} destructures no \`...rest\`. There is no spread for it to reach ` +
-            'the element through, so the prop is dropped and the knob is inert.'
-        );
-        continue;
-      }
-      assert.ok(
-        declaredSet.has(knob.prop),
-        `${where(entry)}: knob \`${knob.prop}\` names a prop ${tagFor(entry.row)} does not ` +
-          `declare. Its props are: ${declared.join(', ')}. Svelte drops an undeclared prop ` +
-          'silently, so the control renders, moves, and changes nothing.'
-      );
-    }
-    for (const waiver of entry.row.unknobbed ?? []) {
-      assert.ok(
-        declaredSet.has(waiver.prop),
-        `${where(entry)}: \`${waiver.prop}\` is waived and ${tagFor(entry.row)} does not declare ` +
-          'it. A waiver for a prop that does not exist hides a real prop going unaccounted for, ' +
-          'because the two lists are compared by size nowhere.'
-      );
-    }
-  }
+  assert.ok(checked > 50, `only ${checked} props were checked, so this rule has almost no domain`);
 });
 
 test('every prop name every shipped component declares is a name', () => {
   // OVER THE WHOLE TREE, not over the catalogued subset. This is the rule the repaired parser
   // exists for, and scoping it to the catalogue would mean the reader could go back to returning
-  // JSDoc comments as prop names the moment a component left the lab.
+  // JSDoc comments as prop names the moment a component left the catalogue.
   let parsed = 0;
   for (const componentPath of SHIPPED_COMPONENTS) {
     let declared;
@@ -452,266 +634,111 @@ test('every prop name every shipped component declares is a name', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-// The knob declarations
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-
-test('a fixed prop and a knob never name the same prop', () => {
-  for (const entry of CATALOGUE) {
-    const knobbed = new Set((entry.row.knobs ?? []).map((knob) => knob.prop));
-    for (const fixed of Object.keys(entry.row.fixedProps ?? {})) {
-      assert.ok(
-        !knobbed.has(fixed),
-        `${where(entry)}: \`${fixed}\` is both a knob and a fixedProp. \`buildProps\` spreads ` +
-          '`fixedProps` LAST, so the fixed value wins on every render and the control is inert — ' +
-          'it moves, the invocation updates, and the specimen never changes.'
-      );
-    }
-  }
-});
-
-test('every event knob writes back into a value knob on its own row', () => {
-  for (const entry of CATALOGUE) {
-    const valueKnobs = new Set(
-      (entry.row.knobs ?? [])
-        .filter((knob) => VALUE_KNOB_TYPES.has(knob.type))
-        .map((knob) => knob.prop)
-    );
-    for (const knob of entry.row.knobs ?? []) {
-      if (knob.writes !== undefined) {
-        assert.ok(
-          valueKnobs.has(knob.writes),
-          `${where(entry)}: \`${knob.prop}\` writes back into \`${knob.writes}\`, which is no ` +
-            'value knob on this row. `applyWriteBack` writes the key anyway, nothing renders it, ' +
-            'and the controlled primitive stays inert — the exact failure `writes` exists to fix.'
-        );
-      }
-      if (knob.arg !== undefined) {
-        assert.ok(
-          Number.isInteger(knob.arg) && knob.arg >= 0,
-          `${where(entry)}: \`${knob.prop}\` declares \`arg: ${JSON.stringify(knob.arg)}\`. It ` +
-            "indexes the callback's arguments, so a non-integer reads `undefined` and writes it."
-        );
-      }
-    }
-  }
-});
-
-test('every wildcard matrix axis names a knob with an option set', () => {
-  for (const entry of CATALOGUE) {
-    const knobs = new Map((entry.row.knobs ?? []).map((knob) => [knob.prop, knob]));
-    for (const story of entry.row.stories ?? []) {
-      for (const [prop, spec] of Object.entries(story.matrix ?? {})) {
-        const knob = knobs.get(prop);
-        assert.ok(
-          knob,
-          `${where(entry)}: story "${story.title}" varies \`${prop}\`, which is no knob on this row`
-        );
-        if (spec !== '*') continue;
-        assert.ok(
-          knob.type === 'boolean' || (knob.options?.length ?? 0) > 0,
-          `${where(entry)}: story "${story.title}" varies \`${prop}\` by \`'*'\` and that knob ` +
-            'declares no options. `expandMatrix` reads `knob.options ?? []`, so the axis expands ' +
-            'to ZERO cells and the whole story renders empty rather than failing.'
-        );
-      }
-    }
-  }
-});
-
-test('no story expands to more cells than anybody would read', () => {
-  for (const entry of CATALOGUE) {
-    const base = defaultValues(entry.row);
-    for (const story of entry.row.stories ?? []) {
-      const cells = expandMatrix(entry.row, story, base);
-      assert.ok(
-        cells.length > 0,
-        `${where(entry)}: story "${story.title}" expands to no cells at all, so it renders as an ` +
-          'empty heading'
-      );
-      assert.ok(
-        cells.length <= MAX_STORY_CELLS,
-        `${where(entry)}: story "${story.title}" expands to ${cells.length} cells. ` +
-          '`expandMatrix` builds an UNCAPPED cartesian product, so a third axis multiplies rather ' +
-          `than adds; ${MAX_STORY_CELLS} is the point past which the page is slower to read than ` +
-          'the component it is showing.'
-      );
-    }
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// The engine itself, exercised rather than described
+// The coverage claim
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * One row carrying every knob type, so the engine rules have a domain the catalogue cannot empty.
+ * The library's entries, indexed the way the coverage rule needs them.
  *
- * Deliberately NOT a real catalogue row. A rule exercised only over the catalogue is a rule that
- * goes quiet the moment the catalogue does, and `accountedProps` — the one function the rest of
- * this file leans on — is also the only one a set comparison touches. `buildProps`,
- * `renderInvocation` and `expandMatrix` are what the page actually runs.
+ * `headings` and `headingSections` are positional against each other — the corpus rule above pins
+ * that — so zipping them is the whole index.
+ *
+ * @returns {{heading: string, section: string|null}[]} Naming entries, in document order.
  */
-const ENGINE_FIXTURE = {
-  path: 'src/ui/svelte/components/Stepper.svelte',
-  knobs: [
-    { prop: 'value', type: 'number', value: 3 },
-    { prop: 'label', type: 'text', value: 'Quantity' },
-    { prop: 'disabled', type: 'boolean' },
-    { prop: 'tone', type: 'select', options: ['neutral', 'danger'] },
-    { prop: 'tint', type: 'colour', value: '#8b6f47' },
-    { prop: 'bands', type: 'json', value: [{ id: 'a' }] },
-    { prop: 'children', type: 'snippet', value: 'text' },
-    { prop: 'trailing', type: 'snippet', value: '' },
-    { prop: 'onChange', type: 'event', writes: 'value' },
-  ],
-  fixedProps: { id: 'engine-fixture' },
-  stories: [{ title: 'tones', matrix: { tone: '*', disabled: [false, true] } }],
-};
+function libraryEntries() {
+  return LIBRARY.headings
+    .map((heading, index) => ({ heading, section: LIBRARY.headingSections[index] }))
+    .filter((entry) => primitiveNamesIn(entry.heading).length > 0);
+}
 
-test('buildProps yields a key for every value knob and every event knob', () => {
-  const values = defaultValues(ENGINE_FIXTURE);
-  const props = buildProps({
-    entry: ENGINE_FIXTURE,
-    values,
-    resolveSnippet: (id) => ({ filler: id }),
-  });
-  const expected = ENGINE_FIXTURE.knobs
-    .filter((knob) => knob.type !== 'snippet' || values[knob.prop])
-    .map((knob) => knob.prop);
-  assert.deepEqual(
-    Object.keys(props).sort(byCodePoint),
-    [...expected, ...Object.keys(ENGINE_FIXTURE.fixedProps)].sort(byCodePoint),
-    'a knob that contributes no key is a control with nothing behind it'
+test('every shipped primitive a catalogued section names has a live specimen', () => {
+  const entries = libraryEntries();
+  const sectionOf = new Map(entries.map((entry) => [entry.heading, entry.section]));
+  const catalogued = new Set(
+    CATALOGUE.map((entry) => sectionOf.get(entry.row.spec)).filter((section) => section !== null)
   );
-  assert.equal(typeof props.onChange, 'function', 'an event knob must contribute a callback');
-  assert.equal(props.id, 'engine-fixture', 'fixedProps must reach the component');
-  assert.ok(
-    !Object.hasOwn(props, 'trailing'),
-    'an unset snippet knob must OMIT its prop — several primitives branch on `=== undefined` to ' +
-      'decide whether to render a slot at all, and an empty snippet takes the other branch'
-  );
-});
-
-test('the generated invocation is Svelte a call site could paste', () => {
-  const values = { ...defaultValues(ENGINE_FIXTURE), value: 7, tone: 'danger', trailing: 'icon' };
-  const markup = renderInvocation(ENGINE_FIXTURE, values);
-  assert.ok(
-    markup.startsWith(`<${tagFor(ENGINE_FIXTURE)}`),
-    `the invocation opens with ${JSON.stringify(markup.slice(0, 40))} rather than the component's ` +
-      'own tag; the library NAME and the importable file name are different strings and only one ' +
-      'of them can be pasted'
-  );
-  // THE OPENING-TAG REGION, which is everything up to the `>` that closes it. A `{#snippet}` block
-  // is a CHILD of a component, never one of its attributes: written inside the opening tag it does
-  // not compile, so the one thing the generated snippet promises — that it can be pasted — is
-  // false exactly for the rows that pass a non-`children` snippet.
-  const openingTag = markup.slice(0, markup.indexOf('>') + 1);
-  assert.ok(
-    !openingTag.includes('{#snippet'),
-    'the invocation renders a non-`children` snippet as an ATTRIBUTE:\n' +
-      `${openingTag}\nA snippet prop is passed as a child block, not inside the opening tag.`
-  );
-});
-
-test('expandMatrix returns at least one cell per story and varies what it names', () => {
-  const base = defaultValues(ENGINE_FIXTURE);
-  const cells = expandMatrix(ENGINE_FIXTURE, ENGINE_FIXTURE.stories[0], base);
-  assert.equal(cells.length, 4, 'two options crossed with two booleans is four cells');
-  assert.deepEqual(
-    [...new Set(cells.map((cell) => cell.values.tone))].sort(byCodePoint),
-    ['danger', 'neutral'],
-    "a `*` axis must expand to the knob's own option list"
-  );
-  assert.equal(
-    expandMatrix(ENGINE_FIXTURE, { title: 'default' }, base).length,
-    1,
-    'a story with no matrix is one cell, not zero — zero renders an empty heading'
-  );
-});
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// The fillers
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-
-test('the filler ids and the ids the invocation describes are one set', () => {
-  // THE ANTI-VACUITY ANCHOR for both filler rules. Each assertion below is a set comparison and a
-  // set comparison passes over two empty sets — including the rule underneath this one, which
-  // would call every catalogue row correct if the ids read as nothing. That is not hypothetical:
-  // the reader this replaces scraped the ids out of `fillers.js` by name, and answered with an
-  // empty set the moment the literal was renamed.
-  assert.ok(FILLER_IDS.length > 3, `read ${FILLER_IDS.length} filler ids, so the reader is broken`);
-  assert.equal(new Set(FILLER_IDS).size, FILLER_IDS.length, 'a filler id is declared twice');
-
-  // `FILLER_IDS` is the one place the set is enumerated, so it is the side every other half is
-  // compared against rather than a fourth record to keep in step with three others.
-  const supplied = [...Object.keys(RAW_FILLERS), ...COMPONENT_FILLER_IDS];
-  assert.deepEqual(
-    missingFrom(supplied, FILLER_IDS),
-    [],
-    '`FILLER_IDS` enumerates a filler that neither `RAW_FILLERS` nor `COMPONENT_FILLER_IDS` ' +
-      'supplies. `fillerIds()` offers it as a knob option, `assembleFillers` resolves it to ' +
-      'nothing, and `buildProps` OMITS the snippet prop — so the slot renders empty and reads as ' +
-      'a component that draws nothing there.'
-  );
-  assert.deepEqual(
-    missingFrom(FILLER_IDS, supplied),
-    [],
-    '`RAW_FILLERS` declares a snippet `FILLER_IDS` does not enumerate. It is unreachable: no ' +
-      'knob offers it, `assembleFillers` never checks for it, and `COMPONENT_FILLER_IDS` is ' +
-      'derived by SUBTRACTING the raw half, so an id only the raw half knows about is silently ' +
-      'excluded from the half `Fillers.svelte` is required to cover.'
-  );
-
-  const described = Object.keys(FILLER_MARKUP);
-  assert.deepEqual(
-    missingFrom(described, FILLER_IDS),
-    [],
-    '`FILLER_MARKUP` describes no markup for a filler the lab offers. `describeFiller` falls ' +
-      'through to the id itself, so the generated invocation — whose whole promise is that it ' +
-      'can be pasted and compile — prints a bare id where the call site would write markup.'
-  );
-  assert.deepEqual(
-    missingFrom(FILLER_IDS, described),
-    [],
-    '`FILLER_MARKUP` describes a filler that does not exist. Nothing resolves it, so the entry ' +
-      'is either a rename that was applied to one half of the file, or markup for a snippet the ' +
-      'lab cannot render.'
-  );
-
-  // The seam itself, not just the map behind it. `renderInvocation` takes `describeFiller` as a
-  // parameter defaulting to the identity function, so the browser's answer and this gate's are the
-  // same function only if this one is exercised.
-  for (const id of FILLER_IDS) {
-    assert.equal(describeFiller(id), FILLER_MARKUP[id], `describeFiller(${id})`);
-  }
-  assert.equal(
-    describeFiller('no-such-filler'),
-    'no-such-filler',
-    "an unknown id must come back as ITSELF. Returning another filler's markup would report the " +
-      'fault as a different filler, in the one output on the page meant to be pasted somewhere.'
-  );
-  assert.deepEqual(
-    fillerIds(),
-    [...FILLER_IDS],
-    '`fillerIds()` is what a snippet knob with no explicit option list offers, so it is the set ' +
-      'the page actually presents'
-  );
-});
-
-test('every filler a catalogue row selects exists', () => {
+  const standsUp = new Map();
   for (const entry of CATALOGUE) {
-    for (const knob of entry.row.knobs ?? []) {
-      if (knob.type !== 'snippet') continue;
-      const ids = [knob.value, ...(knob.options ?? [])].filter(Boolean);
-      for (const id of ids) {
-        assert.ok(
-          FILLER_IDS.includes(id),
-          `${where(entry)}: knob \`${knob.prop}\` offers the filler \`${id}\`, which does not ` +
-            'exist. `buildProps` resolves it to nothing and OMITS the prop, so the slot renders ' +
-            'empty and looks like a component that draws nothing there.'
-        );
-      }
+    if (!standsUp.has(entry.row.spec)) standsUp.set(entry.row.spec, new Set());
+    standsUp.get(entry.row.spec).add(entry.row.path);
+  }
+
+  assert.ok(
+    catalogued.size > 0,
+    `no catalogue row resolves to a library section, so this rule quantifies over nothing. Either ` +
+      'the catalogue is empty or every `spec` names an entry that sits under no `section[id]`.'
+  );
+
+  let required = 0;
+  for (const { heading, section } of entries) {
+    if (!catalogued.has(section)) continue;
+    for (const name of primitiveNamesIn(heading)) {
+      const componentPath = SHIPS_AS.get(`<${name}>`);
+      // UNBUILT NAMES ARE EXEMPT BY CONSTRUCTION. `<Select>` and `<Search>` are specified and have
+      // no manifest row, and the README is explicit that their drawings stay drawings.
+      if (!componentPath) continue;
+      required += 1;
+      assert.ok(
+        standsUp.get(heading)?.has(componentPath),
+        `the library's "${section}" section is catalogued, its entry ${heading} names <${name}>, ` +
+          `and ${componentPath} ships — but no catalogue row stands it up under that entry. The ` +
+          'claim this page makes is per SECTION: once any row addresses an entry in a section, ' +
+          'every shipped primitive that section names has a live specimen. A section with one ' +
+          'entry still drawn is a page a reader cannot tell from a complete one, because a ' +
+          'drawing is exactly what this page looks like when it is working. Add a row, or move ' +
+          "the section's rows out and leave the section uncatalogued."
+      );
     }
+  }
+  assert.ok(
+    required > 5,
+    `${required} shipped primitive(s) were required to have a specimen. The Controls section ` +
+      'alone names eight, so anything below that is a rule whose domain has collapsed.'
+  );
+});
+
+test('every library entry the manifest names sits under a library section', () => {
+  // THE COVERAGE RULE ABOVE IS SCOPED BY SECTION, so an entry under no `section[id]` is invisible
+  // to it: nothing catalogues its section, and nothing requires its primitives. That is a hole a
+  // library edit could open by accident — moving an entry above the first `<section>` — and this
+  // is the rule that reports it.
+  const sectioned = new Set(
+    LIBRARY.headings.filter((_, index) => LIBRARY.headingSections[index] !== null)
+  );
+  const named = MANIFEST_ROWS.filter((row) => row.library !== null);
+  assert.ok(named.length > 20, `${named.length} rows name a library entry, so this has no domain`);
+  for (const row of named) {
+    const name = row.library.slice(1, -1);
+    const entry = [...sectioned].find((heading) => primitiveNamesIn(heading).includes(name));
+    assert.ok(
+      entry,
+      `${row.path} records library entry ${row.library}, which no sectioned \`div.spec-head > h4\` ` +
+        'names. Either the manifest names an entry the library does not head, or the entry sits ' +
+        'outside every `section[id]` — under which the coverage rule above would silently stop ' +
+        'requiring a specimen for it.'
+    );
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// The catalogue directory
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+test('the catalogue directory holds nothing the lab cannot see', () => {
+  const entries = readdirSync(path.join(REPO_ROOT, CATALOGUE_DIRECTORY), { withFileTypes: true });
+  assert.ok(entries.length > 0, 'the catalogue directory is gone');
+  for (const entry of entries) {
+    assert.ok(
+      entry.isFile(),
+      `${CATALOGUE_DIRECTORY}/${entry.name} is a directory. \`import.meta.glob\` is NOT ` +
+        'recursive here, so every row under it is invisible to the lab AND to the reader this ' +
+        'gate uses — identically, and with no error from either.'
+    );
+    assert.ok(
+      entry.name.endsWith('.json') || entry.name === CATALOGUE_README,
+      `${CATALOGUE_DIRECTORY}/${entry.name} is neither a catalogue file nor the README. ` +
+        '`catalogue.js` globs `*.json` and reads nothing else.'
+    );
   }
 });
 
@@ -725,14 +752,10 @@ const SHIM_SOURCE = readFileSync(path.join(REPO_ROOT, SHIM_PATH), 'utf8');
 /**
  * The world the shim is installed with, preferring its own minimal one.
  *
- * The delta gives `installFoundryShim.js` an exported `createMinimalLabWorld()` so the Primitive
- * Lab does not need the View Lab's whole fixture. Until that lands the only world the shim is ever
- * given is the literal in `tests/view-lab/world/labWorld.js`, and the property is the same over
- * either: a field the shim READS that no world SUPPLIES fails late — inside a closure, or never —
- * which is exactly why a literal with no gate was worth replacing.
- *
- * Preference, not a union: once the minimal world exists it is the one the Primitive Lab boots
- * against, so checking the shim against the OTHER world would be checking a page nobody opens.
+ * `mount.js` boots the Primitive Lab against `createMinimalLabWorld()`, so that is the world the
+ * property below has to be checked against; the View Lab's fixture literal is the fallback for a
+ * tree where the minimal one does not exist. Preference, not a union: checking the shim against the
+ * OTHER world would be checking a page nobody opens.
  *
  * @returns {{label: string, keys: string[]}} Where the world came from and what it declares.
  */
@@ -775,30 +798,6 @@ test('every world field the Foundry shim reads is supplied by the world it is gi
         `are: ${world.keys.join(', ')}. An absent one fails LATE — \`settings\`, \`documents\` ` +
         'and `worldTime` are all read inside closures, so the boot succeeds and the failure ' +
         'arrives at whichever specimen happens to touch it first.'
-    );
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// The library's sections, which is what the lab groups its rail by
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-
-test('every manifest library name resolves to a library section', () => {
-  const sectionOf = new Map();
-  for (const [index, heading] of LIBRARY.headings.entries()) {
-    for (const name of primitiveNamesIn(heading))
-      sectionOf.set(name, LIBRARY.headingSections[index]);
-  }
-  const named = MANIFEST_ROWS.filter((row) => row.library !== null);
-  assert.ok(named.length > 20, `${named.length} rows name a library entry, so this has no domain`);
-  for (const row of named) {
-    const name = row.library.slice(1, -1);
-    assert.ok(
-      sectionOf.get(name),
-      `${row.path} records library entry ${row.library}, which resolves to no \`section[id]\`. ` +
-        '`model.js` groups a row by its entry\'s section and falls back to "Shipped, ' +
-        'undocumented" — so a documented primitive would be filed under the group whose whole ' +
-        'meaning is that the library does not name it.'
     );
   }
 });
@@ -941,7 +940,7 @@ test('an empty catalogue is refused rather than run', () => {
   });
 });
 
-test('the mounted-set comparison catches a count and an identity disagreement', () => {
+test('the mounted-set comparison catches a count, an identity and a MULTIPLICITY disagreement', () => {
   const expected = ['a.svelte', 'b.svelte'];
   assert.equal(
     describeMountFailure({ expected, mounted: [...expected], reported: 2 }),
@@ -965,6 +964,20 @@ test('the mounted-set comparison catches a count and an identity disagreement', 
     'a page that carries the specimen roots and reports zero has a broken counter, which is the ' +
       'attribute the whole smoke is decided on'
   );
+  // THE FAILURE THE LIBRARY PAGE MADE REACHABLE. A component standing in a drawing that CONTAINS
+  // another row's drawing detaches the inner host, so the inner specimen mounts outside the
+  // document: the page's counter says three, the document carries two roots, and every path in
+  // the catalogue is still present somewhere. A membership comparison agrees with that page.
+  assert.match(
+    describeMountFailure({
+      expected: ['a.svelte', 'a.svelte', 'b.svelte'],
+      mounted: ['a.svelte', 'b.svelte'],
+      reported: 3,
+    }),
+    /a\.svelte: catalogued 2, mounted 1/,
+    'a path catalogued twice and mounted once must be reported by NAME and by both counts; ' +
+      'membership alone reports two agreeing sets'
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -978,15 +991,14 @@ const SMOKE_PATH = 'scripts/lib/primitiveLabSmoke.js';
  * The half the PAGE owns: the two files that write the attributes, read as text.
  *
  * Read rather than imported, and that is not a preference. `mount.js` boots the lab on import and
- * `Plinth.svelte` needs compiling, so neither can be loaded here — which is exactly the condition
- * under which a hand-maintained mirror of strings goes unchecked. The bytes are the same bytes
- * Vite serves, so reading them is not a second record of the contract.
+ * `LiveSpecimen.svelte` needs compiling, so neither can be loaded here — which is exactly the
+ * condition under which a hand-maintained mirror of strings goes unchecked. The bytes are the same
+ * bytes Vite serves, so reading them is not a second record of the contract.
  */
 const PAGE_SOURCES = new Map(
-  ['tests/view-lab/primitives/mount.js', 'tests/view-lab/primitives/Plinth.svelte'].map((file) => [
-    file,
-    readFileSync(path.join(REPO_ROOT, file), 'utf8'),
-  ])
+  ['tests/view-lab/primitives/mount.js', 'tests/view-lab/primitives/LiveSpecimen.svelte'].map(
+    (file) => [file, readFileSync(path.join(REPO_ROOT, file), 'utf8')]
+  )
 );
 
 /**
@@ -999,9 +1011,9 @@ const PAGE_SOURCES = new Map(
  * catch as agreement.
  *
  * So only the two forms that actually set an attribute count: a quoted string literal, which is how
- * `mount.js` names the three it puts on `<body>`, and `name={…}`, which is how `Plinth.svelte`
- * writes the specimen path onto the plinth. Prose says `` `name` `` or `name=""`, and neither of
- * those is either of these.
+ * `mount.js` names the three it puts on `<body>`, and `name={…}`, which is how
+ * `LiveSpecimen.svelte` writes the row's path onto the specimen root. Prose says `` `name` `` or
+ * `name=""`, and neither of those is either of these.
  *
  * @param {string} attribute An attribute name.
  * @returns {string[]} The page files that set it.

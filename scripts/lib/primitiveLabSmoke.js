@@ -22,8 +22,27 @@
  * So the page publishes a POSITIVE count of what it mounted, and the smoke compares it by equality
  * against a count derived HERE, from the catalogue files on disk. Removing a catalogue file then
  * fails as a mismatch rather than as a smaller green number. The identity check goes one further:
- * the page also publishes each specimen's `path`, and the smoke compares the SET, so a page that
- * mounted the right number of the wrong things is caught too.
+ * the page also publishes each specimen's `path`, and the smoke compares HOW MANY TIMES each path
+ * was mounted against how many rows name it, so a page that mounted the right number of the wrong
+ * things — or the right things the wrong number of times — is caught too.
+ *
+ * WHY THAT COMPARISON IS A MULTISET AND NOT A SET
+ * -----------------------------------------------
+ * It was a set, and the page the library rebuild produced made that unsound. A catalogue row now
+ * replaces one hand-drawn element in `library.html`, and `<Button>` alone stands in eleven places —
+ * so the same `path` appears many times and a set comparison cannot tell eleven from ten.
+ *
+ * That is not a theoretical loss of resolution. `inject.js` resolves EVERY address before it
+ * replaces anything, so a row whose `draws` selects an ancestor of another row's drawing detaches
+ * the inner host, and `replaceWith` on a node with no parent does nothing: the inner specimen still
+ * mounts, still increments the page's counter, and still carries its own root — into a subtree that
+ * is not in the document. The count then agrees, every catalogued path is still present somewhere,
+ * and a set comparison reports two agreeing sets over a page that destroyed one of the library's
+ * drawings and put nothing in its place.
+ *
+ * `tests/design-system-lab-coverage.test.js` catches the same defect statically, by rejecting a row
+ * whose drawing contains another row's. Both are worth having: the static rule is the one that runs
+ * in CI, and this one is the one that would see a page that lost a specimen some other way.
  *
  * THE DOM CONTRACT
  * ----------------
@@ -39,13 +58,13 @@ import path from 'node:path';
 export const LAB_PAGE_PATH = '/tests/view-lab/primitives.html';
 
 /**
- * The query that asks the page to mount every catalogued specimen at once rather than the rail's
- * current selection.
+ * The query that asks the page to mount every catalogued specimen at once.
  *
- * The smoke has to drive every specimen, and walking a 57-entry rail one click at a time is both
- * slow and dependent on the rail's own markup — which would make a rail restyle fail as a mount
- * failure. Mounting all of them is the same coverage with one navigation, and it is a mode the page
- * needs anyway for the side-by-side theme row.
+ * The page satisfies it by already having done it: it renders the whole library and stands up every
+ * catalogued row, so there is no partial mode to switch out of. The query is navigated with anyway,
+ * and `requireSupportedMountMode` in `mount.js` REFUSES every other value — so a page that grew a
+ * selection mode without telling this smoke throws on boot rather than reporting a slice of the
+ * catalogue as the whole of it.
  */
 export const MOUNT_ALL_QUERY = 'mount=all';
 
@@ -76,7 +95,7 @@ export const CATALOGUE_DIRECTORY = 'tests/view-lab/primitives/catalogue';
 /**
  * The one file in the catalogue directory that is not a catalogue file.
  *
- * `model.js` globs `./catalogue/*.json`, so a row written anywhere else in that directory is
+ * `catalogue.js` globs `./catalogue/*.json`, so a row written anywhere else in that directory is
  * invisible to the lab AND to this reader — silently, and identically. Naming the single permitted
  * exception here is what lets the coverage gate reject everything else.
  */
@@ -158,27 +177,62 @@ export function emptyCatalogueMessage(root) {
 }
 
 /**
- * Describe a mounted-count or mounted-identity disagreement.
+ * How many times each path appears.
  *
- * Reports BOTH halves in one message rather than failing on the count and leaving the identity for
+ * @param {string[]} paths Repository-relative POSIX paths.
+ * @returns {Map<string, number>} Path to its occurrence count.
+ */
+function tally(paths) {
+  const counts = new Map();
+  for (const entry of paths) counts.set(entry, (counts.get(entry) ?? 0) + 1);
+  return counts;
+}
+
+/**
+ * Describe a mounted-count, mounted-identity or mounted-multiplicity disagreement.
+ *
+ * Reports EVERY half in one message rather than failing on the count and leaving the identity for
  * the next run: a count that matches while the identity does not is the interesting failure, and a
  * reader who has only been told the count is wrong will assume it is the boring one.
  *
+ * The comparison is a MULTISET — see the module docblock for the page defect that made a set
+ * comparison unsound — so a path catalogued eleven times and mounted ten is reported by name, with
+ * both numbers, rather than agreeing.
+ *
  * @param {object} options Options.
- * @param {string[]} options.expected Catalogue paths.
- * @param {string[]} options.mounted Paths the page reported mounting.
+ * @param {string[]} options.expected Catalogue paths, one per row, duplicates included.
+ * @param {string[]} options.mounted Paths the page reported mounting, one per specimen root.
  * @param {number} options.reported The page's own `data-primitive-lab-mounted` value.
  * @returns {string|null} The failure text, or null when everything agrees.
  */
 export function describeMountFailure({ expected, mounted, reported }) {
-  const missing = expected.filter((entry) => !mounted.includes(entry));
-  const extra = mounted.filter((entry) => !expected.includes(entry));
-  if (reported === expected.length && missing.length === 0 && extra.length === 0) return null;
+  const wanted = tally(expected);
+  const found = tally(mounted);
+  const missing = [...wanted.keys()].filter((entry) => !found.has(entry));
+  const extra = [...found.keys()].filter((entry) => !wanted.has(entry));
+  const miscounted = [...wanted]
+    .filter(([entry, count]) => found.has(entry) && found.get(entry) !== count)
+    .map(([entry, count]) => `${entry}: catalogued ${count}, mounted ${found.get(entry)}`);
+  if (
+    reported === expected.length &&
+    missing.length === 0 &&
+    extra.length === 0 &&
+    miscounted.length === 0
+  ) {
+    return null;
+  }
   const lines = [
     `the catalogue holds ${expected.length} rows; the page reported ${reported} mounted and ` +
       `carries ${mounted.length} specimen roots`,
   ];
   if (missing.length > 0) lines.push(`never mounted: ${missing.join(', ')}`);
   if (extra.length > 0) lines.push(`mounted but not catalogued: ${extra.join(', ')}`);
+  if (miscounted.length > 0) {
+    lines.push(
+      `mounted a different number of times than catalogued: ${miscounted.join('; ')}. A path ` +
+        'drawn in many places is expected; one drawn in FEWER places than the catalogue claims is ' +
+        'a drawing that was replaced by nothing, or a specimen that mounted outside the document.'
+    );
+  }
   return lines.join('\n  ');
 }

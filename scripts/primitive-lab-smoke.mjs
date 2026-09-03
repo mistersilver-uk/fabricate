@@ -2,9 +2,10 @@
 /**
  * Fabricate Primitive Lab smoke — `npm run lab:check`.
  *
- * Boots the View Lab's Vite app, opens `tests/view-lab/primitives.html` with every catalogued
- * specimen mounted, and proves each one mounted against the real Foundry cascade with no console
- * error, no page error, no Fabricate warning and no failed request.
+ * Boots the View Lab's Vite app, opens `tests/view-lab/primitives.html` — which renders
+ * `openspec/specs/design-system/library.html` with each catalogued hand drawing replaced by the
+ * real component — and proves every catalogued row mounted against the real Foundry cascade with no
+ * console error, no page error, no Fabricate warning and no failed request.
  *
  * NOT A CI GATE. It requires a harvested Foundry chrome, which never leaves a maintainer's
  * machine, so CI cannot run it — the same standing as `npm run docs:screenshots` and
@@ -32,7 +33,8 @@
  *
  * WHY READINESS IS AN ATTRIBUTE AND NEVER A TIMER
  * -----------------------------------------------
- * Fifty-seven lazy component chunks settle at wildly different times on a cold optimiser. A sleep
+ * Every catalogued component arrives as its own lazy chunk, and they settle at wildly different
+ * times on a cold optimiser. A sleep
  * long enough to be safe is long enough to be useless, and a sleep short enough to be useful reads
  * a half-mounted page as a mount failure. `data-primitive-lab-ready` is ABSENT until the last
  * specimen settles, and `data-primitive-lab-error` is present when the boot itself failed, so the
@@ -74,9 +76,9 @@ const BROWSER_CONTEXT = {
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--force-color-profile=srgb'];
 
 /**
- * Generous, because this waits for FIFTY-SEVEN lazy chunks rather than one view, and on a cold
- * Vite optimiser the whole module graph is built before the first byte is served. A warm run
- * settles in seconds and never approaches this.
+ * Generous, because this waits for the whole library to be fetched, adopted and every catalogued
+ * chunk imported, rather than for one view — and on a cold Vite optimiser the whole module graph is
+ * built before the first byte is served. A warm run settles in seconds and never approaches this.
  */
 const READY_TIMEOUT_MS = 120_000;
 const NAVIGATION_TIMEOUT_MS = 150_000;
