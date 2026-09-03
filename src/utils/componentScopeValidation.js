@@ -213,31 +213,62 @@ function checkStatus(check) {
 function checkTitle(id, check, phrase, context) {
   const missing = check.state === 'missing';
   const systemName = trimmed(context.systemName) || trimmed(context.systemId);
-  const titles = {
-    source: missing
-      ? ['Validation.SourceMissing', 'No source item linked']
-      : ['Validation.SourceLinked', 'A source item is linked'],
-    name: missing
-      ? ['Validation.NameMissing', 'Name is empty']
-      : ['Validation.NameSet', 'Name is set'],
-    worldCategory: missing
-      ? ['Validation.WorldCategoryMissing', 'No world category']
-      : ['Validation.WorldCategorySet', 'World category is set'],
-    worldTags: missing
-      ? ['Validation.WorldTagsMissing', 'No world tags']
-      : ['Validation.WorldTagsSet', '{count} world tags set'],
-    systemRules: missing
-      ? ['Validation.SystemRulesMissing', 'No rules in {system}']
-      : ['Validation.SystemRulesPresent', 'Rules exist in {system}'],
-    systemCategory: missing
-      ? ['Validation.SystemCategoryMissing', 'No category resolves here']
-      : ['Validation.SystemCategoryResolved', 'Category resolves in {system}'],
-  };
-  const [suffix, fallback] = titles[id];
-  return phrase(`FABRICATE.Admin.Manager.Scoped.Component.${suffix}`, fallback, {
+  const data = {
     system: systemName,
     count: Array.isArray(context.worldTags) ? context.worldTags.length : 0,
-  });
+  };
+  // EVERY KEY IS A COMPLETE LITERAL, never a base plus an interpolated suffix. A composed key
+  // resolves to the NAMESPACE OBJECT under the lang-key scan, which checks only that the base
+  // exists — so a missing leaf would ship green.
+  const titles = {
+    source: missing
+      ? [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.SourceMissing',
+          'No source item linked',
+        ]
+      : [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.SourceLinked',
+          'A source item is linked',
+        ],
+    name: missing
+      ? ['FABRICATE.Admin.Manager.Scoped.Component.Validation.NameMissing', 'Name is empty']
+      : ['FABRICATE.Admin.Manager.Scoped.Component.Validation.NameSet', 'Name is set'],
+    worldCategory: missing
+      ? [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldCategoryMissing',
+          'No world category',
+        ]
+      : [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldCategorySet',
+          'World category is set',
+        ],
+    worldTags: missing
+      ? ['FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsMissing', 'No world tags']
+      : [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsSet',
+          '{count} world tags set',
+        ],
+    systemRules: missing
+      ? [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.SystemRulesMissing',
+          'No rules in {system}',
+        ]
+      : [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.SystemRulesPresent',
+          'Rules exist in {system}',
+        ],
+    systemCategory: missing
+      ? [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.SystemCategoryMissing',
+          'No category resolves here',
+        ]
+      : [
+          'FABRICATE.Admin.Manager.Scoped.Component.Validation.SystemCategoryResolved',
+          'Category resolves in {system}',
+        ],
+  };
+  const [key, fallback] = titles[id];
+  return phrase(key, fallback, data);
 }
 
 /**
@@ -251,20 +282,26 @@ function checkTitle(id, check, phrase, context) {
 function checkDetail(id, check, phrase) {
   if (check.state !== 'missing') return '';
   const details = {
-    source: ['Validation.SourceMissingNote', 'Every component needs one source item.'],
+    source: [
+      'FABRICATE.Admin.Manager.Scoped.Component.Validation.SourceMissingNote',
+      'Every component needs one source item.',
+    ],
     worldCategory: [
-      'Validation.WorldCategoryMissingNote',
+      'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldCategoryMissingNote',
       'Systems that inherit fall back to their own list.',
     ],
-    worldTags: ['Validation.WorldTagsMissingNote', 'Nothing merges into system tag lists.'],
+    worldTags: [
+      'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsMissingNote',
+      'Nothing merges into system tag lists.',
+    ],
     systemCategory: [
-      'Validation.SystemCategoryMissingNote',
+      'FABRICATE.Admin.Manager.Scoped.Component.Validation.SystemCategoryMissingNote',
       'Inheriting from a world value that is not set.',
     ],
   };
   const entry = details[id];
   if (!entry) return '';
-  return phrase(`FABRICATE.Admin.Manager.Scoped.Component.${entry[0]}`, entry[1], {});
+  return phrase(entry[0], entry[1], {});
 }
 
 /**

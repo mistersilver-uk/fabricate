@@ -23929,3 +23929,48 @@
   scroll-snap-align: start;
   scroll-margin-top: var(--fab-space-1);
 }
+
+/* ── THE WORLD COMPONENT CATALOGUE'S ROW STATES (issue 1371) ─────────────────────────────────
+   A NEW BLOCK, APPENDED. No existing rule above is edited: this route declared none of the four
+   selectors below, so every one of them is an addition rather than an override of something the
+   sheet already said.
+
+   IT IS IN THIS SHEET RATHER THAN IN THE PAGE'S OWN `<style>`, and that is structural. The rows
+   are written by `EntityListInspectorFrame`, so a page-scoped rule carries the PAGE's
+   `svelte-<hash>` and never matches them; both sibling world catalogues authored the identical
+   block here for the same reason.
+
+   THE FOUR RULES ARE ONE SHAPE, and each of the other three is load-bearing on its own:
+
+    - FLATTEN. The row and the pager lose their fills, so the 1px border is what makes a row a
+      row — the reference's construction on every scoped list screen.
+    - HOVER, restated one rung up from the pane, because with the resting fill gone the shared
+      hover ladder points at a rung that no longer starts where it assumed.
+    - SELECTION and BULK SELECTION, restated for the route. The flatten above is (0,3,0) and
+      stands LATER in this file than the shared `.is-selected` / `.is-bulk-selected` rules at the
+      same specificity, so without these two a chosen row and a ticked row would both render with
+      no fill at all — the exact defect both sibling lanes shipped once and then closed here.
+
+    Hover EXCLUDES both marked states rather than being written less specifically: hover and
+    selection are different questions about the same row, and the honest statement is that a
+    marked row has no hover paint of its own. `tool-catalogue-row-state-cascade` measures the
+    arbitration in a real browser, because happy-dom computes no cascade and would report
+    nothing at all. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row,
+.fabricate-manager[data-manager-view='world-components'] .manager-pagination {
+  background: transparent;
+}
+
+.fabricate-manager[data-manager-view='world-components']
+  .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover {
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row.is-selected {
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager[data-manager-view='world-components']
+  .manager-scoped-list-row.is-bulk-selected {
+  background: var(--fab-surface-active);
+}
