@@ -1440,8 +1440,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     // draws its rows on a `repeat(auto-fill, minmax(340px, 1fr))` track and this route's
     // `.manager-main` keeps `overflow-x: hidden`, so a panel column narrower than that track
     // CLIPS rather than scrolls — and the element it clips first is the row's trailing
-    // `.manager-icon-button`, the delete. At 1280x900 the 2-up grid clears the track by about
-    // 130px; a third column would not, and nothing else in this registry could see that.
+    // `.manager-icon-button`, the delete. At this case's 1280px the 2-up grid clears the track by
+    // 130px; a third column would not, and nothing else in this registry could see that. The
+    // width is what that clearance depends on, and it is unchanged.
     //
     // BOTH SIDES ARE KEYED PER KIND, on the panel's own `rowAttr`, and that is required rather
     // than tidy: `expectContained` resolves each side with `document.querySelector` and is
@@ -1461,18 +1462,24 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-component-tag-id] .manager-icon-button',
       },
     ],
-    // TALLER THAN THE WORLD SCOPED-ENTITY CASES, and the extra 140px is the FULL-WIDTH TAG BAND
+    // TALLER THAN THE WORLD SCOPED-ENTITY CASES, and the extra 100px is the FULL-WIDTH TAG BAND
     // (issue 1392). This screen stacks a 2-up grid over a third panel rather than filling one
-    // pane, so the tag vocabulary's own head, control row, add card, search row and first row all
-    // sit below the taller of the two category panels. Measured in Chromium against the real
-    // sheet: the tag panel's first row ends 898px below the top of `.manager-body`, which a
-    // 900px frame cuts through — and the `moss` row this screen's whole count asymmetry exists to
-    // show is the one it cuts. `tests/components/world-vocabulary-control-row-cascade.test.js`
-    // asserts the fit against THIS number, so the frame and the assertion cannot drift apart.
+    // pane, so the tag vocabulary's own head, control row, add form, search row and first row all
+    // sit below the taller of the two category panels — and the `moss` row, which is the whole
+    // reason this screen's count asymmetry is photographable, is the one a short frame cuts.
     //
-    // Lab-only, and safe: this case has no smoke label and never runs in the Foundry harness, so
-    // the `max-height` clamp Foundry applies to a real window does not bear on it.
-    position: { width: 1280, height: 1040 },
+    // 1000 IS A CEILING, NOT A PREFERENCE. `.application` is clamped to
+    // `100vh - 1.5 * hotbar`, which at the driver's fixed 1920x1080 context is 1002px, and that
+    // context is shared with the live smoke — so a taller frame does not render taller, it
+    // renders clamped and wrong, silently. Height alone could never have fitted this row anyway:
+    // nothing in the column flexes, so the row sits where the content above it puts it. The fit
+    // was bought by flattening the primitive's add form inside the panel, emptying the hint
+    // paragraph the head subline already says, and zeroing the empty status region — all three in
+    // the page's own scoped block.
+    // `tests/components/world-vocabulary-control-row-cascade.test.js` asserts the fit against
+    // THIS number and against the lab fixture's own row counts, so the frame and the assertion
+    // cannot drift apart.
+    position: { width: 1280, height: 1000 },
     kinds: ['manager', 'world', 'scoped'],
     // THE `ScopedPlaceholderPage` CLAIM IS DELETED HERE, not merely joined by the new patterns
     // (issue 1392). The shared placeholder body is claimed by every case that RENDERS it, and

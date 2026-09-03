@@ -131,8 +131,21 @@ test('the lab seeds a world vocabulary carrying all three delete affordances', (
   );
 });
 
-/** The viewport the capture driver uses; asserted here so the arithmetic is gated, not just run. */
-const CAPTURE_VIEWPORT = { width: 1920, height: 1080 };
+/**
+ * The viewport the capture driver uses, EXTRACTED from the driver rather than restated.
+ *
+ * Every ceiling this file computes is arithmetic over these two numbers, so a restated pair is a
+ * mirror that goes stale in the one direction that matters: the driver widens or shortens its
+ * context, the clamp moves, and this file keeps admitting a case geometry that no longer renders.
+ * The driver's own source is already read here for the click modifiers and the verb list, so this
+ * is the same read one constant further.
+ */
+const CAPTURE_VIEWPORT = (() => {
+  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+  const match = /viewport:\s*\{\s*width:\s*(\d+),\s*height:\s*(\d+)\s*\}/.exec(driver);
+  assert.ok(match, '`scripts/view-lab-screenshots.mjs` no longer declares a browser viewport');
+  return { width: Number(match[1]), height: Number(match[2]) };
+})();
 
 /**
  * The roots every check below draws its corpus from, and the extensions that make them complete.
@@ -1893,6 +1906,33 @@ test('the capture viewport clears the max-height Foundry clamps windows to', () 
       `${appId} declares ${APP_CHROME[appId].position.height}px but the ceiling at this viewport is ${ceiling}px`
     );
   }
+
+  // ── AND EVERY CASE'S OWN GEOMETRY, NOT ONLY EACH APP'S DEFAULT (issue 1392) ──────────────
+  //
+  // A case may override `position`, and an override above the clamp does not render taller — it
+  // renders CLAMPED, at a height nobody declared, with no signal at all. The app-default loop
+  // above cannot see that: it quantifies over the six app defaults, and a case override is not
+  // one of them. Measured when this was added: exactly one case exceeded the ceiling, by 38px,
+  // and every view-lab suite was green.
+  const tooTall = VIEW_LAB_CASES.filter((viewCase) => viewCase.position.height > ceiling)
+    .map((viewCase) => `${viewCase.id}: ${viewCase.position.height}px`)
+    .sort();
+  assert.deepEqual(
+    tooTall,
+    [],
+    `\`.application\` is clamped to \`100vh - 1.5 * hotbar\`, which is ${ceiling}px at the ` +
+      `driver's ${CAPTURE_VIEWPORT.width}x${CAPTURE_VIEWPORT.height} context. A case declaring ` +
+      'more is silently photographed at the clamp:\n  ' +
+      tooTall.join('\n  ')
+  );
+  // NON-VACUITY: the ceiling has to be a real number the cases could exceed, or the filter above
+  // quantifies over nothing meaningful.
+  assert.ok(ceiling > 0 && ceiling < CAPTURE_VIEWPORT.height, `implausible ceiling ${ceiling}`);
+  assert.ok(
+    VIEW_LAB_CASES.some((viewCase) => viewCase.position.height > ceiling - 100),
+    'no case comes within 100px of the ceiling, so this clause is not measuring the registry it ' +
+      'quantifies over'
+  );
 });
 
 test('exactly one fallback case exists and it publishes', () => {

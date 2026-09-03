@@ -34,15 +34,44 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { chromium } from 'playwright';
 
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
+import { buildLabContent } from '../view-lab/world/labContent.js';
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PAGE_PATH = 'src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte';
-const CORE_SHEET = resolve(repoRoot, '../../../.foundry-chrome/14.365/css/foundry2.css');
+
+/**
+ * The harvested core sheet, through the SHIPPED resolver rather than a relative path.
+ *
+ * A hand-written `../../../.foundry-chrome/<pinned>/…` resolves only from a lane worktree three
+ * levels under the clone: from the maintainer's own checkout and in CI it names a directory
+ * outside the repository, `existsSync` answers false, and every test in this file SKIPS while
+ * reporting green. A version pin has the same shape of failure one harvest later.
+ *
+ * The ANCESTOR WALK is for the worktree case specifically. A lane worktree shares ONE harvest
+ * with the clone it was created from rather than duplicating a ~90MB tree into every lane, so the
+ * cache sits at the clone root while `repoRoot` is the lane. Walking up asks the shipped resolver
+ * the same question at each ancestor instead of guessing a depth.
+ */
+function findChromeCache(startRoot) {
+  let current = startRoot;
+  for (let depth = 0; depth < 6; depth += 1) {
+    const cache = resolveChromeCache(current);
+    if (cache) return cache;
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
+
+const chrome = findChromeCache(repoRoot);
+const CORE_SHEET = chrome ? join(chrome.dir, 'css', 'foundry2.css') : null;
 
 const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const page = scopedComponentCss(resolve(repoRoot, PAGE_PATH));
@@ -57,10 +86,10 @@ const page = scopedComponentCss(resolve(repoRoot, PAGE_PATH));
  * loudly rather than to hand-write a stand-in rule: a stub looser than core's real one produces
  * a false pass, and one written from memory is a claim about a file nobody read.
  */
-const CORE_AVAILABLE = existsSync(CORE_SHEET);
+const CORE_AVAILABLE = Boolean(CORE_SHEET) && existsSync(CORE_SHEET);
 const skip = CORE_AVAILABLE
   ? false
-  : `no harvested Foundry chrome at ${CORE_SHEET}; run the chrome harvest to arm this gate`;
+  : 'no harvested Foundry chrome under this repository or its parents; run `npm run view-lab:chrome` to arm this gate';
 
 const KINDS = ['recipeCategories', 'componentCategories', 'componentTags'];
 
@@ -75,21 +104,30 @@ const KINDS = ['recipeCategories', 'componentCategories', 'componentTags'];
 const CAPTURE_CASE = VIEW_LAB_CASES.find((entry) => entry.id === 'world-vocabulary');
 
 /**
- * What the manager draws ABOVE `.manager-body` in the real app: the header band and the second
- * `auto` row of `.fabricate-manager`'s `grid-template-rows: auto auto 1fr`. The fixture stubs one
- * 64px band, so the rest is budgeted rather than measured — deliberately generously, because the
- * failure this guards against is a row that is a few pixels below the fold.
+ * What the manager draws ABOVE `.manager-body` in the real app, MEASURED IN THE LAB rather than
+ * budgeted: the header band and the second `auto` row of `.fabricate-manager`'s
+ * `grid-template-rows: auto auto 1fr` come to 168px on this route.
+ *
+ * The first version of this constant guessed 110 and was 58px optimistic, which is exactly the
+ * margin by which the tag band's first row then missed the frame. It carries a stated margin on
+ * top so that a header that grows by a line reds here rather than in a published frame.
  */
-const CHROME_ALLOWANCE = 110;
+const MEASURED_CHROME = 168;
+const CHROME_MARGIN = 24;
+const CHROME_ALLOWANCE = MEASURED_CHROME + CHROME_MARGIN;
 
 /**
- * The ROW COUNTS the View Lab fixture actually seeds, per kind.
+ * The ROW COUNTS the View Lab fixture actually seeds, per kind — DERIVED from that fixture.
  *
- * The fold assertion below is a height measurement, so the fixture has to hold the same number of
- * rows the photographed corpus does — a one-row stand-in would clear any frame and turn that
- * assertion into a guard that cannot fail.
+ * The fold assertion below is a height measurement, so this fixture has to hold the same number
+ * of rows the photographed corpus does. Restating `{3, 4, 3}` would let a shrunken seed silently
+ * disarm the guard: the frame would lose rows, the measurement would lose the height they take,
+ * and the assertion would keep passing about a screen nobody is capturing.
  */
-const FIXTURE_ROWS = { recipeCategories: 3, componentCategories: 4, componentTags: 3 };
+const LAB_VOCABULARY = buildLabContent().worldVocabulary;
+const FIXTURE_ROWS = Object.fromEntries(
+  KINDS.map((kind) => [kind, (LAB_VOCABULARY[kind] ?? []).length])
+);
 
 /**
  * One panel, with EVERYTHING the primitive draws inside it.
@@ -126,7 +164,10 @@ function panel(kind) {
     '<i class="fas fa-arrow-down-a-z"></i><span>Asc</span></button>' +
     '</section>' +
     '<section class="manager-vocabulary-panel">' +
-    '<p class="manager-vocabulary-desc manager-muted">A hint sentence about this vocabulary.</p>' +
+    // EMPTY, because the page passes `hint={NO_PANEL_HINT}`: the head subline above already says
+    // what this paragraph would. Rendering it with text here would measure a screen the product
+    // does not draw, and would put the fold 46px per panel lower than it really is.
+    '<p class="manager-vocabulary-desc manager-muted"></p>' +
     '<form class="manager-vocabulary-form"><div class="manager-vocabulary-form-fields">' +
     '<label class="manager-field"><span class="manager-field-label">Name</span>' +
         // `fab-manager-button` is the primitive's OWN class, and a fixture that wrote the contract
@@ -151,10 +192,10 @@ function document_(managerWidth) {
     `#manager { width: ${managerWidth}px; height: ${CAPTURE_CASE.position.height}px; }</style></head><body>` +
     '<div class="fabricate fabricate-manager" id="manager" data-fabricate-theme="dark" ' +
     'data-manager-view="world-vocabulary">' +
-    // ONE STUBBED CHROME BAND. The real manager draws its header and a second `auto` grid row
-    // above `.manager-body`; the fold assertion measures from the BODY's own top and budgets the
-    // rest through `CHROME_ALLOWANCE`, so this only has to exist rather than be exact.
-    '<div class="manager-header" style="height: 64px"></div>' +
+    // THE CHROME BAND, AT ITS MEASURED HEIGHT. The real manager draws its header and a second
+    // `auto` grid row above `.manager-body`; both are stubbed as one box here, at the height the
+    // lab measures, so the body this fixture lays out has the same room the product gives it.
+    `<div class="manager-header" style="height: ${MEASURED_CHROME}px"></div>` +
     '<div class="manager-body"><div class="manager-rail"></div>' +
     '<main class="manager-main" data-scoped-page="world-vocabulary" aria-label="Tags &amp; Categories">' +
     `<div class="wvocab ${page.hashClass}" data-scoped-vocabulary="world-vocabulary">` +
@@ -201,6 +242,11 @@ test('the fixture layers core, the module sheet and the page the way the product
     assert.equal(layering.coreDeclaresOrder, 'CSSLayerStatementRule', 'core declares its layer order');
     assert.equal(layering.moduleKind, 'CSSLayerBlockRule', 'the module sheet is in the module layer');
     assert.ok(layering.moduleRules > 2000, `the module layer holds ${layering.moduleRules} rules`);
+    // AND THE DERIVED ROW COUNTS ARE REAL. A lab fixture that lost its vocabulary would give
+    // every panel zero rows, and the fold assertion would measure a screen with no content in it.
+    for (const kind of KINDS) {
+      assert.ok(FIXTURE_ROWS[kind] > 0, `the lab fixture seeds no ${kind}, so the fold is untested`);
+    }
     assert.ok(layering.coreSelectWidth > 10, 'core’s sheet parsed');
 
     // THE ANTI-VACUITY ANCHOR FOR THE WHOLE FILE. If the page's scoped CSS did not reach the
