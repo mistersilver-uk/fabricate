@@ -1,5 +1,91 @@
 [
   {
+    "spec": "<RangeBar>",
+    "cap": "outcome bands — 46px, fixed",
+    "draws": ":scope > div:first-of-type",
+    "path": "src/ui/svelte/components/ThresholdBandStrip.svelte",
+    "props": {
+      "binding": "relative",
+      "bands": [
+        {
+          "id": "fumble",
+          "name": "Fumble",
+          "color": "color-mix(in oklab, var(--fab-danger) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-danger-text)",
+          "from": 1,
+          "to": 9,
+          "index": 0
+        },
+        {
+          "id": "failure",
+          "name": "Failure",
+          "color": "color-mix(in oklab, var(--fab-warning) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-warning-text)",
+          "from": 10,
+          "to": 14,
+          "index": 1
+        },
+        {
+          "id": "success",
+          "name": "Success",
+          "color": "color-mix(in oklab, var(--fab-success) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-success-text)",
+          "from": 15,
+          "to": 19,
+          "index": 2
+        },
+        {
+          "id": "critical",
+          "name": "Critical",
+          "color": "color-mix(in oklab, var(--fab-accent) 26%, var(--fab-bg-0))",
+          "ink": "var(--fab-accent-text)",
+          "from": 20,
+          "index": 3
+        }
+      ],
+      "previewDc": 15,
+      "previewLabel": "Smith's Tools",
+      "min": 1,
+      "max": 30,
+      "fallbackNote": "These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers below; the strip returns once the ranges meet."
+    }
+  },
+  {
+    "spec": "<LinkField>",
+    "cap": "empty",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "props": {
+      "title": "Drop a game-world item here",
+      "hint": "or click to search the catalogue",
+      "emptyIcon": "fas fa-link"
+    }
+  },
+  {
+    "spec": "<LinkField>",
+    "cap": "linked",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "props": {
+      "item": { "name": "Blacksmith's Compendium" },
+      "uuid": "Item.kR3nQ8sT1vW2xY4z",
+      "emptyIcon": "fas fa-book"
+    }
+  },
+  {
+    "spec": "<LinkField>",
+    "cap": "missing",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/ItemDropZone.svelte",
+    "props": {
+      "item": { "name": "Untitled" },
+      "uuid": "Item.9pQr2sT4uV6wX8yZ",
+      "state": "missing",
+      "hint": "This document no longer resolves.",
+      "emptyIcon": "fas fa-triangle-exclamation"
+    }
+  },
+  {
     "spec": "<SearchPopover>",
     "cap": "list form",
     "draws": ":scope > div",
@@ -38,6 +124,16 @@
           "icon": "fas fa-flask"
         }
       ]
+    }
+  },
+  {
+    "spec": "<TintPicker> <ArtPathPicker> <Menu>",
+    "cap": "tint — eight tokens, plus an optional custom colour",
+    "draws": ":scope > div:first-of-type",
+    "path": "src/ui/svelte/components/ManagerColorPopover.svelte",
+    "props": {
+      "colorToken": "sage",
+      "layout": "inline"
     }
   }
 ]
