@@ -832,15 +832,20 @@
        That is the maintainer's ruling on the world catalogues applied to the remaining caller;
        `multiPageOnly` is the mode the essence lane added to `Pagination` for it.
 
-       THE WRAPPER STAYS UNCONDITIONAL (given any tools at all) and only the BAR inside it comes
-       and goes. It is the bottom-pinned layout slot — `margin-top: auto`, zero padding — and it
-       is also what decides whether the browser card above is `:last-child`, which is what the
-       `.manager-tools-main-content > .manager-tools-library-card:last-child` rule keys its
-       `flex: 1 1 auto` off. Removing the slot on the one-page case would therefore stretch the
-       list card to the foot of the pane on exactly the frames the reference draws it
-       content-sized on, which is a second, unasked-for change riding along with this one. Empty,
-       the slot measures zero and the flex free space it would have occupied is absorbed by its
-       own auto margin.
+       THE WRAPPER STAYS UNCONDITIONAL (given any cohort at all) and only the BAR inside it comes
+       and goes. It is the bottom-pinned layout slot — `margin-top: auto`, zero padding — so a
+       bar, when there is one, sits full-bleed at the foot of the pane rather than under the
+       list card. Empty, the slot measures zero and the flex free space it would have occupied is
+       absorbed by its own auto margin, which is why leaving it in costs nothing.
+
+       IT DOES NOT DECIDE ANYTHING ABOUT `:last-child`, and a previous version of this note said
+       it did. The slot is a sibling of `.manager-tools-main-content`, not a child of it — that
+       div closes above this comment — so
+       `.manager-tools-main-content > .manager-tools-library-card:last-child` matches the browser
+       card whether the slot renders or not, and its `flex: 1 1 auto` is unconditional. The claim
+       was repeated in `scripts/foundry-test-run.mjs` and has been corrected there too. Written
+       down because the false premise is the kind a later reader acts on: it argues for keeping a
+       slot that has a real but different reason to stay.
 
        The Foundry smoke's `assertToolLibraryPagination` phase reads the BAR rather than this
        slot for the same reason.

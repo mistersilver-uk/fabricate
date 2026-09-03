@@ -5629,10 +5629,15 @@ async function withSingleToolClipboardWrite(page, expectedUuid, action) {
 //    pinned exactly where they were.
 //
 // THE SLOT IS NOT THE BAR. `[data-tool-browser-pagination]` is the bottom-pinned layout div and
-// it still renders whenever the system has any tools at all — it is what keeps the list card
-// from becoming `:last-child` and stretching. What comes and goes inside it is
+// it renders whenever the selected COHORT is non-empty — not whenever the system has tools, which
+// is what it read before issue 1373 and which left it absent for a system holding none even once
+// the widened world list drew rows above it. What comes and goes inside it is
 // `.manager-pagination`, so presence is read from that, and reading the slot instead would be a
 // check that could never fail.
+//
+// It does NOT keep the list card from becoming `:last-child`, which is what this note used to
+// say. The slot is a sibling of `.manager-tools-main-content` rather than a child, so the card
+// is `:last-child` of that div either way and its `flex: 1 1 auto` never depended on the slot.
 async function assertToolLibraryPagination(page, {
   expectedTotal,
   expectedPage = 1,
