@@ -553,9 +553,9 @@ test('the world-scope write path is supplied FOUR store legs', () => {
     ['component', 'essence', 'tool', 'vocabulary'],
     'the write path reads the same four store legs the read path does'
   );
-  // TWO verbs are overridden, and only on the essence family: a spread of the generic families
-  // with an essence override. A composition that replaced the whole family, or that reached
-  // another entity type, would be a second write path rather than two seams on two verbs.
+  // TWO verbs are overridden PER COMPOSED FAMILY: a spread of the generic families with an
+  // override on each. A composition that replaced a whole family would be a second write path
+  // rather than two seams on two verbs.
   //
   // The pair is `addToSystem` and `removeFromSystem` (issue 1372), because BOTH have a second
   // half in a store `worldScopeActions.js` cannot reach: joining writes the in-system
@@ -565,6 +565,21 @@ test('the world-scope write path is supplied FOUR store legs', () => {
     adminStore,
     /essence: \{\s*\.\.\.worldScopeFamilies\.essence,\s*addToSystem: joinEssenceToSystem,\s*removeFromSystem: partEssenceFromSystem,\s*\},/,
     'the published write path composes the two essence verbs that have an in-system half'
+  );
+  // THE ESSENCE FAMILY IS NO LONGER THE ONLY COMPOSED ONE (issue 1371). The prose above said it
+  // was, and that sentence was the thing this assertion's twin had to be added beside rather
+  // than under: a component ADOPTION is the same two writes for the same reason, and the read
+  // union's row set is the in-system array's, so a membership record written alone names a
+  // component no reader can see.
+  //
+  // IT IS PINNED HERE BECAUSE NOTHING ELSE CAN SEE IT. The composed verb keeps the GENERIC KEY,
+  // so no call site and no mounted test can distinguish it from the verb it replaces — a mounted
+  // test supplies the `actions` bag itself. Delete the `component:` entry and every button in the
+  // product reaches the membership-only verb; this assertion is the only thing that reds.
+  assert.match(
+    adminStore,
+    /component: \{\s*\.\.\.worldScopeFamilies\.component,\s*addToSystem: joinComponentToSystem,\s*removeFromSystem: partComponentFromSystem,\s*\},/,
+    'the published write path composes the two component verbs that have an in-system half'
   );
   // AND EVERY FAMILY IS WRAPPED so a write that lands re-publishes (issue 1372).
   // `buildWorldScopeState()` is read once per publish, so before the wrapper a generic verb
