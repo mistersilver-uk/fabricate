@@ -1,0 +1,90 @@
+[
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "callout — explains a rule that is always true, and stays put",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/Callout.svelte",
+    "props": {
+      "text": "Time only — nothing is awarded when this activity resolves. Reach for the info tint only when the note is about live state."
+    }
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "empty — says what the emptiness means",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/apps/manager/EmptyState.svelte",
+    "props": {
+      "icon": "fas fa-book",
+      "title": "No businesses yet",
+      "hint": "Businesses produce and consume goods. Add one and it becomes available to every settlement on this template."
+    },
+    "content": [
+      {
+        "tag": "button",
+        "attrs": { "type": "button" },
+        "text": "New business"
+      }
+    ]
+  },
+  {
+    "spec": "<Callout> <Notice> <InfoStrip> <Empty>",
+    "cap": "empty — says what the emptiness means",
+    "draws": ".k-empty",
+    "path": "src/ui/svelte/apps/manager/EmptyState.svelte",
+    "props": {
+      "filtered": true,
+      "hint": "No recipes match “ingot” in this system."
+    },
+    "content": [
+      {
+        "tag": "button",
+        "attrs": { "type": "button" },
+        "text": "Clear filters"
+      }
+    ]
+  },
+  {
+    "spec": "<Card> <Well> <RowDisclosure>",
+    "cap": "card — radius 11, padding 16, bg-2",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/InspectorCard.svelte",
+    "content": [
+      {
+        "tag": "h3",
+        "attrs": {
+          "style": "margin:0;font-family:var(--fab-font-serif);font-size:15px;font-weight:600"
+        },
+        "text": "Wages & upkeep"
+      },
+      {
+        "tag": "p",
+        "attrs": {
+          "style": "margin:4px 0 0;color:var(--fab-text-subtle);font-size:11.5px"
+        },
+        "text": "Paid automatically at the top of each tick, before any recipe resolves."
+      }
+    ]
+  },
+  {
+    "spec": "<Card> <Well> <RowDisclosure>",
+    "cap": "collapsible card, body in a well",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/components/InspectorCard.svelte",
+    "content": [
+      {
+        "tag": "h3",
+        "attrs": {
+          "style": "margin:0;font-family:var(--fab-font-serif);font-size:15px;font-weight:600"
+        },
+        "text": "Draw the billet"
+      },
+      {
+        "tag": "p",
+        "attrs": {
+          "style": "margin:4px 0 0;color:var(--fab-text-subtle);font-size:11.5px"
+        },
+        "text": "2 ingredients"
+      }
+    ]
+  }
+]
