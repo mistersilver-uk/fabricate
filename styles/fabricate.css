@@ -3718,7 +3718,16 @@
      over a `--bg1` row, which is our `--fab-bg-1` over the `--fab-bg-0` the block above
      gives every row that draws it. `--fab-bg-3` is the ramp's top rung and has no
      counterpart anywhere on these screens, so the tile read as a bright chip instead of
-     as the row's quiet leading anchor. Both callers keep the same one-rung relationship. */
+     as the row's quiet leading anchor. Both callers keep the same one-rung relationship.
+
+     AND IT IS AN EDGED TILE, NOT A BARE FILL (issue 1373, follow-up). The same declaration
+     `proto:2362` states the fill in also states `border: 1px solid var(--border)`, and that
+     half had not been read: with the fill one rung down from where it used to be, a tile with
+     no edge at all reads as a smudge on the row rather than as a plate holding a glyph. The
+     border is what keeps the tile legible once its fill stops doing the separating. Its
+     measured size does not move — `box-sizing: border-box` is set for every element in this
+     app, so the 26px box stays 26px. */
+  border: 1px solid var(--fab-border);
   background: var(--fab-bg-1);
   font-size: 11px;
 }
@@ -11166,7 +11175,13 @@
    glyph `--bg2` — our `--fab-bg-1` — inside a card the same screen draws over a `--bg1` pane.
    `--fab-bg-3` has no counterpart on these screens at all, so the tile was the brightest object
    on a card whose whole job is to be one of three equal choices. Its SIZE is untouched: the
-   `RadioCardGroup` geometry hold is recorded at the component. */
+   `RadioCardGroup` geometry hold is recorded at the component.
+
+   AND THE EDGE THE SAME DECLARATION STATES (issue 1373, follow-up). `proto:2637` writes this
+   tile `background: var(--bg2); border: 1px solid var(--border)` in one breath; only the fill
+   had been taken, which left a tile one rung above its card and nothing marking where it ends.
+   A hairline is what makes a plate a plate once the fill is quiet enough to belong to the card.
+   The 40px box is unchanged — every element in this app is `box-sizing: border-box`. */
 .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
   order: 1;
   flex: 0 0 40px;
@@ -11175,6 +11190,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
+  border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-bg-1);
   color: var(--fab-accent);
@@ -13484,14 +13500,6 @@
    component editor rather than editing in place: component.difficulty has four
    consumers, so an inline stepper would write across an aggregate boundary. */
 
-/* Chips are <li>s. `margin: 0` zeroes a host list rule that gives non-last items
-   a margin-bottom (which inflated the first chip's box, e.g. 34px vs 30px). The
-   min-width floors short tags ("rare") so they don't collapse to a near-square
-   pill next to longer tags ("reagent"); space-between overrides the base chip's
-   centring so the label sits left and the remove button right regardless of tag
-   length; and the pinned height keeps every chip the same box despite tag glyphs
-   or sub-pixel rounding. */
-
 /* WHAT THIS RULE MAY STATE, AND WHAT IT CANNOT (issue 1373, the layer trap's 4th site).
 
    It stated eight declarations and four of them were discarded before they reached anything.
@@ -13509,9 +13517,28 @@
        the label at the left edge and the remove button at the right of the 4.5rem floor; the
        primitive's `center` has been winning since issue 883 converted this pill, so the
        centred pair is what has shipped and what seven rounds of hand testing signed off. The
-       intent is not smuggled back in under a dead-code removal: restoring it needs a variant
-       on the primitive and one line at its call site, which is recorded as follow-up rather
-       than taken here.
+       intent was not smuggled back in under a dead-code removal — restoring it would need a
+       variant on the primitive and one line at its call site — so it was left as a follow-up
+       to be decided against the reference rather than by preference.
+
+       IT IS DECIDED, AND THE ANSWER IS `center` (issue 1373, follow-up). The reference draws
+       this exact pill at `proto:2254`, and it states no `justify-content` at all: the chip is
+       `flex: 0 0 auto` with `align-items: center`, `padding: 3px 9px` and `gap: 6px`, so it
+       shrink-wraps the tag name and its remove control and there is no free space for any
+       `justify-content` to distribute. `flex-start`, `center` and `space-between` all render
+       the reference's chip identically, so it does not answer the question by omission.
+
+       What the reference DOES fix is the distance between the two, at exactly the 6px this
+       repository already spends as `--fab-space-chip` and the primitive already declares. That
+       is what settles it: `space-between` makes that distance elastic and opens a gap the
+       reference never draws, widening against the 4.5rem floor below whenever a tag name is
+       short — `rare` would render its `x` a third of a pill away from its label while
+       `reagent` rendered it adjacent, from one rule. `center` holds the reference's pair at
+       the reference's gap at every tag length.
+
+       So the primitive's `center` is not merely what shipped, it is what the reference asks
+       for. The follow-up closes with NO `density` variant on `Chip.svelte` and no change at
+       `RecipeIngredientOption.svelte`'s call site, and this declaration stays deleted.
 
    WHAT REMAINS IS WHAT THE PRIMITIVE DOES NOT DECLARE — the chip's POSITION in its parent and
    the one size the primitive has no opinion about. `flex: 0 0 auto` because the chip is an
@@ -19632,7 +19659,14 @@
 
 /* `proto:1981` fills the drop zone's own glyph `--surface-soft`, not a ramp rung: the tile sits
    on a DASHED empty zone and the reference keeps it barely distinguishable from it (issue
-   1373). `--fab-bg-3` made the emptiest object on the screen the loudest one on it. */
+   1373). `--fab-bg-3` made the emptiest object on the screen the loudest one on it.
+
+   AND IT TAKES NO BORDER, WHICH WAS CHECKED RATHER THAN ASSUMED (issue 1373, follow-up). The
+   two other tiles this epic moved onto the reference's rungs — the modifier row's glyph at
+   `proto:2362` and the radio card's at `proto:2637` — each state `border: 1px solid
+   var(--border)` beside the fill, and both now draw it. This one does not: `proto:1981` states
+   `background: var(--surface-soft)` and no border at all, because the tile is already inside a
+   dashed edge of its own and a second edge 12px in would draw the empty zone twice. */
 .fabricate-manager .manager-item-drop-zone-icon {
   display: flex;
   align-items: center;
@@ -26347,15 +26381,54 @@
    feedback states are the only things that change its surface, so they are restated one rung up
    from the pane rather than left pointing at a ladder that no longer starts where they assumed.
    Without this, hover painted `--fab-surface-raised` — the lightest surface the set has — and
-   the row jumped from flat to the lightest thing on the screen under the pointer. */
-.fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row:hover,
-.fabricate-manager[data-manager-view='essences'] .manager-essence-row:hover {
+   the row jumped from flat to the lightest thing on the screen under the pointer.
+
+   ── AND HOVER MUST NOT SPEAK OVER A TICKED ROW (issue 1373) ─────────────────────────────────
+   This rule was `:hover` unqualified, which is (0,4,0), while the only statement of a ticked row
+   these routes had was the shared `.fabricate-manager .manager-scoped-list-row.is-bulk-selected`
+   and its `.manager-essence-row` twin, at (0,3,0). So hover won outright and sweeping the
+   pointer down a list a GM had just ticked took each row's marking off in turn for as long as
+   the pointer stayed on it.
+
+   WHAT REPAIRS THAT IS THE ROUTE-LEVEL RESTATEMENT BELOW, and this exclusion is stated anyway,
+   deliberately and with its limits known. Once the twin below exists the two rules are BOTH
+   (0,4,0) and it stands later in this file, so it would win the argument on source order alone
+   — which means removing these two `:not()`s changes no pixel today and no test in this
+   repository can be made to fail by removing them. They are here so that the arbitration does
+   not REST on which of two equal-weight rules a later edit happens to leave last, and because
+   hover and selection are different questions about the same row: the honest statement is that
+   a marked row has no hover paint of its own, not that its paint happens to be written after.
+   Both states are excluded rather than the selected one alone, and the tool catalogue one route
+   away carries the same pair for the same reason. */
+.fabricate-manager[data-manager-view='world-essences']
+  .manager-scoped-list-row:not(.is-selected):not(.is-bulk-selected):hover,
+.fabricate-manager[data-manager-view='essences']
+  .manager-essence-row:not(.is-selected):not(.is-bulk-selected):hover {
   background: var(--fab-bg-1);
 }
 
 .fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row.is-selected,
 .fabricate-manager[data-manager-view='essences'] .manager-essence-row.is-selected {
   background: var(--fab-bg-1);
+}
+
+/* AND THE TICKED ROW IS RESTATED TOO, WHICH IS A SECOND DEFECT AND NOT THE HOVER ONE (issue
+   1373). Flattening the rows above is written as `[data-manager-view='…'] .manager-…-row {
+   background: transparent }` at (0,3,0), which is the SAME weight as the shared
+   `.is-bulk-selected` rule and stands LATER in this file — so it won on source order and a row
+   a GM had ticked on either essence screen came back fully transparent: invisibly selected,
+   with the tick in its own checkbox the only thing left distinguishing it. `.is-selected` was
+   restated for these routes when the rows were flattened and this was not, which is why it
+   reads as an oversight rather than a decision — the fix is the missing twin of a rule already
+   sitting five lines above it.
+
+   `--fab-surface-active` is the shared rules' own value rather than a route-local answer to
+   them, so a ticked row means the same thing on these two screens as on every other browser.
+   `tests/components/world-tool-catalogue-row-state-cascade.test.js` arbitrates all three
+   flattened routes in a real browser, against the sheet layered the way Foundry layers it. */
+.fabricate-manager[data-manager-view='world-essences'] .manager-scoped-list-row.is-bulk-selected,
+.fabricate-manager[data-manager-view='essences'] .manager-essence-row.is-bulk-selected {
+  background: var(--fab-surface-active);
 }
 
 /* THE SYSTEM-SCOPE RULES LIST SHARES THE MANAGER'S OWN INSPECTOR ASIDE, so its surfaces have to
@@ -26548,6 +26621,35 @@
   line-height: 1.45;
 }
 
+/* AND THE CHOSEN CARD'S OWN TWO VALUES, WHICH ARE THE SAME STATEMENT AS THE RESTING ONE
+   (issue 1373). `proto:4596` builds every one of the reference's radio cards from a single
+   helper whose only conditional pair is the fill and the edge — `background: var(--surface-active)`
+   and `border: 1px solid var(--accent-border)` when the card is on, `var(--bg1)` and
+   `var(--border)` when it is not. The block above took the off half and stopped there, so the
+   two halves disagreed about which set they came from.
+
+   The shipped selected face is an 8% light overlay behind a SOLID accent edge. That reads as a
+   chip lifted off its card, which is the wrong statement for one of three equal choices: the
+   reference lifts the fill to 12% and softens the edge to 48% accent, so the chosen card is the
+   same object as its siblings with its own state turned on. Both tokens already exist here and
+   carry the reference's values exactly, so nothing is minted.
+
+   Route-scoped exactly as the block above is, and in the same shape the Checks Studio uses for
+   its own chosen card a few thousand lines above: the shared rules also dress Crafting Settings
+   and Gathering Economy, which were measured against frames of their own.
+
+   NO GEOMETRY MOVES HERE. No padding, gap, radius or tile size is stated — that hold is the
+   ruling recorded at `RadioCardGroup.svelte` itself. */
+.fabricate-manager[data-manager-view='tool-edit']
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option.is-active,
+.fabricate-manager[data-manager-view='world-tool-entry']
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option.is-active {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
 /* THE ROWS AND THE PAGER LOSE THEIR FILLS, so the 1px border is what makes a row a row — the
    reference’s own construction on both list screens. The two routes name different row
    classes because they are different lists: the world catalogue renders the shared scoped-list
@@ -26604,12 +26706,11 @@
    the route when the rows were flattened; this was not, and a dead state reads as covered.
    `--fab-surface-active` is the shared rule's own value, not a route-local answer to it.
 
-   THE ESSENCE ROUTES ABOVE STILL CARRY THE SAME DEFECT, and it is left standing deliberately
-   rather than overlooked: `world-essences` and `essences` flatten their rows and restate hover
-   and `.is-selected` in exactly this shape, and neither restates `.is-bulk-selected` either. It
-   is one edit each, but it repaints a ticked row on two screens this issue did not measure and
-   has no frame for, so it is recorded here for the lane that owns them rather than taken on the
-   way past. */
+   THE ESSENCE ROUTES ABOVE CARRIED THE SAME DEFECT VERBATIM, and the follow-up lane this
+   paragraph was written for has now taken it: `world-essences` and `essences` flatten their
+   rows and restate hover and `.is-selected` in exactly this shape, and neither restated
+   `.is-bulk-selected`. Both now do, and `world-tool-catalogue-row-state-cascade.test.js`
+   measures all three routes rather than trusting the symmetry between them. */
 .fabricate-manager[data-manager-view='world-tools'] .manager-scoped-list-row.is-bulk-selected {
   background: var(--fab-surface-active);
 }

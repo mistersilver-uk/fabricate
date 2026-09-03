@@ -2121,12 +2121,53 @@ test('the bulk-selected row state is one joined selector across every multi-sele
     ),
     'the recipe and essence rows JOIN the component row rule rather than authoring a second block'
   );
-  for (const row of ['manager-component-row', 'manager-recipe-row', 'manager-essence-row']) {
+  // ── A ROUTE MAY RESTATE THE TONE, AND MAY NOT RE-TONE IT (issue 1373) ────────────────────
+  // Three routes flatten their rows to `background: transparent` so that a 1px border is what
+  // makes a row a row, which is the reference's own construction on those screens. That
+  // flattening is written at (0,3,0) — the SAME weight as the shared rule above — and stands
+  // LATER in the sheet, so it cancelled the ticked fill outright and a ticked row on those
+  // screens painted nothing at all. The repair is a route-scoped RESTATEMENT, and that is a
+  // different object from the per-studio copy this test was written to forbid: it must name
+  // `var(--fab-surface-active)`, the shared rule's own value, so re-toning one studio still
+  // fails here. What stays capped at one is the UNSCOPED statement.
+  //
+  // The scoped-list row joins the loop although it is not in the join above — it has a block of
+  // its own by design, and it is the row class two of those three routes render.
+  //
+  // Comments are stripped first: a paragraph naming a selector is not a declaration of it, and
+  // every one of these rules is explained at length directly above itself.
+  const declarations = css.replaceAll(/[/][*][^]*?[*][/]/g, '');
+  const ruleAt = (selector) => {
+    const at = declarations.indexOf(selector);
+    return at < 0 ? '' : declarations.slice(at, declarations.indexOf('}', at) + 1);
+  };
+  const bulkRows = [
+    'manager-component-row',
+    'manager-recipe-row',
+    'manager-essence-row',
+    'manager-scoped-list-row',
+  ];
+  for (const row of bulkRows) {
+    // Every selector that names this row's ticked state, each taken back to the start of its
+    // own line so the route attribute — the thing that distinguishes a restatement from a copy
+    // — travels with it. Selectors in this sheet are written one per line.
+    const needle = `.${row}.is-bulk-selected`;
+    const written = declarations
+      .split(needle)
+      .slice(0, -1)
+      .map((before) => before.slice(before.lastIndexOf('\n') + 1) + needle);
+    const routed = written.filter((selector) => selector.includes('[data-manager-view='));
     assert.equal(
-      (css.match(new RegExp(`\\.${row}\\.is-bulk-selected`, 'g')) || []).length,
+      written.length - routed.length,
       1,
-      `${row}.is-bulk-selected must be written exactly once`
+      `${row}.is-bulk-selected must be written exactly once outside any route`
     );
+    for (const selector of routed) {
+      assert.ok(
+        ruleAt(selector).includes('background: var(--fab-surface-active)'),
+        `${selector} may restate the shared ticked fill, never re-tone it`
+      );
+    }
   }
   // The negative control on the widening: the environments and gathering-task browsers have
   // no bulk selection at all, so adding the essence row must not have turned the join into
