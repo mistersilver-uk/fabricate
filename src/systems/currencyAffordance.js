@@ -26,6 +26,24 @@ import {
 } from './currencyProfile.js';
 
 /**
+ * The last-resort sentence for a spend refused because the resolved context has no usable spender
+ * and carried no composed reason (issue 1493).
+ *
+ * SYSTEM-framed, not actor-framed. The cause is that no coin spender resolved for the world's spend
+ * strategy in the active game system — `ActorInventoryCoinSpender._resolveAdapter` reads
+ * `game.system.id` and takes no actor — so the previous wording ("not available on this actor")
+ * sent a GM to a character sheet to fix a world setting.
+ *
+ * It is a fallback rather than the primary message because every shipped spender implements
+ * `check`, `spend` and `refund`, so the `!spender?.check` / `!spender?.spend` guards are reachable
+ * only when the spender is `null` — exactly the case `spenderUnavailableReason` already names, and
+ * with more detail. Hand-maintaining a parallel literal at each guard would leave several places
+ * stating one fact.
+ */
+const SPEND_UNAVAILABLE_FALLBACK =
+  'Currency spending is not available: no coin spender is configured for this game system.';
+
+/**
  * Resolve the effective currency config for a recipe, composed from TWO scopes.
  *
  * `enabled` is a per-crafting-system decision (`requirements.currency.enabled`): it says whether
@@ -118,9 +136,51 @@ export function resolveCoinSpender(config = {}, seams = {}) {
 }
 
 /**
+ * Why a resolved currency context cannot spend at all, or `null` when it can (issue 1493).
+ *
+ * There are TWO causes and they must not be conflated, because only one of them has an object to
+ * ask:
+ *
+ *   - **No spender at all.** {@link resolveCoinSpender} returns `null` only under
+ *     `actorInventory`, when neither the seam nor the `game.fabricate` accessor yields an inventory
+ *     spender. `spender?.describeUnavailable?.()` is `undefined` for precisely this case, so the
+ *     sentence is composed HERE, spender-independently.
+ *   - **A spender with no adapter for the active game system.**
+ *     `ActorInventoryCoinSpender.describeUnavailable` owns that sentence, because only the spender
+ *     knows its adapter registry.
+ *
+ * Both are properties of the WORLD's configuration and the active game system, never of an actor.
+ * The per-actor sentence (`Currency unit "X" is not available on ACTOR.`, `CoinSpenders.readCoins`)
+ * deliberately stays out of this field: "your world is misconfigured" and "this actor's sheet lacks
+ * the field" are different problems with different fixes, and merging them is the same class of
+ * error this reason exists to fix.
+ *
+ * `globalThis.game?.` rather than the bare `game.` its neighbours use, for the reason documented at
+ * {@link getCurrencyRequirementConfig}: a bare reference throws `ReferenceError` wherever the
+ * Foundry global is absent, and a throw on the craftability path does not degrade.
+ *
+ * @param {{ spendStrategy?: string }} config
+ * @param {object|null} spender
+ * @returns {string|null}
+ */
+function describeUnavailableCoinSpender(config, spender) {
+  if (!spender) {
+    const systemId = String(globalThis.game?.system?.id || '').trim() || 'unknown';
+    return `No coin spender is registered for the "${config?.spendStrategy || 'actorProperty'}" currency spend strategy in system "${systemId}".`;
+  }
+  return spender.describeUnavailable?.() || null;
+}
+
+/**
  * Resolve everything the affordance/spend layer needs for a recipe: the config, the validated
- * profile, and the resolved spender. Returns `{ enabled: false }` when currency is disabled or the
- * config is absent, and `{ error }` when the profile is invalid.
+ * profile, the resolved spender, and — when the profile is valid but that spender cannot spend —
+ * `spenderUnavailableReason`, the formed sentence saying why.
+ *
+ * Returns `{ enabled: false }` when currency is disabled or the config is absent, and `{ error }`
+ * when the profile is invalid. The disabled short-circuit stays a BARE `{ enabled: false }`: it
+ * says the system does not participate, which is not a fault to report, and
+ * `tests/currency-two-scope-composition.test.js` pins that shape exactly. So
+ * `spenderUnavailableReason` is populated on the enabled path only.
  *
  * @param {object} recipe
  * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null,
@@ -143,14 +203,27 @@ export function resolveCurrencyContext(recipe, seams = {}) {
     };
   }
   const spender = resolveCoinSpender(config, seams);
-  return { enabled: true, config, profile, spender };
+  return {
+    enabled: true,
+    config,
+    profile,
+    spender,
+    spenderUnavailableReason: describeUnavailableCoinSpender(config, spender),
+  };
 }
 
 /**
  * Build the synchronous `affordCurrency(match) -> boolean` probe bound to `craftingActor` and the
  * recipe's currency profile. Returns a probe that is ALWAYS `false` (currency never satisfies) when
- * currency is disabled, misconfigured, or no actor is supplied — so display agrees with execution
- * and a null actor never crashes (currency simply shows missing).
+ * currency is disabled, misconfigured, unspendable, or no actor is supplied — so display agrees
+ * with execution and a null actor never crashes (currency simply shows missing).
+ *
+ * **The probe's boolean contract is deliberate and must not be widened to carry the reason.**
+ * `src/models/match/matchTypes.js` does `!!affordCurrency(match)`, so a `{ valid: false, message }`
+ * return would coerce TRUTHY and turn every refusal into "affordable". The reason travels on the
+ * context instead — `error` for an invalid profile, `spenderUnavailableReason` for a valid one with
+ * no usable spender — which is where callers that need to SAY why (the craft-failure message, the
+ * requirement rail) read it from.
  *
  * @param {object|null} craftingActor
  * @param {object} recipe
@@ -160,7 +233,7 @@ export function resolveCurrencyContext(recipe, seams = {}) {
  */
 export function buildCurrencyAffordProbe(craftingActor, recipe, seams = {}) {
   const context = resolveCurrencyContext(recipe, seams);
-  if (!context.enabled || context.error) return () => false;
+  if (!context.enabled || context.error || context.spenderUnavailableReason) return () => false;
   return buildAffordCurrencyProbe({
     actor: craftingActor || null,
     profile: context.profile,
@@ -275,9 +348,9 @@ export async function checkCurrencySpends(craftingActor, recipe, currencySpends,
   const context = resolveCurrencyContext(recipe, seams);
   if (!context.enabled) return { valid: true };
   if (context.error) return { valid: false, message: context.error };
-  const { profile, config, spender } = context;
+  const { profile, config, spender, spenderUnavailableReason } = context;
   if (!spender?.check) {
-    return { valid: false, message: 'Currency spending is not available on this actor.' };
+    return { valid: false, message: spenderUnavailableReason || SPEND_UNAVAILABLE_FALLBACK };
   }
 
   for (const group of aggregateCurrencySpends(currencySpends, profile)) {
@@ -448,10 +521,10 @@ export async function spendCurrencySpends(craftingActor, recipe, currencySpends,
   if (context.error) {
     return { valid: false, message: context.error, groups: [], settledSpends: [] };
   }
-  const { profile, config, spender } = context;
+  const { profile, config, spender, spenderUnavailableReason } = context;
   const groups = aggregateCurrencySpends(currencySpends, profile);
   if (!spender?.spend) {
-    const message = 'Currency spending is not available on this actor.';
+    const message = spenderUnavailableReason || SPEND_UNAVAILABLE_FALLBACK;
     return {
       valid: false,
       message,

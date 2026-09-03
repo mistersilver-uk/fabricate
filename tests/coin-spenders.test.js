@@ -5,6 +5,7 @@ import {
   ActorInventoryCoinSpender,
   ActorPropertyCoinSpender,
   MacroCoinSpender,
+  buildAffordCurrencyProbe,
   interpretMacroSpendResult,
 } from '../src/systems/CoinSpenders.js';
 import { validateCurrencyProfile } from '../src/systems/currencyProfile.js';
@@ -128,4 +129,89 @@ test('MacroCoinSpender surfaces failure objects and thrown errors as invalid', a
   const emptySpender = new MacroCoinSpender({ macros: {}, runMacro: async () => true });
   const noConfig = await emptySpender.check({ name: 'Hero' }, { amount: 2 }, { macroContext: {} });
   assert.equal(noConfig.valid, false);
+});
+
+// ---------------------------------------------------------------------------
+// The probe's BOOLEAN contract (issue 1493)
+// ---------------------------------------------------------------------------
+
+/**
+ * `buildAffordCurrencyProbe` must return `false` — the primitive — for every refusal, and this
+ * file did not import it at all before issue 1493.
+ *
+ * The hazard is specific and silent. `src/models/match/matchTypes.js` gates the currency match on
+ * `!!affordCurrency(match)`, so widening the probe to carry a reason (`{ valid: false, message }`)
+ * coerces TRUTHY and turns every refusal into "affordable" — the exact inversion of the bug being
+ * fixed, and one no assertion phrased as `assert.ok(!probe(match))` can catch. Hence `strictEqual`
+ * against `false` on every refusal branch, and against `true` on the two that must still pass.
+ */
+test('buildAffordCurrencyProbe returns the primitive false on every refusal branch', () => {
+  globalThis.foundry = undefined;
+  const profile = dnd5eProfile();
+  const spender = new ActorPropertyCoinSpender();
+  const actor = propertyActor({ gp: 5, sp: 0 });
+  const build = (overrides = {}) =>
+    buildAffordCurrencyProbe({ actor, profile, spendStrategy: 'actorProperty', spender, ...overrides });
+
+  assert.strictEqual(build({ actor: null })({ unit: 'gp', amount: 1 }), false, 'no actor');
+  assert.strictEqual(build()({ unit: 'gp', amount: 0 }), false, 'non-positive amount');
+  assert.strictEqual(build()({ unit: 'gp', amount: -3 }), false, 'negative amount');
+  assert.strictEqual(build()({ unit: 'zorkmid', amount: 1 }), false, 'unit not on the ladder');
+  assert.strictEqual(build()(undefined), false, 'no match at all');
+  assert.strictEqual(build({ spender: null })({ unit: 'gp', amount: 1 }), false, 'no spender');
+  assert.strictEqual(build({ spender: {} })({ unit: 'gp', amount: 1 }), false, 'spender cannot read coins');
+  assert.strictEqual(build()({ unit: 'gp', amount: 99 }), false, 'genuinely unaffordable');
+
+  // And the two branches that must still pass, so the guard above cannot be satisfied by a probe
+  // that simply always returns false.
+  assert.strictEqual(build()({ unit: 'gp', amount: 5 }), true, 'exactly affordable');
+  assert.strictEqual(
+    build({ spendStrategy: 'macro', spender: null })({ unit: 'gp', amount: 99 }),
+    true,
+    'macro spending stays optimistic; the async gate is authoritative'
+  );
+});
+
+test('buildAffordCurrencyProbe returns false — not a message object — when no adapter is registered', () => {
+  // The adapter-missing refusal is the one that now ALSO produces a sentence
+  // (`describeUnavailable`). The sentence travels on the currency context; the probe stays boolean.
+  const profile = validateCurrencyProfile(
+    [{ id: 'gp', label: 'Gold', abbreviation: 'gp', denomination: 'gp' }],
+    { spendStrategy: 'actorInventory' }
+  );
+  assert.equal(profile.valid, true);
+  const spender = new ActorInventoryCoinSpender({ adapters: new Map(), getSystemId: () => 'dnd5e' });
+  const probe = buildAffordCurrencyProbe({
+    actor: { name: 'A' },
+    profile,
+    spendStrategy: 'actorInventory',
+    spender,
+  });
+
+  assert.strictEqual(probe({ unit: 'gp', amount: 1 }), false);
+});
+
+// ---------------------------------------------------------------------------
+// ActorInventoryCoinSpender.describeUnavailable (issue 1493)
+// ---------------------------------------------------------------------------
+
+test('ActorInventoryCoinSpender.describeUnavailable names the SYSTEM, and is null when usable', () => {
+  const usable = new ActorInventoryCoinSpender({
+    adapters: new Map([['pf2e', { readCoins: () => ({ copperValue: 1 }) }]]),
+    getSystemId: () => 'pf2e',
+  });
+  assert.equal(usable.describeUnavailable(), null, 'a registered adapter is not a fault to report');
+
+  const unusable = new ActorInventoryCoinSpender({ adapters: new Map(), getSystemId: () => 'dnd5e' });
+  const reason = unusable.describeUnavailable();
+  assert.match(reason, /no currency inventory adapter/i);
+  assert.match(reason, /"dnd5e"/, 'the sentence names the game system, which is the cause');
+  assert.ok(
+    !/actor/i.test(reason),
+    'the cause is the world + system, never an actor: `_resolveAdapter` takes no actor, so sending ' +
+      'a GM to a character sheet to fix a world setting is the conflation issue 1493 exists to end'
+  );
+
+  const nameless = new ActorInventoryCoinSpender({ adapters: new Map(), getSystemId: () => '' });
+  assert.match(nameless.describeUnavailable(), /"unknown"/, 'an unresolvable system id still reads');
 });
