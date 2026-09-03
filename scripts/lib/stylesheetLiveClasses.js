@@ -43,6 +43,22 @@
  *    onto — which is what keeps `.manager-danger-tag-pill.is-hazardous` alive from
  *    `class={`manager-danger-tag-pill is-${tag}`}` without licensing anything else.
  *
+ * ── THE ONE ASYMMETRY IN RULE 2 ──────────────────────────────────────────────────────────────
+ * `class="${x}"` and `class={x}` do NOT resolve the same way. The quoted form is split into parts
+ * and holes, so its hole runs through {@link constantDefinitions} and the constant behind `x` is
+ * substituted. The braced form contributes the string and template literals found INSIDE the
+ * expression, so a bare `class={x}` — an identifier with no quotes anywhere in it — contributes
+ * nothing from that attribute at all.
+ *
+ * The 20 `class={classes}` sites in `src/` are nonetheless answered, by rule 1 rather than by
+ * rule 2: whatever builds `classes` does so out of quoted literals in the same file, and the
+ * catch-all literal sweep takes every identifier run inside every quoted string. So the brace
+ * form's own contribution only ever mattered for a name SPANNING a hole, and no site builds one
+ * that way. If one ever does, the asymmetry under-approximates liveness and the gate reports a
+ * live rule as dead — a false dead, which a deletion makes visible as a moved frame, rather than
+ * a dead rule silently surviving. Resolve bare identifiers in the braced form then; do not assume
+ * it already happens.
+ *
  * ── WHY RESOLUTION IS ADDITIVE, NEVER SUBSTITUTIVE ───────────────────────────────────────────
  * A resolved hole contributes its values AND still contributes its hole. That is not caution for
  * its own sake; it is a measured defect. `is-${count === 'warnings' ? 'warning' : count}` reaches
