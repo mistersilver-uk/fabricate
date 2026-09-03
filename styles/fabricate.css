@@ -1880,8 +1880,8 @@
   family bright. Every remaining reference eyebrow sits between 7.5px and 9.5px; NONE of them
   is anywhere near what shipped, so there is no screen this moves away from its own frame.
 
-  `--subtle` is `--fab-text-subtle`: the two token sets agree byte for byte on this rung
-  (`rgba(217,184,156,.56)`), where `--muted` is `--fab-text-muted` one rung brighter. The size
+  `--subtle` is `--fab-text-subtle`: the two token sets agree byte for byte on this rung — same
+  channels, same alpha — where `--muted` is `--fab-text-muted` one rung brighter. The size
   is stated in px, not rem, because the reference states it in px and because the three sites
   that had already narrowed to it locally state it in px — a `rem` here would read as a
   different figure from the one they were measured against.
@@ -18680,26 +18680,25 @@
   grid-row: 3;
 }
 
-/* The Tool Studio's right-hand panel is the shared inspector surface, not a bespoke aside that
-   happened to resolve to the same colour (issue 881). Only its grid placement and its roomier
-   padding are its own.
+/* The Tool Studio's right-hand panel is the shared inspector surface written through the
+   shared token, not a bespoke `--fab-bg-2` aside that happened to resolve to the same
+   colour (issue 881). Only its grid placement and its roomier padding are its own.
 
-   AND IT IS ONE RUNG ABOVE THE PANE, NOT TWO (issue 1373). This tracked `.manager-inspector`
-   onto `--fab-bg-2`, and the note recording that unification named `--fab-bg-2` as though it
-   were the reference's own figure. It is not: `proto:2944` paints this exact column `--bg2`
-   over the shell's `--bg1`, and the background ramp is the one token family shifted a rung
-   between the two sets, so the reference's `--bg2` is our `--fab-bg-1` and its `--bg1` is our
-   `--fab-bg-0`. `--fab-bg-2` has no counterpart on these screens at all. The `tools` list one
-   click away already reads `proto:2548` the same way and paints its aside `--fab-bg-1`, so the
-   two rails now agree — and the rail's own insets, which the reference draws at `--bg1`,
-   recess against it instead of reading lighter than their container. */
+   THE ROUTE MOVES IT DOWN A RUNG, and does so where the other tool routes state the same thing
+   (issue 1373): see the surface ladder at the foot of this file. The claim above is about which
+   TOKEN this panel resolves through and it is untouched; what the ladder adds is that on
+   `tool-edit` that token is not the answer, because `proto:2945` paints this exact column
+   `--bg2` over the shell's `--bg1` and the background ramp is shifted a rung between the two
+   token sets — so the reference's `--bg2` is our `--fab-bg-1`, and `--fab-bg-2` has no
+   counterpart on these screens at all. The `tools` list one click away already reads
+   `proto:2548` the same way for the shared aside. */
 .fabricate-manager .manager-tool-preview {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-4);
   border-left: 1px solid var(--fab-border);
-  background: var(--fab-bg-1);
+  background: var(--fab-bg-2);
   grid-column: 3;
   grid-row: 2 / 4;
 }
@@ -26475,6 +26474,18 @@
 .fabricate-manager[data-manager-view='tool-edit'] .manager-tool-editor-tabs,
 .fabricate-manager[data-manager-view='tool-edit'] .manager-tool-editor-panel {
   background: var(--fab-bg-0);
+}
+
+/* AND THE EDITOR'S RAIL IS A RUNG ABOVE THAT PANE, exactly as the `tools` list's aside is
+   (issue 1373). `proto:2945` paints this column `--bg2` over the shell's `--bg1`, which on the
+   shifted ramp is our `--fab-bg-1` over `--fab-bg-0`. The panel itself resolves through the
+   shared inspector token, which is `--fab-bg-2` — the rung with no reference counterpart on
+   these screens — so the departure is stated HERE, route-scoped, rather than by rewriting the
+   shared statement that every other studio's rail still reads. Two screens one click apart
+   agreed on nothing before this: the list took `--fab-bg-0`/`--fab-bg-1` from the ladder and
+   the editor took `--fab-bg-2` for both its header and its rail. */
+.fabricate-manager[data-manager-view='tool-edit'] .manager-tool-preview {
+  background: var(--fab-bg-1);
 }
 
 /* ── THE BREAKAGE CHOOSER'S TYPE AND COLOUR, ON BOTH TOOL SCOPES (issue 1373) ────────────────
