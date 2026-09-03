@@ -408,7 +408,10 @@ const REVIEWED = [
     id: globalRule('.fabricate-manager .manager-button.is-ghost:not(:disabled)'),
     disposition: 'INTENDED',
     convertedReach: [
-      { file: 'src/ui/svelte/apps/manager/ToolEditView.svelte', role: 'ghost', buttons: 1 },
+      // TWO since issue 1373: `World Tool` joined `Back to Tool Rules` on the ghost role,
+      // because `proto:2601` and `proto:2602` are one style string and the two buttons sit
+      // side by side.
+      { file: 'src/ui/svelte/apps/manager/ToolEditView.svelte', role: 'ghost', buttons: 2 },
       {
         file: 'src/ui/svelte/apps/manager/component/ComponentEditorHeader.svelte',
         role: 'ghost',

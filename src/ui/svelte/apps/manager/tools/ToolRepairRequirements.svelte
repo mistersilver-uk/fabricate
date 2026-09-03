@@ -136,7 +136,10 @@
     <p class="manager-kicker">
       {text('FABRICATE.Admin.Manager.Tools.Editor.Repair', 'Repair requirements')}
     </p>
-    <Chip tone="neutral" data-tool-repair-count={groupCount}>{countLabel}</Chip>
+    <!-- `proto:4696` states this count pill at `padding: 1px 8px; border-radius: 999px;
+         font: 600 9px var(--sans)`, which is `Chip`'s `list` density value for value. Without
+         it the pill took the base 20px/9.92px/700 scale and outweighed the eyebrow it counts. -->
+    <Chip tone="neutral" density="list" data-tool-repair-count={groupCount}>{countLabel}</Chip>
   </div>
   <p class="manager-muted manager-tool-repair-hint" data-tool-repair-hint>
     {hintParts[0]}{#if hintParts.length > 1}<b class="manager-tool-repair-or">{orToken}</b

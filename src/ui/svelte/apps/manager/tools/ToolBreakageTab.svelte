@@ -382,7 +382,7 @@
       {#if breakageChoice === 'limitedUses'}
         <div class="manager-tool-breakage-config" data-tool-limited-uses-stepper>
           <div data-tool-limited-uses-copy>
-            <p class="manager-kicker">
+            <p class="manager-tool-breakage-config-title">
               {text('FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopy', 'Uses per copy')}
             </p>
             <small
@@ -417,7 +417,7 @@
         <section class="manager-tool-breakage-chance-card" data-tool-breakage-chance>
           <div class="manager-tool-breakage-chance-head">
             <div>
-              <p class="manager-kicker">
+              <p class="manager-tool-breakage-config-title">
                 {text('FABRICATE.Admin.Manager.Tools.BreakageChancePerUse', 'Break chance per use')}
               </p>
               <p>
@@ -642,6 +642,25 @@
 </div>
 
 <style>
+  /* THE TWO CONFIGURATION LABELS ARE TITLES, NOT EYEBROWS (issue 1373). `proto:2645` states
+     `Uses per copy` and `proto:2656` states `Break chance per use` with one string:
+     `font: 600 11.5px var(--sans); color: var(--text)` - sentence case, the body ink, one
+     weight below an eyebrow's 700 and no tracking or casing at all. Both were drawn as
+     `.manager-kicker`, which is the uppercase micro-label the reference reserves for a SECTION
+     HEAD; neither of these heads a section. Each names the control on its own row, in the same
+     voice as the sentence beneath it, which is why the fix is to remove the class rather than
+     to narrow it. 11.5px is 0.72rem against the 16px root.
+
+     `margin: 0` because the shared class carried a 2px bottom margin the reference does not
+     draw: `proto:2645` sets the note directly under the title with no step between them, and
+     the break-chance card's own note states its `--fab-space-1` a few rules below. */
+  .manager-tool-breakage-config-title {
+    margin: 0;
+    color: var(--fab-text);
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
   /* THE BREAK-CHANCE CARD'S HEAD (issue 1373, maintainer round 2).
 
      The design puts the plain-language band on the same line as the label the slider carries

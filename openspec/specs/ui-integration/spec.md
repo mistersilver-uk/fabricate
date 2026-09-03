@@ -1381,6 +1381,7 @@ The enabled toggle persists live through the same immediate path as Recipe enabl
 The editor uses `210px | 1fr | 320px` and exposes exactly three tabs: Breakage, Requirements, and Validation.
 It authors a crafting system's RULES for a Tool and never that Tool's identity, so it has no Overview tab: the linked Item, the shared display name, the art and the description are the world Tool's, and its header states that in one sentence — `Rules in {system} · identity comes from the world Tool`.
 The header owns Back to Tool Rules, a World Tool route to the world record, Save rules, and the dirty-state affordance; there is no footer save bar and no bare `Delete`.
+Both navigations render as the same secondary treatment, because they are the same kind of verb — leaving this screen for another — and `Save rules` is the only primary in the cluster.
 The World Tool route renders only when the world catalogue actually holds a record for the Tool, because a pre-migration in-system Tool has no world half to open.
 The body includes a live behavior preview, while the inspector summarizes identity, effective rules, the player-facing copy, a per-actor preview, and what requires the Tool in this system.
 
@@ -1399,9 +1400,14 @@ Each of the four world-default sections — `breakage`, `onBreak`, `prerequisite
 While a section inherits, the card renders the resolved world value read-only rather than disabled controls, and the switch writes NOTHING to the in-system record in that direction: the union already answers an inheriting section from the world default, so the pill is true without a second write, and making one would mint an override-shaped value under a switch that says there is none.
 Flipping a section to OVERRIDING seeds the in-system record from the value that was on screen — the resolved one — so the GM's first keystroke edits the inherited value rather than an older local one the record happened to retain.
 A section whose resolved value is absent seeds nothing.
+That head's pill states `Inheriting` in the informational colour family and `Overridden` in the warning family, and the Tool Rules list inspector states the same two words the same way, so one model is not read through two vocabularies one click apart.
 A Tool the world catalogue has no record of renders no switch, no pill and no removal callout: there is no parent to inherit from and no membership to remove, and its save writes every section from the draft.
 Disabled preview rules are titled `No prerequisites to use` and `No check bonus`.
 Breakage authors the retained `limitedUses`, `breakageChance`, or `diceExpression` tool-specific configuration, the separate check-driven Breakable/Immune state (`checkBreakable`), and the `destroy`, `flagBroken`, or `replaceWith` action.
+The tool-specific mode set the editor PRESENTS is four choices, not three: `Unlimited uses` leads them as a first-class option rather than as an unset state.
+`limitedUses` with a null `maxUses` IS the unlimited answer — the rail, the player preview and the library row all already print `Unlimited uses` for it — so a set that omitted it left the state authorable only by absence, and a stepper that defaulted the null to `1` silently converted it.
+Picking `Limited uses` therefore seeds `maxUses` at 1 rather than at null, or the choice would return the GM to the option they just left; picking `Unlimited uses` writes the null back; and the stepper renders the stored value with no fallback, because the only case a fallback could fire for is the one the fourth choice now owns.
+Each of the four retains its own configuration while another is selected, and `Unlimited uses` configures nothing, so the editor draws neither a configuration block nor the rule that would separate one.
 Percentage authoring uses the shared synchronized number-and-range slider primitive also used by Gathering drop chances; Tool breakage supplies its own accessible labels and continuously interpolates across a green, yellow, amber, then red risk scale as the chance increases.
 Changing authority or check-driven immunity does not clear the inactive tool-specific configuration or on-break values.
 When `checkBreakable` is false under check-driven authority, on-break controls are actually disabled and removed from interaction while their retained values and the explanation remain readable; opacity or `pointer-events` alone is insufficient.
@@ -1416,6 +1422,8 @@ Selection is resolved BY EXPRESSION rather than by entry id, because a stored ex
 An expression the library does not contain keeps its own row at the head of the list, selected and labelled as set by hand, so a value authored under the retired free-text field is neither highlighted as nothing nor dropped on the next save.
 An empty library states the same absence sentence the prerequisite list states, naming where modifiers are authored, and renders no list frame around nothing.
 Both scopes — the world Tool entry and the system Tool rules editor — render that one section from one component.
+At SYSTEM scope the Requirements card opens with an informational strip naming the crafting system whose rules these are and saying that each section follows the world Tool until this screen overrides it, which is the one element distinguishing the two scopes' otherwise identical card.
+The world Tool entry has no such scope to name and draws no strip; the sentence is resolved by the caller rather than composed inside the shared section.
 Validation uses the Recipe editor's grouped summary-and-checklist surface, lists every failing model check under stable Breakage and Requirements headings, exposes the first failure for focus, and reports an all-clear state that is not color-only.
 It carries NO identity check: a missing game-world Item is the world Tool's defect and no control on this screen can clear it, so it is stated as a routed notice naming the world Tool and it never counts toward the blocking total or the tab badge.
 The domain still refuses the save, and the notice says so rather than implying the record can be saved as it stands.
@@ -1429,6 +1437,11 @@ Discard restores the baseline before navigation, while Keep editing preserves th
 Re-entering the same Tool does not prompt.
 Stopping use of the Tool in this system is armed at its own control rather than confirmed by a separate DialogV2; successful removal returns to the library without a second dirty prompt.
 `Delete`, which destroys the Tool itself, belongs to the world Tool entry.
+
+Every uppercase eyebrow on these two routes takes its type from the manager's one shared kicker class, and no component on them restates that type in its own scoped block.
+The same holds for a card's surface fill, which comes from the route's surface ladder in the global sheet.
+Both are correctness rules rather than tidiness: the global sheet is imported at `layer(modules)` while a component's scoped block is injected unlayered, so a local declaration silently discards the shared rule for that property at any specificity, and the shared value can then be corrected without the screen moving.
+The two breakage configuration labels — `Uses per copy` and `Break chance per use` — are NOT eyebrows and carry no kicker: each names the control on its own row and is drawn as a sentence-case title in the body ink.
 
 Tabs expose `tablist`, `tab`, and `tabpanel` relationships with selected/error state that is not color-only.
 Item creation/drop targets and every icon-only unlink, remove, and menu control have button semantics and localized accessible names.

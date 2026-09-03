@@ -183,8 +183,14 @@
         {#if icon}<i class={icon} aria-hidden="true"></i>{/if}{title}
       </h3>
       {#if inheritable}
+        <!-- THE DESIGN'S OWN TWO FAMILIES (issue 1373). `proto:4912` builds this pill from
+             `--info-soft` / `--info-border` / `--info-text` while it is inheriting and from
+             the WARNING family once it is overridden. The Tool Rules list inspector one
+             column over already reads that string; this card read `neutral` / `accent`, so
+             one model wore two colour vocabularies on two screens a click apart, and neither
+             of ours said what the design says. -->
         <Chip
-          tone={isInherited ? 'neutral' : 'accent'}
+          tone={isInherited ? 'info' : 'warning'}
           data-tool-rule-chip={isInherited ? 'inheriting' : 'overridden'}
           >{isInherited
             ? text('FABRICATE.Admin.Manager.Tools.Editor.Inheriting', 'Inheriting')
@@ -228,10 +234,18 @@
            the ACCENT hue, and that contrast is the point: an accent-toned mark in a tile is a
            fact this system authored, while the cooler informational globe with no tile is the
            reference's mark for a value that came from somewhere else. Ours drew a tan globe,
-           the same hue as the value beside it (issue 1373). -->
+           the same hue as the value beside it (issue 1373).
+
+           AND IT IS THE `rule` DENSITY, WHICH ALREADY EXISTED. `proto:2700` draws this inset
+           at `gap: 10px; padding: 11px 13px; background: var(--bg1); border-radius: 10px` over
+           a `600 11.5px` title and a `400 9.5px` note in the subtle ink - which is the variant
+           `IconFactRow` shipped for the two Tool rails, value for value. Taking the default
+           missed five of its six, and the FILL by a rung: the design recesses this well below
+           the card holding it, and the default row raises it. -->
       <IconFactRow
         icon="fas fa-globe"
         tone="info"
+        density="rule"
         title={fact?.title || ''}
         subtitle={hint
           ? text(
@@ -263,30 +277,27 @@
      Row 1 is the eyebrow, row 2 the title line, row 3 the descriptive line - the subtitle at
      world scope, `InheritRow`'s `World default:` head at system scope. The head's one control
      spans all three, which is where the design centres it (`proto:2323`). */
-  /* -- AND ITS TYPE, WHICH `.manager-kicker` GETS WRONG FOR THIS HEAD (round 5) -----------
+  /* -- AND ITS TYPE IS THE SHARED CLASS'S, NOT A THIRD COPY OF IT (issue 1373) -----------
      `proto:2324` states every section eyebrow on this tab as `font: 700 8.5px var(--sans);
      letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`, and `proto:2860`
-     states the system twin identically. The shared `.manager-kicker` is `0.72rem` — 11.52px,
-     35% over — with NO tracking at all and the MUTED ink, so both section heads read as small
-     headings rather than as the quiet rules they are.
+     states the system twin identically. So does every other eyebrow the reference draws: it
+     is `.manager-kicker`'s value, not this card's.
 
-     NARROWED HERE, never on the shared class, which has callers on every other manager screen
-     whose own reference frames measured them. `ToolBrowserInspector.svelte` already does exactly
-     this for the Tool inspector rail and `styles/fabricate.css:3316` for the Checks rail; this is
-     the third site, stating the reference's own figures rather than borrowing another rail's.
+     THIS BLOCK USED TO RESTATE IT, and so did two more sites, while the shared class went on
+     rendering 11.52px untracked in the muted ink everywhere nobody had patched — which put
+     `PREREQUISITES` and `LINKED ITEM` at two sizes on one screen, one tab apart. The class
+     carries the reference's type at the source now, and this block keeps only the GRID
+     PLACEMENT the three-row head needs.
 
-     The cascade happens to favour a scoped rule here — the sheet is imported at `layer(modules)`
-     and this block is injected unlayered, so it wins whatever the specificity — but the rule is
-     anchored on two classes this component writes anyway, which is (0,3,0) against the sheet's
-     (0,2,0). `tests/components/manager-layout.test.js` reads the COMPILED scoped CSS. */
+     Leaving even one type declaration here would have made that source fix unreachable rather
+     than merely redundant: the sheet is imported at `layer(modules)` and this block is
+     injected unlayered, so an unlayered declaration beats a layered one at ANY specificity —
+     silently, with no error and no failing test to say so. */
   .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow {
     grid-column: 1;
     grid-row: 1;
     min-width: 0;
     margin: 0;
-    color: var(--fab-text-subtle);
-    font-size: 8.5px;
-    letter-spacing: 0.11em;
   }
 
   /* THE HEAD'S OWN RHYTHM (round 5). `proto:2323` gives the header row `gap: 11px` — the sheet's

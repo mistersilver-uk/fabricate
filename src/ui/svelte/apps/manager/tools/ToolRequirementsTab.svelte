@@ -212,6 +212,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
+  import Callout from '../Callout.svelte';
   import Field from '../../../components/Field.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
@@ -261,6 +262,18 @@
     // whose whole point is that both scopes draw it the same way. An absent key renders
     // nothing, so the system editor is untouched.
     sectionNotes = {},
+    // ── THE CARD'S OPENING INFO STRIP (issue 1373) ───────────────────────────────────────
+    // `proto:2855` opens the SYSTEM editor's Requirements card with an `--info-soft` strip
+    // carrying a circle-info glyph and one sentence, and it is the only element that
+    // distinguishes that card from the world entry's otherwise identical one. Absent, it
+    // renders nothing, so the world entry is untouched by its arrival.
+    //
+    // A CALLER'S SENTENCE, for the same reason `sectionNotes` above is one: what it states is
+    // a fact about the caller's SCOPE - which crafting system these rules belong to - and this
+    // component knows nothing about scope except through the props it is handed. The design's
+    // own wording ("the world Tool only seeds them when you add it") is not reproduced: it
+    // describes a model with no inheritance, and ours inherits for real.
+    intro = '',
     onPatch = () => {},
     onToggleInherited = () => {},
   } = $props();
@@ -425,6 +438,13 @@
       onChange={(checked) => patchBonus({ enabled: checked })}
     />
   {/snippet}
+
+  <!-- `proto:2855`. `Callout` is the manager's standing-statement primitive and already draws
+       exactly this: one semantic glyph beside one sentence in the `--info-soft` strip, at the
+       `--info-border` edge. Nothing bespoke is minted for it. -->
+  {#if intro}
+    <Callout text={intro} dataAttr="data-tool-requirements-intro" />
+  {/if}
 
   <ToolInheritCard
     section="prerequisites"
@@ -720,9 +740,17 @@
 <style>
   /* THE TAB IS THE CARD (issue 1373, maintainer round 2, E3). `proto:2322`: `padding: 15px;
      background: var(--bg2); border: 1px solid var(--border); border-radius: 12px`. 15 rounds to
-     `--fab-space-4` on the 4px scale and the 12px radius is the design's exactly. The rung is
-     `--fab-bg-1`: this repository's ramp is shifted one step against the design's, whose
-     `--bg2` is our `--fab-bg-1` - the same mapping every other card on the world entry uses. */
+     `--fab-space-4` on the 4px scale and the 12px radius is the design's exactly.
+
+     THE FILL IS NOT DECLARED HERE, and that is this round's repair. The rung is right - our ramp
+     is shifted one step against the design's, whose `--bg2` is our `--fab-bg-1` - but WHERE it
+     was stated meant nothing else could ever move it. `styles/fabricate.css` is registered in
+     `module.json` with no explicit layer, so Foundry imports it at `layer(modules)` while a
+     component's scoped block is injected UNLAYERED, and unlayered beats layered at ANY
+     specificity. A `background` here therefore discarded the surface ladder's rule for this card
+     silently: no error, no failing test, and the route could be added to the ladder without the
+     card moving a rung. The ladder decides which rung a route's cards sit on, so it owns this
+     one; this block keeps the geometry, which is the tab's own. */
   .manager-tool-requirements-card {
     display: flex;
     flex: 0 0 auto;
@@ -731,7 +759,6 @@
     padding: var(--fab-space-4);
     border: 1px solid var(--fab-border);
     border-radius: 12px;
-    background: var(--fab-bg-1);
   }
 
   /* THE HAIRLINE BETWEEN THE TWO SECTIONS, and NOT a gap: `proto:2349` states
@@ -742,6 +769,15 @@
      `:global()` because `ToolInheritCard` writes the `<section>`, not this template - the
      scoped form would compile to a selector matching nothing. It is anchored on the card this
      file DOES write, so its reach is this tab and no other stack of rule cards. */
+  /* `proto:2855` closes the strip with `margin-bottom: 13px`, which is the 4px scale's
+     `--fab-space-3`. The card is a flex column with NO gap of its own - the hairline between its
+     two sections carries that rhythm instead - so the strip states its own step or there is no
+     step at all. `:global()` because `Callout` writes the element, not this template; it is
+     anchored on the card this file does write, so its reach is this tab. */
+  .manager-tool-requirements-card > :global(.manager-callout) {
+    margin-bottom: var(--fab-space-3);
+  }
+
   .manager-tool-requirements-card > :global(.manager-tool-rule-card ~ .manager-tool-rule-card) {
     margin-top: var(--fab-space-4);
     padding-top: var(--fab-space-4);
@@ -754,28 +790,18 @@
      stays `manager-kicker`'s, so this tab has one heading voice; only the rule is added, and it
      is on THIS eyebrow alone because it marks where the world's library begins rather than
      heading a question the way `Which prerequisites` does. `--fab-space-2` rounds the design's
-     9px gap to the 4px scale's 8px rung. */
+     9px gap to the 4px scale's 8px rung.
+
+     ITS TYPE IS THE SHARED CLASS'S (issue 1373). `proto:2356` states this eyebrow with the SAME
+     string `proto:2324` states the two section eyebrows with, which is the string the reference
+     states EVERY eyebrow with — so it is `.manager-kicker`'s value and it is stated there now,
+     not restated here. `margin: 0` stays: the section is a flex column whose gap is already the
+     reference's own step, and the shared class adds 2px on top of it. */
   .manager-tool-bonus-kicker {
     display: flex;
     gap: var(--fab-space-2);
     align-items: center;
-
-    /* -- AND THE SAME TYPE AS THE CARD HEADS ABOVE IT (issue 1373, round 5) ---------------
-       `proto:2356` states this eyebrow with the SAME string `proto:2324` states the two section
-       eyebrows with — `font: 700 8.5px var(--sans); letter-spacing: .11em; text-transform:
-       uppercase; color: var(--subtle)`. Once `ToolInheritCard` narrowed its head eyebrow to the
-       reference, leaving this one on the shared `.manager-kicker`'s 0.72rem put two uppercase
-       micro-labels at two sizes inside one card — a worse reading than the one before it, and
-       one the reference does not draw at all.
-
-       Narrowed HERE rather than on `.manager-kicker`, which is the same rule the card's own
-       block records: the shared class has callers on every other manager screen. `margin: 0`
-       because the section is a flex column whose gap is already the reference's own step, and
-       the shared class adds 2px on top of it. */
     margin: 0;
-    color: var(--fab-text-subtle);
-    font-size: 8.5px;
-    letter-spacing: 0.11em;
   }
 
   .manager-tool-bonus-kicker::after {

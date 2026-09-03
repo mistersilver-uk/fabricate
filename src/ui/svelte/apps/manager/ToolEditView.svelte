@@ -131,6 +131,27 @@
           'System rules · identity comes from the world Tool'
         )
   );
+  /**
+   * THE REQUIREMENTS CARD'S OPENING STRIP (issue 1373).
+   *
+   * `proto:2855` opens the system editor's Requirements card with an info strip, and it is the
+   * one element that distinguishes that card from the world entry's otherwise identical one.
+   * `ToolRequirementsTab` serves both scopes, so the SENTENCE is resolved here: what it states
+   * is a fact about which crafting system these rules belong to, and only this screen has one.
+   *
+   * The design's own wording — "the world Tool only seeds them when you add it" — is not
+   * reproduced. It describes a model in which a system's copy is taken once and then stands
+   * alone; ours inherits for real, and each section follows the world default until this screen
+   * overrides it. Saying the design's sentence here would be saying something untrue.
+   */
+  const requirementsIntro = $derived(
+    formattedText(
+      'FABRICATE.Admin.Manager.Tools.Editor.RequirementsIntro',
+      { system: systemName },
+      `Prerequisites and the check bonus are ${systemName}’s own: each section follows ` +
+        'the world Tool until you override it here, and no other crafting system changes.'
+    )
+  );
   const editorErrorCount = $derived(
     toolEditorValidation(tool, authority, validation.errors).issueCount
   );
@@ -225,11 +246,22 @@
         <!-- These three are the AUTHORITY for `ManagerButton` (issue 1096): the maintainer's
              reference for what a manager button should look like. They go through the
              primitive so the two screens cannot drift apart again — a role or a treatment
-             that lands here now lands everywhere the primitive is used. Their rendering is
-             unchanged: `fab-manager-button` re-declares the same `.manager-header-actions`
-             values these already inherit from their ancestor. -->
+             that lands here now lands everywhere the primitive is used. THAT CONVERSION changed
+             no rendering: `fab-manager-button` re-declares the same `.manager-header-actions`
+             values these already inherit from their ancestor. A later round did move one of the
+             three onto a different ROLE, which is a different kind of change; see below. -->
+        <!-- BOTH NAVIGATIONS TAKE ONE TREATMENT, because the design gives them one (issue
+             1373). `proto:2601` and `proto:2602` are the same style string twice over -
+             `height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 9px;
+             background: transparent; color: var(--text2); font: 600 11.5px var(--sans)` - and
+             transparent-over-a-border is the GHOST role here, which `Back to Tool Rules` already
+             took. `World Tool` took the neutral role's `--fab-overlay-light-06` fill, so two
+             adjacent buttons that both leave this screen read as two different weights of verb.
+             `Save rules` stays `primary` and stays green: that is a standing ruling, and it is
+             the emphasis split this repair preserves rather than the one it touches. -->
         {#if worldRecordExists}
           <ManagerButton
+            role="ghost"
             data-tool-editor-world-tool={String(tool?.id ?? '')}
             aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
             onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
@@ -302,6 +334,7 @@
         <ToolRequirementsTab
           {tool}
           {authority}
+          intro={requirementsIntro}
           {prerequisiteOptions}
           {modifierOptions}
           {saving}
