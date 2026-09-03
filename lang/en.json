@@ -770,6 +770,8 @@
           "TileMet": "{name} is ready with {have} of {need}.",
           "TilePartial": "{name} has {have} of {need} so far.",
           "TileShort": "{name} needs {need} and you have {have}.",
+          "TileCurrencyMet": "{name}. You can afford this.",
+          "TileCurrencyShort": "{name}. You can't afford this.",
           "OptionsOne": "{count} alternative",
           "OptionsMany": "{count} alternatives",
           "Change": "Change",
