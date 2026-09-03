@@ -46,14 +46,6 @@
     [SLOT_STATE.SHORT]: 'FABRICATE.App.Crafting.Slots.TileShort',
   };
 
-  // Fallbacks so this component is correct before the keys land in `lang/en.json`
-  // (issue 1493). A missing key localizes to itself, which is the only signal available
-  // here, and an accessible name that reads as a dotted key is worse than English.
-  function text(key, data, fallback) {
-    const translated = localize(key, data);
-    return translated && !translated.startsWith(key) ? translated : fallback;
-  }
-
   // A currency requirement has no have/need ratio to announce (issue 1493). The shared
   // TileMet/TileShort keys interpolate BOTH — so leaving currency on them announced
   // "100 gp needs 1 and you have 0", which is the very defect the pip was removed for,
@@ -73,29 +65,19 @@
     // arrive non-localized (the caption from `formatCurrencyRequirement`, the reason from
     // the affordance layer), but the SENTENCE that joins them is copy, and a composed one
     // is the single accessible name on this path that a translator cannot reach.
+    //
+    // No English fallback behind any of the three (issue 1493). All of them ship in
+    // `lang/en.json` in this same change, and Foundry already merges `en` under every
+    // other language, so a fallback here could only ever mirror the shipped copy — a
+    // second wording of the same sentence that nothing forces to agree with the first.
     if (slot.issue) {
-      return text(
-        'FABRICATE.App.Crafting.Slots.TileCurrencyUnavailable',
-        { name: slot.name, issue: slot.issue },
-        `${slot.name}. ${slot.issue}`
-      );
+      return localize('FABRICATE.App.Crafting.Slots.TileCurrencyUnavailable', {
+        name: slot.name,
+        issue: slot.issue,
+      });
     }
-    // The fallbacks BYTE-MATCH the shipped copy in `lang/en.json`. Two sentences for one
-    // state is a maintenance trap: whichever of the pair a reader finds first, they read
-    // the other as dead, and a key that ever fails to resolve then silently changes the
-    // wording rather than degrading to it.
-    if (slot.state === SLOT_STATE.MET) {
-      return text(
-        CURRENCY_LABEL_KEYS[SLOT_STATE.MET],
-        { name: slot.name },
-        `${slot.name}. You can afford this.`
-      );
-    }
-    return text(
-      CURRENCY_LABEL_KEYS[SLOT_STATE.SHORT],
-      { name: slot.name },
-      `${slot.name}. You can't afford this.`
-    );
+    const key = CURRENCY_LABEL_KEYS[slot.state] ?? CURRENCY_LABEL_KEYS[SLOT_STATE.SHORT];
+    return localize(key, { name: slot.name });
   }
 
   function tileLabel(slot) {
@@ -189,9 +171,20 @@
     {/if}
 
     <!-- Before the tiles, so assistive tech reaches the cause in document order rather
-         than after every requirement it explains. -->
+         than after every requirement it explains.
+
+         The reason and the DIRECTIVE are one paragraph, because to this reader they are
+         one statement (issue 1493). The reason alone is an engine sentence — the shipped
+         "Currency unit Gold is missing an actor data path" means nothing to a player, who has no
+         idea what an actor data path is, whether it is their fault, or what to do about
+         it. This is the primary pre-craft discovery surface, so it names the person who
+         can fix it and where they fix it. The reason stays unlocalized (the affordance
+         layer composes it in English); the directive is copy and is keyed. -->
     {#if currencyIssue}
-      <p class="requirement-rail-issue" data-requirement-rail-issue>{currencyIssue}</p>
+      <p class="requirement-rail-issue" data-requirement-rail-issue>
+        {currencyIssue}
+        {localize('FABRICATE.App.Crafting.Slots.CurrencySetupDirective')}
+      </p>
     {/if}
 
     <div class="requirement-rail-slots" data-requirement-rail-slots>
@@ -271,12 +264,16 @@
     color: var(--fab-text-muted);
   }
 
-  /* Same shape as the hint above it, in the danger-TEXT token rather than the base
-     `--fab-danger` fill hue: this is a sentence, not a fill. */
+  /* Same shape as the hint above it, in the warning-TEXT token rather than the base
+     `--fab-warning` fill hue: this is a sentence, not a fill.
+     WARNING, not danger (issue 1493): the world's currency setup is unfinished, which is
+     not the player's fault and not something they can act on beyond asking their GM. Red
+     here reads as "you have done something wrong" on the one surface whose red already
+     means "you cannot afford this". */
   .requirement-rail-issue {
     margin: 0;
     font-size: 12px;
-    color: var(--fab-danger-text);
+    color: var(--fab-warning-text);
   }
 
   /* Slots WRAP rather than shrink: below the tile's minimum the artwork and the pip

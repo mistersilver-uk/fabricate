@@ -6,12 +6,16 @@
  * enabled, over an injected world ladder, plus the purse-carrying actor a currency
  * requirement is evaluated against.
  *
- * The block below was copied into four suites — `craftability-evaluation`,
- * `shopping-list-aggregator`, `requirement-rail-mounted` and `consumption-plan-panel-mounted`
- * — which is the shape SonarCloud's duplication gate measures. It normalizes literals, so
- * differing system ids and gold amounts do not make two copies distinct, and it scores
- * density PER DIFF, so a small hotfix fails a density a large feature branch passes.
- * `tests/**` counts exactly like `src/**`.
+ * The block below was copied into the three suites that evaluate a real currency
+ * requirement — `craftability-evaluation`, `shopping-list-aggregator` and
+ * `requirement-rail-mounted` — which is the shape SonarCloud's duplication gate measures. It
+ * normalizes literals, so differing system ids and gold amounts do not make two copies
+ * distinct, and it scores density PER DIFF, so a small hotfix fails a density a large feature
+ * branch passes. `tests/**` counts exactly like `src/**`.
+ *
+ * `consumption-plan-panel-mounted` is deliberately NOT a consumer: it mounts the panel over a
+ * hand-written craftability literal and never builds a manager, so importing this would give
+ * it a fixture it has no use for.
  *
  * `RecipeManager` is taken as an explicit PARAMETER rather than imported here. Every suite
  * that uses these fixtures installs the Foundry globals `RecipeManager` loads against and
@@ -74,7 +78,7 @@ export function makeCurrencySystem(systemId) {
  * @param {string} [options.systemId]
  * @param {object[]} [options.units] The world's currency ladder.
  * @param {string} [options.spendStrategy]
- * @returns {object} the manager, with `system` attached for a caller that needs to mutate it
+ * @returns {object} the manager
  */
 export function makeCurrencyRecipeManager(
   RecipeManager,
@@ -89,7 +93,11 @@ export function makeCurrencyRecipeManager(
     getCraftingSystemManager: () => ({ getSystem: (id) => (id === systemId ? system : null) }),
     currencyConfigStore: { get: () => ({ spendStrategy, units: [...units] }) },
   });
-  manager.system = system;
+  // Deliberately NOT stamped onto the manager. `RecipeManager` has no `system` field in
+  // production, and a shared fixture that invents one on a production class is how a fake
+  // later reads as real API: the next test to reach for `manager.system` would be reading a
+  // field only this file has ever written. Mutate the system through the closure the
+  // constructor seam already closes over instead.
   return manager;
 }
 

@@ -36,12 +36,20 @@ function _buildIngredientKey(ingredientState) {
  * duck-typed state from an older manager. Never re-derived from `have`/`need`: a currency
  * state's `have` is a documented placeholder and its `need` is a price.
  *
+ * The verdict's SCOPE is one craft of one recipe — that is the only question the resolver
+ * was asked. `_finaliseCurrency` below is where that scope is reconciled with an aggregate
+ * that may span several crafts.
+ *
  * @param {object} ingredientState
  * @returns {boolean}
  */
 function _isAffordable(ingredientState) {
   if (typeof ingredientState.affordable === 'boolean') return ingredientState.affordable;
   return ingredientState.satisfied === true;
+}
+
+function _nonblankText(value) {
+  return typeof value === 'string' && value.trim() !== '' ? value : '';
 }
 
 /**
@@ -60,10 +68,19 @@ function _mergeIngredient(existing, incoming, recipeId, recipeName, recipeQuanti
   existing.have = incoming.have ?? 0;
   if (incoming.isEssence === true) existing.isEssence = true;
   // Affordability is a conjunction across the recipes that name the same cost: one
-  // queued recipe the actor cannot pay for makes the aggregated requirement unmet.
+  // queued recipe the actor cannot pay for makes the aggregated requirement unmet. This
+  // is the ONLY writer of `affordable` — the seed below is the conjunction's identity
+  // (`true`), not a second derivation of the same field, because two writers of one
+  // field are individually unguardable: whichever you delete, the other still produces
+  // the right answer for a single-contribution entry.
   if (incoming.isCurrency === true) {
     existing.isCurrency = true;
     existing.affordable = existing.affordable && _isAffordable(incoming);
+    // The world-configuration reason, if this contribution carries one. FIRST non-blank
+    // wins: the reason is a property of the world's currency setup, so every
+    // contribution that has one carries the same sentence, and a later blank one (a
+    // recipe whose option happens to resolve) must not erase it.
+    if (!existing.issue) existing.issue = _nonblankText(incoming.issue);
   }
   if (!isNonblankIcon(existing.icon) && isNonblankIcon(incoming.icon)) {
     existing.icon = incoming.icon;
@@ -78,6 +95,50 @@ function _mergeIngredient(existing, incoming, recipeId, recipeName, recipeQuanti
 
 function isNonblankIcon(value) {
   return typeof value === 'string' && value.trim() !== '';
+}
+
+/**
+ * Settle a CURRENCY entry (issue 1493).
+ *
+ * A currency requirement is settled by AFFORDABILITY, not by a shortfall count.
+ * `totalNeed - have` would read `100 - 0` for a player carrying a thousand gold, so the
+ * ratio decides nothing here; `missing` is pinned to 0 because there is no quantity of
+ * anything to go and acquire.
+ *
+ * THE SCOPE OF THE VERDICT. `affordable` answers exactly one question — "can this actor
+ * pay ONE craft of this recipe?" — because that is the only question the resolver was
+ * asked, and this module has no coin balance of its own to ask a wider one with (`have`
+ * is a documented placeholder, never a purse). `totalNeed`, meanwhile, is multiplied by
+ * the queued quantity and summed across recipes. Reporting `satisfied = affordable`
+ * against it therefore claimed that 150 gp covers a queue of five 100 gp crafts.
+ *
+ * So the verdict is reported only where it actually reaches:
+ *  - the aggregate is ONE craft's cost — the verdict covers it exactly, and stands;
+ *  - the actor cannot afford one craft — they cannot afford N >= 1 either, so the
+ *    NEGATIVE verdict covers any aggregate and stands;
+ *  - otherwise the aggregate exceeds what was checked. The entry stays unsatisfied so the
+ *    row remains visible, and `affordabilityChecked: false` tells the surface to state the
+ *    cost WITHOUT a verdict rather than invent either colour. `costRepeats` is how many
+ *    times the checked cost recurs — exact, because two costs merge into one entry only
+ *    when their formatted descriptions are identical, which means their amounts are.
+ *
+ * @param {object} entry
+ * @returns {object}
+ */
+function _finaliseCurrency(entry) {
+  const singleCraftCost = entry.recipeBreakdown.reduce(
+    (highest, row) => Math.max(highest, row.need ?? 0),
+    0
+  );
+  const affordable = entry.affordable === true;
+  const affordabilityChecked = !affordable || entry.totalNeed <= singleCraftCost;
+  return {
+    ...entry,
+    missing: 0,
+    affordabilityChecked,
+    costRepeats: singleCraftCost > 0 ? Math.round(entry.totalNeed / singleCraftCost) : 1,
+    satisfied: affordable && affordabilityChecked
+  };
 }
 
 /**
@@ -159,6 +220,12 @@ export function aggregateShoppingList(
       const key = _buildIngredientKey(ing);
       if (!ingredientMap.has(key)) {
         ingredientMap.set(key, {
+          // The dedup key, STAMPED so every consumer keys on the same rule. A list that
+          // re-derives it renders one row per its OWN notion of identity, and a coarser
+          // rule collapses two entries this map deliberately kept apart — which Svelte
+          // answers with `each_key_duplicate`, thrown in the production branch as well as
+          // the dev one, taking down the whole app rather than the row (issue 1493).
+          key,
           componentId: ing.componentId ?? null,
           itemUuid: ing.itemUuid ?? null,
           name: ing.name ?? '',
@@ -173,9 +240,16 @@ export function aggregateShoppingList(
           // neither may be REPORTED: `have` is the evaluation's placeholder, never a coin
           // balance, so "0 / 100 owned" states a balance the player does not have.
           isCurrency: ing.isCurrency === true,
-          // Meaningful only for a currency entry; `true` for every other kind, which is
-          // shopped for on the have/need ratio below and never on affordability.
-          affordable: ing.isCurrency === true ? _isAffordable(ing) : true,
+          // The IDENTITY of the conjunction `_mergeIngredient` applies, never a verdict:
+          // every contribution — including this entry's first — is folded in there, so
+          // this field has exactly one writer. A non-currency entry keeps `true` and is
+          // shopped for on the have/need ratio below, never on affordability.
+          affordable: true,
+          // The world's reason the currency could not be resolved AT ALL, or ''. Carried
+          // because a refusal for a configuration reason is not an affordability
+          // shortfall, and the shopping list is otherwise unable to tell them apart: it
+          // would tell a player carrying 1000 gp that they cannot afford 100 gp.
+          issue: '',
           recipeBreakdown: []
         });
       }
@@ -187,6 +261,10 @@ export function aggregateShoppingList(
       const type = ess.type ?? ess.essenceType ?? 'unknown';
       if (!essenceMap.has(type)) {
         essenceMap.set(type, {
+          // Namespaced, because the shopping list folds essences and ingredients into ONE
+          // keyed list: an essence type and an ingredient description are unrelated
+          // strings that may coincide, and the fold is where they would collide.
+          key: `ess:${type}`,
           type,
           name: ess.name ?? type,
           isEssence: true,
@@ -208,6 +286,7 @@ export function aggregateShoppingList(
       const key = tool.componentId ?? tool.name ?? 'unknown';
       if (!toolMap.has(key)) {
         toolMap.set(key, {
+          key: `tool:${key}`,
           componentId: tool.componentId ?? null,
           name: tool.name ?? tool.description ?? key,
           img: tool.img ?? null,
@@ -227,15 +306,8 @@ export function aggregateShoppingList(
     }
   }
 
-  // --- Finalise ingredients ---
-  // A currency requirement is settled by AFFORDABILITY, not by a shortfall count (issue
-  // 1493). `totalNeed - have` would read `100 - 0` for a player carrying a thousand gold,
-  // so the ratio decides nothing here; `missing` is pinned to 0 because there is no
-  // quantity of anything to go and acquire, and `satisfied` carries the whole verdict.
   const ingredients = Array.from(ingredientMap.values()).map(ing => {
-    if (ing.isCurrency === true) {
-      return { ...ing, missing: 0, satisfied: ing.affordable === true };
-    }
+    if (ing.isCurrency === true) return _finaliseCurrency(ing);
     const missing = Math.max(0, ing.totalNeed - ing.have);
     return {
       ...ing,

@@ -1871,3 +1871,89 @@ test('issue 1493: a currency cost never merges with an item requirement describi
     'and each keeps its own kind'
   );
 });
+
+// ---------------------------------------------------------------------------
+// Issue 1493 (revision 3): the shopping projection's currency EXEMPTION must exempt
+// nothing else, and its dedup key must keep every kind apart.
+//
+// The exemption's neighbour in that same expression is the essence restatement:
+// `_buildEssenceIngredientState` never sets `have` at all (it reports `delivered` and
+// `owned`, which answer two different questions), so the projection restates `owned` as the
+// `have` the aggregator shops against. Exempt that line and every essence row reaches the
+// shopping list with `have: 0` and its whole need reported as missing.
+// ---------------------------------------------------------------------------
+
+test('issue 1493: the shopping projection restates an essence row owned amount as its have', () => {
+  const systemId = 'sys-1493-shop-essence';
+  const essenceId = 'restorative-2f1a';
+  const components = [
+    {
+      id: 'red-herb',
+      name: 'Red Herb',
+      registeredItemUuid: 'Compendium.test.red-herb',
+      originItemUuid: 'Compendium.test.red-herb',
+      essences: { [essenceId]: 1 },
+    },
+  ];
+  const manager = makeRecipeManagerWithEssences(
+    systemId,
+    [{ id: essenceId, name: 'Restorative', icon: 'fas fa-heart' }],
+    components
+  );
+  const recipe = new Recipe({
+    name: 'Healing Potion',
+    craftingSystemId: systemId,
+    ingredientSets: [makeIngredientSet([makeEssenceOptionGroup(essenceId, 2, 'g-ess')]).toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const [state] = manager.evaluateShoppingRequirement(
+    [makeActor([makeComponentItem('red-herb-item', 'Compendium.test.red-herb', 3)])],
+    recipe
+  ).ingredientStates;
+
+  assert.equal(state.isEssence, true, 'the essence group is projected as an essence row');
+  assert.equal(state.owned, 3, 'three herbs carry one Restorative each');
+  assert.equal(
+    state.have,
+    3,
+    'and the shopping projection restates that as `have` — the essence branch sets no' +
+      ' `have` of its own, so exempting this row sends 0 to the aggregator and reports the' +
+      ' whole need as missing'
+  );
+  assert.equal(state.satisfied, true, 'a player holding three cannot need to buy two');
+});
+
+test('issue 1493: an essence requirement never merges with an item requirement describing identically', () => {
+  // The `essence:` half of the same kind-qualified key as the currency test above, and
+  // reachable the same way: an INCOMPLETE essence match (an option whose essence was never
+  // chosen) falls back to `Ingredient#getDescription()`, which reads "Unknown ingredient" —
+  // and so does any option with no match at all. Only a managed component carries an id, so
+  // both states keyed on that shared description and the max-need merge kept ONE of them,
+  // comparing an essence amount against an occurrence count.
+  const systemId = 'sys-1493-essence-key';
+  const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
+  const recipe = new Recipe({
+    name: 'Ambiguous Essence Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [
+      makeIngredientSet([
+        makeGroupData([{ match: { type: 'essence' }, quantity: 1 }], 'g-essence'),
+        makeGroupData([{ quantity: 4 }], 'g-nameless'),
+      ]).toJSON(),
+    ],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+
+  const purse = makePurseActor({ gp: 1000 });
+  const { ingredientStates } = manager.evaluateShoppingRequirement([purse], recipe, {
+    craftingActor: purse,
+  });
+
+  assert.equal(ingredientStates.length, 2, 'two requirements stay two rows');
+  assert.deepEqual(
+    ingredientStates.map((state) => state.isEssence === true),
+    [true, false],
+    'and each keeps its own kind'
+  );
+});

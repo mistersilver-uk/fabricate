@@ -1,8 +1,10 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { assertNoElement } from '../helpers/svelte-dom.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -301,5 +303,101 @@ describe('World > Currency tab (mounted)', () => {
       'composing the neutral callout class would repaint the warning as an accent'
     );
     assert.equal(note.getAttribute('role'), 'note');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1493 (revision 3) — the note has to be true of the screen it appears on.
+//
+// The published `currency-macro` frame shows this note above FIVE perfectly healthy units,
+// reporting two errors that are not about any unit at all: a missing "can afford" macro and
+// a missing "decrement" one. `validateCurrencyProfile` raises at least four non-unit-scoped
+// errors, so "these currency units can't be spent yet" and "fix the units below" named the
+// wrong thing and pointed the wrong way — the problems are listed ABOVE the sentence.
+//
+// `game.i18n` is backed by the real `lang/en.json` here, so these are assertions on the
+// shipped copy rather than on the component's inline fallbacks.
+// ---------------------------------------------------------------------------
+
+describe('WorldCurrencyTab validation copy (issue 1493)', () => {
+  let restoreI18n = () => {};
+
+  before(async () => {
+    await harness.setup();
+    restoreI18n = installLangBackedI18n(repoRoot);
+  });
+  after(() => {
+    restoreI18n();
+    harness.teardown();
+  });
+  afterEach(harness.remount);
+
+  const MACRO_ERRORS = [
+    'A "can afford" currency macro is required for macro spending.',
+    'A "decrement" currency macro is required for macro spending.'
+  ];
+
+  async function mountWithMacroErrors() {
+    return harness.mount({ currencyUnits: UNITS, currencyValidationErrors: MACRO_ERRORS });
+  }
+
+  it('blames the currency, not the units, when no unit is at fault', async () => {
+    const root = await mountWithMacroErrors();
+    const copy = root.querySelector('.currency-validation-copy');
+
+    assert.equal(copy.querySelector('strong').textContent.trim(), "Currency can't be spent yet");
+    assert.ok(
+      !/units/i.test(copy.querySelector('strong').textContent),
+      'the five units on this page are healthy; the missing macros are the fault'
+    );
+  });
+
+  it('points at the problems it actually sits below', async () => {
+    const root = await mountWithMacroErrors();
+    const copy = root.querySelector('.currency-validation-copy');
+
+    assert.deepEqual(
+      [...copy.children].map((child) => child.tagName),
+      ['STRONG', 'UL', 'SPAN'],
+      'the list is between the title and the hint, so "listed above" is literally true'
+    );
+    assert.equal(
+      copy.querySelector('span').textContent.trim(),
+      "Crafting can't price or spend currency until you fix the problems listed above." +
+        ' Each spend strategy needs different things from your setup, so switching it can' +
+        ' raise new ones. Saving still works.'
+    );
+    assert.ok(
+      !/below/i.test(copy.querySelector('span').textContent),
+      'nothing to fix sits below this sentence'
+    );
+  });
+
+  // The one lang<->fallback mirror this change keeps: `WorldCurrencyTab` predates the
+  // decision to drop these shims and uses `text(key, fallback)` throughout, so unwinding it
+  // here would leave the file half-converted. Guarded instead, because a fallback that
+  // drifts from the shipped copy silently changes the wording rather than degrading to it —
+  // which is exactly what this revision found: both fallbacks still held the OLD sentences.
+  it('keeps its validation fallbacks byte-identical to the shipped copy', () => {
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'),
+      'utf8'
+    );
+    const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    const shipped = lang.FABRICATE.Admin.Manager.CurrencyUnits;
+
+    for (const leaf of ['ValidationTitle', 'ValidationHint']) {
+      const key = `FABRICATE.Admin.Manager.CurrencyUnits.${leaf}`;
+      const pattern = new RegExp(
+        `text\\(\\s*'${key.replace(/\./g, '\\.')}',\\s*("(?:[^"\\\\]|\\\\.)*")\\s*\\)`
+      );
+      const found = source.match(pattern);
+      assert.ok(found, `${leaf} must be read through its key with a string fallback`);
+      assert.equal(
+        JSON.parse(found[1]),
+        shipped[leaf],
+        `the ${leaf} fallback must read exactly what lang/en.json ships`
+      );
+    }
   });
 });

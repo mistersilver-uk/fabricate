@@ -773,6 +773,7 @@
           "TileCurrencyMet": "{name}. You can afford this.",
           "TileCurrencyShort": "{name}. You can't afford this.",
           "TileCurrencyUnavailable": "{name}. {issue}",
+          "CurrencySetupDirective": "Ask your GM to finish the world's currency setup (Crafting Systems → World → Currency).",
           "OptionsOne": "{count} alternative",
           "OptionsMany": "{count} alternatives",
           "Change": "Change",
@@ -815,6 +816,9 @@
           "AcquireTools": "Acquire or repair these tools",
           "Owned": "{have} / {need} owned",
           "CurrencyShort": "Can't afford",
+          "CurrencyUnavailable": "Setup needed",
+          "CurrencyRepeats": "×{count}",
+          "CurrencyRepeatsHint": "Fabricate checked whether you can afford one craft. This plan spends that cost {count} times.",
           "Acquire": "Acquire",
           "Repair": "Repair"
         },
@@ -4072,8 +4076,8 @@
           "MacroUnlink": "Unlink macro",
           "MacroMissing": "Macro unresolved",
           "MacroConversionHint": "Conversion between this unit and others is handled by your configured currency macros, matched by abbreviation.",
-          "ValidationTitle": "These currency units can't be spent yet",
-          "ValidationHint": "Crafting can't price or spend currency until you fix the units below. A different spend strategy can raise new problems, because your units have to match it. Saving still works.",
+          "ValidationTitle": "Currency can't be spent yet",
+          "ValidationHint": "Crafting can't price or spend currency until you fix the problems listed above. Each spend strategy needs different things from your setup, so switching it can raise new ones. Saving still works.",
           "ProviderManagedTitle": "Provider-managed denominations",
           "ProviderManagedHint": "These denominations are managed by the selected provider ({provider}) and can't be edited here. You can reference them by abbreviation in recipe currency requirements."
         },

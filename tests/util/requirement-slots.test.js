@@ -460,22 +460,13 @@ describe('suggestChoiceOverrides', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildConsumptionPlan currency rows (issue 1493)', () => {
-  const currencyState = {
-    groupId: 'g-toll',
-    name: '100 gp',
-    description: '100 gp',
-    img: 'icons/coin.webp',
-    need: 100,
-    have: 0,
-    satisfied: true,
-    isCurrency: true,
-    affordable: true,
-    issue: '',
-  };
-
+  // The module-level `currencyState()` factory, NOT a second literal shadowing it: a
+  // block-scoped copy of the same fixture drifts silently from the one every other test in
+  // this file asserts against, and a reader has no way to tell which one a failure came
+  // from.
   it('keeps the currency row in the plan and marks it as currency', () => {
     const { rows } = buildConsumptionPlan({
-      ingredientStates: [fixedState(), currencyState],
+      ingredientStates: [fixedState(), currencyState({ img: 'icons/coin.webp' })],
     });
 
     assert.deepEqual(

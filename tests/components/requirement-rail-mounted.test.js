@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import { buildRequirementSlots } from '../../src/ui/svelte/util/requirementSlots.js';
 import {
   SPENDABLE_GOLD_UNITS,
@@ -58,8 +59,11 @@ const CURRENCY_SYSTEM_ID = 'sys-1493-rail';
  *
  * @param {object[]} units The world's currency ladder. Omitting `actorPath` is the
  *   misconfiguration under test: the unit exists but cannot be read off any actor.
+ * @param {number} [gp] The purse the cost is evaluated against. The default is ten times
+ *   the toll, because the misconfiguration case is only a defect for a player who could
+ *   plainly pay; a poor purse is what distinguishes a genuine shortfall from it.
  */
-function craftabilityFor(units) {
+function craftabilityFor(units, gp = 1000) {
   const manager = makeCurrencyRecipeManager(RecipeManager, {
     systemId: CURRENCY_SYSTEM_ID,
     units,
@@ -92,7 +96,7 @@ function craftabilityFor(units) {
         getFlag: () => undefined,
       },
     ],
-    system: { currency: { gp: 1000 } },
+    system: { currency: { gp } },
   };
   return manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
 }
@@ -429,32 +433,6 @@ describe('RequirementRail mounted behavior', () => {
     }
   });
 
-  // A hand-maintained mirror: the component keeps English fallbacks so it is correct
-  // before a key lands, and two different sentences for one state is a maintenance trap
-  // — whichever a reader finds first, they read the other as dead. Guarded rather than
-  // trusted, because nothing else fails when the pair drifts.
-  it('keeps its currency fallbacks byte-identical to the shipped copy', () => {
-    const source = readFileSync(resolve(repoRoot, RAIL_PATH), 'utf8');
-    const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
-    const slotKeys = lang.FABRICATE.App.Crafting.Slots;
-
-    for (const [key, expression] of [
-      ['TileCurrencyMet', '${slot.name}. '],
-      ['TileCurrencyShort', '${slot.name}. '],
-    ]) {
-      const shipped = slotKeys[key];
-      assert.equal(typeof shipped, 'string', `${key} must be a string leaf in lang/en.json`);
-      // The shipped copy interpolates `{name}`; the fallback interpolates `${slot.name}`.
-      const asFallback = shipped.replace('{name}', '${slot.name}');
-      assert.ok(
-        source.includes(`\`${asFallback}\``),
-        `the ${key} fallback must read exactly "${shipped}" with {name} substituted, `
-          + `so a key that fails to resolve degrades to the copy rather than replacing it`
-      );
-      assert.ok(asFallback.startsWith(expression), 'the fallback leads with the slot name');
-    }
-  });
-
   it('renders no reason line for a rail whose currency resolves', async () => {
     const target = await harness.mount({
       slots: buildRequirementSlots(craftabilityFor(SPENDABLE_GOLD_UNITS)),
@@ -472,5 +450,93 @@ describe('RequirementRail mounted behavior', () => {
     assert.match(caption.textContent, /Moonsilver/);
     // The tile column is fixed width and the caption ellipsises rather than growing it.
     assert.ok(tilesIn(target)[0].classList.contains('requirement-slot'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1493 (revision 3) — the rail's currency copy, read from the REAL `lang/en.json`.
+//
+// The component carries no English fallbacks for these keys. Every one of them ships in
+// this same change and Foundry merges `en` under every other language, so a fallback could
+// only ever be a second wording of the same sentence that nothing forces to agree with the
+// first — and the guard for the pair covered two of the five keys, so drifting the other
+// three changed nothing anybody could see.
+//
+// Backing `game.i18n` with the shipped file instead makes the DOM itself the guard: a
+// renamed key renders as its dotted self, and reworded copy renders the new words. Both
+// fail the literals below.
+// ---------------------------------------------------------------------------
+
+describe('RequirementRail currency copy (issue 1493)', () => {
+  let restoreI18n = () => {};
+
+  before(async () => {
+    await harness.setup();
+    restoreI18n = installLangBackedI18n(repoRoot);
+  });
+  after(() => {
+    restoreI18n();
+    harness.teardown();
+  });
+  afterEach(harness.remount);
+
+  async function tollLabel(units, gp) {
+    const target = await harness.mount({ slots: buildRequirementSlots(craftabilityFor(units, gp)) });
+    return tilesIn(target)[1].getAttribute('aria-label');
+  }
+
+  it('speaks the shipped sentence for a cost the player can pay', async () => {
+    assert.equal(await tollLabel(SPENDABLE_GOLD_UNITS, 1000), '100 gp. You can afford this.');
+  });
+
+  it('speaks the shipped sentence for a cost the player cannot pay', async () => {
+    assert.equal(await tollLabel(SPENDABLE_GOLD_UNITS, 3), "100 gp. You can't afford this.");
+  });
+
+  it('speaks the reason, not a verdict, for a cost the world cannot resolve', async () => {
+    const label = await tollLabel(UNSPENDABLE_GOLD_UNITS, 1000);
+    assert.match(label, /^100 gp\. Currency configuration is invalid/);
+    assert.ok(!/afford/i.test(label), 'a player holding 1000 gp is not short of 100 gp');
+  });
+
+  // The reason alone is an engine sentence. "Currency unit "Gold" is missing an actor data
+  // path" tells a PLAYER nothing they can act on — not whose fault it is, not what to do —
+  // and this rail is the primary pre-craft discovery surface.
+  it('follows the reason with a directive naming who fixes it and where', async () => {
+    const target = await harness.mount({
+      slots: buildRequirementSlots(craftabilityFor(UNSPENDABLE_GOLD_UNITS, 1000)),
+    });
+    const note = target.querySelector('[data-requirement-rail-issue]');
+    const text = note.textContent.replace(/\s+/g, ' ').trim();
+
+    assert.match(text, /^Currency configuration is invalid/, 'the reason leads');
+    assert.ok(
+      text.endsWith(
+        "Ask your GM to finish the world's currency setup (Crafting Systems → World → Currency)."
+      ),
+      `the directive follows it in the same paragraph: "${text}"`
+    );
+    assert.equal(
+      target.querySelectorAll('[data-requirement-rail-issue]').length,
+      1,
+      'reason and directive are ONE statement to this reader, so they are one paragraph'
+    );
+  });
+
+  it('renders no directive for a rail whose currency resolves', async () => {
+    const target = await harness.mount({
+      slots: buildRequirementSlots(craftabilityFor(SPENDABLE_GOLD_UNITS, 1000)),
+    });
+    assert.ok(!target.querySelector('[data-requirement-rail-issue]'));
+  });
+
+  // Tone is not decoration here: this rail's red already means "you cannot afford this",
+  // so painting a GM setup problem the same colour tells the player they did it.
+  it('paints the reason in the warning tone rather than the danger one', () => {
+    const source = readFileSync(resolve(repoRoot, RAIL_PATH), 'utf8');
+    const block = source.match(/\.requirement-rail-issue\s*{([^}]*)}/)?.[1];
+    assert.ok(block, 'the reason line must declare its own colour');
+    assert.match(block, /color:\s*var\(--fab-warning-text\)/);
+    assert.ok(!block.includes('--fab-danger'), 'the fault is not the player\'s');
   });
 });

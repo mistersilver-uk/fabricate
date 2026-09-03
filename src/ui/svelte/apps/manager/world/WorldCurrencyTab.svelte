@@ -591,7 +591,7 @@
               <strong
                 >{text(
                   'FABRICATE.Admin.Manager.CurrencyUnits.ValidationTitle',
-                  "These currency units can't be spent yet"
+                  "Currency can't be spent yet"
                 )}</strong
               >
               <!--
@@ -612,7 +612,7 @@
               <span
                 >{text(
                   'FABRICATE.Admin.Manager.CurrencyUnits.ValidationHint',
-                  "Crafting can't price or spend currency until you fix the units below. A different spend strategy can raise new problems, because your units have to match it. Saving still works."
+                  "Crafting can't price or spend currency until you fix the problems listed above. Each spend strategy needs different things from your setup, so switching it can raise new ones. Saving still works."
                 )}</span
               >
             </div>
