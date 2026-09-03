@@ -54,6 +54,7 @@ import {
   checkCurrencySpends,
   getCurrencyRequirementConfig,
   refundCurrencySpends,
+  resolveCurrencyContext,
   spendCurrencySpends,
 } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
@@ -5390,12 +5391,38 @@ export class CraftingEngine {
     }
   }
 
+  /**
+   * Why the world's currency configuration cannot be spent against for this recipe, or `null` when
+   * it can (issue 1493).
+   *
+   * This is the whole point of the fix. A currency option the world cannot resolve is refused at
+   * SELECTION — `buildCurrencyAffordProbe` returns a constant `false` — so the option is never
+   * chosen, the spend list stays empty, and the engine's currency gate short-circuits before it
+   * ever sees the reason. The craft then dies here, in the missing-items message, which is the only
+   * surface the player reads. Without this the message accuses the player of being poor for a cost
+   * the system could not price.
+   *
+   * Resolved from the context rather than re-derived: `error` covers an invalid profile,
+   * `spenderUnavailableReason` a valid profile with no usable coin spender. Never fails a craft
+   * message — an unresolvable read degrades to the shortfall wording that shipped before.
+   * @private
+   */
+  _missingItemsCurrencyReason(recipe) {
+    try {
+      const context = resolveCurrencyContext(recipe, this._currencySeams());
+      return context?.error || context?.spenderUnavailableReason || null;
+    } catch {
+      return null;
+    }
+  }
+
   _formatMissingItems(missing, recipe = null) {
     const components = this._getSystemComponents(recipe);
     // Resolved ONCE for the whole message, not per line: `getCurrencyRequirementConfig` is a
     // corpus-scaled read the performance programme instruments (see its own comment), and a
     // missing-items list can carry many ingredients.
     const currencyUnits = this._missingItemsCurrencyUnits(recipe);
+    const currencyReason = this._missingItemsCurrencyReason(recipe);
     const lines = [];
 
     for (const { ingredient, have, need } of missing.ingredients) {
@@ -5423,11 +5450,23 @@ export class CraftingEngine {
         ingredient?.match?.type === 'currency' &&
         getMatchHandler(ingredient.match).isComplete(ingredient.match)
       ) {
-        // Deliberately the SAME sentence `Ingredient.getDescription` produces, with only the unit
-        // resolved: the shipped message shape is asserted by an existing contract test, and this
-        // hotfix is fixing an opaque id, not rewording a player-facing failure message.
+        // The cost is the SAME sentence `Ingredient.getDescription` produces, with only the unit
+        // resolved (issue 1410): the shipped message shape is asserted by an existing contract
+        // test, and that hotfix was fixing an opaque id, not rewording a player-facing message.
+        //
+        // Two departures from the item branch, both issue 1493:
+        //
+        //   1. A configuration reason REPLACES the shortfall framing. "Insufficient currency" is a
+        //      claim about the player's purse, and it is false when the refusal came from a ladder
+        //      the world cannot spend against — the player may be holding ten times the cost.
+        //   2. `: have N, need N` is dropped UNCONDITIONALLY, reason or not. Those numbers are the
+        //      selection's occurrence counts (`have 0, need 1` for a hundred-gold cost), not coins:
+        //      the quantity is not the price and a coin balance is not an item count, so the ratio
+        //      states neither the price nor the shortfall. The sentence already states the cost.
         const cost = formatCurrencyRequirement(ingredient.match, currencyUnits);
-        line = `Insufficient currency. Requires ${cost}.: have ${have}, need ${need}`;
+        line = currencyReason
+          ? `Requires ${cost}. ${currencyReason}`
+          : `Insufficient currency. Requires ${cost}.`;
       }
       if (!line) {
         const description =

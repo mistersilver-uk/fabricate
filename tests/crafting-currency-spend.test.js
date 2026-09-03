@@ -260,6 +260,13 @@ function makeRecipeManager({ craftingActorRef } = {}) {
       );
       // Mirror the real evaluateCraftability missing-ingredient mapping so
       // _formatMissingItems surfaces the currency option's getDescription.
+      //
+      // UNGUARDED MIRROR (issue 1493). Nothing asserts this stays faithful to
+      // RecipeManager._buildIngredientState / evaluateCraftability, so a change to the real
+      // missing-ingredient mapping — the currency projection issue 1493 adds there is exactly
+      // such a change — leaves this copy stating the old shape while every engine test below
+      // still passes. If a currency assertion here disagrees with the same assertion made
+      // against the real RecipeManager in section 3, suspect this mapping first.
       const missingIngredients = (selection.missingGroups || [])
         .map((mg) => mg?.ingredient || mg?.group?.options?.[0] || null)
         .filter(Boolean)
@@ -1153,4 +1160,159 @@ test('engine: async-gate failure (macro) does not fall back to an unselected ite
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   assert.equal(result.success, false, 'unconfirmable async gate must not item/currency-craft');
   assert.equal(craftingActor.createdItems.length, 0, 'no result created on async-gate failure');
+});
+
+// ===========================================================================
+// 4. The craft-failure message NAMES the misconfiguration (issue 1493)
+// ===========================================================================
+
+/**
+ * The reported defect, end to end from `CraftingEngine.craft`.
+ *
+ * A world whose currency configuration cannot be resolved refused the option SILENTLY: the probe
+ * read constant-`false`, so `IngredientSet` never selected the currency option, so the spend list
+ * was empty, so the engine's currency gate short-circuited before its error branch — and the craft
+ * died in `_formatMissingItems` telling a player holding 500 gp
+ * `Insufficient currency. Requires 100 gp.: have 0, need 1`. The player is accused of being poor
+ * and the GM is told nothing.
+ *
+ * That suppression is why every assertion below drives `engine.craft` rather than
+ * `checkCurrencySpends`: a unit assertion on the gate's return PASSES ON THE BROKEN TREE, because
+ * the gate is never handed any spends to reject.
+ *
+ * Three fixtures, because the causes are structurally different and no one of them reaches the
+ * others: an INVALID profile, a valid profile whose spender has no adapter, and a valid profile
+ * with no spender at all.
+ */
+
+// (a) `actorProperty` with the actor data path cleared — trips `collectUnitStrategyErrors`, so the
+// profile itself is invalid and `resolveCurrencyContext` sets `error`.
+function brokenPathSystem() {
+  return makeCurrencySystem({
+    units: [{ id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: '', contains: [] }],
+  });
+}
+
+const HAVE_NEED_RATIO = /have \d+, need \d+/;
+
+test('engine: a broken ladder reports the CONFIGURATION reason, not poverty, to an actor who can pay', async () => {
+  const system = brokenPathSystem();
+  setupGame(system);
+  globalThis.game.system = { id: 'dnd5e' };
+  const recipe = makeRecipe({ ingredientSet: makeSet([[currencyOption('gp', 100)]]) });
+  // Deliberately RICH. On the broken tree this actor is told they cannot afford 100 gp while
+  // holding 500, which is the whole reported defect.
+  const craftingActor = makeDnd5eActor({ id: 'rich', currency: { gp: 500 } });
+  const engine = makeEngine(system, { actorPropertyCoinSpender: new ActorPropertyCoinSpender() });
+
+  const result = await engine.craft(craftingActor, [makeDnd5eActor({ id: 'src' })], recipe, null, {});
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /Currency configuration is invalid/, 'the GM is told what is wrong');
+  assert.match(result.message, /missing an actor data path/, 'and which unit is wrong');
+  assert.match(result.message, /100 gp/, 'the cost is still stated');
+  assert.ok(
+    !/Insufficient currency/i.test(result.message),
+    'and the false claim about the purse is gone: this actor holds 500 gp'
+  );
+  assert.ok(!HAVE_NEED_RATIO.test(result.message), 'no have/need ratio for a currency cost');
+});
+
+test('engine: a valid ladder with no registered inventory adapter names the SYSTEM', async () => {
+  // (b) `actorInventory` that VALIDATES (pf2e denominations), with no adapter registered. Fixture
+  // (a) cannot reach this branch: `collectUnitStrategyErrors` checks `denomination` under
+  // `actorInventory` and `actorPath` under `actorProperty`, so a cleared path is never even read.
+  // This is `ActorInventoryCoinSpender.describeUnavailable()`'s sentence reaching a human for the
+  // first time.
+  const system = makeCurrencySystem({ spendStrategy: 'actorInventory' });
+  setupGame(system);
+  globalThis.game.system = { id: 'dnd5e' };
+  const recipe = makeRecipe({ ingredientSet: makeSet([[currencyOption('gp', 100)]]) });
+  const craftingActor = makePf2eActor({ id: 'rich', coins: { gp: 500 } });
+  const engine = makeEngine(system, {
+    actorInventoryCoinSpender: new ActorInventoryCoinSpender({
+      adapters: new Map(),
+      getSystemId: () => 'dnd5e',
+    }),
+  });
+
+  const result = await engine.craft(craftingActor, [makePf2eActor({ id: 'src' })], recipe, null, {});
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /no currency inventory adapter is registered/i);
+  assert.match(result.message, /"dnd5e"/, 'the game system is the cause, so the message names it');
+  assert.match(result.message, /100 gp/);
+  assert.ok(!/Insufficient currency/i.test(result.message));
+  assert.ok(!HAVE_NEED_RATIO.test(result.message));
+});
+
+test('engine: a valid ladder with NO coin spender at all still reports a reason', async () => {
+  // (c) The null-spender path — `resolveCoinSpender` returns `null`, so there is no object to ask
+  // and the reason has to be composed by `resolveCurrencyContext` itself. This is the case the
+  // first design of this fix could not serve at all, because it only asked the spender.
+  const system = makeCurrencySystem({ spendStrategy: 'actorInventory' });
+  setupGame(system);
+  globalThis.game.system = { id: 'dnd5e' };
+  const recipe = makeRecipe({ ingredientSet: makeSet([[currencyOption('gp', 100)]]) });
+  const craftingActor = makePf2eActor({ id: 'rich', coins: { gp: 500 } });
+  const engine = makeEngine(system, { actorInventoryCoinSpender: null });
+
+  const result = await engine.craft(craftingActor, [makePf2eActor({ id: 'src' })], recipe, null, {});
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /no coin spender is registered/i);
+  assert.match(result.message, /actorInventory/, 'it names the strategy the GM chose');
+  assert.match(result.message, /"dnd5e"/);
+  assert.match(result.message, /100 gp/);
+  assert.ok(!/Insufficient currency/i.test(result.message));
+  assert.ok(!HAVE_NEED_RATIO.test(result.message));
+});
+
+test('engine: a GENUINELY poor actor on a sound ladder still reads Insufficient currency, with no ratio', async () => {
+  // The control the reason must NOT swallow, plus the unconditional half of the have/need drop:
+  // there is no configuration reason here, and the ratio is gone anyway. `have 0, need 1` counts
+  // ingredient OCCURRENCES — the quantity is not the price and a coin balance is not an item
+  // count — so it reported neither the cost nor the shortfall.
+  const system = makeCurrencySystem();
+  setupGame(system);
+  globalThis.game.system = { id: 'dnd5e' };
+  const recipe = makeRecipe({ ingredientSet: makeSet([[currencyOption('gp', 100)]]) });
+  const craftingActor = makeDnd5eActor({ id: 'poor', currency: { gp: 1 } });
+  const engine = makeEngine(system, { actorPropertyCoinSpender: new ActorPropertyCoinSpender() });
+
+  const result = await engine.craft(craftingActor, [makeDnd5eActor({ id: 'src' })], recipe, null, {});
+
+  assert.equal(result.success, false);
+  assert.match(result.message, /Insufficient currency\. Requires 100 gp\./);
+  assert.ok(!HAVE_NEED_RATIO.test(result.message), 'the ratio is dropped for currency ALWAYS');
+});
+
+test('engine: a missing ITEM still reports its have/need ratio, which the currency drop must not touch', async () => {
+  // The scope guard for the unconditional drop. `have`/`need` are meaningful for a component —
+  // they count the same thing on both sides — so the currency branch must be the only one to lose
+  // them.
+  const system = makeCurrencySystem();
+  setupGame(system);
+  globalThis.game.system = { id: 'dnd5e' };
+  const recipe = makeRecipe({ ingredientSet: makeSet([[itemOption('comp-absent', 2)]]) });
+  const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 100 } });
+  const engine = makeEngine(system, { actorPropertyCoinSpender: new ActorPropertyCoinSpender() });
+
+  const result = await engine.craft(craftingActor, [makeDnd5eActor({ id: 'src' })], recipe, null, {});
+
+  assert.equal(result.success, false);
+  assert.match(result.message, HAVE_NEED_RATIO);
+});
+
+test('engine: an unbroken ladder still crafts, so the reason lookup cannot refuse a sound world', async () => {
+  const system = makeCurrencySystem();
+  setupGame(system);
+  globalThis.game.system = { id: 'dnd5e' };
+  const recipe = makeRecipe({ ingredientSet: makeSet([[currencyOption('gp', 2)]]) });
+  const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 5 } });
+  const engine = makeEngine(system, { actorPropertyCoinSpender: new ActorPropertyCoinSpender() });
+
+  const result = await engine.craft(craftingActor, [makeDnd5eActor({ id: 'src' })], recipe, null, {});
+  assert.equal(result.success, true, result.message);
+  assert.equal(craftingActor.system.currency.gp, 3);
 });
