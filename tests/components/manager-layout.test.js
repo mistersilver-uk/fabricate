@@ -274,11 +274,15 @@ test('Tool library renders 210px and 340px fixed columns through the 832px produ
   assert.equal(stacked.overflow, false);
 });
 
-test('Tool editor header spans the 210px/editor/320px triptych and stacks only below 832px', async () => {
+// The rail track is 340, not 320 (issue 1373). The Tool Rules list holds its inspector at 340
+// against `proto:2496`'s 326, and that deviation justifies itself on the figure being shared
+// with the collapsed variant AND the editor route — which it was not, because this route was
+// 320, so the rail jumped 20px every time a GM opened a Tool from the list and came back.
+test('Tool editor header spans the 210px/editor/340px triptych and stacks only below 832px', async () => {
   for (const width of [1212, 832]) {
     const report = await readRenderedToolGeometry(width, 'tool-edit');
     assert.equal(Math.round(report.rail.width), 210);
-    assert.equal(Math.round(report.preview.width), 320);
+    assert.equal(Math.round(report.preview.width), 340);
     assert.ok(Math.abs(report.header.left - report.root.left) <= 1);
     assert.ok(Math.abs(report.header.right - report.root.right) <= 1);
     assert.ok(report.tabs.left >= report.rail.right - 1);

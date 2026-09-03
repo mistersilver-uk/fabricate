@@ -3713,7 +3713,13 @@
   height: 26px;
   border-radius: 7px;
   color: var(--fab-accent);
-  background: var(--fab-bg-3);
+
+  /* ONE RUNG ABOVE THE ROW, NOT THREE (issue 1373). `proto:2362` fills this tile `--bg2`
+     over a `--bg1` row, which is our `--fab-bg-1` over the `--fab-bg-0` the block above
+     gives every row that draws it. `--fab-bg-3` is the ramp's top rung and has no
+     counterpart anywhere on these screens, so the tile read as a bright chip instead of
+     as the row's quiet leading anchor. Both callers keep the same one-rung relationship. */
+  background: var(--fab-bg-1);
   font-size: 11px;
 }
 
@@ -11146,6 +11152,11 @@
   box-shadow: none;
 }
 
+/* THE TILE IS A RUNG ABOVE THE CARD, NOT THE RAMP'S TOP (issue 1373). `proto:2637` fills this
+   glyph `--bg2` — our `--fab-bg-1` — inside a card the same screen draws over a `--bg1` pane.
+   `--fab-bg-3` has no counterpart on these screens at all, so the tile was the brightest object
+   on a card whose whole job is to be one of three equal choices. Its SIZE is untouched: the
+   `RadioCardGroup` geometry hold is recorded at the component. */
 .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
   order: 1;
   flex: 0 0 40px;
@@ -11155,7 +11166,7 @@
   width: 40px;
   height: 40px;
   border-radius: 9px;
-  background: var(--fab-bg-3);
+  background: var(--fab-bg-1);
   color: var(--fab-accent);
   font-size: 0.95rem;
 }
@@ -12827,6 +12838,12 @@
   margin-bottom: var(--fab-space-2);
 }
 
+/* THE PILL CARRIES THE ACCENT FILL, and it is the only thing in the group that does (issue
+   1373). `proto:2242` states it as `padding: 2px 9px; border-radius: 999px; background:
+   var(--accent-soft); border: 1px solid var(--accent-border)`, and the block above already
+   records why the BOX beside it takes `--surface-soft` instead. This shipped with the border
+   and the ink but no fill at all, so the one element the reference uses to carry the accent
+   was the one element on the group with nothing behind it. */
 .fabricate-manager .manager-recipe-any-one-of-pill {
   display: inline-flex;
   align-items: center;
@@ -12834,6 +12851,7 @@
   padding: 2px var(--fab-space-2);
   border: 1px solid var(--fab-accent-border);
   border-radius: 999px;
+  background: var(--fab-accent-soft);
   color: var(--fab-accent);
   font-size: 0.58rem;
   font-weight: 700;
@@ -18387,13 +18405,20 @@
  * Manager — Tool Studio editor
  * ========================================================================== */
 
+/* THE INSPECTOR TRACK IS 340px HERE TOO (issue 1373). The recorded hold on 340 for the Tool
+   Rules list justifies itself on the track being "shared with the collapsed variant and the
+   editor route" — and the collapsed variant IS 340, but this route was 320, so the shared
+   figure the deviation rests on did not exist and the rail jumped 20px every time a GM opened
+   a Tool from the list and came back. `proto:2496` and `proto:2607` state 326 for both rails,
+   so the two screens agree in the reference as well; the 14px adjudication is stated once, at
+   the list's own block, and this restates its outcome rather than a second answer. */
 .fabricate-manager[data-manager-view="tool-edit"] .manager-body {
-  grid-template-columns: 210px minmax(0, 1fr) 320px;
+  grid-template-columns: 210px minmax(0, 1fr) 340px;
   grid-template-rows: max-content max-content minmax(0, 1fr);
 }
 
 .fabricate-manager[data-manager-view="tool-edit"] .manager-body.is-rail-collapsed {
-  grid-template-columns: 56px minmax(0, 1fr) 320px;
+  grid-template-columns: 56px minmax(0, 1fr) 340px;
 }
 
 .fabricate-manager[data-manager-view="tool-edit"] .manager-rail,
@@ -18428,13 +18453,21 @@
   overflow: hidden;
 }
 
+/* THE EDITOR'S TITLE BAND SITS ON THE PANE'S OWN RUNG (issue 1373).
+
+   `proto:2588` is this band, and it declares NO fill at all: it takes the shell's `--bg1`,
+   which is our `--fab-bg-0`, and states its boundary with the hairline alone. This shipped on
+   `--fab-bg-2` — the rung of our ramp the reference has no counterpart for on these screens —
+   while the two LIST routes one click away already took `--fab-bg-0` from the surface ladder
+   below. So a GM opening a Tool from the rules list watched the header change colour on
+   navigation, with nothing in either frame asking for it. */
 .fabricate-manager .manager-tool-edit-header {
   display: grid;
   gap: var(--fab-space-2);
   min-width: 0;
   padding: var(--fab-space-2) var(--fab-space-4) 10px;
   border-bottom: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
+  background: var(--fab-bg-0);
   grid-column: 1 / -1;
   grid-row: 1;
 }
@@ -18590,16 +18623,26 @@
   grid-row: 3;
 }
 
-/* The Tool Studio's right-hand panel is the shared inspector surface written through the
-   shared token, not a bespoke `--fab-bg-2` aside that happened to resolve to the same
-   colour (issue 881). Only its grid placement and its roomier padding are its own. */
+/* The Tool Studio's right-hand panel is the shared inspector surface, not a bespoke aside that
+   happened to resolve to the same colour (issue 881). Only its grid placement and its roomier
+   padding are its own.
+
+   AND IT IS ONE RUNG ABOVE THE PANE, NOT TWO (issue 1373). This tracked `.manager-inspector`
+   onto `--fab-bg-2`, and the note recording that unification named `--fab-bg-2` as though it
+   were the reference's own figure. It is not: `proto:2944` paints this exact column `--bg2`
+   over the shell's `--bg1`, and the background ramp is the one token family shifted a rung
+   between the two sets, so the reference's `--bg2` is our `--fab-bg-1` and its `--bg1` is our
+   `--fab-bg-0`. `--fab-bg-2` has no counterpart on these screens at all. The `tools` list one
+   click away already reads `proto:2548` the same way and paints its aside `--fab-bg-1`, so the
+   two rails now agree — and the rail's own insets, which the reference draws at `--bg1`,
+   recess against it instead of reading lighter than their container. */
 .fabricate-manager .manager-tool-preview {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-3);
   padding: var(--fab-space-4);
   border-left: 1px solid var(--fab-border);
-  background: var(--fab-bg-2);
+  background: var(--fab-bg-1);
   grid-column: 3;
   grid-row: 2 / 4;
 }
@@ -18619,6 +18662,11 @@
   margin: 0;
 }
 
+/* The identity inset RECESSES against the rail (issue 1373): `proto:2947` gives it `--bg1`
+   inside a `--bg2` column, which is our `--fab-bg-0` inside `--fab-bg-1`. It shipped on
+   `--fab-bg-1` while the rail sat a rung lighter, so the inset read as a lit patch; with the
+   rail back on its own reference rung this would have been flush with its container instead.
+   `IconFactRow`'s `rule` density and the note below already state `proto:2954`'s value. */
 .fabricate-manager .manager-tool-preview-identity {
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr) max-content;
@@ -18628,7 +18676,7 @@
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-bg-1);
+  background: var(--fab-bg-0);
 }
 
 .fabricate-manager .manager-tool-preview-identity > img {
@@ -19026,6 +19074,8 @@
   min-width: 0;
 }
 
+/* The rail's closing note is an inset like every other one in this column, so it takes
+   `proto:2947`'s rung for the reason the identity block above states (issue 1373). */
 .fabricate-manager .manager-tool-preview-live {
   display: flex;
   align-items: flex-start;
@@ -19034,7 +19084,7 @@
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 7px;
-  background: var(--fab-bg-1);
+  background: var(--fab-bg-0);
   color: var(--fab-text-muted);
   font-size: 0.66rem;
   line-height: 1.35;
@@ -19112,6 +19162,19 @@
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 10px;
+  background: var(--fab-bg-1);
+}
+
+/* THE REQUIREMENTS TAB IS ITSELF A CARD, and its fill belongs to the ladder rather than to its
+   own component (issue 1373). `proto:2322` at world scope and `proto:2854` at system scope both
+   state it `padding: 15px; background: var(--bg2); border: 1px solid var(--border)` — our
+   `--fab-bg-1`, one rung above the `--fab-bg-0` these routes take from the surface block at the
+   foot of this file. It was declared in `ToolRequirementsTab`'s own scoped block, which put a
+   route's surface decision inside one tab's component; with `tool-edit` joining the ladder the
+   fill has to be stated where the ladder can see it, or the card and its pane are the same
+   value again and only the hairline says a card is there. Geometry stays with the component:
+   this states the rung and nothing else. */
+.fabricate-manager .manager-tool-requirements-card {
   background: var(--fab-bg-1);
 }
 
@@ -19511,6 +19574,9 @@
   opacity: 0.55;
 }
 
+/* `proto:1981` fills the drop zone's own glyph `--surface-soft`, not a ramp rung: the tile sits
+   on a DASHED empty zone and the reference keeps it barely distinguishable from it (issue
+   1373). `--fab-bg-3` made the emptiest object on the screen the loudest one on it. */
 .fabricate-manager .manager-item-drop-zone-icon {
   display: flex;
   align-items: center;
@@ -19519,7 +19585,7 @@
   height: 44px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--fab-bg-3);
+  background: var(--fab-surface-soft);
   color: var(--fab-accent);
 }
 
@@ -19639,6 +19705,14 @@
   color: var(--fab-info);
 }
 
+/* THE TWO BREAKAGE INSETS RECESS; THEY DO NOT LIGHTEN (issue 1373).
+
+   `proto:2644` and `proto:2654` are these two exactly — `Uses per copy` and `Break chance per
+   use` — and both state `padding: 11px 13px; background: var(--bg1)` inside a `--bg2` card.
+   The reference's `--bg1` is our `--fab-bg-0`, so both sit one rung BELOW the card holding
+   them. What shipped was a 3% light overlay, which composites UP from the card: the design
+   sinks these two rows into their card and we raised them out of it. Tokens, not overlays, so
+   the rung is the same one every other surface on this screen is written against. */
 .fabricate-manager .manager-tool-breakage-config {
   display: flex;
   align-items: center;
@@ -19647,20 +19721,21 @@
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-overlay-light-03);
+  background: var(--fab-bg-0);
 }
 
 .fabricate-manager .manager-tool-breakage-config small {
   color: var(--fab-text-muted);
 }
 
+/* `proto:2654`, and the block above states the whole argument for both. */
 .fabricate-manager .manager-tool-breakage-chance-card {
   display: grid;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 8px;
-  background: var(--fab-overlay-light-03);
+  background: var(--fab-bg-0);
 }
 
 .fabricate-manager .manager-tool-breakage-chance-card > div > p:last-child {
@@ -24791,11 +24866,16 @@
 
 /* THE INSPECTOR TRACK STAYS AT 340px (issue 1373 parity round). `proto:2496` states 326, and
    the difference is adjudicated rather than closed: 14px is under a rung of this screen's own
-   spacing scale, the track is a shared grid figure the rail-collapsed variant below restates
-   and the Tool EDITOR route holds at 320, and moving one of the three would make the inspector
-   column change width on a trip into the editor and back — which the design does not do and
-   which no frame would explain. The panel's own inset moves to the scale instead; see the
-   `.manager-inspector` block below. */
+   spacing scale, and the track is a shared grid figure the rail-collapsed variant below and the
+   Tool EDITOR route both restate, so moving one of the three would make the inspector column
+   change width on a trip into the editor and back — which the design does not do and which no
+   frame would explain. The panel's own inset moves to the scale instead; see the
+   `.manager-inspector` block below.
+
+   THAT ARGUMENT ONLY BECAME TRUE THIS ROUND. The editor route was 320 while this one was 340,
+   so the rail did jump 20px on exactly the trip this note says it must not — the deviation was
+   recorded against a shared figure that did not exist yet. The editor route now states 340 and
+   cites this block; all three figures agree. */
 .fabricate-manager[data-manager-view="tools"] .manager-body {
   grid-template-columns: 210px minmax(0, 1fr) 340px;
 }
@@ -26316,6 +26396,68 @@
 .fabricate-manager[data-manager-view='world-tool-entry'] .manager-header,
 .fabricate-manager[data-manager-view='tools'] .manager-header {
   background: var(--fab-bg-0);
+}
+
+/* ── AND THE FOURTH TOOL ROUTE, WHICH WAS MISSING FROM ITS OWN LADDER (issue 1373) ───────────
+   `tool-edit` is the same archetype as the three above — `proto:2588`'s screen draws one flat
+   content surface with bordered cards on it, exactly as `proto:1945`'s and `proto:2485`'s do —
+   and it was the one route the list never named. So its pane fell all the way through to the
+   manager root's own `--fab-bg-1`, and EVERY rule card on it is `--fab-bg-1` too: card and pane
+   were the same value, and only the hairline said a card was there at all. `proto:2637` puts
+   the card on `--bg2` over the pane's `--bg1`, which is our `--fab-bg-1` over `--fab-bg-0`, so
+   the cards were already right and it was the pane that had nowhere to sit.
+
+   IT NAMES DIFFERENT ELEMENTS from the three above, and it has to. This route's `<main>` is
+   `display: contents` — it hands its children straight to `.manager-body`'s grid — so a
+   `.manager-main` rule here would paint nothing at all: an element that generates no box paints
+   no background. Its column two is exactly the tab strip and the editor panel (its header spans
+   `1 / -1` on row one and states its own fill above), so those two are the pane.
+
+   NOT `.manager-body`, which would take the nav rail with it. The rail is out of scope here for
+   the same reason the essence block above gives, and it already states `--fab-bg-0` itself. */
+.fabricate-manager[data-manager-view='tool-edit'] .manager-tool-editor-tabs,
+.fabricate-manager[data-manager-view='tool-edit'] .manager-tool-editor-panel {
+  background: var(--fab-bg-0);
+}
+
+/* ── THE BREAKAGE CHOOSER'S TYPE AND COLOUR, ON BOTH TOOL SCOPES (issue 1373) ────────────────
+   `RadioCardGroup`'s GEOMETRY stays on the shipped ladder — that hold is recorded at the
+   component and nothing here moves a padding, a gap, a radius or the tile — but its own
+   wording is that TYPE and COLOUR come from the reference, and three of those had not been
+   taken.
+
+   `proto:4596` states the resting card `background: var(--bg1)`, our `--fab-bg-0`, inside a
+   `--bg2` card, our `--fab-bg-1` — so the choice recesses INTO the section holding it. The
+   shipped fill is a 4% light overlay, which composites the other way and lifted all three
+   choices off their card. `proto:2637` states the label `600 11.5px` and the description
+   `400 10px/1.45`; the shared primitive renders 0.82rem/700 and 0.76rem/500 — 13.12px and
+   12.16px — so the label read a weight and a size above the card heading idiom around it.
+
+   NARROWED FOR THESE TWO ROUTES, never on the primitive, which is exactly what the Checks
+   Studio already does for its own scale a few thousand lines above: the shared rules also
+   dress the Crafting Settings and Gathering Economy cards, and those screens were measured
+   against frames of their own. Route attributes put the name and description rules at (0,3,0)
+   over the primitive's (0,2,0), and the card fill at (0,4,0) over its (0,3,0). */
+.fabricate-manager[data-manager-view='tool-edit']
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option,
+.fabricate-manager[data-manager-view='world-tool-entry']
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option {
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager[data-manager-view='tool-edit'] .manager-resolution-option-name,
+.fabricate-manager[data-manager-view='world-tool-entry'] .manager-resolution-option-name {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager[data-manager-view='tool-edit'] .manager-resolution-option-desc,
+.fabricate-manager[data-manager-view='world-tool-entry'] .manager-resolution-option-desc {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.45;
 }
 
 /* THE ROWS AND THE PAGER LOSE THEIR FILLS, so the 1px border is what makes a row a row — the
