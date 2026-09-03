@@ -8395,56 +8395,79 @@ test('the small selection box is the reference box', () => {
   );
 });
 
-// ── THE REQUIREMENTS CARD HEAD IS THE REFERENCE'S EYEBROW, NOT `.manager-kicker` (round 5) ──
+// ── THE EYEBROW IS THE REFERENCE'S, AND IT IS THE SHARED CLASS THAT SAYS SO (issue 1373) ──
 //
 // `proto:2324` states every section eyebrow on this tab as `font: 700 8.5px var(--sans);
-// letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`. The shared
-// `.manager-kicker` is `0.72rem` — 11.52px, 35% over — with NO tracking and the MUTED ink, so
-// the two section heads read as small headings rather than as the quiet rules they are.
+// letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`, and 63 further
+// eyebrows across the reference state it identically. The shared `.manager-kicker` shipped at
+// `0.72rem` — 11.52px, 35% over — with NO tracking and the MUTED ink, so every head that drew
+// one read as a small heading rather than as the quiet rule it is.
 //
-// NARROWED IN THE CARD, never on the shared class: `.manager-kicker` has callers on every other
-// manager screen and their own reference frames measured them. This is the treatment
-// `ToolBrowserInspector.svelte` already applies to the Tool inspector rail and
-// `styles/fabricate.css:3316` to the Checks rail — a third site, stated the same way.
+// FIXED ON THE SHARED CLASS. Three tool screens had each re-achieved the value locally, and the
+// world Tool entry still rendered two uppercase micro-labels at two sizes one tab apart. This
+// test now pins the shared class itself; a component that still restates the same figures is
+// harmless duplication, but a component that restates a DIFFERENT one is the defect returning.
 //
-// The cascade happens to favour a scoped rule here (the sheet is layered, this block is not),
-// but the assertion reads the COMPILED scoped CSS rather than the source, so what it pins is
-// what Svelte emits.
+// The cascade happens to favour a scoped rule in the card (the sheet is layered, the component
+// block is not), but the component assertions read the COMPILED scoped CSS rather than the
+// source, so what they pin is what Svelte emits.
 test('the Tool rule card eyebrow carries the reference type, not the shared kicker size', () => {
-  const { css: cardCss } = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte')
-  );
-  const flat = cardCss.replace(/\.svelte-[a-z0-9]+/g, '');
-  const start = flat.indexOf('.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow');
-  assert.ok(start >= 0, 'the eyebrow keeps a block of its own');
-  const declarations = flat.slice(start, flat.indexOf('}', start));
+  const start = css.indexOf('.fabricate-manager .manager-kicker {');
+  assert.ok(start >= 0, 'the shared eyebrow keeps a block of its own');
+  const declarations = css.slice(start, css.indexOf('}', start));
   assert.match(declarations, /font-size: 8\.5px/, '`proto:2324` sets the eyebrow at 8.5px');
   assert.match(declarations, /letter-spacing: 0\.11em/, 'and tracks it at .11em');
+  assert.match(declarations, /font-weight: 700/, 'at the reference weight');
+  assert.match(declarations, /text-transform: uppercase/, 'and the reference casing');
   assert.match(
     declarations,
     /color: var\(--fab-text-subtle\)/,
-    'and inks it `--subtle`, one rung quieter than the muted the shared class gives'
-  );
-  assert.equal(
-    css.includes('.fabricate-manager .manager-kicker {\n  margin: 0 0 var(--fab-space-2xs);'),
-    true,
-    'and the shared kicker is untouched for every other screen that draws one'
+    'and inks it `--subtle`, one rung quieter than the muted this shipped with'
   );
 
-  // AND THE ONE EYEBROW INSIDE THE CARD BODY TAKES THE SAME TREATMENT. `proto:2356` states the
-  // bonus list's `World modifiers` label with the SAME string `proto:2324` states the two
-  // section eyebrows with, so narrowing only the head would put two uppercase micro-labels at
-  // two sizes inside one card — a worse reading than the one this repair started from.
-  const { css: tabCss } = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte')
-  );
-  const tabFlat = tabCss.replace(/\.svelte-[a-z0-9]+/g, '');
-  const kickerStart = tabFlat.indexOf('.manager-tool-bonus-kicker {');
-  assert.ok(kickerStart >= 0, 'the bonus eyebrow keeps a block of its own');
-  const kickerDeclarations = tabFlat.slice(kickerStart, tabFlat.indexOf('}', kickerStart));
-  assert.match(kickerDeclarations, /font-size: 8\.5px/);
-  assert.match(kickerDeclarations, /letter-spacing: 0\.11em/);
-  assert.match(kickerDeclarations, /color: var\(--fab-text-subtle\)/);
+  // AND NOTHING RESTATES A SECOND SIZE FOR IT. The eyebrow was 35% oversized for as long as it
+  // took three tool screens to narrow it locally, one at a time, which is how the world entry
+  // came to draw two uppercase micro-labels at two sizes one tab apart. A local block may still
+  // carry the eyebrow's GEOMETRY — its grid cell, its margin, its flex rule — and one still has
+  // to restate the size where a heading rule out-specifies the shared class. What none of them
+  // may do is name a DIFFERENT figure, which is the defect returning under a new address.
+  const kickerFontSize = /font-size: ([^;]+);/;
+  for (const [file, selector] of [
+    ['tools/ToolInheritCard.svelte', '.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow'],
+    ['tools/ToolBrowserInspector.svelte', '.manager-tool-inspector-kicker'],
+    ['tools/ToolRequirementsTab.svelte', '.manager-tool-bonus-kicker {'],
+  ]) {
+    const { css: componentCss } = scopedComponentCss(
+      resolve(__dirname, `../../src/ui/svelte/apps/manager/${file}`)
+    );
+    const flat = componentCss.replace(/\.svelte-[a-z0-9]+/g, '');
+    const blockStart = flat.indexOf(selector);
+    assert.ok(blockStart >= 0, `${file} keeps a block for its eyebrow`);
+    const block = flat.slice(blockStart, flat.indexOf('}', blockStart));
+    const stated = kickerFontSize.exec(block);
+    assert.ok(
+      !stated || stated[1] === '8.5px',
+      `${file} either defers to the shared eyebrow or restates its exact size, not ${stated?.[1]}`
+    );
+  }
+
+  // The sheet's own two restatements answer to the same rule. `.manager-tool-rule-card-title h3`
+  // out-specifies the shared class at (0,2,1), so the world entry's card head HAS to repeat the
+  // size; the Tool Studio rail does not, and its retired 0.66rem was a third figure with no
+  // reference behind it (`proto:2404`, `:2409`, `:2418`, `:2436`, `:2466` are all 8.5px).
+  for (const selector of [
+    '.fabricate-manager .manager-tool-rule-card-title h3.manager-kicker {',
+    '.fabricate-manager .manager-tool-preview > .manager-kicker {',
+  ]) {
+    const blockStart = css.indexOf(selector);
+    assert.ok(blockStart >= 0, `${selector} keeps a block of its own`);
+    const block = css.slice(blockStart, css.indexOf('}', blockStart));
+    const stated = kickerFontSize.exec(block);
+    assert.ok(
+      !stated || stated[1] === '8.5px',
+      `${selector} states no size of its own, or the shared one, not ${stated?.[1]}`
+    );
+  }
 });
 
 test('the locked activation indicator offers no hover affordance', async () => {

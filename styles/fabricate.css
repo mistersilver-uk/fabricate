@@ -1868,12 +1868,38 @@
   min-width: 0;
 }
 
+/*
+  THE MANAGER'S EYEBROW, AT THE REFERENCE'S OWN FIGURES (issue 1373).
+
+  This shipped at `0.72rem` — 11.52px — with NO tracking and the MUTED ink, and it is the one
+  class every uppercase micro-label on every manager screen reaches for. The reference draws
+  the eyebrow as `font: 700 8.5px var(--sans); letter-spacing: .11em; text-transform:
+  uppercase; color: var(--subtle)` in 64 of its 71 eyebrows — `proto:2005`, `:2011`, `:2087`,
+  `:2104`, `:2121`, `:2160`, `:2188`, `:2202`, `:2234`, `:2324`, `:2404`, `:2409`, `:2418`,
+  `:2436`, `:2466` and `:2622` among them — so 11.52px is 35% over, untracked, and one ink
+  family bright. Every remaining reference eyebrow sits between 7.5px and 9.5px; NONE of them
+  is anywhere near what shipped, so there is no screen this moves away from its own frame.
+
+  `--subtle` is `--fab-text-subtle`: the two token sets agree byte for byte on this rung
+  (`rgba(217,184,156,.56)`), where `--muted` is `--fab-text-muted` one rung brighter. The size
+  is stated in px, not rem, because the reference states it in px and because the three sites
+  that had already narrowed to it locally state it in px — a `rem` here would read as a
+  different figure from the one they were measured against.
+
+  FIXED AT THE SOURCE rather than as a fourteenth narrowing rule. Three tool screens had each
+  re-achieved this value locally, and the world Tool entry still rendered `PREREQUISITES` at
+  8.5px beside `LINKED ITEM` at 11.52px, one tab apart. The four surfaces that state a
+  DIFFERENT measured figure keep their own rules and are untouched: the Checks rail's
+  9px/.14em (`.manager-checks-rail .manager-kicker`), the scope card's 8px/.1em — the
+  reference's other eyebrow family, `proto:519` — and the Tools authority and create cards'
+  0.64rem.
+*/
 .fabricate-manager .manager-kicker {
   margin: 0 0 var(--fab-space-2xs);
-  color: var(--fab-text-muted);
-  font-size: 0.72rem;
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
   font-weight: 700;
-  letter-spacing: 0;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 
@@ -8224,11 +8250,21 @@
   min-width: 0;
 }
 
-/* The card's own micro-label is tighter and quieter than a page kicker. */
+/* The card's own micro-label is tighter and quieter than a page kicker.
+
+   AND THE REFERENCE HAS A COUNTERPART FOR IT, at its own figures (issue 1373, handed over by
+   the world-surfaces lane). `proto:519` is this exact element — the `Crafting system` label
+   above the system select, inside the rail's scope card — and states `font: 700 8px
+   var(--sans); letter-spacing: .1em; color: var(--subtle)`. That is the reference's SECOND
+   eyebrow family, 20 of them, distinct from the .11em one the shared `.manager-kicker` now
+   carries; the tracking and the ink here were already exact and only the size was 20% over at
+   0.6rem. So this narrowing is kept rather than folded into the shared class — it states a
+   different measured figure, which is the only reason a narrowing may exist — and converged to
+   the figure it was reaching for. */
 .fabricate-manager .manager-scope-card .manager-kicker {
   margin: 0;
   color: var(--fab-text-subtle);
-  font-size: 0.6rem;
+  font-size: 8px;
   letter-spacing: 0.1em;
 }
 
@@ -18568,9 +18604,19 @@
   grid-row: 2 / 4;
 }
 
+/*
+  THE RAIL'S EYEBROWS TAKE THE SHARED CLASS'S SIZE, NOT A THIRD ONE (issue 1373).
+
+  This restated `0.66rem` — 10.56px — which made the Tool Studio rail a THIRD eyebrow size on a
+  screen family that already disagreed with itself at 11.52px and 8.5px. It has no reference
+  behind it: `proto:2404`, `:2409`, `:2418`, `:2436` and `:2466` are this rail's own five
+  eyebrows and all five state `font: 700 8.5px var(--sans); letter-spacing: .11em; color:
+  var(--subtle)` — the shared class's value since this issue. Only `margin: 0` is this rail's
+  own, because the panel is a flex column whose `gap` already states the step and the shared
+  class adds 2px on top of it.
+*/
 .fabricate-manager .manager-tool-preview > .manager-kicker {
   margin: 0;
-  font-size: 0.66rem;
 }
 
 .fabricate-manager .manager-tool-preview-identity {
@@ -19137,10 +19183,16 @@
    heading idioms on one screen. `ToolInheritCard`'s `headingStyle="kicker"` adds the shipped
    `.manager-kicker` to the same `<h3>`, and that class carries the colour, weight and casing
    at (0,2,0); the two properties the rule above out-specifies at (0,2,1) — the serif face and
-   the 0.9rem size — are what this restates. Nothing else about the card moves. */
+   the 0.9rem size — are what this restates. Nothing else about the card moves.
+
+   The size RESTATES the shared class rather than choosing its own: `.manager-kicker` now
+   carries `proto:2324`'s 8.5px, and this rule exists only because the heading rule above it
+   out-specifies that class, so it has to repeat the value it is deferring to. Keeping the
+   retired 0.72rem here would have re-inflated the world entry's card heads to 11.52px beside
+   their own eyebrows at 8.5px — the exact split this issue removed. */
 .fabricate-manager .manager-tool-rule-card-title h3.manager-kicker {
   font-family: inherit;
-  font-size: 0.72rem;
+  font-size: 8.5px;
 }
 
 /* THE HEAD'S THIRD LINE, at `proto:2324`'s `font: 400 10.5px/1.5 var(--sans); color:
