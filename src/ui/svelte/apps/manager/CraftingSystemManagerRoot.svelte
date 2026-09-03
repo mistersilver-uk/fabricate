@@ -12353,6 +12353,7 @@
         worldItems={worldItemOptions}
         onBackToCatalogue={() => setView('world-components')}
         onOpenSystemRules={(entityId, systemId) => openSystemComponentRules(entityId, systemId)}
+        onOpenWorldVocabulary={() => setView('world-vocabulary')}
         onSourceDrop={relinkWorldComponentSource}
         onUnlinkSource={() => unlinkWorldComponentSource(worldScopedEntryId)}
         onCopySourceUuid={(uuid) => copyComponentSource(uuid)}

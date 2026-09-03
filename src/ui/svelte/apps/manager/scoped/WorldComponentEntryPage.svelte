@@ -76,6 +76,10 @@
     entityId = '',
     worldItems = [],
     onBackToCatalogue = () => {},
+    // THE WORLD VOCABULARY EXIT (issue 1371, round 2). NULL BY DEFAULT and the control is
+    // withheld without it, so a call site that has no route to offer renders no dead affordance —
+    // the same rule `onUnlink` follows on the drop zone above.
+    onOpenWorldVocabulary = null,
     onOpenSystemRules = null,
     onSourceDrop = () => {},
     onUnlinkSource = () => {},
@@ -913,9 +917,42 @@
                 class="manager-edit-card manager-component-entry-card"
                 data-scoped-entry-category={entry.id}
               >
-                <p class="manager-kicker">
-                  {text('FABRICATE.Admin.Manager.Scoped.Component.WorldCategory', 'World category')}
-                </p>
+                <div class="manager-component-entry-system-head">
+                  <p class="manager-kicker">
+                    {text(
+                      'FABRICATE.Admin.Manager.Scoped.Component.WorldCategory',
+                      'World category'
+                    )}
+                  </p>
+                  <!--
+                    THE VOCABULARY EXIT, RESTORED (issue 1371, round 2). The reference draws one
+                    `World classification` card carrying `Edit world vocabulary`; this screen
+                    splits that card in two — `World category` and `World tags` — and the split
+                    dropped the exit. It belongs on THIS half: the category is the value a system
+                    resolves, and the vocabulary screen is where the list it is chosen from is
+                    authored.
+
+                    It routes through the OWNER, which is what makes it safe on a buffered editor:
+                    the gateway's `setView` runs the unsaved-changes guard before it moves, so a
+                    GM with an unsaved name is asked rather than losing it. A link that navigated
+                    itself would be the one exit on this screen that skipped that.
+                  -->
+                  {#if onOpenWorldVocabulary}
+                    <ManagerButton
+                      data-scoped-entry-vocabulary-exit
+                      onclick={() => onOpenWorldVocabulary()}
+                    >
+                      <i class="fas fa-tags" aria-hidden="true"></i>
+                      <span
+                        >{text(
+                          'FABRICATE.Admin.Manager.Scoped.Component.EditVocabulary',
+                          'Edit world vocabulary'
+                        )}</span
+                      >
+                      <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                    </ManagerButton>
+                  {/if}
+                </div>
                 <div class="manager-component-entry-inline">
                   <input
                     class="manager-component-entry-category-input"

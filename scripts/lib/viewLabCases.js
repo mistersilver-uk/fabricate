@@ -1583,14 +1583,12 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-page="world-component-entry"]',
         target: '[data-scoped-entry-source="sm-coal"]',
       },
-      {
-        container: '[data-scoped-page="world-component-entry"]',
-        target: '[data-scoped-entry-category="sm-coal"]',
-      },
-      {
-        container: '[data-scoped-entry-category="sm-coal"]',
-        target: '[data-scoped-entry-category-note]',
-      },
+      // THE CATEGORY CARD'S CLAIMS MOVED TO THE TAGS CASE (issue 1371, round 2), because that is
+      // the frame the card is fully drawn in. It sat one line inside this frame's fold, and the
+      // restored `Edit world vocabulary` exit — a button on the card's head row, where a kicker
+      // used to sit alone — is taller than the line it replaced. The choice was to shrink the
+      // affordance to fit an assertion or to assert it where it is drawn; the tags case already
+      // scrolls to exactly that region, so the claim is unchanged and only its frame moved.
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
@@ -1628,6 +1626,21 @@ export const VIEW_LAB_CASES = Object.freeze([
       {
         container: '[data-scoped-entry-tags="sm-coal"]',
         target: '[data-scoped-entry-tag-note]',
+      },
+      // THE CATEGORY CARD, WHOLE, INCLUDING ITS RESTORED VOCABULARY EXIT. Scrolling to the tag
+      // card puts the category card immediately above it and fully in frame, which the definition
+      // case's unscrolled position no longer does.
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-category="sm-coal"]',
+      },
+      {
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-category-note]',
+      },
+      {
+        container: '[data-scoped-entry-category="sm-coal"]',
+        target: '[data-scoped-entry-vocabulary-exit]',
       },
       {
         container: '[data-scoped-page="world-component-entry"]',

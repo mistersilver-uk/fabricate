@@ -6194,6 +6194,7 @@
             "SystemSummaryMutedOne": " · mutes {count} world tag",
             "SystemSummaryNone": "No rules here, so nothing in this system resolves to this component.",
             "Copy": "Copy",
+            "EditVocabulary": "Edit world vocabulary",
             "Copied": "Copied",
             "AliasesEmpty": "No aliases yet.",
             "RosterEmpty": "No system has rules for this component yet. It is registered in the world but unused — recipes cannot reference it anywhere.",

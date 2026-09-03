@@ -71,7 +71,7 @@ async function drain() {
 /** Mount the entry on one component, with a recording action bag and the draft wires captured. */
 async function open(entityId, overrides) {
   const { calls, actions } = recordingComponentActions();
-  const reports = { dirty: [], handles: [], deletes: [] };
+  const reports = { dirty: [], handles: [], deletes: [], vocabulary: [] };
   const target = await harness.mount({
     scope: scopeFor(overrides),
     actions,
@@ -81,6 +81,7 @@ async function open(entityId, overrides) {
     onDirtyChange: (dirty) => reports.dirty.push(dirty),
     onDraftChange: (handle) => reports.handles.push(handle),
     onDeleteChange: (descriptor) => reports.deletes.push(descriptor),
+    onOpenWorldVocabulary: () => reports.vocabulary.push(true),
   });
   return { target, calls, actions, reports };
 }
@@ -508,6 +509,26 @@ describe('world Component entry editor (issue 1371)', () => {
         Boolean(target.querySelector('[data-scoped-entry-aliases-empty]')),
         'and the alias list states its empty case rather than rendering a bare heading'
       );
+    });
+  });
+
+  describe('the world category card exits to the vocabulary screen', () => {
+    // The reference draws one `World classification` card carrying `Edit world vocabulary`; this
+    // screen splits that card in two, and the split dropped the exit. It is restored on the
+    // category half, because the category is the value a system resolves and the vocabulary
+    // screen is where the list it is chosen from is authored.
+    it('hands the click BACK, so the owner runs the unsaved-changes guard', async () => {
+      // THE HANDOFF IS THE POINT. This editor buffers its identity edits, and every other route
+      // change on this screen goes through the gateway's `setView`, which confirms before it
+      // moves. A link that navigated itself would be the one exit here that discarded a draft
+      // silently — so the assertion is that the page CALLS OUT rather than that a route changed.
+      const { target, reports, calls } = await open('ingot');
+      const exit = target.querySelector('[data-scoped-entry-vocabulary-exit]');
+      assert.ok(Boolean(exit), 'the category card offers the exit');
+      exit.click();
+      await drain();
+      assert.deepEqual(reports.vocabulary, [true], 'exactly one handoff');
+      assert.deepEqual(calls, [], 'and it writes nothing on the way out');
     });
   });
 
