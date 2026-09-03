@@ -772,6 +772,7 @@
           "TileShort": "{name} needs {need} and you have {have}.",
           "TileCurrencyMet": "{name}. You can afford this.",
           "TileCurrencyShort": "{name}. You can't afford this.",
+          "TileCurrencyUnavailable": "{name}. {issue}",
           "OptionsOne": "{count} alternative",
           "OptionsMany": "{count} alternatives",
           "Change": "Change",
@@ -813,6 +814,7 @@
           "AcquireComponents": "Acquire these components",
           "AcquireTools": "Acquire or repair these tools",
           "Owned": "{have} / {need} owned",
+          "CurrencyShort": "Can't afford",
           "Acquire": "Acquire",
           "Repair": "Repair"
         },
@@ -4070,8 +4072,8 @@
           "MacroUnlink": "Unlink macro",
           "MacroMissing": "Macro unresolved",
           "MacroConversionHint": "Conversion between this unit and others is handled by your configured currency macros, matched by abbreviation.",
-          "ValidationTitle": "This ladder can't be spent against yet",
-          "ValidationHint": "Crafting cannot price or spend currency until these are fixed. Changing the spend strategy can raise new ones, because the ladder has to match it. Nothing here blocks saving.",
+          "ValidationTitle": "These currency units can't be spent yet",
+          "ValidationHint": "Crafting can't price or spend currency until you fix the units below. A different spend strategy can raise new problems, because your units have to match it. Saving still works.",
           "ProviderManagedTitle": "Provider-managed denominations",
           "ProviderManagedHint": "These denominations are managed by the selected provider ({provider}) and can't be edited here. You can reference them by abbreviation in recipe currency requirements."
         },

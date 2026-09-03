@@ -186,11 +186,30 @@ describe('World > Currency tab (mounted)', () => {
     ]);
   });
 
+  it('renders a repeated validator message rather than throwing on it', async () => {
+    // The list is keyed on the INDEX, never on the message. Svelte 5 throws `each_key_duplicate`
+    // on a repeated key in BOTH its dev and production branches, and these rows are plain
+    // validator strings, so keying on the string itself would turn a duplicated message into a
+    // crash of the whole route. They are distinct today only because `validateCurrencyProfile`
+    // happens to return `[...new Set(errors)]`, an unpinned detail of a file this surface does
+    // not own. (Unkeyed is not on the table: `svelte/require-each-key` fails `lint:svelte`.)
+    const repeated = 'Currency unit "Gold" is missing an actor data path.';
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: [repeated, repeated]
+    });
+
+    const errors = [...root.querySelectorAll('[data-world-currency-validation-error]')].map(
+      (item) => item.textContent.trim()
+    );
+    assert.deepEqual(errors, [repeated, repeated], 'both rows render, and neither one throws');
+  });
+
   it('keeps the live region in the DOM while it has nothing to say', async () => {
     // The whole point of the wrapper. A live region inserted in the same tick as its content is
     // not announced, so rendering the element that carries `aria-live` conditionally would
     // announce nothing at the one moment that matters — the strategy switch that breaks the
-    // ladder. The region outlives its content; only the note inside it comes and goes.
+    // currency profile. The region outlives its content; only the note inside it comes and goes.
     const healthy = await harness.mount({ currencyUnits: UNITS, currencyValidationErrors: [] });
 
     const region = healthy.querySelector('[data-world-currency-validation]');
@@ -200,7 +219,7 @@ describe('World > Currency tab (mounted)', () => {
     assertNoElement(
       healthy,
       '[data-world-currency-validation-note]',
-      'but it says nothing while the ladder is sound'
+      'but it says nothing while the currency profile is sound'
     );
 
     harness.remount();
@@ -212,6 +231,36 @@ describe('World > Currency tab (mounted)', () => {
     assert.ok(
       spoken.querySelector('[data-world-currency-validation-note]'),
       'and the note appears INSIDE the region rather than beside it'
+    );
+  });
+
+  it('hides the silent region with the shipped visually-hidden utility, not a margin hack', async () => {
+    // A permanently mounted live region has to be a REAL hidden element while it is silent, or it
+    // leaves a phantom row in the section's gapped flex column. `.visually-hidden`
+    // (`styles/fabricate.css`, under `.fabricate-manager`) is the shipped utility for exactly
+    // that, and it is the one the reorder announcer at the top of this same component already
+    // uses; it clips the element out of flow while leaving it in the accessibility tree.
+    //
+    // This asserts the CLASS, never a computed style: happy-dom cannot compute the cascade, so a
+    // `getComputedStyle` assertion here would pass against a stylesheet that was never loaded.
+    const silent = await harness.mount({ currencyUnits: UNITS, currencyValidationErrors: [] });
+    const hidden = silent.querySelector('[data-world-currency-validation]');
+    assert.equal(
+      hidden.classList.contains('visually-hidden'),
+      true,
+      'the silent region is hidden, not collapsed by a negative margin'
+    );
+
+    harness.remount();
+    const speaking = await harness.mount({
+      currencyUnits: UNITS,
+      currencyValidationErrors: ['Currency unit "Gold" is missing an actor data path.']
+    });
+    const shown = speaking.querySelector('[data-world-currency-validation]');
+    assert.equal(
+      shown.classList.contains('visually-hidden'),
+      false,
+      'and it becomes visible the moment it has something to report'
     );
   });
 
@@ -231,7 +280,7 @@ describe('World > Currency tab (mounted)', () => {
     assertNoElement(
       root,
       '[data-world-currency-validation-note]',
-      'the empty ladder is not an error the GM has made'
+      'an empty currency profile is not an error the GM has made'
     );
   });
 
