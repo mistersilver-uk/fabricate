@@ -105,9 +105,18 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
   it('and the usage argument gains a component leg beside its two siblings', () => {
     assert.match(
       adminStore,
-      /usage: \{\s*component: _worldComponentUsage\(\),\s*essence: _worldEssenceUsage\(\),\s*tool: _worldToolUsage\(\),\s*\}/,
+      /usage: \{\s*component: _worldComponentUsage\(recipeCache\),\s*essence: _worldEssenceUsage\(\),\s*tool: _worldToolUsage\(recipeCache\),\s*\}/,
       'the projection already consumed this argument; two of three legs were wired and the ' +
         'third answered 0 recipes for every world component in the world'
+    );
+    // AND THE TWO LEGS THAT WALK THE RECIPES SHARE ONE READ. The per-refresh recipe fetch is a
+    // bounded budget the store's own suite asserts, and a second consumer reading the cohort
+    // again scales that budget by the crafting-system count — which is a cost with no rendered
+    // symptom at all, so nothing but the budget assertion and this line would report it.
+    assert.match(
+      adminStore,
+      /const recipeCache = new Map\(\);/,
+      'the cohort cache is minted per projection call, never as a module-level memo'
     );
   });
 
