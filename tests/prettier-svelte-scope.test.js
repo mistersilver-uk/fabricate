@@ -197,6 +197,10 @@ const GATE_TARGETS = [
   'scripts/docs-screenshots.mjs',
   'scripts/lib/webpFrames.js',
   'scripts/lib/docsScreenshotRun.js',
+  // The stylesheet live-class derivation (issue 1498): the shared oracle behind the dead-rule
+  // gate, which decides which of the sheet's class selectors any component can still match. It
+  // is only ever imported by tests, so no other entry in this list would drag it in.
+  'scripts/lib/stylesheetLiveClasses.js',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
