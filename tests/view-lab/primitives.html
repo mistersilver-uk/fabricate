@@ -53,6 +53,33 @@
         padding: 0;
         background: #0b0a13;
       }
+
+      /*
+        AND THE PAGE HAS TO BE ALLOWED TO SCROLL, which the comment above asserted and nothing
+        delivered. `configureLabPage()` stamps Foundry's own body classes — `FOUNDRY_CHROME_SPEC`
+        declares them `['vtt', 'game']` — and foundry2.css:15257 answers `body.game` with
+        `position: fixed; display: flex; overflow: hidden`. That is exactly right for a VTT game
+        view, which is one viewport-sized surface, and exactly wrong for a catalogue. Measured
+        before this rule existed: 9376px of content in a 1080px viewport, `document.body`
+        computing `position: fixed`, and `window.scrollBy(0, 3000)` moving nothing. Roughly 88%
+        of the page — every plinth past the first screen — was unreachable by wheel, keyboard or
+        scrollbar.
+
+        `npm run lab:check` was green throughout, and correctly so: it reads the DOM, and every
+        specimen genuinely had mounted. Nothing it asserts is about pixels. This is the class of
+        defect a mount count cannot see.
+
+        The classes STAY, because rules key off them and dropping them would trade a layout bug
+        for a cascade one. Only the four layout declarations are overridden, and the selector
+        carries `body.game` rather than `body` because a bare element selector loses to
+        foundry2.css's (0,1,1) on specificity and would silently do nothing.
+      */
+      body.game {
+        position: static;
+        display: block;
+        height: auto;
+        overflow: visible;
+      }
     </style>
   </head>
   <body>
