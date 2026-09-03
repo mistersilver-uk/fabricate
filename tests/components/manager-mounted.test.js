@@ -27198,6 +27198,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       systemToolBreakage,
       worldEssences,
       worldTools,
+      // The world COMPONENT corpus (issue 1371). It defaulted to three generated entities and
+      // had no override, so a suite that needed a KNOWN component corpus — an empty one, or one
+      // holding a record with a specific alias — could not ask for it.
+      worldComponents,
       craftingCheck,
       resolutionMode,
       // The COMPONENT's services bag, which is a different one from the admin store's: the
@@ -27206,7 +27210,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       componentServices = {},
     } = {}) {
       scopeStores = {
-        component: scopeStore(worldEntities(3, 'comp')),
+        component: scopeStore(worldComponents ?? worldEntities(3, 'comp')),
         essence: scopeStore(worldEssences ?? worldEntities(2, 'ess')),
         tool: scopeStore(
           worldTools ?? worldEntities(1, 'tool'),
@@ -28122,6 +28126,222 @@ describe('CraftingSystemManager mounted behavior', () => {
 
         assert.equal(worldToolIds().length, 2, 'a different source Item is a different world Tool');
         assert.equal(entryName(), AWL.name, 'and the GM lands on the one they just made');
+      });
+    });
+
+    // ── THE WORLD COMPONENT CATALOGUE'S CREATION ZONE (issue 1371) ────────────────────────
+    //
+    // NESTED HERE for the reason the tool block above is: `mountWithRealStore` is the only
+    // harness in the repository that drives the manager shell over a real world-scope corpus,
+    // and the drop handler lives in the shell — a page cannot reach the services bag that
+    // resolves a payload, and `worldScopeActions` reads no Foundry global by design.
+    //
+    // TWO PROPERTIES, AND THE SECOND IS NEW BEHAVIOUR ON ONE ZONE. The drop RESOLVES before it
+    // mints, because `createEntity` dedupes on the entity id and the id is fresh every time — so
+    // an unresolved drop turns one Item into two world components with identical identity, and
+    // nothing on any screen says which one a recipe means. And an EMBEDDED Item is refused,
+    // which no shipped drop path does today: its uuid dies with its parent actor, while a
+    // compendium Item resolves through every client.
+    describe('the world Component catalogue mints ONE record per source Item', () => {
+      const RESIN = Object.freeze({
+        uuid: 'Item.resin',
+        name: 'Wildwood Resin',
+        img: 'icons/commodities/tree/sap-drop-amber.webp',
+        description: 'Tapped from an ironwood.',
+      });
+      const SALT = Object.freeze({
+        uuid: 'Item.salt',
+        name: 'Unbound Salt',
+        img: 'icons/commodities/materials/salt-pile-white.webp',
+        description: '',
+      });
+      // The COMPENDIUM positive control. A compendium drag carries `{pack, id}` and no `uuid` at
+      // all, so it resolves to `Compendium.<pack>.<id>` — which has NO `.Item.` segment and is
+      // therefore not embedded. It is supplied as the RAW payload rather than as a uuid string,
+      // because that is what the zone forwards.
+      const PACKED = Object.freeze({
+        uuid: 'Compendium.p.b',
+        name: 'Packed Ore',
+        img: 'icons/commodities/stone/ore-chunk-brown.webp',
+        description: '',
+      });
+      const COMPONENT_SOURCES = Object.freeze({
+        [RESIN.uuid]: RESIN,
+        [SALT.uuid]: SALT,
+        [PACKED.uuid]: PACKED,
+      });
+
+      async function settleDrop() {
+        for (let i = 0; i < 24; i += 1) await Promise.resolve();
+        await tick();
+        flushSync();
+        await tick();
+        flushSync();
+      }
+
+      async function goToComponentCatalogue() {
+        worldNavItem('component-catalogue').click();
+        await settleDrop();
+        assert.ok(
+          Boolean(target.querySelector('[data-item-drop-zone="component-create"]')),
+          'the catalogue rendered no creation drop zone, so nothing below drops anywhere'
+        );
+      }
+
+      /**
+       * Open the world Component Catalogue over a real corpus, with the resolver seam wired.
+       *
+       * @param {Array<object>} worldComponents the corpus to start from.
+       * @returns {Promise<object>} the mounted admin store.
+       */
+      async function openComponentCatalogue(worldComponents) {
+        const store = await mountWithRealStore({
+          worldComponents,
+          componentServices: { resolveToolSource: async (uuid) => COMPONENT_SOURCES[uuid] ?? null },
+        });
+        await goToComponentCatalogue();
+        return store;
+      }
+
+      const worldComponentIds = () =>
+        scopeStores.component.corpus().entities.map((entity) => String(entity?.id ?? ''));
+      const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
+
+      /**
+       * Drop one payload on the creation zone, capturing what the GM is told while it happens.
+       *
+       * `foundry.utils.parseUuid` IS SEEDED, and that is load-bearing rather than scaffolding:
+       * the embedded-uuid gate FAILS CLOSED, so without a parser every drop is refused and every
+       * assertion below would pass for a fixture reason rather than a behavioural one. The stub
+       * answers the shape the real parser does — `embedded` is the segment pairs after the
+       * primary document — so `Actor.a.Item.b` reports one embedded pair and `Compendium.p.b`
+       * reports none.
+       *
+       * @param {object} payload the raw drag payload.
+       * @returns {Promise<{info: string[], warn: string[]}>} the toasts the drop raised.
+       */
+      async function dropPayload(payload) {
+        const info = [];
+        const warn = [];
+        const previousUi = globalThis.ui;
+        const previousFoundry = globalThis.foundry;
+        globalThis.ui = {
+          notifications: {
+            info: (message) => info.push(message),
+            warn: (message) => warn.push(message),
+          },
+        };
+        globalThis.foundry = {
+          ...(previousFoundry ?? {}),
+          utils: {
+            ...(previousFoundry?.utils ?? {}),
+            parseUuid: (uuid) => {
+              const parts = String(uuid).split('.');
+              if (parts.length < 2) throw new Error(`unparseable uuid: ${uuid}`);
+              // Every `<Type>.<id>` pair AFTER the primary document is an embedded one, which is
+              // what makes all three embedded shapes report a non-empty list and a compendium
+              // uuid report an empty one.
+              const primary = parts[0] === 'Compendium' ? 3 : 2;
+              const embedded = [];
+              for (let index = primary; index + 1 < parts.length + 1; index += 2) {
+                if (parts[index] !== undefined) embedded.push(parts[index], parts[index + 1]);
+              }
+              return { embedded };
+            },
+          },
+        };
+        try {
+          dispatchDrop(target.querySelector('[data-item-drop-zone="component-create"]'), payload);
+          await settleDrop();
+          return { info, warn };
+        } finally {
+          if (previousUi === undefined) delete globalThis.ui;
+          else globalThis.ui = previousUi;
+          if (previousFoundry === undefined) delete globalThis.foundry;
+          else globalThis.foundry = previousFoundry;
+        }
+      }
+
+      it('mints ONE record when the same Item is dropped twice, and navigates to the first', async () => {
+        await openComponentCatalogue([]);
+
+        const first = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+        assert.deepEqual(first.info, [], 'the first drop is a plain creation and says nothing');
+        assert.equal(worldComponentIds().length, 1);
+        assert.equal(managerView(), 'world-component-entry', 'and lands the GM on it');
+        const created = worldComponentIds()[0];
+
+        await goToComponentCatalogue();
+        const second = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+
+        assert.equal(worldComponentIds().length, 1, 'the second drop mints NOTHING');
+        assert.equal(second.info.length, 1, 'and says so rather than appearing to do nothing');
+        assert.deepEqual(worldComponentIds(), [created], 'the record is the one that existed');
+        assert.equal(managerView(), 'world-component-entry');
+      });
+
+      it('resolves through the whole source-reference union, not one field', async () => {
+        // A RE-POINTED LINK keeps its previous uuid as an ALIAS. Comparing `registeredItemUuid`
+        // directly mints a duplicate for exactly the records a GM has already tidied, and the
+        // origin case above stays green while it does.
+        await openComponentCatalogue([
+          {
+            id: 'existing',
+            name: 'Older Resin',
+            originItemUuid: 'Item.something-else',
+            registeredItemUuid: 'Item.something-else',
+            aliasItemUuids: [RESIN.uuid],
+          },
+        ]);
+
+        const dropped = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
+
+        assert.deepEqual(worldComponentIds(), ['existing'], 'the ALIAS match mints nothing');
+        assert.equal(dropped.info.length, 1);
+      });
+
+      it('REFUSES an embedded Item in all three of its shapes', async () => {
+        // `Actor.a.Item.b`, an unlinked token's `Scene.s.Token.t.Actor.a.Item.b`, and a
+        // compendium actor's `Compendium.p.Actor.a.Item.b`. A `startsWith('Actor.')` predicate
+        // catches only the first — and the token shape is the one a GM reaches by dragging off a
+        // token sheet.
+        await openComponentCatalogue([]);
+
+        for (const uuid of [
+          'Actor.a.Item.b',
+          'Scene.s.Token.t.Actor.a.Item.b',
+          'Compendium.p.Actor.a.Item.b',
+        ]) {
+          const refused = await dropPayload({ type: 'Item', uuid });
+          assert.deepEqual(worldComponentIds(), [], `${uuid} minted nothing`);
+          assert.equal(refused.warn.length, 1, `${uuid} told the GM why`);
+        }
+      });
+
+      it('and still MINTS from a compendium drag, which carries no uuid at all', async () => {
+        // THE POSITIVE CONTROL for the refusal, and it is the payload shape rather than a uuid
+        // string: `ItemDropZone` forwards the raw drag data, and a compendium drag carries
+        // `{pack, id}` — so a handler reading `data.uuid` refuses every compendium drop while a
+        // uuid-string fixture stays green.
+        await openComponentCatalogue([]);
+
+        const minted = await dropPayload({ type: 'Item', pack: 'p', id: 'b' });
+
+        assert.equal(worldComponentIds().length, 1, 'a compendium Item is a world component');
+        assert.deepEqual(minted.warn, [], 'and nothing refused it');
+        assert.equal(managerView(), 'world-component-entry');
+      });
+
+      it('and REFUSES an unparseable uuid, because the gate fails CLOSED', async () => {
+        // The snapshot helper's fail-open idiom is right for a snapshot and wrong for a refusal:
+        // a parse that threw and was read as "not embedded" would admit exactly the payloads this
+        // gate exists to turn away.
+        await openComponentCatalogue([]);
+
+        const refused = await dropPayload({ type: 'Item', uuid: 'nonsense' });
+
+        assert.deepEqual(worldComponentIds(), [], 'nothing was minted');
+        assert.equal(refused.warn.length, 1);
       });
     });
 

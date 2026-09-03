@@ -726,8 +726,50 @@ actions.copyMembership(entry.id, row.systemId);`),
     assert.equal(copyMembershipCalls(both).length, 2);
   });
 
-  it('no shell calls it at all today, and any future call carries three arguments', () => {
-    for (const path of [...SHELLS, ROSTER]) {
+  /**
+   * EVERY `.svelte` under `apps/manager/`, recursively — which is what this ban now scans.
+   *
+   * ── THE THREE-FILE LIST WAS THE FIRST OF THIS SCAN'S OWN RECORDED BOUNDS (issue 1371) ────
+   * `SHELLS` is hand-maintained, and `scoped/` alone already held twelve unscanned siblings —
+   * among them `MembershipActions.svelte`, which is the natural home for the very control this
+   * ban is about. Widening it also brings in the ONE real three-argument call site in the
+   * repository, which is what makes the scan a measurement rather than an empty set: with the
+   * narrow list it examined four files and found zero calls, so raising the expected argument
+   * count to a value NO call could satisfy would still have passed.
+   *
+   * @returns {string[]} repo-relative paths.
+   */
+  function everyManagerComponent() {
+    const managerDir = 'src/ui/svelte/apps/manager';
+    const walk = (relative) =>
+      readdirSync(resolve(repoRoot, relative), { withFileTypes: true }).flatMap((entry) => {
+        const child = `${relative}/${entry.name}`;
+        if (entry.isDirectory()) return walk(child);
+        return entry.name.endsWith('.svelte') ? [child] : [];
+      });
+    return walk(managerDir);
+  }
+
+  it('THE SCAN IS NOT VACUOUS: it reaches beyond the shells and finds a real call', () => {
+    const scanned = everyManagerComponent();
+    assert.ok(
+      scanned.length > SHELLS.length + 1,
+      `the widened walk resolved ${scanned.length} manager components, against the ` +
+        `${SHELLS.length + 1} the narrow list named`
+    );
+    // AND IT FINDS THE ONE REAL CALL SITE. `EssenceEditView`'s copy card is the only shipped
+    // three-argument `copyMembership` call in the repository, and it lives outside `scoped/`
+    // entirely — so a scan that missed it is a scan that could not fail.
+    const withCalls = scanned.filter((path) => copyMembershipCalls(sourceOf(path)).length > 0);
+    assert.deepEqual(
+      withCalls,
+      ['src/ui/svelte/apps/manager/EssenceEditView.svelte'],
+      'exactly one manager component calls copyMembership today, and the scan reaches it'
+    );
+  });
+
+  it('no manager component calls it with fewer than three arguments', () => {
+    for (const path of everyManagerComponent()) {
       for (const args of copyMembershipCalls(sourceOf(path))) {
         assert.equal(
           args.length,

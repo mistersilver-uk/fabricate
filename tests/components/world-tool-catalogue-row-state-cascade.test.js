@@ -75,6 +75,23 @@ const ROUTES = [
     component: ESSENCE_ROW,
     subject: 'system Essence',
   },
+  // ── THE FOURTH ROUTE (issue 1371) ────────────────────────────────────────────────────────
+  // The world Component catalogue renders the SAME shared frame row as the two world routes
+  // above it, so its block is the twin of theirs — and it was the one flattened list route that
+  // had no such block at all until this lane appended one. It is added HERE rather than in a
+  // copy of this file: a second copy is a SonarCloud duplication failure, and consolidating two
+  // copies later makes the per-diff density worse rather than better.
+  //
+  // `components` is NOT a member. The system Component Rules list does not flatten
+  // `.manager-component-row`, so it declares none of these four selectors — and a route added
+  // here without a block passes every assertion below on the strength of the SHARED rules alone,
+  // which is exactly what the non-vacuity clause guards against.
+  {
+    view: 'world-components',
+    rowClass: 'manager-scoped-list-row',
+    component: FRAME,
+    subject: 'Component',
+  },
 ];
 
 const components = new Map();
@@ -179,6 +196,43 @@ test('the fixture layers the sheet the way Foundry does, or it proves nothing', 
     );
   } finally {
     await close();
+  }
+});
+
+/*
+ * THE NON-VACUITY CLAUSE FOR THE PARAMETERISATION ITSELF (issue 1371), and it is NOT the route
+ * count.
+ *
+ * Every one of the four browser assertions below is satisfied, on a route that declares NOTHING,
+ * by the SHARED rules alone: `.is-bulk-selected` already stands later than `:hover` at equal
+ * specificity in the base ladder, so a route with no block of its own arbitrates correctly and
+ * this file reports four passes about a screen it has never measured. That is the exact shape a
+ * fourth ROUTES entry added without its stylesheet block would have.
+ *
+ * So each route must DECLARE something. Measured on this sheet, `world-tools`, `world-essences`
+ * and `essences` each carry FOUR such selectors — the block shape is flatten, the
+ * `:not(.is-selected):not(.is-bulk-selected):hover` guard, `.is-selected` and `.is-bulk-selected`
+ * — and before this lane `world-components` carried ZERO.
+ *
+ * `tools` is deliberately NOT a member of ROUTES and this is where that shows: its rows are
+ * `.manager-tools-row`, and it declares only two of the four, so a clause asserting a four-rule
+ * shape across every shipped route would red on a clean tree.
+ */
+test('every parameterised route DECLARES its own row rules, or it measures nothing', () => {
+  const declarations = [...sheet.matchAll(/([^{}]+)\{[^{}]*\}/g)].map((match) => match[1]);
+  assert.ok(declarations.length > 2000, 'the selector scan found nothing; it is broken');
+  for (const route of ROUTES) {
+    const owned = declarations.filter(
+      (selector) =>
+        selector.includes(`[data-manager-view='${route.view}']`) &&
+        selector.includes(route.rowClass)
+    );
+    assert.ok(
+      owned.length >= 4,
+      `${route.view} declares ${owned.length} of its own row selectors; with none of them the ` +
+        'four assertions below are decided entirely by the shared ladder and this route is ' +
+        'measured only in appearance'
+    );
   }
 });
 
