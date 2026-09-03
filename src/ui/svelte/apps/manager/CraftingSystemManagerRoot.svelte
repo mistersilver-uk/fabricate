@@ -16,6 +16,11 @@
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
+  // THE SHARED SOURCE-REFERENCE WALK (issue 1373). One Item is one world Tool, and the union
+  // over `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` is how every other reader
+  // in this repository answers "is this record that Item". A fourth comparison written here
+  // would drift from the index the migration grouped by.
+  import { getItemMatchUuids } from '../../../../utils/sourceReferenceUnion.js';
   import {
     routedOutcomeTierOptions,
     routedTierOptionsForPolicy,
@@ -8022,7 +8027,55 @@
   }
 
   /**
+   * The world Tool that ALREADY names `uuid` as its source Item, or `null`.
+   *
+   * ── WHY THE UNION AND NOT A FIELD COMPARISON ────────────────────────────────────────────
+   * A world Tool can name its Item through three fields, and `getItemMatchUuids` is the shared
+   * walk over all three — the same one `definitionIndex` builds its source-reference facet with
+   * and the same one the read union matches on. A comparison written here against
+   * `registeredItemUuid` alone would be a fourth answer to a question the repository already
+   * answers once, and it would miss exactly the records that make this check matter: a Tool
+   * whose link was re-pointed keeps the previous uuid as an ALIAS, so the Item a GM is dragging
+   * may be reachable only through `aliasItemUuids`.
+   *
+   * READ OFF `entries` RATHER THAN `entities` because the caller needs `worldEnabled` too, and
+   * that is resolved by the projection through `isWorldEnabled` — an ABSENT flag means enabled,
+   * so a raw entity cannot answer it without restating that rule.
+   *
+   * @param {string} uuid The resolved source Item uuid.
+   * @returns {object|null} The world scope entry, or `null` when no record names that Item.
+   */
+  function worldToolForSourceItem(uuid) {
+    const needle = String(uuid ?? '').trim();
+    if (!needle) return null;
+    return (
+      (worldScopeState.tool?.entries ?? []).find((entry) =>
+        getItemMatchUuids(entry?.entity).includes(needle)
+      ) ?? null
+    );
+  }
+
+  /**
    * Create a WORLD Tool from an Item dropped on the world Tools Catalogue, and open its entry.
+   *
+   * ── ONE GAME-WORLD ITEM IS ONE WORLD TOOL (issue 1373) ──────────────────────────────────
+   * The drop RESOLVES before it creates. Minting `store.randomID()` unconditionally made the
+   * same Item dropped twice into two world Tools with identical identity, and
+   * `worldScopeActions.createEntity` cannot catch that: it dedupes on the entity id, and the id
+   * is fresh every time. Both records then show up in every system's catalogue with nothing on
+   * any screen to say which one a recipe means.
+   *
+   * This is the rule the rest of the epic already keeps. `worldScopeEntityGrouping` groups the
+   * migration BY RESOLVED SOURCE ITEM so that one real Item becomes one world record, the
+   * system-scope path this zone replaced upserted rather than inserted, and copy-mode import
+   * reuses the world entity when the source item matches.
+   *
+   * A MATCH NAVIGATES AND SAYS SO, rather than silently doing nothing: a drop that appears to
+   * have no effect is precisely the defect this screen spent a round removing. A world-DISABLED
+   * record is reused on the same terms and told apart in the sentence — `enabled` is the world
+   * master switch, so landing on a Tool that does nothing without being told why is worse than
+   * being told, and a second record would strand the GM's own switch decision on the row they
+   * can no longer find.
    *
    * ── WHY THE RESOLUTION HAPPENS HERE ─────────────────────────────────────────────────────
    * `worldScopeActions` reads no Foundry global by design, and a page cannot reach the
@@ -8051,6 +8104,13 @@
     if (!uuid) return false;
     const source = await services?.resolveToolSource?.(uuid);
     if (!source) return false;
+    const sourceUuid = source.uuid || uuid;
+    const existing = worldToolForSourceItem(sourceUuid);
+    if (existing) {
+      notifyInfo(existingWorldToolMessage(existing));
+      openWorldScopedEntry('world-tool-entry', existing.id);
+      return true;
+    }
     const entityId = String(store?.randomID?.() || '');
     if (!entityId) return false;
     const created = await store?.worldScope?.tool?.createEntity?.({
@@ -8058,14 +8118,34 @@
       name: source.name || '',
       img: source.img || '',
       description: source.description || '',
-      originItemUuid: source.uuid || uuid,
-      registeredItemUuid: source.uuid || uuid,
+      originItemUuid: sourceUuid,
+      registeredItemUuid: sourceUuid,
     });
     if (created !== true) return false;
     // CHAINED, so the drop lands the GM on the record it just made rather than on a list they
     // then have to find it in. Routed through the same guard every other entry navigation uses.
     openWorldScopedEntry('world-tool-entry', entityId);
     return true;
+  }
+
+  /**
+   * What a GM is told when their drop landed on a world Tool that already existed.
+   *
+   * TWO SENTENCES, not one with a clause, because the two states have different consequences:
+   * an enabled record is simply the one they were about to duplicate, while a world-DISABLED one
+   * is a Tool that no system can use until the switch on the screen they just arrived at moves.
+   *
+   * @param {object} entry The matched world scope entry.
+   * @returns {string}
+   */
+  function existingWorldToolMessage(entry) {
+    const name = String(entry?.entity?.name || entry?.id || '');
+    const key = entry?.worldEnabled === false ? 'DropExistingDisabled' : 'DropExisting';
+    const fallback =
+      entry?.worldEnabled === false
+        ? '{name} already exists for that Item and is disabled at world scope. Opened it instead of creating a second.'
+        : '{name} already exists for that Item. Opened it instead of creating a second.';
+    return text(`FABRICATE.Admin.Manager.Scoped.Tool.${key}`, fallback).replace('{name}', name);
   }
 
   /**

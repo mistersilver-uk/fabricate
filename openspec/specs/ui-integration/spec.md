@@ -1363,7 +1363,9 @@ The library uses the Manager three-column shell at `210px | 1fr | 340px`.
 It owns the sole system-breakage-authority card above search, with self-describing `toolSpecific` and `checkDriven` options; changing authority persists live and never erases the inactive per-Tool settings.
 The center library accepts no Item drop.
 Creating a Tool from an Item is a WORLD-scope act and its drop zone lives on the World Tools Catalogue, because a Tool's identity is one world record that every crafting system adopts rather than a per-system copy.
-That zone rejects non-Items, snapshots source name, image and description, and uses durable Tool identity rather than name matching.
+That zone rejects non-Items and snapshots the source Item's name, image and description.
+A drop whose source Item is already named by a world Tool - through any of that record's source references - resolves to that record and opens it rather than creating a second one, and states which record it landed on and whether that record is disabled at world scope.
+A drop no world Tool names creates one with a durable id of its own that references the source Item by uuid, so one game-world Item is one world record.
 Each Tool row shows its linked image, display name, enabled state, breakage summary, and validation state.
 The right inspector presents the selected Tool's identity and description followed by four headed card sections for breakage mode, on-break action, character prerequisites, and check bonus.
 The Tool editor's own rail states five regions in a fixed order: how the Tool behaves, its effective rules, how players see one copy of it, a per-actor preview, and what requires it in this system.

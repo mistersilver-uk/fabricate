@@ -136,6 +136,13 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../../utils/recipeBulkEditModel.js',
   '../../../../utils/recipeCategories.js',
   '../../../../utils/routedOutcomeKeywords.js',
+  // ADDED BY ISSUE 1373, and legitimately under the message below. One game-world Item is one
+  // world Tool, so the catalogue's drop zone RESOLVES before it creates - and the walk over a
+  // record's `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` is the shared one the
+  // definition index and the read union already answer that question with. A fourth comparison
+  // written in the shell would drift from the index the migration grouped by, which is exactly
+  // the failure `sourceReferenceUnion` was extracted to prevent.
+  '../../../../utils/sourceReferenceUnion.js',
   '../../../../utils/vocabularyUsage.js',
   '../../../managerExtensions.js',
   '../../../navTabBadgeStore.js',

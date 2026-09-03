@@ -6176,7 +6176,9 @@
             "SelectAllShort": "All",
             "SearchPlaceholder": "Search tools\u2026",
             "OpenEntry": "Edit tool",
-            "RowOpenEntry": "Edit tool"
+            "RowOpenEntry": "Edit tool",
+            "DropExisting": "{name} already exists for that Item. Opened it instead of creating a second.",
+            "DropExistingDisabled": "{name} already exists for that Item and is disabled at world scope. Opened it instead of creating a second."
           },
           "List": {
             "ClearFilters": "Clear filters",
