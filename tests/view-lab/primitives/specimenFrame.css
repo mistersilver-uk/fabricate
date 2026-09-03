@@ -16,6 +16,44 @@ body {
 }
 
 /*
+ * `configureLabPage()` (`specimenMount.js`) stamps Foundry's own real body classes —
+ * `FOUNDRY_CHROME_SPEC` declares them `['vtt', 'game']` — and `foundry2.css:15257` answers
+ * `body.game` with `position: fixed; display: flex; overflow: hidden`. That is exactly right for
+ * a real game view, which is one viewport-sized surface, and it is what `tests/view-lab/index.html`
+ * deliberately leaves in place for that reason.
+ *
+ * It is wrong for a specimen, and not merely cosmetically: `display: flex` makes `body` a FLEX
+ * CONTAINER, and a flex container's own children are BLOCKIFIED regardless of what they declare —
+ * a spec rule this file's own default-slot `.pl-specimen` rule below collided with directly. With
+ * every window-subtree element between it and `body` at `display: contents` (see below),
+ * `.pl-specimen` becomes a direct flex child of `body`, and Chromium reports its COMPUTED
+ * `display` as the blockified `block` rather than the declared `inline-block` — so it stops
+ * shrink-wrapping its content in either dimension and the measured size handed to `mount.js` is
+ * wrong. Measured: a 102x28 `<Stepper>` reported through a wrapper computing 102x10.
+ *
+ * `position: fixed` and `overflow: hidden` are equally wrong for a document meant to be measured
+ * and auto-sized rather than clipped to one viewport-sized window. Only the four layout
+ * declarations are overridden — the classes stay, because `styles/fabricate.css` keys real rules
+ * off them (see the citations at `body.game` above).
+ */
+body.game {
+  position: static;
+  display: block;
+  height: auto;
+  overflow: visible;
+}
+
+/*
+ * `foundry2.css:13930` gives `body` a `background: var(--background)` — BLACK, the right backdrop
+ * for a game view and the wrong one for a specimen: it used to cover the drawing's own surface the
+ * component stands in for, which no bare drawing in `library.html` ever painted over. A specimen
+ * shows through to whatever the library drew underneath it, exactly as the drawing it replaced did.
+ */
+body {
+  background: transparent;
+}
+
+/*
  * DEFAULT (no `slot` declared on the row): the window subtree generates no boxes at all. The
  * elements stay in the DOM and in the inheritance chain — so `.application`'s
  * `font-size: var(--font-size-14)`, its ten custom properties and the theme's whole `--fab-*`

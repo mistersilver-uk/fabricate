@@ -26,7 +26,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
-import { diffSnapshots, formatParityReport, PARITY_PROPERTIES } from './lib/primitiveLabParity.js';
+import {
+  diffSnapshots,
+  evaluateSpecimens,
+  formatParityReport,
+  PARITY_PROPERTIES,
+} from './lib/primitiveLabParity.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -159,6 +164,80 @@ async function snapshot(browser, url, waitForLabReady) {
   return data;
 }
 
+/** The identity marker on each specimen `<iframe>` — same literal `mount.js` writes. */
+const SPECIMEN_ATTRIBUTE = 'data-primitive-lab-specimen';
+
+/**
+ * Measure every specimen independently of what `mount.js` itself measured, closing the blind spot
+ * {@link collectStyleWalk} leaves by design: a `.unit` holding a live specimen is excluded from
+ * the style walk entirely, so a specimen mounting a correctly-sized component behind a
+ * wrongly-sized `<iframe>` would score a perfect parity pass.
+ *
+ * INDEPENDENT ON PURPOSE. This measures the mounted component's OWN root — the first element
+ * child of `[data-primitive-lab-specimen]` — rather than the `.pl-specimen` wrapper `mount.js`'s
+ * `ResizeObserver` actually observes. Measuring the same element a defect's own report is built
+ * from would make this comparison agree with a wrong report by construction, which is exactly how
+ * a first version of this oracle scored 0 style differences while every one of 76 specimens
+ * rendered as a clipped, opaque black bar: the wrapper and the iframe agreed with each other, both
+ * wrongly, and nothing here checked either against the component actually mounted inside.
+ *
+ * @param {import('playwright').Browser} browser The launched browser.
+ * @param {string} baseUrl The lab server's own base URL.
+ * @returns {Promise<object[]>} One measurement per specimen iframe, shaped for
+ *   {@link evaluateSpecimens}.
+ */
+async function collectSpecimenMeasurements(browser, baseUrl) {
+  const page = await browser.newPage({ viewport: VIEWPORT });
+  await page.goto(`${baseUrl}${LAB_PAGE_PATH}`, {
+    waitUntil: 'load',
+    timeout: NAVIGATION_TIMEOUT_MS,
+  });
+  await page.waitForFunction(
+    (attribute) => globalThis.document.body.hasAttribute(attribute),
+    READY_ATTRIBUTE,
+    { timeout: READY_TIMEOUT_MS }
+  );
+  await page.evaluate(() => globalThis.document.fonts.ready);
+  await page.waitForTimeout(SETTLE_MS);
+
+  const iframeHandles = await page.$$(`iframe[${SPECIMEN_ATTRIBUTE}]`);
+  const measurements = [];
+  for (const iframeHandle of iframeHandles) {
+    const path = (await iframeHandle.getAttribute(SPECIMEN_ATTRIBUTE)) ?? '(unknown path)';
+    const outerBox = await iframeHandle.boundingBox();
+    const frame = await iframeHandle.contentFrame();
+    const inner = frame
+      ? await frame.evaluate(() => {
+          // The literal, not an interpolation of `SPECIMEN_ATTRIBUTE` — this body runs inside the
+          // specimen's own document, a different realm from the constant above, so composing the
+          // selector here rather than passing it in keeps `unicorn/require-css-escape` honest
+          // about there being nothing dynamic in it.
+          const root = globalThis.document.querySelector('[data-primitive-lab-specimen]');
+          const kid = root?.firstElementChild ?? null;
+          const rect = kid?.getBoundingClientRect();
+          return {
+            mounted: Boolean(kid),
+            width: rect ? rect.width : 0,
+            height: rect ? rect.height : 0,
+            backgroundColor: globalThis.getComputedStyle(globalThis.document.body).backgroundColor,
+          };
+        })
+      : { mounted: false, width: 0, height: 0, backgroundColor: '' };
+    measurements.push({
+      path,
+      mounted: inner.mounted,
+      frameWidth: outerBox ? outerBox.width : 0,
+      frameHeight: outerBox ? outerBox.height : 0,
+      contentWidth: inner.width,
+      contentHeight: inner.height,
+      backgroundColor: inner.backgroundColor,
+    });
+  }
+
+  await page.close();
+  return measurements;
+}
+
 async function run() {
   const cache = resolveChromeCache(ROOT);
   if (!cache) throw new Error(missingChromeMessage(ROOT));
@@ -168,16 +247,19 @@ async function run() {
   try {
     const reference = await snapshot(browser, pathToFileURL(REFERENCE_PATH).href, false);
     const lab = await snapshot(browser, `${server.baseUrl}${LAB_PAGE_PATH}`, true);
+    const specimenMeasurements = await collectSpecimenMeasurements(browser, server.baseUrl);
 
     const { compared, diffs, missing } = diffSnapshots({ reference, lab });
+    const specimens = evaluateSpecimens(specimenMeasurements);
     const report = formatParityReport({
       referenceCount: reference.length,
       compared,
       missingCount: missing.length,
       diffs,
+      specimens,
     });
     console.log(report);
-    if (diffs.length > 0) process.exitCode = 1;
+    if (diffs.length > 0 || specimens.problems.length > 0) process.exitCode = 1;
   } finally {
     await browser.close();
     await server.close();
