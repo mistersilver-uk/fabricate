@@ -24,6 +24,7 @@ this programme has already measured what happens to those.
 | `cap`     | no       | A `.unit` caption in that entry, decoded and whitespace-collapsed — `"page 38 · the header pair only"`. It scopes `draws` to that one unit, which is what makes a caption like `"disabled"` unambiguous. Omit it to scope to the whole entry, for a specimen group the library drew with no `.unit` wrapper — `<Field>`'s six labelled columns are the only such group today. |
 | `draws`   | yes      | A CSS selector for the hand-drawn element this row replaces, evaluated inside the scope above. Usually a kit class: `.k-btn`, `.k-step`, `.k-tog`, `.k-cb`, `.k-seg`.                                                                                                                                                                                                         |
 | `path`    | yes      | Repository-relative POSIX path to the component, exactly as `scripts/lib/designSystemPrimitives.json` and a `git diff` write it. Also the identity `npm run lab:check` compares the page against.                                                                                                                                                                             |
+| `slot`    | no       | `{width?, height?}`, in CSS px. Present at all, the slot's window subtree generates real BOXES at that size rather than `display: contents`. Omit it unless the specimen needs a containing block or a query container — an overlay, or a panel that restyles at a breakpoint. See below.                                                                                     |
 | `props`   | no       | A plain object, passed to the component verbatim. Plain JSON only — no functions, no state, no knobs.                                                                                                                                                                                                                                                                         |
 | `content` | no       | The `children` snippet, as a node array. See below.                                                                                                                                                                                                                                                                                                                           |
 
@@ -53,6 +54,56 @@ specimen to another caption fails loudly on the next page load, naming both
 numbers.
 The alternative is a page that silently draws three live buttons and one drawing
 with nothing saying which is which, which is worse than no page at all.
+
+## `slot` — when a specimen needs a real box
+
+By default a slot's window subtree is `display: contents`: the elements are in
+the DOM and in the inheritance chain, but they generate no boxes, so the
+component's own root is what the library's layout lays out and a live control
+stands exactly where the drawing stood.
+That is right for a control, and it is wrong for two kinds of specimen.
+
+An element with no principal box is **not a containing block** and is **not a
+query container**.
+`src/ui/svelte/util/overlayHost.js` portals an overlay to the nearest
+`.fabricate-manager` and measures its coordinate origin from that same element,
+so a popover in a default slot is appended to a host that does not contain it
+and positioned against a 0x0 rect — it renders, byte-identically, somewhere else
+on the page.
+`styles/fabricate.css` puts `container-type: inline-size` on `.fabricate-manager`
+and the shipped breakpoints resolve against it, so in a default slot none of them
+can fire.
+
+A row that needs either states the box it needs:
+
+```json
+"slot": { "height": 320 }
+```
+
+Both keys are optional and both are CSS pixels; an unrecognised key is refused
+rather than ignored.
+An omitted dimension is taken from the library's own layout, which is usually
+what you want for `width` — the `<SearchPopover>` units carry `width: 300px` in
+`library.html`, and a row restating that number would be a copy that can drift.
+An omitted `height` is almost always wrong for an overlay: `.fabricate-manager`
+carries `overflow: clip`, so a slot only as tall as its trigger swallows the
+panel the row exists to show.
+
+**The box cannot be shrink-wrapped, and this is not a limitation of the lab.**
+An inline-size container is sized as if it had no contents, so a boxed slot left
+to take its width from its specimen measures zero and collapses its `.unit` with
+it.
+The page re-reads every boxed slot after layout and reports one that came out
+zero, so this fails loudly rather than rendering a specimen that is merely
+missing.
+
+What a boxed slot reproduces is the window's **box**, not its **chrome**:
+position, size, containment, `overflow`, the manager's grid and its own surface
+are production's declarations untouched, while the border, radius, shadow and
+window `z-index` that draw a floating window are dropped.
+And it is exactly as big as the row said, so a breakpoint answer or a flip
+decision read off the page is an answer for that box and not for the manager's
+real content width.
 
 ## `content` — what a call site puts inside
 

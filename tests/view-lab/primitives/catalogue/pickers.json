@@ -1,0 +1,43 @@
+[
+  {
+    "spec": "<SearchPopover>",
+    "cap": "list form",
+    "draws": ":scope > div",
+    "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
+    "slot": { "height": 320 },
+    "props": {
+      "open": true,
+      "value": "steel-ingot",
+      "triggerClass": "manager-travel-picker-trigger",
+      "triggerIcon": "fas fa-hammer",
+      "triggerLabel": "Steel Ingot",
+      "triggerAriaLabel": "Choose a component",
+      "dialogAriaLabel": "Choose a component",
+      "searchAriaLabel": "Search components",
+      "searchPlaceholder": "Search components",
+      "popoverTitle": "Components",
+      "showFilteredCount": true,
+      "filteredCountTemplate": "{matched} of {total}",
+      "options": [
+        {
+          "id": "steel-ingot",
+          "label": "Steel Ingot",
+          "meta": "Metal · #Refined",
+          "icon": "fas fa-hammer"
+        },
+        {
+          "id": "iron-ingot",
+          "label": "Iron Ingot",
+          "meta": "Metal · #Raw",
+          "icon": "fas fa-hammer"
+        },
+        {
+          "id": "ingotwort-oil",
+          "label": "Ingotwort Oil",
+          "meta": "Reagent · #Alchemy",
+          "icon": "fas fa-flask"
+        }
+      ]
+    }
+  }
+]

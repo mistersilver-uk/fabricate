@@ -1,5 +1,5 @@
 /*
- * The Primitive Lab's own chrome — all four rules of it.
+ * The Primitive Lab's own chrome — all six rules of it.
  *
  * The page draws nothing for itself. Its layout, its type, its palette and every one of its
  * surfaces come from `openspec/specs/design-system/library.html`, injected at load time by
@@ -14,14 +14,17 @@
  */
 
 /* ─────────────────────────────────────────────────────────────────────────────────────────────
- * THE LIVE SLOT, AND THE ONE DISCLOSED FIDELITY DEVIATION ON THIS PAGE.
+ * THE LIVE SLOT HAS TWO SHAPES, AND A ROW CHOOSES BETWEEN THEM BY WHAT IT NEEDS.
  *
  * A specimen has to be painted the way production paints it, which means it has to sit inside
  * `.application.fabricate.crafting-system-manager > .window-content > .fabricate-manager` — see
  * the block comment in `mount.js` for the four things a bare root loses against the harvested
- * chrome, none of which announces itself.
+ * chrome, none of which announces itself. Both shapes below carry all four elements. What differs
+ * is whether they generate BOXES.
  *
- * But `.application` is a WINDOW: `foundry2.css:6985` gives it `position: absolute`, a 200px
+ * ── THE DEFAULT SLOT GENERATES NONE ──────────────────────────────────────────────────────────
+ *
+ * `.application` is a WINDOW: `foundry2.css:6985` gives it `position: absolute`, a 200px
  * `min-width`, a `min-height`, a 1px border, a 6px radius, a `0 0 10px #000` shadow and
  * `overflow: hidden`, and `.window-content` adds `var(--spacer-16)` of padding. Nested inside a
  * library `.unit` — which is a caption above a row of bare controls — that draws a bordered,
@@ -35,22 +38,78 @@
  * component's own root becomes the element the library's layout lays out, which is what puts a
  * live control precisely where the drawing it replaced stood.
  *
- * WHAT IT COSTS, stated rather than discovered later: an element with no principal box is not a
- * containing block and is not a query container. `.application` therefore does not position an
- * overlay (`src/ui/svelte/util/overlayHost.js` lists it as an overlay host BECAUSE it is
- * positioned) and `.fabricate-manager`'s `container-type: inline-size` does not fire, so its
- * 1320px / 1120px / 680px breakpoints are unreachable here. Neither is judgeable from this page,
- * and no Controls entry reaches either. A future entry that does — a popover, a panel that
- * restyles at a breakpoint — needs a real box and therefore a different slot, not a wider
- * exception to this rule.
+ * ── AND A BOXED SLOT IS THE SAME SUBTREE AT A SIZE THE ROW DECLARES ──────────────────────────
+ *
+ * An element with no principal box is not a containing block and is not a query container, so the
+ * default slot cannot carry a specimen that needs either:
+ *
+ *   - `src/ui/svelte/util/overlayHost.js` portals an overlay to the nearest `.fabricate-manager`
+ *     or `.fabricate-app` AND measures its coordinate origin from that same element. With no box
+ *     the portal target holds a `position: absolute` panel it does not contain, and the origin
+ *     rect reads 0×0 — so the panel's `left`/`top` are viewport numbers resolved against the
+ *     initial containing block, and it lands somewhere else entirely. Measured on this page: the
+ *     `<SearchPopover>` panel drew 7300px above its own trigger.
+ *   - `styles/fabricate.css:1439` declares `container-type: inline-size` on `.fabricate-manager`,
+ *     and the shipped 1320 / 1120 / 960 / 900 / 831 / 680 breakpoints resolve against it. With no
+ *     box there is no container, so every one of them is unreachable.
+ *
+ * THE BOX HAS TO BE DECLARED, NOT SHRINK-WRAPPED, and the reason is the query container itself.
+ * `container-type: inline-size` applies inline-size CONTAINMENT: the element's own width is
+ * computed as if it had no contents. A boxed slot left to size itself from its specimen therefore
+ * measures zero and takes its `.unit` down with it — measured on this page, the `<SearchPopover>`
+ * unit collapsed from 300px to 63px, the width of its caption. A query container's inline size
+ * arrives from outside or it does not arrive; that is what makes container queries answerable at
+ * all, and it is why `slot.js` re-reads the box after layout and reports one that came out zero.
+ *
+ * WHAT A BOXED SLOT REPRODUCES IS THE WINDOW'S BOX, NOT THE WINDOW'S CHROME. Position, size,
+ * containment, containing block, `overflow`, the manager's own grid and its `--fab-bg-1` surface
+ * are all production's own declarations, untouched. The four that draw a floating window — border,
+ * radius, shadow, and the `--background` fill behind a manager that covers it — are dropped, along
+ * with the window `z-index` that would otherwise stack a specimen over the library's rail. A
+ * specimen is a pane excerpt on a reference page, not a window on a desktop.
+ *
+ * WHAT IT STILL DOES NOT REPRODUCE: a boxed slot is as tall and as wide as its row said, so a
+ * breakpoint answer or a flip/clamp decision read off this page is an answer for THAT box. It is
+ * not the manager's real 758px content width, and nothing here is evidence about how a panel
+ * behaves at a size no row declared.
  *
  * Written unlayered, so it beats `foundry2.css` (which is layered end to end), and keyed on
  * classes only this page writes.
  * ───────────────────────────────────────────────────────────────────────────────────────────── */
 .pl-live,
-.pl-live .application,
-.pl-live .window-content,
-.pl-live .fabricate-manager,
 .pl-live .pl-specimen {
   display: contents;
+}
+
+.pl-live:not(.pl-boxed) .application,
+.pl-live:not(.pl-boxed) .window-content,
+.pl-live:not(.pl-boxed) .fabricate-manager {
+  display: contents;
+}
+
+.pl-live.pl-boxed .application {
+  /* `slot.js` writes these two, and only for a dimension the row stated. The `auto` fallback is
+     what lets a row take a width from the library's own layout — the `<SearchPopover>` units
+     carry `width: 300px` in the file — instead of restating a number that would then be a copy. */
+  inline-size: var(--pl-slot-inline-size, auto);
+  block-size: var(--pl-slot-block-size, auto);
+
+  /* The declared box is the box, in every layout the slot can land in: `flex: none` stops a
+     `.stage` row or a `.unit` column from shrinking it, and core's `min-width: 200px` /
+     `min-height: calc(var(--header-height) + 1rem)` are window minima, not specimen minima. */
+  flex: none;
+  min-inline-size: 0;
+  min-block-size: 0;
+
+  /* `relative`, not core's `absolute`: the slot is laid out where the drawing was, and it is the
+     `.fabricate-manager` inside it that has to be the overlay's containing block. `z-index: auto`
+     because core's is `var(--z-index-window)`. */
+  position: relative;
+  z-index: auto;
+
+  /* The window's chrome, and nothing else. See the header. */
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }

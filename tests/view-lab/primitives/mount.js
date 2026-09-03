@@ -51,8 +51,8 @@
  * ── WHY EACH LIVE SLOT CARRIES A PRODUCTION WINDOW SUBTREE THAT DRAWS NOTHING ─────────────────
  *
  * Every slot is `.application.fabricate.crafting-system-manager > section.window-content >
- * .fabricate-manager`, and `page.css` gives all three `display: contents`. That is not ceremony:
- * each one supplies something a bare root loses, silently, against the harvested 14.365 chrome.
+ * .fabricate-manager`. That is not ceremony: each one supplies something a bare root loses,
+ * silently, against the harvested 14.365 chrome.
  *
  *   - `foundry2.css:6997` — `.application { font-size: var(--font-size-14) }`, against
  *     `foundry2.css:13936`'s `body { font-size: var(--font-size-15) }`. Without it every unsized
@@ -70,12 +70,12 @@
  *     rather than on the document (`applyFabricateTheme()` writes the document root and would
  *     repaint the whole page).
  *
- * `display: contents` is the disclosed deviation, and it buys the one thing the plinth version of
- * this page could not have: a specimen that sits in the library's own dense layout with no window
- * chrome around it. What it costs is stated rather than hidden — the frame is no longer a
- * containing block (`overlayHost.js` relies on `.application` being positioned) and
- * `.fabricate-manager` is no longer a query container, so an overlay or a container-query breakpoint
- * cannot be judged from this page. No Controls entry reaches either.
+ * WHETHER THOSE FOUR ELEMENTS GENERATE BOXES IS THE ROW'S CHOICE, and it is the only choice a row
+ * gets about its slot. By default they do not (`display: contents`), which is what puts a live
+ * control in the library's own dense layout with no window chrome around it. A row that declares a
+ * `slot` box gets the same subtree drawing real boxes at the size it states, which is what an
+ * overlay or a container query needs. `slot.js` owns both shapes and `page.css` states, with the
+ * measurement behind it, why the default cannot simply be widened to cover the second.
  */
 import { mount } from 'svelte';
 
@@ -90,6 +90,7 @@ import { loadComponent } from './importers.js';
 import { resolveSlots } from './inject.js';
 import { LIVE_CLASS, PAGE_CLASS, readLibrary } from './library.js';
 import LiveSpecimen from './LiveSpecimen.svelte';
+import { createLiveSlot, describeCollapsedSlot } from './slot.js';
 
 const MOUNTED_ATTRIBUTE = 'data-primitive-lab-mounted';
 const READY_ATTRIBUTE = 'data-primitive-lab-ready';
@@ -210,25 +211,28 @@ function renderLibrary(library) {
   while (library.body.firstChild) document.body.append(document.adoptNode(library.body.firstChild));
 }
 
+/** The frame chrome every slot carries, passed to `slot.js` rather than imported by it. */
+const SLOT_CHROME = Object.freeze({
+  liveClass: LIVE_CLASS,
+  themeAttribute: FABRICATE_THEME_ATTRIBUTE,
+  themeId: FABRICATE_THEME_IDS.FABRICATE,
+});
+
 /**
- * Build one live slot: the production window subtree, ready for a specimen.
+ * Build one row's slot, reporting a bad `slot` declaration as a row defect.
  *
- * @returns {{live: HTMLElement, root: HTMLElement}} The slot, and the element to mount into.
+ * @param {object} row A catalogue row.
+ * @param {string[]} problems The collector.
+ * @returns {{live: HTMLElement, root: HTMLElement, boxed: boolean}|null} The slot, or null when
+ *   the row declared a box this page cannot build.
  */
-function createLiveSlot() {
-  const live = document.createElement('div');
-  live.className = LIVE_CLASS;
-  const frame = document.createElement('div');
-  frame.className = 'application fabricate crafting-system-manager';
-  frame.setAttribute(FABRICATE_THEME_ATTRIBUTE, FABRICATE_THEME_IDS.FABRICATE);
-  const content = document.createElement('section');
-  content.className = 'window-content';
-  const root = document.createElement('div');
-  root.className = 'fabricate-manager';
-  content.append(root);
-  frame.append(content);
-  live.append(frame);
-  return { live, root };
+function toSlotElements(row, problems) {
+  try {
+    return createLiveSlot(row, SLOT_CHROME);
+  } catch (error) {
+    problems.push(`${row.spec} / ${row.path}: ${String(error?.message ?? error)}`);
+    return null;
+  }
 }
 
 /**
@@ -276,13 +280,15 @@ async function boot() {
   );
 
   let mounted = 0;
+  const boxed = [];
   for (const slot of slots) {
     const component = components.get(slot);
     if (!component) continue;
-    const { live, root } = createLiveSlot();
-    slot.host.replaceWith(live);
+    const elements = toSlotElements(slot.row, problems);
+    if (!elements) continue;
+    slot.host.replaceWith(elements.live);
     mount(LiveSpecimen, {
-      target: root,
+      target: elements.root,
       props: {
         path: slot.row.path,
         component,
@@ -290,7 +296,16 @@ async function boot() {
         content: slot.row.content ?? null,
       },
     });
+    if (elements.boxed) boxed.push({ row: slot.row, root: elements.root });
     mounted += 1;
+  }
+
+  // AFTER every slot is in the document, so one layout answers for all of them rather than each
+  // measurement forcing its own. A boxed slot is the only kind that can fail this way, and it
+  // fails invisibly: see `describeCollapsedSlot`.
+  for (const slot of boxed) {
+    const problem = describeCollapsedSlot(slot.row, slot.root);
+    if (problem) problems.push(problem);
   }
 
   publishReport({ mounted, problems });
