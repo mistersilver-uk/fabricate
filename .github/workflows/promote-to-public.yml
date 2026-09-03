@@ -612,18 +612,18 @@ jobs:
           VERIFIED=$(jq -r '.compatibility.verified // ""' "$MODJSON")
           MAX=$(jq -r '.compatibility.maximum // ""' "$MODJSON")
 
-          # The ARTEFACT is the source of truth for the version the registry advertises, so the string
-          # Foundry offers and the string an installed module.json reports cannot drift. They must
-          # not: `isNewerVersion` is NOT semver — it compares part-wise and falls back to a string
-          # compare when either part is non-numeric, so an advertised `v1.9.3` against an installed
-          # `1.9.3` compares `v1` with `1` as strings, reads as permanently newer, and becomes a
-          # perpetual update prompt.
+          # The published manifest carries the BARE version, as every working release has: v1.2.1's
+          # module.json says `1.2.1` while its Foundry listing reads `v1.2.1`. So the artefact and the
+          # requested version are the same string and this is a literal identity check again.
           #
-          # This guard still establishes exactly what it always did — this artefact IS the version
-          # being promoted — while staying agnostic about the prefix, so the release line can start
-          # carrying one without a lockstep change here. `VERSION` is bare by contract, validated
-          # against `^[0-9]+\.[0-9]+\.[0-9]+$` in job 1, so only the built side needs normalising.
-          if [ "${BUILT_VERSION#v}" != "$VERSION" ]; then
+          # The `v` is PRESENTATION, and it belongs in exactly one place — the registry payload's
+          # `version` field below, which is what the package listing renders. Issue 1407 put it in
+          # module.json instead, and issue 1457 then made this payload read the artefact rather than
+          # construct the display string, which coupled the two: `release-s3.js` compares the built
+          # manifest against the requested version, so every publish after that refused with
+          # `version mismatch: requested 1.9.3 built v1.9.3`. Do not re-derive this field from the
+          # artefact.
+          if [ "$BUILT_VERSION" != "$VERSION" ]; then
             echo "::error::artefact version '$BUILT_VERSION' does not match the version being promoted '$VERSION'."
             exit 1
           fi
@@ -651,7 +651,7 @@ jobs:
 
           jq -n \
             --arg id "$ID" \
-            --arg version "$BUILT_VERSION" \
+            --arg version "v${VERSION}" \
             --arg manifest "$MANIFEST" \
             --arg notes "$NOTES" \
             --argjson compatibility "$COMPAT" \
