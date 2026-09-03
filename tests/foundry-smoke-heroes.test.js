@@ -75,7 +75,7 @@ test('the smoke world seeds a restricted-visibility system so the recipe access 
   assert.match(
     smokeRunSource,
     /observerUser\.update\(\{ character: travelMember\.id \}\)/,
-    "a seeded PLAYER user must have an assigned character, or the rail's assigned-controller route has no fixture"
+    'a seeded PLAYER user must have an assigned character, or the rail\'s assigned-controller route has no fixture'
   );
   assert.match(
     smokeRunSource,
@@ -86,9 +86,7 @@ test('the smoke world seeds a restricted-visibility system so the recipe access 
 
 test('the restricted-rail capture reuses the shared smoke helpers instead of a fresh open/assert span', () => {
   const captureBlock = smokeRunSource.slice(
-    smokeRunSource.indexOf(
-      'await openManagerRecipeEditor(page, craftingSetup.restrictedRecipeName);'
-    ),
+    smokeRunSource.indexOf("await openManagerRecipeEditor(page, craftingSetup.restrictedRecipeName);"),
     smokeRunSource.indexOf("label: 'manager-recipe-edit-access-rail'")
   );
   assert.ok(captureBlock.length > 0, 'expected to find the restricted-rail capture block');

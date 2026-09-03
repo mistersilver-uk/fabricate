@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   GATHERING_RUN_HISTORY_LIMIT,
   GatheringRunManager,
-  GatheringRunManagerError,
+  GatheringRunManagerError
 } from '../src/systems/GatheringRunManager.js';
 
 class FakeActor {
@@ -70,7 +70,7 @@ function manager(options = {}) {
     nowWorldTime: () => 1000,
     getUserId: () => 'user-1',
     getActors: () => [],
-    ...options,
+    ...options
   });
 }
 
@@ -79,7 +79,7 @@ function runData(overrides = {}) {
     craftingSystemId: 'system-1',
     environmentId: 'env-1',
     taskId: 'task-1',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -92,7 +92,7 @@ test('GatheringRunManager writes canonical gatheringRuns flag path only', async 
   assert.ok(actor.flags.fabricate.gatheringRuns);
   assert.equal(actor.flags.fabricate.fabricate, undefined);
   assert.deepEqual(
-    actor.setFlagCalls.map((call) => [call.namespace, call.key]),
+    actor.setFlagCalls.map(call => [call.namespace, call.key]),
     [['fabricate', 'gatheringRuns']]
   );
 });
@@ -113,7 +113,7 @@ test('GatheringRunManager normalizes missing and malformed containers', () => {
           status: 'waitingTime',
           startedAtWorldTime: 10,
           updatedAtWorldTime: 20,
-          unknown: true,
+          unknown: true
         },
         duplicateNew: {
           id: 'new',
@@ -125,37 +125,35 @@ test('GatheringRunManager normalizes missing and malformed containers', () => {
           status: 'inProgress',
           startedAtWorldTime: 30,
           updatedAtWorldTime: 40,
-          blindLabel: 'Secret Spring',
+          blindLabel: 'Secret Spring'
         },
         terminalInActive: {
           id: 'terminal',
           craftingSystemId: 'system-1',
           environmentId: 'env-1',
           taskId: 'task-2',
-          status: 'succeeded',
-        },
+          status: 'succeeded'
+        }
       },
-      history: 'not an array',
-    },
+      history: 'not an array'
+    }
   };
 
   const runs = manager();
 
-  assert.deepEqual(runs.getActiveRuns(actor), [
-    {
-      id: 'new',
-      actorUuid: actor.uuid,
-      userId: 'user-1',
-      craftingSystemId: 'system-1',
-      environmentId: 'env-1',
-      taskId: 'task-1',
-      status: 'inProgress',
-      startedAtWorldTime: 30,
-      updatedAtWorldTime: 40,
-      usedTools: [],
-      createdResults: [],
-    },
-  ]);
+  assert.deepEqual(runs.getActiveRuns(actor), [{
+    id: 'new',
+    actorUuid: actor.uuid,
+    userId: 'user-1',
+    craftingSystemId: 'system-1',
+    environmentId: 'env-1',
+    taskId: 'task-1',
+    status: 'inProgress',
+    startedAtWorldTime: 30,
+    updatedAtWorldTime: 40,
+    usedTools: [],
+    createdResults: []
+  }]);
   assert.deepEqual(runs.getRunHistory(actor), []);
 
   const emptyActor = new FakeActor('Empty');
@@ -167,27 +165,15 @@ test('GatheringRunManager creates active runs with only canonical fields', async
   const actor = new FakeActor();
   const runs = manager();
 
-  const run = await runs.createRun(
-    actor,
-    runData({
-      id: 'caller-id',
-      taskName: 'Hidden Task',
-      blindLabel: 'Generic Gather',
-      environmentSnapshot: { name: 'Snapshot' },
-      checkResult: { total: 18, leaked: 'allowed because checkResult is opaque' },
-      usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1, label: 'Tool' }],
-      createdResults: [
-        {
-          actorUuid: actor.uuid,
-          itemUuid: 'Item.herb',
-          quantity: 2,
-          name: 'Herb',
-          img: 'icons/herb.webp',
-          leaked: 'dropped',
-        },
-      ],
-    })
-  );
+  const run = await runs.createRun(actor, runData({
+    id: 'caller-id',
+    taskName: 'Hidden Task',
+    blindLabel: 'Generic Gather',
+    environmentSnapshot: { name: 'Snapshot' },
+    checkResult: { total: 18, leaked: 'allowed because checkResult is opaque' },
+    usedTools: [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1, label: 'Tool' }],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 2, name: 'Herb', img: 'icons/herb.webp', leaked: 'dropped' }]
+  }));
 
   assert.deepEqual(Object.keys(run), [
     'id',
@@ -201,7 +187,7 @@ test('GatheringRunManager creates active runs with only canonical fields', async
     'updatedAtWorldTime',
     'checkResult',
     'usedTools',
-    'createdResults',
+    'createdResults'
   ]);
   assert.equal(run.id, 'run-1');
   assert.equal(run.status, 'inProgress');
@@ -209,13 +195,7 @@ test('GatheringRunManager creates active runs with only canonical fields', async
   // name/img are canonical display fields for created results (for the run journal);
   // other extras (e.g. `leaked`) are still stripped.
   assert.deepEqual(run.createdResults, [
-    {
-      actorUuid: actor.uuid,
-      itemUuid: 'Item.herb',
-      quantity: 2,
-      name: 'Herb',
-      img: 'icons/herb.webp',
-    },
+    { actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 2, name: 'Herb', img: 'icons/herb.webp' }
   ]);
   assert.equal('blindLabel' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
   assert.equal('environmentSnapshot' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
@@ -225,7 +205,10 @@ test('GatheringRunManager rejects persistence failures without dirtying the cach
   const actor = new RejectingActor();
   const runs = manager();
 
-  await assert.rejects(() => runs.createRun(actor, runData()), /setFlag failed/);
+  await assert.rejects(
+    () => runs.createRun(actor, runData()),
+    /setFlag failed/
+  );
 
   assert.equal(actor.flags.fabricate, undefined);
   assert.deepEqual(runs.getActiveRuns(actor), []);
@@ -239,7 +222,7 @@ test('GatheringRunManager blocks duplicate active runs for one task', async () =
 
   await assert.rejects(
     () => runs.createRun(actor, runData({ environmentId: 'env-2' })),
-    (error) => error instanceof GatheringRunManagerError && error.code === 'DUPLICATE_ACTIVE_TASK'
+    error => error instanceof GatheringRunManagerError && error.code === 'DUPLICATE_ACTIVE_TASK'
   );
 
   assert.equal(runs.getActiveRuns(actor).length, 1);
@@ -252,7 +235,7 @@ test('GatheringRunManager blocks duplicate active runs using trimmed task IDs', 
 
   await assert.rejects(
     () => runs.createRun(actor, runData({ taskId: ' task-trimmed ' })),
-    (error) => error instanceof GatheringRunManagerError && error.code === 'DUPLICATE_ACTIVE_TASK'
+    error => error instanceof GatheringRunManagerError && error.code === 'DUPLICATE_ACTIVE_TASK'
   );
 });
 
@@ -262,7 +245,7 @@ test('GatheringRunManager rejects waitingTime active runs without a valid time g
 
   await assert.rejects(
     () => runs.createRun(actor, runData({ status: 'waitingTime' })),
-    (error) => error instanceof GatheringRunManagerError && error.code === 'INVALID_TIME_GATE'
+    error => error instanceof GatheringRunManagerError && error.code === 'INVALID_TIME_GATE'
   );
 
   assert.deepEqual(runs.getActiveRuns(actor), []);
@@ -282,11 +265,11 @@ test('GatheringRunManager drops persisted waitingTime active records without a v
           taskId: 'task-waiting',
           status: 'waitingTime',
           startedAtWorldTime: 10,
-          updatedAtWorldTime: 20,
-        },
+          updatedAtWorldTime: 20
+        }
       },
-      history: [],
-    },
+      history: []
+    }
   };
   const runs = manager();
 
@@ -298,20 +281,17 @@ test('GatheringRunManager drops persisted waitingTime active records without a v
 test('GatheringRunManager keeps terminal identity refs from the active run', async () => {
   const actor = new FakeActor();
   const runs = manager();
-  const run = await runs.createRun(
-    actor,
-    runData({
-      craftingSystemId: 'system-original',
-      environmentId: 'env-original',
-      taskId: 'task-original',
-    })
-  );
+  const run = await runs.createRun(actor, runData({
+    craftingSystemId: 'system-original',
+    environmentId: 'env-original',
+    taskId: 'task-original'
+  }));
 
   const completed = await runs.completeRun(actor, run, 'succeeded', {
     craftingSystemId: 'system-conflicting',
     environmentId: 'env-conflicting',
     taskId: 'task-conflicting',
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 1 }],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 1 }]
   });
 
   assert.equal(completed.craftingSystemId, 'system-original');
@@ -327,18 +307,15 @@ test('GatheringRunManager clears created results for failed and cancelled comple
   const cancelledRun = await runs.createRun(actor, runData({ taskId: 'task-cancelled' }));
 
   const failed = await runs.completeRun(actor, failedRun, 'failed', {
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 1 }],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 1 }]
   });
   const cancelled = await runs.completeRun(actor, cancelledRun, 'cancelled', {
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }]
   });
 
   assert.deepEqual(failed.createdResults, []);
   assert.deepEqual(cancelled.createdResults, []);
-  assert.deepEqual(
-    runs.getRunHistory(actor).map((run) => run.createdResults),
-    [[], []]
-  );
+  assert.deepEqual(runs.getRunHistory(actor).map(run => run.createdResults), [[], []]);
 });
 
 test('GatheringRunManager preserves waiting time gates on completion and cancellation', async () => {
@@ -348,57 +325,39 @@ test('GatheringRunManager preserves waiting time gates on completion and cancell
   const expectedGate = {
     requiredSeconds: 2700,
     availableAt: 3700,
-    initiatedAt: 1000,
+    initiatedAt: 1000
   };
 
-  const completedRun = await runs.createWaitingRun(
-    actor,
-    runData({ taskId: 'task-complete' }),
-    timeRequirement
-  );
-  const cancelledRun = await runs.createWaitingRun(
-    actor,
-    runData({ taskId: 'task-cancel' }),
-    timeRequirement
-  );
+  const completedRun = await runs.createWaitingRun(actor, runData({ taskId: 'task-complete' }), timeRequirement);
+  const cancelledRun = await runs.createWaitingRun(actor, runData({ taskId: 'task-cancel' }), timeRequirement);
 
   const completed = await runs.completeRun(actor, completedRun, 'succeeded');
   const cancelled = await runs.cancelRun(actor, cancelledRun.id);
 
   assert.deepEqual(completed.timeGate, expectedGate);
   assert.deepEqual(cancelled.timeGate, expectedGate);
-  assert.deepEqual(
-    runs.getRunHistory(actor).map((run) => run.timeGate),
-    [expectedGate, expectedGate]
-  );
+  assert.deepEqual(runs.getRunHistory(actor).map(run => run.timeGate), [expectedGate, expectedGate]);
 });
 
 test('GatheringRunManager drops malformed run item refs', async () => {
   const actor = new FakeActor();
   const runs = manager();
 
-  const run = await runs.createRun(
-    actor,
-    runData({
-      usedTools: [
-        { actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1 },
-        { actorUuid: actor.uuid, quantity: 1 },
-        { itemUuid: 'Item.missing-actor', quantity: 1 },
-      ],
-      createdResults: [
-        { actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2 },
-        { actorUuid: '', itemUuid: 'Item.invalid-result', quantity: 1 },
-        { actorUuid: actor.uuid, itemUuid: null, quantity: 1 },
-      ],
-    })
-  );
+  const run = await runs.createRun(actor, runData({
+    usedTools: [
+      { actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1 },
+      { actorUuid: actor.uuid, quantity: 1 },
+      { itemUuid: 'Item.missing-actor', quantity: 1 }
+    ],
+    createdResults: [
+      { actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2 },
+      { actorUuid: '', itemUuid: 'Item.invalid-result', quantity: 1 },
+      { actorUuid: actor.uuid, itemUuid: null, quantity: 1 }
+    ]
+  }));
 
-  assert.deepEqual(run.usedTools, [
-    { actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1 },
-  ]);
-  assert.deepEqual(run.createdResults, [
-    { actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2 },
-  ]);
+  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1 }]);
+  assert.deepEqual(run.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2 }]);
 });
 
 test('GatheringRunManager creates terminal history directly for immediate attempts', async () => {
@@ -407,33 +366,23 @@ test('GatheringRunManager creates terminal history directly for immediate attemp
   let id = 0;
   const runs = manager({
     randomID: () => `terminal-${++id}`,
-    nowWorldTime: () => worldTime,
+    nowWorldTime: () => worldTime
   });
 
-  const succeeded = await runs.createTerminalRun(
-    actor,
-    runData({ taskId: 'task-success' }),
-    'succeeded',
-    {
-      createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3 }],
-    }
-  );
+  const succeeded = await runs.createTerminalRun(actor, runData({ taskId: 'task-success' }), 'succeeded', {
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3 }]
+  });
   worldTime += 10;
   const failed = await runs.createTerminalRun(actor, runData({ taskId: 'task-failed' }), 'failed', {
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.should-drop', quantity: 1 }],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.should-drop', quantity: 1 }]
   });
 
   assert.equal(succeeded.status, 'succeeded');
-  assert.deepEqual(succeeded.createdResults, [
-    { actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3 },
-  ]);
+  assert.deepEqual(succeeded.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3 }]);
   assert.equal(failed.status, 'failed');
   assert.deepEqual(failed.createdResults, []);
   assert.deepEqual(runs.getActiveRuns(actor), []);
-  assert.deepEqual(
-    runs.getRunHistory(actor).map((run) => run.taskId),
-    ['task-failed', 'task-success']
-  );
+  assert.deepEqual(runs.getRunHistory(actor).map(run => run.taskId), ['task-failed', 'task-success']);
 });
 
 test('GatheringRunManager blocks direct terminal creation when the task is already active', async () => {
@@ -443,7 +392,7 @@ test('GatheringRunManager blocks direct terminal creation when the task is alrea
 
   await assert.rejects(
     () => runs.createTerminalRun(actor, runData({ taskId: ' task-active ' }), 'succeeded'),
-    (error) => error instanceof GatheringRunManagerError && error.code === 'DUPLICATE_ACTIVE_TASK'
+    error => error instanceof GatheringRunManagerError && error.code === 'DUPLICATE_ACTIVE_TASK'
   );
 
   assert.deepEqual(runs.getRunHistory(actor), []);
@@ -455,7 +404,7 @@ test('GatheringRunManager caps directly-created terminal history at 50', async (
   let id = 0;
   const runs = manager({
     randomID: () => `terminal-${++id}`,
-    nowWorldTime: () => worldTime,
+    nowWorldTime: () => worldTime
   });
 
   for (let index = 0; index < GATHERING_RUN_HISTORY_LIMIT + 1; index += 1) {
@@ -467,10 +416,7 @@ test('GatheringRunManager caps directly-created terminal history at 50', async (
   assert.equal(history.length, GATHERING_RUN_HISTORY_LIMIT);
   assert.equal(history[0].taskId, 'task-50');
   assert.equal(history.at(-1).taskId, 'task-1');
-  assert.equal(
-    history.some((run) => run.taskId === 'task-0'),
-    false
-  );
+  assert.equal(history.some(run => run.taskId === 'task-0'), false);
 });
 
 test('GatheringRunManager completes terminal runs newest-first and caps history at 50', async () => {
@@ -479,7 +425,7 @@ test('GatheringRunManager completes terminal runs newest-first and caps history 
   let id = 0;
   const runs = manager({
     randomID: () => `run-${++id}`,
-    nowWorldTime: () => worldTime,
+    nowWorldTime: () => worldTime
   });
 
   for (let index = 0; index < GATHERING_RUN_HISTORY_LIMIT + 1; index += 1) {
@@ -487,7 +433,7 @@ test('GatheringRunManager completes terminal runs newest-first and caps history 
     const run = await runs.createRun(actor, runData({ taskId: `task-${index}` }));
     worldTime += 1;
     await runs.completeRun(actor, run, index % 2 === 0 ? 'succeeded' : 'failed', {
-      createdResults: [{ actorUuid: actor.uuid, itemUuid: `Item.${index}`, quantity: 1 }],
+      createdResults: [{ actorUuid: actor.uuid, itemUuid: `Item.${index}`, quantity: 1 }]
     });
   }
 
@@ -496,11 +442,8 @@ test('GatheringRunManager completes terminal runs newest-first and caps history 
   assert.equal(history.length, GATHERING_RUN_HISTORY_LIMIT);
   assert.equal(history[0].taskId, 'task-50');
   assert.equal(history.at(-1).taskId, 'task-1');
-  assert.equal(
-    history.some((run) => run.taskId === 'task-0'),
-    false
-  );
-  assert.ok(history.every((run) => Number.isFinite(run.completedAtWorldTime)));
+  assert.equal(history.some(run => run.taskId === 'task-0'), false);
+  assert.ok(history.every(run => Number.isFinite(run.completedAtWorldTime)));
 });
 
 test('GatheringRunManager deletes completed active runs before replacing flags in Foundry-style merging updates', async () => {
@@ -514,9 +457,7 @@ test('GatheringRunManager deletes completed active runs before replacing flags i
   assert.equal(actor.flags.fabricate.gatheringRuns.history[0].taskId, 'task-time');
   assert.deepEqual(runs.getActiveRuns(actor), []);
   assert.ok(
-    actor.updateCalls.some((call) =>
-      Object.hasOwn(call, `flags.fabricate.gatheringRuns.active.-=${run.id}`)
-    ),
+    actor.updateCalls.some(call => Object.hasOwn(call, `flags.fabricate.gatheringRuns.active.-=${run.id}`)),
     'completed run should be explicitly deleted for merging Foundry flag updates'
   );
 });
@@ -531,7 +472,7 @@ test('GatheringRunManager waiting runs store normalized time gate fields', async
   assert.deepEqual(run.timeGate, {
     requiredSeconds: 5400,
     availableAt: 5900,
-    initiatedAt: 500,
+    initiatedAt: 500
   });
 });
 
@@ -542,30 +483,23 @@ test('GatheringRunManager returns only matured active waiting runs across actors
   let worldTime = 1000;
   const runs = manager({
     nowWorldTime: () => worldTime,
-    getActors: () => actors,
+    getActors: () => actors
   });
 
   const ready = await runs.createWaitingRun(actor, runData({ taskId: 'ready' }), { minutes: 1 });
-  const pending = await runs.createWaitingRun(actor, runData({ taskId: 'pending' }), {
-    minutes: 5,
-  });
-  const otherReady = await runs.createWaitingRun(otherActor, runData({ taskId: 'other-ready' }), {
-    minutes: 1,
-  });
+  const pending = await runs.createWaitingRun(actor, runData({ taskId: 'pending' }), { minutes: 5 });
+  const otherReady = await runs.createWaitingRun(otherActor, runData({ taskId: 'other-ready' }), { minutes: 1 });
 
   worldTime = 1060;
 
   assert.deepEqual(
-    runs.getMaturedWaitingRuns(worldTime).map((entry) => [entry.actor.uuid, entry.run.id]),
+    runs.getMaturedWaitingRuns(worldTime).map(entry => [entry.actor.uuid, entry.run.id]),
     [
       [actor.uuid, ready.id],
-      [otherActor.uuid, otherReady.id],
+      [otherActor.uuid, otherReady.id]
     ]
   );
-  assert.equal(
-    runs.getMaturedWaitingRuns(worldTime).some((entry) => entry.run.id === pending.id),
-    false
-  );
+  assert.equal(runs.getMaturedWaitingRuns(worldTime).some(entry => entry.run.id === pending.id), false);
 });
 
 test('GatheringRunManager clears an active run without writing terminal history', async () => {
@@ -587,57 +521,27 @@ test('GatheringRunManager cleanup by system, environment, and task removes match
   const actors = [actor, otherActor];
   const runs = manager({ getActors: () => actors });
 
-  const keep = await runs.createRun(
-    actor,
-    runData({ craftingSystemId: 'system-keep', environmentId: 'env-keep', taskId: 'task-keep' })
-  );
-  const bySystem = await runs.createRun(
-    actor,
-    runData({ craftingSystemId: 'system-delete', environmentId: 'env-a', taskId: 'task-a' })
-  );
+  const keep = await runs.createRun(actor, runData({ craftingSystemId: 'system-keep', environmentId: 'env-keep', taskId: 'task-keep' }));
+  const bySystem = await runs.createRun(actor, runData({ craftingSystemId: 'system-delete', environmentId: 'env-a', taskId: 'task-a' }));
   await runs.completeRun(actor, bySystem, 'succeeded');
-  await runs.createRun(
-    actor,
-    runData({ craftingSystemId: 'system-delete', environmentId: 'env-b', taskId: 'task-b' })
-  );
-  await runs.createRun(
-    otherActor,
-    runData({ craftingSystemId: 'system-keep', environmentId: 'env-delete', taskId: 'task-c' })
-  );
-  const byTaskHistory = await runs.createRun(
-    otherActor,
-    runData({ craftingSystemId: 'system-keep', environmentId: 'env-keep', taskId: 'task-delete' })
-  );
+  await runs.createRun(actor, runData({ craftingSystemId: 'system-delete', environmentId: 'env-b', taskId: 'task-b' }));
+  await runs.createRun(otherActor, runData({ craftingSystemId: 'system-keep', environmentId: 'env-delete', taskId: 'task-c' }));
+  const byTaskHistory = await runs.createRun(otherActor, runData({ craftingSystemId: 'system-keep', environmentId: 'env-keep', taskId: 'task-delete' }));
   await runs.completeRun(otherActor, byTaskHistory, 'cancelled');
 
   await runs.removeRunsForSystem('system-delete');
   assert.equal(runs.getActiveRun(actor, keep.id)?.taskId, 'task-keep');
-  assert.equal(
-    runs.getActiveRuns(actor).some((run) => run.craftingSystemId === 'system-delete'),
-    false
-  );
-  assert.equal(
-    runs.getRunHistory(actor).some((run) => run.craftingSystemId === 'system-delete'),
-    false
-  );
+  assert.equal(runs.getActiveRuns(actor).some(run => run.craftingSystemId === 'system-delete'), false);
+  assert.equal(runs.getRunHistory(actor).some(run => run.craftingSystemId === 'system-delete'), false);
 
   await runs.removeRunsForEnvironment('env-delete');
-  assert.equal(
-    runs.getActiveRuns(otherActor).some((run) => run.environmentId === 'env-delete'),
-    false
-  );
+  assert.equal(runs.getActiveRuns(otherActor).some(run => run.environmentId === 'env-delete'), false);
 
   await runs.removeRunsForTask('task-delete', { environmentId: 'env-other' });
-  assert.equal(
-    runs.getRunHistory(otherActor).some((run) => run.taskId === 'task-delete'),
-    true
-  );
+  assert.equal(runs.getRunHistory(otherActor).some(run => run.taskId === 'task-delete'), true);
 
   await runs.removeRunsForTask('task-delete', { environmentId: 'env-keep' });
-  assert.equal(
-    runs.getRunHistory(otherActor).some((run) => run.taskId === 'task-delete'),
-    false
-  );
+  assert.equal(runs.getRunHistory(otherActor).some(run => run.taskId === 'task-delete'), false);
   assert.equal(runs.getActiveRun(actor, keep.id)?.taskId, 'task-keep');
 });
 

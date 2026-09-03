@@ -4,11 +4,14 @@ import {
   DEFAULT_RECIPE_IMAGE,
   RECIPE_IMAGE_OPTIONS,
   normalizeRecipeImage,
-  filterRecipeImageOptions,
+  filterRecipeImageOptions
 } from '../../src/ui/svelte/util/recipeImageIcons.js';
 
 test('DEFAULT_RECIPE_IMAGE is the alchemical blueprint path', () => {
-  assert.equal(DEFAULT_RECIPE_IMAGE, 'icons/sundries/documents/blueprint-recipe-alchemical.webp');
+  assert.equal(
+    DEFAULT_RECIPE_IMAGE,
+    'icons/sundries/documents/blueprint-recipe-alchemical.webp'
+  );
 });
 
 test('RECIPE_IMAGE_OPTIONS has exactly 46 entries', () => {
@@ -21,22 +24,14 @@ test('RECIPE_IMAGE_OPTIONS is frozen', () => {
 
 test('every RECIPE_IMAGE_OPTIONS entry has a non-empty path string', () => {
   for (const entry of RECIPE_IMAGE_OPTIONS) {
-    assert.equal(
-      typeof entry.path,
-      'string',
-      `entry.path should be a string: ${JSON.stringify(entry)}`
-    );
+    assert.equal(typeof entry.path, 'string', `entry.path should be a string: ${JSON.stringify(entry)}`);
     assert.ok(entry.path.length > 0, `entry.path should be non-empty: ${JSON.stringify(entry)}`);
   }
 });
 
 test('every RECIPE_IMAGE_OPTIONS entry has a non-empty label string', () => {
   for (const entry of RECIPE_IMAGE_OPTIONS) {
-    assert.equal(
-      typeof entry.label,
-      'string',
-      `entry.label should be a string: ${JSON.stringify(entry)}`
-    );
+    assert.equal(typeof entry.label, 'string', `entry.label should be a string: ${JSON.stringify(entry)}`);
     assert.ok(entry.label.length > 0, `entry.label should be non-empty: ${JSON.stringify(entry)}`);
   }
 });
@@ -57,18 +52,18 @@ test('every RECIPE_IMAGE_OPTIONS path ends with .webp', () => {
 });
 
 test('labels are title-cased from filename', () => {
-  const anchor = RECIPE_IMAGE_OPTIONS.find((o) => o.path.includes('blueprint-anchor'));
+  const anchor = RECIPE_IMAGE_OPTIONS.find(o => o.path.includes('blueprint-anchor'));
   assert.ok(anchor, 'should have blueprint-anchor entry');
   assert.equal(anchor.label, 'Blueprint Anchor');
 });
 
 test('DEFAULT_RECIPE_IMAGE is present in RECIPE_IMAGE_OPTIONS', () => {
-  const found = RECIPE_IMAGE_OPTIONS.some((o) => o.path === DEFAULT_RECIPE_IMAGE);
+  const found = RECIPE_IMAGE_OPTIONS.some(o => o.path === DEFAULT_RECIPE_IMAGE);
   assert.ok(found, 'DEFAULT_RECIPE_IMAGE should be in RECIPE_IMAGE_OPTIONS');
 });
 
 test('all paths in RECIPE_IMAGE_OPTIONS are unique', () => {
-  const paths = RECIPE_IMAGE_OPTIONS.map((o) => o.path);
+  const paths = RECIPE_IMAGE_OPTIONS.map(o => o.path);
   const uniquePaths = new Set(paths);
   assert.equal(uniquePaths.size, paths.length, 'all paths should be unique');
 });
@@ -81,7 +76,10 @@ test('normalizeRecipeImage returns path when it exists in RECIPE_IMAGE_OPTIONS',
 });
 
 test('normalizeRecipeImage returns DEFAULT_RECIPE_IMAGE for an invalid path', () => {
-  assert.equal(normalizeRecipeImage('icons/svg/item-bag.svg'), DEFAULT_RECIPE_IMAGE);
+  assert.equal(
+    normalizeRecipeImage('icons/svg/item-bag.svg'),
+    DEFAULT_RECIPE_IMAGE
+  );
 });
 
 test('normalizeRecipeImage returns DEFAULT_RECIPE_IMAGE for empty string', () => {
@@ -134,10 +132,7 @@ test('filterRecipeImageOptions returns all blueprints when searching "Blueprint"
   const result = filterRecipeImageOptions(RECIPE_IMAGE_OPTIONS, 'Blueprint');
   assert.ok(result.length > 1, 'should return multiple blueprint entries');
   for (const entry of result) {
-    assert.ok(
-      entry.label.toLowerCase().includes('blueprint'),
-      `label should contain blueprint: ${entry.label}`
-    );
+    assert.ok(entry.label.toLowerCase().includes('blueprint'), `label should contain blueprint: ${entry.label}`);
   }
 });
 

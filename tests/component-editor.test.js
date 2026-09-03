@@ -5,7 +5,7 @@ import {
   buildComponentEditorUpdates,
   clampComponentEssenceQuantity,
   getComponentEditorHintKey,
-  getDefaultEssenceIcon,
+  getDefaultEssenceIcon
 } from '../src/ui/svelte/util/componentEditor.js';
 
 function makeSystem(overrides = {}) {
@@ -13,12 +13,12 @@ function makeSystem(overrides = {}) {
     features: {
       itemTags: false,
       essences: false,
-      ...(overrides.features || {}),
+      ...(overrides.features || {})
     },
     itemTags: overrides.itemTags || [],
     tags: overrides.tags || [],
     essenceDefinitions: overrides.essenceDefinitions || [],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -28,7 +28,7 @@ function makeItem(overrides = {}) {
     name: 'Blazing Herb',
     tags: overrides.tags || [],
     essences: overrides.essences || {},
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -38,15 +38,15 @@ test('buildComponentEditorState exposes tag and essence sections when essences a
     itemTags: ['fire', 'flora'],
     essenceDefinitions: [
       { id: 'ess-shadow', name: 'Shadow', icon: '' },
-      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' },
-    ],
+      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' }
+    ]
   });
   const item = makeItem({
     tags: ['fire'],
     essences: {
       'ess-fire': 2,
-      'ess-shadow': 1,
-    },
+      'ess-shadow': 1
+    }
   });
 
   const state = buildComponentEditorState(system, item);
@@ -57,7 +57,7 @@ test('buildComponentEditorState exposes tag and essence sections when essences a
   assert.equal(state.hintKey, 'FABRICATE.Admin.Items.Editor.HintTagsAndEssences');
   assert.deepEqual(state.tagOptions, [
     { tag: 'fire', checked: true },
-    { tag: 'flora', checked: false },
+    { tag: 'flora', checked: false }
   ]);
   // `enabled` is part of the row shape (issue 1036): the option list is a whitelist
   // rebuild, so a field it does not name is invisible to the add-new offer filter no
@@ -65,7 +65,7 @@ test('buildComponentEditorState exposes tag and essence sections when essences a
   // both must default to TRUE here — a `false` fixture is asserted below.
   assert.deepEqual(state.essenceOptions, [
     { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', enabled: true, quantity: 2 },
-    { id: 'ess-shadow', name: 'Shadow', icon: getDefaultEssenceIcon(), enabled: true, quantity: 1 },
+    { id: 'ess-shadow', name: 'Shadow', icon: getDefaultEssenceIcon(), enabled: true, quantity: 1 }
   ]);
 });
 
@@ -74,8 +74,8 @@ test('1036/2: buildEditableEssenceOptions carries a FALSE enabled onto its optio
     features: { itemTags: false, essences: true },
     essenceDefinitions: [
       { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
-      { id: 'ess-water', name: 'Water', icon: 'fas fa-droplet', enabled: true },
-    ],
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-droplet', enabled: true }
+    ]
   });
   const state = buildComponentEditorState(system, makeItem({ essences: { 'ess-fire': 3 } }));
 
@@ -97,31 +97,24 @@ test('buildComponentEditorState sorts essence options alphabetically by display 
     essenceDefinitions: [
       { id: 'ess-zeta', name: 'zeta', icon: 'fas fa-bolt' },
       { id: 'ess-ember', icon: 'fas fa-fire' },
-      { id: 'ess-alpha', name: 'Alpha', icon: 'fas fa-feather' },
-    ],
+      { id: 'ess-alpha', name: 'Alpha', icon: 'fas fa-feather' }
+    ]
   });
 
-  const state = buildComponentEditorState(
-    system,
-    makeItem({
-      essences: {
-        'ess-alpha': 2,
-        'ess-ember': 1,
-        'ess-zeta': 3,
-      },
-    })
-  );
+  const state = buildComponentEditorState(system, makeItem({
+    essences: {
+      'ess-alpha': 2,
+      'ess-ember': 1,
+      'ess-zeta': 3
+    }
+  }));
 
   assert.deepEqual(
-    state.essenceOptions.map((option) => ({
-      id: option.id,
-      name: option.name,
-      quantity: option.quantity,
-    })),
+    state.essenceOptions.map(option => ({ id: option.id, name: option.name, quantity: option.quantity })),
     [
       { id: 'ess-alpha', name: 'Alpha', quantity: 2 },
       { id: 'ess-ember', name: 'ess-ember', quantity: 1 },
-      { id: 'ess-zeta', name: 'zeta', quantity: 3 },
+      { id: 'ess-zeta', name: 'zeta', quantity: 3 }
     ]
   );
 });
@@ -129,7 +122,7 @@ test('buildComponentEditorState sorts essence options alphabetically by display 
 test('buildComponentEditorState only refers to tags when essences are disabled', () => {
   const system = makeSystem({
     features: { itemTags: false, essences: false },
-    itemTags: ['rare'],
+    itemTags: ['rare']
   });
 
   const state = buildComponentEditorState(system, makeItem({ tags: ['rare'] }));
@@ -144,13 +137,10 @@ test('buildComponentEditorState still refers to tags when legacy item tags flag 
   const system = makeSystem({
     features: { itemTags: false, essences: true },
     itemTags: ['water'],
-    essenceDefinitions: [{ id: 'ess-water', name: 'Water', icon: 'fas fa-tint' }],
+    essenceDefinitions: [{ id: 'ess-water', name: 'Water', icon: 'fas fa-tint' }]
   });
 
-  const state = buildComponentEditorState(
-    system,
-    makeItem({ tags: ['water'], essences: { 'ess-water': 3 } })
-  );
+  const state = buildComponentEditorState(system, makeItem({ tags: ['water'], essences: { 'ess-water': 3 } }));
 
   assert.equal(state.showTags, true);
   assert.equal(state.showEssences, true);
@@ -162,7 +152,7 @@ test('buildComponentEditorState keeps tags editable when the essences feature is
   const system = makeSystem({
     features: { itemTags: true, essences: false },
     itemTags: ['fire'],
-    essenceDefinitions: [{ id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' }],
+    essenceDefinitions: [{ id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' }]
   });
 
   const state = buildComponentEditorState(system, makeItem());
@@ -181,14 +171,14 @@ test('buildComponentEditorUpdates clamps quantities and omits disabled features'
     essenceOptions: [
       { id: 'ess-fire', quantity: '3.8' },
       { id: 'ess-water', quantity: -1 },
-      { id: 'ess-air', quantity: 0 },
-    ],
+      { id: 'ess-air', quantity: 0 }
+    ]
   });
 
   assert.deepEqual(updates, {
     essences: {
-      'ess-fire': 3,
-    },
+      'ess-fire': 3
+    }
   });
 });
 
@@ -201,24 +191,24 @@ test('buildComponentEditorState reads quantities from the item-card array essenc
     features: { itemTags: false, essences: true },
     essenceDefinitions: [
       { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' },
-      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint' },
-    ],
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint' }
+    ]
   });
 
   const itemCard = makeItem({
     essences: [
       { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 4 },
-      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint', quantity: 2 },
-    ],
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint', quantity: 2 }
+    ]
   });
 
   const state = buildComponentEditorState(system, itemCard);
 
   assert.deepEqual(
-    state.essenceOptions.map((option) => ({ id: option.id, quantity: option.quantity })),
+    state.essenceOptions.map(option => ({ id: option.id, quantity: option.quantity })),
     [
       { id: 'ess-fire', quantity: 4 },
-      { id: 'ess-water', quantity: 2 },
+      { id: 'ess-water', quantity: 2 }
     ]
   );
 });
@@ -230,26 +220,26 @@ test('item-card essences round-trip through open then save without loss', () => 
     features: { itemTags: false, essences: true },
     essenceDefinitions: [
       { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire' },
-      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint' },
-    ],
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint' }
+    ]
   });
 
   const itemCard = makeItem({
     essences: [
       { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 4 },
-      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint', quantity: 2 },
-    ],
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-tint', quantity: 2 }
+    ]
   });
 
   const state = buildComponentEditorState(system, itemCard);
   const updates = buildComponentEditorUpdates({
     showEssences: true,
-    essenceOptions: state.essenceOptions,
+    essenceOptions: state.essenceOptions
   });
 
   assert.deepEqual(updates.essences, {
     'ess-fire': 4,
-    'ess-water': 2,
+    'ess-water': 2
   });
 });
 

@@ -298,7 +298,7 @@ test('accept is a predicate over the value, not a list of values', () => {
 test('a <style> opener must be the whole line, and prose naming one opens nothing', () => {
   const svelte = [
     '<script>',
-    '  // a scoped `<style>` is what this component deliberately does not have',
+    "  // a scoped `<style>` is what this component deliberately does not have",
     '  export let height = 40;',
     '</script>',
     '',
@@ -637,11 +637,7 @@ test('the scan reaches a value written only into a token', () => {
 
     const corpus = collectStyleCorpus({ roots: [root], extensions: ['.svelte', '.css'] });
     const files = Object.keys(corpus);
-    assert.equal(
-      files.length,
-      2,
-      `the fixture corpus must hold both files, got ${files.join(', ')}`
-    );
+    assert.equal(files.length, 2, `the fixture corpus must hold both files, got ${files.join(', ')}`);
 
     const { occurrences } = scanPixelValues({ corpus, properties: ['height'], values: [36, 40] });
 

@@ -8,12 +8,10 @@ import {
 } from '../src/config/flags.js';
 
 function getPathValue(object, path) {
-  return String(path)
-    .split('.')
-    .reduce((value, part) => {
-      if (value == null || typeof value !== 'object') return undefined;
-      return value[part];
-    }, object);
+  return String(path).split('.').reduce((value, part) => {
+    if (value == null || typeof value !== 'object') return undefined;
+    return value[part];
+  }, object);
 }
 
 function setPathValue(object, path, value) {
@@ -151,10 +149,10 @@ test('getFabricateFlag reads fabricate.* key from fabricate namespace', () => {
     flags: {
       fabricate: {
         fabricate: {
-          craftingRuns: payload,
-        },
-      },
-    },
+          craftingRuns: payload
+        }
+      }
+    }
   });
 
   assert.deepEqual(getFabricateFlag(doc, 'craftingRuns', null), payload);
@@ -170,7 +168,7 @@ test('getFabricateFlag fails closed but setFabricateFlag surfaces an invalid sco
   assert.equal(getFabricateFlag(doc, 'craftingRuns', 'fallback'), 'fallback');
   await assert.rejects(
     () => setFabricateFlag(doc, 'craftingRuns', { active: {}, history: [] }),
-    /not valid or not currently active/
+    /not valid or not currently active/,
   );
 });
 

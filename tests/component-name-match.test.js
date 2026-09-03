@@ -70,11 +70,7 @@ describe('matchComponentByName — per-site case-sensitivity (issue 540)', () =>
     assert.equal(matchComponentByName({ name: '' }, component, { caseSensitive: false }), false);
     assert.equal(matchComponentByName({}, component, { caseSensitive: false }), false);
     assert.equal(
-      matchComponentByName(
-        { name: 'Iron Ingot' },
-        { id: 'c1', name: '' },
-        { caseSensitive: false }
-      ),
+      matchComponentByName({ name: 'Iron Ingot' }, { id: 'c1', name: '' }, { caseSensitive: false }),
       false
     );
   });
@@ -141,20 +137,12 @@ describe('name-only telemetry — warn-once + fires only on a name match (issue 
   });
 
   it('warns separately for distinct (system, component, item) matches', () => {
-    matchComponentByName(
-      { name: 'Iron Ingot' },
-      { id: 'c1', name: 'Iron Ingot' },
-      {
-        systemId: 'sys-a',
-      }
-    );
-    matchComponentByName(
-      { name: 'Iron Ingot' },
-      { id: 'c1', name: 'Iron Ingot' },
-      {
-        systemId: 'sys-b',
-      }
-    );
+    matchComponentByName({ name: 'Iron Ingot' }, { id: 'c1', name: 'Iron Ingot' }, {
+      systemId: 'sys-a',
+    });
+    matchComponentByName({ name: 'Iron Ingot' }, { id: 'c1', name: 'Iron Ingot' }, {
+      systemId: 'sys-b',
+    });
     assert.equal(warnCalls.length, 2, 'a different system id is a distinct name-only match');
   });
 });

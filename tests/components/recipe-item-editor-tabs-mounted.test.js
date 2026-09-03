@@ -20,7 +20,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte'
 });
 
 before(() => harness.setup());
@@ -34,18 +34,18 @@ function tabButtons(root) {
 describe('RecipeItemEditorTabs (mounted)', () => {
   it('renders the four editor tabs in order', async () => {
     const root = await harness.mount({ activeTab: 'overview' });
-    const ids = tabButtons(root).map((b) => b.getAttribute('data-recipe-item-tab-button'));
+    const ids = tabButtons(root).map(b => b.getAttribute('data-recipe-item-tab-button'));
     assert.deepEqual(ids, ['overview', 'contents', 'limits', 'validation']);
   });
 
   it('marks the active tab selected with a roving tabindex', async () => {
     const root = await harness.mount({ activeTab: 'limits' });
     const buttons = tabButtons(root);
-    const active = buttons.find((b) => b.getAttribute('data-recipe-item-tab-button') === 'limits');
+    const active = buttons.find(b => b.getAttribute('data-recipe-item-tab-button') === 'limits');
     assert.equal(active.getAttribute('aria-selected'), 'true');
     assert.equal(active.getAttribute('tabindex'), '0');
-    const others = buttons.filter((b) => b !== active);
-    assert.ok(others.every((b) => b.getAttribute('tabindex') === '-1'));
+    const others = buttons.filter(b => b !== active);
+    assert.ok(others.every(b => b.getAttribute('tabindex') === '-1'));
   });
 
   it('renders a neutral count badge on the Contents tab', async () => {
@@ -63,34 +63,22 @@ describe('RecipeItemEditorTabs (mounted)', () => {
   });
 
   it('renders a success check badge when validation passes', async () => {
-    const root = await harness.mount({
-      activeTab: 'overview',
-      badges: { validation: [{ label: '✓', tone: 'success' }] },
-    });
+    const root = await harness.mount({ activeTab: 'overview', badges: { validation: [{ label: '✓', tone: 'success' }] } });
     const badge = root.querySelector('[data-recipe-item-tab-badge="validation"]');
     assert.ok(badge);
     assert.equal(badge.textContent.trim(), '✓');
-    assert.ok(
-      badge.classList.contains('is-active'),
-      'success badge reuses the is-active chip tone'
-    );
+    assert.ok(badge.classList.contains('is-active'), 'success badge reuses the is-active chip tone');
     const button = root.querySelector('[data-recipe-item-tab-button="validation"]');
     assert.ok(!button.classList.contains('is-danger'));
   });
 
   it('turns the validation tab danger when the badge is a failing count', async () => {
-    const root = await harness.mount({
-      activeTab: 'overview',
-      badges: { validation: [{ label: '2', tone: 'danger' }] },
-    });
+    const root = await harness.mount({ activeTab: 'overview', badges: { validation: [{ label: '2', tone: 'danger' }] } });
     const badge = root.querySelector('[data-recipe-item-tab-badge="validation"]');
     assert.equal(badge.textContent.trim(), '2');
     assert.ok(badge.classList.contains('is-danger'));
     const button = root.querySelector('[data-recipe-item-tab-button="validation"]');
-    assert.ok(
-      button.classList.contains('is-danger'),
-      'the validation tab button carries the danger tone'
-    );
+    assert.ok(button.classList.contains('is-danger'), 'the validation tab button carries the danger tone');
   });
 
   it('fires onSelect when a tab is clicked', async () => {
@@ -104,12 +92,8 @@ describe('RecipeItemEditorTabs (mounted)', () => {
     const calls = [];
     const root = await harness.mount({ activeTab: 'overview', onSelect: (id) => calls.push(id) });
     const overview = root.querySelector('[data-recipe-item-tab-button="overview"]');
-    overview.dispatchEvent(
-      new globalThis.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
-    );
-    overview.dispatchEvent(
-      new globalThis.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })
-    );
+    overview.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    overview.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     assert.deepEqual(calls, ['contents', 'validation']);
   });
 });

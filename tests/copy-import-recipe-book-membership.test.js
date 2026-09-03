@@ -154,11 +154,7 @@ test('#701 end-to-end: an imported copy persists books whose recipeIds resolve t
 });
 
 test('#701 a genuinely dangling membership entry is preserved verbatim and reported', async () => {
-  const prepared = prepareForImport(
-    buildMembershipPayload({ danglingId: 'recipe-ghost' }),
-    'copy',
-    emptyCopyOptions()
-  );
+  const prepared = prepareForImport(buildMembershipPayload({ danglingId: 'recipe-ghost' }), 'copy', emptyCopyOptions());
 
   const membership = prepared.system.recipeItemDefinitions[0].recipeIds;
   assert.ok(

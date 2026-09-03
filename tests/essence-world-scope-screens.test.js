@@ -204,10 +204,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
       resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/essenceScoped.js'),
       'utf8'
     );
-    assert.ok(
-      leaf.length > 500,
-      'the leaf source read produced nothing, so the scan below is empty'
-    );
+    assert.ok(leaf.length > 500, 'the leaf source read produced nothing, so the scan below is empty');
     assert.deepEqual(
       [...leaf.matchAll(/^import\s/gm)].map((match) => match[0]),
       [],
@@ -302,7 +299,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     // drift `design-system/spec.md` orders "back before save" to prevent.
     //
     // The count is THREE because the world tool entry took this component next (issue 1373) and
-    // the world COMPONENT entry took it third (issue 1371) — which is what this seam was
+    // the world COMPONENT entry took it third (issue 1371) - which is what this seam was
     // extracted for, and this is the lane the note below asked to come here and say so. All
     // three world entry routes now render it; the count stays asserted rather than unbounded so
     // that a second pair inside one branch still reds.
@@ -401,10 +398,7 @@ describe('the entry editor buffers exactly the identity fields an essence lifts 
     const declaration = /const IDENTITY_FIELDS = Object\.freeze\(\[([^\]]*)\]\)/.exec(entrySource);
     assert.ok(declaration, 'the entry editor declares no frozen IDENTITY_FIELDS list');
     const declared = [...declaration[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
-    assert.ok(
-      declared.length > 0,
-      'the declaration parsed to an empty list, so the equality below is vacuous'
-    );
+    assert.ok(declared.length > 0, 'the declaration parsed to an empty list, so the equality below is vacuous');
     assert.deepEqual(
       declared,
       [...WORLD_IDENTITY_FIELDS.essences],
@@ -464,10 +458,7 @@ describe('the world essence entry editor keeps the live-preview note', () => {
 
 describe('criterion 3 — no essence screen declares a prop its call site does not supply', () => {
   const SCREENS = [
-    [
-      'WorldEssenceCataloguePage',
-      'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
-    ],
+    ['WorldEssenceCataloguePage', 'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte'],
     ['WorldEssenceEntryPage', 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte'],
     ['EssenceBrowserView', 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte'],
     ['EssenceEditView', 'src/ui/svelte/apps/manager/EssenceEditView.svelte'],
@@ -512,7 +503,9 @@ describe('criterion 3 — no essence screen declares a prop its call site does n
       const declared = declaredPropNames(source);
       const start = source.indexOf('let {');
       const body = source.slice(source.indexOf('} = $props();', start));
-      const unread = declared.filter((name) => !new RegExp(`\\b${name}\\b`).test(body));
+      const unread = declared.filter(
+        (name) => !new RegExp(`\\b${name}\\b`).test(body)
+      );
       assert.deepEqual(unread, [], `${path} declares ${unread.join(', ')} and never reads them`);
     });
   }
@@ -604,10 +597,7 @@ describe('criterion 7 — re-inheriting RETAINS the dormant override', () => {
     // OVERRIDE, then author a value that is NOT the world's, so a re-seed is distinguishable
     // from a retention. A test that left the seeded copy in place could not tell them apart.
     assert.equal(await actions.setSectionInherited('ash', 'sys-a', 'effectSource', false), true);
-    assert.equal(
-      await actions.updateMembershipSection('ash', 'sys-a', 'effectSource', 'Item.local'),
-      true
-    );
+    assert.equal(await actions.updateMembershipSection('ash', 'sys-a', 'effectSource', 'Item.local'), true);
     const overridden = read().membership[0];
     assert.equal(overridden.inherit.effectSource, false);
     assert.equal(overridden.effectSource, 'Item.local');
@@ -677,10 +667,9 @@ describe('criterion 9 — the world-defaults effectSource picker refuses a syste
     // too, which proves the roster is what admits it rather than the shape test admitting
     // everything; and every candidate is admitted once each is world-addressable, which proves
     // the filter is not simply dropping the third by position.
-    assert.deepEqual(
-      worldAddressableEffectSources(CANDIDATES, []).map((c) => c.id),
-      ['Item.kTz9QpLm2xR4vB1a']
-    );
+    assert.deepEqual(worldAddressableEffectSources(CANDIDATES, []).map((c) => c.id), [
+      'Item.kTz9QpLm2xR4vB1a',
+    ]);
     assert.equal(worldAddressableEffectSources(CANDIDATES, [{ id: 'sm-c-iron' }]).length, 2);
   });
 
@@ -708,10 +697,7 @@ describe('criterion 11 — the system-scope pass BLOCKS with no membership recor
     assert.ok(counts.blocking >= 1, 'and it is counted');
     // AND IT RETURNS: the four membership checks are OMITTED rather than reported as passes,
     // because their subject is a record that does not exist.
-    assert.deepEqual(
-      systemGroup.rows.map((row) => row.id),
-      ['systemRules']
-    );
+    assert.deepEqual(systemGroup.rows.map((row) => row.id), ['systemRules']);
     assert.match(systemGroup.rows[0].detail, /Mythwright Forge/);
   });
 
@@ -730,10 +716,13 @@ describe('criterion 11 — the system-scope pass BLOCKS with no membership recor
       }
     );
     const systemGroup = groups.find((group) => group.id === 'system');
-    assert.deepEqual(
-      systemGroup.rows.map((row) => row.id),
-      ['systemRules', 'systemEnabled', 'systemEffectSource', 'systemMacro', 'systemCarrier']
-    );
+    assert.deepEqual(systemGroup.rows.map((row) => row.id), [
+      'systemRules',
+      'systemEnabled',
+      'systemEffectSource',
+      'systemMacro',
+      'systemCarrier',
+    ]);
   });
 });
 
@@ -792,10 +781,15 @@ describe('criterion 12 — every added validation check actually RENDERS', () =>
       { name: 'Ash', icon: 'fas fa-fire', description: 'Cinders' },
       {}
     );
-    assert.deepEqual(
-      shipped.checks.map((check) => check.id),
-      ['name', 'icon', 'colour', 'description', 'macro', 'source', 'usage']
-    );
+    assert.deepEqual(shipped.checks.map((check) => check.id), [
+      'name',
+      'icon',
+      'colour',
+      'description',
+      'macro',
+      'source',
+      'usage',
+    ]);
   });
 });
 

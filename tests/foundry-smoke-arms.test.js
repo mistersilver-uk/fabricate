@@ -132,7 +132,7 @@ test('the derived world manifest is the identity function for the default arm', 
   assert.deepEqual(
     derived,
     fixture,
-    "deriving the DEFAULT arm's world manifest changed the committed fixture, so the runtime world " +
+    'deriving the DEFAULT arm\'s world manifest changed the committed fixture, so the runtime world ' +
       'no longer matches the one tests/view-lab-chrome-version-lock.test.js checks'
   );
 });

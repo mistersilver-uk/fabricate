@@ -90,18 +90,11 @@ describe('planRecipeItemMembershipPrune', () => {
     const defs = definitions();
     const plan = planRecipeItemMembershipPrune(
       defs,
-      [
-        recipe('r-scalar', { recipeItemId: 'book-a' }),
-        recipe('r-uuid', { linkedRecipeItemUuid: BOOK_B_UUID }),
-      ],
+      [recipe('r-scalar', { recipeItemId: 'book-a' }), recipe('r-uuid', { linkedRecipeItemUuid: BOOK_B_UUID })],
       false
     );
 
-    assert.deepEqual(
-      plan.affectedIds.sort(),
-      ['book-a', 'book-b'],
-      'the stated count is basis-aware'
-    );
+    assert.deepEqual(plan.affectedIds.sort(), ['book-a', 'book-b'], 'the stated count is basis-aware');
     assert.equal(
       plan.prunes.length,
       0,
@@ -127,18 +120,11 @@ describe('planRecipeItemMembershipPrune', () => {
       [recipe('r', { recipeItemId: 'book-a' })],
       true
     );
-    assert.deepEqual(
-      plan.affectedIds,
-      [],
-      'a modern-basis system resolves membership by array only'
-    );
+    assert.deepEqual(plan.affectedIds, [], 'a modern-basis system resolves membership by array only');
   });
 
   it('tolerates absent definitions and recipes rather than throwing', () => {
-    assert.deepEqual(planRecipeItemMembershipPrune(null, null, true), {
-      affectedIds: [],
-      prunes: [],
-    });
+    assert.deepEqual(planRecipeItemMembershipPrune(null, null, true), { affectedIds: [], prunes: [] });
     assert.deepEqual(planRecipeItemMembershipPrune(undefined, [recipe('r')], false), {
       affectedIds: [],
       prunes: [],
@@ -219,7 +205,11 @@ describe('selectLearnerActorIds', () => {
 });
 
 describe('describeRecipeDeleteImpact', () => {
-  const recipes = [recipe('r1'), recipe('r2'), recipe('r3', { recipeItemId: 'book-b' })];
+  const recipes = [
+    recipe('r1'),
+    recipe('r2'),
+    recipe('r3', { recipeItemId: 'book-b' }),
+  ];
 
   it('states three independent numbers over a modern-basis system', () => {
     const impact = describeRecipeDeleteImpact(['r1', 'r2'], {

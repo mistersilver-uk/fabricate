@@ -2,36 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
-import {
-  GatheringEnvironmentStore,
-  GatheringEnvironmentValidationError,
-} from '../src/systems/GatheringEnvironmentStore.js';
+import { GatheringEnvironmentStore, GatheringEnvironmentValidationError } from '../src/systems/GatheringEnvironmentStore.js';
 
 function makeMemoryStore({
   saved = [],
   gatheringConfig = {},
   systems = [
-    {
-      id: 'system-a',
-      features: { gathering: true },
-      components: [{ id: 'component-gem', difficulty: 1 }],
-    },
-    { id: 'system-disabled', features: { gathering: false } },
+    { id: 'system-a', features: { gathering: true }, components: [{ id: 'component-gem', difficulty: 1 }] },
+    { id: 'system-disabled', features: { gathering: false } }
   ],
   ids = ['env-new', 'task-new', 'env-copy', 'task-copy-1', 'task-copy-2'],
   // Realms are WORLD scope since issue 1282, so realm-reference validation resolves against
   // one library rather than the owning system's copy.
   realms = [],
-  runCleanup = null,
+  runCleanup = null
 } = {}) {
   const settings = new Map([
     [SETTING_KEYS.GATHERING_ENVIRONMENTS, saved],
-    [SETTING_KEYS.GATHERING_CONFIG, gatheringConfig],
+    [SETTING_KEYS.GATHERING_CONFIG, gatheringConfig]
   ]);
   const writes = [];
   const nextIds = [...ids];
   const store = new GatheringEnvironmentStore({
-    getSetting: (key) => settings.get(key),
+    getSetting: key => settings.get(key),
     setSetting: async (key, value) => {
       settings.set(key, value);
       writes.push({ key, value });
@@ -44,7 +37,7 @@ function makeMemoryStore({
       if (!next) throw new Error('test ID queue exhausted');
       return next;
     },
-    runCleanup,
+    runCleanup
   });
 
   return { store, settings, writes };
@@ -60,16 +53,18 @@ function routedTask(overrides = {}) {
     resolutionMode: 'routed',
     resultSelection: {
       provider: 'macroOutcome',
-      macroUuid: 'Macro.outcome',
+      macroUuid: 'Macro.outcome'
     },
     resultGroups: [
       {
         id: 'group-iron',
         name: 'Iron',
-        results: [{ id: 'result-iron', componentId: 'component-iron', quantity: 1 }],
-      },
+        results: [
+          { id: 'result-iron', componentId: 'component-iron', quantity: 1 }
+        ]
+      }
     ],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -83,19 +78,21 @@ function progressiveTask(overrides = {}) {
     resolutionMode: 'progressive',
     check: {
       formula: '@skills.sur.mod',
-      threshold: '12',
+      threshold: '12'
     },
     progressive: {
-      awardMode: 'partial',
+      awardMode: 'partial'
     },
     resultGroups: [
       {
         id: 'group-gems',
         name: 'Gems',
-        results: [{ id: 'result-gem', componentId: 'component-gem', quantity: 1, difficulty: 1 }],
-      },
+        results: [
+          { id: 'result-gem', componentId: 'component-gem', quantity: 1, difficulty: 1 }
+        ]
+      }
     ],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -115,7 +112,7 @@ function environment(overrides = {}) {
     // the composition predicate there and this fixture has to say which mode it means.
     compositionMode: 'manual',
     enabledTaskIds: ['lib-task'],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -124,8 +121,8 @@ test('create, update, list, reorder, and delete operate by crafting system', asy
     saved: [
       environment({ id: 'env-1', name: 'One' }),
       environment({ id: 'env-2', name: 'Two' }),
-      environment({ id: 'env-other', craftingSystemId: 'system-disabled', name: 'Other' }),
-    ],
+      environment({ id: 'env-other', craftingSystemId: 'system-disabled', name: 'Other' })
+    ]
   });
   store.load();
 
@@ -136,33 +133,22 @@ test('create, update, list, reorder, and delete operate by crafting system', asy
   assert.equal(updated.name, 'One Updated');
 
   await store.reorder('system-a', ['env-new', 'env-1', 'env-2']);
-  assert.deepEqual(
-    store.listBySystem('system-a').map((env) => env.id),
-    ['env-new', 'env-1', 'env-2']
-  );
+  assert.deepEqual(store.listBySystem('system-a').map(env => env.id), ['env-new', 'env-1', 'env-2']);
 
   await store.delete('env-2');
-  assert.deepEqual(
-    store.listBySystem('system-a').map((env) => env.id),
-    ['env-new', 'env-1']
-  );
-  assert.deepEqual(
-    settings.get(SETTING_KEYS.GATHERING_ENVIRONMENTS).map((env) => env.id),
-    ['env-new', 'env-1', 'env-other']
-  );
+  assert.deepEqual(store.listBySystem('system-a').map(env => env.id), ['env-new', 'env-1']);
+  assert.deepEqual(settings.get(SETTING_KEYS.GATHERING_ENVIRONMENTS).map(env => env.id), ['env-new', 'env-1', 'env-other']);
 });
 
 test('targeted environments may compose gathering task-library records by enabledTaskIds', async () => {
   const { store } = makeMemoryStore();
   store.load();
 
-  const created = await store.create(
-    environment({
-      id: 'env-library',
-      tasks: [],
-      enabledTaskIds: ['task-library-a', 'task-library-b'],
-    })
-  );
+  const created = await store.create(environment({
+    id: 'env-library',
+    tasks: [],
+    enabledTaskIds: ['task-library-a', 'task-library-b']
+  }));
   assert.deepEqual(created.enabledTaskIds, ['task-library-a', 'task-library-b']);
 });
 
@@ -173,35 +159,21 @@ test('validation permits an automatic environment backed by a matching library t
         'system-a': {
           tasks: [
             { id: 'task-cave', name: 'Mine Ore', enabled: true, biomes: ['cave'], dropRows: [] },
-            {
-              id: 'task-disabled',
-              name: 'Disabled',
-              enabled: false,
-              biomes: ['cave'],
-              dropRows: [],
-            },
-            {
-              id: 'task-desert',
-              name: 'Dig Sand',
-              enabled: true,
-              biomes: ['desert'],
-              dropRows: [],
-            },
-          ],
-        },
-      },
-    },
+            { id: 'task-disabled', name: 'Disabled', enabled: false, biomes: ['cave'], dropRows: [] },
+            { id: 'task-desert', name: 'Dig Sand', enabled: true, biomes: ['desert'], dropRows: [] }
+          ]
+        }
+      }
+    }
   });
   store.load();
 
-  const automatic = await store.create(
-    environment({
-      id: 'env-automatic-library',
-      enabledTaskIds: [],
-      compositionMode: 'automatic',
-      biomes: ['cave'],
-    })
-  );
+  const automatic = await store.create(environment({
+    id: 'env-automatic-library',
+    enabledTaskIds: [],
+    compositionMode: 'automatic',
+    biomes: ['cave']
+  }));
   assert.deepEqual(automatic.enabledTaskIds, []);
 
   // Issue 1315: manual composes exactly `enabledTaskIds`, so a force list is not a task source
@@ -221,14 +193,12 @@ test('validation permits an automatic environment backed by a matching library t
     /must have at least one task before it can be enabled/
   );
 
-  const unmatched = store.validate(
-    environment({
-      id: 'env-unmatched-library',
-      enabledTaskIds: [],
-      compositionMode: 'automatic',
-      biomes: ['swamp'],
-    })
-  );
+  const unmatched = store.validate(environment({
+    id: 'env-unmatched-library',
+    enabledTaskIds: [],
+    compositionMode: 'automatic',
+    biomes: ['swamp']
+  }));
   assert.equal(unmatched.valid, false);
   assert.match(unmatched.errors.join('\n'), /must have at least one task before it can be enabled/);
 });
@@ -244,7 +214,7 @@ test('a disabled environment may be saved without any task source', async () => 
     enabled: false,
     enabledTaskIds: [],
     compositionMode: 'automatic',
-    biomes: ['swamp'],
+    biomes: ['swamp']
   });
 
   const result = store.validate(draft);
@@ -260,20 +230,18 @@ test('enabling a saved task-less environment is rejected', async () => {
   const { store } = makeMemoryStore();
   store.load();
 
-  const created = await store.create(
-    environment({
-      id: 'env-toggle-on',
-      enabled: false,
-      enabledTaskIds: [],
-      compositionMode: 'automatic',
-      biomes: ['swamp'],
-    })
-  );
+  const created = await store.create(environment({
+    id: 'env-toggle-on',
+    enabled: false,
+    enabledTaskIds: [],
+    compositionMode: 'automatic',
+    biomes: ['swamp']
+  }));
   assert.equal(created.enabled, false);
 
   await assert.rejects(
     () => store.update('env-toggle-on', { enabled: true }),
-    (error) => {
+    error => {
       assert.ok(error instanceof GatheringEnvironmentValidationError);
       assert.match(error.errors.join('\n'), /must have at least one task before it can be enabled/);
       return true;
@@ -285,73 +253,57 @@ test('drop-rate adjustments normalize to non-zero integer deltas and validate ra
   const { store } = makeMemoryStore();
   store.load();
 
-  const created = await store.create(
-    environment({
-      id: 'env-adjustments',
-      enabledTaskIds: ['task-library-a'],
-      taskDropRateAdjustments: {
-        ' task-library-a ': {
-          ' drop-a ': 15,
-          'drop-zero': 0,
-        },
-        'task-empty': {
-          'drop-empty': 0,
-        },
+  const created = await store.create(environment({
+    id: 'env-adjustments',
+    enabledTaskIds: ['task-library-a'],
+    taskDropRateAdjustments: {
+      ' task-library-a ': {
+        ' drop-a ': 15,
+        'drop-zero': 0
       },
-      taskDropRateAdjustmentsEnabled: {
-        ' task-library-a ': false,
-        'task-library-default': true,
-      },
-      eventDropRateAdjustments: {
-        ' event-a ': -20,
-        'event-zero': 0,
-      },
-      eventDropRateAdjustmentsEnabled: {
-        ' event-a ': false,
-        'event-default': true,
-      },
-    })
-  );
+      'task-empty': {
+        'drop-empty': 0
+      }
+    },
+    taskDropRateAdjustmentsEnabled: {
+      ' task-library-a ': false,
+      'task-library-default': true
+    },
+    eventDropRateAdjustments: {
+      ' event-a ': -20,
+      'event-zero': 0
+    },
+    eventDropRateAdjustmentsEnabled: {
+      ' event-a ': false,
+      'event-default': true
+    }
+  }));
 
   assert.deepEqual(created.taskDropRateAdjustments, {
-    'task-library-a': { 'drop-a': 15 },
+    'task-library-a': { 'drop-a': 15 }
   });
   assert.deepEqual(created.taskDropRateAdjustmentsEnabled, {
-    'task-library-a': false,
+    'task-library-a': false
   });
   assert.deepEqual(created.eventDropRateAdjustments, {
-    'event-a': -20,
+    'event-a': -20
   });
   assert.deepEqual(created.eventDropRateAdjustmentsEnabled, {
-    'event-a': false,
+    'event-a': false
   });
 
-  const invalid = store.validate(
-    environment({
-      id: 'env-invalid-adjustments',
-      taskDropRateAdjustments: { 'task-library-a': { 'drop-a': 101 } },
-      taskDropRateAdjustmentsEnabled: { 'task-library-a': 'false' },
-      eventDropRateAdjustments: { 'event-a': -101 },
-      eventDropRateAdjustmentsEnabled: { 'event-a': 'false' },
-    })
-  );
+  const invalid = store.validate(environment({
+    id: 'env-invalid-adjustments',
+    taskDropRateAdjustments: { 'task-library-a': { 'drop-a': 101 } },
+    taskDropRateAdjustmentsEnabled: { 'task-library-a': 'false' },
+    eventDropRateAdjustments: { 'event-a': -101 },
+    eventDropRateAdjustmentsEnabled: { 'event-a': 'false' }
+  }));
   assert.equal(invalid.valid, false);
-  assert.match(
-    invalid.errors.join('\n'),
-    /taskDropRateAdjustments\.task-library-a\.drop-a must be an integer from -100 to 100/
-  );
-  assert.match(
-    invalid.errors.join('\n'),
-    /taskDropRateAdjustmentsEnabled\.task-library-a must be a boolean/
-  );
-  assert.match(
-    invalid.errors.join('\n'),
-    /eventDropRateAdjustments\.event-a must be an integer from -100 to 100/
-  );
-  assert.match(
-    invalid.errors.join('\n'),
-    /eventDropRateAdjustmentsEnabled\.event-a must be a boolean/
-  );
+  assert.match(invalid.errors.join('\n'), /taskDropRateAdjustments\.task-library-a\.drop-a must be an integer from -100 to 100/);
+  assert.match(invalid.errors.join('\n'), /taskDropRateAdjustmentsEnabled\.task-library-a must be a boolean/);
+  assert.match(invalid.errors.join('\n'), /eventDropRateAdjustments\.event-a must be an integer from -100 to 100/);
+  assert.match(invalid.errors.join('\n'), /eventDropRateAdjustmentsEnabled\.event-a must be a boolean/);
 });
 
 test('save rejects an invalid selection mode without writing settings', async () => {
@@ -367,15 +319,7 @@ test('save rejects an invalid selection mode without writing settings', async ()
 test('duplicate deep-clones with a fresh environment id and reset node pools', async () => {
   const source = environment({
     id: 'env-source',
-    nodeRuntime: {
-      'lib-task': {
-        enabled: true,
-        max: 3,
-        current: 1,
-        depletionTiming: 'onStart',
-        respawn: { policy: 'manual' },
-      },
-    },
+    nodeRuntime: { 'lib-task': { enabled: true, max: 3, current: 1, depletionTiming: 'onStart', respawn: { policy: 'manual' } } }
   });
   const { store } = makeMemoryStore({ saved: [source], ids: ['env-copy'] });
   store.load();
@@ -392,12 +336,12 @@ test('duplicate deep-clones with a fresh environment id and reset node pools', a
 test('delete environment invokes the environment cleanup hook', async () => {
   const calls = [];
   const runCleanup = {
-    removeRunsForSystem: async (systemId) => calls.push(['system', systemId]),
-    removeRunsForEnvironment: async (environmentId) => calls.push(['environment', environmentId]),
+    removeRunsForSystem: async systemId => calls.push(['system', systemId]),
+    removeRunsForEnvironment: async environmentId => calls.push(['environment', environmentId])
   };
   const { store } = makeMemoryStore({
     saved: [environment({ id: 'env-cleanup' })],
-    runCleanup,
+    runCleanup
   });
   store.load();
 
@@ -410,15 +354,18 @@ test('delete environment defers cleanup until remaining records validate and per
   const { store, writes } = makeMemoryStore({
     saved: [
       environment({ id: 'env-delete-me' }),
-      environment({ id: 'env-invalid-remaining', craftingSystemId: 'missing-system' }),
+      environment({ id: 'env-invalid-remaining', craftingSystemId: 'missing-system' })
     ],
     runCleanup: {
-      removeRunsForEnvironment: async (environmentId) => calls.push(environmentId),
-    },
+      removeRunsForEnvironment: async environmentId => calls.push(environmentId)
+    }
   });
   store.load();
 
-  await assert.rejects(() => store.delete('env-delete-me'), /unresolved craftingSystemId/);
+  await assert.rejects(
+    () => store.delete('env-delete-me'),
+    /unresolved craftingSystemId/
+  );
 
   assert.deepEqual(calls, []);
   assert.equal(writes.length, 0);
@@ -430,19 +377,16 @@ test('cleanup by crafting system removes owned environments and invokes system c
   const { store } = makeMemoryStore({
     saved: [
       environment({ id: 'env-a', craftingSystemId: 'system-a' }),
-      environment({ id: 'env-b', craftingSystemId: 'system-disabled' }),
+      environment({ id: 'env-b', craftingSystemId: 'system-disabled' })
     ],
     runCleanup: {
-      removeRunsForSystem: async (systemId) => calls.push(systemId),
-    },
+      removeRunsForSystem: async systemId => calls.push(systemId)
+    }
   });
   store.load();
 
   await store.cleanupByCraftingSystem('system-a');
-  assert.deepEqual(
-    store.list().map((env) => env.id),
-    ['env-b']
-  );
+  assert.deepEqual(store.list().map(env => env.id), ['env-b']);
   assert.deepEqual(calls, ['system-a']);
 });
 
@@ -451,11 +395,11 @@ test('cleanup by crafting system defers run cleanup until remaining records vali
   const { store, writes } = makeMemoryStore({
     saved: [
       environment({ id: 'env-owned', craftingSystemId: 'system-a' }),
-      environment({ id: 'env-invalid-remaining', craftingSystemId: 'missing-system' }),
+      environment({ id: 'env-invalid-remaining', craftingSystemId: 'missing-system' })
     ],
     runCleanup: {
-      removeRunsForSystem: async (systemId) => calls.push(systemId),
-    },
+      removeRunsForSystem: async systemId => calls.push(systemId)
+    }
   });
   store.load();
 
@@ -466,50 +410,41 @@ test('cleanup by crafting system defers run cleanup until remaining records vali
 
   assert.deepEqual(calls, []);
   assert.equal(writes.length, 0);
-  assert.deepEqual(
-    store.list().map((env) => env.id),
-    ['env-owned', 'env-invalid-remaining']
-  );
+  assert.deepEqual(store.list().map(env => env.id), ['env-owned', 'env-invalid-remaining']);
 });
 
 test('disabled gathering feature preserves records but explicit visible query excludes them', () => {
   const { store } = makeMemoryStore({
     saved: [
       environment({ id: 'env-enabled', craftingSystemId: 'system-a' }),
-      environment({ id: 'env-disabled', craftingSystemId: 'system-disabled' }),
-    ],
+      environment({ id: 'env-disabled', craftingSystemId: 'system-disabled' })
+    ]
   });
   store.load();
 
+  assert.deepEqual(store.listBySystem('system-disabled').map(env => env.id), ['env-disabled']);
   assert.deepEqual(
-    store.listBySystem('system-disabled').map((env) => env.id),
-    ['env-disabled']
-  );
-  assert.deepEqual(
-    store.listBySystem('system-disabled', { includeDisabledFeature: false }).map((env) => env.id),
+    store.listBySystem('system-disabled', { includeDisabledFeature: false }).map(env => env.id),
     []
   );
 });
 
 test('stale sceneUuid is preserved without scene resolution', async () => {
   const { store, settings } = makeMemoryStore({
-    saved: [environment({ id: 'env-scene', sceneUuid: 'Scene.no-longer-exists' })],
+    saved: [environment({ id: 'env-scene', sceneUuid: 'Scene.no-longer-exists' })]
   });
 
   const loaded = store.load();
   assert.equal(loaded[0].sceneUuid, 'Scene.no-longer-exists');
 
   await store.save();
-  assert.equal(
-    settings.get(SETTING_KEYS.GATHERING_ENVIRONMENTS)[0].sceneUuid,
-    'Scene.no-longer-exists'
-  );
+  assert.equal(settings.get(SETTING_KEYS.GATHERING_ENVIRONMENTS)[0].sceneUuid, 'Scene.no-longer-exists');
 });
 
 test('preserves a per-environment nodeRuntime map through update and resets it on duplicate', () => {
   const { store } = makeMemoryStore({
     saved: [environment({ id: 'env-nodes', name: 'Mines' })],
-    ids: ['env-copy', 'task-copy-1'],
+    ids: ['env-copy', 'task-copy-1']
   });
   store.load();
 
@@ -517,25 +452,15 @@ test('preserves a per-environment nodeRuntime map through update and resets it o
   assert.deepEqual(store.get('env-nodes').nodeRuntime, {});
 
   // A runtime pool survives update with its current preserved (not reset to max).
-  return store
-    .update('env-nodes', {
-      nodeRuntime: {
-        'lib-1': {
-          enabled: true,
-          max: 4,
-          current: 1,
-          depletionTiming: 'onStart',
-          respawn: { policy: 'manual' },
-        },
-      },
-    })
-    .then(async (updated) => {
-      assert.equal(updated.nodeRuntime['lib-1'].current, 1);
-      assert.equal(updated.nodeRuntime['lib-1'].max, 4);
+  return store.update('env-nodes', {
+    nodeRuntime: { 'lib-1': { enabled: true, max: 4, current: 1, depletionTiming: 'onStart', respawn: { policy: 'manual' } } }
+  }).then(async (updated) => {
+    assert.equal(updated.nodeRuntime['lib-1'].current, 1);
+    assert.equal(updated.nodeRuntime['lib-1'].max, 4);
 
-      const copy = await store.duplicate('env-nodes', { name: 'Mines Copy' });
-      assert.deepEqual(copy.nodeRuntime, {}, 'a duplicate starts with full pools');
-    });
+    const copy = await store.duplicate('env-nodes', { name: 'Mines Copy' });
+    assert.deepEqual(copy.nodeRuntime, {}, 'a duplicate starts with full pools');
+  });
 });
 
 test('normalizes the four location availability id lists; legacy region/biomes preserved', async () => {
@@ -544,21 +469,19 @@ test('normalizes the four location availability id lists; legacy region/biomes p
   // raw fixture systems omitted the key entirely.
   const { store } = makeMemoryStore({
     ids: ['env-loc', 'task-loc'],
-    realms: [{ id: 'r1' }, { id: 'r2' }],
+    realms: [{ id: 'r1' }, { id: 'r2' }]
   });
   store.load();
-  const created = await store.create(
-    environment({
-      id: undefined,
-      name: 'Located',
-      region: 'forest',
-      biomes: ['Forest', 'forest'],
-      includedRealmIds: ['r1', 'r1', ''],
-      excludedRealmIds: ['r2'],
-      includedBiomeIds: ['Temperate', 'temperate'],
-      excludedBiomeIds: ['Arid'],
-    })
-  );
+  const created = await store.create(environment({
+    id: undefined,
+    name: 'Located',
+    region: 'forest',
+    biomes: ['Forest', 'forest'],
+    includedRealmIds: ['r1', 'r1', ''],
+    excludedRealmIds: ['r2'],
+    includedBiomeIds: ['Temperate', 'temperate'],
+    excludedBiomeIds: ['Arid']
+  }));
   assert.deepEqual(created.includedRealmIds, ['r1']);
   assert.deepEqual(created.excludedRealmIds, ['r2']);
   assert.deepEqual(created.includedBiomeIds, ['temperate']);
@@ -571,7 +494,7 @@ test('normalizes the four location availability id lists; legacy region/biomes p
 test('save-time validation rejects an includedRealmId not present on the owning system', async () => {
   const { store } = makeMemoryStore({
     realms: [{ id: 'known' }],
-    ids: ['env-bad', 'task-bad'],
+    ids: ['env-bad', 'task-bad']
   });
   store.load();
   await assert.rejects(
@@ -579,20 +502,18 @@ test('save-time validation rejects an includedRealmId not present on the owning 
     /unknown realm/
   );
   // A known realm id passes.
-  const ok = await store.create(
-    environment({ id: undefined, name: 'Good', includedRealmIds: ['known'] })
-  );
+  const ok = await store.create(environment({ id: undefined, name: 'Good', includedRealmIds: ['known'] }));
   assert.deepEqual(ok.includedRealmIds, ['known']);
 });
 
 test('load never throws on a stale includedRealmId (validation is save-time only)', () => {
   const { store } = makeMemoryStore({
     saved: [environment({ id: 'env-stale', includedRealmIds: ['gone'] })],
-    realms: [{ id: 'known' }],
+    realms: [{ id: 'known' }]
   });
   // load() normalizes without validating; no throw, stale id preserved.
   const loaded = store.load();
-  assert.deepEqual(loaded.find((e) => e.id === 'env-stale').includedRealmIds, ['gone']);
+  assert.deepEqual(loaded.find(e => e.id === 'env-stale').includedRealmIds, ['gone']);
 });
 
 // ---------------------------------------------------------------------------
@@ -611,7 +532,7 @@ test('_normalizeEnvironment accepts legacy hazard-schema keys and values on read
     hazardSelectionMode: 'highestRankedDrop',
     hazardPolicy: 'failureWithHazard',
     hazardDropRateAdjustments: { h1: 20 },
-    hazardDropRateAdjustmentsEnabled: { h1: false },
+    hazardDropRateAdjustmentsEnabled: { h1: false }
   });
   assert.deepEqual(normalized.enabledEventIds, ['h1']);
   assert.deepEqual(normalized.disabledEventIds, ['h2']);
@@ -625,10 +546,7 @@ test('_normalizeEnvironment accepts legacy hazard-schema keys and values on read
 
 test('_normalizeEnvironment defaults an unknown event policy to successWithEvent', () => {
   const { store } = makeMemoryStore();
-  const normalized = store._normalizeEnvironment({
-    craftingSystemId: 'system-a',
-    hazardPolicy: 'nonsense',
-  });
+  const normalized = store._normalizeEnvironment({ craftingSystemId: 'system-a', hazardPolicy: 'nonsense' });
   assert.equal(normalized.eventPolicy, 'successWithEvent');
 });
 
@@ -638,18 +556,10 @@ test('_normalizeEnvironment accepts legacy region-schema id lists on read (pre-1
     id: 'env-legacy-realm',
     craftingSystemId: 'system-a',
     includedRegionIds: ['r1', 'r2'],
-    excludedRegionIds: ['r3'],
+    excludedRegionIds: ['r3']
   });
-  assert.deepEqual(
-    normalized.includedRealmIds,
-    ['r1', 'r2'],
-    'legacy includedRegionIds read as includedRealmIds'
-  );
-  assert.deepEqual(
-    normalized.excludedRealmIds,
-    ['r3'],
-    'legacy excludedRegionIds read as excludedRealmIds'
-  );
+  assert.deepEqual(normalized.includedRealmIds, ['r1', 'r2'], 'legacy includedRegionIds read as includedRealmIds');
+  assert.deepEqual(normalized.excludedRealmIds, ['r3'], 'legacy excludedRegionIds read as excludedRealmIds');
 });
 
 test('_normalizeEnvironment prefers the new realm id lists when both are present', () => {
@@ -657,11 +567,7 @@ test('_normalizeEnvironment prefers the new realm id lists when both are present
   const normalized = store._normalizeEnvironment({
     craftingSystemId: 'system-a',
     includedRealmIds: ['new'],
-    includedRegionIds: ['legacy'],
+    includedRegionIds: ['legacy']
   });
-  assert.deepEqual(
-    normalized.includedRealmIds,
-    ['new'],
-    'new key wins over legacy when both present'
-  );
+  assert.deepEqual(normalized.includedRealmIds, ['new'], 'new key wins over legacy when both present');
 });

@@ -11,11 +11,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import {
-  makeCraftingRun,
-  makeGatheringRun,
-  makeSucceededRun,
-} from '../helpers/journal-fixtures.js';
+import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -28,7 +24,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/systems/foundryCalendar.js',
-    'src/ui/svelte/apps/journal/journalRunStatus.js',
+    'src/ui/svelte/apps/journal/journalRunStatus.js'
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
@@ -50,9 +46,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/WhatToExpect.svelte',
     'src/ui/svelte/apps/journal/JournalTips.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
-    'src/ui/svelte/apps/journal/JournalView.svelte',
+    'src/ui/svelte/apps/journal/JournalView.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/journal/JournalView.svelte',
+  componentPath: 'src/ui/svelte/apps/journal/JournalView.svelte'
 });
 
 function makeJournal(overrides = {}) {
@@ -77,19 +73,15 @@ function makeJournal(overrides = {}) {
     loadedOnce: true,
     busyRunId: '',
     load() {},
-    select(id) {
-      calls.select.push(id);
-    },
+    select(id) { calls.select.push(id); },
     setActiveSort() {},
     setHistorySort() {},
     setHistoryPage() {},
     setHistoryPageSize() {},
     advance() {},
-    cancel(run) {
-      calls.cancel.push(run?.id ?? run);
-    },
+    cancel(run) { calls.cancel.push(run?.id ?? run); },
     tickWorldTime() {},
-    ...overrides,
+    ...overrides
   };
   return { store, calls };
 }
@@ -130,7 +122,7 @@ describe('JournalView mounted behavior', () => {
       historyPageItems: [makeSucceededRun()],
       historyCount: 1,
       recentTerminalRuns: [makeSucceededRun()],
-      navCount: 1,
+      navCount: 1
     });
     const target = await harness.mount({ services: makeServices(store) });
     assert.ok(target.querySelector('[data-journal-state="populated"]'), 'populated grid shown');
@@ -138,18 +130,9 @@ describe('JournalView mounted behavior', () => {
     assert.ok(target.querySelector('.journal-view-column-center'), 'center column present');
     assert.ok(target.querySelector('.journal-view-column-right'), 'right column present');
     assert.ok(target.querySelector('[data-run-id="run-craft-1"]'), 'the active run card renders');
-    assert.ok(
-      target.querySelector('[data-journal-detail]'),
-      'the run detail renders in the centre'
-    );
-    assert.ok(
-      target.querySelector('[data-journal-card="recent"]'),
-      'recent results render on the right'
-    );
-    assert.ok(
-      target.querySelector('[data-journal-card="about"]'),
-      'about-this-run renders when a run is selected'
-    );
+    assert.ok(target.querySelector('[data-journal-detail]'), 'the run detail renders in the centre');
+    assert.ok(target.querySelector('[data-journal-card="recent"]'), 'recent results render on the right');
+    assert.ok(target.querySelector('[data-journal-card="about"]'), 'about-this-run renders when a run is selected');
     // Right-column order (mockup): about → recent (about now precedes recent).
     const about = target.querySelector('[data-journal-card="about"]');
     const recent = target.querySelector('[data-journal-card="recent"]');
@@ -159,11 +142,7 @@ describe('JournalView mounted behavior', () => {
     );
     // A multi-step crafting run uses the standard crafting explainer, not the single-step variant.
     const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(
-      expect.textContent,
-      /WhatToExpect\.Crafting\b/,
-      'multi-step run uses the standard crafting copy'
-    );
+    assert.match(expect.textContent, /WhatToExpect\.Crafting\b/, 'multi-step run uses the standard crafting copy');
     assert.doesNotMatch(expect.textContent, /CraftingSingleStep/, 'not the single-step variant');
   });
 
@@ -175,22 +154,15 @@ describe('JournalView mounted behavior', () => {
       isFinalStep: true,
       stepLabel: '',
       structureLabel: 'Single-Step Recipe',
-      steps: [base.steps[0]],
+      steps: [base.steps[0]]
     });
     const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
     const target = await harness.mount({ services: makeServices(store) });
 
     const center = target.querySelector('.journal-view-column-center');
-    assert.ok(
-      !center.querySelector('[data-journal-timeline]'),
-      'no step timeline for a single-step run'
-    );
+    assert.ok(!center.querySelector('[data-journal-timeline]'), 'no step timeline for a single-step run');
     // Only the structure chip renders — the blanked step-label chip is gone from the DOM.
-    assert.equal(
-      center.querySelectorAll('.journal-detail-tag').length,
-      1,
-      'only the structure chip remains'
-    );
+    assert.equal(center.querySelectorAll('.journal-detail-tag').length, 1, 'only the structure chip remains');
 
     const trigger = target.querySelector('[data-journal-trigger]');
     assert.ok(trigger, 'the primary action button renders');
@@ -201,11 +173,7 @@ describe('JournalView mounted behavior', () => {
     assert.match(gate.textContent, /WhenPassedFinal/, 'gate hint uses the finish variant');
     // The right-column explainer switches to the single-step crafting copy.
     const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(
-      expect.textContent,
-      /CraftingSingleStep/,
-      'what-to-expect uses the single-step copy'
-    );
+    assert.match(expect.textContent, /CraftingSingleStep/, 'what-to-expect uses the single-step copy');
   });
 
   it('uses finish copy on the last step of a multi-step run while keeping the timeline', async () => {
@@ -216,10 +184,7 @@ describe('JournalView mounted behavior', () => {
     const target = await harness.mount({ services: makeServices(store) });
 
     const center = target.querySelector('.journal-view-column-center');
-    assert.ok(
-      center.querySelector('[data-journal-timeline]'),
-      'the multi-step timeline is still shown'
-    );
+    assert.ok(center.querySelector('[data-journal-timeline]'), 'the multi-step timeline is still shown');
     assert.match(
       target.querySelector('[data-journal-trigger]').textContent,
       /FinishCrafting/,
@@ -237,43 +202,22 @@ describe('JournalView mounted behavior', () => {
     const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
     const target = await harness.mount({ services: makeServices(store) });
     const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(
-      expect.textContent,
-      /WhatToExpect\.Gathering/,
-      'gathering run keeps the gathering copy'
-    );
-    assert.doesNotMatch(
-      expect.textContent,
-      /CraftingSingleStep/,
-      'gathering never mis-routes to the single-step copy'
-    );
+    assert.match(expect.textContent, /WhatToExpect\.Gathering/, 'gathering run keeps the gathering copy');
+    assert.doesNotMatch(expect.textContent, /CraftingSingleStep/, 'gathering never mis-routes to the single-step copy');
   });
 
   it('shows per-column empty states when there are no active or history runs', async () => {
     const { store } = makeJournal({ activeRuns: [], historyPageItems: [], historyCount: 0 });
     const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(
-      target.querySelector('[data-journal-empty="active"]'),
-      'no-active-runs empty state shown'
-    );
-    assert.ok(
-      target.querySelector('[data-journal-empty="history"]'),
-      'no-history empty state shown'
-    );
-    assert.ok(
-      target.querySelector('[data-journal-empty="detail"]'),
-      'no-run-selected empty state shown'
-    );
+    assert.ok(target.querySelector('[data-journal-empty="active"]'), 'no-active-runs empty state shown');
+    assert.ok(target.querySelector('[data-journal-empty="history"]'), 'no-history empty state shown');
+    assert.ok(target.querySelector('[data-journal-empty="detail"]'), 'no-run-selected empty state shown');
   });
 
   it('shows an owner-only cancel affordance that confirms then routes to store.cancel', async () => {
     // A discovered, owned, in-progress crafting run offers the player cancel (issue 848).
     const run = makeCraftingRun({ canCancel: true, refundOnCancel: true });
-    const { store, calls } = makeJournal({
-      activeRuns: [run],
-      selectedRun: run,
-      selectedRunId: run.id,
-    });
+    const { store, calls } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
     const target = await harness.mount({ services: makeServices(store) });
 
     const startBtn = target.querySelector('[data-journal-cancel-start]');
@@ -293,11 +237,7 @@ describe('JournalView mounted behavior', () => {
 
   it('lets the player back out of a cancel with "keep crafting" (no cancel issued)', async () => {
     const run = makeCraftingRun({ canCancel: true, refundOnCancel: false });
-    const { store, calls } = makeJournal({
-      activeRuns: [run],
-      selectedRun: run,
-      selectedRunId: run.id,
-    });
+    const { store, calls } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
     const target = await harness.mount({ services: makeServices(store) });
 
     target.querySelector('[data-journal-cancel-start]').click();
@@ -311,20 +251,14 @@ describe('JournalView mounted behavior', () => {
     target.querySelector('[data-journal-cancel-keep]').click();
     flushSync();
     assert.equal(calls.cancel.length, 0, 'backing out issues no cancel');
-    assert.ok(
-      !target.querySelector('[data-journal-cancel-prompt]'),
-      'the confirm step is dismissed'
-    );
+    assert.ok(!target.querySelector('[data-journal-cancel-prompt]'), 'the confirm step is dismissed');
   });
 
   it('hides the cancel affordance for a run the player does not own', async () => {
     const run = makeCraftingRun({ canCancel: false });
     const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
     const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(
-      !target.querySelector('[data-journal-cancel]'),
-      'no cancel affordance for a not-owned run'
-    );
+    assert.ok(!target.querySelector('[data-journal-cancel]'), 'no cancel affordance for a not-owned run');
     // The advance button still renders — only the cancel affordance is gated.
     assert.ok(target.querySelector('[data-journal-trigger]'), 'the advance button is unaffected');
   });
@@ -334,10 +268,6 @@ describe('JournalView mounted behavior', () => {
     const { store, calls } = makeJournal({ activeRuns: [run] });
     const target = await harness.mount({ services: makeServices(store) });
     target.querySelector('[data-run-id="run-craft-1"]').click();
-    assert.deepEqual(
-      calls.select,
-      ['run-craft-1'],
-      'clicking the card calls store.select with the run id'
-    );
+    assert.deepEqual(calls.select, ['run-craft-1'], 'clicking the card calls store.select with the run id');
   });
 });

@@ -29,8 +29,9 @@ function setProperty(object, path, value) {
 globalThis.foundry = { utils: { getProperty, setProperty } };
 
 const { buildCurrencyRefundUpdates } = await import('../src/systems/currencyProfile.js');
-const { ActorPropertyCoinSpender, ActorInventoryCoinSpender, MacroCoinSpender } =
-  await import('../src/systems/CoinSpenders.js');
+const { ActorPropertyCoinSpender, ActorInventoryCoinSpender, MacroCoinSpender } = await import(
+  '../src/systems/CoinSpenders.js'
+);
 const { Pf2eInventoryCoinAdapter } = await import('../src/systems/Pf2eInventoryCoinAdapter.js');
 const { refundCurrencySpends } = await import('../src/systems/currencyAffordance.js');
 
@@ -148,11 +149,7 @@ test('MacroCoinSpender.refund runs the increment macro (the reserved refund flow
   const ctx = { profile: { units: [] }, macroContext: { actor: { name: 'A' } } };
   const result = await spender.refund({ name: 'A' }, { unit: { id: 'gp' }, amount: 2 }, ctx);
   assert.equal(result.valid, true);
-  assert.deepEqual(
-    runs.map((r) => r.uuid),
-    ['M.inc'],
-    'the increment macro is invoked for a refund'
-  );
+  assert.deepEqual(runs.map((r) => r.uuid), ['M.inc'], 'the increment macro is invoked for a refund');
 });
 
 test('MacroCoinSpender.refund fails loudly when no increment macro is configured', async () => {
@@ -160,11 +157,7 @@ test('MacroCoinSpender.refund fails loudly when no increment macro is configured
     macros: { canAfford: 'M.afford', decrement: 'M.dec' },
     runMacro: async () => true,
   });
-  const result = await spender.refund(
-    { name: 'A' },
-    { unit: { id: 'gp' }, amount: 2 },
-    { profile: { units: [] } }
-  );
+  const result = await spender.refund({ name: 'A' }, { unit: { id: 'gp' }, amount: 2 }, { profile: { units: [] } });
   assert.equal(result.valid, false, 'a missing increment macro cannot silently drop a refund');
 });
 
@@ -177,8 +170,9 @@ test('MacroCoinSpender.refund fails loudly when no increment macro is configured
 // ---------------------------------------------------------------------------
 
 const { aggregateCurrencySpends } = await import('../src/systems/currencyAffordance.js');
-const { validateCurrencyProfile: validateProfile } =
-  await import('../src/systems/currencyProfile.js');
+const { validateCurrencyProfile: validateProfile } = await import(
+  '../src/systems/currencyProfile.js'
+);
 const { CurrencyCraftingActorFake, TWO_TERMINAL_CURRENCY_UNITS, makeDelegatingCoinSpender } =
   await import('./helpers/currency-spend-fixtures.js');
 

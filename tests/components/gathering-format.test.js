@@ -7,7 +7,7 @@ import {
   riskLabel,
   biomeChipStyle,
   toPercent,
-  descriptionOrDefault,
+  descriptionOrDefault
 } from '../../src/ui/svelte/util/gatheringFormat.js';
 
 // An echo `localize` so assertions read against the resolved keys/formatting.
@@ -37,10 +37,7 @@ describe('gatheringFormat', () => {
 
   describe('riskLabel', () => {
     it('localizes a known tier via the Detail.Risk key', () => {
-      assert.equal(
-        riskLabel('hazardous', localize),
-        'FABRICATE.App.Gathering.Detail.Risk.hazardous'
-      );
+      assert.equal(riskLabel('hazardous', localize), 'FABRICATE.App.Gathering.Detail.Risk.hazardous');
       assert.equal(riskLabel('safe', localize), 'FABRICATE.App.Gathering.Detail.Risk.safe');
     });
 

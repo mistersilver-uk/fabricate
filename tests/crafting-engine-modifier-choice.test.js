@@ -65,7 +65,11 @@ test('engine gating: a non-interactive craft threads no modifierChoice', () => {
 test('engine gating: an interactive non-playerPicks rule threads no modifierChoice', () => {
   withRoll({ med: 2, herb: 5 }, () => {
     for (const systemPolicy of ['addAll', 'highest', 'bySubject']) {
-      assert.equal(build('1d20', context({ systemPolicy }), true), null, systemPolicy);
+      assert.equal(
+        build('1d20', context({ systemPolicy }), true),
+        null,
+        systemPolicy
+      );
     }
     // …including `bySubject` with a real recipe pick in hand: the selection is stored, so
     // there is still nothing to prompt for.
@@ -147,9 +151,8 @@ test('engine gating: a formula that strips to empty threads no modifierChoice', 
   const previousRoll = globalThis.Roll;
   globalThis.Roll = {
     replaceFormulaData: (expression) =>
-      String(expression).replace(
-        /@([a-z]+)/gi,
-        (_match, key) => ({ med: '2', herb: '5' })[key] ?? `@${key}`
+      String(expression).replace(/@([a-z]+)/gi, (_match, key) =>
+        ({ med: '2', herb: '5' })[key] ?? `@${key}`
       ),
     validate(formula) {
       const text = String(formula).trim();
@@ -183,7 +186,10 @@ test('engine gating: fewer than two eligible modifiers threads no modifierChoice
   withRoll({ med: 2, herb: 5 }, () => {
     // One eligible modifier is not a choice: the radio could not be changed, and
     // `highest` over a single value substitutes that very modifier anyway.
-    assert.equal(build('1d20', context({ defaultModifierIds: ['med'] }), true), null);
+    assert.equal(
+      build('1d20', context({ defaultModifierIds: ['med'] }), true),
+      null
+    );
     assert.ok(
       build('1d20', context({ defaultModifierIds: ['med', 'herb'] }), true),
       'two eligible modifiers still build a descriptor'
@@ -199,12 +205,20 @@ test('engine gating: a stored recipe policy can neither add nor remove the descr
   withRoll({ med: 2, herb: 5 }, () => {
     for (const stale of ['playerPicks', 'bySubject', 'highest', 'addAll']) {
       assert.equal(
-        build('1d20', context({ systemPolicy: 'addAll', subjectPolicy: stale }), true),
+        build(
+          '1d20',
+          context({ systemPolicy: 'addAll', subjectPolicy: stale }),
+          true
+        ),
         null,
         `a recipe carrying ${stale} cannot opt an addAll system into an interactive roll`
       );
       assert.ok(
-        build('1d20', context({ systemPolicy: 'playerPicks', subjectPolicy: stale }), true),
+        build(
+          '1d20',
+          context({ systemPolicy: 'playerPicks', subjectPolicy: stale }),
+          true
+        ),
         `…and cannot opt a playerPicks system out of one either (${stale})`
       );
     }

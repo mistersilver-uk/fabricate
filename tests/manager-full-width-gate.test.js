@@ -187,8 +187,7 @@ test('every released route declares its collapsed sibling at equal specificity',
     [],
     '`.manager-body.is-rail-collapsed` out-specifies a single-class rule, so a released column ' +
       'with no collapsed sibling silently snaps back to three tracks the moment the GM ' +
-      'collapses the rail:\n  ' +
-      missing.join('\n  ')
+      'collapses the rail:\n  ' + missing.join('\n  ')
   );
 });
 
@@ -212,7 +211,7 @@ test('the aside chain is BUILT from the set rather than restating it', () => {
   }
 });
 
-test("every entry's PREDICATE answers for its own id", () => {
+test('every entry\'s PREDICATE answers for its own id', () => {
   // THE FIELD THAT SHIPS THE DEFECT, and the one this gate could not see (issue 1362 review
   // M1). `fullWidthLayout` derives from `predicate` and from nothing else; `id` and `selector`
   // are read at runtime by nothing at all. Swapping two routes' predicates — the inspector

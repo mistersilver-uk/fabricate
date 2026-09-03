@@ -223,10 +223,7 @@ describe('adminStore character prerequisite delete confirmation (issue 1308)', (
     // Whole literals, not composed from a scope token: a template-literal key reads to the
     // lang-key scanner as the bare Manager namespace base and disarms the orphaned-key gate for
     // everything beneath it.
-    assert.match(
-      seen[0].title,
-      /^FABRICATE\.Admin\.Manager\.CharacterPrerequisites\.DeleteTitle\|/
-    );
+    assert.match(seen[0].title, /^FABRICATE\.Admin\.Manager\.CharacterPrerequisites\.DeleteTitle\|/);
     assert.match(
       seen[0].content,
       /FABRICATE\.Admin\.Manager\.CharacterPrerequisites\.DeleteContent\|/
@@ -247,9 +244,7 @@ describe('adminStore character prerequisite delete confirmation (issue 1308)', (
   it('escapes the entry name in the dialog BODY, which is HTML', async () => {
     const seen = [];
     const services = createServices({
-      prerequisites: [
-        { id: 'p1', name: '<img src=x onerror=alert(1)>', path: 'a', op: 'gte', value: 1 },
-      ],
+      prerequisites: [{ id: 'p1', name: '<img src=x onerror=alert(1)>', path: 'a', op: 'gte', value: 1 }],
     });
     services.confirmDialog = async (options) => {
       seen.push(options);

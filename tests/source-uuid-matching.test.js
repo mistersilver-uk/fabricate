@@ -39,8 +39,8 @@ function makeFakeGame({ system = null } = {}) {
       getCraftingSystemManager: () => systemManager,
       getResolutionModeService: () => null,
       getCraftingRunManager: () => null,
-      getRecipeVisibilityService: () => null,
-    },
+      getRecipeVisibilityService: () => null
+    }
   };
 }
 
@@ -57,7 +57,7 @@ function makeIngredient(componentId, quantity = 1) {
     componentId,
     quantity,
     getDescription: () => `ingredient-${componentId}`,
-    match: null,
+    match: null
   };
 }
 
@@ -88,7 +88,7 @@ function makeRecipe(overrides = {}) {
     id: 'recipe-1',
     craftingSystemId: 'system-1',
     ingredientSets: [],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -98,7 +98,7 @@ function makeSystem(componentId, registeredItemUuid, name = 'Test Item') {
   return {
     features: {},
     components: [component],
-    tools: [toolFromComponent(component)],
+    tools: [toolFromComponent(component)]
   };
 }
 
@@ -106,7 +106,7 @@ function makeSystemWithComponent(component) {
   return {
     features: {},
     components: [component],
-    tools: [toolFromComponent(component)],
+    tools: [toolFromComponent(component)]
   };
 }
 
@@ -129,7 +129,7 @@ test('T1 - ingredientMatchesItem: matches item that only has _stats.compendiumSo
     _stats: { compendiumSource: registeredItemUuid },
     flags: {},
     name: 'Test Item',
-    system: { quantity: 1 },
+    system: { quantity: 1 }
   };
 
   assert.equal(manager.ingredientMatchesItem(recipe, ingredient, item), true);
@@ -152,7 +152,7 @@ test('T2 - ingredientMatchesItem: matches item with only flags.core.sourceId (le
     uuid: 'world-item-uuid-v10',
     flags: { core: { sourceId: registeredItemUuid } },
     name: 'Legacy Item',
-    system: { quantity: 1 },
+    system: { quantity: 1 }
   };
 
   assert.equal(manager.ingredientMatchesItem(recipe, ingredient, item), true);
@@ -175,7 +175,7 @@ test('T3 - _toolMatchesItem: matches item that only has _stats.compendiumSource'
     uuid: 'world-catalyst-uuid',
     _stats: { compendiumSource: registeredItemUuid },
     flags: {},
-    name: 'Catalyst Item',
+    name: 'Catalyst Item'
   };
 
   assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
@@ -197,7 +197,7 @@ test('T4 - _toolMatchesItem: matches item with only flags.core.sourceId (legacy)
   const item = {
     uuid: 'world-catalyst-uuid-v10',
     flags: { core: { sourceId: registeredItemUuid } },
-    name: 'Legacy Catalyst',
+    name: 'Legacy Catalyst'
   };
 
   assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
@@ -220,7 +220,7 @@ test('T5 - ingredientMatchesItem: no match when compendiumSource differs from co
     _stats: { compendiumSource: 'Compendium.world.items.wrong' },
     flags: {},
     name: 'Wrong Item',
-    system: { quantity: 1 },
+    system: { quantity: 1 }
   };
 
   assert.equal(manager.ingredientMatchesItem(recipe, ingredient, item), false);
@@ -242,7 +242,7 @@ test('T6 - _toolMatchesItem: no match when compendiumSource differs from compone
     uuid: 'world-wrong',
     _stats: { compendiumSource: 'Compendium.world.items.wrong' },
     flags: {},
-    name: 'Wrong Catalyst',
+    name: 'Wrong Catalyst'
   };
 
   assert.equal(manager.toolMatchesItem(recipe, tool, item), false);
@@ -257,7 +257,7 @@ test('T8 - toolMatchesItem: matches item linked only by _stats.duplicateSource',
     id: 'cat-8',
     registeredItemUuid: 'Compendium.world.items.pick-live',
     originItemUuid: 'Item.world-pick',
-    name: 'Mining Pick',
+    name: 'Mining Pick'
   });
   globalThis.game = makeFakeGame({ system });
 
@@ -270,7 +270,7 @@ test('T8 - toolMatchesItem: matches item linked only by _stats.duplicateSource',
     uuid: 'Item.actor-drag-copy',
     _stats: { compendiumSource: null, duplicateSource: 'Item.world-pick' },
     flags: {},
-    name: 'Mining Pick',
+    name: 'Mining Pick'
   };
 
   assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
@@ -285,7 +285,7 @@ test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId with 
     id: 'cat-9',
     registeredItemUuid: 'Compendium.world.items.pick-live',
     originItemUuid: 'Item.world-pick',
-    name: 'Mining Pick',
+    name: 'Mining Pick'
   });
   globalThis.game = makeFakeGame({ system });
 
@@ -299,7 +299,7 @@ test('T9 - toolMatchesItem: does NOT match on flags.fabricate.mythwrightId with 
     uuid: 'Item.actor-seeded',
     _stats: {},
     flags: { fabricate: { mythwrightId: 'mw-pick' } },
-    name: 'Unrelated Chisel',
+    name: 'Unrelated Chisel'
   };
 
   assert.equal(manager.toolMatchesItem(recipe, tool, item), false);
@@ -310,7 +310,7 @@ test('T9b - toolMatchesItem: matches a same-named item when source UUIDs differ 
     id: 'cat-9b',
     registeredItemUuid: 'Compendium.world.items.pick-live',
     originItemUuid: 'Item.world-pick',
-    name: 'Mining Pick',
+    name: 'Mining Pick'
   });
   globalThis.game = makeFakeGame({ system });
 
@@ -323,7 +323,7 @@ test('T9b - toolMatchesItem: matches a same-named item when source UUIDs differ 
     uuid: 'Item.actor-templated',
     _stats: { duplicateSource: 'Item.some-template' },
     flags: {},
-    name: 'Mining Pick',
+    name: 'Mining Pick'
   };
 
   assert.equal(manager.toolMatchesItem(recipe, tool, item), true);
@@ -334,7 +334,7 @@ test('T7 - ingredientMatchesItem: matches canonical originItemUuid when live reg
     id: 'comp-7',
     registeredItemUuid: 'Compendium.world.items.iron-ore-live',
     originItemUuid: 'Compendium.source.items.iron-ore',
-    name: 'Iron Ore',
+    name: 'Iron Ore'
   });
   globalThis.game = makeFakeGame({ system });
 
@@ -347,7 +347,7 @@ test('T7 - ingredientMatchesItem: matches canonical originItemUuid when live reg
     _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
     flags: {},
     name: 'Iron Ore',
-    system: { quantity: 1 },
+    system: { quantity: 1 }
   };
 
   assert.equal(manager.ingredientMatchesItem(recipe, ingredient, item), true);

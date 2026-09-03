@@ -118,7 +118,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     assert.equal(
       numberInputs.length,
       1,
-      "the one shared numericField snippet is the component's only number input"
+      'the one shared numericField snippet is the component\'s only number input'
     );
     assert.ok(
       !/type="text"/.test(markup),
@@ -172,8 +172,8 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     // ~265 files present so an added component never has to update it.
     assert.ok(
       scannedPaths.length >= MINIMUM_SCANNED_SVELTE_FILES,
-      `scanned only ${scannedPaths.length} .svelte files under src/ui/svelte; expected at least ` +
-        `${MINIMUM_SCANNED_SVELTE_FILES}, so the enumeration is broken rather than the tree`
+      `scanned only ${scannedPaths.length} .svelte files under src/ui/svelte; expected at least `
+        + `${MINIMUM_SCANNED_SVELTE_FILES}, so the enumeration is broken rather than the tree`
     );
     assert.ok(
       scannedPaths.includes(STEPPER_PATH),
@@ -188,11 +188,9 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     assert.deepEqual(
       [...bareFieldCounts.keys()].sort(),
       BARE_NUMBER_FIELD_REGISTER.map((entry) => entry.path).sort(),
-      'every bare `type="number"` outside the primitive must carry a written reason in the ' +
-        'non-reuse register:\n  ' +
-        BARE_NUMBER_FIELD_REGISTER.map(
-          (entry) => `${entry.register} ${entry.path}: ${entry.reason}`
-        ).join('\n  ')
+      'every bare `type="number"` outside the primitive must carry a written reason in the '
+        + 'non-reuse register:\n  '
+        + BARE_NUMBER_FIELD_REGISTER.map((entry) => `${entry.register} ${entry.path}: ${entry.reason}`).join('\n  ')
     );
     // Derived from the register's own length rather than hard-coded, so adding an entry cannot
     // hide a SECOND bare field appearing in an already-registered file: the claim being pinned is
@@ -219,13 +217,13 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     assert.deepEqual(
       selectors.filter((selector) => !namesASpecificControl(selector)),
       [],
-      'a spinner suppression whose selector names only an area root reaches every bare field in ' +
-        'that area, including the ones whose spinner is their only pointer affordance'
+      'a spinner suppression whose selector names only an area root reaches every bare field in '
+        + 'that area, including the ones whose spinner is their only pointer affordance'
     );
     assert.ok(
       !selectors.some((selector) => selector.includes('manager-availability-pill')),
-      'R2 (the currency sub-unit amount) keeps its native spinner: it is a bare field in a chip ' +
-        'with no other pointer-driven stepping affordance'
+      'R2 (the currency sub-unit amount) keeps its native spinner: it is a bare field in a chip '
+        + 'with no other pointer-driven stepping affordance'
     );
   });
 
@@ -242,8 +240,8 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     assert.match(
       readFileSync(resolve(repoRoot, 'src/ui/svelte/components/ChanceSlider.svelte'), 'utf8'),
       /onkeydown=\{handleNumberKeydown\}/,
-      'and keeps its own keydown handler, which is what stops the suppression removing keyboard ' +
-        'stepping — the difference between R1 and the regression #1037 refused to ship'
+      'and keeps its own keydown handler, which is what stops the suppression removing keyboard '
+        + 'stepping — the difference between R1 and the regression #1037 refused to ship'
     );
   });
 });

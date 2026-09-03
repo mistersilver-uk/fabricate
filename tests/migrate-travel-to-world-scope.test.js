@@ -75,10 +75,7 @@ describe('buildWorldTravelConfig', () => {
   it('carries sceneMappings across, because a map region link IS the realm record', () => {
     const built = buildWorldTravelConfig([
       systemWithTravel('herbalism', [
-        {
-          id: 'vale',
-          sceneMappings: [{ sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.r1' }],
-        },
+        { id: 'vale', sceneMappings: [{ sceneUuid: 'Scene.s1', sceneRegionUuid: 'Scene.s1.Region.r1' }] },
       ]),
     ]);
     assert.deepEqual(built.realms[0].sceneMappings, [
@@ -90,16 +87,8 @@ describe('buildWorldTravelConfig', () => {
     // A system with travel switched off never configured these deliberately, so an enabled
     // system's choice is the only signal available about how this world reveals its places.
     const built = buildWorldTravelConfig([
-      systemWithTravel('off', [], {
-        enabled: false,
-        revealMode: 'manual',
-        modifierVisibility: 'gmOnly',
-      }),
-      systemWithTravel('on', [], {
-        enabled: true,
-        revealMode: 'alwaysVisible',
-        modifierVisibility: 'visible',
-      }),
+      systemWithTravel('off', [], { enabled: false, revealMode: 'manual', modifierVisibility: 'gmOnly' }),
+      systemWithTravel('on', [], { enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'visible' }),
     ]);
     assert.equal(built.revealMode, 'alwaysVisible');
     assert.equal(built.modifierVisibility, 'visible');
@@ -123,10 +112,7 @@ describe('buildWorldTravelConfig', () => {
         gatheringRegionSettings: { enabled: true, revealMode: 'alwaysVisible' },
       },
     ]);
-    assert.deepEqual(
-      built.realms.map((r) => r.id),
-      ['north']
-    );
+    assert.deepEqual(built.realms.map((r) => r.id), ['north']);
     assert.equal(built.revealMode, 'alwaysVisible');
   });
 
@@ -136,10 +122,7 @@ describe('buildWorldTravelConfig', () => {
       'nope',
       systemWithTravel('ok', [null, { name: 'no id' }, { id: '   ' }, { id: 'vale' }]),
     ]);
-    assert.deepEqual(
-      built.realms.map((r) => r.id),
-      ['vale']
-    );
+    assert.deepEqual(built.realms.map((r) => r.id), ['vale']);
   });
 });
 
@@ -158,11 +141,7 @@ describe('stripSystemTravelConfig', () => {
 
   it('drops the legacy region keys as well, so they cannot resurrect the library', () => {
     const [system] = stripSystemTravelConfig([
-      {
-        id: 'legacy',
-        gatheringRegions: [{ id: 'north' }],
-        gatheringRegionSettings: { enabled: true },
-      },
+      { id: 'legacy', gatheringRegions: [{ id: 'north' }], gatheringRegionSettings: { enabled: true } },
     ]);
     assert.equal(system.gatheringRegions, undefined);
     assert.equal(system.gatheringRegionSettings, undefined);
@@ -233,10 +212,7 @@ describe('collapsePartyRealmOverrides', () => {
 
   it('reads the pre-1.1.0 currentRegionOverrides key too', () => {
     const { parties } = collapsePartyRealmOverrides([
-      {
-        id: 'p1',
-        currentRegionOverrides: { a: { mode: 'manual', realmIds: ['north'], updatedAt: 3 } },
-      },
+      { id: 'p1', currentRegionOverrides: { a: { mode: 'manual', realmIds: ['north'], updatedAt: 3 } } },
     ]);
     assert.deepEqual(parties[0].currentRealmOverride.realmIds, ['north']);
     assert.equal(parties[0].currentRegionOverrides, undefined);
@@ -264,10 +240,7 @@ describe('migrateTravelToWorldScope', () => {
       ],
       travelConfig: {},
     });
-    assert.deepEqual(
-      result.travelConfig.realms.map((r) => r.id),
-      ['vale', 'quarry']
-    );
+    assert.deepEqual(result.travelConfig.realms.map((r) => r.id), ['vale', 'quarry']);
     assert.deepEqual(result.systems[0].gatheringRealmSettings, { enabled: true });
     assert.deepEqual(result.systems[1].gatheringRealmSettings, { enabled: false });
   });
@@ -289,9 +262,7 @@ describe('migrateTravelToWorldScope', () => {
   it('re-running over already-shrunk systems changes nothing', () => {
     const first = migrateTravelToWorldScope({
       systems: [systemWithTravel('herbalism', [{ id: 'vale' }])],
-      gatheringParties: [
-        { id: 'p1', currentRealmOverrides: { a: { mode: 'manual', realmIds: ['vale'] } } },
-      ],
+      gatheringParties: [{ id: 'p1', currentRealmOverrides: { a: { mode: 'manual', realmIds: ['vale'] } } }],
       travelConfig: {},
     });
     const second = migrateTravelToWorldScope({
@@ -310,10 +281,7 @@ describe('migrateTravelToWorldScope', () => {
     // over a stored `{}` would register as a change and write the setting in every world that
     // never used travel — an unexplained write in an otherwise no-op upgrade.
     const stored = {};
-    const result = migrateTravelToWorldScope({
-      systems: [{ id: 'herbalism' }],
-      travelConfig: stored,
-    });
+    const result = migrateTravelToWorldScope({ systems: [{ id: 'herbalism' }], travelConfig: stored });
     assert.equal(result.travelConfig, stored);
   });
 
@@ -324,11 +292,7 @@ describe('migrateTravelToWorldScope', () => {
       travelConfig: {},
     });
     assert.deepEqual(
-      migrateTravelToWorldScope({
-        systems: 'nope',
-        gatheringParties: 'nope',
-        travelConfig: 'nope',
-      }),
+      migrateTravelToWorldScope({ systems: 'nope', gatheringParties: 'nope', travelConfig: 'nope' }),
       { systems: [], gatheringParties: [], travelConfig: {} }
     );
   });
@@ -367,54 +331,33 @@ describe('MigrationRunner 1.27.0 leg', () => {
   it('lifts the library, shrinks the systems and collapses the overrides in one run', async () => {
     const settings = makeSettings({
       craftingSystems: [
-        systemWithTravel(
-          'herbalism',
-          [{ id: 'vale', name: 'Vale', craftingSystemId: 'herbalism' }],
-          {
-            enabled: true,
-            revealMode: 'alwaysVisible',
-            modifierVisibility: 'gmOnly',
-          }
-        ),
+        systemWithTravel('herbalism', [{ id: 'vale', name: 'Vale', craftingSystemId: 'herbalism' }], {
+          enabled: true,
+          revealMode: 'alwaysVisible',
+          modifierVisibility: 'gmOnly',
+        }),
       ],
       gatheringParties: [
-        {
-          id: 'p1',
-          name: 'Heroes',
-          currentRealmOverrides: {
-            herbalism: { mode: 'manual', realmIds: ['vale'], updatedAt: 5 },
-          },
-        },
+        { id: 'p1', name: 'Heroes', currentRealmOverrides: { herbalism: { mode: 'manual', realmIds: ['vale'], updatedAt: 5 } } },
       ],
     });
-    const runner = new MigrationRunner({
-      getSetting: settings.getSetting,
-      setSetting: settings.setSetting,
-    });
+    const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
     await runner.run();
 
     const config = settings.store.get('travelConfig');
-    assert.deepEqual(
-      config.realms.map((r) => r.id),
-      ['vale']
-    );
+    assert.deepEqual(config.realms.map((r) => r.id), ['vale']);
     assert.equal(config.revealMode, 'alwaysVisible');
     assert.equal(config.modifierVisibility, 'gmOnly');
     assert.equal(settings.store.get('craftingSystems')[0].gatheringRealms, undefined);
-    assert.deepEqual(settings.store.get('gatheringParties')[0].currentRealmOverride.realmIds, [
-      'vale',
-    ]);
+    assert.deepEqual(settings.store.get('gatheringParties')[0].currentRealmOverride.realmIds, ['vale']);
   });
 
   it('writes the DESTINATION before the source, so a failed write cannot destroy the library', async () => {
     const settings = makeSettings({
       craftingSystems: [systemWithTravel('herbalism', [{ id: 'vale' }])],
     });
-    const runner = new MigrationRunner({
-      getSetting: settings.getSetting,
-      setSetting: settings.setSetting,
-    });
+    const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
     await runner.run();
 
@@ -432,17 +375,10 @@ describe('MigrationRunner 1.27.0 leg', () => {
     // deleted — is silently resurrected from the re-imported system block.
     const settings = makeSettings({
       craftingSystems: [systemWithTravel('herbalism', [{ id: 'vale' }, { id: 'fen' }])],
-      travelConfig: {
-        revealMode: 'alwaysVisible',
-        modifierVisibility: 'visible',
-        realms: [{ id: 'vale', name: 'Vale' }],
-      },
+      travelConfig: { revealMode: 'alwaysVisible', modifierVisibility: 'visible', realms: [{ id: 'vale', name: 'Vale' }] },
       migrationVersion: '1.26.0',
     });
-    const runner = new MigrationRunner({
-      getSetting: settings.getSetting,
-      setSetting: settings.setSetting,
-    });
+    const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
     await runner.run();
 
@@ -457,10 +393,7 @@ describe('MigrationRunner 1.27.0 leg', () => {
 
   it('takes no travelConfig write in a world that never used travel', async () => {
     const settings = makeSettings({ craftingSystems: [{ id: 'herbalism', name: 'Herbalism' }] });
-    const runner = new MigrationRunner({
-      getSetting: settings.getSetting,
-      setSetting: settings.setSetting,
-    });
+    const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
     await runner.run();
 

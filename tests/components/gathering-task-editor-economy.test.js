@@ -19,31 +19,17 @@ const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 describe('Gathering task editor — economy sections are flag-gated and carded', () => {
   it('accepts independent staminaEnabled / nodesEnabled props (default false)', () => {
-    assert.match(
-      editorSource,
-      /staminaEnabled\s*=\s*false/,
-      'editor should declare a staminaEnabled prop defaulting to false'
-    );
-    assert.match(
-      editorSource,
-      /nodesEnabled\s*=\s*false/,
-      'editor should declare a nodesEnabled prop defaulting to false'
-    );
+    assert.match(editorSource, /staminaEnabled\s*=\s*false/, 'editor should declare a staminaEnabled prop defaulting to false');
+    assert.match(editorSource, /nodesEnabled\s*=\s*false/, 'editor should declare a nodesEnabled prop defaulting to false');
     // The single mode prop is gone.
-    assert.ok(
-      !/economyMode\s*=\s*'none'/.test(editorSource),
-      'the old economyMode prop is removed'
-    );
+    assert.ok(!/economyMode\s*=\s*'none'/.test(editorSource), 'the old economyMode prop is removed');
   });
 
   it('shows the stamina cost card only when stamina is enabled', () => {
     const guardIdx = editorSource.indexOf('{#if staminaEnabled}');
     const staminaIdx = editorSource.indexOf('data-gathering-task-stamina');
     assert.ok(guardIdx >= 0, 'stamina section should be guarded by staminaEnabled');
-    assert.ok(
-      staminaIdx > guardIdx,
-      'the stamina card should render inside the staminaEnabled guard'
-    );
+    assert.ok(staminaIdx > guardIdx, 'the stamina card should render inside the staminaEnabled guard');
   });
 
   it('shows the resource node card only when nodes are enabled', () => {
@@ -69,22 +55,14 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     const guardIdx = editorSource.indexOf('{#if nodesEnabled}');
     // Prettier (issue 923) prints the section's attributes one per line, so match the {:else}
     // and the hint card's class as a pattern rather than as a fixed two-line string.
-    const elseMatch =
-      /\{:else\}\s*<section\s+class="manager-task-nodes-card manager-task-nodes-hint-card"/.exec(
-        editorSource.slice(guardIdx)
-      );
+    const elseMatch = /\{:else\}\s*<section\s+class="manager-task-nodes-card manager-task-nodes-hint-card"/.exec(
+      editorSource.slice(guardIdx)
+    );
     const elseIdx = elseMatch ? guardIdx + elseMatch.index : -1;
     const hintIdx = editorSource.indexOf('data-gathering-task-nodes-hint');
     assert.ok(elseIdx > guardIdx, 'the nodes guard has an else branch carrying the hint');
-    assert.ok(
-      hintIdx > elseIdx,
-      'the guidance hint renders inside the else (nodes-disabled) branch'
-    );
-    assert.match(
-      editorSource,
-      /FABRICATE\.Admin\.Manager\.Economy\.TaskNodesEconomyHint/,
-      'the hint uses the dedicated guidance key'
-    );
+    assert.ok(hintIdx > elseIdx, 'the guidance hint renders inside the else (nodes-disabled) branch');
+    assert.match(editorSource, /FABRICATE\.Admin\.Manager\.Economy\.TaskNodesEconomyHint/, 'the hint uses the dedicated guidance key');
   });
 
   it('the node-guidance hint i18n key drops "mode" and names the Resource nodes toggle', () => {
@@ -102,56 +80,31 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
       'data-gathering-task-node-interval',
       'data-gathering-task-node-gain-mode',
       'data-gathering-task-node-chance',
-      'data-gathering-task-node-amount',
+      'data-gathering-task-node-amount'
     ]) {
       assert.ok(editorSource.includes(attr), `node card should expose ${attr}`);
     }
     // The three respawn policies are offered (issue 301 adds nonRegenerating).
     for (const policy of ['"manual"', '"overTime"', '"nonRegenerating"']) {
-      assert.ok(
-        editorSource.includes(`value=${policy}`),
-        `respawn select should offer policy ${policy}`
-      );
+      assert.ok(editorSource.includes(`value=${policy}`), `respawn select should offer policy ${policy}`);
     }
     // The three over-time gain modes are offered.
     for (const gainMode of ['"guaranteed"', '"chance"', '"expression"']) {
-      assert.ok(
-        editorSource.includes(`value=${gainMode}`),
-        `gain-mode select should offer ${gainMode}`
-      );
+      assert.ok(editorSource.includes(`value=${gainMode}`), `gain-mode select should offer ${gainMode}`);
     }
     // The removed legacy policies are gone.
     for (const policy of ['"none"', '"elapsedTime"', '"probability"', '"manualAndElapsedTime"']) {
-      assert.ok(
-        !editorSource.includes(`value=${policy}`),
-        `respawn select should no longer offer policy ${policy}`
-      );
+      assert.ok(!editorSource.includes(`value=${policy}`), `respawn select should no longer offer policy ${policy}`);
     }
   });
 
   it('persists node edits through onUpdateTask with sensible normalization', () => {
     assert.match(editorSource, /function setNodeCount/, 'has a node-count setter');
-    assert.match(
-      editorSource,
-      /onUpdateTask\(\{ nodes: null \}\)/,
-      'blank/zero count clears the node config'
-    );
-    assert.match(
-      editorSource,
-      /current:\s*max/,
-      'authoring starts a node pool full (current = max)'
-    );
-    assert.match(
-      editorSource,
-      /chance:[^}]*next\s*\/\s*100/,
-      'chance is stored as a 0..1 fraction (÷100)'
-    );
+    assert.match(editorSource, /onUpdateTask\(\{ nodes: null \}\)/, 'blank/zero count clears the node config');
+    assert.match(editorSource, /current:\s*max/, 'authoring starts a node pool full (current = max)');
+    assert.match(editorSource, /chance:[^}]*next\s*\/\s*100/, 'chance is stored as a 0..1 fraction (÷100)');
     assert.match(editorSource, /Math\.min\(1,\s*Math\.max\(0,/, 'chance is clamped to 0..1');
-    assert.match(
-      editorSource,
-      /intervalUnit,\s*intervalAmount:/,
-      'interval is stored as unit + amount (calendar-aware at runtime)'
-    );
+    assert.match(editorSource, /intervalUnit,\s*intervalAmount:/, 'interval is stored as unit + amount (calendar-aware at runtime)');
   });
 
   it('gives both economy sections card chrome', () => {
@@ -163,26 +116,10 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('wires the two economy flags from the parent', () => {
-    assert.match(
-      rootSource,
-      /selectedGatheringTaskStaminaEnabled\s*=\s*\$derived/,
-      'parent derives stamina-enabled from the system economy block'
-    );
-    assert.match(
-      rootSource,
-      /selectedGatheringTaskNodesEnabled\s*=\s*\$derived/,
-      'parent derives nodes-enabled from the system economy block'
-    );
-    assert.match(
-      rootSource,
-      /staminaEnabled=\{selectedGatheringTaskStaminaEnabled\}/,
-      'parent passes staminaEnabled to the task editor'
-    );
-    assert.match(
-      rootSource,
-      /nodesEnabled=\{selectedGatheringTaskNodesEnabled\}/,
-      'parent passes nodesEnabled to the task editor'
-    );
+    assert.match(rootSource, /selectedGatheringTaskStaminaEnabled\s*=\s*\$derived/, 'parent derives stamina-enabled from the system economy block');
+    assert.match(rootSource, /selectedGatheringTaskNodesEnabled\s*=\s*\$derived/, 'parent derives nodes-enabled from the system economy block');
+    assert.match(rootSource, /staminaEnabled=\{selectedGatheringTaskStaminaEnabled\}/, 'parent passes staminaEnabled to the task editor');
+    assert.match(rootSource, /nodesEnabled=\{selectedGatheringTaskNodesEnabled\}/, 'parent passes nodesEnabled to the task editor');
   });
 
   it('authors depletedBehavior with a FilePicker swap-image (swap is the only behavior; no delete, no postfix)', () => {
@@ -191,7 +128,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     // canvas tiles (tiles have no nameplate).
     for (const attr of [
       'data-gathering-task-depleted-behavior',
-      'data-gathering-task-depleted-image',
+      'data-gathering-task-depleted-image'
     ]) {
       assert.ok(editorSource.includes(attr), `depleted-behavior block should expose ${attr}`);
     }
@@ -200,26 +137,15 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
       'data-gathering-task-depleted-warning',
       'data-gathering-task-depleted-postfix',
       'depletedDeleteToken',
-      'toggleDepletedDelete',
+      'toggleDepletedDelete'
     ]) {
-      assert.ok(
-        !editorSource.includes(removed),
-        `the delete behavior is removed: ${removed} must not appear`
-      );
+      assert.ok(!editorSource.includes(removed), `the delete behavior is removed: ${removed} must not appear`);
     }
 
     // The swap-image control is wired to the FilePicker service (onPickImagePath),
     // not a free-text input.
-    assert.match(
-      editorSource,
-      /async function chooseDepletedImage/,
-      'swap-image uses the FilePicker via onPickImagePath'
-    );
-    assert.match(
-      editorSource,
-      /onPickImagePath\(\s*depletedSwapImage/,
-      'the depleted image picker calls onPickImagePath'
-    );
+    assert.match(editorSource, /async function chooseDepletedImage/, 'swap-image uses the FilePicker via onPickImagePath');
+    assert.match(editorSource, /onPickImagePath\(\s*depletedSwapImage/, 'the depleted image picker calls onPickImagePath');
   });
 
   it('puts the swap-image picker inline with the title/hint and the clear control below the image (plus right-click clears)', () => {
@@ -228,36 +154,18 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     const copyIdx = editorSource.indexOf('manager-task-depleted-copy');
     const imageColIdx = editorSource.indexOf('data-gathering-task-depleted-image-column');
     assert.ok(rowIdx >= 0, 'an inline row wraps the depleted-behavior block');
-    assert.ok(
-      copyIdx > rowIdx && imageColIdx > rowIdx,
-      'the title/hint copy and the image column both sit inside the inline row'
-    );
+    assert.ok(copyIdx > rowIdx && imageColIdx > rowIdx, 'the title/hint copy and the image column both sit inside the inline row');
 
     // The remove control is a button BELOW the thumbnail (inside the image column,
     // after the picker button).
     const pickerIdx = editorSource.indexOf('data-gathering-task-depleted-image');
     const clearIdx = editorSource.indexOf('data-gathering-task-depleted-image-clear');
-    assert.ok(
-      clearIdx > pickerIdx,
-      'the remove-image button renders after (below) the picker thumbnail'
-    );
-    assert.match(
-      editorSource,
-      /class="manager-link-button manager-task-depleted-image-clear"/,
-      'the remove control is a labelled button below the image'
-    );
+    assert.ok(clearIdx > pickerIdx, 'the remove-image button renders after (below) the picker thumbnail');
+    assert.match(editorSource, /class="manager-link-button manager-task-depleted-image-clear"/, 'the remove control is a labelled button below the image');
 
     // Right-click on the thumbnail clears it (oncontextmenu prevents the default menu).
-    assert.match(
-      editorSource,
-      /oncontextmenu=\{onDepletedImageContextMenu\}/,
-      'the thumbnail wires a context-menu (right-click) clear'
-    );
-    assert.match(
-      editorSource,
-      /function onDepletedImageContextMenu\(event\)\s*\{[\s\S]*?event\.preventDefault\(\)/,
-      'the context-menu handler prevents the default menu'
-    );
+    assert.match(editorSource, /oncontextmenu=\{onDepletedImageContextMenu\}/, 'the thumbnail wires a context-menu (right-click) clear');
+    assert.match(editorSource, /function onDepletedImageContextMenu\(event\)\s*\{[\s\S]*?event\.preventDefault\(\)/, 'the context-menu handler prevents the default menu');
   });
 
   it('positions the depleted picker pen as a corner badge and the empty-state placeholder centered (no overlap)', () => {
@@ -268,8 +176,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     const pickerIdx = editorSource.indexOf('manager-task-depleted-image-picker');
     const pickerBlock = editorSource.slice(pickerIdx, editorSource.indexOf('</button>', pickerIdx));
     assert.ok(
-      pickerBlock.includes('{#if depletedSwapImage}') &&
-        pickerBlock.includes('<img src={depletedSwapImage}'),
+      pickerBlock.includes('{#if depletedSwapImage}') && pickerBlock.includes('<img src={depletedSwapImage}'),
       'the picker renders the swap <img> when an image is set'
     );
     assert.ok(
@@ -291,62 +198,22 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
       /\.manager-task-image-picker \.fa-pen[\s\S]*?position:\s*absolute[\s\S]*?bottom:\s*5px/,
       'the pen badge is pinned to the bottom-right corner in the shared rule'
     );
-    const placeholderRule = cssSource.slice(
-      cssSource.indexOf('.manager-task-image-picker .fa-image')
-    );
+    const placeholderRule = cssSource.slice(cssSource.indexOf('.manager-task-image-picker .fa-image'));
     const placeholderBlock = placeholderRule.slice(0, placeholderRule.indexOf('}'));
-    assert.match(
-      placeholderBlock,
-      /position:\s*absolute/,
-      'the placeholder uses an absolute layer so its centering is independent of the button display'
-    );
-    assert.match(
-      placeholderBlock,
-      /inset:\s*0/,
-      'the absolute layer fills the whole box (so margin/flex centering is box-relative, not corner-pinned)'
-    );
-    assert.match(
-      placeholderBlock,
-      /justify-content:\s*center/,
-      'the placeholder glyph is centered horizontally'
-    );
-    assert.ok(
-      !placeholderBlock.includes('bottom: 5px'),
-      'the placeholder is NOT corner-pinned like the pen badge (no overlap)'
-    );
-    assert.match(
-      placeholderBlock,
-      /font-size:\s*1\.8rem/,
-      'the placeholder icon is larger than the corner badge'
-    );
+    assert.match(placeholderBlock, /position:\s*absolute/, 'the placeholder uses an absolute layer so its centering is independent of the button display');
+    assert.match(placeholderBlock, /inset:\s*0/, 'the absolute layer fills the whole box (so margin/flex centering is box-relative, not corner-pinned)');
+    assert.match(placeholderBlock, /justify-content:\s*center/, 'the placeholder glyph is centered horizontally');
+    assert.ok(!placeholderBlock.includes('bottom: 5px'), 'the placeholder is NOT corner-pinned like the pen badge (no overlap)');
+    assert.match(placeholderBlock, /font-size:\s*1\.8rem/, 'the placeholder icon is larger than the corner badge');
   });
 
   it('authors the optional defaultEnvironmentId select wired from the parent', () => {
-    assert.ok(
-      editorSource.includes('data-gathering-task-field="defaultEnvironmentId"'),
-      'a default-environment select is present'
-    );
-    assert.match(
-      editorSource,
-      /function setDefaultEnvironment/,
-      'has a default-environment setter'
-    );
-    assert.match(
-      editorSource,
-      /defaultEnvironmentId: id \|\| null/,
-      'the setter coerces empty to null'
-    );
+    assert.ok(editorSource.includes('data-gathering-task-field="defaultEnvironmentId"'), 'a default-environment select is present');
+    assert.match(editorSource, /function setDefaultEnvironment/, 'has a default-environment setter');
+    assert.match(editorSource, /defaultEnvironmentId: id \|\| null/, 'the setter coerces empty to null');
     // The parent feeds the system environments into the editor.
-    assert.match(
-      rootSource,
-      /selectedSystemEnvironmentOptions\s*=\s*\$derived/,
-      'parent derives the system environment options'
-    );
-    assert.match(
-      rootSource,
-      /environmentOptions=\{selectedSystemEnvironmentOptions\}/,
-      'parent passes environmentOptions to the task editor'
-    );
+    assert.match(rootSource, /selectedSystemEnvironmentOptions\s*=\s*\$derived/, 'parent derives the system environment options');
+    assert.match(rootSource, /environmentOptions=\{selectedSystemEnvironmentOptions\}/, 'parent passes environmentOptions to the task editor');
   });
 
   it('adds the depleted-behavior + default-environment + drop-dialog i18n keys', () => {
@@ -364,10 +231,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     assert.ok(typeof tasks.DefaultEnvironmentHint === 'string');
 
     const canvas = lang.FABRICATE.Canvas.Interactable;
-    assert.ok(
-      canvas.EnvironmentAutoResolved.includes('{environment}'),
-      'the auto-resolve notification names the environment'
-    );
+    assert.ok(canvas.EnvironmentAutoResolved.includes('{environment}'), 'the auto-resolve notification names the environment');
     assert.ok(typeof canvas.EnvironmentDialogTitle === 'string');
     assert.ok(typeof canvas.EnvironmentDialogConfirm === 'string');
   });
@@ -376,16 +240,8 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     // The DC override gate is the resolutionMode prop: routed has an editable DC,
     // d100 has no DC at all, and progressive has no DC (value-driven). So the card
     // is gated on `dcOverrideEnabled`, which is true only for routed.
-    assert.match(
-      editorSource,
-      /resolutionMode\s*=\s*'d100'/,
-      'editor declares a resolutionMode prop defaulting to d100'
-    );
-    assert.match(
-      editorSource,
-      /dcOverrideEnabled\s*=\s*\$derived\(resolutionMode === 'routed'\)/,
-      'the DC field is enabled only for routed resolution'
-    );
+    assert.match(editorSource, /resolutionMode\s*=\s*'d100'/, 'editor declares a resolutionMode prop defaulting to d100');
+    assert.match(editorSource, /dcOverrideEnabled\s*=\s*\$derived\(resolutionMode === 'routed'\)/, 'the DC field is enabled only for routed resolution');
     const guardIdx = editorSource.indexOf('{#if dcOverrideEnabled}');
     const dcCardIdx = editorSource.indexOf('data-gathering-task-dc');
     const dcFieldIdx = editorSource.indexOf('data-gathering-task-dc-override');
@@ -396,37 +252,18 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
 
   it('persists the DC override through onUpdateTask: null when blank, truncated integer otherwise', () => {
     assert.match(editorSource, /function updateDcOverride/, 'has a DC override setter');
-    assert.match(
-      editorSource,
-      /onUpdateTask\(\{ dcOverride: null \}\)/,
-      'a blank DC clears the override (null = system default)'
-    );
-    assert.match(
-      editorSource,
-      /dcOverride:\s*Number\.isFinite\(next\)\s*\?\s*Math\.trunc\(next\)\s*:\s*null/,
-      'a numeric DC is truncated to an integer'
-    );
+    assert.match(editorSource, /onUpdateTask\(\{ dcOverride: null \}\)/, 'a blank DC clears the override (null = system default)');
+    assert.match(editorSource, /dcOverride:\s*Number\.isFinite\(next\)\s*\?\s*Math\.trunc\(next\)\s*:\s*null/, 'a numeric DC is truncated to an integer');
     // The parent threads the gathering resolution mode into the editor.
-    assert.match(
-      rootSource,
-      /resolutionMode=\{gatheringResolutionMode\}/,
-      'parent passes the gathering resolution mode to the task editor'
-    );
+    assert.match(rootSource, /resolutionMode=\{gatheringResolutionMode\}/, 'parent passes the gathering resolution mode to the task editor');
   });
 
   it('adds the per-task DC override i18n keys', () => {
     const keys = lang.FABRICATE.Admin.Manager.Gathering;
     assert.equal(keys.TaskDcOverrideTitle, 'Check DC override');
     assert.equal(keys.TaskDcOverride, 'DC');
-    assert.ok(
-      typeof keys.TaskDcOverrideHint === 'string' && keys.TaskDcOverrideHint.length > 0,
-      'the DC override hint exists'
-    );
-    assert.ok(
-      typeof keys.TaskDcOverridePlaceholder === 'string' &&
-        keys.TaskDcOverridePlaceholder.length > 0,
-      'the DC override placeholder exists'
-    );
+    assert.ok(typeof keys.TaskDcOverrideHint === 'string' && keys.TaskDcOverrideHint.length > 0, 'the DC override hint exists');
+    assert.ok(typeof keys.TaskDcOverridePlaceholder === 'string' && keys.TaskDcOverridePlaceholder.length > 0, 'the DC override placeholder exists');
   });
 
   it('adds the node i18n keys', () => {

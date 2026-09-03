@@ -12,16 +12,16 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
-    'src/ui/svelte/apps/manager/resolutionModeOptions.js',
+    'src/ui/svelte/apps/manager/resolutionModeOptions.js'
   ],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
     'src/ui/svelte/apps/manager/CraftingEffectPanel.svelte',
-    'src/ui/svelte/apps/manager/CraftingSettingsView.svelte',
+    'src/ui/svelte/apps/manager/CraftingSettingsView.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte'
 });
 
 // Let Svelte's scheduler flush DOM updates triggered by an (async) event handler.
@@ -38,7 +38,7 @@ function makeSystem(overrides = {}) {
     visibilityMode,
     craftingEffect: craftingEffect(visibilityMode),
     features: { salvage: true },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -61,9 +61,7 @@ afterEach(() => harness.remount());
 
 describe('CraftingSettingsView (mounted)', () => {
   it('renders the resolution grid, the visibility grid and the effect panel', async () => {
-    const root = await harness.mount({
-      selectedSystem: makeSystem({ visibilityMode: 'knowledge' }),
-    });
+    const root = await harness.mount({ selectedSystem: makeSystem({ visibilityMode: 'knowledge' }) });
 
     const resolution = root.querySelector('[data-crafting-resolution-mode]');
     const visibility = root.querySelector('[data-crafting-visibility-mode]');
@@ -82,11 +80,7 @@ describe('CraftingSettingsView (mounted)', () => {
     );
     assert.deepEqual(values, ['global', 'restricted', 'item', 'knowledge']);
     assert.equal(
-      activeOptionValue(
-        root,
-        'data-crafting-visibility-mode',
-        'data-crafting-visibility-mode-option'
-      ),
+      activeOptionValue(root, 'data-crafting-visibility-mode', 'data-crafting-visibility-mode-option'),
       'item'
     );
   });
@@ -95,7 +89,7 @@ describe('CraftingSettingsView (mounted)', () => {
     const calls = [];
     const root = await harness.mount({
       selectedSystem: makeSystem({ visibilityMode: 'knowledge' }),
-      onSetVisibilityMode: (mode) => calls.push(mode),
+      onSetVisibilityMode: (mode) => calls.push(mode)
     });
 
     selectRadio(root, 'data-crafting-visibility-mode-option', 'global');
@@ -129,7 +123,7 @@ describe('CraftingSettingsView (mounted)', () => {
       onSetResolutionMode: (mode) => {
         calls.push(mode);
         return Promise.resolve(false);
-      },
+      }
     });
 
     selectRadio(root, 'data-crafting-resolution-mode-option', 'progressive');
@@ -137,11 +131,7 @@ describe('CraftingSettingsView (mounted)', () => {
 
     assert.deepEqual(calls, ['progressive'], 'the store action was asked to migrate');
     assert.equal(
-      activeOptionValue(
-        root,
-        'data-crafting-resolution-mode',
-        'data-crafting-resolution-mode-option'
-      ),
+      activeOptionValue(root, 'data-crafting-resolution-mode', 'data-crafting-resolution-mode-option'),
       'simple',
       'the radio reverts to the persisted mode on cancel'
     );
@@ -149,41 +139,33 @@ describe('CraftingSettingsView (mounted)', () => {
 
   it('alchemy: relabels the restricted option as "Manual (GM-granted access)" with reveal wording', async () => {
     const root = await harness.mount({
-      selectedSystem: makeSystem({ resolutionMode: 'alchemy', visibilityMode: 'restricted' }),
+      selectedSystem: makeSystem({ resolutionMode: 'alchemy', visibilityMode: 'restricted' })
     });
     const restricted = root.querySelector('[data-crafting-visibility-mode-option="restricted"]');
     assert.ok(restricted, 'the restricted option still exists (stored value unchanged)');
-    const label =
-      restricted.querySelector('.manager-resolution-option-title, .manager-resolution-option-label')
-        ?.textContent ?? restricted.textContent;
+    const label = restricted.querySelector('.manager-resolution-option-title, .manager-resolution-option-label')
+      ?.textContent ?? restricted.textContent;
     assert.ok(label.includes('Manual'), 'the restricted option is labeled Manual for alchemy');
     assert.ok(!label.includes('Restricted'), 'the non-alchemy "Restricted" label is not shown');
 
     const html = root.querySelector('[data-crafting-visibility-mode]').innerHTML;
-    assert.ok(
-      html.includes('reveal') || html.includes('Access tab'),
-      'reveal wording is used, not gating'
-    );
+    assert.ok(html.includes('reveal') || html.includes('Access tab'), 'reveal wording is used, not gating');
   });
 
   it('alchemy: selecting Manual still stores the `restricted` value (no enum change)', async () => {
     const calls = [];
     const root = await harness.mount({
       selectedSystem: makeSystem({ resolutionMode: 'alchemy', visibilityMode: 'knowledge' }),
-      onSetVisibilityMode: (mode) => calls.push(mode),
+      onSetVisibilityMode: (mode) => calls.push(mode)
     });
     selectRadio(root, 'data-crafting-visibility-mode-option', 'restricted');
     await flushRender();
-    assert.deepEqual(
-      calls,
-      ['restricted'],
-      'the stored enum value stays restricted (Access tab stays reachable)'
-    );
+    assert.deepEqual(calls, ['restricted'], 'the stored enum value stays restricted (Access tab stays reachable)');
   });
 
   it('non-alchemy: keeps the "Restricted" label and gating language', async () => {
     const root = await harness.mount({
-      selectedSystem: makeSystem({ resolutionMode: 'simple', visibilityMode: 'restricted' }),
+      selectedSystem: makeSystem({ resolutionMode: 'simple', visibilityMode: 'restricted' })
     });
     const restricted = root.querySelector('[data-crafting-visibility-mode-option="restricted"]');
     assert.ok(restricted.textContent.includes('Restricted'), 'non-alchemy shows Restricted');
@@ -191,19 +173,12 @@ describe('CraftingSettingsView (mounted)', () => {
   });
 
   it('shows the salvage card only when the salvage feature is enabled', async () => {
-    const withSalvage = await harness.mount({
-      selectedSystem: makeSystem({ features: { salvage: true } }),
-    });
-    assert.ok(
-      withSalvage.querySelector('[data-crafting-salvage-resolution-mode]'),
-      'salvage card shown'
-    );
+    const withSalvage = await harness.mount({ selectedSystem: makeSystem({ features: { salvage: true } }) });
+    assert.ok(withSalvage.querySelector('[data-crafting-salvage-resolution-mode]'), 'salvage card shown');
 
     harness.remount();
 
-    const withoutSalvage = await harness.mount({
-      selectedSystem: makeSystem({ features: { salvage: false } }),
-    });
+    const withoutSalvage = await harness.mount({ selectedSystem: makeSystem({ features: { salvage: false } }) });
     assert.equal(
       withoutSalvage.querySelector('[data-crafting-salvage-resolution-mode]'),
       null,

@@ -7,8 +7,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { migrateRetireProgressiveAllowPlayerReorder } =
-  await import('../src/migration/migrateRetireProgressiveAllowPlayerReorder.js');
+const { migrateRetireProgressiveAllowPlayerReorder } = await import(
+  '../src/migration/migrateRetireProgressiveAllowPlayerReorder.js'
+);
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 
 // ---------------------------------------------------------------------------
@@ -130,10 +131,7 @@ test('the runner applies 1.18.0 and bumps the migration version', async () => {
 test('1.18.0 is version-gated — it does not re-run once the version is already at the latest', async () => {
   const store = new Map([
     ['migrationVersion', '1.31.0'],
-    [
-      'craftingSystems',
-      [{ id: 'sys', craftingCheck: { progressive: { allowPlayerReorder: true } } }],
-    ],
+    ['craftingSystems', [{ id: 'sys', craftingCheck: { progressive: { allowPlayerReorder: true } } }]],
   ]);
   const runner = new MigrationRunner({
     getSetting: (k) => store.get(k),

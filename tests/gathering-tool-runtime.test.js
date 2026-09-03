@@ -11,7 +11,7 @@ import {
   classifyGatheringToolStates,
   createGatheringToolAvailability,
   isToolBroken,
-  matchGatheringTools,
+  matchGatheringTools
 } from '../src/gatheringToolRuntime.js';
 import { createToolBreakageRuntime } from '../src/toolBreakageRuntime.js';
 import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
@@ -24,12 +24,8 @@ function makeRunManager() {
       createdTerminal = { runData, status, payload };
       return { id: 'run-1', status, ...runData, ...payload };
     },
-    async getMaturedWaitingRuns() {
-      return [];
-    },
-    inspectCreated() {
-      return createdTerminal;
-    },
+    async getMaturedWaitingRuns() { return []; },
+    inspectCreated() { return createdTerminal; }
   };
 }
 
@@ -39,13 +35,7 @@ function makeEvaluator({ requirementResults = new Map() } = {}) {
       return { visible: true, reasonCode: 'VISIBLE', diagnostic: null };
     },
     async evaluateCheck() {
-      return {
-        success: true,
-        status: 'success',
-        value: 1,
-        reasonCode: 'CHECK_SUCCESS',
-        diagnostic: null,
-      };
+      return { success: true, status: 'success', value: 1, reasonCode: 'CHECK_SUCCESS', diagnostic: null };
     },
     async evaluateRequirement({ requirement }) {
       const key = requirement?.formula || '';
@@ -55,9 +45,9 @@ function makeEvaluator({ requirementResults = new Map() } = {}) {
         allowed,
         description: result?.description ?? '',
         reasonCode: allowed ? 'REQUIREMENT_MET' : 'REQUIREMENT_FAILED',
-        diagnostic: null,
+        diagnostic: null
       };
-    },
+    }
   };
 }
 
@@ -66,27 +56,27 @@ function makeRichState({ toolBreakagePolicy = 'failureOnBreak' } = {}) {
     composeEnvironment(environment) {
       const composed = {
         ...environment,
-        rules: { ...(environment.rules || {}), toolBreakagePolicy },
+        rules: { ...(environment.rules || {}), toolBreakagePolicy }
       };
       if (environment?.__libraryTools instanceof Map) {
         Object.defineProperty(composed, '__libraryTools', {
           value: environment.__libraryTools,
-          enumerable: false,
+          enumerable: false
         });
       }
       return composed;
-    },
+    }
   };
 }
 
 function makeStores({ environment, system }) {
   return {
     environmentStore: {
-      get: (id) => (id === environment.id ? environment : null),
+      get: id => id === environment.id ? environment : null,
       list: () => [environment],
-      listBySystem: () => [environment],
+      listBySystem: () => [environment]
     },
-    getSystems: () => [system],
+    getSystems: () => [system]
   };
 }
 
@@ -97,9 +87,9 @@ function makeAvailability({ missing = [], failedRequirements = [] } = {}) {
         available: missing.length === 0 && failedRequirements.length === 0,
         missing,
         failedRequirements,
-        items: tools,
+        items: tools
       };
-    },
+    }
   };
 }
 
@@ -107,18 +97,10 @@ function makeBreakage({ planResult = [], applyResult = [] } = {}) {
   const calls = { plan: 0, apply: 0, planTools: [], applyTools: [] };
   return {
     impl: {
-      async plan({ tools }) {
-        calls.plan++;
-        calls.planTools.push(tools);
-        return planResult;
-      },
-      async apply({ tools }) {
-        calls.apply++;
-        calls.applyTools.push(tools);
-        return applyResult;
-      },
+      async plan({ tools }) { calls.plan++; calls.planTools.push(tools); return planResult; },
+      async apply({ tools }) { calls.apply++; calls.applyTools.push(tools); return applyResult; }
     },
-    calls,
+    calls
   };
 }
 
@@ -129,24 +111,19 @@ function makeSimpleEngine({
   toolMissing = [],
   failedRequirements = [],
   toolBreakagePolicy = 'failureOnBreak',
-  libraryTools = [],
+  libraryTools = []
 }) {
-  const system = {
-    id: 'system-a',
-    enabled: true,
-    features: { gathering: true },
-    gatheringCraftingCheck: routedSystemCheck(),
-  };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
     id: 'env-a',
     craftingSystemId: 'system-a',
     enabled: true,
     selectionMode: 'targeted',
-    tasks: [task],
+    tasks: [task]
   };
   Object.defineProperty(environment, '__libraryTools', {
-    value: new Map(libraryTools.map((tool) => [tool.id, tool])),
-    enumerable: false,
+    value: new Map(libraryTools.map(tool => [tool.id, tool])),
+    enumerable: false
   });
   const stores = makeStores({ environment, system });
   const breakage = makeBreakage({ planResult: toolPlan, applyResult: toolApply });
@@ -164,14 +141,10 @@ function makeSimpleEngine({
     toolAvailability: makeAvailability({ missing: toolMissing, failedRequirements }),
     toolBreakage: breakage.impl,
     resultCreator: {
-      async plan() {
-        return [];
-      },
-      async create() {
-        return [];
-      },
+      async plan() { return []; },
+      async create() { return []; }
     },
-    failureFeedback: { apply: async () => null },
+    failureFeedback: { apply: async () => null }
   });
   return { engine, environment, system, breakage, runManager };
 }
@@ -183,10 +156,8 @@ function baseTask(overrides = {}) {
     enabled: true,
     resolutionMode: 'routed',
     tools: [],
-    resultGroups: [
-      { id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] },
-    ],
-    ...overrides,
+    resultGroups: [{ id: 'g', name: 'Iron', results: [{ id: 'r', componentId: 'comp-iron', quantity: 1 }] }],
+    ...overrides
   };
 }
 
@@ -197,14 +168,10 @@ const viewer = { id: 'user-1', isGM: false };
 // ---------------------------------------------------------------------------
 
 test('missing tool blocks startAttempt with TOOL_BLOCKED', async () => {
-  const tool = {
-    componentId: 'comp-axe',
-    breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } };
   const { engine } = makeSimpleEngine({
     task: baseTask({ tools: [tool] }),
-    toolMissing: [tool],
+    toolMissing: [tool]
   });
   const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
   assert.equal(result.accepted, false);
@@ -217,11 +184,11 @@ test('failed tool requirement blocks startAttempt with failedRequirements detail
     componentId: 'comp-axe',
     requirement: { formula: '@flags.proficient' },
     breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
+    onBreak: { mode: 'destroy' }
   };
   const { engine } = makeSimpleEngine({
     task: baseTask({ tools: [tool] }),
-    failedRequirements: [{ tool, reasonCode: 'REQUIREMENT_FAILED' }],
+    failedRequirements: [{ tool, reasonCode: 'REQUIREMENT_FAILED' }]
   });
   const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
   assert.equal(result.accepted, false);
@@ -230,15 +197,11 @@ test('failed tool requirement blocks startAttempt with failedRequirements detail
 });
 
 test('startAttempt succeeds with available tool and runs breakage plan/apply', async () => {
-  const tool = {
-    componentId: 'comp-axe',
-    breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } };
   const { engine, breakage } = makeSimpleEngine({
     task: baseTask({ tools: [tool] }),
     toolPlan: [{ componentId: 'comp-axe', mode: 'limitedUses', broken: false }],
-    toolApply: [{ componentId: 'comp-axe', broken: false }],
+    toolApply: [{ componentId: 'comp-axe', broken: false }]
   });
   let result;
   routedRoll(true);
@@ -251,9 +214,7 @@ test('startAttempt succeeds with available tool and runs breakage plan/apply', a
   assert.equal(result.state, 'succeeded');
   assert.equal(breakage.calls.plan, 1);
   assert.equal(breakage.calls.apply, 1);
-  assert.deepEqual(result.usedTools, [
-    { componentId: 'comp-axe', mode: 'limitedUses', broken: false },
-  ]);
+  assert.deepEqual(result.usedTools, [{ componentId: 'comp-axe', mode: 'limitedUses', broken: false }]);
 });
 
 test('library toolIds resolve through __libraryTools for gates, breakage, and persisted usedTools', async () => {
@@ -261,23 +222,21 @@ test('library toolIds resolve through __libraryTools for gates, breakage, and pe
     id: 'tool-axe',
     componentId: 'comp-axe',
     breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'replaceWith', replacementComponentId: 'broken-axe' },
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'broken-axe' }
   };
-  const plan = [
-    {
-      componentId: 'comp-axe',
-      itemRef: { actorUuid: 'Actor.actor-1', itemUuid: 'Item.axe', quantity: 1 },
-      mode: 'breakageChance',
-      broken: true,
-      onBreak: { action: 'replaced', replacementComponentId: 'broken-axe' },
-    },
-  ];
+  const plan = [{
+    componentId: 'comp-axe',
+    itemRef: { actorUuid: 'Actor.actor-1', itemUuid: 'Item.axe', quantity: 1 },
+    mode: 'breakageChance',
+    broken: true,
+    onBreak: { action: 'replaced', replacementComponentId: 'broken-axe' }
+  }];
   const { engine, breakage, runManager } = makeSimpleEngine({
     task: baseTask({ toolIds: ['tool-axe'] }),
     libraryTools: [libraryTool],
     toolPlan: plan,
     toolApply: plan,
-    toolBreakagePolicy: 'successDespiteBreak',
+    toolBreakagePolicy: 'successDespiteBreak'
   });
 
   const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
@@ -292,7 +251,7 @@ test('library toolIds resolve through __libraryTools for gates, breakage, and pe
 
 test('missing library toolId blocks startAttempt before actor inventory checks', async () => {
   const { engine, breakage } = makeSimpleEngine({
-    task: baseTask({ toolIds: ['missing-tool'] }),
+    task: baseTask({ toolIds: ['missing-tool'] })
   });
 
   const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
@@ -309,11 +268,11 @@ test('disabled library toolId blocks listForActor with TOOL_BLOCKED', async () =
     enabled: false,
     componentId: 'comp-axe',
     breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
+    onBreak: { mode: 'destroy' }
   };
   const { engine } = makeSimpleEngine({
     task: baseTask({ toolIds: ['tool-disabled'] }),
-    libraryTools: [disabledTool],
+    libraryTools: [disabledTool]
   });
 
   const listing = await engine.listForActor({ viewer });
@@ -321,9 +280,7 @@ test('disabled library toolId blocks listForActor with TOOL_BLOCKED', async () =
   assert.equal(listing.visible, true);
   assert.equal(listing.attemptable, false);
   assert.equal(listing.environments[0].tasks[0].blockedReasons[0].code, 'TOOL_BLOCKED');
-  assert.deepEqual(listing.environments[0].tasks[0].blockedReasons[0].data.disabledToolIds, [
-    'tool-disabled',
-  ]);
+  assert.deepEqual(listing.environments[0].tasks[0].blockedReasons[0].data.disabledToolIds, ['tool-disabled']);
 });
 
 test('timed completion resolves library toolIds for usedTools evidence', async () => {
@@ -332,68 +289,55 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
     id: 'tool-axe',
     componentId: 'comp-axe',
     breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
+    onBreak: { mode: 'destroy' }
   };
-  const plan = [
-    {
-      componentId: 'comp-axe',
-      itemRef: { actorUuid: 'Actor.actor-1', itemUuid: 'Item.axe', quantity: 1 },
-      mode: 'limitedUses',
-      broken: false,
-    },
-  ];
+  const plan = [{
+    componentId: 'comp-axe',
+    itemRef: { actorUuid: 'Actor.actor-1', itemUuid: 'Item.axe', quantity: 1 },
+    mode: 'limitedUses',
+    broken: false
+  }];
   const task = baseTask({ toolIds: ['tool-axe'], timeRequirement: { minutes: 10 } });
-  const system = {
-    id: 'system-a',
-    enabled: true,
-    features: { gathering: true },
-    gatheringCraftingCheck: routedSystemCheck(),
-  };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
     id: 'env-a',
     craftingSystemId: 'system-a',
     enabled: true,
     selectionMode: 'targeted',
-    tasks: [task],
+    tasks: [task]
   };
   Object.defineProperty(environment, '__libraryTools', {
     value: new Map([['tool-axe', libraryTool]]),
-    enumerable: false,
+    enumerable: false
   });
   const breakage = makeBreakage({ planResult: plan, applyResult: plan });
   const runManager = {
     async getMaturedWaitingRuns() {
-      return [
-        {
-          actor,
-          run: {
-            id: 'run-waiting',
-            actorUuid: 'Actor.actor-1',
-            status: 'waitingTime',
-            craftingSystemId: 'system-a',
-            environmentId: 'env-a',
-            taskId: 'task-a',
-          },
-        },
-      ];
+      return [{
+        actor,
+        run: {
+          id: 'run-waiting',
+          actorUuid: 'Actor.actor-1',
+          status: 'waitingTime',
+          craftingSystemId: 'system-a',
+          environmentId: 'env-a',
+          taskId: 'task-a'
+        }
+      }];
     },
     async completeRun(_actor, run, status, payload, { terminalRunData } = {}) {
       return { ...run, ...terminalRunData, status, ...payload };
-    },
+    }
   };
   const engine = new GatheringEngine({
-    environmentStore: {
-      get: () => environment,
-      list: () => [environment],
-      listBySystem: () => [environment],
-    },
+    environmentStore: { get: () => environment, list: () => [environment], listBySystem: () => [environment] },
     runManager,
     evaluator: makeEvaluator(),
     getSystems: () => [system],
     getRunViewer: () => viewer,
     toolBreakage: breakage.impl,
     resultCreator: { plan: async () => [], create: async () => [] },
-    failureFeedback: { apply: async () => null },
+    failureFeedback: { apply: async () => null }
   });
 
   const result = await engine.processWorldTime(100);
@@ -408,16 +352,12 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
 // ---------------------------------------------------------------------------
 
 test('failureOnBreak policy overrides outcome to failed when a tool breaks', async () => {
-  const tool = {
-    componentId: 'comp-axe',
-    breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'comp-axe', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'destroy' } };
   const { engine, breakage } = makeSimpleEngine({
     task: baseTask({ tools: [tool] }),
     toolPlan: [{ componentId: 'comp-axe', mode: 'breakageChance', broken: true }],
     toolApply: [{ componentId: 'comp-axe', broken: true, onBreak: { action: 'destroyed' } }],
-    toolBreakagePolicy: 'failureOnBreak',
+    toolBreakagePolicy: 'failureOnBreak'
   });
   const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
   assert.equal(result.accepted, true);
@@ -427,16 +367,12 @@ test('failureOnBreak policy overrides outcome to failed when a tool breaks', asy
 });
 
 test('successDespiteBreak policy preserves success even when a tool breaks', async () => {
-  const tool = {
-    componentId: 'comp-axe',
-    breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'flagBroken' },
-  };
+  const tool = { componentId: 'comp-axe', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'flagBroken' } };
   const { engine } = makeSimpleEngine({
     task: baseTask({ tools: [tool] }),
     toolPlan: [{ componentId: 'comp-axe', mode: 'breakageChance', broken: true }],
     toolApply: [{ componentId: 'comp-axe', broken: true, onBreak: { action: 'flagged' } }],
-    toolBreakagePolicy: 'successDespiteBreak',
+    toolBreakagePolicy: 'successDespiteBreak'
   });
   let result;
   routedRoll(true);
@@ -451,19 +387,11 @@ test('successDespiteBreak policy preserves success even when a tool breaks', asy
 });
 
 test('multi-tool: any missing tool blocks the start', async () => {
-  const tool1 = {
-    componentId: 'comp-axe',
-    breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
-  };
-  const tool2 = {
-    componentId: 'comp-saw',
-    breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool1 = { componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } };
+  const tool2 = { componentId: 'comp-saw', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } };
   const { engine } = makeSimpleEngine({
     task: baseTask({ tools: [tool1, tool2] }),
-    toolMissing: [tool2],
+    toolMissing: [tool2]
   });
   const result = await engine.startAttempt({ viewer, environmentId: 'env-a', taskId: 'task-a' });
   assert.equal(result.accepted, false);
@@ -507,81 +435,41 @@ test('isToolBroken detects every supported flag form and is false otherwise', ()
 });
 
 const matcher = {
-  toolMatchesItem: (_recipe, tool, candidate) =>
-    Boolean(tool?.componentId) && tool.componentId === candidate?.componentId,
+  toolMatchesItem: (_recipe, tool, candidate) => Boolean(tool?.componentId) && tool.componentId === candidate?.componentId
 };
 
 function inventoryItem(componentId, broken = false) {
-  return {
-    componentId,
-    getFlag: (ns, flag) => ns === 'fabricate' && flag === 'toolBroken' && broken,
-  };
+  return { componentId, getFlag: (ns, flag) => ns === 'fabricate' && flag === 'toolBroken' && broken };
 }
 
 test('classifyGatheringToolStates reports present / damaged / missing per tool', () => {
   const tools = [{ componentId: 'c-axe' }, { componentId: 'c-saw' }, { componentId: 'c-net' }];
   const actor = { items: [inventoryItem('c-axe'), inventoryItem('c-saw', true)] };
-  const states = classifyGatheringToolStates({
-    actor,
-    system: { id: 's' },
-    task: { id: 't' },
-    tools,
-    craftingSystemManager: matcher,
-  });
-  assert.deepEqual(
-    states.map((s) => s.state),
-    ['present', 'damaged', 'missing']
-  );
+  const states = classifyGatheringToolStates({ actor, system: { id: 's' }, task: { id: 't' }, tools, craftingSystemManager: matcher });
+  assert.deepEqual(states.map(s => s.state), ['present', 'damaged', 'missing']);
 });
 
 test('classifyGatheringToolStates prefers a non-broken duplicate (present over damaged)', () => {
   const actor = { items: [inventoryItem('c-axe', true), inventoryItem('c-axe', false)] };
-  const states = classifyGatheringToolStates({
-    actor,
-    system: { id: 's' },
-    task: { id: 't' },
-    tools: [{ componentId: 'c-axe' }],
-    craftingSystemManager: matcher,
-  });
+  const states = classifyGatheringToolStates({ actor, system: { id: 's' }, task: { id: 't' }, tools: [{ componentId: 'c-axe' }], craftingSystemManager: matcher });
   assert.equal(states[0].state, 'present');
 });
 
 test('classifyGatheringToolStates treats a null actor as all-missing without throwing', () => {
-  const states = classifyGatheringToolStates({
-    actor: null,
-    system: { id: 's' },
-    task: { id: 't' },
-    tools: [{ componentId: 'c-axe' }],
-    craftingSystemManager: matcher,
-  });
-  assert.deepEqual(
-    states.map((s) => s.state),
-    ['missing']
-  );
+  const states = classifyGatheringToolStates({ actor: null, system: { id: 's' }, task: { id: 't' }, tools: [{ componentId: 'c-axe' }], craftingSystemManager: matcher });
+  assert.deepEqual(states.map(s => s.state), ['missing']);
 });
 
 test('the matcher falls back to craftingSystemManager.recipeManager when the manager has none', () => {
   const viaRecipeManager = { recipeManager: matcher };
   const actor = { items: [inventoryItem('c-axe')] };
-  const states = classifyGatheringToolStates({
-    actor,
-    system: { id: 's' },
-    task: { id: 't' },
-    tools: [{ componentId: 'c-axe' }],
-    craftingSystemManager: viaRecipeManager,
-  });
+  const states = classifyGatheringToolStates({ actor, system: { id: 's' }, task: { id: 't' }, tools: [{ componentId: 'c-axe' }], craftingSystemManager: viaRecipeManager });
   assert.equal(states[0].state, 'present');
 });
 
 test('matchGatheringTools still collapses a broken matching tool into missing (attempt validation unchanged)', () => {
   const actor = { items: [inventoryItem('c-axe', true)] };
-  const result = matchGatheringTools({
-    actor,
-    system: { id: 's' },
-    task: { id: 't' },
-    tools: [{ componentId: 'c-axe' }],
-    craftingSystemManager: matcher,
-  });
+  const result = matchGatheringTools({ actor, system: { id: 's' }, task: { id: 't' }, tools: [{ componentId: 'c-axe' }], craftingSystemManager: matcher });
   assert.equal(result.items.length, 0);
   assert.equal(result.missing.length, 1);
 });
@@ -606,15 +494,12 @@ function classifyOne(actor, tool) {
     system: { id: 's' },
     task: { id: 't' },
     tools: [tool],
-    craftingSystemManager: matcher,
+    craftingSystemManager: matcher
   })[0].state;
 }
 
 test('classifyGatheringToolStates: replaceWith variant only → damaged; working → present; neither → missing', () => {
-  assert.equal(
-    classifyOne({ items: [inventoryItem('c-pick-broken')] }, replaceWithTool()),
-    'damaged'
-  );
+  assert.equal(classifyOne({ items: [inventoryItem('c-pick-broken')] }, replaceWithTool()), 'damaged');
   assert.equal(classifyOne({ items: [inventoryItem('c-pick')] }, replaceWithTool()), 'present');
   assert.equal(classifyOne({ items: [inventoryItem('c-other')] }, replaceWithTool()), 'missing');
 });
@@ -643,14 +528,8 @@ test('classifyGatheringToolStates recognizes a direct-Item replacement by preser
 
 test('classifyGatheringToolStates: destroy/flagBroken onBreak does not trigger the broken-variant fallback', () => {
   const actor = { items: [inventoryItem('c-pick-broken')] };
-  const destroyTool = {
-    componentId: 'c-pick',
-    onBreak: { mode: 'destroy', replacementComponentId: 'c-pick-broken' },
-  };
-  const flagTool = {
-    componentId: 'c-pick',
-    onBreak: { mode: 'flagBroken', replacementComponentId: 'c-pick-broken' },
-  };
+  const destroyTool = { componentId: 'c-pick', onBreak: { mode: 'destroy', replacementComponentId: 'c-pick-broken' } };
+  const flagTool = { componentId: 'c-pick', onBreak: { mode: 'flagBroken', replacementComponentId: 'c-pick-broken' } };
   assert.equal(classifyOne(actor, destroyTool), 'missing');
   assert.equal(classifyOne(actor, flagTool), 'missing');
 });
@@ -659,14 +538,8 @@ test('classifyGatheringToolStates: null/empty/missing replacementComponentId is 
   // An inventory item whose componentId is undefined must NOT be matched by a
   // synthetic { componentId: undefined } probe.
   const actor = { items: [{ componentId: undefined, getFlag: () => false }] };
-  const nullRepl = {
-    componentId: 'c-pick',
-    onBreak: { mode: 'replaceWith', replacementComponentId: null },
-  };
-  const emptyRepl = {
-    componentId: 'c-pick',
-    onBreak: { mode: 'replaceWith', replacementComponentId: '   ' },
-  };
+  const nullRepl = { componentId: 'c-pick', onBreak: { mode: 'replaceWith', replacementComponentId: null } };
+  const emptyRepl = { componentId: 'c-pick', onBreak: { mode: 'replaceWith', replacementComponentId: '   ' } };
   const missingRepl = { componentId: 'c-pick', onBreak: { mode: 'replaceWith' } };
   assert.equal(classifyOne(actor, nullRepl), 'missing');
   assert.equal(classifyOne(actor, emptyRepl), 'missing');
@@ -687,7 +560,7 @@ test('matchGatheringTools: holding only the replaceWith broken variant stays mis
     system: { id: 's' },
     task: { id: 't' },
     tools: [replaceWithTool()],
-    craftingSystemManager: matcher,
+    craftingSystemManager: matcher
   });
   assert.equal(result.items.length, 0);
   assert.equal(result.missing.length, 1);
@@ -704,7 +577,7 @@ test('matchGatheringTools: a componentId in presentTools matches virtually with 
     task: { id: 't' },
     tools: [{ componentId: 'c-axe' }],
     craftingSystemManager: matcher,
-    presentTools: { systemId: 's', componentIds: ['c-axe'] },
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
   });
   assert.equal(result.missing.length, 0, 'virtual-present satisfies the gate');
   assert.equal(result.items.length, 1);
@@ -712,7 +585,7 @@ test('matchGatheringTools: a componentId in presentTools matches virtually with 
   assert.equal(result.items[0].item, null, 'no owned item backs a virtual match');
 });
 
-test("matchGatheringTools: a present tool from another system does NOT satisfy this system's task (cross-system collision)", () => {
+test('matchGatheringTools: a present tool from another system does NOT satisfy this system\'s task (cross-system collision)', () => {
   // componentId is a PER-SYSTEM id. A station tool from system-A with componentId
   // c-axe must NOT satisfy a system-B task whose required tool shares c-axe.
   const result = matchGatheringTools({
@@ -721,7 +594,7 @@ test("matchGatheringTools: a present tool from another system does NOT satisfy t
     task: { id: 't', craftingSystemId: 'system-b' },
     tools: [{ componentId: 'c-axe' }],
     craftingSystemManager: matcher,
-    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] },
+    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] }
   });
   assert.equal(result.items.length, 0, 'out-of-system present tool is inert');
   assert.deepEqual(result.missing, [{ componentId: 'c-axe' }]);
@@ -734,7 +607,7 @@ test('matchGatheringTools: same componentId AND same systemId IS satisfied (posi
     task: { id: 't', craftingSystemId: 'system-a' },
     tools: [{ componentId: 'c-axe' }],
     craftingSystemManager: matcher,
-    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] },
+    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] }
   });
   assert.equal(result.missing.length, 0, 'in-system present tool satisfies the gate');
   assert.equal(result.items.length, 1);
@@ -748,7 +621,7 @@ test('matchGatheringTools: WITHOUT the active tool the same requirement is missi
     task: { id: 't' },
     tools: [{ componentId: 'c-axe' }],
     craftingSystemManager: matcher,
-    presentTools: null,
+    presentTools: null
   });
   assert.equal(result.items.length, 0);
   assert.deepEqual(result.missing, [{ componentId: 'c-axe' }]);
@@ -761,7 +634,7 @@ test('matchGatheringTools: an owned non-broken item takes precedence over a virt
     task: { id: 't' },
     tools: [{ componentId: 'c-axe' }],
     craftingSystemManager: matcher,
-    presentTools: { systemId: 's', componentIds: ['c-axe'] },
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
   });
   assert.equal(result.items.length, 1);
   assert.equal(result.items[0].virtual, undefined, 'owned item wins, not virtual');
@@ -771,14 +644,14 @@ test('matchGatheringTools: an owned non-broken item takes precedence over a virt
 test('createGatheringToolAvailability: virtual-present tool reports available and drops the null item', async () => {
   const availability = createGatheringToolAvailability({
     craftingSystemManager: matcher,
-    evaluator: { evaluateRequirement: async () => ({ allowed: true }) },
+    evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
   });
   const result = await availability.check({
     actor: { items: [] },
     system: { id: 's' },
     task: { id: 't' },
     tools: [{ componentId: 'c-axe' }],
-    presentTools: { systemId: 's', componentIds: ['c-axe'] },
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
   });
   assert.equal(result.available, true);
   assert.deepEqual(result.missing, []);
@@ -838,10 +711,7 @@ test('gathering stale usability ids fail closed while bonus-only failures remain
   const availability = createGatheringToolAvailability({
     craftingSystemManager: matcher,
     evaluator: {
-      evaluateExpression: async () => {
-        numericEvaluations += 1;
-        return 99;
-      },
+      evaluateExpression: async () => { numericEvaluations += 1; return 99; },
     },
   });
   const system = { id: 's', characterPrerequisites: [TRAINED_PREREQUISITE] };
@@ -884,31 +754,18 @@ test('tool breakage runtime EXCLUDES a virtual-present tool from plan/apply (no 
   const applied = [];
   const runtime = createToolBreakageRuntime({
     matchTools: ({ actor, system, task, tools, presentTools }) =>
-      matchGatheringTools({
-        actor,
-        system,
-        task,
-        tools,
-        craftingSystemManager: matcher,
-        presentTools,
-      }),
+      matchGatheringTools({ actor, system, task, tools, craftingSystemManager: matcher, presentTools }),
     buildItemRef: (_actor, item) => {
       applied.push(item);
       return { actorUuid: null, itemUuid: item?.componentId ?? null, quantity: 1 };
-    },
+    }
   });
   const params = {
     actor: { items: [] },
     system: { id: 's' },
     task: { id: 't' },
-    tools: [
-      {
-        componentId: 'c-axe',
-        breakage: { mode: 'limitedUses', maxUses: 1 },
-        onBreak: { mode: 'destroy' },
-      },
-    ],
-    presentTools: { systemId: 's', componentIds: ['c-axe'] },
+    tools: [{ componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } }],
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
   };
   const planned = await runtime.plan(params);
   const evidence = await runtime.apply(params);
@@ -923,9 +780,7 @@ test('gathering direct-Item replacement failure preserves the original Tool', as
     deleted: false,
     parent: null,
     getFlag: () => undefined,
-    async delete() {
-      this.deleted = true;
-    },
+    async delete() { this.deleted = true; },
   };
   const actor = {
     uuid: 'Actor.a',
@@ -950,12 +805,7 @@ test('gathering direct-Item replacement failure preserves the original Tool', as
     }),
   });
 
-  const evidence = await runtime.apply({
-    actor,
-    system: { id: 's' },
-    task: { id: 't' },
-    tools: [tool],
-  });
+  const evidence = await runtime.apply({ actor, system: { id: 's' }, task: { id: 't' }, tools: [tool] });
 
   assert.equal(item.deleted, false);
   assert.equal(evidence[0].onBreak.action, 'none');
@@ -968,12 +818,9 @@ test('classifyGatheringToolStates: a virtual-present tool displays as present', 
     task: { id: 't' },
     tools: [{ componentId: 'c-axe' }, { componentId: 'c-saw' }],
     craftingSystemManager: matcher,
-    presentTools: { systemId: 's', componentIds: ['c-axe'] },
+    presentTools: { systemId: 's', componentIds: ['c-axe'] }
   });
-  assert.deepEqual(
-    states.map((s) => s.state),
-    ['present', 'missing']
-  );
+  assert.deepEqual(states.map(s => s.state), ['present', 'missing']);
 });
 
 test('classifyGatheringToolStates: an out-of-system present tool does NOT display as present', () => {
@@ -983,35 +830,19 @@ test('classifyGatheringToolStates: an out-of-system present tool does NOT displa
     task: { id: 't', craftingSystemId: 'system-b' },
     tools: [{ componentId: 'c-axe' }],
     craftingSystemManager: matcher,
-    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] },
+    presentTools: { systemId: 'system-a', componentIds: ['c-axe'] }
   });
-  assert.deepEqual(
-    states.map((s) => s.state),
-    ['missing']
-  );
+  assert.deepEqual(states.map(s => s.state), ['missing']);
 });
 
 test('startAttempt: an unowned tool present as activeCanvasTool gathers without breakage/usage', async () => {
   // Build an engine wired with the REAL availability + breakage runtime so the
   // virtual-present injection is exercised end to end (not via mocks).
-  const tool = {
-    componentId: 'comp-axe',
-    breakage: { mode: 'limitedUses', maxUses: 1 },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'comp-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
   const task = baseTask({ tools: [tool] });
-  const system = {
-    id: 'system-a',
-    enabled: true,
-    features: { gathering: true },
-    gatheringCraftingCheck: routedSystemCheck(),
-  };
+  const system = { id: 'system-a', enabled: true, features: { gathering: true }, gatheringCraftingCheck: routedSystemCheck() };
   const environment = {
-    id: 'env-a',
-    craftingSystemId: 'system-a',
-    enabled: true,
-    selectionMode: 'targeted',
-    tasks: [task],
+    id: 'env-a', craftingSystemId: 'system-a', enabled: true, selectionMode: 'targeted', tasks: [task]
   };
   Object.defineProperty(environment, '__libraryTools', { value: new Map(), enumerable: false });
   const stores = makeStores({ environment, system });
@@ -1029,25 +860,15 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
     sceneAccess: { canAttempt: async () => ({ allowed: true }) },
     toolAvailability: createGatheringToolAvailability({
       craftingSystemManager: matcher,
-      evaluator: { evaluateRequirement: async () => ({ allowed: true }) },
+      evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
     }),
     toolBreakage: createToolBreakageRuntime({
       matchTools: ({ actor, system: sys, task: t, tools, presentTools }) =>
-        matchGatheringTools({
-          actor,
-          system: sys,
-          task: t,
-          tools,
-          craftingSystemManager: matcher,
-          presentTools,
-        }),
-      buildItemRef: (_actor, item) => {
-        buildRefs.push(item);
-        return { actorUuid: null, itemUuid: item?.componentId ?? null, quantity: 1 };
-      },
+        matchGatheringTools({ actor, system: sys, task: t, tools, craftingSystemManager: matcher, presentTools }),
+      buildItemRef: (_actor, item) => { buildRefs.push(item); return { actorUuid: null, itemUuid: item?.componentId ?? null, quantity: 1 }; }
     }),
     resultCreator: { plan: async () => [], create: async () => [] },
-    failureFeedback: { apply: async () => null },
+    failureFeedback: { apply: async () => null }
   });
 
   // WITHOUT the active tool the unowned requirement blocks the attempt.
@@ -1058,16 +879,10 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
   // A present tool scoped to a DIFFERENT system is inert (cross-system collision
   // guard): componentId comp-axe from system-zzz must not satisfy system-a's task.
   const wrongSystem = await engine.startAttempt({
-    viewer,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-    presentTools: { systemId: 'system-zzz', componentIds: ['comp-axe'] },
+    viewer, environmentId: 'env-a', taskId: 'task-a',
+    presentTools: { systemId: 'system-zzz', componentIds: ['comp-axe'] }
   });
-  assert.equal(
-    wrongSystem.accepted,
-    false,
-    'an out-of-system station tool does not unlock the task'
-  );
+  assert.equal(wrongSystem.accepted, false, 'an out-of-system station tool does not unlock the task');
   assert.equal(wrongSystem.blockedReasons[0].code, 'TOOL_BLOCKED');
 
   // WITH the active tool scoped to the matching system the attempt succeeds and
@@ -1076,10 +891,8 @@ test('startAttempt: an unowned tool present as activeCanvasTool gathers without 
   routedRoll(true);
   try {
     ok = await engine.startAttempt({
-      viewer,
-      environmentId: 'env-a',
-      taskId: 'task-a',
-      presentTools: { systemId: 'system-a', componentIds: ['comp-axe'] },
+      viewer, environmentId: 'env-a', taskId: 'task-a',
+      presentTools: { systemId: 'system-a', componentIds: ['comp-axe'] }
     });
   } finally {
     delete globalThis.Roll;
@@ -1105,11 +918,7 @@ import {
 function gatheringRuntime(items) {
   return createToolBreakageRuntime({
     matchTools: () => ({ items, missing: [] }),
-    buildItemRef: (actor, item) => ({
-      actorUuid: actor?.uuid ?? null,
-      itemUuid: item.uuid,
-      quantity: 1,
-    }),
+    buildItemRef: (actor, item) => ({ actorUuid: actor?.uuid ?? null, itemUuid: item.uuid, quantity: 1 })
   });
 }
 
@@ -1121,33 +930,13 @@ test('gathering checkDriven runtime: forces breakage on non-immune tools, immune
   const axe = new RuntimeFakeItem('Item.gaxe');
   const anvil = new RuntimeFakeItem('Item.ganvil');
   const runtime = gatheringRuntime([
-    {
-      tool: {
-        componentId: 'gaxe',
-        breakage: { mode: 'breakageChance', breakageChance: 0 },
-        onBreak: { mode: 'flagBroken' },
-      },
-      item: axe,
-    },
-    {
-      tool: {
-        componentId: 'ganvil',
-        breakage: { mode: 'immune' },
-        onBreak: { mode: 'flagBroken' },
-      },
-      item: anvil,
-    },
+    { tool: { componentId: 'gaxe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+    { tool: { componentId: 'ganvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } }, item: anvil }
   ]);
-  const args = {
-    actor: { uuid: 'Actor.g' },
-    task: { id: 'task-a' },
-    system: checkDrivenSystem,
-    checkResult: GATHER_RESULT,
-    checkBreakage: GATHER_TRIGGER,
-  };
+  const args = { actor: { uuid: 'Actor.g' }, task: { id: 'task-a' }, system: checkDrivenSystem, checkResult: GATHER_RESULT, checkBreakage: GATHER_TRIGGER };
   await runtime.plan(args);
   const applied = await runtime.apply(args);
-  const byId = Object.fromEntries(applied.map((e) => [e.componentId, e]));
+  const byId = Object.fromEntries(applied.map(e => [e.componentId, e]));
   assert.equal(byId.gaxe.broken, true);
   assert.equal(byId.gaxe.reason, 'Check breakage');
   assert.equal(byId.ganvil.broken, false);
@@ -1178,14 +967,7 @@ test('gathering/crafting drift: the gathering apply breaks exactly what the craf
   // Gathering APPLICATION via the real shared runtime against a real item.
   const axe = new RuntimeFakeItem('Item.drift-axe');
   const runtime = gatheringRuntime([
-    {
-      tool: {
-        componentId: 'drift-axe',
-        breakage: { mode: 'breakageChance', breakageChance: 0 },
-        onBreak: { mode: 'flagBroken' },
-      },
-      item: axe,
-    },
+    { tool: { componentId: 'drift-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
   ]);
   const args = {
     actor: { uuid: 'Actor.g' },
@@ -1201,11 +983,7 @@ test('gathering/crafting drift: the gathering apply breaks exactly what the craf
 
   // The gathering application result must agree with the crafting decision: same
   // forceBreak verdict, same triggerId, same human-readable reason on the broken tool.
-  assert.equal(
-    applied[0].broken,
-    craftingDecision.forceBreak,
-    'gathering breaks iff crafting decided to'
-  );
+  assert.equal(applied[0].broken, craftingDecision.forceBreak, 'gathering breaks iff crafting decided to');
   assert.equal(applied[0].triggerId, craftingDecision.triggerId, 'same triggerId across surfaces');
   assert.equal(applied[0].reason, craftingDecision.reason, 'same break reason across surfaces');
 });
@@ -1217,26 +995,9 @@ test('gathering checkDriven runtime: the realm toolBreakagePolicy is orthogonal 
   // decision is the same regardless of policy.
   const axe = new RuntimeFakeItem('Item.gaxe2');
   const runtime = gatheringRuntime([
-    {
-      tool: {
-        componentId: 'gaxe2',
-        breakage: { mode: 'limitedUses', maxUses: null },
-        onBreak: { mode: 'flagBroken' },
-      },
-      item: axe,
-    },
+    { tool: { componentId: 'gaxe2', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'flagBroken' } }, item: axe }
   ]);
-  const args = {
-    actor: { uuid: 'Actor.g' },
-    task: { id: 'task-b' },
-    system: checkDrivenSystem,
-    checkResult: GATHER_RESULT,
-    checkBreakage: GATHER_TRIGGER,
-  };
+  const args = { actor: { uuid: 'Actor.g' }, task: { id: 'task-b' }, system: checkDrivenSystem, checkResult: GATHER_RESULT, checkBreakage: GATHER_TRIGGER };
   const applied = await runtime.apply(args);
-  assert.equal(
-    applied[0].broken,
-    true,
-    'the decision depends only on the check, not the realm policy'
-  );
+  assert.equal(applied[0].broken, true, 'the decision depends only on the check, not the realm policy');
 });

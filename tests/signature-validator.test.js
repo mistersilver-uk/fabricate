@@ -84,7 +84,7 @@ test('component-vs-component overlap: same component in both recipes → conflic
   const conflict = result.conflicts[0];
   assert.ok(
     (conflict.recipeA.id === 'r-1' && conflict.recipeB.id === 'r-2') ||
-      (conflict.recipeA.id === 'r-2' && conflict.recipeB.id === 'r-1'),
+    (conflict.recipeA.id === 'r-2' && conflict.recipeB.id === 'r-1'),
     'Conflict should reference both recipes'
   );
 });
@@ -96,12 +96,8 @@ test('component-vs-component overlap: same component in both recipes → conflic
 test('component-vs-component no overlap: different components → no conflict', () => {
   const components = [makeComponent('comp-a'), makeComponent('comp-b')];
 
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-b' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-b' })])]);
 
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA]);
   const recipeB = makeRecipe('r-2', 'Recipe B', [setB]);
@@ -123,26 +119,18 @@ test('component-vs-tag overlap: component has tag used by other recipe → confl
   const components = [compX];
 
   // Recipe A: uses component X by ID
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-x' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-x' })])]);
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA]);
 
   // Recipe B: uses tag 'fire' (which comp-x has)
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['fire'], tagMatch: 'any' })]),
-  ]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['fire'], tagMatch: 'any' })])]);
   const recipeB = makeRecipe('r-2', 'Recipe B', [setB]);
 
   const system = { id: 'sys-1', resolutionMode: 'simple' };
   const validator = buildValidator(system, [recipeA, recipeB], components);
 
   const result = validator.validateSystem('sys-1');
-  assert.equal(
-    result.valid,
-    false,
-    'Expected conflict when component has tag used by other recipe'
-  );
+  assert.equal(result.valid, false, 'Expected conflict when component has tag used by other recipe');
   assert.ok(result.conflicts.length > 0, 'Expected at least one conflict');
 });
 
@@ -156,15 +144,11 @@ test('tag-vs-tag overlap (any): recipes share at least one tag → conflict', ()
   const components = [compA, compB];
 
   // Recipe A: any item with 'fire' tag
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['fire'], tagMatch: 'any' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['fire'], tagMatch: 'any' })])]);
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA]);
 
   // Recipe B: any item with 'fire' or 'rare' tag
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'any' })]),
-  ]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'any' })])]);
   const recipeB = makeRecipe('r-2', 'Recipe B', [setB]);
 
   const system = { id: 'sys-1', resolutionMode: 'simple' };
@@ -185,15 +169,11 @@ test('tag-vs-tag overlap (all): component with all required tags used in both re
   const components = [compA];
 
   // Recipe A: requires 'fire' AND 'rare' (all)
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'all' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'all' })])]);
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA]);
 
   // Recipe B: also requires 'fire' AND 'rare' (all)
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'all' })]),
-  ]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'all' })])]);
   const recipeB = makeRecipe('r-2', 'Recipe B', [setB]);
 
   const system = { id: 'sys-1', resolutionMode: 'simple' };
@@ -215,15 +195,11 @@ test('no false positives: tag all with no component having all required tags →
   const components = [compA, compB];
 
   // Recipe A: requires 'fire' AND 'rare' (all) — no component satisfies this
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'all' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'all' })])]);
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA]);
 
   // Recipe B: also requires 'fire' AND 'rare' (all) — same, empty match set
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'all' })]),
-  ]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['fire', 'rare'], tagMatch: 'all' })])]);
   const recipeB = makeRecipe('r-2', 'Recipe B', [setB]);
 
   const system = { id: 'sys-1', resolutionMode: 'simple' };
@@ -231,11 +207,7 @@ test('no false positives: tag all with no component having all required tags →
 
   const result = validator.validateSystem('sys-1');
   // Both expand to empty set → no overlap → no conflict
-  assert.equal(
-    result.valid,
-    true,
-    'Expected no conflict when no component satisfies the all-tag requirement'
-  );
+  assert.equal(result.valid, true, 'Expected no conflict when no component satisfies the all-tag requirement');
   assert.equal(result.conflicts.length, 0);
 });
 
@@ -249,15 +221,11 @@ test('genuinely disjoint signatures: no shared components between recipes → no
   const components = [compA, compB];
 
   // Recipe A: uses 'fire' tag
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['fire'], tagMatch: 'any' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['fire'], tagMatch: 'any' })])]);
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA]);
 
   // Recipe B: uses 'water' tag
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('tags', { tags: ['water'], tagMatch: 'any' })]),
-  ]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('tags', { tags: ['water'], tagMatch: 'any' })])]);
   const recipeB = makeRecipe('r-2', 'Recipe B', [setB]);
 
   const system = { id: 'sys-1', resolutionMode: 'simple' };
@@ -297,9 +265,7 @@ test('empty system: no recipes → valid with no conflicts', () => {
 
 test('single recipe: only one recipe → no conflict possible', () => {
   const components = [makeComponent('comp-a', ['fire'])];
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA]);
 
   const system = { id: 'sys-1', resolutionMode: 'simple' };
@@ -317,15 +283,9 @@ test('single recipe: only one recipe → no conflict possible', () => {
 test('validateRecipe: returns only conflicts involving the given recipe', () => {
   const components = [makeComponent('comp-a', [])];
 
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
-  const setC = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
+  const setC = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
 
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA]);
   const recipeB = makeRecipe('r-2', 'Recipe B', [setB]);
@@ -436,14 +396,10 @@ test('multiple ingredient sets per recipe: conflict detected across sets', () =>
   const components = [makeComponent('comp-a', [])];
 
   // Recipe A has two ingredient sets, one of which overlaps with recipe B
-  const setA1 = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
+  const setA1 = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
   const recipeA = makeRecipe('r-1', 'Recipe A', [setA1]);
 
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
   const recipeB = makeRecipe('r-2', 'Recipe B', [setB]);
 
   const system = { id: 'sys-1', resolutionMode: 'simple' };
@@ -811,12 +767,8 @@ test('incomparable siblings {S,V,E} / {S,V,R} → ALLOWED (issue 774)', () => {
 test('conflict message includes both recipe names', () => {
   const components = [makeComponent('comp-a', [])];
 
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
   const recipeA = makeRecipe('r-1', 'Alpha', [setA]);
   const recipeB = makeRecipe('r-2', 'Beta', [setB]);
 
@@ -849,11 +801,7 @@ test('computeGroupOptions: essence capacity = min(amount, ids.size), not option.
   const validator = buildValidator({ id: 'sys-1', resolutionMode: 'alchemy' }, [], components);
   const [group] = validator.computeGroupOptions(set, components);
   // amount 3 but only 2 components carry fire → capacity is min(3, 2) = 2 (NOT quantity 1).
-  assert.equal(
-    group[0].capacity,
-    2,
-    'capacity derives from the essence amount, capped by ids.size'
-  );
+  assert.equal(group[0].capacity, 2, 'capacity derives from the essence amount, capped by ids.size');
   assert.deepEqual([...group[0].ids].sort(), ['c1', 'c2']);
 });
 
@@ -876,21 +824,13 @@ test('essence expansion makes an essence group overlap a component carrying that
 
 test('validateSystem is enabled-scoped: a disabled collider does not count against the gate', () => {
   const components = [makeComponent('comp-a')];
-  const setA = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
-  const setB = makeIngredientSet([
-    makeGroup([makeIngredient('component', { componentId: 'comp-a' })]),
-  ]);
+  const setA = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
+  const setB = makeIngredientSet([makeGroup([makeIngredient('component', { componentId: 'comp-a' })])]);
   const validator = buildValidator(
     { id: 'sys-1', resolutionMode: 'alchemy' },
     [makeRecipe('r-1', 'A', [setA], true), makeRecipe('r-2', 'B', [setB], false)],
     components
   );
   const result = validator.validateSystem('sys-1');
-  assert.equal(
-    result.valid,
-    true,
-    'the disabled collider is excluded, so the enabled set is clean'
-  );
+  assert.equal(result.valid, true, 'the disabled collider is excluded, so the enabled set is clean');
 });

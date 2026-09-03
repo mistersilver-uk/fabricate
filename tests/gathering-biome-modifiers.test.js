@@ -6,26 +6,20 @@ import { makeRichState } from './helpers/gathering.js';
 // Compose an environment whose biomes drive biome-modifier matching, with a
 // chosen aggregation mode. composeEnvironment pulls conditions from system
 // defaults; we override rules so each test can pick the aggregation strategy.
-function composedEnvironment(
-  service,
-  { biomes = [], aggregation = 'strongestOfEach', events = [] } = {}
-) {
-  const composed = service.composeEnvironment(
-    {
-      id: 'env',
-      craftingSystemId: 'system-a',
-      biomes,
-      tasks: [],
-    },
-    { id: 'system-a' }
-  );
+function composedEnvironment(service, { biomes = [], aggregation = 'strongestOfEach', events = [] } = {}) {
+  const composed = service.composeEnvironment({
+    id: 'env',
+    craftingSystemId: 'system-a',
+    biomes,
+    tasks: []
+  }, { id: 'system-a' });
   composed.rules = {
     rewardSelectionMode: 'allDrops',
     eventSelectionMode: 'allDrops',
     rewardLimit: 99,
     eventLimit: 99,
     eventPolicy: 'successWithEvent',
-    biomeModifierAggregation: aggregation,
+    biomeModifierAggregation: aggregation
   };
   if (events.length > 0) composed.events = events;
   return composed;
@@ -39,31 +33,23 @@ const WORKED_EXAMPLE_BIOME_MODIFIERS = {
   biome: [
     { id: 'bm-grassland', conditionId: 'grassland', value: 10 },
     { id: 'bm-forest', conditionId: 'forest', value: 15 },
-    { id: 'bm-cave', conditionId: 'cave', value: -7 },
-  ],
+    { id: 'bm-cave', conditionId: 'cave', value: -7 }
+  ]
 };
 
 async function resolveWorkedExample(aggregation) {
   const { service } = makeRichState({ config: configFor(), rolls: [100] });
   const environment = composedEnvironment(service, {
     biomes: ['grassland', 'forest', 'cave'],
-    aggregation,
+    aggregation
   });
   const result = await service.resolveD100Attempt({
     task: {
       id: 't',
-      dropRows: [
-        {
-          id: 'd1',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 25,
-          conditionModifiers: WORKED_EXAMPLE_BIOME_MODIFIERS,
-        },
-      ],
+      dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 25, conditionModifiers: WORKED_EXAMPLE_BIOME_MODIFIERS }]
     },
     environment,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   return result.items[0];
 }
@@ -88,25 +74,14 @@ test('dominant applies only the single largest-magnitude modifier', async () => 
 
 test('biome modifiers only match biomes present in the gathering environment', async () => {
   const { service } = makeRichState({ config: configFor(), rolls: [100] });
-  const environment = composedEnvironment(service, {
-    biomes: ['grassland'],
-    aggregation: 'cumulative',
-  });
+  const environment = composedEnvironment(service, { biomes: ['grassland'], aggregation: 'cumulative' });
   const result = await service.resolveD100Attempt({
     task: {
       id: 't',
-      dropRows: [
-        {
-          id: 'd1',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 25,
-          conditionModifiers: WORKED_EXAMPLE_BIOME_MODIFIERS,
-        },
-      ],
+      dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 25, conditionModifiers: WORKED_EXAMPLE_BIOME_MODIFIERS }]
     },
     environment,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   // Only grassland (+10) is an active biome; forest and cave are ignored.
   assert.equal(result.items[0].conditionModifier, 10);
@@ -118,19 +93,17 @@ test('event trigger rate is adjusted by its biome modifiers at runtime', async (
   const environment = composedEnvironment(service, {
     biomes: ['cave'],
     aggregation: 'strongestOfEach',
-    events: [
-      {
-        id: 'h1',
-        name: 'Cave-in',
-        dropRate: 25,
-        conditionModifiers: { biome: [{ id: 'hb-cave', conditionId: 'cave', value: 15 }] },
-      },
-    ],
+    events: [{
+      id: 'h1',
+      name: 'Cave-in',
+      dropRate: 25,
+      conditionModifiers: { biome: [{ id: 'hb-cave', conditionId: 'cave', value: 15 }] }
+    }]
   });
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [] },
     environment,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   assert.equal(result.events.length, 1);
   assert.equal(result.events[0].conditionModifier, 15);

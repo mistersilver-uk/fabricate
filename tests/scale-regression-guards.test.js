@@ -61,16 +61,19 @@ installFoundryEnv();
 
 const { AlchemyListingBuilder } = await import('../src/systems/AlchemyListingBuilder.js');
 const { RunJournalBuilder } = await import('../src/systems/RunJournalBuilder.js');
-const { RecipeVisibilityService, readVisibilityCounters, resetVisibilityCounters } =
-  await import('../src/systems/RecipeVisibilityService.js');
+const { RecipeVisibilityService, readVisibilityCounters, resetVisibilityCounters } = await import(
+  '../src/systems/RecipeVisibilityService.js'
+);
 const { CraftingListingBuilder } = await import('../src/systems/CraftingListingBuilder.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
-const { SignatureValidator, readSignatureCounters, resetSignatureCounters } =
-  await import('../src/systems/SignatureValidator.js');
+const { SignatureValidator, readSignatureCounters, resetSignatureCounters } = await import(
+  '../src/systems/SignatureValidator.js'
+);
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
-const { readIdentityCounters, resetIdentityCounters } =
-  await import('../src/utils/definitionIndex.js');
+const { readIdentityCounters, resetIdentityCounters } = await import(
+  '../src/utils/definitionIndex.js'
+);
 const { findMatchingComponent } = await import('../src/utils/essenceResolver.js');
 
 const PLAYER = { id: 'user-1', isGM: false };

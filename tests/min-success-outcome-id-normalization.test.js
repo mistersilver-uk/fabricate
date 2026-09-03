@@ -20,38 +20,18 @@ describe('Recipe.minSuccessOutcomeId', () => {
   });
 
   it('keeps a trimmed non-empty string', () => {
-    const recipe = new Recipe({
-      name: 'Test',
-      minSuccessOutcomeId: '  high  ',
-      resultGroups: RESULT_GROUPS,
-    });
+    const recipe = new Recipe({ name: 'Test', minSuccessOutcomeId: '  high  ', resultGroups: RESULT_GROUPS });
     assert.equal(recipe.minSuccessOutcomeId, 'high');
   });
 
   it('normalizes whitespace-only / non-string to null', () => {
-    assert.equal(
-      new Recipe({ name: 'T', minSuccessOutcomeId: '   ', resultGroups: RESULT_GROUPS })
-        .minSuccessOutcomeId,
-      null
-    );
-    assert.equal(
-      new Recipe({ name: 'T', minSuccessOutcomeId: 42, resultGroups: RESULT_GROUPS })
-        .minSuccessOutcomeId,
-      null
-    );
-    assert.equal(
-      new Recipe({ name: 'T', minSuccessOutcomeId: null, resultGroups: RESULT_GROUPS })
-        .minSuccessOutcomeId,
-      null
-    );
+    assert.equal(new Recipe({ name: 'T', minSuccessOutcomeId: '   ', resultGroups: RESULT_GROUPS }).minSuccessOutcomeId, null);
+    assert.equal(new Recipe({ name: 'T', minSuccessOutcomeId: 42, resultGroups: RESULT_GROUPS }).minSuccessOutcomeId, null);
+    assert.equal(new Recipe({ name: 'T', minSuccessOutcomeId: null, resultGroups: RESULT_GROUPS }).minSuccessOutcomeId, null);
   });
 
   it('serializes into toJSON and round-trips through fromJSON', () => {
-    const original = new Recipe({
-      name: 'Test',
-      minSuccessOutcomeId: 'high',
-      resultGroups: RESULT_GROUPS,
-    });
+    const original = new Recipe({ name: 'Test', minSuccessOutcomeId: 'high', resultGroups: RESULT_GROUPS });
     const json = original.toJSON();
     assert.equal(json.minSuccessOutcomeId, 'high');
     const restored = Recipe.fromJSON(json);
@@ -59,9 +39,7 @@ describe('Recipe.minSuccessOutcomeId', () => {
   });
 
   it('round-trips a null override', () => {
-    const restored = Recipe.fromJSON(
-      new Recipe({ name: 'T', resultGroups: RESULT_GROUPS }).toJSON()
-    );
+    const restored = Recipe.fromJSON(new Recipe({ name: 'T', resultGroups: RESULT_GROUPS }).toJSON());
     assert.equal(restored.minSuccessOutcomeId, null);
   });
 });

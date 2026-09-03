@@ -49,7 +49,9 @@ const RECIPE_BULK_EDIT_PANEL = scopedComponentCss(
 // unified Fabricate shell is an empty placeholder whose focus/contrast styling
 // is Svelte-scoped (not in fabricate.css), so it is intentionally not validated
 // here yet — re-add it once the shell has real, token-driven content.
-const surfaceMatrix = [{ id: 'manager', widths: [900, 560], height: 560, fixture: managerFixture }];
+const surfaceMatrix = [
+  { id: 'manager', widths: [900, 560], height: 560, fixture: managerFixture }
+];
 
 function parseColor(value) {
   const match = value.match(/rgba?\(([^)]+)\)/);
@@ -57,7 +59,7 @@ function parseColor(value) {
   // Numeric default, not the string it used to be. `composite` only ever multiplies by it,
   // so a string alpha was invisible there, but `effectiveBackground` COMPARES it — and an
   // `rgb()` triple's implicit alpha has to equal 1, not merely coerce to it.
-  const [r, g, b, a = 1] = match[1].split(',').map((part) => Number.parseFloat(part.trim()));
+  const [r, g, b, a = 1] = match[1].split(',').map(part => Number.parseFloat(part.trim()));
   return { r, g, b, a };
 }
 
@@ -67,12 +69,12 @@ function composite(foreground, background) {
     r: foreground.r * alpha + background.r * (1 - alpha),
     g: foreground.g * alpha + background.g * (1 - alpha),
     b: foreground.b * alpha + background.b * (1 - alpha),
-    a: 1,
+    a: 1
   };
 }
 
 function luminance({ r, g, b }) {
-  const channel = (value) => {
+  const channel = value => {
     const normalized = value / 255;
     return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
   };
@@ -142,9 +144,7 @@ function themePage(theme, width, height, body) {
 }
 
 function managerRows() {
-  return Array.from(
-    { length: 8 },
-    (_, index) => `
+  return Array.from({ length: 8 }, (_, index) => `
     <article class="manager-system-row" tabindex="0" data-boundary>
       <div class="manager-system-identity">
         <span class="manager-system-thumb is-empty">${index + 1}</span>
@@ -159,8 +159,7 @@ function managerRows() {
       </button>
       <button type="button" class="manager-button fab-manager-button" data-boundary>Open</button>
     </article>
-  `
-  ).join('');
+  `).join('');
 }
 
 /*
@@ -223,7 +222,7 @@ function bulkBookPickCard() {
     'fab-bulk-book-pick-art',
     'fab-bulk-book-pick-copy',
     'fab-bulk-book-pick-name',
-    'fab-bulk-book-pick-meta',
+    'fab-bulk-book-pick-meta'
   ].reduce(
     (fixture, className) => withScopeHash(fixture, className, RECIPE_BULK_EDIT_PANEL.hashClass),
     markup
@@ -231,11 +230,7 @@ function bulkBookPickCard() {
 }
 
 function managerFixture(theme, width, height) {
-  return themePage(
-    theme,
-    width,
-    height,
-    `
+  return themePage(theme, width, height, `
     <section class="fabricate fabricate-manager surface-root" data-fabricate-theme="${theme}" data-manager-view="systems" data-surface-backdrop>
       <header class="manager-header" data-region data-boundary>
         <div class="manager-heading">
@@ -300,8 +295,7 @@ function managerFixture(theme, width, height) {
           ${bulkBookPickCard()}
         </aside>
       </div>
-    </section>`
-  );
+    </section>`);
 }
 
 /*
@@ -326,7 +320,7 @@ function effectiveBackground(sample, selector) {
 }
 
 function contrastSample(result, selector) {
-  const sample = result.contrastSamples.find((entry) => entry.selector === selector);
+  const sample = result.contrastSamples.find(entry => entry.selector === selector);
   assert.ok(sample, `expected contrast sample for ${selector}`);
   const background = effectiveBackground(sample, selector);
   // The FOREGROUND is composited over that background too, not just the ancestor fills over
@@ -343,84 +337,32 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   assert.equal(result.theme, theme);
   assert.equal(result.rootTheme, theme);
   assert.equal(result.appTheme, theme);
-  assert.ok(
-    result.rootTokens.bg0 && result.rootTokens.text && result.rootTokens.accent,
-    `${theme}/${surfaceId}/${width} should expose root theme tokens`
-  );
-  assert.equal(
-    result.horizontalOverflow,
-    false,
-    `${theme}/${surfaceId}/${width} should not horizontally overflow its app container`
-  );
-  assert.deepEqual(
-    result.outOfBounds,
-    [],
-    `${theme}/${surfaceId}/${width} checked elements should remain inside the surface bounds`
-  );
-  assert.deepEqual(
-    result.overlaps,
-    [],
-    `${theme}/${surfaceId}/${width} layout regions should not overlap`
-  );
-  assert.deepEqual(
-    result.badHitTargets,
-    [],
-    `${theme}/${surfaceId}/${width} hit targets should receive pointer events at their center`
-  );
-  assert.ok(
-    result.focus.hasRing,
-    `${theme}/${surfaceId}/${width} focused control should expose a visible focus treatment`
-  );
-  assert.ok(
-    contrastSample(result, '[data-contrast-surface]') >= 4.5,
-    `${theme}/${surfaceId}/${width} primary surface text contrast should pass WCAG AA`
-  );
-  assert.ok(
-    contrastSample(result, '[data-contrast-soft]') >= 4.5,
-    `${theme}/${surfaceId}/${width} chip/status text contrast should pass WCAG AA`
-  );
-  assert.ok(
-    contrastSample(result, '[data-contrast-solid]') >= 4.5,
-    `${theme}/${surfaceId}/${width} solid action contrast should pass WCAG AA`
-  );
-  assert.ok(
-    contrastSample(result, '[data-contrast-solid-armed]') >= 4.5,
-    `${theme}/${surfaceId}/${width} armed danger action contrast should pass WCAG AA`
-  );
+  assert.ok(result.rootTokens.bg0 && result.rootTokens.text && result.rootTokens.accent, `${theme}/${surfaceId}/${width} should expose root theme tokens`);
+  assert.equal(result.horizontalOverflow, false, `${theme}/${surfaceId}/${width} should not horizontally overflow its app container`);
+  assert.deepEqual(result.outOfBounds, [], `${theme}/${surfaceId}/${width} checked elements should remain inside the surface bounds`);
+  assert.deepEqual(result.overlaps, [], `${theme}/${surfaceId}/${width} layout regions should not overlap`);
+  assert.deepEqual(result.badHitTargets, [], `${theme}/${surfaceId}/${width} hit targets should receive pointer events at their center`);
+  assert.ok(result.focus.hasRing, `${theme}/${surfaceId}/${width} focused control should expose a visible focus treatment`);
+  assert.ok(contrastSample(result, '[data-contrast-surface]') >= 4.5, `${theme}/${surfaceId}/${width} primary surface text contrast should pass WCAG AA`);
+  assert.ok(contrastSample(result, '[data-contrast-soft]') >= 4.5, `${theme}/${surfaceId}/${width} chip/status text contrast should pass WCAG AA`);
+  assert.ok(contrastSample(result, '[data-contrast-solid]') >= 4.5, `${theme}/${surfaceId}/${width} solid action contrast should pass WCAG AA`);
+  assert.ok(contrastSample(result, '[data-contrast-solid-armed]') >= 4.5, `${theme}/${surfaceId}/${width} armed danger action contrast should pass WCAG AA`);
   // The two quiet roles, muted ink on no fill (issue 1118). Non-vacuity FIRST, for the same
   // reason the scoped samples check it: these two are the only probes here whose rule paints
   // a MUTED scale over the panel's inherited primary ink, so a role rule that stopped
   // applying computes the inherited colour and passes on a ratio that measures nothing. The
   // ratio is in the message because a failure is a THEME TOKEN decision and the number is
   // what decides it.
-  for (const [hook, role] of [
-    ['[data-contrast-quiet-ghost]', 'ghost'],
-    ['[data-contrast-quiet-dashed]', 'dashed'],
-  ]) {
-    const sample = result.contrastSamples.find((entry) => entry.selector === hook);
+  for (const [hook, role] of [['[data-contrast-quiet-ghost]', 'ghost'], ['[data-contrast-quiet-dashed]', 'dashed']]) {
+    const sample = result.contrastSamples.find(entry => entry.selector === hook);
     assert.ok(sample, `expected a contrast sample for the ${role} role at ${hook}`);
-    assert.notEqual(
-      sample.color,
-      sample.inheritedColor,
-      `${theme}/${surfaceId}/${width} the ${role} role computed the inherited ink (${sample.color}) — its rule did not apply, so the ratio would prove nothing`
-    );
+    assert.notEqual(sample.color, sample.inheritedColor, `${theme}/${surfaceId}/${width} the ${role} role computed the inherited ink (${sample.color}) — its rule did not apply, so the ratio would prove nothing`);
     const ratio = contrastSample(result, hook);
-    assert.ok(
-      ratio >= 4.5,
-      `${theme}/${surfaceId}/${width} the ${role} role's label should pass WCAG AA against the surface it recedes into, got ${ratio.toFixed(2)}:1`
-    );
+    assert.ok(ratio >= 4.5, `${theme}/${surfaceId}/${width} the ${role} role's label should pass WCAG AA against the surface it recedes into, got ${ratio.toFixed(2)}:1`);
   }
   // The bulk edit panels' muted copy (issue 1015), one probe per COLUMN it renders on.
-  assertScopedSamplePassesAA(
-    result,
-    '[data-contrast-bulk-muted]',
-    `${theme}/${surfaceId}/${width} bulk edit muted copy on the rail fill`
-  );
-  assertScopedSamplePassesAA(
-    result,
-    '[data-contrast-bulk-bg-muted]',
-    `${theme}/${surfaceId}/${width} bulk edit book pick meta on the card fill`
-  );
+  assertScopedSamplePassesAA(result, '[data-contrast-bulk-muted]', `${theme}/${surfaceId}/${width} bulk edit muted copy on the rail fill`);
+  assertScopedSamplePassesAA(result, '[data-contrast-bulk-bg-muted]', `${theme}/${surfaceId}/${width} bulk edit book pick meta on the card fill`);
   // The rail's bare-numeral `.manager-nav-count` (issue 1304), one probe per GROUND it
   // renders on: the idle rail's own `--fab-bg-0` fill, and `--fab-surface-active` under the
   // active row. A 0.625rem/600 numeral is not large text, so the bar is 4.5:1 on both — and
@@ -428,15 +370,9 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   // (the active row's translucent tint sits closer to the rail's own ink than the opaque
   // idle fill does).
   const idleCountRatio = contrastSample(result, '[data-contrast-nav-count-idle]');
-  assert.ok(
-    idleCountRatio >= 4.5,
-    `${theme}/${surfaceId}/${width} the idle rail's nav count should pass WCAG AA, got ${idleCountRatio.toFixed(2)}:1`
-  );
+  assert.ok(idleCountRatio >= 4.5, `${theme}/${surfaceId}/${width} the idle rail's nav count should pass WCAG AA, got ${idleCountRatio.toFixed(2)}:1`);
   const activeCountRatio = contrastSample(result, '[data-contrast-nav-count-active]');
-  assert.ok(
-    activeCountRatio >= 4.5,
-    `${theme}/${surfaceId}/${width} the active row's nav count should pass WCAG AA against --fab-surface-active, got ${activeCountRatio.toFixed(2)}:1`
-  );
+  assert.ok(activeCountRatio >= 4.5, `${theme}/${surfaceId}/${width} the active row's nav count should pass WCAG AA against --fab-surface-active, got ${activeCountRatio.toFixed(2)}:1`);
 }
 
 /*
@@ -448,7 +384,7 @@ function assertRenderedResult(result, theme, surfaceId, width) {
  * `contrastSample` already states that with `assert.ok`, and this check has to state it too.
  */
 function assertScopedSamplePassesAA(result, selector, label) {
-  const sample = result.contrastSamples.find((entry) => entry.selector === selector);
+  const sample = result.contrastSamples.find(entry => entry.selector === selector);
   assert.ok(sample, `expected contrast sample for ${selector} (${label})`);
   assert.notEqual(
     sample.color,
@@ -464,38 +400,25 @@ async function inspectRenderedSurface(page) {
   return page.evaluate(() => {
     const root = document.querySelector('.surface-root');
     const rootRect = root.getBoundingClientRect();
-    const rectOf = (element) => {
+    const rectOf = element => {
       const rect = element.getBoundingClientRect();
-      return {
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
-      };
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
     };
-    const intersects = (a, b) =>
-      a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-    const regions = Array.from(document.querySelectorAll('[data-region]')).map((element) => ({
-      element,
-      rect: rectOf(element),
-    }));
+    const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    const regions = Array.from(document.querySelectorAll('[data-region]')).map(element => ({ element, rect: rectOf(element) }));
     const visibleRegions = regions.filter(({ rect }) => rect.width > 0 && rect.height > 0);
     const outOfBounds = Array.from(document.querySelectorAll('[data-boundary]'))
-      .filter((element) => {
+      .filter(element => {
         const rect = element.getBoundingClientRect();
         return rect.width > 0 && (rect.left < rootRect.left - 1 || rect.right > rootRect.right + 1);
       })
-      .map((element) => element.className || element.tagName);
+      .map(element => element.className || element.tagName);
     const overlaps = [];
 
     for (let outerIndex = 0; outerIndex < visibleRegions.length; outerIndex += 1) {
       for (let innerIndex = outerIndex + 1; innerIndex < visibleRegions.length; innerIndex += 1) {
         if (intersects(visibleRegions[outerIndex].rect, visibleRegions[innerIndex].rect)) {
-          overlaps.push(
-            `${visibleRegions[outerIndex].element.className} overlaps ${visibleRegions[innerIndex].element.className}`
-          );
+          overlaps.push(`${visibleRegions[outerIndex].element.className} overlaps ${visibleRegions[innerIndex].element.className}`);
         }
       }
     }
@@ -514,11 +437,11 @@ async function inspectRenderedSurface(page) {
     // fixture page rather than the surface under test. `effectiveBackground` asserts the
     // final layer is opaque, so a walk that runs out of surface fails rather than silently
     // scoring against a translucent base.
-    const isOpaque = (color) => {
+    const isOpaque = color => {
       const channels = String(color).match(/[\d.]+/g) || [];
       return channels.length <= 3 || Number(channels[3]) === 1;
     };
-    const backgroundLayersUnder = (element) => {
+    const backgroundLayersUnder = element => {
       const layers = [];
       for (let node = element; node; node = node.parentElement) {
         const color = getComputedStyle(node).backgroundColor;
@@ -527,18 +450,7 @@ async function inspectRenderedSurface(page) {
       }
       return layers;
     };
-    const contrastSamples = [
-      '[data-contrast-surface]',
-      '[data-contrast-soft]',
-      '[data-contrast-solid]',
-      '[data-contrast-solid-armed]',
-      '[data-contrast-quiet-ghost]',
-      '[data-contrast-quiet-dashed]',
-      '[data-contrast-bulk-muted]',
-      '[data-contrast-bulk-bg-muted]',
-      '[data-contrast-nav-count-idle]',
-      '[data-contrast-nav-count-active]',
-    ].map((selector) => {
+    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-quiet-ghost]', '[data-contrast-quiet-dashed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]', '[data-contrast-nav-count-idle]', '[data-contrast-nav-count-active]'].map(selector => {
       const element = document.querySelector(selector);
       const style = getComputedStyle(element);
       return {
@@ -548,11 +460,11 @@ async function inspectRenderedSurface(page) {
         // What the node would read as with no rule of its own — the inherited `--fab-text`
         // from `.fabricate-manager`. A probe whose scoped rule silently stopped applying
         // computes exactly this, so comparing against it is what keeps the sample honest.
-        inheritedColor: getComputedStyle(element.parentElement).color,
+        inheritedColor: getComputedStyle(element.parentElement).color
       };
     });
     const badHitTargets = Array.from(document.querySelectorAll('[data-hit]'))
-      .filter((element) => {
+      .filter(element => {
         const rect = element.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
@@ -566,13 +478,10 @@ async function inspectRenderedSurface(page) {
         ) {
           return false;
         }
-        const hit = document.elementFromPoint(
-          rect.left + rect.width / 2,
-          rect.top + rect.height / 2
-        );
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
         return !hit || !element.contains(hit);
       })
-      .map((element) => element.textContent.trim());
+      .map(element => element.textContent.trim());
     const focusedStyle = getComputedStyle(document.activeElement);
 
     return {
@@ -582,7 +491,7 @@ async function inspectRenderedSurface(page) {
       rootTokens: {
         bg0: getComputedStyle(document.documentElement).getPropertyValue('--fab-bg-0').trim(),
         text: getComputedStyle(document.documentElement).getPropertyValue('--fab-text').trim(),
-        accent: getComputedStyle(document.documentElement).getPropertyValue('--fab-accent').trim(),
+        accent: getComputedStyle(document.documentElement).getPropertyValue('--fab-accent').trim()
       },
       horizontalOverflow: root.scrollWidth > root.clientWidth + 1,
       outOfBounds,
@@ -594,10 +503,11 @@ async function inspectRenderedSurface(page) {
         outlineStyle: focusedStyle.outlineStyle,
         outlineWidth: focusedStyle.outlineWidth,
         boxShadow: focusedStyle.boxShadow,
-        hasRing:
+        hasRing: (
           (focusedStyle.outlineStyle !== 'none' && focusedStyle.outlineWidth !== '0px') ||
-          focusedStyle.boxShadow !== 'none',
-      },
+          focusedStyle.boxShadow !== 'none'
+        )
+      }
     };
   });
 }
@@ -615,17 +525,17 @@ async function startStaticServer() {
     const contentType = extname(filePath) === '.js' ? 'text/javascript' : 'text/plain';
     response.writeHead(200, {
       'Access-Control-Allow-Origin': '*',
-      'Content-Type': `${contentType}; charset=utf-8`,
+      'Content-Type': `${contentType}; charset=utf-8`
     });
     response.end(readFileSync(filePath, 'utf8'));
   });
 
-  await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen));
+  await new Promise(resolveListen => server.listen(0, '127.0.0.1', resolveListen));
   const { port } = server.address();
 
   return {
     origin: `http://127.0.0.1:${port}`,
-    close: () => new Promise((resolveClose) => server.close(resolveClose)),
+    close: () => new Promise(resolveClose => server.close(resolveClose))
   };
 }
 
@@ -659,100 +569,73 @@ function liveUpdateFixture(origin) {
     </html>`;
 }
 
-test(
-  'renders all Fabricate themes across representative surfaces with readable, unclipped controls',
-  { timeout: 60_000 },
-  async () => {
-    const browser = await chromium.launch();
+test('renders all Fabricate themes across representative surfaces with readable, unclipped controls', { timeout: 60_000 }, async () => {
+  const browser = await chromium.launch();
 
-    try {
-      const page = await browser.newPage({
-        viewport: { width: 1120, height: 760 },
-        deviceScaleFactor: 1,
-      });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1120, height: 760 }, deviceScaleFactor: 1 });
 
-      for (const theme of themeIds) {
-        for (const surface of surfaceMatrix) {
-          for (const width of surface.widths) {
-            await page.setViewportSize({ width: width + 48, height: surface.height + 48 });
-            await page.setContent(surface.fixture(theme, width, surface.height), {
-              waitUntil: 'load',
-            });
+    for (const theme of themeIds) {
+      for (const surface of surfaceMatrix) {
+        for (const width of surface.widths) {
+          await page.setViewportSize({ width: width + 48, height: surface.height + 48 });
+          await page.setContent(surface.fixture(theme, width, surface.height), { waitUntil: 'load' });
 
-            const result = await inspectRenderedSurface(page);
-            assertRenderedResult(result, theme, surface.id, width);
-          }
+          const result = await inspectRenderedSurface(page);
+          assertRenderedResult(result, theme, surface.id, width);
         }
       }
-    } finally {
-      await browser.close();
     }
+  } finally {
+    await browser.close();
   }
-);
+});
 
-test(
-  'updates an already-mounted Fabricate surface through the registered theme onChange behavior',
-  { timeout: 30_000 },
-  async () => {
-    const server = await startStaticServer();
-    const browser = await chromium.launch();
+test('updates an already-mounted Fabricate surface through the registered theme onChange behavior', { timeout: 30_000 }, async () => {
+  const server = await startStaticServer();
+  const browser = await chromium.launch();
 
-    try {
-      const page = await browser.newPage({
-        viewport: { width: 820, height: 520 },
-        deviceScaleFactor: 1,
-      });
-      await page.setContent(liveUpdateFixture(server.origin), { waitUntil: 'load' });
-      await page.waitForFunction(() => window.themeSettingDefinition?.onChange);
+  try {
+    const page = await browser.newPage({ viewport: { width: 820, height: 520 }, deviceScaleFactor: 1 });
+    await page.setContent(liveUpdateFixture(server.origin), { waitUntil: 'load' });
+    await page.waitForFunction(() => window.themeSettingDefinition?.onChange);
 
-      const before = await page.evaluate(() => {
-        const root = document.querySelector('#mounted-surface');
-        return {
-          theme: document.documentElement.getAttribute('data-fabricate-theme'),
-          appTheme: root.getAttribute('data-fabricate-theme'),
-          background: getComputedStyle(root).backgroundColor,
-          accent: getComputedStyle(root).getPropertyValue('--fab-accent').trim(),
-          sameNode: window.fabricateRoot === root,
-        };
-      });
+    const before = await page.evaluate(() => {
+      const root = document.querySelector('#mounted-surface');
+      return {
+        theme: document.documentElement.getAttribute('data-fabricate-theme'),
+        appTheme: root.getAttribute('data-fabricate-theme'),
+        background: getComputedStyle(root).backgroundColor,
+        accent: getComputedStyle(root).getPropertyValue('--fab-accent').trim(),
+        sameNode: window.fabricateRoot === root
+      };
+    });
 
-      await page.evaluate(
-        (themeId) => window.themeSettingDefinition.onChange(themeId),
-        FABRICATE_THEME_IDS.STARGLASS_ARCANA
-      );
+    await page.evaluate(themeId => window.themeSettingDefinition.onChange(themeId), FABRICATE_THEME_IDS.STARGLASS_ARCANA);
 
-      const after = await page.evaluate(() => {
-        const root = document.querySelector('#mounted-surface');
-        return {
-          theme: document.documentElement.getAttribute('data-fabricate-theme'),
-          appTheme: root.getAttribute('data-fabricate-theme'),
-          background: getComputedStyle(root).backgroundColor,
-          accent: getComputedStyle(root).getPropertyValue('--fab-accent').trim(),
-          sameNode: window.fabricateRoot === root,
-          rootCount: document.querySelectorAll('#mounted-surface').length,
-        };
-      });
+    const after = await page.evaluate(() => {
+      const root = document.querySelector('#mounted-surface');
+      return {
+        theme: document.documentElement.getAttribute('data-fabricate-theme'),
+        appTheme: root.getAttribute('data-fabricate-theme'),
+        background: getComputedStyle(root).backgroundColor,
+        accent: getComputedStyle(root).getPropertyValue('--fab-accent').trim(),
+        sameNode: window.fabricateRoot === root,
+        rootCount: document.querySelectorAll('#mounted-surface').length
+      };
+    });
 
-      assert.equal(before.theme, FABRICATE_THEME_IDS.FABRICATE);
-      assert.equal(before.appTheme, FABRICATE_THEME_IDS.FABRICATE);
-      assert.equal(before.sameNode, true);
-      assert.equal(after.theme, FABRICATE_THEME_IDS.STARGLASS_ARCANA);
-      assert.equal(after.appTheme, FABRICATE_THEME_IDS.STARGLASS_ARCANA);
-      assert.equal(after.sameNode, true);
-      assert.equal(after.rootCount, 1);
-      assert.notEqual(
-        after.background,
-        before.background,
-        'mounted surface background should visibly update'
-      );
-      assert.notEqual(
-        after.accent,
-        before.accent,
-        'mounted surface theme tokens should update live'
-      );
-    } finally {
-      await browser.close();
-      await server.close();
-    }
+    assert.equal(before.theme, FABRICATE_THEME_IDS.FABRICATE);
+    assert.equal(before.appTheme, FABRICATE_THEME_IDS.FABRICATE);
+    assert.equal(before.sameNode, true);
+    assert.equal(after.theme, FABRICATE_THEME_IDS.STARGLASS_ARCANA);
+    assert.equal(after.appTheme, FABRICATE_THEME_IDS.STARGLASS_ARCANA);
+    assert.equal(after.sameNode, true);
+    assert.equal(after.rootCount, 1);
+    assert.notEqual(after.background, before.background, 'mounted surface background should visibly update');
+    assert.notEqual(after.accent, before.accent, 'mounted surface theme tokens should update live');
+  } finally {
+    await browser.close();
+    await server.close();
   }
-);
+});

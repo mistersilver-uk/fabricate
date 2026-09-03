@@ -29,7 +29,7 @@ const harness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
-    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js'
   ],
   compiledModules: [
     // The shipped segmented primitive: the outcome toggle and the tier-step mode
@@ -50,9 +50,9 @@ const harness = createMountedComponentHarness({
     // The shared status card: a trigger's break-tools effect is its own bordered card with an
     // icon, a sentence and a switch (issue 1096), which is exactly this primitive.
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
-    'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
 });
 
 const breakageKeys = en.FABRICATE.Admin.Manager.Checks.Breakage;
@@ -103,12 +103,12 @@ const rollTotalTrigger = {
   condition: { type: 'rollTotal', operator: '<=', value: 3 },
   outcome: 'failure',
   breakTools: false,
-  tierStep: { mode: 'none', steps: 1, tierId: null },
+  tierStep: { mode: 'none', steps: 1, tierId: null }
 };
 
 const ROUTED_TIERS = [
   { id: 'tier-a', name: 'Ruined' },
-  { id: 'tier-b', name: 'Masterwork' },
+  { id: 'tier-b', name: 'Masterwork' }
 ];
 
 function routedTrigger(tierStep, overrides = {}) {
@@ -118,21 +118,18 @@ function routedTrigger(tierStep, overrides = {}) {
     outcome: 'none',
     breakTools: false,
     tierStep,
-    ...overrides,
+    ...overrides
   };
 }
 
-async function mountRouted(
-  tierStep,
-  { outcomeOptions = ROUTED_TIERS, onChange, expand = true } = {}
-) {
+async function mountRouted(tierStep, { outcomeOptions = ROUTED_TIERS, onChange, expand = true } = {}) {
   const root = await harness.mount({
     value: triggerBlock([routedTrigger(tierStep)]),
     rollFormula: '1d20',
     kind: 'routed',
     outcomeOptions,
     showBreakTools: false,
-    ...(onChange ? { onChange } : {}),
+    ...(onChange ? { onChange } : {})
   });
   if (expand) expandTrigger(root, 'r1');
   return root;
@@ -151,7 +148,7 @@ function mountSimple(triggers, overrides = {}) {
     rollFormula: '1d20',
     kind: 'simple',
     showBreakTools: false,
-    ...overrides,
+    ...overrides
   });
 }
 
@@ -162,7 +159,10 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     expandTrigger(root, 't1');
     const selected = root.querySelector('[data-trigger="t1"] [data-trigger-outcome="failure"]');
     assert.ok(selected, 'the failure outcome segment renders for a trigger');
-    assert.ok(selected.classList.contains('is-active'), 'the toggle reflects the trigger outcome');
+    assert.ok(
+      selected.classList.contains('is-active'),
+      'the toggle reflects the trigger outcome'
+    );
     assert.equal(
       selected.querySelector('input[type="radio"]').checked,
       true,
@@ -183,11 +183,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     );
     assert.deepEqual(
       labels,
-      [
-        breakageKeys.OutcomeForceSuccess,
-        breakageKeys.OutcomeForceNone,
-        breakageKeys.OutcomeForceFailure,
-      ],
+      [breakageKeys.OutcomeForceSuccess, breakageKeys.OutcomeForceNone, breakageKeys.OutcomeForceFailure],
       'the outcome segments use the localized force-outcome copy in success | none | failure order'
     );
   });
@@ -195,16 +191,11 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
   it('relabels the outcome segments Award all / Award none for a progressive check', async () => {
     const root = await harness.mount({
       value: triggerBlock([
-        {
-          id: 'p1',
-          condition: { type: 'progressiveValue', operator: '>=', value: 10 },
-          outcome: 'success',
-          breakTools: false,
-        },
+        { id: 'p1', condition: { type: 'progressiveValue', operator: '>=', value: 10 }, outcome: 'success', breakTools: false }
       ]),
       rollFormula: '2d6',
       kind: 'progressive',
-      showBreakTools: false,
+      showBreakTools: false
     });
     expandTrigger(root, 'p1');
     const labels = [...root.querySelectorAll('[data-trigger-outcome]')].map((b) =>
@@ -255,7 +246,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     const emitted = [];
     const root = await mountSimple([rollTotalTrigger], {
       showBreakTools: true,
-      onChange: (next) => emitted.push(next),
+      onChange: (next) => emitted.push(next)
     });
     expandTrigger(root, 't1');
     const toggle = root.querySelector('[data-trigger="t1"] [data-trigger-break]');
@@ -272,7 +263,11 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     const emitted = [];
     const root = await mountSimple([rollTotalTrigger], { onChange: (next) => emitted.push(next) });
     expandTrigger(root, 't1');
-    chooseSegment(root.querySelector('[data-trigger="t1"]'), 'data-trigger-outcome', 'success');
+    chooseSegment(
+      root.querySelector('[data-trigger="t1"]'),
+      'data-trigger-outcome',
+      'success'
+    );
     assert.equal(
       emitted.at(-1).triggers[0].outcome,
       'success',
@@ -284,12 +279,9 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     const emitted = [];
     const root = await mountSimple([], {
       showBreakTools: true,
-      onChange: (next) => emitted.push(next),
+      onChange: (next) => emitted.push(next)
     });
-    assert.ok(
-      root.querySelector('[data-triggers-empty]'),
-      'the empty state renders with no triggers'
-    );
+    assert.ok(root.querySelector('[data-triggers-empty]'), 'the empty state renders with no triggers');
     root.querySelector('[data-add-trigger]').click();
     const added = emitted.at(-1).triggers;
     assert.equal(added.length, 1, 'Add seeds exactly one trigger');
@@ -305,18 +297,12 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
   it('disables the forcing segments for an outcomeTier condition (routed)', async () => {
     const root = await harness.mount({
       value: triggerBlock([
-        {
-          id: 'o1',
-          condition: { type: 'outcomeTier', tierIds: ['tier-a'], outcomeKeys: [] },
-          outcome: 'none',
-          breakTools: true,
-          tierStep: { mode: 'none', steps: 1, tierId: null },
-        },
+        { id: 'o1', condition: { type: 'outcomeTier', tierIds: ['tier-a'], outcomeKeys: [] }, outcome: 'none', breakTools: true, tierStep: { mode: 'none', steps: 1, tierId: null } }
       ]),
       rollFormula: '1d20',
       kind: 'routed',
       outcomeOptions: [{ id: 'tier-a', name: 'Critical' }],
-      showBreakTools: true,
+      showBreakTools: true
     });
     expandTrigger(root, 'o1');
     const card = root.querySelector('[data-trigger="o1"]');
@@ -325,14 +311,8 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     // Disabled on the RADIO, not merely a dimmed class: `select()` guards only
     // `next !== value`, so a live-but-dimmed segment would still force an outcome and
     // re-open the circularity this pin exists to prevent.
-    assert.ok(
-      radioFor('success').disabled,
-      'the success segment is disabled for an outcomeTier condition'
-    );
-    assert.ok(
-      radioFor('failure').disabled,
-      'the failure segment is disabled for an outcomeTier condition'
-    );
+    assert.ok(radioFor('success').disabled, 'the success segment is disabled for an outcomeTier condition');
+    assert.ok(radioFor('failure').disabled, 'the failure segment is disabled for an outcomeTier condition');
     assert.equal(radioFor('none').disabled, false, 'No effect stays choosable');
     assert.ok(
       card.querySelector('[data-trigger-outcome="none"]').classList.contains('is-active'),
@@ -378,7 +358,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
       value: triggerBlock([rollTotalTrigger]),
       rollFormula: '2d6',
       kind: 'progressive',
-      showBreakTools: false,
+      showBreakTools: false
     });
     expandTrigger(progressive, 't1');
     assert.ok(
@@ -471,11 +451,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
   it('shows a dangling target as a Missing tier option plus an invalid field', async () => {
     const root = await mountRouted({ mode: 'target', steps: 1, tierId: 'tier-gone' });
     const select = root.querySelector('[data-trigger-tier-step-target]');
-    assert.equal(
-      select.value,
-      'tier-gone',
-      'the dangling id stays selected, not silently remapped'
-    );
+    assert.equal(select.value, 'tier-gone', 'the dangling id stays selected, not silently remapped');
     const dangling = select.querySelector('option[value="tier-gone"]');
     assert.ok(dangling, 'the dangling id is appended as its own option');
     assert.equal(dangling.disabled, true, 'and cannot be re-chosen');
@@ -487,12 +463,9 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
   });
 
   it('shows its OWN no-tiers cue for a target on a tier-less check', async () => {
-    const root = await mountRouted(
-      { mode: 'target', steps: 1, tierId: null },
-      {
-        outcomeOptions: [],
-      }
-    );
+    const root = await mountRouted({ mode: 'target', steps: 1, tierId: null }, {
+      outcomeOptions: []
+    });
     const cue = root.querySelector('[data-trigger-step-no-tiers]');
     assert.ok(cue, 'the tier-step cue renders');
     assert.equal(cue.textContent.trim(), breakageKeys.TierStepNoTiers);
@@ -554,13 +527,13 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
         routedTrigger(
           { mode: 'none', steps: 1, tierId: null },
           { condition: { type: 'outcomeTier', tierIds: ['tier-a'], outcomeKeys: [] } }
-        ),
+        )
       ]),
       rollFormula: '1d20',
       kind: 'routed',
       outcomeOptions: ROUTED_TIERS,
       showBreakTools: false,
-      onChange: (next) => emitted.push(next),
+      onChange: (next) => emitted.push(next)
     });
     expandTrigger(root, 'r1');
     const card = root.querySelector('[data-trigger="r1"]');
@@ -612,14 +585,14 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
     condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 20 },
     outcome: 'none',
     breakTools: false,
-    tierStep: { mode: 'up', steps: 1, tierId: null },
+    tierStep: { mode: 'up', steps: 1, tierId: null }
   };
   const stepDown = {
     id: 'd1',
     condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '==', value: 1 },
     outcome: 'none',
     breakTools: false,
-    tierStep: { mode: 'down', steps: 2, tierId: null },
+    tierStep: { mode: 'down', steps: 2, tierId: null }
   };
 
   function mountPair(overrides = {}) {
@@ -629,7 +602,7 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
       kind: 'routed',
       outcomeOptions: ROUTED_TIERS,
       showBreakTools: false,
-      ...overrides,
+      ...overrides
     });
   }
 
@@ -752,7 +725,7 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
         breakageKeys.OpSelectAtLeast,
         breakageKeys.OpSelectAtMost,
         breakageKeys.OpSelectOver,
-        breakageKeys.OpSelectUnder,
+        breakageKeys.OpSelectUnder
       ],
       'and each reads as a comparison a GM can say out loud'
     );
@@ -811,7 +784,7 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       rollFormula: '1d20',
       kind: 'routed',
       outcomeOptions: ROUTED_TIERS,
-      showBreakTools: false,
+      showBreakTools: false
     });
     const buttons = [...root.querySelectorAll('[data-add-trigger-preset]')];
     assert.equal(buttons.length, 2, 'both presets render');
@@ -827,7 +800,7 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       kind: 'routed',
       outcomeOptions: ROUTED_TIERS,
       showBreakTools: false,
-      onChange: (next) => emitted.push(next),
+      onChange: (next) => emitted.push(next)
     });
 
     root.querySelector('[data-add-trigger-preset="high"]').click();
@@ -838,7 +811,7 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       groupId: 0,
       aggregate: 'anyDie',
       operator: '==',
-      value: 20,
+      value: 20
     });
     assert.deepEqual(trigger.tierStep, { mode: 'up', steps: 1, tierId: null });
     assert.ok(trigger.id, 'it carries a real id');
@@ -852,7 +825,7 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       kind: 'routed',
       outcomeOptions: ROUTED_TIERS,
       showBreakTools: false,
-      onChange: (next) => emitted.push(next),
+      onChange: (next) => emitted.push(next)
     });
     root.querySelector('[data-add-trigger-preset="low"]').click();
     assert.deepEqual(
@@ -869,7 +842,7 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       rollFormula: '@abilities.int.mod',
       kind: 'routed',
       outcomeOptions: ROUTED_TIERS,
-      showBreakTools: false,
+      showBreakTools: false
     });
     assert.equal(root.querySelector('[data-check-trigger-presets]'), null);
   });

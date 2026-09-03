@@ -52,10 +52,7 @@ describe('handleFabricateSettingChange', () => {
     assert.equal(emitted.length, 2);
     assert.equal(emitted[0][0], 'fabricate.recipesChanged');
     assert.deepEqual(emitted[0][1], { action: 'external', recipes: [{ id: 'r1' }] });
-    assert.deepEqual(emitted[1], [
-      'fabricate.craftingDataChanged',
-      { source: 'recipes', scopes: [] },
-    ]);
+    assert.deepEqual(emitted[1], ['fabricate.craftingDataChanged', { source: 'recipes', scopes: [] }]);
   });
 
   it('reloads the gathering environment store and re-emits the change hook', () => {

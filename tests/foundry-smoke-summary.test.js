@@ -79,11 +79,7 @@ test('computeSmokeSignal populates from partial results (an early phase abort)',
   assert.equal(signal.consoleErrorCount, 1);
 
   // Robust even when fields are entirely absent (never throws, never undefined).
-  assert.deepEqual(computeSmokeSignal({}), {
-    stepFailures: 0,
-    consoleErrorCount: 0,
-    degraded: false,
-  });
+  assert.deepEqual(computeSmokeSignal({}), { stepFailures: 0, consoleErrorCount: 0, degraded: false });
 });
 
 // ── The appendable waiver ─────────────────────────────────────────────────
@@ -119,9 +115,7 @@ test('--allowed-console-error-patterns APPENDS to the in-source defaults, never 
   // ...AND the supplied default STILL applies with the flag set, which is the property
   // this file pins. Which patterns the harness supplies is the harness's business, and is
   // pinned there — today it supplies no canvas waiver at all.
-  assert.ok(
-    isConsoleErrorWaived("Cannot read properties of undefined (reading 'OBJECTS')", combined)
-  );
+  assert.ok(isConsoleErrorWaived("Cannot read properties of undefined (reading 'OBJECTS')", combined));
 
   // Defaults come first, then the CSV patterns; nothing is dropped.
   assert.equal(combined.length, 2);
@@ -136,26 +130,18 @@ test('an unrelated error is still gating even with a waiver pattern set', () => 
 test('a pageerror is waivable by a matching pattern and NOT by a non-matching one', () => {
   // The pageerror handler tests err.message against the same pattern set, so a
   // matching appended pattern waives it — the deliberate existing capability.
-  const waived = appendAllowedConsoleErrorPatterns(
-    [RETIRED_OBJECTS_WAIVER],
-    'benign lifecycle glitch'
-  );
+  const waived = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'benign lifecycle glitch');
   assert.ok(isConsoleErrorWaived('benign lifecycle glitch during teardown', waived));
 
   // A non-matching pattern does not waive it.
-  const nonMatching = appendAllowedConsoleErrorPatterns(
-    [RETIRED_OBJECTS_WAIVER],
-    'some other thing'
-  );
+  const nonMatching = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'some other thing');
   assert.equal(isConsoleErrorWaived('benign lifecycle glitch during teardown', nonMatching), false);
 
   // And a supplied default keeps waiving with no CLI patterns at all, so an empty CSV
   // narrows nothing. Stated over the retired fixture rather than over whatever the harness
   // ships today, because the claim is about the EMPTY-CSV path and not about that list.
   const defaultsOnly = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], '');
-  assert.ok(
-    isConsoleErrorWaived("Cannot read properties of undefined (reading 'OBJECTS')", defaultsOnly)
-  );
+  assert.ok(isConsoleErrorWaived("Cannot read properties of undefined (reading 'OBJECTS')", defaultsOnly));
 });
 
 // ── Throw order: steps first, and no input waives a step failure ──────────
@@ -183,14 +169,9 @@ test('no input waives a step failure — an all-waived console list still throws
   // Model the full pipeline: the waiver removed every console error (consoleErrors
   // is empty because all matched a pattern), yet a step failed. The run MUST still
   // throw, and with reason 'steps' — the waiver cannot rescue a failed step.
-  const patterns = appendAllowedConsoleErrorPatterns(
-    [RETIRED_OBJECTS_WAIVER],
-    'everything is benign'
-  );
+  const patterns = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'everything is benign');
   const capturedButAllWaived = ['everything is benign here', "reading 'OBJECTS'"];
-  const gatingConsoleErrors = capturedButAllWaived.filter(
-    (text) => !isConsoleErrorWaived(text, patterns)
-  );
+  const gatingConsoleErrors = capturedButAllWaived.filter((text) => !isConsoleErrorWaived(text, patterns));
   assert.deepEqual(gatingConsoleErrors, []); // all waived → nothing gates on console
 
   const outcome = evaluateSmokeOutcome({
@@ -215,21 +196,14 @@ test('a clean run with all console errors waived does not throw', () => {
 // ── The shared capture-routing seam (both handlers go through it) ─────────
 
 test('classifyCapturedError routes a matching error to waived and a non-matching one to gating', () => {
-  const patterns = appendAllowedConsoleErrorPatterns(
-    [RETIRED_OBJECTS_WAIVER],
-    'benign lifecycle glitch'
-  );
+  const patterns = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'benign lifecycle glitch');
 
   // The Foundry canvas-artefact default and an appended pattern both waive.
   assert.deepEqual(classifyCapturedError("reading 'OBJECTS' blew up", patterns), { waived: true });
-  assert.deepEqual(classifyCapturedError('benign lifecycle glitch here', patterns), {
-    waived: true,
-  });
+  assert.deepEqual(classifyCapturedError('benign lifecycle glitch here', patterns), { waived: true });
 
   // A real regression is gating.
-  assert.deepEqual(classifyCapturedError('a real Fabricate regression', patterns), {
-    waived: false,
-  });
+  assert.deepEqual(classifyCapturedError('a real Fabricate regression', patterns), { waived: false });
 });
 
 test('classifyCapturedError routes identically regardless of console-vs-pageerror origin', () => {
@@ -263,19 +237,12 @@ test('both attachConsoleCapture handlers route through classifyCapturedError, ga
 
   // Exactly two call sites — one per handler; no third path may bypass the seam.
   const callSites = body.match(/classifyCapturedError\(/g) ?? [];
-  assert.equal(
-    callSites.length,
-    2,
-    'both handlers (and only they) must call classifyCapturedError'
-  );
+  assert.equal(callSites.length, 2, 'both handlers (and only they) must call classifyCapturedError');
 
   // ── console handler: condition + branch routing ──
   const consoleBlockStart = body.indexOf("if (msg.type() === 'error')");
   const consoleBlockEnd = body.indexOf("page.on('pageerror'", consoleBlockStart);
-  assert.ok(
-    consoleBlockStart > 0 && consoleBlockEnd > consoleBlockStart,
-    'expected the console handler block'
-  );
+  assert.ok(consoleBlockStart > 0 && consoleBlockEnd > consoleBlockStart, 'expected the console handler block');
   const consoleBlock = body.slice(consoleBlockStart, consoleBlockEnd);
   // Routes on the classifier's .waived, not a constant. Catches "console never
   // consults the waiver".
@@ -284,10 +251,7 @@ test('both attachConsoleCapture handlers route through classifyCapturedError, ga
   // "console pushes WAIVED errors into the gating consoleErrors list".
   const cWaived = consoleBlock.indexOf('waivedConsoleErrors.push(text)');
   const cGating = consoleBlock.indexOf('consoleErrors.push(text)');
-  assert.ok(
-    cWaived > 0 && cGating > cWaived,
-    'console handler must gate only on the not-waived (else) branch'
-  );
+  assert.ok(cWaived > 0 && cGating > cWaived, 'console handler must gate only on the not-waived (else) branch');
 
   // ── pageerror handler: condition + branch routing ──
   const pageBlockStart = body.indexOf("page.on('pageerror'");
@@ -295,16 +259,10 @@ test('both attachConsoleCapture handlers route through classifyCapturedError, ga
   // Routes on classifier .waived over err.message. Catches BOTH "pageerror skips
   // the waiver (if(false))" and "pageerror waives unconditionally (if(true))" —
   // either replaces this exact condition.
-  assert.match(
-    pageBlock,
-    /if \(classifyCapturedError\(err\.message, ignoredErrorPatterns\)\.waived\)/
-  );
+  assert.match(pageBlock, /if \(classifyCapturedError\(err\.message, ignoredErrorPatterns\)\.waived\)/);
   const pWaived = pageBlock.indexOf('waivedConsoleErrors.push(`pageerror:');
   const pGating = pageBlock.indexOf('consoleErrors.push(`pageerror:');
-  assert.ok(
-    pWaived > 0 && pGating > pWaived,
-    'pageerror handler must gate only on the not-waived (else) branch'
-  );
+  assert.ok(pWaived > 0 && pGating > pWaived, 'pageerror handler must gate only on the not-waived (else) branch');
 });
 
 // ── Source contract: the signal is written from the finally block ─────────
@@ -335,22 +293,10 @@ test('stepFailures/consoleErrorCount are assigned in the finally block, beside r
 
   // Both assignments exist, sit AFTER the finally opens (not in the try), and
   // BEFORE summary.json is written — i.e. in the same finally block.
-  assert.ok(
-    stepFailuresAssign > finallyOpen,
-    'results.stepFailures must be assigned inside the finally block'
-  );
-  assert.ok(
-    consoleErrorCountAssign > finallyOpen,
-    'results.consoleErrorCount must be assigned inside the finally block'
-  );
-  assert.ok(
-    stepFailuresAssign < summaryWrite,
-    'results.stepFailures must be written before summary.json'
-  );
-  assert.ok(
-    consoleErrorCountAssign < summaryWrite,
-    'results.consoleErrorCount must be written before summary.json'
-  );
+  assert.ok(stepFailuresAssign > finallyOpen, 'results.stepFailures must be assigned inside the finally block');
+  assert.ok(consoleErrorCountAssign > finallyOpen, 'results.consoleErrorCount must be assigned inside the finally block');
+  assert.ok(stepFailuresAssign < summaryWrite, 'results.stepFailures must be written before summary.json');
+  assert.ok(consoleErrorCountAssign < summaryWrite, 'results.consoleErrorCount must be written before summary.json');
 
   // And they are computed with computeSmokeSignal, the same helper this suite tests.
   assert.match(source, /computeSmokeSignal\(results\)/);
@@ -419,14 +365,17 @@ test('source: Manager readiness resolves the explicit or registered owner of the
     body,
     /liveMatches = applicationCandidates\.filter\(\(candidate\) => candidate\.liveMatch\)/
   );
-  assert.match(body, /ApplicationV2 render readiness failed \(\$\{causeMessage\}\)/);
+  assert.match(
+    body,
+    /ApplicationV2 render readiness failed \(\$\{causeMessage\}\)/
+  );
 });
 
 test('source: responsive evidence viewports narrowly waive Foundry minimum-resolution warnings', async () => {
   const source = await readFile(HARNESS_PATH, 'utf8');
   assert.match(
     source,
-    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater[\s\S]*?1280px by 720px\|1280px by 520px\|900px by 700px\|680px by 700px/
+    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater[\s\S]*?1280px by 720px\|1280px by 520px\|900px by 700px\|680px by 700px/,
   );
   // The waiver stays dimension-specific: an unexpected low-resolution run must still
   // fail the smoke, so a catch-all pattern would defeat its purpose (issue 881).
@@ -436,15 +385,9 @@ test('source: responsive evidence viewports narrowly waive Foundry minimum-resol
 test('source: smoke-world cleanup removes stale chat cards before stale documents', async () => {
   const source = await readFile(HARNESS_PATH, 'utf8');
   const messageCleanup = source.indexOf('const staleMessages = game.messages?.contents ?? []');
-  const actorCleanup = source.indexOf(
-    'const staleActors = game.actors.contents.filter',
-    messageCleanup
-  );
+  const actorCleanup = source.indexOf('const staleActors = game.actors.contents.filter', messageCleanup);
   assert.ok(messageCleanup > 0, 'expected stale smoke chat cleanup');
-  assert.ok(
-    actorCleanup > messageCleanup,
-    'chat cards must be removed before their source documents'
-  );
+  assert.ok(actorCleanup > messageCleanup, 'chat cards must be removed before their source documents');
   assert.match(
     source.slice(messageCleanup, actorCleanup),
     /ChatMessage\.deleteDocuments\(staleMessages\.map\(message => message\.id\)\)/
@@ -465,37 +408,21 @@ test('shouldTolerateSmokeTeardown: truth table (teardown class AND required capt
 
   // Teardown class present but captures NOT complete → do not tolerate (pre-milestone).
   assert.equal(
-    shouldTolerateSmokeTeardown({
-      message: teardown,
-      pageClosed: false,
-      requiredCapturesComplete: false,
-    }),
+    shouldTolerateSmokeTeardown({ message: teardown, pageClosed: false, requiredCapturesComplete: false }),
     false
   );
   assert.equal(
-    shouldTolerateSmokeTeardown({
-      message: 'unrelated',
-      pageClosed: true,
-      requiredCapturesComplete: false,
-    }),
+    shouldTolerateSmokeTeardown({ message: 'unrelated', pageClosed: true, requiredCapturesComplete: false }),
     false
   );
 
   // Teardown class present AND captures complete → tolerate (post-milestone).
   assert.equal(
-    shouldTolerateSmokeTeardown({
-      message: teardown,
-      pageClosed: false,
-      requiredCapturesComplete: true,
-    }),
+    shouldTolerateSmokeTeardown({ message: teardown, pageClosed: false, requiredCapturesComplete: true }),
     true
   );
   assert.equal(
-    shouldTolerateSmokeTeardown({
-      message: 'unrelated',
-      pageClosed: true,
-      requiredCapturesComplete: true,
-    }),
+    shouldTolerateSmokeTeardown({ message: 'unrelated', pageClosed: true, requiredCapturesComplete: true }),
     true
   );
 
@@ -599,10 +526,7 @@ test('source: the D0 screenshot-manager catch tolerates WITHOUT rethrowing', asy
 
   // The tolerate branch lives in this span and it does NOT rethrow.
   assert.match(catchRegion, /d0TeardownTolerated = true/);
-  assert.ok(
-    !/\bthrow\b/.test(catchRegion),
-    'the D0 catch must not rethrow (would double-record in Phase C)'
-  );
+  assert.ok(!/\bthrow\b/.test(catchRegion), 'the D0 catch must not rethrow (would double-record in Phase C)');
 
   // The tolerate decision routes through the shared predicate — assert against the
   // whole catch (the condition precedes the hard-failure push, so it is upstream
@@ -619,20 +543,11 @@ test('source: d0RequiredCapturesComplete flips true AFTER the last capture, BEFO
   assert.ok(screenshotAnchor > 0, 'expected the manager-experimental-off milestone capture');
 
   const milestoneAssign = source.indexOf('d0RequiredCapturesComplete = true', screenshotAnchor);
-  assert.ok(
-    milestoneAssign > screenshotAnchor,
-    'milestone flag must be set AFTER the last capture'
-  );
+  assert.ok(milestoneAssign > screenshotAnchor, 'milestone flag must be set AFTER the last capture');
 
   // The success push {step:'screenshot-manager', passed:true} (single line, no skipped).
-  const managerPassPush = source.indexOf(
-    "step: 'screenshot-manager', passed: true }",
-    screenshotAnchor
-  );
-  assert.ok(
-    managerPassPush > milestoneAssign,
-    'milestone flag must be set BEFORE the screenshot-manager pass push'
-  );
+  const managerPassPush = source.indexOf("step: 'screenshot-manager', passed: true }", screenshotAnchor);
+  assert.ok(managerPassPush > milestoneAssign, 'milestone flag must be set BEFORE the screenshot-manager pass push');
 
   // Pin against hoisting: the ONLY `= true` assignment is the post-milestone one.
   assert.equal(
@@ -659,25 +574,13 @@ test('source: results.degraded and results.rendererCrashed are assigned in the f
   // sits in the try, before the finally) by matching the finally-block coercion.
   const rendererAssign = source.indexOf('results.rendererCrashed = Boolean(', finallyOpen);
 
-  assert.ok(
-    degradedAssign > finallyOpen,
-    'results.degraded must be assigned inside the finally block'
-  );
-  assert.ok(
-    rendererAssign > finallyOpen,
-    'results.rendererCrashed must be assigned inside the finally block'
-  );
+  assert.ok(degradedAssign > finallyOpen, 'results.degraded must be assigned inside the finally block');
+  assert.ok(rendererAssign > finallyOpen, 'results.rendererCrashed must be assigned inside the finally block');
   assert.ok(degradedAssign < summaryWrite, 'results.degraded must be written before summary.json');
-  assert.ok(
-    rendererAssign < summaryWrite,
-    'results.rendererCrashed must be written before summary.json'
-  );
+  assert.ok(rendererAssign < summaryWrite, 'results.rendererCrashed must be written before summary.json');
 
   // degraded is computed via the same helper this suite tests.
-  assert.match(
-    source,
-    /const \{ stepFailures, consoleErrorCount, degraded \} = computeSmokeSignal\(results\)/
-  );
+  assert.match(source, /const \{ stepFailures, consoleErrorCount, degraded \} = computeSmokeSignal\(results\)/);
   // A causation-bearing renderer-crash listener feeds rendererCrashed.
   assert.match(source, /page\.on\('crash'/);
 });
@@ -705,11 +608,7 @@ test('source (F4): both teardown-skip writer sites reference the exported TRANSI
 
   // Both writer sites (D0 skip + Journal skip) stamp the error via the symbol.
   const symbolWrites = source.match(/error: TRANSIENT_TEARDOWN_SKIP_PREFIX \+ /g) ?? [];
-  assert.equal(
-    symbolWrites.length,
-    2,
-    'both skip writers must reference the exported prefix symbol'
-  );
+  assert.equal(symbolWrites.length, 2, 'both skip writers must reference the exported prefix symbol');
 
   // The literal string must NOT be re-inlined anywhere in the harness — that would
   // defeat the drift protection (change the constant and that writer stops marking degraded).
@@ -764,14 +663,8 @@ test('evaluateSmokeOutcome pins its failed-step excerpt byte for byte', () => {
 // implementation reading `s.name` against a hand-written `{ name: … }` fixture would pass its
 // own tests and emit an empty excerpt against a real summary.
 test('formatFailedStep reads the `step` key and falls back to `failed`', () => {
-  assert.equal(
-    formatFailedStep({ step: 'screenshot-manager', passed: false, error: 'boom' }),
-    'screenshot-manager: boom'
-  );
-  assert.equal(
-    formatFailedStep({ step: 'screenshot-manager', passed: false }),
-    'screenshot-manager: failed'
-  );
+  assert.equal(formatFailedStep({ step: 'screenshot-manager', passed: false, error: 'boom' }), 'screenshot-manager: boom');
+  assert.equal(formatFailedStep({ step: 'screenshot-manager', passed: false }), 'screenshot-manager: failed');
   assert.equal(formatFailedStep({}), 'undefined: failed');
 });
 
@@ -870,10 +763,7 @@ test('explainSmokeSummaryRefusal reports each condition with the value it measur
 test('explainSmokeSummaryRefusal renders an absent or non-numeric count as "not recorded"', () => {
   for (const value of [undefined, null, '3', Number.NaN]) {
     assert.match(refusalFor({ stepFailures: value }), /^ {2}stepFailures: not recorded — /m);
-    assert.match(
-      refusalFor({ consoleErrorCount: value }),
-      /^ {2}consoleErrorCount: not recorded — /m
-    );
+    assert.match(refusalFor({ consoleErrorCount: value }), /^ {2}consoleErrorCount: not recorded — /m);
   }
   assert.match(refusalFor({ passed: undefined }), /^ {2}passed: not recorded — /m);
   assert.match(refusalFor({ degraded: 'yes' }), /^ {2}degraded: not recorded — /m);
@@ -905,21 +795,12 @@ test('explainSmokeSummaryRefusal never pairs an unrecorded signal with a measure
   }
   // And a RECORDED value still carries the note that says what the measurement means — the
   // conditional must not have collapsed both branches onto the absent-signal wording.
-  assert.match(
-    refusalFor({ stepFailures: 2 }),
-    /^ {2}stepFailures: 2 — one or more phase steps did not pass$/m
-  );
-  assert.match(
-    refusalFor({ rendererCrashed: true }),
-    /^ {2}rendererCrashed: true — the page reported a renderer crash/m
-  );
+  assert.match(refusalFor({ stepFailures: 2 }), /^ {2}stepFailures: 2 — one or more phase steps did not pass$/m);
+  assert.match(refusalFor({ rendererCrashed: true }), /^ {2}rendererCrashed: true — the page reported a renderer crash/m);
   // `passed` is deliberately NOT routed through the absent-signal note: "the run did not record
   // a successful verdict" is true of an absent verdict as well as a false one, so narrowing it
   // would replace a precise statement with a weaker one.
-  assert.match(
-    refusalFor({ passed: undefined }),
-    /^ {2}passed: not recorded — the run did not record a successful verdict$/m
-  );
+  assert.match(refusalFor({ passed: undefined }), /^ {2}passed: not recorded — the run did not record a successful verdict$/m);
 });
 
 test('explainSmokeSummaryRefusal quotes the failing steps and the un-waived console errors', () => {
@@ -936,10 +817,7 @@ test('explainSmokeSummaryRefusal quotes the failing steps and the un-waived cons
   assert.match(message, /^ {4}- screenshot-manager: locator timeout$/m);
   assert.match(message, /^ {4}- player-journal: failed$/m);
   assert.ok(!message.includes('craft-item-phase'), 'a passing step is not evidence of a failure');
-  assert.match(
-    message,
-    /^ {4}- pageerror: Cannot read properties of undefined \(reading 'INTERFACE'\)$/m
-  );
+  assert.match(message, /^ {4}- pageerror: Cannot read properties of undefined \(reading 'INTERFACE'\)$/m);
 });
 
 // `degraded` and `rendererCrashed` both fire on runs that PASSED and exited 0 (AGENTS.md:380),
@@ -958,26 +836,12 @@ test('explainSmokeSummaryRefusal gives degraded and rendererCrashed their own ev
       // evidence on a real degraded run, and nothing else in this suite would notice.
       { step: 'license-check', passed: true, skipped: true },
       { step: 'craft-item-phase', passed: true },
-      {
-        step: 'player-journal',
-        passed: true,
-        skipped: true,
-        error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed`,
-      },
+      { step: 'player-journal', passed: true, skipped: true, error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed` },
     ],
   });
-  assert.match(
-    degradedMessage,
-    /^ {4}- player-journal: transient page teardown \(skipped\): target closed$/m
-  );
-  assert.ok(
-    !degradedMessage.includes('license-check'),
-    'a skipped non-teardown step is not tolerated-teardown evidence'
-  );
-  assert.ok(
-    !/\bfailed\b/.test(degradedMessage.split('\n\n')[1]),
-    'a tolerated teardown is not a failed step'
-  );
+  assert.match(degradedMessage, /^ {4}- player-journal: transient page teardown \(skipped\): target closed$/m);
+  assert.ok(!degradedMessage.includes('license-check'), 'a skipped non-teardown step is not tolerated-teardown evidence');
+  assert.ok(!/\bfailed\b/.test(degradedMessage.split('\n\n')[1]), 'a tolerated teardown is not a failed step');
 
   const crashMessage = refusalFor({ rendererCrashed: true });
   assert.match(crashMessage, /^ {2}rendererCrashed: true — /m);
@@ -1002,19 +866,11 @@ test('the degraded and rendererCrashed notes never claim the run exited 0', () =
     steps: [
       { step: 'boot-and-join', passed: false, error: 'locator timeout' },
       { step: 'screenshot-manager', passed: false, error: 'assertion' },
-      {
-        step: 'player-journal',
-        passed: true,
-        skipped: true,
-        error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed`,
-      },
+      { step: 'player-journal', passed: true, skipped: true, error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed` },
     ],
   });
   // This summary is exactly the shape whose process exit is non-zero.
-  assert.ok(
-    !/exited 0/.test(alsoFailed),
-    'no note may assert an exit code the summary does not carry'
-  );
+  assert.ok(!/exited 0/.test(alsoFailed), 'no note may assert an exit code the summary does not carry');
   for (const name of ['degraded', 'rendererCrashed']) {
     assert.match(
       alsoFailed,
@@ -1029,22 +885,15 @@ test('the degraded and rendererCrashed notes never claim the run exited 0', () =
 test('explainSmokeSummaryRefusal explains a bare passed:false with nothing else recorded', () => {
   const message = refusalFor({ passed: false });
   assert.deepEqual(namedConditions(message), ['passed']);
-  assert.match(
-    message,
-    /records no failing step, un-waived console error, tolerated teardown, or renderer crash/
-  );
+  assert.match(message, /records no failing step, un-waived console error, tolerated teardown, or renderer crash/);
   assert.match(message, /aborted before/);
 
   // With other conditions present, the verdict block points at them rather than repeating them.
-  assert.match(
-    refusalFor({ passed: false, consoleErrorCount: 3 }),
-    /follows from the condition\(s\) below/
-  );
+  assert.match(refusalFor({ passed: false, consoleErrorCount: 3 }), /follows from the condition\(s\) below/);
 });
 
 test('explainSmokeSummaryRefusal caps each excerpt at five entries with a (+N more) tail', () => {
-  const errorsOfLength = (count) =>
-    Array.from({ length: count }, (_, index) => `console-error-${index + 1}`);
+  const errorsOfLength = (count) => Array.from({ length: count }, (_, index) => `console-error-${index + 1}`);
 
   const five = refusalFor({ consoleErrorCount: 5, consoleErrors: errorsOfLength(5) });
   assert.match(five, /^ {4}- console-error-5$/m);
@@ -1086,10 +935,7 @@ test('explainSmokeSummaryRefusal reports how many console errors were suppressed
   // point of the note — it tells the reader these entries are NOT why the gate refused — and
   // matched on the count alone it can be deleted with this suite still green.
   assert.match(
-    refusalFor({
-      passed: false,
-      waivedConsoleErrors: ['favicon 404', 'pageerror: minimum resolution'],
-    }),
+    refusalFor({ passed: false, waivedConsoleErrors: ['favicon 404', 'pageerror: minimum resolution'] }),
     /^The run also suppressed 2 waived console error\(s\); a waived entry never disqualifies a run, and each is listed under waivedConsoleErrors in the summary\.$/m
   );
   // ONE waived error still prints the note. The boundary matters: `waivedCount > 0` weakened to
@@ -1103,9 +949,7 @@ test('explainSmokeSummaryRefusal reports how many console errors were suppressed
   const suppressionNote = /suppressed \d+ waived console error/;
   assert.ok(!suppressionNote.test(refusalFor({ passed: false, waivedConsoleErrors: [] })));
   assert.ok(!suppressionNote.test(refusalFor({ passed: false })));
-  assert.ok(
-    !suppressionNote.test(refusalFor({ passed: false, waivedConsoleErrors: 'not an array' }))
-  );
+  assert.ok(!suppressionNote.test(refusalFor({ passed: false, waivedConsoleErrors: 'not an array' })));
 });
 
 // The gate reads ONE summary and therefore cannot attribute what it read to a head. The
@@ -1199,38 +1043,18 @@ test('explainSmokeSummaryRefusal quotes exactly the steps computeSmokeSignal cou
       { step: 'boot', passed: true },
       { step: 'screenshot-manager', passed: false, error: 'locator timeout' },
       { step: 'craft-item-phase', passed: false, error: 'assertion' },
-      {
-        step: 'player-journal',
-        passed: true,
-        skipped: true,
-        error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed`,
-      },
+      { step: 'player-journal', passed: true, skipped: true, error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed` },
     ],
     consoleErrors: ['boom'],
   };
   const signal = computeSmokeSignal(results);
   assert.deepEqual(signal, { stepFailures: 2, consoleErrorCount: 1, degraded: true });
 
-  const message = explainSmokeSummaryRefusal({
-    ...ACCEPTING_SUMMARY,
-    ...signal,
-    passed: false,
-    ...results,
-  });
-  const quotedSteps = message
-    .split('\n')
-    .filter((line) =>
-      /^ {4}- (boot|screenshot-manager|craft-item-phase|player-journal): /.test(line)
-    );
+  const message = explainSmokeSummaryRefusal({ ...ACCEPTING_SUMMARY, ...signal, passed: false, ...results });
+  const quotedSteps = message.split('\n').filter((line) => /^ {4}- (boot|screenshot-manager|craft-item-phase|player-journal): /.test(line));
   // Two failing-step quotes plus the one tolerated-teardown quote `degraded` is entitled to.
-  assert.equal(
-    quotedSteps.filter((line) => !line.includes(TRANSIENT_TEARDOWN_SKIP_PREFIX)).length,
-    signal.stepFailures
-  );
-  assert.equal(
-    quotedSteps.filter((line) => line.includes(TRANSIENT_TEARDOWN_SKIP_PREFIX)).length,
-    1
-  );
+  assert.equal(quotedSteps.filter((line) => !line.includes(TRANSIENT_TEARDOWN_SKIP_PREFIX)).length, signal.stepFailures);
+  assert.equal(quotedSteps.filter((line) => line.includes(TRANSIENT_TEARDOWN_SKIP_PREFIX)).length, 1);
 });
 
 test('source: the run verdict that feeds summary.passed is set on both the success and the catch path', async () => {

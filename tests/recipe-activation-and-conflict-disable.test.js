@@ -79,10 +79,7 @@ describe('recipe activation gate', () => {
 
   it('allows enabling a complete, non-conflicting recipe', async () => {
     const manager = makeManager();
-    manager.recipes.set(
-      'r-c',
-      new Recipe(completeRecipe('r-c', 'C', 'comp-b', { enabled: false }))
-    );
+    manager.recipes.set('r-c', new Recipe(completeRecipe('r-c', 'C', 'comp-b', { enabled: false })));
 
     const updated = await manager.updateRecipe('r-c', { enabled: true });
     assert.equal(updated.enabled, true);
@@ -161,10 +158,7 @@ describe('RecipeManager.disableSignatureConflicts', () => {
     // `disableSignatureConflicts` reports nothing.
     const manager = makeManager();
     manager.save = async () => {};
-    manager.recipes.set(
-      'r-a',
-      new Recipe(completeRecipe('r-a', 'A', 'comp-a', { enabled: false }))
-    );
+    manager.recipes.set('r-a', new Recipe(completeRecipe('r-a', 'A', 'comp-a', { enabled: false })));
     manager.recipes.set('r-b', new Recipe(completeRecipe('r-b', 'B', 'comp-a')));
 
     const disabled = await manager.disableSignatureConflicts('sys-1');

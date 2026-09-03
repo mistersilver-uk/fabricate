@@ -212,11 +212,7 @@ describe('the per-stage complication band (issue 1286)', () => {
       'one-line clipping would remove the disclosure at roughly sixty characters'
     );
     assert.match(body.getAttribute('style') || '', /--fab-complication-body-lines:\s*3/);
-    assert.equal(
-      body.getAttribute('title'),
-      complication().description,
-      'the full string stays reachable'
-    );
+    assert.equal(body.getAttribute('title'), complication().description, 'the full string stays reachable');
   });
 
   it('never shows the player a trigger sentence', async () => {

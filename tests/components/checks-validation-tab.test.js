@@ -163,7 +163,10 @@ describe('ChecksValidationTab (mounted)', () => {
       target.querySelector('[data-editor-validation-count="warnings"]').textContent.trim(),
       '0'
     );
-    assert.ok(!target.querySelector('[data-issue]'), 'a clean check lists no issue rows at all');
+    assert.ok(
+      !target.querySelector('[data-issue]'),
+      'a clean check lists no issue rows at all'
+    );
     harness.remount();
   });
 

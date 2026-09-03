@@ -15,23 +15,23 @@ import assert from 'node:assert/strict';
 globalThis.foundry = {
   utils: {
     randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`,
-    getProperty: () => undefined,
-  },
+    getProperty: () => undefined
+  }
 };
 
 globalThis.game = {
   user: { isGM: true, name: 'TestGM' },
   time: { worldTime: 0 },
   actors: [],
-  fabricate: null,
+  fabricate: null
 };
 
 globalThis.ui = {
   notifications: {
     info: () => {},
     warn: () => {},
-    error: () => {},
-  },
+    error: () => {}
+  }
 };
 
 globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
@@ -63,19 +63,23 @@ function makeValidPayload(overrides = {}) {
           {
             id: 'group-1',
             name: 'Group 1',
-            options: [{ id: 'ing-1', itemUuid: 'Item.test-herb-uuid', quantity: 1 }],
-          },
+            options: [
+              { id: 'ing-1', itemUuid: 'Item.test-herb-uuid', quantity: 1 }
+            ]
+          }
         ],
-        essences: {},
-      },
+        essences: {}
+      }
     ],
     resultGroups: [
       {
         id: 'rg-1',
-        results: [{ id: 'res-1', systemItemId: null, itemUuid: 'Item.some-uuid', quantity: 1 }],
-      },
+        results: [
+          { id: 'res-1', systemItemId: null, itemUuid: 'Item.some-uuid', quantity: 1 }
+        ]
+      }
     ],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -112,9 +116,10 @@ test('RecipeManager.createRecipe logs recipe name and ID after successful save',
     const recipe = await manager.createRecipe(makeValidPayload({ name: 'Logged Potion' }));
 
     assert.ok(
-      logMessages.some(
-        (msg) =>
-          msg.includes('Created recipe') && msg.includes('Logged Potion') && msg.includes(recipe.id)
+      logMessages.some(msg =>
+        msg.includes('Created recipe') &&
+        msg.includes('Logged Potion') &&
+        msg.includes(recipe.id)
       ),
       `Expected a console.debug containing "Created recipe", the recipe name, and its ID. Got: ${JSON.stringify(logMessages)}`
     );
@@ -136,20 +141,16 @@ test('RecipeManager.updateRecipe logs recipe name and ID after successful save',
     id: 'recipe-to-update',
     name: 'Original Name',
     craftingSystemId: TEST_SYSTEM_ID,
-    ingredientSets: [
-      {
-        id: 's-1',
-        ingredientGroups: [
-          {
-            id: 'g-1',
-            name: 'Group 1',
-            options: [{ id: 'i-1', itemUuid: 'Item.herb', quantity: 1 }],
-          },
-        ],
-        essences: {},
-      },
-    ],
-    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', itemUuid: 'Item.x', quantity: 1 }] }],
+    ingredientSets: [{
+      id: 's-1',
+      ingredientGroups: [{
+        id: 'g-1',
+        name: 'Group 1',
+        options: [{ id: 'i-1', itemUuid: 'Item.herb', quantity: 1 }]
+      }],
+      essences: {}
+    }],
+    resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', itemUuid: 'Item.x', quantity: 1 }] }]
   });
   manager.recipes.set(existing.id, existing);
 
@@ -161,11 +162,10 @@ test('RecipeManager.updateRecipe logs recipe name and ID after successful save',
     const updated = await manager.updateRecipe(existing.id, { name: 'Updated Potion' });
 
     assert.ok(
-      logMessages.some(
-        (msg) =>
-          msg.includes('Updated recipe') &&
-          msg.includes('Updated Potion') &&
-          msg.includes(updated.id)
+      logMessages.some(msg =>
+        msg.includes('Updated recipe') &&
+        msg.includes('Updated Potion') &&
+        msg.includes(updated.id)
       ),
       `Expected a console.debug containing "Updated recipe", the recipe name, and its ID. Got: ${JSON.stringify(logMessages)}`
     );

@@ -682,8 +682,14 @@ test('TC8e: one physical item cannot satisfy both ingredient consumption and a T
   const systemId = 'sys-tc8e';
   const compId = 'comp-vial';
   const registeredItemUuid = 'Item.vial-source';
-  const consumedVial = makeComponentItem('Actor.crafter.Item.vial-consumed', registeredItemUuid, 1);
-  const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 1)])]);
+  const consumedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-consumed',
+    registeredItemUuid,
+    1
+  );
+  const set = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData(compId, 1)]),
+  ]);
   const manager = makeRecipeManagerWithSystem(
     systemId,
     [{ id: compId, registeredItemUuid, name: 'Empty Vial' }],
@@ -709,9 +715,19 @@ test('TC8f: a second physical copy remains available as the Tool', () => {
   const systemId = 'sys-tc8f';
   const compId = 'comp-vial';
   const registeredItemUuid = 'Item.vial-source';
-  const consumedVial = makeComponentItem('Actor.crafter.Item.vial-consumed', registeredItemUuid, 1);
-  const retainedVial = makeComponentItem('Actor.crafter.Item.vial-retained', registeredItemUuid, 1);
-  const set = makeIngredientSet([makeGroupData([makeComponentIngredientData(compId, 1)])]);
+  const consumedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-consumed',
+    registeredItemUuid,
+    1
+  );
+  const retainedVial = makeComponentItem(
+    'Actor.crafter.Item.vial-retained',
+    registeredItemUuid,
+    1
+  );
+  const set = makeIngredientSet([
+    makeGroupData([makeComponentIngredientData(compId, 1)]),
+  ]);
   const manager = makeRecipeManagerWithSystem(
     systemId,
     [{ id: compId, registeredItemUuid, name: 'Empty Vial' }],
@@ -725,7 +741,10 @@ test('TC8f: a second physical copy remains available as the Tool', () => {
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
 
-  const result = manager.evaluateCraftability([makeActor([consumedVial, retainedVial])], recipe);
+  const result = manager.evaluateCraftability(
+    [makeActor([consumedVial, retainedVial])],
+    recipe
+  );
 
   assert.equal(result.canCraft, true);
   assert.equal(result.toolStates[0].available, true);
@@ -1572,9 +1591,7 @@ test('issue 857: a tagMatch=all ingredient needs the resolved component to carry
 
   // Require ALL of {plant, fresh}.
   const set = makeIngredientSet([
-    makeGroupData([
-      { match: { type: 'tags', tags: ['plant', 'fresh'], tagMatch: 'all' }, quantity: 1 },
-    ]),
+    makeGroupData([{ match: { type: 'tags', tags: ['plant', 'fresh'], tagMatch: 'all' }, quantity: 1 }]),
   ]);
   const recipe = new Recipe({
     name: 'Fresh Poultice',
@@ -1587,24 +1604,14 @@ test('issue 857: a tagMatch=all ingredient needs the resolved component to carry
   const both = makeRecipeManagerWithSystem(systemId, [
     { id: 'c-both', registeredItemUuid: srcBoth, name: 'Fresh Herb', tags: ['plant', 'fresh'] },
   ]);
-  const satisfied = both.evaluateCraftability(
-    [makeActor([makeComponentItem('held-both', srcBoth, 1)])],
-    recipe
-  );
+  const satisfied = both.evaluateCraftability([makeActor([makeComponentItem('held-both', srcBoth, 1)])], recipe);
   assert.equal(satisfied.canCraft, true, 'all required tags present on the component → satisfied');
 
   const partial = makeRecipeManagerWithSystem(systemId, [
     { id: 'c-partial', registeredItemUuid: srcPartial, name: 'Dried Herb', tags: ['plant'] },
   ]);
-  const unsatisfied = partial.evaluateCraftability(
-    [makeActor([makeComponentItem('held-partial', srcPartial, 1)])],
-    recipe
-  );
-  assert.equal(
-    unsatisfied.canCraft,
-    false,
-    'a component missing one required tag does NOT satisfy an all-rule'
-  );
+  const unsatisfied = partial.evaluateCraftability([makeActor([makeComponentItem('held-partial', srcPartial, 1)])], recipe);
+  assert.equal(unsatisfied.canCraft, false, 'a component missing one required tag does NOT satisfy an all-rule');
 });
 
 test('issue 857: a by-tag ingredient stays unsatisfied when no owned component carries the tag', () => {

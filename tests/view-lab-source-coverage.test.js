@@ -21,11 +21,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import {
-  BROAD_SIGNAL_PATTERN,
-  VIEW_LAB_CASES,
-  normalizePath,
-} from '../scripts/lib/viewLabCases.js';
+import { BROAD_SIGNAL_PATTERN, VIEW_LAB_CASES, normalizePath } from '../scripts/lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 

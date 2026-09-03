@@ -10,29 +10,30 @@ test('migrateGatheringConfig clears top-level vocabularies.regions when non-empt
       regions: ['northreach', 'eastreach'],
       biomes: ['forest', 'grassland'],
       weather: ['clear', 'rain'],
-      timeOfDay: ['dawn', 'dusk'],
+      timeOfDay: ['dawn', 'dusk']
     },
-    systems: { 'my-system': { tools: [{ id: 't1' }] } },
+    systems: { 'my-system': { tools: [{ id: 't1' }] } }
   };
 
   const result = migrateGatheringConfig(input);
 
   assert.deepEqual(result.vocabularies.regions, []);
-  assert.deepEqual(result.vocabularies.biomes, ['forest', 'grassland'], 'biomes preserved');
-  assert.deepEqual(result.vocabularies.weather, ['clear', 'rain'], 'weather preserved');
-  assert.deepEqual(result.vocabularies.timeOfDay, ['dawn', 'dusk'], 'timeOfDay preserved');
-  assert.deepEqual(
-    result.conditions,
-    { weather: 'rain', timeOfDay: 'dusk' },
-    'conditions preserved'
-  );
-  assert.deepEqual(result.systems, { 'my-system': { tools: [{ id: 't1' }] } }, 'systems preserved');
+  assert.deepEqual(result.vocabularies.biomes, ['forest', 'grassland'],
+    'biomes preserved');
+  assert.deepEqual(result.vocabularies.weather, ['clear', 'rain'],
+    'weather preserved');
+  assert.deepEqual(result.vocabularies.timeOfDay, ['dawn', 'dusk'],
+    'timeOfDay preserved');
+  assert.deepEqual(result.conditions, { weather: 'rain', timeOfDay: 'dusk' },
+    'conditions preserved');
+  assert.deepEqual(result.systems, { 'my-system': { tools: [{ id: 't1' }] } },
+    'systems preserved');
 });
 
 test('migrateGatheringConfig is idempotent when regions already empty', () => {
   const input = {
     vocabularies: { regions: [], biomes: ['forest'] },
-    systems: {},
+    systems: {}
   };
 
   const result = migrateGatheringConfig(input);
@@ -46,11 +47,8 @@ test('migrateGatheringConfig leaves config alone when vocabularies missing', () 
   const result = migrateGatheringConfig(input);
 
   assert.deepEqual(result, input);
-  assert.equal(
-    'vocabularies' in result,
-    false,
-    'no vocabularies key is injected when not present in input'
-  );
+  assert.equal('vocabularies' in result, false,
+    'no vocabularies key is injected when not present in input');
 });
 
 test('migrateGatheringConfig handles non-object inputs by passing them through', () => {
@@ -68,9 +66,9 @@ test('migrateGatheringConfig does not touch per-system vocabularies', () => {
     systems: {
       'sys-a': {
         vocabularies: { regions: { values: ['system-scoped-region'] } },
-        tools: [],
-      },
-    },
+        tools: []
+      }
+    }
   };
 
   const result = migrateGatheringConfig(input);
@@ -79,9 +77,6 @@ test('migrateGatheringConfig does not touch per-system vocabularies', () => {
   // The 0.2.0 migration deliberately preserves per-system region vocab so the
   // later 0.9.0 unify-regions migration can read it and derive GatheringRegion
   // records before clearing it (see migrate-unify-gathering-regions.test.js).
-  assert.deepEqual(
-    result.systems['sys-a'].vocabularies.regions.values,
-    ['system-scoped-region'],
-    'per-system regions preserved here so 0.9.0 can unify them downstream'
-  );
+  assert.deepEqual(result.systems['sys-a'].vocabularies.regions.values, ['system-scoped-region'],
+    'per-system regions preserved here so 0.9.0 can unify them downstream');
 });

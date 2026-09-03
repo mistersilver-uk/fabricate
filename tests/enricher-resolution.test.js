@@ -29,11 +29,15 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 globalThis.fromUuid = async () => null;
 globalThis.game = { user: { isGM: true }, items: [], packs: [], actors: [] };
 
-const { enrichToHtml, primeEnricherCache, resolveItemSourceSnapshot } =
-  await import('../src/ui/svelte/util/foundryBridge.js');
+const { enrichToHtml, primeEnricherCache, resolveItemSourceSnapshot } = await import(
+  '../src/ui/svelte/util/foundryBridge.js'
+);
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
-const { REPORTER_ENRICHER_DESCRIPTION, REPORTER_RESOLVED_EXPECTED, makeFakeEnricher } =
-  await import('./helpers/enricherDescriptionFixtures.js');
+const {
+  REPORTER_ENRICHER_DESCRIPTION,
+  REPORTER_RESOLVED_EXPECTED,
+  makeFakeEnricher,
+} = await import('./helpers/enricherDescriptionFixtures.js');
 
 // ---------------------------------------------------------------------------
 // 1. The option bag — REAL enrichToHtml, stubbed enrichHTML
@@ -49,9 +53,7 @@ function captureEnrichOptions({ onImplementation = true } = {}) {
     calls.push({ text, options });
     return `<enriched>${text}</enriched>`;
   };
-  const TextEditor = onImplementation
-    ? { implementation: { enrichHTML: stub } }
-    : { enrichHTML: stub };
+  const TextEditor = onImplementation ? { implementation: { enrichHTML: stub } } : { enrichHTML: stub };
   globalThis.foundry.applications = { ux: { TextEditor } };
   return calls;
 }
@@ -214,7 +216,10 @@ const SOURCE_ITEM = Object.freeze({
 });
 
 function makeResolvingManager() {
-  return new CraftingSystemManager({ getRecipes: () => [] }, { enrichToHtml: makeFakeEnricher() });
+  return new CraftingSystemManager(
+    { getRecipes: () => [] },
+    { enrichToHtml: makeFakeEnricher() }
+  );
 }
 
 test('_buildComponentSourceSnapshot resolves a LABEL-LESS @UUID to the document name', async (t) => {
@@ -224,18 +229,13 @@ test('_buildComponentSourceSnapshot resolves a LABEL-LESS @UUID to the document 
   t.after(teardownDOM);
   const manager = makeResolvingManager();
 
-  const snapshot = await manager._buildComponentSourceSnapshot(
-    SOURCE_ITEM.uuid,
-    SOURCE_ITEM,
-    null,
-    {
-      currentUuid: SOURCE_ITEM.uuid,
-      canonicalUuid: SOURCE_ITEM.uuid,
-      aliasItemUuids: [],
-      sourceFallbacks: [],
-      references: [],
-    }
-  );
+  const snapshot = await manager._buildComponentSourceSnapshot(SOURCE_ITEM.uuid, SOURCE_ITEM, null, {
+    currentUuid: SOURCE_ITEM.uuid,
+    canonicalUuid: SOURCE_ITEM.uuid,
+    aliasItemUuids: [],
+    sourceFallbacks: [],
+    references: [],
+  });
 
   assert.equal(
     snapshot.description,
@@ -268,7 +268,10 @@ test('manager drop snapshots use the same enriched plain-text projection as pers
     clearEnrichStub();
     globalThis.fromUuid = async () => null;
   });
-  const manager = new CraftingSystemManager({ getRecipes: () => [] }, { enrichToHtml });
+  const manager = new CraftingSystemManager(
+    { getRecipes: () => [] },
+    { enrichToHtml }
+  );
 
   const persistedDescription = await manager._extractSourceDescription(SOURCE_ITEM);
   const dropped = await resolveItemSourceSnapshot(SOURCE_ITEM.uuid);

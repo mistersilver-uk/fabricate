@@ -54,8 +54,8 @@ let _idCounter = 0;
 globalThis.foundry = {
   utils: {
     randomID: () => `id-${++_idCounter}`,
-    getProperty: (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj) ?? undefined,
-  },
+    getProperty: (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj) ?? undefined
+  }
 };
 
 const _mockPacks = new Map();
@@ -64,19 +64,19 @@ globalThis.game = {
   user: { isGM: true },
   actors: [],
   packs: {
-    get: (id) => _mockPacks.get(id) ?? null,
+    get: (id) => _mockPacks.get(id) ?? null
   },
   folders: {
-    get: (id) => _mockFolders.get(id) ?? null,
+    get: (id) => _mockFolders.get(id) ?? null
   },
-  fabricate: null,
+  fabricate: null
 };
 globalThis.ui = {
   notifications: {
     info: () => {},
     warn: () => {},
-    error: () => {},
-  },
+    error: () => {}
+  }
 };
 globalThis.fromUuid = async () => null;
 
@@ -84,8 +84,7 @@ globalThis.fromUuid = async () => null;
 // Module imports
 // ---------------------------------------------------------------------------
 
-const { resolveDropUuid, resolveDropData, folderIdFromDropData } =
-  await import('../src/ui/svelte/util/dropUtils.js');
+const { resolveDropUuid, resolveDropData, folderIdFromDropData } = await import('../src/ui/svelte/util/dropUtils.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 // ---------------------------------------------------------------------------
@@ -95,12 +94,11 @@ const { CraftingSystemManager } = await import('../src/systems/CraftingSystemMan
 function makeRecipeManager(recipes = []) {
   return {
     getRecipes: (filter = {}) => {
-      if (filter.craftingSystemId)
-        return recipes.filter((r) => r.craftingSystemId === filter.craftingSystemId);
+      if (filter.craftingSystemId) return recipes.filter(r => r.craftingSystemId === filter.craftingSystemId);
       return recipes;
     },
     deleteRecipe: async () => {},
-    updateRecipe: async () => {},
+    updateRecipe: async () => {}
   };
 }
 
@@ -179,15 +177,9 @@ test('onDropItem — compendium pack+id drop resolves UUID and calls addItemFrom
   let refreshed = false;
 
   const handler = buildOnDropItem({
-    addItemFromUuid: async (sysId, uuid) => {
-      calls.push({ sysId, uuid });
-    },
-    refresh: async () => {
-      refreshed = true;
-    },
-    warnFn: () => {
-      throw new Error('warn should not be called');
-    },
+    addItemFromUuid: async (sysId, uuid) => { calls.push({ sysId, uuid }); },
+    refresh: async () => { refreshed = true; },
+    warnFn: () => { throw new Error('warn should not be called'); }
   });
 
   await handler({ pack: 'dnd5e.items', id: 'abc' });
@@ -202,13 +194,9 @@ test('onDropItem — invalid drop calls warn and does NOT call addItemFromUuid',
   let warned = false;
 
   const handler = buildOnDropItem({
-    addItemFromUuid: async (sysId, uuid) => {
-      calls.push({ sysId, uuid });
-    },
+    addItemFromUuid: async (sysId, uuid) => { calls.push({ sysId, uuid }); },
     refresh: async () => {},
-    warnFn: () => {
-      warned = true;
-    },
+    warnFn: () => { warned = true; }
   });
 
   await handler({});
@@ -230,12 +218,7 @@ test('bulk pack drop — Foundry v13 { type: "Compendium", collection: "world.pa
 });
 
 test('bulk pack drop — single compendium item with uuid is NOT detected as bulk', () => {
-  const data = {
-    type: 'Item',
-    uuid: 'Compendium.world.pack.item1',
-    pack: 'world.pack',
-    id: 'item1',
-  };
+  const data = { type: 'Item', uuid: 'Compendium.world.pack.item1', pack: 'world.pack', id: 'item1' };
   const isBulkPackDrop = data?.type === 'Compendium' && data?.collection && !data?.uuid;
   assert.equal(isBulkPackDrop, false);
 });
@@ -250,8 +233,8 @@ test('addItemsFromPack — imports all Item documents from a mock pack', async (
   _mockPacks.set('world.mypack', {
     getDocuments: async () => [
       { id: 'item-a', documentName: 'Item', name: 'Iron Ore', img: 'ore.png' },
-      { id: 'item-b', documentName: 'Item', name: 'Coal', img: 'coal.png' },
-    ],
+      { id: 'item-b', documentName: 'Item', name: 'Coal', img: 'coal.png' }
+    ]
   });
 
   const result = await mgr.addItemsFromPack('sys1', 'world.mypack');
@@ -262,30 +245,22 @@ test('addItemsFromPack — imports all Item documents from a mock pack', async (
 
   const sys = mgr.getSystem('sys1');
   assert.equal(sys.components.length, 2);
-  assert.ok(sys.components.some((i) => i.registeredItemUuid === 'Compendium.world.mypack.item-a'));
-  assert.ok(sys.components.some((i) => i.registeredItemUuid === 'Compendium.world.mypack.item-b'));
+  assert.ok(sys.components.some(i => i.registeredItemUuid === 'Compendium.world.mypack.item-a'));
+  assert.ok(sys.components.some(i => i.registeredItemUuid === 'Compendium.world.mypack.item-b'));
 });
 
 test('addItemsFromPack — skips items already in the system by registeredItemUuid', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'existing-1',
-          name: 'Iron Ore',
-          registeredItemUuid: 'Compendium.world.mypack.item-a',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{ id: 'existing-1', name: 'Iron Ore', registeredItemUuid: 'Compendium.world.mypack.item-a' }]
+  }]);
 
   _mockPacks.set('world.mypack', {
     getDocuments: async () => [
       { id: 'item-a', documentName: 'Item', name: 'Iron Ore', img: 'ore.png' },
-      { id: 'item-b', documentName: 'Item', name: 'Coal', img: 'coal.png' },
-    ],
+      { id: 'item-b', documentName: 'Item', name: 'Coal', img: 'coal.png' }
+    ]
   });
 
   const result = await mgr.addItemsFromPack('sys1', 'world.mypack');
@@ -298,25 +273,21 @@ test('addItemsFromPack — skips items already in the system by registeredItemUu
 });
 
 test('addItemsFromPack — updates existing component when canonical source UUID matches but live UUID changes', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'existing-1',
-          name: 'Iron Ore',
-          registeredItemUuid: 'Compendium.world.old-pack.item-a',
-          originItemUuid: 'Compendium.source.items.iron-ore',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'existing-1',
+      name: 'Iron Ore',
+      registeredItemUuid: 'Compendium.world.old-pack.item-a',
+      originItemUuid: 'Compendium.source.items.iron-ore'
+    }]
+  }]);
 
   _mockPacks.set('world.new-pack', {
     getDocuments: async () => [
-      { id: 'item-b', documentName: 'Item', name: 'Iron Ore', img: 'ore-new.png' },
-    ],
+      { id: 'item-b', documentName: 'Item', name: 'Iron Ore', img: 'ore-new.png' }
+    ]
   });
 
   globalThis.fromUuid = async (uuid) => {
@@ -328,7 +299,7 @@ test('addItemsFromPack — updates existing component when canonical source UUID
       documentName: 'Item',
       name: 'Iron Ore',
       img: 'ore-new.png',
-      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
     };
   };
 
@@ -349,24 +320,22 @@ test('addItemsFromPack — updates existing component when canonical source UUID
 });
 
 test('addItemsFromPack — filters out non-Item documents and returns correct counts', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        { id: 'e1', name: 'Existing A', registeredItemUuid: 'Compendium.world.mypack.item-a' },
-        { id: 'e2', name: 'Existing B', registeredItemUuid: 'Compendium.world.mypack.item-b' },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      { id: 'e1', name: 'Existing A', registeredItemUuid: 'Compendium.world.mypack.item-a' },
+      { id: 'e2', name: 'Existing B', registeredItemUuid: 'Compendium.world.mypack.item-b' }
+    ]
+  }]);
 
   _mockPacks.set('world.mypack', {
     getDocuments: async () => [
       { id: 'item-a', documentName: 'Item', name: 'Iron Ore' },
       { id: 'item-b', documentName: 'Item', name: 'Coal' },
       { id: 'item-c', documentName: 'Item', name: 'Silver' },
-      { id: 'actor-d', documentName: 'Actor', name: 'Not an item' }, // must be filtered
-    ],
+      { id: 'actor-d', documentName: 'Actor', name: 'Not an item' } // must be filtered
+    ]
   });
 
   const result = await mgr.addItemsFromPack('sys1', 'world.mypack');
@@ -414,9 +383,7 @@ function countCorpusWrites(mgr, systemId) {
   const record = { calls: 0, componentNamesAtLastWrite: [] };
   mgr.save = async () => {
     record.calls += 1;
-    record.componentNamesAtLastWrite = (mgr.getSystem(systemId)?.components || []).map(
-      (c) => c.name
-    );
+    record.componentNamesAtLastWrite = (mgr.getSystem(systemId)?.components || []).map(c => c.name);
   };
   return record;
 }
@@ -427,7 +394,7 @@ function mockPackOfItems(packId, count) {
     id: `item-${index + 1}`,
     documentName: 'Item',
     name: `Item ${index + 1}`,
-    img: `item-${index + 1}.png`,
+    img: `item-${index + 1}.png`
   }));
   _mockPacks.set(packId, { getDocuments: async () => documents });
   return documents;
@@ -476,24 +443,14 @@ test('addItemFromUuid — a single-item caller still writes per call (positive c
 });
 
 test('addItemsFromPack — an all-skipped re-drop writes the corpus zero times', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Item 1',
-          registeredItemUuid: 'Compendium.world.batch-redrop.item-1',
-        },
-        {
-          id: 'comp-2',
-          name: 'Item 2',
-          registeredItemUuid: 'Compendium.world.batch-redrop.item-2',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      { id: 'comp-1', name: 'Item 1', registeredItemUuid: 'Compendium.world.batch-redrop.item-1' },
+      { id: 'comp-2', name: 'Item 2', registeredItemUuid: 'Compendium.world.batch-redrop.item-2' }
+    ]
+  }]);
   const writes = countCorpusWrites(mgr, 'sys1');
   mockPackOfItems('world.batch-redrop', 2);
 
@@ -515,7 +472,7 @@ test('addItemsFromPack — a mid-batch failure flushes the items already importe
     if (uuid === 'Compendium.world.batch-fails.item-4') {
       return { documentName: 'Actor', name: 'Not an item' };
     }
-    return documents.find((doc) => `Compendium.world.batch-fails.${doc.id}` === uuid) ?? null;
+    return documents.find(doc => `Compendium.world.batch-fails.${doc.id}` === uuid) ?? null;
   };
 
   await assert.rejects(
@@ -540,15 +497,11 @@ test('addItemsFromPack — a mid-batch failure flushes the items already importe
 // ---------------------------------------------------------------------------
 
 test('addItemFromUuid — exact duplicate returns { item, action: "skipped" }', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        { id: 'comp-1', name: 'Iron Ore', registeredItemUuid: 'Compendium.world.pack.item-a' },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{ id: 'comp-1', name: 'Iron Ore', registeredItemUuid: 'Compendium.world.pack.item-a' }]
+  }]);
 
   // fromUuid returns null by default — exact match should skip before resolving
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-a');
@@ -567,7 +520,7 @@ test('addItemFromUuid — new item returns { item, action: "added" }', async () 
     name: 'Fresh Coal',
     img: 'coal.png',
     system: { description: { value: '<p>Fresh <strong>coal</strong> for the forge.</p>' } },
-    _stats: { compendiumSource: 'Compendium.source.items.coal' },
+    _stats: { compendiumSource: 'Compendium.source.items.coal' }
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-coal');
@@ -593,7 +546,7 @@ test('addItemFromUuid — keeps resolvable canonical source UUID', async () => {
         documentName: 'Item',
         name: 'Azuryt',
         img: 'azuryt.png',
-        _stats: { compendiumSource: 'Compendium.crafting.items.Item.azuryt' },
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.azuryt' }
       };
     }
     if (uuid === 'Compendium.crafting.items.Item.azuryt') {
@@ -623,7 +576,7 @@ test('addItemFromUuid — falls back to live item UUID when canonical source is 
         documentName: 'Item',
         name: 'Azuryt',
         img: 'azuryt.png',
-        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' },
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' }
       };
     }
     return null;
@@ -635,40 +588,34 @@ test('addItemFromUuid — falls back to live item UUID when canonical source is 
   assert.equal(result.item.registeredItemUuid, 'Item.world-azuryt');
   assert.equal(result.item.originItemUuid, 'Item.world-azuryt');
   assert.deepEqual(result.item.aliasItemUuids, ['Compendium.crafting.items.Item.missing-azuryt']);
-  assert.deepEqual(result.sourceFallbacks, [
-    {
-      itemName: 'Azuryt',
-      brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
-      fallbackUuid: 'Item.world-azuryt',
-    },
-  ]);
+  assert.deepEqual(result.sourceFallbacks, [{
+    itemName: 'Azuryt',
+    brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+    fallbackUuid: 'Item.world-azuryt'
+  }]);
 
   globalThis.fromUuid = async () => null;
 });
 
 test('addItemFromUuid — exact match with differing metadata overwrites name/img and returns updated', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Iron Ore',
-          img: 'ore-old.png',
-          description: 'Old description',
-          registeredItemUuid: 'Compendium.world.pack.item-a',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Iron Ore',
+      img: 'ore-old.png',
+      description: 'Old description',
+      registeredItemUuid: 'Compendium.world.pack.item-a'
+    }]
+  }]);
 
   globalThis.fromUuid = async () => ({
     documentName: 'Item',
     name: 'Updated Iron Ore',
     img: 'ore2.png',
     system: { description: { value: '<p>Smelts into sturdy ingots.</p>' } },
-    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-a');
@@ -687,21 +634,17 @@ test('addItemFromUuid — exact match with differing metadata overwrites name/im
 });
 
 test('addItemFromUuid — updates existing component through broken canonical source reference', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Old Azuryt',
-          img: 'old.png',
-          registeredItemUuid: 'Compendium.crafting.items.Item.missing-azuryt',
-          originItemUuid: 'Compendium.crafting.items.Item.missing-azuryt',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Azuryt',
+      img: 'old.png',
+      registeredItemUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+      originItemUuid: 'Compendium.crafting.items.Item.missing-azuryt'
+    }]
+  }]);
 
   globalThis.fromUuid = async (uuid) => {
     if (uuid === 'Item.world-azuryt') {
@@ -710,7 +653,7 @@ test('addItemFromUuid — updates existing component through broken canonical so
         documentName: 'Item',
         name: 'Azuryt',
         img: 'azuryt.png',
-        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' },
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' }
       };
     }
     return null;
@@ -731,26 +674,17 @@ test('addItemFromUuid — updates existing component through broken canonical so
 });
 
 test('addItemFromUuid — exact match with same metadata returns skipped', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Iron Ore',
-          img: 'ore.png',
-          registeredItemUuid: 'Compendium.world.pack.item-a',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{ id: 'comp-1', name: 'Iron Ore', img: 'ore.png', registeredItemUuid: 'Compendium.world.pack.item-a' }]
+  }]);
 
   // fromUuid returns same name and img as existing item
   globalThis.fromUuid = async () => ({
     documentName: 'Item',
     name: 'Iron Ore',
-    img: 'ore.png',
+    img: 'ore.png'
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-a');
@@ -763,26 +697,22 @@ test('addItemFromUuid — exact match with same metadata returns skipped', async
   globalThis.fromUuid = async () => null;
 });
 
-test("addItemFromUuid — overwrites when dropped UUID is in existing item's aliasItemUuids", async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Iron Ore',
-          registeredItemUuid: 'Item.world-123',
-          aliasItemUuids: ['Compendium.world.pack.item-a'],
-        },
-      ],
-    },
-  ]);
+test('addItemFromUuid — overwrites when dropped UUID is in existing item\'s aliasItemUuids', async () => {
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Iron Ore',
+      registeredItemUuid: 'Item.world-123',
+      aliasItemUuids: ['Compendium.world.pack.item-a']
+    }]
+  }]);
 
   globalThis.fromUuid = async (uuid) => ({
     documentName: 'Item',
     name: 'Updated Iron Ore',
-    img: 'ore-updated.png',
+    img: 'ore-updated.png'
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-a');
@@ -804,25 +734,21 @@ test("addItemFromUuid — overwrites when dropped UUID is in existing item's ali
 });
 
 test('addItemFromUuid — aliasItemUuids accumulates without duplicates', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Iron Ore',
-          registeredItemUuid: 'Item.world-123',
-          aliasItemUuids: ['old-uuid-1', 'Compendium.world.pack.item-a'],
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Iron Ore',
+      registeredItemUuid: 'Item.world-123',
+      aliasItemUuids: ['old-uuid-1', 'Compendium.world.pack.item-a']
+    }]
+  }]);
 
   globalThis.fromUuid = async () => ({
     documentName: 'Item',
     name: 'Updated Iron Ore',
-    img: 'ore2.png',
+    img: 'ore2.png'
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-a');
@@ -843,22 +769,18 @@ test('addItemFromUuid — aliasItemUuids accumulates without duplicates', async 
 test('addItemFromUuid — source-chain overwrite with fromUuid returning null keeps existing metadata', async () => {
   // Issue 3: when fromUuid returns null during the fallback/source-chain overwrite path,
   // the existing item keeps its current name and img.
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Old Iron Ore',
-          img: 'old-ore.png',
-          description: 'Existing source description.',
-          registeredItemUuid: 'Item.world-456',
-          aliasItemUuids: ['Compendium.world.pack.item-b'],
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Iron Ore',
+      img: 'old-ore.png',
+      description: 'Existing source description.',
+      registeredItemUuid: 'Item.world-456',
+      aliasItemUuids: ['Compendium.world.pack.item-b']
+    }]
+  }]);
 
   // fromUuid returns null — source not resolvable
   globalThis.fromUuid = async () => null;
@@ -868,11 +790,7 @@ test('addItemFromUuid — source-chain overwrite with fromUuid returning null ke
   assert.equal(result.action, 'updated');
   assert.equal(result.item.id, 'comp-1');
   // Name and img should fall back to the existing values since source is null
-  assert.equal(
-    result.item.name,
-    'Old Iron Ore',
-    'name should retain old value when source is null'
-  );
+  assert.equal(result.item.name, 'Old Iron Ore', 'name should retain old value when source is null');
   assert.equal(result.item.img, 'old-ore.png', 'img should retain old value when source is null');
   assert.equal(result.item.description, 'Existing source description.');
   // registeredItemUuid updated to the dropped UUID
@@ -882,28 +800,24 @@ test('addItemFromUuid — source-chain overwrite with fromUuid returning null ke
 });
 
 test('replaceItemSource — updates source refs, description, and aliasItemUuids for a specific component', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Old Herb',
-          img: 'old-herb.png',
-          description: 'Old herb description.',
-          registeredItemUuid: 'Item.old-herb',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Herb',
+      img: 'old-herb.png',
+      description: 'Old herb description.',
+      registeredItemUuid: 'Item.old-herb'
+    }]
+  }]);
 
   globalThis.fromUuid = async () => ({
     documentName: 'Item',
     name: 'Sunleaf',
     img: 'sunleaf.png',
     system: { description: { value: '<p>Radiates <em>warmth</em>.</p>' } },
-    _stats: { compendiumSource: 'Compendium.source.items.sunleaf' },
+    _stats: { compendiumSource: 'Compendium.source.items.sunleaf' }
   });
 
   const result = await mgr.replaceItemSource('sys1', 'comp-1', 'Compendium.world.pack.sunleaf');
@@ -922,21 +836,17 @@ test('replaceItemSource — updates source refs, description, and aliasItemUuids
 });
 
 test('replaceItemSource — falls back to live item UUID when canonical source is broken', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Old Herb',
-          img: 'old-herb.png',
-          description: 'Old herb description.',
-          registeredItemUuid: 'Item.old-herb',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Herb',
+      img: 'old-herb.png',
+      description: 'Old herb description.',
+      registeredItemUuid: 'Item.old-herb'
+    }]
+  }]);
 
   globalThis.fromUuid = async (uuid) => {
     if (uuid === 'Item.world-sunleaf') {
@@ -945,7 +855,7 @@ test('replaceItemSource — falls back to live item UUID when canonical source i
         documentName: 'Item',
         name: 'Sunleaf',
         img: 'sunleaf.png',
-        _stats: { compendiumSource: 'Compendium.source.items.missing-sunleaf' },
+        _stats: { compendiumSource: 'Compendium.source.items.missing-sunleaf' }
       };
     }
     return null;
@@ -960,33 +870,27 @@ test('replaceItemSource — falls back to live item UUID when canonical source i
   assert.equal(item.originItemUuid, 'Item.world-sunleaf');
   assert.ok(item.aliasItemUuids.includes('Item.old-herb'));
   assert.ok(item.aliasItemUuids.includes('Compendium.source.items.missing-sunleaf'));
-  assert.deepEqual(result.sourceFallbacks, [
-    {
-      itemName: 'Sunleaf',
-      brokenUuid: 'Compendium.source.items.missing-sunleaf',
-      fallbackUuid: 'Item.world-sunleaf',
-    },
-  ]);
+  assert.deepEqual(result.sourceFallbacks, [{
+    itemName: 'Sunleaf',
+    brokenUuid: 'Compendium.source.items.missing-sunleaf',
+    fallbackUuid: 'Item.world-sunleaf'
+  }]);
 
   globalThis.fromUuid = async () => null;
 });
 
 test('replaceItemSource — preserves existing metadata when fromUuid cannot resolve the dropped item', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-1',
-          name: 'Old Herb',
-          img: 'old-herb.png',
-          description: 'Old herb description.',
-          registeredItemUuid: 'Item.old-herb',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-1',
+      name: 'Old Herb',
+      img: 'old-herb.png',
+      description: 'Old herb description.',
+      registeredItemUuid: 'Item.old-herb'
+    }]
+  }]);
 
   globalThis.fromUuid = async () => null;
 
@@ -1000,27 +904,21 @@ test('replaceItemSource — preserves existing metadata when fromUuid cannot res
 });
 
 test('addItemsFromPack — returns { added, updated, skipped, total } with updated field', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        // This item's registeredItemUuid exactly matches pack item-a — will be skipped
-        {
-          id: 'comp-existing',
-          name: 'Iron Ore',
-          registeredItemUuid: 'Compendium.world.mypack2.item-a',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      // This item's registeredItemUuid exactly matches pack item-a — will be skipped
+      { id: 'comp-existing', name: 'Iron Ore', registeredItemUuid: 'Compendium.world.mypack2.item-a' }
+    ]
+  }]);
 
   _mockPacks.set('world.mypack2', {
     getDocuments: async () => [
       { id: 'item-a', documentName: 'Item', name: 'Iron Ore', img: 'ore.png' },
       { id: 'item-b', documentName: 'Item', name: 'Coal', img: 'coal.png' },
-      { id: 'item-c', documentName: 'Item', name: 'Silver', img: 'silver.png' },
-    ],
+      { id: 'item-c', documentName: 'Item', name: 'Silver', img: 'silver.png' }
+    ]
   });
 
   const result = await mgr.addItemsFromPack('sys1', 'world.mypack2');
@@ -1038,8 +936,8 @@ test('addItemsFromPack — aggregates broken canonical source fallbacks', async 
   _mockPacks.set('world.broken-sources', {
     getDocuments: async () => [
       { id: 'item-a', documentName: 'Item', name: 'Azuryt', img: 'azuryt.png' },
-      { id: 'item-b', documentName: 'Item', name: 'Cytryn', img: 'cytryn.png' },
-    ],
+      { id: 'item-b', documentName: 'Item', name: 'Cytryn', img: 'cytryn.png' }
+    ]
   });
 
   globalThis.fromUuid = async (uuid) => {
@@ -1048,7 +946,7 @@ test('addItemsFromPack — aggregates broken canonical source fallbacks', async 
         documentName: 'Item',
         name: 'Azuryt',
         img: 'azuryt.png',
-        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' },
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.missing-azuryt' }
       };
     }
     if (uuid === 'Compendium.world.broken-sources.item-b') {
@@ -1056,7 +954,7 @@ test('addItemsFromPack — aggregates broken canonical source fallbacks', async 
         documentName: 'Item',
         name: 'Cytryn',
         img: 'cytryn.png',
-        _stats: { compendiumSource: 'Compendium.crafting.items.Item.cytryn' },
+        _stats: { compendiumSource: 'Compendium.crafting.items.Item.cytryn' }
       };
     }
     if (uuid === 'Compendium.crafting.items.Item.cytryn') {
@@ -1069,21 +967,13 @@ test('addItemsFromPack — aggregates broken canonical source fallbacks', async 
 
   assert.equal(result.total, 2);
   assert.equal(result.added, 2);
-  assert.deepEqual(result.sourceFallbacks, [
-    {
-      itemName: 'Azuryt',
-      brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
-      fallbackUuid: 'Compendium.world.broken-sources.item-a',
-    },
-  ]);
-  assert.equal(
-    mgr.getSystem('sys1').components[0].originItemUuid,
-    'Compendium.world.broken-sources.item-a'
-  );
-  assert.equal(
-    mgr.getSystem('sys1').components[1].originItemUuid,
-    'Compendium.crafting.items.Item.cytryn'
-  );
+  assert.deepEqual(result.sourceFallbacks, [{
+    itemName: 'Azuryt',
+    brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+    fallbackUuid: 'Compendium.world.broken-sources.item-a'
+  }]);
+  assert.equal(mgr.getSystem('sys1').components[0].originItemUuid, 'Compendium.world.broken-sources.item-a');
+  assert.equal(mgr.getSystem('sys1').components[1].originItemUuid, 'Compendium.crafting.items.Item.cytryn');
 
   globalThis.fromUuid = async () => null;
 });
@@ -1093,10 +983,13 @@ test('addItemFromUuid — rejects non-Item document type', async () => {
 
   globalThis.fromUuid = async () => ({
     documentName: 'Actor',
-    name: 'Bob the Blacksmith',
+    name: 'Bob the Blacksmith'
   });
 
-  await assert.rejects(() => mgr.addItemFromUuid('sys1', 'Actor.bob123'), /non-Item|Actor/);
+  await assert.rejects(
+    () => mgr.addItemFromUuid('sys1', 'Actor.bob123'),
+    /non-Item|Actor/
+  );
 
   globalThis.fromUuid = async () => null;
 });
@@ -1105,19 +998,11 @@ test('addItemFromUuid — a world item cloned from another (duplicateSource) imp
   // Regression: Foundry stamps _stats.duplicateSource on an item copied from
   // another. A clone is a distinct item and must NOT be conflated with the
   // original's component on import.
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-moonsilver',
-          name: 'Moonsilver Weed',
-          registeredItemUuid: 'Item.Xjbuj7dbkzhOPrMC',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{ id: 'comp-moonsilver', name: 'Moonsilver Weed', registeredItemUuid: 'Item.Xjbuj7dbkzhOPrMC' }]
+  }]);
 
   globalThis.fromUuid = async (uuid) => {
     if (uuid !== 'Item.y8qq6t1F9YwRh8HH') return null;
@@ -1127,7 +1012,7 @@ test('addItemFromUuid — a world item cloned from another (duplicateSource) imp
       name: 'Talonvine',
       img: 'icons/consumables/plants/thorned-stem-brown.webp',
       // Cloned from Moonsilver Weed: no compendium source, only a duplicate source.
-      _stats: { compendiumSource: null, duplicateSource: 'Item.Xjbuj7dbkzhOPrMC' },
+      _stats: { compendiumSource: null, duplicateSource: 'Item.Xjbuj7dbkzhOPrMC' }
     };
   };
 
@@ -1137,53 +1022,41 @@ test('addItemFromUuid — a world item cloned from another (duplicateSource) imp
   assert.equal(result.item.name, 'Talonvine');
   assert.equal(result.item.registeredItemUuid, 'Item.y8qq6t1F9YwRh8HH');
   const sys = mgr.getSystem('sys1');
-  assert.equal(
-    sys.components.length,
-    2,
-    'clone must be a separate component, not merged with the original'
-  );
-  assert.ok(sys.components.some((c) => c.id === 'comp-moonsilver'));
+  assert.equal(sys.components.length, 2, 'clone must be a separate component, not merged with the original');
+  assert.ok(sys.components.some(c => c.id === 'comp-moonsilver'));
 
   globalThis.fromUuid = async () => null;
 });
 
-test("refreshComponentMetadataForUpdatedItem — editing a clone does NOT rewrite the original item's component", async () => {
+test('refreshComponentMetadataForUpdatedItem — editing a clone does NOT rewrite the original item\'s component', async () => {
   // The clone (Talonvine) itself carries duplicateSource → the original
   // (Moonsilver). Metadata propagation must match on identity only, so editing
   // the clone touches its own component and leaves the original's untouched.
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-moonsilver',
-          name: 'Moonsilver Weed',
-          registeredItemUuid: 'Item.Xjbuj7dbkzhOPrMC',
-        },
-        { id: 'comp-talonvine', name: 'Talonvine', registeredItemUuid: 'Item.y8qq6t1F9YwRh8HH' },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      { id: 'comp-moonsilver', name: 'Moonsilver Weed', registeredItemUuid: 'Item.Xjbuj7dbkzhOPrMC' },
+      { id: 'comp-talonvine', name: 'Talonvine', registeredItemUuid: 'Item.y8qq6t1F9YwRh8HH' }
+    ]
+  }]);
   let saveCount = 0;
-  mgr.save = async () => {
-    saveCount++;
-  };
+  mgr.save = async () => { saveCount++; };
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     {
       uuid: 'Item.y8qq6t1F9YwRh8HH',
       name: 'Talonvine Renamed',
-      _stats: { compendiumSource: null, duplicateSource: 'Item.Xjbuj7dbkzhOPrMC' },
+      _stats: { compendiumSource: null, duplicateSource: 'Item.Xjbuj7dbkzhOPrMC' }
     },
     { name: 'Talonvine Renamed' }
   );
 
-  assert.equal(result.updated, 1, "only the clone's own component should update");
+  assert.equal(result.updated, 1, 'only the clone\'s own component should update');
   const sys = mgr.getSystem('sys1');
-  assert.equal(sys.components.find((c) => c.id === 'comp-talonvine').name, 'Talonvine Renamed');
+  assert.equal(sys.components.find(c => c.id === 'comp-talonvine').name, 'Talonvine Renamed');
   assert.equal(
-    sys.components.find((c) => c.id === 'comp-moonsilver').name,
+    sys.components.find(c => c.id === 'comp-moonsilver').name,
     'Moonsilver Weed',
     'the original component must not be renamed by editing its clone'
   );
@@ -1191,28 +1064,23 @@ test("refreshComponentMetadataForUpdatedItem — editing a clone does NOT rewrit
 });
 
 test('createItem — rejects a duplicate source reference already used by another component', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-existing',
-          name: 'Iron Ore',
-          registeredItemUuid: 'Compendium.world.pack.item-a',
-          originItemUuid: 'Compendium.source.items.iron-ore',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-existing',
+      name: 'Iron Ore',
+      registeredItemUuid: 'Compendium.world.pack.item-a',
+      originItemUuid: 'Compendium.source.items.iron-ore'
+    }]
+  }]);
 
   await assert.rejects(
-    () =>
-      mgr.createItem('sys1', {
-        name: 'Duplicate Iron Ore',
-        registeredItemUuid: 'Compendium.world.other-pack.item-z',
-        originItemUuid: 'Compendium.source.items.iron-ore',
-      }),
+    () => mgr.createItem('sys1', {
+      name: 'Duplicate Iron Ore',
+      registeredItemUuid: 'Compendium.world.other-pack.item-z',
+      originItemUuid: 'Compendium.source.items.iron-ore'
+    }),
     /already belongs/
   );
 });
@@ -1221,63 +1089,59 @@ test('createSystem — rejects duplicate component source references in one payl
   const mgr = buildManager([]);
 
   await assert.rejects(
-    () =>
-      mgr.createSystem({
-        id: 'sys-dupes',
-        name: 'Duplicate Sources',
-        components: [
-          {
-            id: 'comp-a',
-            name: 'Iron Ore',
-            registeredItemUuid: 'Compendium.world.pack.item-a',
-          },
-          {
-            id: 'comp-b',
-            name: 'Iron Ore Copy',
-            aliasItemUuids: ['Compendium.world.pack.item-a'],
-          },
-        ],
-      }),
+    () => mgr.createSystem({
+      id: 'sys-dupes',
+      name: 'Duplicate Sources',
+      components: [
+        {
+          id: 'comp-a',
+          name: 'Iron Ore',
+          registeredItemUuid: 'Compendium.world.pack.item-a'
+        },
+        {
+          id: 'comp-b',
+          name: 'Iron Ore Copy',
+          aliasItemUuids: ['Compendium.world.pack.item-a']
+        }
+      ]
+    }),
     /claimed by both/
   );
 });
 
 test('updateSystem — rejects duplicate component source references in one payload', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      {
+        id: 'comp-a',
+        name: 'Iron Ore',
+        registeredItemUuid: 'Compendium.world.pack.item-a'
+      },
+      {
+        id: 'comp-b',
+        name: 'Coal',
+        registeredItemUuid: 'Compendium.world.pack.item-b'
+      }
+    ]
+  }]);
+
+  await assert.rejects(
+    () => mgr.updateSystem('sys1', {
+      components: [
         {
           id: 'comp-a',
           name: 'Iron Ore',
-          registeredItemUuid: 'Compendium.world.pack.item-a',
+          registeredItemUuid: 'Compendium.world.pack.item-a'
         },
         {
           id: 'comp-b',
-          name: 'Coal',
-          registeredItemUuid: 'Compendium.world.pack.item-b',
-        },
-      ],
-    },
-  ]);
-
-  await assert.rejects(
-    () =>
-      mgr.updateSystem('sys1', {
-        components: [
-          {
-            id: 'comp-a',
-            name: 'Iron Ore',
-            registeredItemUuid: 'Compendium.world.pack.item-a',
-          },
-          {
-            id: 'comp-b',
-            name: 'Iron Ore Copy',
-            originItemUuid: 'Compendium.world.pack.item-a',
-          },
-        ],
-      }),
+          name: 'Iron Ore Copy',
+          originItemUuid: 'Compendium.world.pack.item-a'
+        }
+      ]
+    }),
     /claimed by both/
   );
 });
@@ -1290,8 +1154,8 @@ test('createSystem — allows multiple components without source references', as
     name: 'No Source Components',
     components: [
       { id: 'comp-a', name: 'Hand-authored A' },
-      { id: 'comp-b', name: 'Hand-authored B' },
-    ],
+      { id: 'comp-b', name: 'Hand-authored B' }
+    ]
   });
 
   assert.equal(system.components.length, 2);
@@ -1300,63 +1164,58 @@ test('createSystem — allows multiple components without source references', as
 });
 
 test('updateItem — rejects changing a component to a source reference already used by another component', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-a',
-          name: 'Iron Ore',
-          registeredItemUuid: 'Compendium.world.pack.item-a',
-          originItemUuid: 'Compendium.source.items.iron-ore',
-        },
-        {
-          id: 'comp-b',
-          name: 'Coal',
-          registeredItemUuid: 'Compendium.world.pack.item-b',
-          originItemUuid: 'Compendium.source.items.coal',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      {
+        id: 'comp-a',
+        name: 'Iron Ore',
+        registeredItemUuid: 'Compendium.world.pack.item-a',
+        originItemUuid: 'Compendium.source.items.iron-ore'
+      },
+      {
+        id: 'comp-b',
+        name: 'Coal',
+        registeredItemUuid: 'Compendium.world.pack.item-b',
+        originItemUuid: 'Compendium.source.items.coal'
+      }
+    ]
+  }]);
 
   await assert.rejects(
-    () =>
-      mgr.updateItem('sys1', 'comp-b', {
-        originItemUuid: 'Compendium.source.items.iron-ore',
-      }),
+    () => mgr.updateItem('sys1', 'comp-b', {
+      originItemUuid: 'Compendium.source.items.iron-ore'
+    }),
     /already belongs/
   );
 });
 
 test('replaceItemSource — rejects changing a component to a source reference already used by another component', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-a',
-          name: 'Iron Ore',
-          registeredItemUuid: 'Compendium.world.pack.item-a',
-          originItemUuid: 'Compendium.source.items.iron-ore',
-        },
-        {
-          id: 'comp-b',
-          name: 'Coal',
-          registeredItemUuid: 'Compendium.world.pack.item-b',
-          originItemUuid: 'Compendium.source.items.coal',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [
+      {
+        id: 'comp-a',
+        name: 'Iron Ore',
+        registeredItemUuid: 'Compendium.world.pack.item-a',
+        originItemUuid: 'Compendium.source.items.iron-ore'
+      },
+      {
+        id: 'comp-b',
+        name: 'Coal',
+        registeredItemUuid: 'Compendium.world.pack.item-b',
+        originItemUuid: 'Compendium.source.items.coal'
+      }
+    ]
+  }]);
 
   globalThis.fromUuid = async () => ({
     documentName: 'Item',
     name: 'Duplicate Iron Ore',
     img: 'ore.png',
-    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+    _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
   });
 
   await assert.rejects(
@@ -1368,30 +1227,24 @@ test('replaceItemSource — rejects changing a component to a source reference a
 });
 
 test('refreshComponentMetadataForUpdatedItem — updates component image for direct source UUID match', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-herb',
-          name: 'Herb',
-          img: 'icons/herb-old.webp',
-          registeredItemUuid: 'Item.herb',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      img: 'icons/herb-old.webp',
+      registeredItemUuid: 'Item.herb'
+    }]
+  }]);
   let saveCount = 0;
   let notifyCount = 0;
   const previousHooks = globalThis.Hooks;
-  mgr.save = async () => {
-    saveCount++;
-  };
+  mgr.save = async () => { saveCount++; };
   globalThis.Hooks = {
     callAll: (hookName) => {
       if (hookName === 'fabricate.craftingSystemsChanged') notifyCount++;
-    },
+    }
   };
 
   try {
@@ -1410,24 +1263,18 @@ test('refreshComponentMetadataForUpdatedItem — updates component image for dir
 });
 
 test('refreshComponentMetadataForUpdatedItem — updates component name for direct source UUID match', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-herb',
-          name: 'Old Herb',
-          img: 'icons/herb.webp',
-          registeredItemUuid: 'Item.herb',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Old Herb',
+      img: 'icons/herb.webp',
+      registeredItemUuid: 'Item.herb'
+    }]
+  }]);
   let saveCount = 0;
-  mgr.save = async () => {
-    saveCount++;
-  };
+  mgr.save = async () => { saveCount++; };
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     { uuid: 'Item.herb', name: 'Fresh Herb', img: 'icons/herb.webp' },
@@ -1440,31 +1287,25 @@ test('refreshComponentMetadataForUpdatedItem — updates component name for dire
 });
 
 test('refreshComponentMetadataForUpdatedItem — updates component image for canonical source UUID match', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-ore',
-          name: 'Iron Ore',
-          img: 'icons/ore-old.webp',
-          registeredItemUuid: 'Item.world-copy',
-          originItemUuid: 'Compendium.source.items.iron-ore',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-ore',
+      name: 'Iron Ore',
+      img: 'icons/ore-old.webp',
+      registeredItemUuid: 'Item.world-copy',
+      originItemUuid: 'Compendium.source.items.iron-ore'
+    }]
+  }]);
   let saveCount = 0;
-  mgr.save = async () => {
-    saveCount++;
-  };
+  mgr.save = async () => { saveCount++; };
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     {
       uuid: 'Actor.actor-1.Item.ore-copy',
       img: 'icons/ore-new.webp',
-      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
     },
     { img: 'icons/ore-new.webp' }
   );
@@ -1475,31 +1316,25 @@ test('refreshComponentMetadataForUpdatedItem — updates component image for can
 });
 
 test('refreshComponentMetadataForUpdatedItem — updates component description for direct source UUID match', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-herb',
-          name: 'Herb',
-          img: 'icons/herb.webp',
-          description: 'Old herb description.',
-          registeredItemUuid: 'Item.herb',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      img: 'icons/herb.webp',
+      description: 'Old herb description.',
+      registeredItemUuid: 'Item.herb'
+    }]
+  }]);
   let saveCount = 0;
-  mgr.save = async () => {
-    saveCount++;
-  };
+  mgr.save = async () => { saveCount++; };
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     {
       uuid: 'Item.herb',
       img: 'icons/herb.webp',
-      system: { description: { value: '<p>Bright <strong>green</strong> leaves.</p>' } },
+      system: { description: { value: '<p>Bright <strong>green</strong> leaves.</p>' } }
     },
     { 'system.description.value': '<p>Bright <strong>green</strong> leaves.</p>' }
   );
@@ -1514,21 +1349,17 @@ test('refreshComponentMetadataForUpdatedItem — RESOLVES the edited description
   // Without resolution here, editing a source item would re-propagate raw directive
   // text over a description the GM had already repaired — undoing the backfill one
   // edit at a time. Placed beside the propagation assertion above deliberately.
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-supplies',
-          name: 'Supplies',
-          img: 'icons/supplies.webp',
-          description: 'Component Pouch',
-          registeredItemUuid: 'Item.supplies',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-supplies',
+      name: 'Supplies',
+      img: 'icons/supplies.webp',
+      description: 'Component Pouch',
+      registeredItemUuid: 'Item.supplies'
+    }]
+  }]);
   mgr.save = async () => {};
   mgr._enrichToHtml = async (raw) =>
     raw.replaceAll('@UUID[Item.pouch]', '<a class="content-link">Component Pouch</a>');
@@ -1547,33 +1378,27 @@ test('refreshComponentMetadataForUpdatedItem — RESOLVES the edited description
 });
 
 test('refreshComponentMetadataForUpdatedItem — clears component description for canonical source UUID match', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-ore',
-          name: 'Iron Ore',
-          img: 'icons/ore.webp',
-          description: 'Old ore description.',
-          registeredItemUuid: 'Item.world-copy',
-          originItemUuid: 'Compendium.source.items.iron-ore',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-ore',
+      name: 'Iron Ore',
+      img: 'icons/ore.webp',
+      description: 'Old ore description.',
+      registeredItemUuid: 'Item.world-copy',
+      originItemUuid: 'Compendium.source.items.iron-ore'
+    }]
+  }]);
   let saveCount = 0;
-  mgr.save = async () => {
-    saveCount++;
-  };
+  mgr.save = async () => { saveCount++; };
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     {
       uuid: 'Actor.actor-1.Item.ore-copy',
       img: 'icons/ore.webp',
       system: { description: { value: '' } },
-      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' },
+      _stats: { compendiumSource: 'Compendium.source.items.iron-ore' }
     },
     { system: { description: { value: '' } } }
   );
@@ -1584,24 +1409,18 @@ test('refreshComponentMetadataForUpdatedItem — clears component description fo
 });
 
 test('refreshComponentMetadataForUpdatedItem — ignores updates without synced metadata changes', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-herb',
-          name: 'Herb',
-          img: 'icons/herb-old.webp',
-          registeredItemUuid: 'Item.herb',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      img: 'icons/herb-old.webp',
+      registeredItemUuid: 'Item.herb'
+    }]
+  }]);
   let saveCount = 0;
-  mgr.save = async () => {
-    saveCount++;
-  };
+  mgr.save = async () => { saveCount++; };
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     { uuid: 'Item.herb', img: 'icons/herb-new.webp' },
@@ -1614,24 +1433,18 @@ test('refreshComponentMetadataForUpdatedItem — ignores updates without synced 
 });
 
 test('refreshComponentMetadataForUpdatedItem — skips save when matched metadata is unchanged', async () => {
-  const mgr = buildManager([
-    {
-      id: 'sys1',
-      name: 'System One',
-      items: [
-        {
-          id: 'comp-herb',
-          name: 'Herb',
-          img: 'icons/herb.webp',
-          registeredItemUuid: 'Item.herb',
-        },
-      ],
-    },
-  ]);
+  const mgr = buildManager([{
+    id: 'sys1',
+    name: 'System One',
+    items: [{
+      id: 'comp-herb',
+      name: 'Herb',
+      img: 'icons/herb.webp',
+      registeredItemUuid: 'Item.herb'
+    }]
+  }]);
   let saveCount = 0;
-  mgr.save = async () => {
-    saveCount++;
-  };
+  mgr.save = async () => { saveCount++; };
 
   const result = await mgr.refreshComponentMetadataForUpdatedItem(
     { uuid: 'Item.herb', img: 'icons/herb.webp' },
@@ -1713,7 +1526,7 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
     notifyWarn('SourceFallbackWarning', {
       name: fallback.itemName || fallback.fallbackUuid,
       brokenUuid: fallback.brokenUuid,
-      fallbackUuid: fallback.fallbackUuid,
+      fallbackUuid: fallback.fallbackUuid
     });
   }
 
@@ -1731,14 +1544,9 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
   }
 
   function folderChildren(folder) {
-    const explicit = Array.isArray(folder.children)
-      ? folder.children.map((child) => child.folder || child)
-      : [];
-    const fromCollection = folderValues().filter(
-      (candidate) =>
-        candidate?.folder?.id === folder?.id ||
-        candidate?.parent?.id === folder?.id ||
-        candidate?.parent === folder?.id
+    const explicit = Array.isArray(folder.children) ? folder.children.map(child => child.folder || child) : [];
+    const fromCollection = folderValues().filter(candidate =>
+      candidate?.folder?.id === folder?.id || candidate?.parent?.id === folder?.id || candidate?.parent === folder?.id
     );
     return [...explicit, ...fromCollection];
   }
@@ -1747,8 +1555,8 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
     if (!folder?.id || visited.has(folder.id)) return [];
     visited.add(folder.id);
     return [
-      ...(folder.contents || []).filter((d) => d.documentName === 'Item' && d.uuid),
-      ...folderChildren(folder).flatMap((child) => collectItems(child, visited)),
+      ...(folder.contents || []).filter(d => d.documentName === 'Item' && d.uuid),
+      ...folderChildren(folder).flatMap(child => collectItems(child, visited))
     ];
   }
 
@@ -1760,8 +1568,8 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
     if (type && type !== 'Item') return [];
     const subfolders = typeof folder.getSubfolders === 'function' ? folder.getSubfolders(true) : [];
     return [folder, ...subfolders]
-      .flatMap((current) => current?.contents || [])
-      .map((entry) => entry?.uuid)
+      .flatMap(current => current?.contents || [])
+      .map(entry => entry?.uuid)
       .filter(Boolean);
   }
 
@@ -1798,9 +1606,7 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
       // traverse live Item documents.
       const itemUuids = folder.pack
         ? collectCompendiumFolderItemUuids(folder)
-        : (folder.documentType && folder.documentType !== 'Item' ? [] : collectItems(folder)).map(
-            (fi) => fi.uuid
-          );
+        : (folder.documentType && folder.documentType !== 'Item' ? [] : collectItems(folder)).map(fi => fi.uuid);
       if (itemUuids.length === 0) {
         notifyInfo('FolderEmpty', { name: folder.name });
         return;
@@ -1816,13 +1622,7 @@ function buildFullOnDropItem({ systemId, systemManager, notifyWarn, notifyInfo, 
         else skipped++;
         if (Array.isArray(res.sourceFallbacks)) sourceFallbacks.push(...res.sourceFallbacks);
       }
-      notifyInfo('FolderImportSummary', {
-        added,
-        updated,
-        skipped,
-        total: itemUuids.length,
-        name: folder.name,
-      });
+      notifyInfo('FolderImportSummary', { added, updated, skipped, total: itemUuids.length, name: folder.name });
       notifyBulkSourceFallback(sourceFallbacks);
       return;
     }
@@ -1854,21 +1654,16 @@ test('onDropItem integration — Actor drop shows warning and does not call addI
   const warnings = [];
 
   const mgr = {
-    addItemFromUuid: async (...args) => {
-      addCalls.push(args);
-      return { item: {}, action: 'added' };
-    },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 }),
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
   };
 
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: mgr,
-    notifyWarn: (key, params) => {
-      warnings.push({ key, params });
-    },
+    notifyWarn: (key, params) => { warnings.push({ key, params }); },
     notifyInfo: () => {},
-    folders: new Map(),
+    folders: new Map()
   });
 
   await handler({ type: 'Actor', uuid: 'Actor.123' });
@@ -1886,45 +1681,33 @@ test('onDropItem integration — single item import warns when source fallback i
     addItemFromUuid: async () => ({
       item: { name: 'Azuryt' },
       action: 'added',
-      sourceFallbacks: [
-        {
-          itemName: 'Azuryt',
-          brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
-          fallbackUuid: 'Item.world-azuryt',
-        },
-      ],
+      sourceFallbacks: [{
+        itemName: 'Azuryt',
+        brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+        fallbackUuid: 'Item.world-azuryt'
+      }]
     }),
-    addItemsFromPack: async () => ({
-      added: 0,
-      updated: 0,
-      skipped: 0,
-      total: 0,
-      sourceFallbacks: [],
-    }),
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0, sourceFallbacks: [] })
   };
 
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: mgr,
-    notifyWarn: (key, params) => {
-      warnings.push({ key, params });
-    },
+    notifyWarn: (key, params) => { warnings.push({ key, params }); },
     notifyInfo: () => {},
-    folders: new Map(),
+    folders: new Map()
   });
 
   await handler({ type: 'Item', uuid: 'Item.world-azuryt' });
 
-  assert.deepEqual(warnings, [
-    {
-      key: 'SourceFallbackWarning',
-      params: {
-        name: 'Azuryt',
-        brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
-        fallbackUuid: 'Item.world-azuryt',
-      },
-    },
-  ]);
+  assert.deepEqual(warnings, [{
+    key: 'SourceFallbackWarning',
+    params: {
+      name: 'Azuryt',
+      brokenUuid: 'Compendium.crafting.items.Item.missing-azuryt',
+      fallbackUuid: 'Item.world-azuryt'
+    }
+  }]);
 });
 
 test('onDropItem integration — compendium pack import summarizes source fallbacks', async () => {
@@ -1939,30 +1722,18 @@ test('onDropItem integration — compendium pack import summarizes source fallba
       skipped: 0,
       total: 2,
       sourceFallbacks: [
-        {
-          itemName: 'Azuryt',
-          brokenUuid: 'Compendium.missing.a',
-          fallbackUuid: 'Compendium.world.pack.a',
-        },
-        {
-          itemName: 'Cytryn',
-          brokenUuid: 'Compendium.missing.c',
-          fallbackUuid: 'Compendium.world.pack.c',
-        },
-      ],
-    }),
+        { itemName: 'Azuryt', brokenUuid: 'Compendium.missing.a', fallbackUuid: 'Compendium.world.pack.a' },
+        { itemName: 'Cytryn', brokenUuid: 'Compendium.missing.c', fallbackUuid: 'Compendium.world.pack.c' }
+      ]
+    })
   };
 
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: mgr,
-    notifyWarn: (key, params) => {
-      warnings.push({ key, params });
-    },
-    notifyInfo: (key, params) => {
-      infos.push({ key, params });
-    },
-    folders: new Map(),
+    notifyWarn: (key, params) => { warnings.push({ key, params }); },
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders: new Map()
   });
 
   await handler({ type: 'Compendium', collection: 'world.pack' });
@@ -1980,32 +1751,27 @@ test('onDropItem integration — Folder with Items imports each and shows summar
       addCalls.push(uuid);
       return { item: { name: 'Item' }, action: 'added' };
     },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 }),
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
   };
 
   const folders = new Map([
-    [
-      'folder1',
-      {
-        id: 'folder1',
-        name: 'My Folder',
-        contents: [
-          { documentName: 'Item', uuid: 'Item.item-x' },
-          { documentName: 'Item', uuid: 'Item.item-y' },
-          { documentName: 'Actor', uuid: 'Actor.some-actor' }, // should be ignored
-        ],
-      },
-    ],
+    ['folder1', {
+      id: 'folder1',
+      name: 'My Folder',
+      contents: [
+        { documentName: 'Item', uuid: 'Item.item-x' },
+        { documentName: 'Item', uuid: 'Item.item-y' },
+        { documentName: 'Actor', uuid: 'Actor.some-actor' } // should be ignored
+      ]
+    }]
   ]);
 
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: mgr,
     notifyWarn: () => {},
-    notifyInfo: (key, params) => {
-      infos.push({ key, params });
-    },
-    folders,
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
   });
 
   await handler({ type: 'Folder', id: 'folder1', documentType: 'Item' });
@@ -2030,19 +1796,12 @@ function buildFolderDropProbe(folders = new Map()) {
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: {
-      addItemFromUuid: async (_sysId, uuid) => {
-        addCalls.push(uuid);
-        return { item: { name: uuid }, action: 'added' };
-      },
-      addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 }),
+      addItemFromUuid: async (_sysId, uuid) => { addCalls.push(uuid); return { item: { name: uuid }, action: 'added' }; },
+      addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
     },
-    notifyWarn: (key) => {
-      warnings.push(key);
-    },
-    notifyInfo: (key, params) => {
-      infos.push({ key, params });
-    },
-    folders,
+    notifyWarn: (key) => { warnings.push(key); },
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
   });
   return { handler, addCalls, infos, warnings };
 }
@@ -2054,8 +1813,8 @@ test('onDropItem integration — v13 Folder uuid drop resolves via fromUuidSync 
     name: 'My Folder',
     contents: [
       { documentName: 'Item', uuid: 'Item.item-x' },
-      { documentName: 'Item', uuid: 'Item.item-y' },
-    ],
+      { documentName: 'Item', uuid: 'Item.item-y' }
+    ]
   };
   globalThis.fromUuidSync = (uuid) => (uuid === 'Folder.folder1' ? folderDoc : null);
 
@@ -2072,18 +1831,9 @@ test('onDropItem integration — v13 Folder uuid drop resolves via fromUuidSync 
 });
 
 test('onDropItem integration — v13 Folder uuid drop falls back to id lookup when fromUuidSync is unavailable', async () => {
-  const { handler, addCalls, infos } = buildFolderDropProbe(
-    new Map([
-      [
-        'folder1',
-        {
-          id: 'folder1',
-          name: 'My Folder',
-          contents: [{ documentName: 'Item', uuid: 'Item.item-x' }],
-        },
-      ],
-    ])
-  );
+  const { handler, addCalls, infos } = buildFolderDropProbe(new Map([
+    ['folder1', { id: 'folder1', name: 'My Folder', contents: [{ documentName: 'Item', uuid: 'Item.item-x' }] }]
+  ]));
 
   // No globalThis.fromUuidSync defined — id is stripped from the uuid and looked up in the map.
   await handler({ type: 'Folder', uuid: 'Folder.folder1' });
@@ -2114,11 +1864,11 @@ test('onDropItem integration — compendium Folder drop imports items from pack 
     getSubfolders: () => [],
     contents: [
       { _id: 'a', uuid: 'Compendium.world.simple-smithing.Item.a' },
-      { _id: 'b', uuid: 'Compendium.world.simple-smithing.Item.b' },
-    ],
+      { _id: 'b', uuid: 'Compendium.world.simple-smithing.Item.b' }
+    ]
   };
   globalThis.fromUuidSync = (uuid) =>
-    uuid === 'Compendium.world.simple-smithing.Folder.cmp-folder' ? compendiumFolder : null;
+    (uuid === 'Compendium.world.simple-smithing.Folder.cmp-folder' ? compendiumFolder : null);
 
   // Empty world-folder map: resolution and enumeration must come from the compendium folder.
   const { handler, addCalls, infos, warnings } = buildFolderDropProbe(new Map());
@@ -2128,7 +1878,7 @@ test('onDropItem integration — compendium Folder drop imports items from pack 
 
   assert.deepEqual(addCalls, [
     'Compendium.world.simple-smithing.Item.a',
-    'Compendium.world.simple-smithing.Item.b',
+    'Compendium.world.simple-smithing.Item.b'
   ]);
   assert.equal(warnings.length, 0, 'a resolvable compendium folder must not warn');
   assert.equal(infos[0].key, 'FolderImportSummary');
@@ -2141,7 +1891,7 @@ test('onDropItem integration — compendium Folder drop includes nested subfolde
     name: 'Ores',
     type: 'Item',
     pack: 'world.simple-smithing',
-    contents: [{ _id: 'c', uuid: 'Compendium.world.simple-smithing.Item.c' }],
+    contents: [{ _id: 'c', uuid: 'Compendium.world.simple-smithing.Item.c' }]
   };
   const root = {
     id: 'cmp-root',
@@ -2149,10 +1899,10 @@ test('onDropItem integration — compendium Folder drop includes nested subfolde
     type: 'Item',
     pack: 'world.simple-smithing',
     getSubfolders: (recursive) => (recursive ? [nested] : []),
-    contents: [{ _id: 'a', uuid: 'Compendium.world.simple-smithing.Item.a' }],
+    contents: [{ _id: 'a', uuid: 'Compendium.world.simple-smithing.Item.a' }]
   };
   globalThis.fromUuidSync = (uuid) =>
-    uuid === 'Compendium.world.simple-smithing.Folder.cmp-root' ? root : null;
+    (uuid === 'Compendium.world.simple-smithing.Folder.cmp-root' ? root : null);
 
   const { handler, addCalls, infos } = buildFolderDropProbe(new Map());
   await handler({ type: 'Folder', uuid: 'Compendium.world.simple-smithing.Folder.cmp-root' });
@@ -2161,7 +1911,7 @@ test('onDropItem integration — compendium Folder drop includes nested subfolde
 
   assert.deepEqual(addCalls, [
     'Compendium.world.simple-smithing.Item.a',
-    'Compendium.world.simple-smithing.Item.c',
+    'Compendium.world.simple-smithing.Item.c'
   ]);
   assert.equal(infos[0].params.total, 2);
 });
@@ -2173,10 +1923,10 @@ test('onDropItem integration — non-Item compendium Folder drop shows empty not
     type: 'Actor',
     pack: 'world.bestiary',
     getSubfolders: () => [],
-    contents: [{ _id: 'a', uuid: 'Compendium.world.bestiary.Actor.a' }],
+    contents: [{ _id: 'a', uuid: 'Compendium.world.bestiary.Actor.a' }]
   };
   globalThis.fromUuidSync = (uuid) =>
-    uuid === 'Compendium.world.bestiary.Folder.cmp-actors' ? actorFolder : null;
+    (uuid === 'Compendium.world.bestiary.Folder.cmp-actors' ? actorFolder : null);
 
   const { handler, addCalls, infos, warnings } = buildFolderDropProbe(new Map());
   await handler({ type: 'Folder', uuid: 'Compendium.world.bestiary.Folder.cmp-actors' });
@@ -2196,42 +1946,30 @@ test('onDropItem integration — Folder import summarizes source fallbacks once'
     addItemFromUuid: async (_sysId, uuid) => ({
       item: { name: uuid },
       action: 'added',
-      sourceFallbacks:
-        uuid === 'Item.item-x'
-          ? [{ itemName: 'Azuryt', brokenUuid: 'Compendium.missing.azuryt', fallbackUuid: uuid }]
-          : [],
+      sourceFallbacks: uuid === 'Item.item-x'
+        ? [{ itemName: 'Azuryt', brokenUuid: 'Compendium.missing.azuryt', fallbackUuid: uuid }]
+        : []
     }),
-    addItemsFromPack: async () => ({
-      added: 0,
-      updated: 0,
-      skipped: 0,
-      total: 0,
-      sourceFallbacks: [],
-    }),
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0, sourceFallbacks: [] })
   };
 
   const folders = new Map([
-    [
-      'folder1',
-      {
-        id: 'folder1',
-        name: 'My Folder',
-        contents: [
-          { documentName: 'Item', uuid: 'Item.item-x' },
-          { documentName: 'Item', uuid: 'Item.item-y' },
-        ],
-      },
-    ],
+    ['folder1', {
+      id: 'folder1',
+      name: 'My Folder',
+      contents: [
+        { documentName: 'Item', uuid: 'Item.item-x' },
+        { documentName: 'Item', uuid: 'Item.item-y' }
+      ]
+    }]
   ]);
 
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: mgr,
-    notifyWarn: (key, params) => {
-      warnings.push({ key, params });
-    },
+    notifyWarn: (key, params) => { warnings.push({ key, params }); },
     notifyInfo: () => {},
-    folders,
+    folders
   });
 
   await handler({ type: 'Folder', id: 'folder1', documentType: 'Item' });
@@ -2245,7 +1983,7 @@ test('onDropItem integration — Folder import includes nested item folders and 
   const actions = new Map([
     ['Item.direct', 'added'],
     ['Item.nested-updated', 'updated'],
-    ['Item.deep-skipped', 'skipped'],
+    ['Item.deep-skipped', 'skipped']
   ]);
 
   const mgr = {
@@ -2253,52 +1991,35 @@ test('onDropItem integration — Folder import includes nested item folders and 
       addCalls.push(uuid);
       return { item: { name: uuid }, action: actions.get(uuid) || 'skipped' };
     },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 }),
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
   };
 
   const folders = new Map([
-    [
-      'root',
-      {
-        id: 'root',
-        name: 'Root Folder',
-        documentType: 'Item',
-        contents: [
-          { documentName: 'Item', uuid: 'Item.direct' },
-          { documentName: 'Actor', uuid: 'Actor.ignored' },
-        ],
-        children: [
-          {
-            folder: {
-              id: 'nested',
-              name: 'Nested',
-              documentType: 'Item',
-              contents: [{ documentName: 'Item', uuid: 'Item.nested-updated' }],
-            },
-          },
-        ],
-      },
-    ],
-    [
-      'deep',
-      {
-        id: 'deep',
-        name: 'Deep',
-        documentType: 'Item',
-        parent: 'nested',
-        contents: [{ documentName: 'Item', uuid: 'Item.deep-skipped' }],
-      },
-    ],
+    ['root', {
+      id: 'root',
+      name: 'Root Folder',
+      documentType: 'Item',
+      contents: [
+        { documentName: 'Item', uuid: 'Item.direct' },
+        { documentName: 'Actor', uuid: 'Actor.ignored' }
+      ],
+      children: [{ folder: { id: 'nested', name: 'Nested', documentType: 'Item', contents: [{ documentName: 'Item', uuid: 'Item.nested-updated' }] } }]
+    }],
+    ['deep', {
+      id: 'deep',
+      name: 'Deep',
+      documentType: 'Item',
+      parent: 'nested',
+      contents: [{ documentName: 'Item', uuid: 'Item.deep-skipped' }]
+    }]
   ]);
 
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: mgr,
     notifyWarn: () => {},
-    notifyInfo: (key, params) => {
-      infos.push({ key, params });
-    },
-    folders,
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
   });
 
   await handler({ type: 'Folder', id: 'root', documentType: 'Item' });
@@ -2310,7 +2031,7 @@ test('onDropItem integration — Folder import includes nested item folders and 
     updated: 1,
     skipped: 1,
     total: 3,
-    name: 'Root Folder',
+    name: 'Root Folder'
   });
 });
 
@@ -2318,32 +2039,24 @@ test('onDropItem integration — Non-item folder shows empty notification and sk
   const addCalls = [];
   const infos = [];
   const mgr = {
-    addItemFromUuid: async (...args) => {
-      addCalls.push(args);
-      return { item: {}, action: 'added' };
-    },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 }),
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
   };
   const folders = new Map([
-    [
-      'actors',
-      {
-        id: 'actors',
-        name: 'Actors',
-        documentType: 'Actor',
-        contents: [{ documentName: 'Item', uuid: 'Item.should-not-import' }],
-      },
-    ],
+    ['actors', {
+      id: 'actors',
+      name: 'Actors',
+      documentType: 'Actor',
+      contents: [{ documentName: 'Item', uuid: 'Item.should-not-import' }]
+    }]
   ]);
 
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: mgr,
     notifyWarn: () => {},
-    notifyInfo: (key, params) => {
-      infos.push({ key, params });
-    },
-    folders,
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
   });
 
   await handler({ type: 'Folder', id: 'actors', documentType: 'Actor' });
@@ -2358,32 +2071,26 @@ test('onDropItem integration — Folder with no Items shows info notification an
   const infos = [];
 
   const mgr = {
-    addItemFromUuid: async (...args) => {
-      addCalls.push(args);
-      return { item: {}, action: 'added' };
-    },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 }),
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
   };
 
   const folders = new Map([
-    [
-      'folder-empty',
-      {
-        id: 'folder-empty',
-        name: 'Empty Folder',
-        contents: [{ documentName: 'Actor', uuid: 'Actor.someone' }],
-      },
-    ],
+    ['folder-empty', {
+      id: 'folder-empty',
+      name: 'Empty Folder',
+      contents: [
+        { documentName: 'Actor', uuid: 'Actor.someone' }
+      ]
+    }]
   ]);
 
   const handler = buildFullOnDropItem({
     systemId: 'sys1',
     systemManager: mgr,
     notifyWarn: () => {},
-    notifyInfo: (key, params) => {
-      infos.push({ key, params });
-    },
-    folders,
+    notifyInfo: (key, params) => { infos.push({ key, params }); },
+    folders
   });
 
   await handler({ type: 'Folder', id: 'folder-empty', documentType: 'Item' });
@@ -2403,21 +2110,16 @@ test('onDropItem integration — single item drop with no system selected shows 
   const warnings = [];
 
   const mgr = {
-    addItemFromUuid: async (...args) => {
-      addCalls.push(args);
-      return { item: {}, action: 'added' };
-    },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 }),
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
   };
 
   const handler = buildFullOnDropItem({
     systemId: '',
     systemManager: mgr,
-    notifyWarn: (key) => {
-      warnings.push(key);
-    },
+    notifyWarn: (key) => { warnings.push(key); },
     notifyInfo: () => {},
-    folders: new Map(),
+    folders: new Map()
   });
 
   await handler({ uuid: 'Item.some-item' });
@@ -2432,25 +2134,20 @@ test('onDropItem integration — folder drop with no system selected shows DropN
   const warnings = [];
 
   const mgr = {
-    addItemFromUuid: async (...args) => {
-      addCalls.push(args);
-      return { item: {}, action: 'added' };
-    },
-    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 }),
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async () => ({ added: 0, updated: 0, skipped: 0, total: 0 })
   };
 
   const folders = new Map([
-    ['folder1', { name: 'My Folder', contents: [{ documentName: 'Item', uuid: 'Item.item-x' }] }],
+    ['folder1', { name: 'My Folder', contents: [{ documentName: 'Item', uuid: 'Item.item-x' }] }]
   ]);
 
   const handler = buildFullOnDropItem({
     systemId: '',
     systemManager: mgr,
-    notifyWarn: (key) => {
-      warnings.push(key);
-    },
+    notifyWarn: (key) => { warnings.push(key); },
     notifyInfo: () => {},
-    folders,
+    folders
   });
 
   await handler({ type: 'Folder', id: 'folder1', documentType: 'Item' });
@@ -2465,24 +2162,16 @@ test('onDropItem integration — compendium pack drop with no system selected sh
   const warnings = [];
 
   const mgr = {
-    addItemFromUuid: async (...args) => {
-      addCalls.push(args);
-      return { item: {}, action: 'added' };
-    },
-    addItemsFromPack: async (...args) => {
-      addCalls.push(args);
-      return { added: 0, updated: 0, skipped: 0, total: 0 };
-    },
+    addItemFromUuid: async (...args) => { addCalls.push(args); return { item: {}, action: 'added' }; },
+    addItemsFromPack: async (...args) => { addCalls.push(args); return { added: 0, updated: 0, skipped: 0, total: 0 }; }
   };
 
   const handler = buildFullOnDropItem({
     systemId: '',
     systemManager: mgr,
-    notifyWarn: (key) => {
-      warnings.push(key);
-    },
+    notifyWarn: (key) => { warnings.push(key); },
     notifyInfo: () => {},
-    folders: new Map(),
+    folders: new Map()
   });
 
   await handler({ type: 'Compendium', collection: 'world.my-pack' });
@@ -2511,7 +2200,7 @@ test('addItemFromUuid — stamps flags.fabricate.roles[sys].componentId on a wor
     getFlag: () => undefined,
     setFlag: async (scope, key, value) => {
       setFlags.push({ scope, key, value });
-    },
+    }
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Item.world-embercap');
@@ -2540,7 +2229,7 @@ test('addItemFromUuid — does NOT stamp a compendium (non-world) source item', 
     getFlag: () => undefined,
     setFlag: async (scope, key, value) => {
       setFlags.push({ scope, key, value });
-    },
+    }
   });
 
   const result = await mgr.addItemFromUuid('sys1', 'Compendium.world.pack.item-ore');

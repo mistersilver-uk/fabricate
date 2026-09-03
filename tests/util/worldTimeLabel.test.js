@@ -55,10 +55,7 @@ test('pads single-digit clock components', () => {
 });
 
 test('falls back to the clock form when the phase is blank', () => {
-  const label = worldTimeLabel(
-    { day: 1, hour: 23, minute: 59 },
-    { timeOfDayLabel: '   ', localize }
-  );
+  const label = worldTimeLabel({ day: 1, hour: 23, minute: 59 }, { timeOfDayLabel: '   ', localize });
   assert.equal(label, 'FABRICATE.App.Journal.Time.DayWithClock|{"day":2,"time":"23:59"}');
 });
 

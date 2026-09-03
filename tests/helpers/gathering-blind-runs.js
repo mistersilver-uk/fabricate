@@ -40,7 +40,11 @@ export const BLIND_ENVIRONMENT_ID = 'env-blind';
  * @param {object} [options]
  * @param {string[]} [options.ownerIds] User ids holding Foundry OWNER on this actor.
  */
-export function blindActor({ id = 'actor-blind', uuid = 'Actor.actor-blind', ownerIds = [] } = {}) {
+export function blindActor({
+  id = 'actor-blind',
+  uuid = 'Actor.actor-blind',
+  ownerIds = [],
+} = {}) {
   const flags = { fabricate: {} };
   const owners = new Set(ownerIds.map((ownerId) => String(ownerId)));
   return {

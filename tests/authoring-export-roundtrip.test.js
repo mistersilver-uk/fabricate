@@ -14,11 +14,16 @@ import assert from 'node:assert/strict';
 // The shared harness installs the minimal Foundry globals + the single-store
 // GatheringEnvironmentStore harness and the export resolution helpers.
 const { makeHarness, exportCurrent } = await import('./helpers/authoringExportHarness.js');
-const { validateImportData, prepareForImport } =
-  await import('../src/systems/CraftingSystemExporter.js');
+const { validateImportData, prepareForImport } = await import(
+  '../src/systems/CraftingSystemExporter.js'
+);
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
-const { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID, FIXTURE_REALM_ID, normalizeExportEnvelope } =
-  await import('./helpers/fullAuthoringFixture.js');
+const {
+  buildFullAuthoringFixture,
+  FIXTURE_SYSTEM_ID,
+  FIXTURE_REALM_ID,
+  normalizeExportEnvelope,
+} = await import('./helpers/fullAuthoringFixture.js');
 const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
 
 test('round-trip: export → import(keep) → export is deep-equal modulo volatile fields', async () => {

@@ -18,19 +18,14 @@ import assert from 'node:assert/strict';
 globalThis.foundry = {
   utils: {
     randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`,
-    getProperty: () => undefined,
+    getProperty: () => undefined
   },
   applications: {
     api: {
       HandlebarsApplicationMixin: (Base) => class extends Base {},
-      ApplicationV2: class {
-        async _prepareContext() {
-          return {};
-        }
-        close() {}
-      },
-    },
-  },
+      ApplicationV2: class { async _prepareContext() { return {}; } close() {} }
+    }
+  }
 };
 globalThis.game = { user: { isGM: true }, fabricate: null };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
@@ -57,7 +52,7 @@ function makeItem(uuid, quantity = 1) {
     uuid,
     id: uuid,
     system: { quantity },
-    getFlag: (_scope, _key) => undefined,
+    getFlag: (_scope, _key) => undefined
   };
 }
 
@@ -76,7 +71,7 @@ function makeGroupData(options, id = null) {
   return {
     id: id || foundry.utils.randomID(),
     name: 'Test Group',
-    options,
+    options
   };
 }
 
@@ -94,8 +89,8 @@ function makeIngredientSet(groupDataArray) {
 function makeRecipe(ingredientSets) {
   return new Recipe({
     name: 'Test Recipe',
-    ingredientSets: ingredientSets.map((s) => s.toJSON()),
-    resultGroups: [{ id: 'rg-1', results: [] }],
+    ingredientSets: ingredientSets.map(s => s.toJSON()),
+    resultGroups: [{ id: 'rg-1', results: [] }]
   });
 }
 
@@ -203,7 +198,7 @@ test('AC2: ingredient set succeeds when both groups are satisfied', () => {
 
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a')]),
-    makeGroupData([makeIngredientData('item-b')]),
+    makeGroupData([makeIngredientData('item-b')])
   ]);
 
   const result = set.resolveIngredientSelection([itemA, itemB]);
@@ -218,7 +213,7 @@ test('AC2: ingredient set fails when first group satisfied but second group not'
 
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a')]),
-    makeGroupData([makeIngredientData('item-b')]),
+    makeGroupData([makeIngredientData('item-b')])
   ]);
 
   const result = set.resolveIngredientSelection([itemA]);
@@ -233,7 +228,7 @@ test('AC2: ingredient set fails when first group unsatisfied even though second 
 
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a')]),
-    makeGroupData([makeIngredientData('item-b')]),
+    makeGroupData([makeIngredientData('item-b')])
   ]);
 
   const result = set.resolveIngredientSelection([itemB]);
@@ -250,7 +245,7 @@ test('AC2: ingredient set with three groups fails when middle group is unsatisfi
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a')]),
     makeGroupData([makeIngredientData('item-b')]), // unsatisfied
-    makeGroupData([makeIngredientData('item-c')]),
+    makeGroupData([makeIngredientData('item-c')])
   ]);
 
   const result = set.resolveIngredientSelection([itemA, itemC]);
@@ -267,7 +262,7 @@ test('AC2: ingredient set with three groups succeeds when all three are satisfie
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a')]),
     makeGroupData([makeIngredientData('item-b')]),
-    makeGroupData([makeIngredientData('item-c')]),
+    makeGroupData([makeIngredientData('item-c')])
   ]);
 
   const result = set.resolveIngredientSelection([itemA, itemB, itemC]);
@@ -286,7 +281,10 @@ test('AC3: group is satisfied when first option matches', () => {
   const itemY = makeItem('item-y');
 
   const set = makeIngredientSet([
-    makeGroupData([makeIngredientData('item-x'), makeIngredientData('item-y')]),
+    makeGroupData([
+      makeIngredientData('item-x'),
+      makeIngredientData('item-y')
+    ])
   ]);
 
   const result = set.resolveIngredientSelection([itemX, itemY]);
@@ -303,26 +301,25 @@ test('AC3: group is satisfied when only second option matches (first is unavaila
   const set = makeIngredientSet([
     makeGroupData([
       makeIngredientData('item-x'), // not available
-      makeIngredientData('item-y'), // available
-    ]),
+      makeIngredientData('item-y')  // available
+    ])
   ]);
 
   const result = set.resolveIngredientSelection([itemY]);
 
   assert.equal(result.success, true, 'group should be satisfied by second option');
   assert.equal(result.selectedIngredients.length, 1, 'one ingredient should be selected');
-  assert.equal(
-    result.selectedIngredients[0].itemUuid,
-    'item-y',
-    'second option should be selected'
-  );
+  assert.equal(result.selectedIngredients[0].itemUuid, 'item-y', 'second option should be selected');
 });
 
 test('AC3: group fails when neither option matches', () => {
   // Neither item-x nor item-y available
 
   const set = makeIngredientSet([
-    makeGroupData([makeIngredientData('item-x'), makeIngredientData('item-y')]),
+    makeGroupData([
+      makeIngredientData('item-x'),
+      makeIngredientData('item-y')
+    ])
   ]);
 
   const result = set.resolveIngredientSelection([]);
@@ -335,7 +332,10 @@ test('AC3: group fails when available item does not match any option', () => {
   const itemZ = makeItem('item-z'); // irrelevant item
 
   const set = makeIngredientSet([
-    makeGroupData([makeIngredientData('item-x'), makeIngredientData('item-y')]),
+    makeGroupData([
+      makeIngredientData('item-x'),
+      makeIngredientData('item-y')
+    ])
   ]);
 
   const result = set.resolveIngredientSelection([itemZ]);
@@ -398,15 +398,9 @@ test('AC4: canCraft returns missing details from first set when all sets fail', 
 
   assert.equal(result.canCraft, false);
   assert.ok(Array.isArray(result.missing.ingredients), 'missing.ingredients should be an array');
-  assert.ok(
-    result.missing.ingredients.length > 0,
-    'missing.ingredients should be populated from first set'
-  );
-  assert.equal(
-    result.missing.ingredients[0].ingredient.itemUuid,
-    'item-x',
-    'missing ingredient should be from the first set'
-  );
+  assert.ok(result.missing.ingredients.length > 0, 'missing.ingredients should be populated from first set');
+  assert.equal(result.missing.ingredients[0].ingredient.itemUuid, 'item-x',
+    'missing ingredient should be from the first set');
 });
 
 test('AC4: canCraft returns false when actor has no items array', () => {
@@ -431,16 +425,12 @@ test('Bonus: shared item pool — two groups both need same item with enough for
 
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a', 1)]),
-    makeGroupData([makeIngredientData('item-a', 1)]),
+    makeGroupData([makeIngredientData('item-a', 1)])
   ]);
 
   const result = set.resolveIngredientSelection([itemA]);
 
-  assert.equal(
-    result.success,
-    true,
-    'set should succeed: 2 available covers both groups needing 1 each'
-  );
+  assert.equal(result.success, true, 'set should succeed: 2 available covers both groups needing 1 each');
 });
 
 test('Bonus: shared item pool — two groups need same item, only enough for one group', () => {
@@ -450,16 +440,13 @@ test('Bonus: shared item pool — two groups need same item, only enough for one
 
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a', 1)]),
-    makeGroupData([makeIngredientData('item-a', 1)]),
+    makeGroupData([makeIngredientData('item-a', 1)])
   ]);
 
   const result = set.resolveIngredientSelection([itemA]);
 
-  assert.equal(
-    result.success,
-    false,
-    'set should fail: only 1 available but 2 total needed across groups'
-  );
+  assert.equal(result.success, false,
+    'set should fail: only 1 available but 2 total needed across groups');
 });
 
 test('Bonus: multi-stack quantity — ingredient needs qty 3, have two stacks of 2 (total 4)', () => {
@@ -468,11 +455,14 @@ test('Bonus: multi-stack quantity — ingredient needs qty 3, have two stacks of
   const itemA2 = makeItem('item-a-stack2', 2);
 
   // Use a custom matcher to treat both items as "item-a" variants
-  const set = makeIngredientSet([makeGroupData([makeIngredientData('item-a-stack1', 3)])]);
+  const set = makeIngredientSet([
+    makeGroupData([makeIngredientData('item-a-stack1', 3)])
+  ]);
 
   // Only stack1 matches (uuid match), and it has qty 2 — not enough
   const resultSingleStack = set.resolveIngredientSelection([itemA1, itemA2]);
-  assert.equal(resultSingleStack.success, false, 'stack1 alone has qty 2, needs 3 — should fail');
+  assert.equal(resultSingleStack.success, false,
+    'stack1 alone has qty 2, needs 3 — should fail');
 
   // Give stack1 qty 3 — should now succeed
   const itemA1Enough = makeItem('item-a-stack1', 3);
@@ -486,17 +476,16 @@ test('Bonus: multi-stack quantity via custom matcher — need 3, have two stacks
   const itemA2 = makeItem('item-a-2', 2);
 
   // The ingredient references item-a-1 but we override matcher to match both
-  const set = makeIngredientSet([makeGroupData([makeIngredientData('item-a-1', 3)])]);
+  const set = makeIngredientSet([
+    makeGroupData([makeIngredientData('item-a-1', 3)])
+  ]);
 
   // Custom matcher: treat any item whose uuid starts with 'item-a-' as matching
   const matcher = (ingredient, item) => item.uuid.startsWith('item-a-');
   const result = set.resolveIngredientSelection([itemA1, itemA2], matcher);
 
-  assert.equal(
-    result.success,
-    true,
-    'should succeed: custom matcher allows both stacks (2+2=4) to fill the need of 3'
-  );
+  assert.equal(result.success, true,
+    'should succeed: custom matcher allows both stacks (2+2=4) to fill the need of 3');
   assert.equal(result.plan.length, 2, 'plan should include entries from both stacks');
 
   const totalConsumed = result.plan.reduce((sum, entry) => sum + entry.quantity, 0);
@@ -514,9 +503,11 @@ test('Bonus: complex recipe — 2 sets, 2 groups each with options, correct set 
 
   const setA = makeIngredientSet([
     makeGroupData([makeIngredientData('item-x'), makeIngredientData('item-y')]),
-    makeGroupData([makeIngredientData('item-z')]),
+    makeGroupData([makeIngredientData('item-z')])
   ]);
-  const setB = makeIngredientSet([makeGroupData([makeIngredientData('item-w')])]);
+  const setB = makeIngredientSet([
+    makeGroupData([makeIngredientData('item-w')])
+  ]);
 
   const recipe = makeRecipe([setA, setB]);
   const actor = makeActor([itemY, itemZ]);
@@ -536,9 +527,11 @@ test('Bonus: complex recipe — 2 sets both unsatisfied returns canCraft false',
 
   const setA = makeIngredientSet([
     makeGroupData([makeIngredientData('item-x')]),
-    makeGroupData([makeIngredientData('item-z')]),
+    makeGroupData([makeIngredientData('item-z')])
   ]);
-  const setB = makeIngredientSet([makeGroupData([makeIngredientData('item-w')])]);
+  const setB = makeIngredientSet([
+    makeGroupData([makeIngredientData('item-w')])
+  ]);
 
   const recipe = makeRecipe([setA, setB]);
   const actor = makeActor([itemY]);
@@ -555,7 +548,7 @@ test('Bonus: resolveIngredientSelection returns correct selectedIngredients and 
 
   const set = makeIngredientSet([
     makeGroupData([makeIngredientData('item-a')]),
-    makeGroupData([makeIngredientData('item-b')]),
+    makeGroupData([makeIngredientData('item-b')])
   ]);
 
   const result = set.resolveIngredientSelection([itemA, itemB]);
@@ -564,7 +557,7 @@ test('Bonus: resolveIngredientSelection returns correct selectedIngredients and 
   assert.equal(result.selectedIngredients.length, 2, 'should select one ingredient per group');
   assert.equal(result.plan.length, 2, 'plan should have one entry per satisfied group');
 
-  const planUuids = result.plan.map((entry) => entry.item.uuid);
+  const planUuids = result.plan.map(entry => entry.item.uuid);
   assert.ok(planUuids.includes('item-a'), 'plan should include item-a');
   assert.ok(planUuids.includes('item-b'), 'plan should include item-b');
 });
@@ -573,7 +566,7 @@ test('Bonus: insufficient quantity — ingredient needs qty 3, actor has qty 2 �
   const itemA = makeItem('item-a', 2); // only 2 available
 
   const set = makeIngredientSet([
-    makeGroupData([makeIngredientData('item-a', 3)]), // needs 3
+    makeGroupData([makeIngredientData('item-a', 3)]) // needs 3
   ]);
 
   const result = set.resolveIngredientSelection([itemA]);
@@ -588,7 +581,7 @@ test('Bonus: sufficient quantity — ingredient needs qty 3, actor has qty 4 —
   const itemA = makeItem('item-a', 4); // 4 available
 
   const set = makeIngredientSet([
-    makeGroupData([makeIngredientData('item-a', 3)]), // needs 3
+    makeGroupData([makeIngredientData('item-a', 3)]) // needs 3
   ]);
 
   const result = set.resolveIngredientSelection([itemA]);

@@ -65,9 +65,7 @@ const runCheck = (engine) => engine._runCraftingCheck(RECIPE, ACTOR, [ACTOR], nu
 // --- _runCraftingCheck dispatch ---------------------------------------------
 
 test('checkMode=none returns an unconditional no-op success (ignores stray formula)', async () => {
-  const engine = installSystem(
-    makeSystem({ checkMode: 'none' }, { simple: { rollFormula: '1d20', dc: 15 } })
-  );
+  const engine = installSystem(makeSystem({ checkMode: 'none' }, { simple: { rollFormula: '1d20', dc: 15 } }));
   stubThrowingRoll();
   const result = await runCheck(engine);
   assert.equal(result.success, true);
@@ -75,12 +73,7 @@ test('checkMode=none returns an unconditional no-op success (ignores stray formu
 });
 
 test('checkMode=simple runs the pass/fail check; a pass succeeds, a fail fails', async () => {
-  const engine = installSystem(
-    makeSystem(
-      { checkMode: 'simple' },
-      { simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet', dcMode: 'static' } }
-    )
-  );
+  const engine = installSystem(makeSystem({ checkMode: 'simple' }, { simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet', dcMode: 'static' } }));
   stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
   assert.equal((await runCheck(engine)).success, true);
   stubRoll(9, [{ number: 1, faces: 20, total: 9 }]);
@@ -88,9 +81,7 @@ test('checkMode=simple runs the pass/fail check; a pass succeeds, a fail fails',
 });
 
 test('checkMode=simple with no formula is a misconfiguration', async () => {
-  const engine = installSystem(
-    makeSystem({ checkMode: 'simple' }, { simple: { rollFormula: '' } })
-  );
+  const engine = installSystem(makeSystem({ checkMode: 'simple' }, { simple: { rollFormula: '' } }));
   const result = await runCheck(engine);
   assert.equal(result.success, false);
   assert.equal(result.misconfigured, true);
@@ -119,9 +110,7 @@ test('checkMode=tiered runs the routed check and returns the matched tier outcom
 });
 
 test('checkMode=tiered with no routed formula is a misconfiguration', async () => {
-  const engine = installSystem(
-    makeSystem({ checkMode: 'tiered' }, { routed: { rollFormula: '' } })
-  );
+  const engine = installSystem(makeSystem({ checkMode: 'tiered' }, { routed: { rollFormula: '' } }));
   const result = await runCheck(engine);
   assert.equal(result.success, false);
   assert.equal(result.misconfigured, true);
@@ -134,15 +123,8 @@ test('checkMode=tiered with no routed formula is a misconfiguration', async () =
 // is exercised here at the helper boundary — the one seam integration can't reach
 // cheaply — to prove it produces + learns WITHOUT re-consuming.
 
-function failureHarness({
-  consumeOnFail = true,
-  learnOnCraft = true,
-  failureGroupItems = ['potion-of-sludge'],
-} = {}) {
-  const system = makeSystem(
-    { checkMode: 'simple', consumeOnFail, learnOnCraft },
-    { simple: { rollFormula: '1d20', dc: 15 } }
-  );
+function failureHarness({ consumeOnFail = true, learnOnCraft = true, failureGroupItems = ['potion-of-sludge'] } = {}) {
+  const system = makeSystem({ checkMode: 'simple', consumeOnFail, learnOnCraft }, { simple: { rollFormula: '1d20', dc: 15 } });
   const calls = { consumed: 0, currency: 0, learn: 0, itemUse: 0, chat: null };
   const engine = installSystem(system);
   globalThis.game.fabricate.getRecipeVisibilityService = () => ({
@@ -162,17 +144,10 @@ function failureHarness({
   engine._spendCraftCurrency = async () => {
     calls.currency += 1;
   };
-  engine._resolveCraftingBreakageDecision = () => ({
-    forceBreak: false,
-    authority: 'toolSpecific',
-  });
+  engine._resolveCraftingBreakageDecision = () => ({ forceBreak: false, authority: 'toolSpecific' });
   engine._applyToolBreakage = async () => [];
   engine._createResultItems = async () => ({
-    items: failureGroupItems.map((name) => ({
-      name,
-      uuid: `Item.${name}`,
-      system: { quantity: 1 },
-    })),
+    items: failureGroupItems.map((name) => ({ name, uuid: `Item.${name}`, system: { quantity: 1 } })),
     resolutionMeta: {},
   });
   engine._postCraftChatMessage = async (payload) => {

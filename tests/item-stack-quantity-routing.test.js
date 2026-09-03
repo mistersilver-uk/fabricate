@@ -53,8 +53,9 @@ const { createOrStackComponentItem } = await import('../src/systems/componentSta
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
 const { createToolReplacementCreator } = await import('../src/toolBreakageRuntime.js');
 const { findStackableMatch } = await import('../src/utils/sourceUuid.js');
-const { configureItemStackQuantityPath, resetItemStackQuantityPath } =
-  await import('../src/systems/itemStackQuantity.js');
+const { configureItemStackQuantityPath, resetItemStackQuantityPath } = await import(
+  '../src/systems/itemStackQuantity.js'
+);
 
 const CONFIGURED_PATH = 'system.qtd';
 

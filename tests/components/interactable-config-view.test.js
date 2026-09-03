@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 
 import {
   describeVisualStatus,
-  describeActivationGate,
+  describeActivationGate
 } from '../../src/ui/interactableConfigView.js';
 
 describe('describeVisualStatus', () => {
@@ -37,29 +37,19 @@ describe('describeActivationGate', () => {
     assert.equal(describeActivationGate({ enabled: false }).status, 'disabled');
     assert.equal(describeActivationGate({ enabled: true, locked: true }).status, 'locked');
     assert.equal(describeActivationGate({ enabled: true, consumed: true }).status, 'consumed');
-    assert.equal(
-      describeActivationGate({ enabled: true, uses: { max: 2, used: 2 } }).status,
-      'usesExhausted'
-    );
+    assert.equal(describeActivationGate({ enabled: true, uses: { max: 2, used: 2 } }).status, 'usesExhausted');
   });
 
   it('reports a COOLDOWN gate when now is before lastUsed + seconds', () => {
     const state = { enabled: true, cooldown: { seconds: 100, lastUsedWorldTime: 1000 } };
-    assert.equal(
-      describeActivationGate(state, { now: 1050 }).status,
-      'cooldown',
-      'still cooling down'
-    );
+    assert.equal(describeActivationGate(state, { now: 1050 }).status, 'cooldown', 'still cooling down');
     assert.equal(describeActivationGate(state, { now: 1100 }).status, 'active', 'cooldown elapsed');
     // No `now` supplied → the cooldown gate is skipped (active).
     assert.equal(describeActivationGate(state).status, 'active');
   });
 
   it('reports active when nothing blocks', () => {
-    assert.equal(
-      describeActivationGate({ enabled: true, uses: { max: 3, used: 1 } }).status,
-      'active'
-    );
+    assert.equal(describeActivationGate({ enabled: true, uses: { max: 3, used: 1 } }).status, 'active');
     assert.equal(describeActivationGate({}).status, 'active', 'empty state defaults to active');
   });
 });

@@ -6,7 +6,7 @@ export const DEFAULT_TEST_ACTOR = Object.freeze({
   id: 'actor-test',
   uuid: 'Actor.actor-test',
   name: 'Test Gatherer',
-  items: [],
+  items: []
 });
 
 export const DEFAULT_TEST_VIEWER = Object.freeze({ id: 'user-test', isGM: false });
@@ -16,7 +16,7 @@ export const DEFAULT_TEST_SYSTEM = Object.freeze({
   name: 'Test System',
   enabled: true,
   features: { gathering: true },
-  components: [{ id: 'herb' }],
+  components: [{ id: 'herb' }]
 });
 
 export function makeFakeActor(overrides = {}) {
@@ -31,7 +31,7 @@ export function makeFakeActor(overrides = {}) {
       flags = { ...flags, [`${namespace}.${key}`]: value };
       return value;
     },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -51,7 +51,7 @@ export function makeRichState({
   rolls = [100],
   evaluateExpression = null,
   runMacro = null,
-  secondsPerUnit = null,
+  secondsPerUnit = null
 } = {}) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
   const writes = [];
@@ -61,7 +61,7 @@ export function makeRichState({
   const evaluateCalls = [];
   const macroCalls = [];
   const service = new GatheringRichStateService({
-    getSetting: (key) => settings.get(key),
+    getSetting: key => settings.get(key),
     setSetting: async (key, value) => {
       settings.set(key, value);
       writes.push({ key, value });
@@ -73,21 +73,15 @@ export function makeRichState({
       return rollQueue.shift() ?? 1;
     },
     hooks: {
-      callAll: (name, payload) => hooks.push({ name, payload }),
+      callAll: (name, payload) => hooks.push({ name, payload })
     },
     evaluateExpression: evaluateExpression
-      ? async (payload) => {
-          evaluateCalls.push(payload);
-          return evaluateExpression(payload);
-        }
+      ? async (payload) => { evaluateCalls.push(payload); return evaluateExpression(payload); }
       : null,
     runMacro: runMacro
-      ? async (uuid, context) => {
-          macroCalls.push({ uuid, context });
-          return runMacro(uuid, context);
-        }
+      ? async (uuid, context) => { macroCalls.push({ uuid, context }); return runMacro(uuid, context); }
       : null,
-    secondsPerUnit,
+    secondsPerUnit
   });
   // A REAL system shape, not a bare `{ id }`: the same object is handed to
   // `composeEnvironment` (which reads `tools` and `modifiers`) and to `makeEngine` (which
@@ -114,24 +108,17 @@ export function environment(overrides = {}) {
     biomes: ['forest'],
     dangerTags: ['hazardous'],
     tasks: [],
-    ...overrides,
+    ...overrides
   };
 }
 
-export function makeEngine({
-  richState,
-  env = environment(),
-  calls = {},
-  runManager = null,
-  actingActor = DEFAULT_TEST_ACTOR,
-  system = DEFAULT_TEST_SYSTEM,
-} = {}) {
+export function makeEngine({ richState, env = environment(), calls = {}, runManager = null, actingActor = DEFAULT_TEST_ACTOR, system = DEFAULT_TEST_SYSTEM } = {}) {
   calls.created = [];
   calls.terminal = [];
   return new GatheringEngine({
     environmentStore: {
       list: () => [env],
-      get: () => env,
+      get: () => env
     },
     getSystems: () => [system],
     richState,
@@ -139,33 +126,28 @@ export function makeEngine({
     isActorSelectable: () => true,
     isGamePaused: () => false,
     evaluator: {
-      evaluateVisibility: async () => ({ visible: true }),
+      evaluateVisibility: async () => ({ visible: true })
     },
     sceneAccess: {
-      canAttempt: () => ({ allowed: true }),
+      canAttempt: () => ({ allowed: true })
     },
     resultCreator: {
-      plan: async ({ resultGroups }) =>
-        resultGroups
-          .flatMap((group) => group.results)
-          .map((result) => ({
-            actorUuid: actingActor.uuid,
-            itemUuid: result.itemUuid || `Component.${result.componentId}`,
-            quantity: result.quantity,
-          })),
+      plan: async ({ resultGroups }) => resultGroups.flatMap(group => group.results).map(result => ({
+        actorUuid: actingActor.uuid,
+        itemUuid: result.itemUuid || `Component.${result.componentId}`,
+        quantity: result.quantity
+      })),
       create: async (payload) => {
         calls.created.push(payload);
-        return payload.resultGroups
-          .flatMap((group) => group.results)
-          .map((result) => ({
-            actorUuid: actingActor.uuid,
-            itemUuid: result.itemUuid || `Component.${result.componentId}`,
-            quantity: result.quantity,
-          }));
-      },
+        return payload.resultGroups.flatMap(group => group.results).map(result => ({
+          actorUuid: actingActor.uuid,
+          itemUuid: result.itemUuid || `Component.${result.componentId}`,
+          quantity: result.quantity
+        }));
+      }
     },
     failureFeedback: {
-      apply: async () => null,
+      apply: async () => null
     },
     runManager: runManager ?? {
       getActiveRuns: () => [],
@@ -174,9 +156,9 @@ export function makeEngine({
       createTerminalRun: async (selectedActor, runData, status, payload) => {
         calls.terminal.push({ selectedActor, runData, status, payload });
         return { id: 'run-test', status, ...runData, ...payload };
-      },
+      }
     },
-    localize: (key) => key,
+    localize: key => key
   });
 }
 
@@ -208,7 +190,7 @@ export function routedSystemCheck({
   tierName = 'Iron',
   dc = 15,
   failureTierName = null,
-  triggers = [],
+  triggers = []
 } = {}) {
   const relativeOutcomes = [{ id: `tier-${tierName}`, name: tierName, success: true, dc: 0 }];
   if (failureTierName) {
@@ -216,7 +198,7 @@ export function routedSystemCheck({
       id: `tier-${failureTierName}`,
       name: failureTierName,
       success: false,
-      dc: -10,
+      dc: -10
     });
   }
   return {
@@ -226,8 +208,8 @@ export function routedSystemCheck({
       type: 'relative',
       thresholdMode: 'meet',
       relativeOutcomes,
-      checkBreakage: { triggers },
-    },
+      checkBreakage: { triggers }
+    }
   };
 }
 
@@ -258,3 +240,5 @@ export function routedRoll(success = true) {
   const total = success ? 18 : 5;
   stubRoll(total, [{ number: 1, faces: 20, total }]);
 }
+
+

@@ -875,8 +875,7 @@ test('the GM complication row STACKS its sections at chat width', async () => {
     // The FULL dotted path, not the leaf: the severity label lives under the manager's
     // namespace, and a leaf lookup would resolve it to the key itself — a 60-character string
     // that overflows the row and would make this gate fail on its own stub.
-    (key) =>
-      key.split('.').reduce((node, part) => node?.[part], { FABRICATE: LANG.FABRICATE }) ?? key
+    (key) => key.split('.').reduce((node, part) => node?.[part], { FABRICATE: LANG.FABRICATE }) ?? key
   );
   const context = await browser.newContext({
     viewport: { width: 1280, height: 720 },
@@ -899,7 +898,10 @@ test('the GM complication row STACKS its sections at chat width', async () => {
     // THE CONTROL. Without the `--gm` rules every run is an inline span, so the identity
     // lines share lines with each other and each heading runs into its own facts. That is
     // what makes each assertion below a measurement rather than a tautology.
-    assert.ok(!unstyled.stacked, 'the control runs the row together on shared lines');
+    assert.ok(
+      !unstyled.stacked,
+      'the control runs the row together on shared lines'
+    );
     assert.ok(!unstyled.headingsOwnLine, 'and runs each heading into the fact after it');
 
     assert.ok(shipped.stacked, 'each run starts below the one before it');

@@ -27,7 +27,7 @@ for (const [label, manifest] of [
     assert.equal(
       'maximum' in manifest.compatibility,
       false,
-      'a set compatibility.maximum makes the module unavailable on the next Foundry generation'
+      'a set compatibility.maximum makes the module unavailable on the next Foundry generation',
     );
   });
 
@@ -37,10 +37,6 @@ for (const [label, manifest] of [
   test(`${label} keeps compatibility.verified a bare integer (majorOnly auto-detect)`, () => {
     const verified = manifest.compatibility.verified;
     assert.equal(Number.isInteger(Number(verified)), true, 'verified must parse as an integer');
-    assert.equal(
-      String(verified).includes('.'),
-      false,
-      'verified must stay a bare major, never X.Y.Z'
-    );
+    assert.equal(String(verified).includes('.'), false, 'verified must stay a bare major, never X.Y.Z');
   });
 }

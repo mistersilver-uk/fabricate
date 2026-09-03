@@ -164,26 +164,10 @@ test('D6: a result id COLLIDING across two steps ranks independently in each', (
   const service = makeService({ getPlayerResultOrder: () => ['dup'] });
   const recipe = makeRecipe();
   const stepA = {
-    resultGroups: [
-      {
-        id: 'gA',
-        results: [
-          { id: 'r-a', componentId: 'c-a' },
-          { id: 'dup', componentId: 'c-b' },
-        ],
-      },
-    ],
+    resultGroups: [{ id: 'gA', results: [{ id: 'r-a', componentId: 'c-a' }, { id: 'dup', componentId: 'c-b' }] }],
   };
   const stepB = {
-    resultGroups: [
-      {
-        id: 'gB',
-        results: [
-          { id: 'r-c', componentId: 'c-c' },
-          { id: 'dup', componentId: 'c-d' },
-        ],
-      },
-    ],
+    resultGroups: [{ id: 'gB', results: [{ id: 'r-c', componentId: 'c-c' }, { id: 'dup', componentId: 'c-d' }] }],
   };
 
   const a = service.resolveResultGroups({ recipe, step: stepA, checkResult: { value: 1 } });
@@ -404,11 +388,7 @@ test('D2: a world-time resume awards down the order stamped by run.userId, not t
   setupSalvageGame({ userId: 'player-alice', worldTime: 100, salvageRunManager, actor });
 
   const engine = new CraftingEngine(
-    {
-      canCraft: () => ({ canCraft: true }),
-      getToolsForSet: () => [],
-      toolMatchesItem: () => false,
-    },
+    { canCraft: () => ({ canCraft: true }), getToolsForSet: () => [], toolMatchesItem: () => false },
     null,
     null,
     null,
@@ -440,11 +420,7 @@ test('D2: a world-time resume awards down the order stamped by run.userId, not t
   // RESUME as somebody else, exactly as the synced updateWorldTime hook would, and with
   // a seam that would return a DIFFERENT order if anything still read settings.
   const resumeEngine = new CraftingEngine(
-    {
-      canCraft: () => ({ canCraft: true }),
-      getToolsForSet: () => [],
-      toolMatchesItem: () => false,
-    },
+    { canCraft: () => ({ canCraft: true }), getToolsForSet: () => [], toolMatchesItem: () => false },
     null,
     null,
     null,
@@ -462,11 +438,7 @@ test('D2: a world-time resume awards down the order stamped by run.userId, not t
   });
 
   assert.equal(resumed.success, true, resumed.message);
-  assert.notEqual(
-    persisted.userId,
-    globalThis.game.user.id,
-    'the executing user is NOT the starter'
-  );
+  assert.notEqual(persisted.userId, globalThis.game.user.id, 'the executing user is NOT the starter');
   assert.deepEqual(
     actor.createdNames,
     ['Scrap C', 'Scrap B'],
@@ -503,11 +475,7 @@ test('salvage: the captured order key is scoped per (systemId, componentId), nev
     'comp-1': ['s-a', 's-b', 's-c'],
   };
   const engine = new CraftingEngine(
-    {
-      canCraft: () => ({ canCraft: true }),
-      getToolsForSet: () => [],
-      toolMatchesItem: () => false,
-    },
+    { canCraft: () => ({ canCraft: true }), getToolsForSet: () => [], toolMatchesItem: () => false },
     null,
     null,
     null,

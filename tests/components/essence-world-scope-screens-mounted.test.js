@@ -183,20 +183,8 @@ function essenceScope() {
     entityType: 'essence',
     corpus: {
       entities: [
-        {
-          id: 'ash',
-          name: 'Ash',
-          icon: 'fas fa-fire',
-          colorToken: 'ember',
-          description: 'Cinders',
-        },
-        {
-          id: 'brine',
-          name: 'Brine',
-          icon: 'fas fa-water',
-          colorToken: 'tide',
-          description: 'Salt',
-        },
+        { id: 'ash', name: 'Ash', icon: 'fas fa-fire', colorToken: 'ember', description: 'Cinders' },
+        { id: 'brine', name: 'Brine', icon: 'fas fa-water', colorToken: 'tide', description: 'Salt' },
       ],
       defaults: [{ id: 'ash', effectSource: 'Item.ember' }],
       membership: [
@@ -489,7 +477,9 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     await entryHarness.setProps({});
 
     assert.equal(await reported.handle.save(), true);
-    assert.deepEqual(actions.calls, [['updateWorldDefaultSection', 'ash', 'effectSource', null]]);
+    assert.deepEqual(actions.calls, [
+      ['updateWorldDefaultSection', 'ash', 'effectSource', null],
+    ]);
     assert.equal(
       reported.handle.isDirty(),
       false,

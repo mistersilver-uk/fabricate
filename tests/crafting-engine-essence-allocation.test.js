@@ -183,9 +183,7 @@ function stepFor(id, ingredientSets, extra = {}) {
     id,
     name: id,
     ingredientSets,
-    resultGroups: [
-      { id: `rg-${id}`, results: [{ id: `r-${id}`, componentId: 'plank', quantity: 1 }] },
-    ],
+    resultGroups: [{ id: `rg-${id}`, results: [{ id: `r-${id}`, componentId: 'plank', quantity: 1 }] }],
     toolIds: [],
     outcomeRouting: null,
     timeRequirement: null,
@@ -351,12 +349,12 @@ test('a collapsed multi-step chain applies the allocation to step 0 only', async
   // The collapsed chain is exactly `multiStepRecipes: false` + more than one step.
   const runManager = new CraftingRunManager();
   const engine = engineFor({
-    system: systemFor({
-      features: { craftingChecks: false, essences: true, multiStepRecipes: false },
-    }),
+    system: systemFor({ features: { craftingChecks: false, essences: true, multiStepRecipes: false } }),
     runManager,
   });
-  const source = new FakeActor('src', [new FakeItem('emberwood', 'Emberwood', 8)]);
+  const source = new FakeActor('src', [
+    new FakeItem('emberwood', 'Emberwood', 8),
+  ]);
 
   const result = await engine.craft(new FakeActor('pc'), [source], recipe, 'set-1', {
     ingredientEssenceAllocation: payload({
@@ -383,9 +381,7 @@ test('a collapsed chain nulls the allocation even when it names a LATER step exa
   const steps = [stepFor('step-1', [first]), stepFor('step-2', [second])];
   const recipe = recipeFor(steps, { authoredSteps: steps });
   const engine = engineFor({
-    system: systemFor({
-      features: { craftingChecks: false, essences: true, multiStepRecipes: false },
-    }),
+    system: systemFor({ features: { craftingChecks: false, essences: true, multiStepRecipes: false } }),
     runManager: new CraftingRunManager(),
   });
   const source = new FakeActor('src', [new FakeItem('emberwood', 'Emberwood', 8)]);

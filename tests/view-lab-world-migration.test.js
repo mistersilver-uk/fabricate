@@ -130,7 +130,8 @@ test('the startup migration pass MERGES both lab libraries into the world librar
     'the fixture must go on authoring the catalogue at the PRE-1.22.0 location, or the lab ' +
       'build stops exercising the migration and this assertion proves nothing'
   );
-  const seededGatheringConfig = before.gatheringConfig?.systems?.[LAB_SYSTEM_IDS.HERBALISM] ?? {};
+  const seededGatheringConfig =
+    before.gatheringConfig?.systems?.[LAB_SYSTEM_IDS.HERBALISM] ?? {};
   const seededGathering = seededGatheringConfig.characterModifiers ?? [];
 
   // NO COLLISION IN THE LAB WORLD, deliberately: the two libraries authored the same id for

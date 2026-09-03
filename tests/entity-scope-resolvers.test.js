@@ -46,13 +46,7 @@ const SYSTEM_ID = 'blacksmithing';
 
 test('the component answer OMITS the enabled key, and the essence and tool answers carry it', () => {
   const cases = [
-    [
-      'component',
-      resolveComponent,
-      normalizeComponentWorldDefaults,
-      normalizeComponentMemberships,
-      false,
-    ],
+    ['component', resolveComponent, normalizeComponentWorldDefaults, normalizeComponentMemberships, false],
     ['essence', resolveEssence, normalizeEssenceWorldDefaults, normalizeEssenceMemberships, true],
     ['tool', resolveTool, normalizeToolWorldDefaults, normalizeToolMemberships, true],
   ];
@@ -126,11 +120,7 @@ test('a world default with no authored category carries the key ABSENT, so an in
     'reagent',
     'an authored non-general system category survives the first resolve against an empty world'
   );
-  assert.equal(
-    resolved.inherited.category,
-    true,
-    'the section is still inherited; only the value falls through'
-  );
+  assert.equal(resolved.inherited.category, true, 'the section is still inherited; only the value falls through');
 });
 
 test('a world category the GM later deletes reaches the resolver as absence and takes the same path', () => {
@@ -167,9 +157,7 @@ test('BOTH normalizers coerce the category, so the overriding branch is as match
   );
 
   for (const notACategory of [42, {}, [], '   ', null, true]) {
-    const [worldEntry] = normalizeComponentWorldDefaults([
-      { id: ENTITY_ID, category: notACategory },
-    ]);
+    const [worldEntry] = normalizeComponentWorldDefaults([{ id: ENTITY_ID, category: notACategory }]);
     assert.ok(
       !('category' in worldEntry),
       `a non-string or blank world category (${JSON.stringify(notACategory)}) normalizes to ABSENCE`
@@ -205,7 +193,11 @@ test('effective tags are world tags MINUS muted PLUS system-only tags, with no i
       mutedTags: ['reagent'],
     },
   ]);
-  assert.deepStrictEqual(resolveComponent(world, record).tags, ['metal', 'rare', 'forgeable']);
+  assert.deepStrictEqual(resolveComponent(world, record).tags, [
+    'metal',
+    'rare',
+    'forgeable',
+  ]);
   assert.ok(
     !('tags' in record.inherit),
     'tags carries no inherit switch at all: muting is per tag, which one switch cannot express'
@@ -225,11 +217,7 @@ test('an AUTHORED EMPTY tag list normalizes to ABSENT, so no reader can tell it 
   ]);
   assert.ok(!('tags' in record), 'a list whose every entry trims away is ABSENT too');
   assert.ok(!('mutedTags' in record), 'and so is an empty muted list');
-  assert.deepStrictEqual(
-    resolveComponent(world, record).tags,
-    [],
-    'the resolved set is still a list'
-  );
+  assert.deepStrictEqual(resolveComponent(world, record).tags, [], 'the resolved set is still a list');
 });
 
 // --- Essence: the soft disable, preserved verbatim (criteria 2 and 3) --------------------------
@@ -250,11 +238,7 @@ test('a disabled essence is a MEMBER that is off and keeps its overrides', () =>
   const resolved = resolveEssence(world, record);
   assert.equal(resolved.member, true, 'disabled is NOT absent');
   assert.equal(resolved.enabled, false);
-  assert.deepStrictEqual(
-    resolved.macro,
-    { uuid: 'Macro.local' },
-    'a disabled member keeps its overrides'
-  );
+  assert.deepStrictEqual(resolved.macro, { uuid: 'Macro.local' }, 'a disabled member keeps its overrides');
   assert.deepStrictEqual(resolved.effectSource, { mode: 'transfer' });
   assert.equal(essenceCarriesBehaviour(resolved), false, 'neither the macro nor the transfer runs');
 });
@@ -374,11 +358,7 @@ test('tool repairRequirements are SEEDED once on add and never re-read from the 
   ]);
   const seeded = seedToolRepairRequirements(world);
   assert.deepStrictEqual(seeded, [{ id: 'group-1', options: ['whetstone'] }]);
-  assert.notEqual(
-    seeded,
-    world.repairRequirements,
-    'the seed is a COPY, not the world list itself'
-  );
+  assert.notEqual(seeded, world.repairRequirements, 'the seed is a COPY, not the world list itself');
   assert.notEqual(seeded[0], world.repairRequirements[0], 'and it is a deep copy');
 
   const [record] = normalizeToolMemberships([

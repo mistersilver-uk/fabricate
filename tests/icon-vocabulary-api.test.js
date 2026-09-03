@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { findCuratedIconRecord, listCuratedIconVocabulary } from '../src/utils/iconVocabulary.js';
 import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
-  FOUNDRY_ICON_DEFINITIONS,
+  FOUNDRY_ICON_DEFINITIONS
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

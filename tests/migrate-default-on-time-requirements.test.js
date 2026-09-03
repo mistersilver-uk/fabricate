@@ -13,8 +13,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { migrateDefaultOnTimeRequirements } =
-  await import('../src/migration/migrateDefaultOnTimeRequirements.js');
+const { migrateDefaultOnTimeRequirements } = await import(
+  '../src/migration/migrateDefaultOnTimeRequirements.js'
+);
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 
 // ---------------------------------------------------------------------------
@@ -38,7 +39,9 @@ test('1.19.0 leaves a persisted `true` in place (honoured, never coerced by the 
 });
 
 test('1.19.0 leaves an absent flag absent (already default-on under the 714 reader)', () => {
-  const { systems } = migrateDefaultOnTimeRequirements([{ id: 'sys', requirements: { time: {} } }]);
+  const { systems } = migrateDefaultOnTimeRequirements([
+    { id: 'sys', requirements: { time: {} } },
+  ]);
   assert.ok(!('enabled' in systems[0].requirements.time));
 });
 
@@ -77,11 +80,7 @@ test('1.19.0 tolerates malformed payloads without throwing', () => {
     { id: 'time-absent', requirements: { currency: { enabled: true } } },
   ]);
   assert.equal(systems.length, 6, 'malformed entries are skipped, not dropped or repaired');
-  assert.equal(
-    systems[3].requirements,
-    'nope',
-    'a malformed requirements is left exactly as found'
-  );
+  assert.equal(systems[3].requirements, 'nope', 'a malformed requirements is left exactly as found');
   assert.equal(systems[4].requirements.time, 'nope');
 });
 

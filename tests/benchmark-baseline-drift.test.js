@@ -99,11 +99,7 @@ for (const profile of SWEPT_SCALE_PROFILE_NAMES) {
       reps: 0,
     });
     const drift = diffAgainstBaseline(baseline, class1ByProfile[profile]);
-    assert.deepEqual(
-      drift,
-      [],
-      `class-1 drift in ${profile}:\n  ${drift.join('\n  ')}\n\n${REFRESH_HINT}`
-    );
+    assert.deepEqual(drift, [], `class-1 drift in ${profile}:\n  ${drift.join('\n  ')}\n\n${REFRESH_HINT}`);
   });
 }
 

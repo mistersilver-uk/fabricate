@@ -38,21 +38,9 @@ function buildService(system = buildSystem()) {
 
 function groups() {
   return [
-    {
-      id: 'flawed',
-      name: 'Flawed',
-      results: [{ id: 'r1', componentId: 'flawed-item', quantity: 1 }],
-    },
-    {
-      id: 'standard',
-      name: 'Standard',
-      results: [{ id: 'r2', componentId: 'standard-item', quantity: 1 }],
-    },
-    {
-      id: 'mythic',
-      name: 'Mythic',
-      results: [{ id: 'r3', componentId: 'mythic-item', quantity: 1 }],
-    },
+    { id: 'flawed', name: 'Flawed', results: [{ id: 'r1', componentId: 'flawed-item', quantity: 1 }] },
+    { id: 'standard', name: 'Standard', results: [{ id: 'r2', componentId: 'standard-item', quantity: 1 }] },
+    { id: 'mythic', name: 'Mythic', results: [{ id: 'r3', componentId: 'mythic-item', quantity: 1 }] },
   ];
 }
 
@@ -156,11 +144,7 @@ describe('routed recipe resolution', () => {
   function singleGroupStep() {
     return step({
       resultGroups: [
-        {
-          id: 'only',
-          name: 'Anything',
-          results: [{ id: 'r-only', componentId: 'x', quantity: 1 }],
-        },
+        { id: 'only', name: 'Anything', results: [{ id: 'r-only', componentId: 'x', quantity: 1 }] },
       ],
     });
   }
@@ -223,12 +207,7 @@ describe('routed recipe resolution', () => {
       id: 'stray',
       name: 'Stray',
       craftingSystemId: 'sys-routed',
-      ingredientSets: [
-        {
-          id: 'set-1',
-          ingredientGroups: [{ id: 'g', options: [{ componentId: 'ore', quantity: 1 }] }],
-        },
-      ],
+      ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: 'g', options: [{ componentId: 'ore', quantity: 1 }] }] }],
       resultGroups: [
         { id: 'g1', name: 'Hazard', results: [] },
         { id: 'g2', name: 'hazard', results: [] },
@@ -265,11 +244,7 @@ describe('routed recipe resolution', () => {
     const recipe = recipeWithStep(step({ resultGroups: assigned }));
     const result = resolve(service, recipe, { outcome: 'Mythic' });
     assert.equal(result.meta.disposition, 'success');
-    assert.equal(
-      result.groups[0].id,
-      'standard',
-      'routed to the assigned group, not the same-named one'
-    );
+    assert.equal(result.groups[0].id, 'standard', 'routed to the assigned group, not the same-named one');
   });
 
   // A `success: false` tier in `checkOutcomeIds` NEVER produces a `disposition: 'success'`
@@ -284,9 +259,7 @@ describe('routed recipe resolution', () => {
         routed: {
           type: 'relative',
           rollExpression: '1d20',
-          relativeOutcomes: [
-            { id: 't-botch', name: 'Botch', success: false, breakTools: true, dc: -5 },
-          ],
+          relativeOutcomes: [{ id: 't-botch', name: 'Botch', success: false, breakTools: true, dc: -5 }],
           fixedOutcomes: [],
         },
       },
@@ -334,9 +307,7 @@ describe('routed recipe resolution', () => {
         routed: {
           type: 'relative',
           rollExpression: '1d20',
-          relativeOutcomes: [
-            { id: 't-myth', name: 'Mythic', success: true, breakTools: false, dc: 10 },
-          ],
+          relativeOutcomes: [{ id: 't-myth', name: 'Mythic', success: true, breakTools: false, dc: 10 }],
           fixedOutcomes: [],
         },
       },
@@ -379,9 +350,7 @@ describe('routed recipe resolution', () => {
         routed: {
           type: 'relative',
           rollExpression: '1d20',
-          relativeOutcomes: [
-            { id: 't-std', name: 'Standard', success: true, breakTools: false, dc: 0 },
-          ],
+          relativeOutcomes: [{ id: 't-std', name: 'Standard', success: true, breakTools: false, dc: 0 }],
           fixedOutcomes: [],
         },
       },
@@ -467,10 +436,7 @@ describe('simple mode result resolution (issue 643)', () => {
       name: 'Simple',
       craftingSystemId: 'sys-routed',
       ingredientSets: [
-        {
-          id: 's1',
-          ingredientGroups: [{ id: 'g', options: [{ componentId: 'ore', quantity: 1 }] }],
-        },
+        { id: 's1', ingredientGroups: [{ id: 'g', options: [{ componentId: 'ore', quantity: 1 }] }] },
       ],
       resultGroups,
     });

@@ -18,11 +18,8 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
-const {
-  buildCheckModifierContext,
-  resolveCheckModifierContribution,
-  makeRollDataExpressionResolver,
-} = await import('../src/systems/checkModifierResolver.js');
+const { buildCheckModifierContext, resolveCheckModifierContribution, makeRollDataExpressionResolver } =
+  await import('../src/systems/checkModifierResolver.js');
 
 const CATALOGUE = [
   { id: 'med', label: 'Medicine', expression: '@med' },
@@ -406,11 +403,8 @@ test('the LISTED formula and the ROLLED formula resolve the same scalar, under e
     // either side is what would let the listed formula and the rolled one disagree.
     const context = buildCheckModifierContext(system, 'crafting', recipe);
     assert.equal(
-      resolveCheckModifierContribution(
-        context,
-        makeRollDataExpressionResolver(ACTOR, StubRoll),
-        StubRoll
-      ).scalar,
+      resolveCheckModifierContribution(context, makeRollDataExpressionResolver(ACTOR, StubRoll), StubRoll)
+        .scalar,
       expected,
       `${policy}: the listed scalar is the rolled scalar`
     );

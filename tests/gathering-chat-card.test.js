@@ -14,23 +14,20 @@ function fullModel(overrides = {}) {
     taskName: 'Forage Herbs',
     components: [
       { name: 'Sage Leaf', img: 'icons/sage.png', quantity: 3 },
-      { name: 'Wild Root', img: 'icons/root.png', quantity: 1 },
+      { name: 'Wild Root', img: 'icons/root.png', quantity: 1 }
     ],
     events: [{ name: 'Thornpatch', img: 'icons/thorn.png' }],
     brokenTools: [{ name: 'Worn Sickle', img: 'icons/sickle.png' }],
     staminaSpent: 5,
     nodesRemaining: 2,
-    ...overrides,
+    ...overrides
   };
 }
 
 test('renders success header, modifier class, actor and task', () => {
   const content = buildGatheringChatContent(fullModel());
   assert.ok(content.includes('fabricate-gather-chat--success'), 'success modifier class');
-  assert.ok(
-    content.includes('FABRICATE.Chat.GatherSuccess'),
-    'success title key (identity localize)'
-  );
+  assert.ok(content.includes('FABRICATE.Chat.GatherSuccess'), 'success title key (identity localize)');
   assert.ok(content.includes('Aria'), 'actor name');
   assert.ok(content.includes('Forage Herbs'), 'task name');
 });
@@ -38,10 +35,7 @@ test('renders success header, modifier class, actor and task', () => {
 test('renders components with quantity prefix and image src', () => {
   const content = buildGatheringChatContent(fullModel());
   assert.ok(content.includes('3× Sage Leaf'), 'quantity > 1 prefixed');
-  assert.ok(
-    content.includes('Wild Root') && !content.includes('1× Wild Root'),
-    'quantity 1 not prefixed'
-  );
+  assert.ok(content.includes('Wild Root') && !content.includes('1× Wild Root'), 'quantity 1 not prefixed');
   assert.ok(content.includes('src="icons/sage.png"'), 'component image src');
 });
 
@@ -61,24 +55,15 @@ test('renders stamina and remaining nodes as icon pills', () => {
   assert.ok(content.includes('FABRICATE.Chat.GatherNodes'), 'nodes label');
   assert.ok(content.includes('>5</span>'), 'stamina value emphasized');
   assert.ok(content.includes('>2</span>'), 'nodes value emphasized');
-  assert.ok(
-    content.includes('fabricate-gather-chat__stat-icon fas fa-bolt'),
-    'stamina lightning bolt icon'
-  );
-  assert.ok(
-    content.includes('fabricate-gather-chat__stat-icon fas fa-mountain'),
-    'nodes mountain icon'
-  );
+  assert.ok(content.includes('fabricate-gather-chat__stat-icon fas fa-bolt'), 'stamina lightning bolt icon');
+  assert.ok(content.includes('fabricate-gather-chat__stat-icon fas fa-mountain'), 'nodes mountain icon');
 });
 
 test('failure status uses failure header and modifier', () => {
   const content = buildGatheringChatContent(fullModel({ status: 'failed', components: [] }));
   assert.ok(content.includes('fabricate-gather-chat--failure'), 'failure modifier');
   assert.ok(content.includes('FABRICATE.Chat.GatherFailure'), 'failure title');
-  assert.ok(
-    !content.includes('FABRICATE.Chat.GatherComponents'),
-    'empty components section omitted'
-  );
+  assert.ok(!content.includes('FABRICATE.Chat.GatherComponents'), 'empty components section omitted');
   assert.ok(content.includes('Thornpatch'), 'events still shown on failure');
 });
 
@@ -91,7 +76,7 @@ test('omits empty arrays and null economy sections', () => {
     events: [],
     brokenTools: [],
     staminaSpent: null,
-    nodesRemaining: null,
+    nodesRemaining: null
   });
   assert.ok(!content.includes('FABRICATE.Chat.GatherEvents'), 'no event section');
   assert.ok(!content.includes('FABRICATE.Chat.GatherToolsBroken'), 'no broken tools section');
@@ -107,11 +92,9 @@ test('zero nodes remaining still renders (0 is meaningful)', () => {
 });
 
 test('escapes HTML in user-authored names', () => {
-  const content = buildGatheringChatContent(
-    fullModel({
-      components: [{ name: '<script>x</script> & "rare"', img: 'icons/x.png', quantity: 1 }],
-    })
-  );
+  const content = buildGatheringChatContent(fullModel({
+    components: [{ name: '<script>x</script> & "rare"', img: 'icons/x.png', quantity: 1 }]
+  }));
   assert.ok(!content.includes('<script>x</script>'), 'raw script tag not present');
   assert.ok(content.includes('&lt;script&gt;'), 'angle brackets escaped');
   assert.ok(content.includes('&amp;'), 'ampersand escaped');
@@ -120,20 +103,8 @@ test('escapes HTML in user-authored names', () => {
 
 test('routes every label through the localize function', () => {
   const seen = [];
-  buildGatheringChatContent(fullModel(), (key) => {
-    seen.push(key);
-    return `loc:${key}`;
-  });
-  for (const key of [
-    'GatherSuccess',
-    'GatherActor',
-    'GatherTask',
-    'GatherComponents',
-    'GatherEvents',
-    'GatherToolsBroken',
-    'GatherStamina',
-    'GatherNodes',
-  ]) {
+  buildGatheringChatContent(fullModel(), (key) => { seen.push(key); return `loc:${key}`; });
+  for (const key of ['GatherSuccess', 'GatherActor', 'GatherTask', 'GatherComponents', 'GatherEvents', 'GatherToolsBroken', 'GatherStamina', 'GatherNodes']) {
     assert.ok(seen.includes(`FABRICATE.Chat.${key}`), `localize asked for FABRICATE.Chat.${key}`);
   }
 });
@@ -173,19 +144,14 @@ test('the empty-results line is a SUCCESS-only rule (a failure omits the section
 
 test('the empty-state key is routed through localize', () => {
   const seen = [];
-  buildGatheringChatContent(fullModel({ components: [] }), (key) => {
-    seen.push(key);
-    return `loc:${key}`;
-  });
-  assert.ok(
-    seen.includes('FABRICATE.Chat.GatherNothing'),
-    'localize asked for the empty-state key'
-  );
+  buildGatheringChatContent(fullModel({ components: [] }), (key) => { seen.push(key); return `loc:${key}`; });
+  assert.ok(seen.includes('FABRICATE.Chat.GatherNothing'), 'localize asked for the empty-state key');
 });
 
 test('an empty-results success escapes its localized text', () => {
-  const content = buildGatheringChatContent(fullModel({ components: [] }), (key) =>
-    key === 'FABRICATE.Chat.GatherNothing' ? '<b>none</b>' : key
+  const content = buildGatheringChatContent(
+    fullModel({ components: [] }),
+    (key) => (key === 'FABRICATE.Chat.GatherNothing' ? '<b>none</b>' : key)
   );
   assert.ok(!content.includes('<b>none</b>'), 'raw markup from a translation is not injected');
   assert.ok(content.includes('&lt;b&gt;none&lt;/b&gt;'), 'translated text is escaped');

@@ -10,10 +10,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
-const inspectorPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
-);
+const inspectorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
 const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
@@ -48,25 +45,10 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
     // row edit — but Duplicate and Delete remain the inspector's job, so the row must not
     // author those callbacks or the old three-icon action group.
     assert.ok(browserSource.includes('onEditRecipe'), 'the row declares the onEditRecipe prop');
-    assert.ok(
-      browserSource.includes('data-recipe-edit={recipe.id}'),
-      'the row renders its Edit pencil'
-    );
-    assert.equal(
-      browserSource.includes('onDuplicateRecipe'),
-      false,
-      'the row should not declare an onDuplicateRecipe prop'
-    );
-    assert.equal(
-      browserSource.includes('onDeleteRecipe'),
-      false,
-      'the row should not declare an onDeleteRecipe prop'
-    );
-    assert.equal(
-      browserSource.includes('manager-recipe-actions'),
-      false,
-      'the row action group markup should be gone'
-    );
+    assert.ok(browserSource.includes('data-recipe-edit={recipe.id}'), 'the row renders its Edit pencil');
+    assert.equal(browserSource.includes('onDuplicateRecipe'), false, 'the row should not declare an onDuplicateRecipe prop');
+    assert.equal(browserSource.includes('onDeleteRecipe'), false, 'the row should not declare an onDeleteRecipe prop');
+    assert.equal(browserSource.includes('manager-recipe-actions'), false, 'the row action group markup should be gone');
     // The other two controls the row KEEPS.
     assert.ok(browserSource.includes('data-recipe-lock'), 'the row keeps the lock control');
     // `<StatusToggle`, not the class literal (issue 1040): the shared primitive is the only
@@ -129,7 +111,7 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
     for (const selector of [
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-duplicate',
       '.fabricate-manager .manager-button.manager-recipe-browser-inspector-edit',
-      '.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete',
+      '.fabricate-manager .manager-button.manager-recipe-browser-inspector-delete'
     ]) {
       const pattern = selector
         .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
@@ -147,24 +129,13 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
   it('wires the inspector Edit button to onEdit with the localized label', () => {
     const block = inspectorActionBlock();
     assert.ok(block.includes('onEdit()'), 'Edit button should call onEdit');
-    assert.ok(
-      block.includes('FABRICATE.Admin.Manager.Recipe.Edit'),
-      'Edit button uses the Edit label key'
-    );
+    assert.ok(block.includes('FABRICATE.Admin.Manager.Recipe.Edit'), 'Edit button uses the Edit label key');
   });
 
   it('does not gate the inspector actions on the recipe lock state', () => {
     const block = inspectorActionBlock();
-    assert.equal(
-      block.includes('.locked'),
-      false,
-      'inspector actions must not gate on the recipe lock state'
-    );
-    assert.equal(
-      /\{#if[^}]*locked/.test(block),
-      false,
-      'no locked guard should wrap the inspector actions'
-    );
+    assert.equal(block.includes('.locked'), false, 'inspector actions must not gate on the recipe lock state');
+    assert.equal(/\{#if[^}]*locked/.test(block), false, 'no locked guard should wrap the inspector actions');
   });
 });
 
@@ -206,33 +177,18 @@ describe('inspector action button layout', () => {
 
 describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   it('imports and renders RecipeEditView', () => {
-    assert.ok(
-      rootSource.includes("import RecipeEditView from './RecipeEditView.svelte'"),
-      'RecipeEditView should be imported'
-    );
+    assert.ok(rootSource.includes("import RecipeEditView from './RecipeEditView.svelte'"), 'RecipeEditView should be imported');
     assert.ok(rootSource.includes('<RecipeEditView'), 'RecipeEditView should be rendered');
     // The route-exit-aware Back lives in the shared header (onclick={backToRecipesBrowse}),
     // not as a view prop — the controlled editor carries no onBack.
-    assert.ok(
-      rootSource.includes('onclick={backToRecipesBrowse}'),
-      'header Back wired to the route-exit-aware backToRecipesBrowse'
-    );
+    assert.ok(rootSource.includes('onclick={backToRecipesBrowse}'), 'header Back wired to the route-exit-aware backToRecipesBrowse');
   });
 
   it('defines editRecipe and backToRecipesBrowse navigation', () => {
     assert.ok(/function editRecipe\(/.test(rootSource), 'editRecipe should be defined');
-    assert.ok(
-      /function backToRecipesBrowse\(/.test(rootSource),
-      'backToRecipesBrowse should be defined'
-    );
-    assert.ok(
-      rootSource.includes("confirmRouteExit('recipe-edit')"),
-      'editRecipe should run the recipe-edit route exit guard'
-    );
-    assert.ok(
-      rootSource.includes("activeView = 'recipe-edit'"),
-      'editRecipe should switch to the recipe-edit view'
-    );
+    assert.ok(/function backToRecipesBrowse\(/.test(rootSource), 'backToRecipesBrowse should be defined');
+    assert.ok(rootSource.includes("confirmRouteExit('recipe-edit')"), 'editRecipe should run the recipe-edit route exit guard');
+    assert.ok(rootSource.includes("activeView = 'recipe-edit'"), 'editRecipe should switch to the recipe-edit view');
   });
 
   it('wires both the inspector and the row Edit actions to the recipe-edit navigation', () => {
@@ -303,10 +259,7 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   it('renders a recipe-edit breadcrumb crumb back to Recipes', () => {
     const idx = rootSource.indexOf("currentView === 'recipe-edit'");
     assert.ok(idx >= 0, 'recipe-edit branch should exist');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb'),
-      'breadcrumb uses the EditBreadcrumb key'
-    );
+    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb'), 'breadcrumb uses the EditBreadcrumb key');
   });
 });
 
@@ -320,14 +273,8 @@ describe('RecipeEditView empty-state regression guards', () => {
   it('renders a null-recipe empty branch reusing SelectRecipe', () => {
     assert.ok(editSource.includes('{#if recipe}'), 'view branches on the recipe prop');
     assert.ok(editSource.includes('{:else}'), 'view has a null-recipe branch');
-    assert.ok(
-      editSource.includes('FABRICATE.Admin.Manager.Recipe.SelectRecipe'),
-      'null branch reuses SelectRecipe'
-    );
-    assert.ok(
-      editSource.includes('FABRICATE.Admin.Manager.Recipe.EditMissingHint'),
-      'null branch uses EditMissingHint'
-    );
+    assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.SelectRecipe'), 'null branch reuses SelectRecipe');
+    assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.EditMissingHint'), 'null branch uses EditMissingHint');
   });
 
   // Issue 785: the surface is a shared COMPONENT now, not a bare class the view hand-rolls
@@ -346,11 +293,7 @@ describe('RecipeEditView empty-state regression guards', () => {
   });
 
   it('no longer references the removed placeholder copy', () => {
-    assert.equal(
-      editSource.includes('EditPlaceholderTitle'),
-      false,
-      'placeholder title key removed'
-    );
+    assert.equal(editSource.includes('EditPlaceholderTitle'), false, 'placeholder title key removed');
     assert.equal(editSource.includes('EditPlaceholderHint'), false, 'placeholder hint key removed');
   });
 });
@@ -358,43 +301,23 @@ describe('RecipeEditView empty-state regression guards', () => {
 describe('recipe-edit localization keys', () => {
   it('pins logic-bearing keys exactly', () => {
     assert.equal(recipeLang.Edit, 'Edit recipe', 'Edit title copy is fixed');
-    assert.ok(
-      typeof recipeLang.EditNamed === 'string' && recipeLang.EditNamed.includes('{name}'),
-      'EditNamed must interpolate {name}'
-    );
+    assert.ok(typeof recipeLang.EditNamed === 'string' && recipeLang.EditNamed.includes('{name}'), 'EditNamed must interpolate {name}');
   });
 
   it('provides non-empty incidental copy', () => {
-    for (const key of [
-      'EditSubtitle',
-      'BackToBrowse',
-      'EditTitle',
-      'EditBreadcrumb',
-      'EditMissingHint',
-    ]) {
-      assert.ok(
-        typeof recipeLang[key] === 'string' && recipeLang[key].trim().length > 0,
-        `${key} should be a non-empty string`
-      );
+    for (const key of ['EditSubtitle', 'BackToBrowse', 'EditTitle', 'EditBreadcrumb', 'EditMissingHint']) {
+      assert.ok(typeof recipeLang[key] === 'string' && recipeLang[key].trim().length > 0, `${key} should be a non-empty string`);
     }
   });
 
   it('drops the removed placeholder keys and stale coming-soon subtitle', () => {
     assert.equal('EditPlaceholderTitle' in recipeLang, false, 'EditPlaceholderTitle removed');
     assert.equal('EditPlaceholderHint' in recipeLang, false, 'EditPlaceholderHint removed');
-    assert.equal(
-      recipeLang.EditSubtitle.includes('coming soon'),
-      false,
-      'EditSubtitle no longer says coming soon'
-    );
+    assert.equal(recipeLang.EditSubtitle.includes('coming soon'), false, 'EditSubtitle no longer says coming soon');
   });
 
   it('reuses the existing SelectRecipe key', () => {
-    assert.equal(
-      recipeLang.SelectRecipe,
-      'Select a recipe',
-      'SelectRecipe is reused, not duplicated'
-    );
+    assert.equal(recipeLang.SelectRecipe, 'Select a recipe', 'SelectRecipe is reused, not duplicated');
   });
 
   it('does not introduce BackToLibrary or EditMissingTitle under Recipe', () => {

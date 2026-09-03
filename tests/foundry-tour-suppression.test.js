@@ -69,11 +69,7 @@ test('withSuppressedTours preserves unrelated namespaces', () => {
 test('withSuppressedTours treats a malformed value as absent rather than throwing', () => {
   for (const bad of ['nonsense', 42, null, [], { core: 'not-an-object' }, { core: [] }]) {
     const result = withSuppressedTours(bad);
-    assert.equal(
-      result.core.welcome,
-      SUPPRESSED_STEP_INDEX,
-      `malformed input ${JSON.stringify(bad)}`
-    );
+    assert.equal(result.core.welcome, SUPPRESSED_STEP_INDEX, `malformed input ${JSON.stringify(bad)}`);
   }
 });
 
@@ -90,10 +86,7 @@ test('seedTourProgress writes JSON.stringify output under the key', () => {
 test('seedTourProgress recovers from an unparseable stored value', () => {
   const storage = fakeStorage({ [TOUR_PROGRESS_STORAGE_KEY]: '{not json' });
   seedTourProgress(storage);
-  assert.equal(
-    JSON.parse(storage.read(TOUR_PROGRESS_STORAGE_KEY)).core.welcome,
-    SUPPRESSED_STEP_INDEX
-  );
+  assert.equal(JSON.parse(storage.read(TOUR_PROGRESS_STORAGE_KEY)).core.welcome, SUPPRESSED_STEP_INDEX);
 });
 
 test('seedTourProgress is idempotent', () => {

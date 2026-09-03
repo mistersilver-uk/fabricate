@@ -26,11 +26,7 @@ function target(root) {
  * @param {object} [options] Fixture behaviour.
  * @returns {object} `{ provider, calls }`.
  */
-function makeProvider({
-  id = 'downtime',
-  tabIds = ['board', 'ledger'],
-  throwOnMount = false,
-} = {}) {
+function makeProvider({ id = 'downtime', tabIds = ['board', 'ledger'], throwOnMount = false } = {}) {
   const calls = { mounts: [], cleanups: [], contexts: [] };
   const provider = {
     apiVersion: 1,
@@ -177,15 +173,8 @@ describe('PlayerExtensionHost (mounted)', () => {
     });
 
     assert.equal(calls.mounts.length, 1, 'the mount was attempted');
-    assert.equal(
-      target(root).childNodes.length,
-      0,
-      'the partial content the companion appended is gone'
-    );
-    assert.ok(
-      !target(root).getAttribute('data-player-extension-mounted'),
-      'and nothing is stamped'
-    );
+    assert.equal(target(root).childNodes.length, 0, 'the partial content the companion appended is gone');
+    assert.ok(!target(root).getAttribute('data-player-extension-mounted'), 'and nothing is stamped');
     assert.deepEqual(faults, [provider], 'the fault is reported UP rather than healed locally');
     assert.equal(errors.length, 1, 'and reported through the injected error sink');
   });
@@ -271,12 +260,12 @@ describe('PlayerExtensionHost (mounted)', () => {
     assert.deepEqual(
       calls.cleanups,
       [{ tabId: 'board', connected: false }],
-      'the onDestroy net still runs the cleanup exactly once, but NECESSARILY against a ' +
-        'detached target: destroy_effect removes the effect DOM before running teardowns and ' +
-        'onDestroy is itself a teardown. Pinned rather than left as a bare count because that ' +
-        'is what makes this a leak net rather than a second connected-target path — the ' +
-        'connected paths are disposeBeforeRemoval and the shell pre-effect that calls it ' +
-        'before a tab switch, a surface swap or an unregistration removes this component.'
+      'the onDestroy net still runs the cleanup exactly once, but NECESSARILY against a '
+        + 'detached target: destroy_effect removes the effect DOM before running teardowns and '
+        + 'onDestroy is itself a teardown. Pinned rather than left as a bare count because that '
+        + 'is what makes this a leak net rather than a second connected-target path — the '
+        + 'connected paths are disposeBeforeRemoval and the shell pre-effect that calls it '
+        + 'before a tab switch, a surface swap or an unregistration removes this component.'
     );
     assert.deepEqual(
       hooks.map(([name]) => name),

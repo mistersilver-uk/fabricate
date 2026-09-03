@@ -9,7 +9,7 @@ import {
   DND5E_CHARACTER_MODIFIER_PRESETS,
   PF2E_CHARACTER_MODIFIER_PRESETS,
   getCharacterModifierPresetsForFoundrySystem,
-  seedCharacterModifierPresets,
+  seedCharacterModifierPresets
 } from '../src/config/gatheringCharacterModifierPresets.js';
 
 // ISSUE 1117 — THE LIBRARY MOVED, SO THIS SUITE MOVED WITH IT.
@@ -24,13 +24,10 @@ import {
 function makeService(config = {}, options = {}) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
   return new GatheringRichStateService({
-    getSetting: (key) => settings.get(key),
-    setSetting: async (key, value) => {
-      settings.set(key, value);
-      return value;
-    },
+    getSetting: key => settings.get(key),
+    setSetting: async (key, value) => { settings.set(key, value); return value; },
     settingKey: SETTING_KEYS.GATHERING_CONFIG,
-    ...options,
+    ...options
   });
 }
 
@@ -41,11 +38,9 @@ test('the gathering config no longer emits a character modifier library', () => 
   const service = makeService({
     systems: {
       'system-a': {
-        characterModifiers: [
-          { id: 'strength', label: 'Strength', expression: '@abilities.str.mod' },
-        ],
-      },
-    },
+        characterModifiers: [{ id: 'strength', label: 'Strength', expression: '@abilities.str.mod' }]
+      }
+    }
   });
   const systemConfig = service._config().systems['system-a'];
   assert.equal(
@@ -62,12 +57,7 @@ test('a drop row resolves its reference against the SYSTEM library', async () =>
   const evaluateCalls = [];
   const service = makeService(
     { systems: { 'system-a': {} } },
-    {
-      evaluateExpression: async (payload) => {
-        evaluateCalls.push(payload);
-        return 3;
-      },
-    }
+    { evaluateExpression: async (payload) => { evaluateCalls.push(payload); return 3; } }
   );
   const composed = service.composeEnvironment(
     { id: 'env', craftingSystemId: 'system-a', tasks: [], events: [] },
@@ -76,18 +66,10 @@ test('a drop row resolves its reference against the SYSTEM library', async () =>
   const result = await service.resolveD100Attempt({
     task: {
       id: 'task-evaluator',
-      dropRows: [
-        {
-          id: 'drop-1',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 10,
-          characterModifiers: [{ id: 'ref-1', modifierId: 'str', operator: '+' }],
-        },
-      ],
+      dropRows: [{ id: 'drop-1', componentId: 'herb', quantity: 1, dropRate: 10, characterModifiers: [{ id: 'ref-1', modifierId: 'str', operator: '+' }] }]
     },
     environment: composed,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   assert.equal(result.status === 'succeeded' || result.status === 'failed', true);
   assert.equal(evaluateCalls.length, 1);
@@ -104,9 +86,9 @@ test('a library left in the gathering config resolves NOTHING', async () => {
     {
       systems: {
         'system-a': {
-          characterModifiers: [{ id: 'str', label: 'Strength', expression: '@str' }],
-        },
-      },
+          characterModifiers: [{ id: 'str', label: 'Strength', expression: '@str' }]
+        }
+      }
     },
     { evaluateExpression: async () => 3 }
   );
@@ -117,18 +99,10 @@ test('a library left in the gathering config resolves NOTHING', async () => {
   const result = await service.resolveD100Attempt({
     task: {
       id: 'task-evaluator',
-      dropRows: [
-        {
-          id: 'drop-1',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 10,
-          characterModifiers: [{ id: 'ref-1', modifierId: 'str', operator: '+' }],
-        },
-      ],
+      dropRows: [{ id: 'drop-1', componentId: 'herb', quantity: 1, dropRate: 10, characterModifiers: [{ id: 'ref-1', modifierId: 'str', operator: '+' }] }]
     },
     environment: composed,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   assert.equal(result.status, 'misconfigured');
   assert.equal(result.diagnostics[0].code, 'MISSING_CHARACTER_MODIFIER');
@@ -143,7 +117,7 @@ test('seeded presets survive the library normalizer, edits and all', () => {
   seeded[0].label = 'Mighty Strength';
   seeded[0].expression = '@abilities.str.mod + 1';
   const library = normalizeModifierLibrary(seeded);
-  const strength = library.find((entry) => entry.id === seeded[0].id);
+  const strength = library.find(entry => entry.id === seeded[0].id);
   assert.equal(strength.label, 'Mighty Strength');
   assert.equal(strength.expression, '@abilities.str.mod + 1');
   assert.equal(strength.isRollExpression, false);

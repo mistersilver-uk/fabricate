@@ -16,13 +16,14 @@ let Component;
 let mounted;
 let target;
 
+
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
   const compiled = compile(source, {
     filename: sourcePath,
     generate: 'client',
     dev: true,
-    css: 'injected',
+    css: 'injected'
   });
   const destination = join(tempRoot, `${sourcePath}.js`);
   mkdirSync(dirname(destination), { recursive: true });
@@ -56,8 +57,8 @@ async function renderComposition(props = {}) {
       onExclude: () => {},
       onRestore: () => {},
       onOpenSource: () => {},
-      ...props,
-    },
+      ...props
+    }
   });
   flushSync();
   await tick();
@@ -71,7 +72,7 @@ function sampleRecords() {
     record('candidate', 'Candidate', 'candidate', { matches: true }),
     record('excluded-nonmatching', 'Excluded Nonmatching', 'excluded', { matches: false }),
     record('excluded-matching', 'Excluded Matching', 'excluded', { matches: true }),
-    record('nonmatching', 'Nonmatching', 'notMatching', { matches: false }),
+    record('nonmatching', 'Nonmatching', 'notMatching', { matches: false })
   ];
 }
 
@@ -85,28 +86,24 @@ function record(id, name, compositionState, overrides = {}) {
     record: {
       name,
       img: `icons/${id}.webp`,
-      description: `${name} description`,
+      description: `${name} description`
     },
-    ...overrides,
+    ...overrides
   };
 }
 
 function sectionNames() {
-  return Array.from(target.querySelectorAll('[data-section]')).map((section) =>
-    section.getAttribute('data-section')
-  );
+  return Array.from(target.querySelectorAll('[data-section]'))
+    .map(section => section.getAttribute('data-section'));
 }
 
 function rowIds(sectionName) {
-  return Array.from(
-    target.querySelectorAll(`[data-section="${sectionName}"] [data-record-id]`)
-  ).map((row) => row.getAttribute('data-record-id'));
+  return Array.from(target.querySelectorAll(`[data-section="${sectionName}"] [data-record-id]`))
+    .map(row => row.getAttribute('data-record-id'));
 }
 
 function quickAction(recordId, action) {
-  return target.querySelector(
-    `[data-record-id="${recordId}"] .manager-environment-comp-quick-action[data-action="${action}"]`
-  );
+  return target.querySelector(`[data-record-id="${recordId}"] .manager-environment-comp-quick-action[data-action="${action}"]`);
 }
 
 /**
@@ -119,9 +116,7 @@ function quickAction(recordId, action) {
  * single-panel assertion below holds rather than assumes.
  */
 async function openRowMenu(recordId) {
-  target
-    .querySelector(`[data-record-id="${recordId}"] .manager-icon-button[aria-haspopup="menu"]`)
-    .click();
+  target.querySelector(`[data-record-id="${recordId}"] .manager-icon-button[aria-haspopup="menu"]`).click();
   await tick();
   flushSync();
   const panels = target.querySelectorAll('[role="menu"]');
@@ -155,7 +150,7 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/apps/manager/environment/OverrideIndicator.svelte',
       'src/ui/svelte/components/Pagination.svelte',
       // The shared numeric stepper (issue 1050): the blind-weight cell renders it.
-      'src/ui/svelte/components/Stepper.svelte',
+      'src/ui/svelte/components/Stepper.svelte'
     ]) {
       writeCompiledSvelte(component);
     }
@@ -185,17 +180,14 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/actions/anchoredPopover.js',
       'src/ui/svelte/util/overlayHost.js',
       'src/ui/svelte/util/actionMenuLayout.js',
-      'src/gatheringImageDefaults.js',
+      'src/gatheringImageDefaults.js'
     ]) {
       copyModule(modulePath);
     }
-    Component = (
-      await import(
-        pathToFileURL(
-          join(tempRoot, 'src/ui/svelte/apps/manager/environment/CompositionList.svelte.js')
-        ).href
-      )
-    ).default;
+    Component = (await import(pathToFileURL(join(
+      tempRoot,
+      'src/ui/svelte/apps/manager/environment/CompositionList.svelte.js'
+    )).href)).default;
   });
 
   afterEach(() => {
@@ -218,18 +210,19 @@ describe('CompositionList mounted layout', () => {
       onInclude: (kind, id) => calls.push(['include', kind, id]),
       onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
       onExclude: (kind, id) => calls.push(['exclude', kind, id]),
-      onOpenSource: (kind, id) => calls.push(['openSource', kind, id]),
+      onOpenSource: (kind, id) => calls.push(['openSource', kind, id])
     });
 
     assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
     assert.deepEqual(rowIds('included'), ['included']);
-    assert.deepEqual(rowIds('available-to-add'), ['candidate', 'nonmatching', 'disabled']);
+    assert.deepEqual(rowIds('available-to-add'), [
+      'candidate',
+      'nonmatching',
+      'disabled'
+    ]);
     assert.equal(target.querySelector('[data-section="excluded"]'), null);
     assert.equal(target.querySelector('[data-section="non-matching"]'), null);
-    assert.ok(
-      !target.textContent.includes('Excluded'),
-      'manual task mode does not present excluded task rows'
-    );
+    assert.ok(!target.textContent.includes('Excluded'), 'manual task mode does not present excluded task rows');
 
     const excludeQuick = quickAction('included', 'exclude');
     assert.ok(excludeQuick, 'included manual task rows render a quick remove action');
@@ -258,10 +251,7 @@ describe('CompositionList mounted layout', () => {
     // the GM's picked list with no match filter, so there is no filter for a force to override and
     // the row offers the same Add as a matching one.
     const nonMatchingQuick = quickAction('nonmatching', 'include');
-    assert.ok(
-      nonMatchingQuick,
-      'non-matching available task rows render the same quick add action'
-    );
+    assert.ok(nonMatchingQuick, 'non-matching available task rows render the same quick add action');
     assert.equal(nonMatchingQuick.getAttribute('title'), 'Add');
     assert.equal(nonMatchingQuick.getAttribute('aria-label'), 'Add');
     nonMatchingQuick.click();
@@ -290,14 +280,8 @@ describe('CompositionList mounted layout', () => {
 
     menu = await openRowMenu('disabled');
     assert.ok(menu.textContent.includes('Enable in library first'));
-    assert.ok(
-      !menu.querySelector('[data-action="include"]'),
-      'the library gate precedes both modes, so a disabled record cannot be added'
-    );
-    assert.ok(
-      !menu.querySelector('[data-action="force-include"]'),
-      'and no force can reach past it either'
-    );
+    assert.ok(!menu.querySelector('[data-action="include"]'), 'the library gate precedes both modes, so a disabled record cannot be added');
+    assert.ok(!menu.querySelector('[data-action="force-include"]'), 'and no force can reach past it either');
     menu.querySelectorAll('button').item(1).click();
     assert.deepEqual(calls.at(-1), ['openSource', 'task', 'disabled']);
   });
@@ -307,20 +291,14 @@ describe('CompositionList mounted layout', () => {
     await renderComposition({
       kind: 'task',
       mode: 'automatic',
-      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
+      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id])
     });
 
     assert.deepEqual(sectionNames(), ['included', 'excluded', 'non-matching']);
-    assert.ok(
-      !target.querySelector('[data-section="available-to-add"]'),
-      'automatic mode has no Available to add list'
-    );
+    assert.ok(!target.querySelector('[data-section="available-to-add"]'), 'automatic mode has no Available to add list');
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
-    assert.ok(
-      !target.querySelector('.manager-environment-comp-quick-action'),
-      'automatic rows carry no icon-only quick actions'
-    );
+    assert.ok(!target.querySelector('.manager-environment-comp-quick-action'), 'automatic rows carry no icon-only quick actions');
 
     // The revived control (issue #1315). Its guard demanded `mode === 'manual'` inside a section
     // gated `mode !== 'manual'`, so it rendered in NO state at all; rendering it is half the fix,
@@ -349,25 +327,21 @@ describe('CompositionList mounted layout', () => {
       onInclude: (kind, id) => calls.push(['include', kind, id]),
       onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
       onExclude: (kind, id) => calls.push(['exclude', kind, id]),
-      onOpenSource: (kind, id) => calls.push(['openSource', kind, id]),
+      onOpenSource: (kind, id) => calls.push(['openSource', kind, id])
     });
 
     assert.deepEqual(sectionNames(), ['included', 'available-to-add']);
     assert.deepEqual(rowIds('included'), ['included']);
-    assert.deepEqual(rowIds('available-to-add'), ['candidate', 'nonmatching', 'disabled']);
+    assert.deepEqual(rowIds('available-to-add'), [
+      'candidate',
+      'nonmatching',
+      'disabled'
+    ]);
     assert.equal(target.querySelector('[data-section="candidates"]'), null);
     assert.equal(target.querySelector('[data-section="excluded"]'), null);
     assert.equal(target.querySelector('[data-section="non-matching"]'), null);
-    assert.equal(
-      target.querySelector('.manager-environment-comp-handle'),
-      null,
-      'all-drops event mode does not render rank handles'
-    );
-    assert.equal(
-      target.querySelector('[data-record-id="included"]').getAttribute('draggable'),
-      null,
-      'all-drops event rows are not draggable'
-    );
+    assert.equal(target.querySelector('.manager-environment-comp-handle'), null, 'all-drops event mode does not render rank handles');
+    assert.equal(target.querySelector('[data-record-id="included"]').getAttribute('draggable'), null, 'all-drops event rows are not draggable');
 
     const removeQuick = quickAction('included', 'exclude');
     assert.ok(removeQuick, 'included manual event rows render a quick remove action');
@@ -375,9 +349,7 @@ describe('CompositionList mounted layout', () => {
     removeQuick.click();
     assert.deepEqual(calls.at(-1), ['exclude', 'event', 'included']);
     assert.equal(
-      target.querySelector(
-        '[data-record-id="included"] .manager-icon-button[aria-label="Open source event"]'
-      ),
+      target.querySelector('[data-record-id="included"] .manager-icon-button[aria-label="Open source event"]'),
       null,
       'included manual event rows do not render a standalone edit-source action'
     );
@@ -388,10 +360,7 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(calls.at(-1), ['include', 'event', 'candidate']);
 
     const nonMatchingQuick = quickAction('nonmatching', 'include');
-    assert.ok(
-      nonMatchingQuick,
-      'non-matching available event rows render the same quick add action'
-    );
+    assert.ok(nonMatchingQuick, 'non-matching available event rows render the same quick add action');
     nonMatchingQuick.click();
     assert.deepEqual(calls.at(-1), ['include', 'event', 'nonmatching']);
 
@@ -430,64 +399,28 @@ describe('CompositionList mounted layout', () => {
       records: [
         record('first', 'First', 'explicitlyIncluded', { runtimeState: 'available' }),
         record('second', 'Second', 'explicitlyIncluded', { runtimeState: 'available' }),
-        record('blocked', 'Blocked', 'explicitlyIncluded', {
-          runtimeState: 'unavailable',
-          conditionsMet: false,
-        }),
+        record('blocked', 'Blocked', 'explicitlyIncluded', { runtimeState: 'unavailable', conditionsMet: false }),
         record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' }),
         record('candidate', 'Candidate', 'candidate', { matches: true }),
         record('nonmatching', 'Nonmatching', 'notMatching', { matches: false }),
-        record('disabled', 'Disabled', 'libraryDisabled', { libraryEnabled: false, matches: true }),
+        record('disabled', 'Disabled', 'libraryDisabled', { libraryEnabled: false, matches: true })
       ],
-      onReorder: (kind, from, to) => calls.push(['reorder', kind, from, to]),
+      onReorder: (kind, from, to) => calls.push(['reorder', kind, from, to])
     });
 
     const includedRow = target.querySelector('[data-section="included"] [data-record-id="first"]');
-    assert.ok(
-      includedRow.classList.contains('has-rank-controls'),
-      'included ranked event rows opt into the handle grid'
-    );
-    assert.equal(
-      includedRow.getAttribute('draggable'),
-      'true',
-      'included ranked event rows are draggable'
-    );
-    assert.ok(
-      includedRow.querySelector('.manager-environment-comp-handle .fa-grip-vertical'),
-      'included ranked event rows render the grip handle'
-    );
-    assert.ok(
-      includedRow.querySelector('.manager-environment-comp-order').textContent.includes('1'),
-      'included ranked event rows render the rank number'
-    );
+    assert.ok(includedRow.classList.contains('has-rank-controls'), 'included ranked event rows opt into the handle grid');
+    assert.equal(includedRow.getAttribute('draggable'), 'true', 'included ranked event rows are draggable');
+    assert.ok(includedRow.querySelector('.manager-environment-comp-handle .fa-grip-vertical'), 'included ranked event rows render the grip handle');
+    assert.ok(includedRow.querySelector('.manager-environment-comp-order').textContent.includes('1'), 'included ranked event rows render the rank number');
     const forcedRow = target.querySelector('[data-section="included"] [data-record-id="forced"]');
-    assert.ok(
-      forcedRow.classList.contains('has-rank-controls'),
-      'force-included event rows also opt into rank controls'
-    );
-    assert.equal(
-      forcedRow.getAttribute('draggable'),
-      'true',
-      'force-included ranked event rows are draggable'
-    );
-    assert.ok(
-      forcedRow.querySelector('.manager-environment-comp-order').textContent.includes('4'),
-      'force-included rows receive their visible rank'
-    );
+    assert.ok(forcedRow.classList.contains('has-rank-controls'), 'force-included event rows also opt into rank controls');
+    assert.equal(forcedRow.getAttribute('draggable'), 'true', 'force-included ranked event rows are draggable');
+    assert.ok(forcedRow.querySelector('.manager-environment-comp-order').textContent.includes('4'), 'force-included rows receive their visible rank');
     const blockedRow = target.querySelector('[data-section="included"] [data-record-id="blocked"]');
-    assert.ok(
-      blockedRow.classList.contains('has-rank-controls'),
-      'condition-blocked included event rows opt into rank controls'
-    );
-    assert.equal(
-      blockedRow.getAttribute('draggable'),
-      'true',
-      'condition-blocked included event rows are draggable'
-    );
-    assert.ok(
-      blockedRow.querySelector('.manager-environment-comp-order').textContent.includes('3'),
-      'condition-blocked included rows receive their visible rank'
-    );
+    assert.ok(blockedRow.classList.contains('has-rank-controls'), 'condition-blocked included event rows opt into rank controls');
+    assert.equal(blockedRow.getAttribute('draggable'), 'true', 'condition-blocked included event rows are draggable');
+    assert.ok(blockedRow.querySelector('.manager-environment-comp-order').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
 
     assert.equal(
       target.querySelector('[data-section="available-to-add"] .manager-environment-comp-handle'),
@@ -495,9 +428,7 @@ describe('CompositionList mounted layout', () => {
       'available-to-add events do not reserve a blank handle placeholder'
     );
     assert.equal(
-      target.querySelector(
-        '[data-section="available-to-add"] .manager-environment-comp-row.has-rank-controls'
-      ),
+      target.querySelector('[data-section="available-to-add"] .manager-environment-comp-row.has-rank-controls'),
       null,
       'available-to-add events keep the non-handle grid'
     );
@@ -515,8 +446,8 @@ describe('CompositionList mounted layout', () => {
       eventSelectionMode: 'allDrops',
       records: [
         record('included', 'Included', 'explicitlyIncluded', { runtimeState: 'available' }),
-        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' }),
-      ],
+        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' })
+      ]
     });
 
     assert.equal(target.querySelector('.manager-environment-comp-head.has-rank-controls'), null);
@@ -535,21 +466,15 @@ describe('CompositionList mounted layout', () => {
       eventSelectionMode: 'limitedDrops',
       records: [
         record('included', 'Included', 'explicitlyIncluded', { runtimeState: 'available' }),
-        record('blocked', 'Blocked', 'explicitlyIncluded', {
-          runtimeState: 'unavailable',
-          conditionsMet: false,
-        }),
-        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' }),
-      ],
+        record('blocked', 'Blocked', 'explicitlyIncluded', { runtimeState: 'unavailable', conditionsMet: false }),
+        record('forced', 'Forced', 'forceIncluded', { runtimeState: 'unavailable' })
+      ]
     });
 
     assert.deepEqual(rowIds('included'), ['included', 'blocked', 'forced']);
     assert.equal(target.querySelector('.manager-environment-comp-handle'), null);
     assert.equal(target.querySelector('[data-record-id="forced"]').getAttribute('draggable'), null);
-    assert.equal(
-      target.querySelector('[data-record-id="blocked"]').getAttribute('draggable'),
-      null
-    );
+    assert.equal(target.querySelector('[data-record-id="blocked"]').getAttribute('draggable'), null);
   });
 
   it('event automatic mode retains Excluded and standalone Non-matching sections, and renders the labelled Force add', async () => {
@@ -557,28 +482,16 @@ describe('CompositionList mounted layout', () => {
     await renderComposition({
       kind: 'event',
       mode: 'automatic',
-      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
+      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id])
     });
 
     assert.deepEqual(sectionNames(), ['included', 'excluded', 'non-matching']);
-    assert.ok(
-      !target.querySelector('[data-section="available-to-add"]'),
-      'automatic mode has no Available to add list'
-    );
-    assert.ok(
-      !target.querySelector('[data-section="candidates"]'),
-      'nor a separate candidates list'
-    );
+    assert.ok(!target.querySelector('[data-section="available-to-add"]'), 'automatic mode has no Available to add list');
+    assert.ok(!target.querySelector('[data-section="candidates"]'), 'nor a separate candidates list');
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
-    assert.ok(
-      !target.querySelector('[data-section="excluded"] .manager-environment-comp-handle'),
-      'excluded rows reserve no rank handle'
-    );
-    assert.ok(
-      !target.querySelector('[data-section="non-matching"] .manager-environment-comp-handle'),
-      'non-matching rows reserve no rank handle'
-    );
+    assert.ok(!target.querySelector('[data-section="excluded"] .manager-environment-comp-handle'), 'excluded rows reserve no rank handle');
+    assert.ok(!target.querySelector('[data-section="non-matching"] .manager-environment-comp-handle'), 'non-matching rows reserve no rank handle');
 
     // THE `warning` role's first reachable call site (issues 1118 and #1315), asserted from a
     // MOUNT. It could only be pinned from source before, because the control rendered in no state
@@ -586,13 +499,8 @@ describe('CompositionList mounted layout', () => {
     // `mode === 'manual'`. That is also how it shipped asking for `is-warning`, a class the sheet
     // declares nowhere — nobody ever saw it. The source-level guard in
     // `tests/manager-button-source-contract.test.js` is retired in favour of these four lines.
-    const forceAdd = target.querySelector(
-      '[data-record-id="nonmatching"] .manager-environment-force-include'
-    );
-    assert.ok(
-      Boolean(forceAdd),
-      'the automatic-mode Non-matching list renders the labelled Force add'
-    );
+    const forceAdd = target.querySelector('[data-record-id="nonmatching"] .manager-environment-force-include');
+    assert.ok(Boolean(forceAdd), 'the automatic-mode Non-matching list renders the labelled Force add');
     assert.ok(forceAdd.textContent.includes('Force add'));
     assert.ok(
       forceAdd.classList.contains('fab-manager-button'),
@@ -614,9 +522,7 @@ describe('CompositionList mounted layout', () => {
       'a library-disabled row gets the enable-in-library note instead, because no force can revive it'
     );
     assert.ok(
-      target
-        .querySelector('[data-record-id="disabled"]')
-        .textContent.includes('Enable in library first'),
+      target.querySelector('[data-record-id="disabled"]').textContent.includes('Enable in library first'),
       'and that note is what it renders'
     );
   });

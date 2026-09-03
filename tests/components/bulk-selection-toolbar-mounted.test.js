@@ -48,7 +48,7 @@ const toolbar = createMountedComponentHarness({
   tmpPrefix: 'fabricate-bulk-selection-toolbar-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [CHECKBOX_PATH, TOOLBAR_PATH],
-  componentPath: TOOLBAR_PATH,
+  componentPath: TOOLBAR_PATH
 });
 
 function readRepoFile(repoPath) {
@@ -97,9 +97,8 @@ afterEach(() => {
 
 describe('BulkSelectionToolbar cross-boundary focus ring (issue 924 / 1010)', () => {
   it('keeps every class inside its :global() selector present in SelectionCheckbox markup', () => {
-    const globalSelectors = [
-      ...styleBlockOf(readRepoFile(TOOLBAR_PATH)).matchAll(/:global\(([^)]+)\)/g),
-    ].map(([, selector]) => selector);
+    const globalSelectors = [...styleBlockOf(readRepoFile(TOOLBAR_PATH)).matchAll(/:global\(([^)]+)\)/g)]
+      .map(([, selector]) => selector);
 
     // Teeth first: if the extraction ever drops the rule, the loop below would iterate an
     // empty set and pass while the ring was gone.
@@ -146,7 +145,7 @@ describe('BulkSelectionToolbar cross-boundary focus ring (issue 924 / 1010)', ()
     const box = input.nextElementSibling;
     assert.ok(
       box?.classList.contains('fab-selection-check'),
-      "the visible box must remain the input's IMMEDIATE element sibling: the ring is drawn by" +
+      'the visible box must remain the input\'s IMMEDIATE element sibling: the ring is drawn by' +
         ' `.fab-selection-input:focus-visible + .fab-selection-check`, so interposing an element' +
         ' or renaming the box silently kills the focus ring on the page-selection control'
     );
@@ -159,7 +158,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       pageSelectionState: 'some',
       count: 2,
       showSelectAllResults: true,
-      selectAllResultsCount: 9,
+      selectAllResultsCount: 9
     });
 
     const row = root.querySelector('[data-component-selection-toolbar]');
@@ -174,7 +173,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       'data-component-select-all-page',
       'data-component-selection-count',
       'data-component-select-all-results',
-      'data-component-clear-selection',
+      'data-component-clear-selection'
     ]) {
       assert.ok(
         Boolean(root.querySelector(`[${hook}]`)),
@@ -194,7 +193,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       pageBoxAttr: 'data-recipe-select-all-page',
       countAttr: 'data-recipe-selection-count',
       resultsAttr: 'data-recipe-select-all-results',
-      clearAttr: 'data-recipe-clear-selection',
+      clearAttr: 'data-recipe-clear-selection'
     });
 
     const row = root.querySelector('[data-recipe-selection-toolbar]');
@@ -205,7 +204,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       'data-recipe-select-all-page',
       'data-recipe-selection-count',
       'data-recipe-select-all-results',
-      'data-recipe-clear-selection',
+      'data-recipe-clear-selection'
     ]) {
       assert.ok(Boolean(root.querySelector(`[${hook}]`)), `${hook} should be rendered`);
     }
@@ -217,7 +216,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       'data-component-select-all-page',
       'data-component-selection-count',
       'data-component-select-all-results',
-      'data-component-clear-selection',
+      'data-component-clear-selection'
     ]) {
       assert.ok(
         !root.querySelector(`[${shipped}]`),
@@ -236,7 +235,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
     for (const hook of [
       'data-component-selection-count',
       'data-component-select-all-results',
-      'data-component-clear-selection',
+      'data-component-clear-selection'
     ]) {
       assert.ok(!root.querySelector(`[${hook}]`), `${hook} belongs to a non-empty selection`);
     }

@@ -521,9 +521,7 @@ test('1036: an essence macro returning a non-object is warned about and ignored'
 
 test('1036: the essence macro context names the invoking essence and its contribution', async () => {
   const system = makeSystem({
-    essenceDefinitions: [
-      makeEssence({ id: 'fire', name: 'Fire', propertyMacroUuid: 'Macro.fire' }),
-    ],
+    essenceDefinitions: [makeEssence({ id: 'fire', name: 'Fire', propertyMacroUuid: 'Macro.fire' })],
   });
   publishSystem(system, {
     'Macro.fire': makeScriptMacro(

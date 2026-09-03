@@ -32,7 +32,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-stepper-unset-',
   // Import-free leaf by design, so it needs no `rawModules` and nothing else compiled.
   compiledModules: [STEPPER],
-  componentPath: STEPPER,
+  componentPath: STEPPER
 });
 
 before(() => harness.setup());
@@ -47,7 +47,7 @@ async function mountStepper(props) {
     calls,
     input: root.querySelector('[data-stepper-input]'),
     decrement: root.querySelector('[data-stepper-decrement]'),
-    increment: root.querySelector('[data-stepper-increment]'),
+    increment: root.querySelector('[data-stepper-increment]')
   };
 }
 
@@ -102,7 +102,7 @@ describe('Stepper unset-value state (issue 1050)', () => {
       live: ['increment', 'decrement'],
       clicks: ['increment'],
       commits: [6],
-      why: '+ steps from min, not from the coerced 0',
+      why: '+ steps from min, not from the coerced 0'
     },
     {
       title: 'steps an unset field with no lower bound from 0, in both directions',
@@ -116,7 +116,7 @@ describe('Stepper unset-value state (issue 1050)', () => {
       live: [],
       clicks: ['increment', 'decrement'],
       commits: [1, -1],
-      why: 'an unbounded unset field steps from 0 and is not clamped',
+      why: 'an unbounded unset field steps from 0 and is not clamped'
     },
     {
       title: 'keeps − effective on an unset field whose min is 0',
@@ -124,7 +124,7 @@ describe('Stepper unset-value state (issue 1050)', () => {
       live: ['decrement'],
       clicks: ['decrement'],
       commits: [0],
-      why: 'clamp(0 - 1) is 0, which is still a change from blank',
+      why: 'clamp(0 - 1) is 0, which is still a change from blank'
     },
     {
       title: 'keeps + effective on an unset field whose max is 0',
@@ -139,8 +139,8 @@ describe('Stepper unset-value state (issue 1050)', () => {
       live: ['increment'],
       clicks: ['increment'],
       commits: [0],
-      why: 'clamp(0 + 1) is 0, which is still a change from blank',
-    },
+      why: 'clamp(0 + 1) is 0, which is still a change from blank'
+    }
   ];
 
   for (const testCase of UNSET_ADJUNCT_CASES) {
@@ -149,8 +149,8 @@ describe('Stepper unset-value state (issue 1050)', () => {
       for (const name of testCase.live) {
         assert.ok(
           !parts[name].disabled,
-          `${name} stays live while there is no value to be at the bound of, so it must not be ` +
-            'a no-op'
+          `${name} stays live while there is no value to be at the bound of, so it must not be `
+            + 'a no-op'
         );
       }
       for (const name of testCase.clicks) parts[name].click();
@@ -174,7 +174,7 @@ describe('Stepper unset-value state (issue 1050)', () => {
     // script rather than left to attribute order.
     const { input } = await mountStepper({
       placeholder: 'explicit',
-      inputProps: { placeholder: 'spread' },
+      inputProps: { placeholder: 'spread' }
     });
     assert.equal(input.getAttribute('placeholder'), 'explicit');
   });
@@ -194,7 +194,7 @@ function styleRules(source) {
   const style = /<style>([\s\S]*)<\/style>/.exec(source)[1].replace(/\/\*[\s\S]*?\*\//g, '');
   return [...style.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
     selector: match[1].trim().replace(/\s+/g, ' '),
-    body: match[2],
+    body: match[2]
   }));
 }
 
@@ -202,11 +202,7 @@ const RULES = styleRules(stepperSource);
 
 function bodyOf(selector) {
   const matches = RULES.filter((rule) => rule.selector === selector);
-  assert.equal(
-    matches.length,
-    1,
-    `expected exactly one \`${selector}\` rule, found ${matches.length}`
-  );
+  assert.equal(matches.length, 1, `expected exactly one \`${selector}\` rule, found ${matches.length}`);
   return matches[0].body;
 }
 
@@ -223,11 +219,7 @@ const CLASS_ONLY = /^(?:\s*(?:\.[A-Za-z][\w-]*|:not\(\.[A-Za-z][\w-]*\)))+$/;
  * order alone. Asserting the guarded form is strictly higher removes that dependence.
  */
 function classColumn(selector) {
-  assert.match(
-    selector,
-    CLASS_ONLY,
-    `${selector} is class-only, so a class count IS its specificity`
-  );
+  assert.match(selector, CLASS_ONLY, `${selector} is class-only, so a class count IS its specificity`);
   return selector.match(/\.[A-Za-z][\w-]*/g).length;
 }
 
@@ -311,8 +303,8 @@ describe('Stepper inputProps contract (issue 1050)', () => {
     assert.match(
       header,
       /attributes and `data-\*` only, NEVER event handlers/i,
-      'the spread sits after oninput/onblur, so a handler routed through it silently ' +
-        'replaces the commit path and the control stops reporting edits'
+      'the spread sits after oninput/onblur, so a handler routed through it silently '
+        + 'replaces the commit path and the control stops reporting edits'
     );
     assert.match(header, /oninput/);
     assert.match(header, /onblur/);

@@ -103,7 +103,9 @@ function requirementFor(result, groupId) {
 
 test('a set with essence requirements exposes a pool of requirements, carriers and allocation', () => {
   const manager = makeManager({
-    definitions: [{ id: 'radiant', name: 'Radiant', icon: 'fas fa-sun', colorToken: 'butter' }],
+    definitions: [
+      { id: 'radiant', name: 'Radiant', icon: 'fas fa-sun', colorToken: 'butter' },
+    ],
   });
   const recipe = makeRecipe([essenceGroup('g-rad', 'radiant', 3)]);
 
@@ -189,7 +191,10 @@ test('carriers[].ownedUnits is net of the set’s non-essence consumption plan',
 
 test('two requirements naming one essence each read their own need, never the id total', () => {
   const manager = makeManager({ definitions: [{ id: 'radiant', name: 'Radiant' }] });
-  const recipe = makeRecipe([essenceGroup('g-a', 'radiant', 2), essenceGroup('g-b', 'radiant', 2)]);
+  const recipe = makeRecipe([
+    essenceGroup('g-a', 'radiant', 2),
+    essenceGroup('g-b', 'radiant', 2),
+  ]);
 
   const result = evaluate(manager, recipe, [heldItem('shard', 4, { radiant: 1 })]);
 

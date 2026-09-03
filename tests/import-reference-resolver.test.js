@@ -13,10 +13,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { resolveImportReferences, rebindCopyContainerIds, REFERENCE_KINDS } =
-  await import('../src/systems/importReferenceResolver.js');
-const { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID, FIXTURE_REALM_ID } =
-  await import('./helpers/fullAuthoringFixture.js');
+const { resolveImportReferences, rebindCopyContainerIds, REFERENCE_KINDS } = await import(
+  '../src/systems/importReferenceResolver.js'
+);
+const { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID, FIXTURE_REALM_ID } = await import(
+  './helpers/fullAuthoringFixture.js'
+);
 
 function payloadFromFixture() {
   const f = buildFullAuthoringFixture();

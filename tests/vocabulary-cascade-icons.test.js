@@ -137,12 +137,7 @@ describe('vocabularyCascade (issue 689)', () => {
 
   it('leaves an emptied placeholder with an empty tags array, never the deleted tag', () => {
     const recipes = [
-      {
-        id: 'r1',
-        ingredientSets: [
-          { ingredientGroups: [{ options: [{ match: { type: 'tags', tags: ['ore'] } }] }] },
-        ],
-      },
+      { id: 'r1', ingredientSets: [{ ingredientGroups: [{ options: [{ match: { type: 'tags', tags: ['ore'] } }] }] }] },
     ];
     const [patch] = planRecipeTagRemovals(recipes, 'ore');
     assert.deepEqual(patch.updates.ingredientSets[0].ingredientGroups[0].options[0].match.tags, []);
@@ -175,11 +170,7 @@ describe('vocabularyUsage (issue 689)', () => {
   it('walks per-step ingredient sets and the legacy ingredients shape', () => {
     const tagUsage = new Map();
     countRecipeTagPlaceholders(
-      {
-        steps: [
-          { ingredientSets: [{ ingredients: [{ match: { type: 'tags', tags: ['fuel'] } }] }] },
-        ],
-      },
+      { steps: [{ ingredientSets: [{ ingredients: [{ match: { type: 'tags', tags: ['fuel'] } }] }] }] },
       tagUsage
     );
     assert.equal(tagUsage.get('fuel'), 1);
@@ -191,9 +182,7 @@ describe('vocabularyUsage (issue 689)', () => {
         { category: 'Potions', ingredientSets: [] },
         {
           category: 'general',
-          ingredientSets: [
-            { ingredientGroups: [{ options: [{ match: { type: 'tags', tags: ['herb'] } }] }] },
-          ],
+          ingredientSets: [{ ingredientGroups: [{ options: [{ match: { type: 'tags', tags: ['herb'] } }] }] }],
         },
       ],
       [

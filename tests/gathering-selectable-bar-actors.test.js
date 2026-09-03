@@ -5,7 +5,7 @@ import { createGatheringSelectableActorsGetter } from '../src/gatheringBootstrap
 import { isGatheringActorSelectableByUser } from '../src/config/preferencesCleanup.js';
 import {
   createPlayerCharacterActorPredicate,
-  isPlayerCharacterActor,
+  isPlayerCharacterActor
 } from '../src/config/playerCharacterTypes.js';
 
 // This file used to RE-IMPLEMENT the player-character predicate locally, on the
@@ -30,7 +30,7 @@ function redactActor(actor) {
     id: actor?.id ?? actor?.uuid ?? null,
     uuid: actor?.uuid ?? null,
     name: actor?.name ?? '',
-    img: actor?.img ?? null,
+    img: actor?.img ?? null
   };
 }
 
@@ -50,43 +50,27 @@ const gm = { id: 'gm', isGM: true };
  */
 function ownedBy(userId) {
   return {
-    testUserPermission: (user, level) => level === 'OWNER' && user?.id === userId,
+    testUserPermission: (user, level) => level === 'OWNER' && user?.id === userId
   };
 }
 
 const ownedPc = {
-  id: 'pc-1',
-  uuid: 'Actor.pc-1',
-  name: 'Aria',
-  img: 'icons/a.webp',
-  type: 'character',
-  ...ownedBy(player.id),
-  system: { secret: 'gm-only' },
+  id: 'pc-1', uuid: 'Actor.pc-1', name: 'Aria', img: 'icons/a.webp',
+  type: 'character', ...ownedBy(player.id),
+  system: { secret: 'gm-only' }
 };
 const ownedNpc = {
-  id: 'npc-1',
-  uuid: 'Actor.npc-1',
-  name: 'Goblin',
-  img: null,
-  type: 'npc',
-  ...ownedBy(player.id),
+  id: 'npc-1', uuid: 'Actor.npc-1', name: 'Goblin', img: null,
+  type: 'npc', ...ownedBy(player.id)
 };
 const otherPc = {
-  id: 'pc-2',
-  uuid: 'Actor.pc-2',
-  name: 'Borin',
-  img: null,
-  type: 'character',
-  ...ownedBy('someone-else'),
+  id: 'pc-2', uuid: 'Actor.pc-2', name: 'Borin', img: null,
+  type: 'character', ...ownedBy('someone-else')
 };
 // GoldenGamin's reported actor: a Fallout PC on the second player-character sheet.
 const ownedRobot = {
-  id: 'pc-3',
-  uuid: 'Actor.pc-3',
-  name: 'Robby',
-  img: null,
-  type: 'robot',
-  ...ownedBy(player.id),
+  id: 'pc-3', uuid: 'Actor.pc-3', name: 'Robby', img: null,
+  type: 'robot', ...ownedBy(player.id)
 };
 
 function makeBarGetter(actors, isPlayerCharacter = isPlayerCharacterActor) {
@@ -94,7 +78,7 @@ function makeBarGetter(actors, isPlayerCharacter = isPlayerCharacterActor) {
     getActors: () => actors,
     getCurrentUser: () => player,
     isSelectable: (actor, viewer) =>
-      isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacter(actor),
+      isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacter(actor)
   });
 }
 
@@ -102,11 +86,7 @@ test('the bar list narrows to owned player characters for a non-GM user', () => 
   const getter = makeBarGetter([ownedPc, ownedNpc, otherPc]);
   const selected = getter({ viewer: player });
 
-  assert.deepEqual(
-    selected.map((a) => a.id),
-    ['pc-1'],
-    'only the owned PC is listed'
-  );
+  assert.deepEqual(selected.map((a) => a.id), ['pc-1'], 'only the owned PC is listed');
 });
 
 test('a GM sees all player characters but not non-player-character actors', () => {
@@ -133,9 +113,7 @@ test('an owned `robot` is absent from the bar until the GM configures that actor
     createPlayerCharacterActorPredicate(() => ['robot'])
   );
   assert.deepEqual(
-    configured({ viewer: player })
-      .map((a) => a.id)
-      .sort(),
+    configured({ viewer: player }).map((a) => a.id).sort(),
     ['pc-1', 'pc-3'],
     'a configured additional type joins the bar without displacing `character`'
   );
@@ -143,18 +121,10 @@ test('an owned `robot` is absent from the bar until the GM configures that actor
 
 test('an owned non-PC stays attempt-authorized while absent from the bar list', () => {
   // Attempt authorization is the ownership predicate alone — and it passes.
-  assert.equal(
-    isGatheringActorSelectableByUser(ownedNpc, player),
-    true,
-    'owned npc is attempt-authorized'
-  );
+  assert.equal(isGatheringActorSelectableByUser(ownedNpc, player), true, 'owned npc is attempt-authorized');
   // But it is excluded from the bar list (PC-narrowed).
   const getter = makeBarGetter([ownedPc, ownedNpc]);
-  assert.deepEqual(
-    getter({ viewer: player }).map((a) => a.id),
-    ['pc-1'],
-    'owned npc absent from the bar list'
-  );
+  assert.deepEqual(getter({ viewer: player }).map((a) => a.id), ['pc-1'], 'owned npc absent from the bar list');
 });
 
 test('redacted records contain ONLY { id, uuid, name, img }', () => {
@@ -163,12 +133,7 @@ test('redacted records contain ONLY { id, uuid, name, img }', () => {
 
   assert.equal(records.length, 1);
   assert.deepEqual(Object.keys(records[0]).sort(), ['id', 'img', 'name', 'uuid']);
-  assert.deepEqual(records[0], {
-    id: 'pc-1',
-    uuid: 'Actor.pc-1',
-    name: 'Aria',
-    img: 'icons/a.webp',
-  });
+  assert.deepEqual(records[0], { id: 'pc-1', uuid: 'Actor.pc-1', name: 'Aria', img: 'icons/a.webp' });
   // No leaked actor internals (e.g. the GM-only `system` field).
   assert.equal('system' in records[0], false, 'no actor internals leak');
 });

@@ -102,12 +102,7 @@ test('a static check resolves the tier DC, else the base DC', async () => {
 
 test('THE MACRO RECEIVES THE ANCHOR and returns the final number', async () => {
   const seen = [];
-  const config = {
-    dc: 12,
-    dcMode: 'dynamic',
-    macroUuid: 'Macro.abc',
-    tiers: [{ id: 't1', dc: 21 }],
-  };
+  const config = { dc: 12, dcMode: 'dynamic', macroUuid: 'Macro.abc', tiers: [{ id: 't1', dc: 21 }] };
   const spy = async (uuid, payload) => {
     seen.push(payload);
     return payload.anchorDc + 3;
@@ -135,30 +130,16 @@ test('the macro still receives everything it used to', async () => {
 });
 
 test('a macro that fails falls back to the ANCHOR and never throws', async () => {
-  const config = {
-    dc: 12,
-    dcMode: 'dynamic',
-    macroUuid: 'Macro.abc',
-    tiers: [{ id: 't1', dc: 21 }],
-  };
+  const config = { dc: 12, dcMode: 'dynamic', macroUuid: 'Macro.abc', tiers: [{ id: 't1', dc: 21 }] };
   const recipe = { checkTierId: 't1' };
   const cases = [
-    [
-      'throws',
-      async () => {
-        throw new Error('boom');
-      },
-    ],
+    ['throws', async () => { throw new Error('boom'); }],
     ['returns a non-number', async () => 'not a number'],
     ['returns nothing', async () => undefined],
     ['returns Infinity', async () => Number.POSITIVE_INFINITY],
   ];
   for (const [label, impl] of cases) {
-    assert.equal(
-      await resolveDc(config, recipe, impl),
-      21,
-      `a macro that ${label} keeps the anchor`
-    );
+    assert.equal(await resolveDc(config, recipe, impl), 21, `a macro that ${label} keeps the anchor`);
   }
   assert.equal(
     await resolveDc({ ...config, macroUuid: null }, recipe),

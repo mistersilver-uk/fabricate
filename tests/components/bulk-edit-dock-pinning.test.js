@@ -394,7 +394,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
     }
   });
 
-  it("ships the dock as Apply's wrapper in the rendered product markup", () => {
+  it('ships the dock as Apply\'s wrapper in the rendered product markup', () => {
     // (d). Read off the MOUNTED component, so deleting the wrapper from
     // `BulkEditPanelShell.svelte` fails here however faithfully the studio fixtures still
     // mirror it.

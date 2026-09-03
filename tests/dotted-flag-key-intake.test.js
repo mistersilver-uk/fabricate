@@ -124,10 +124,7 @@ test('1143 updateSystem cannot introduce a dotted system id (the id is pinned to
   manager.initialized = true;
   const system = await manager.createSystem({ id: 'safe-system', name: 'Safe' });
 
-  const updated = await manager.updateSystem(system.id, {
-    id: 'imported.system.id',
-    name: 'Renamed',
-  });
+  const updated = await manager.updateSystem(system.id, { id: 'imported.system.id', name: 'Renamed' });
 
   assert.equal(updated.id, 'safe-system', 'the payload id is ignored');
   assert.equal(manager.getSystem('imported.system.id'), null, 'no dotted system is registered');

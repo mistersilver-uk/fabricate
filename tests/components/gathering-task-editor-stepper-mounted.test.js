@@ -344,18 +344,10 @@ describe('Gathering task editor steppers (issue 1050)', () => {
       '15',
       'ArrowUp steps the displayed value'
     );
-    assert.equal(
-      lastWrite(updates, (patch) => patch.dcOverride),
-      15,
-      'and commits it'
-    );
+    assert.equal(lastWrite(updates, (patch) => patch.dcOverride), 15, 'and commits it');
     await sync();
     assert.equal(stepNativeNumberInput(dc, 'down'), '14', 'ArrowDown steps it back');
-    assert.equal(
-      lastWrite(updates, (patch) => patch.dcOverride),
-      14,
-      'and commits that too'
-    );
+    assert.equal(lastWrite(updates, (patch) => patch.dcOverride), 14, 'and commits that too');
   });
 
   it('lets the respawn unit select size to its content, on specificity not source order', () => {
@@ -382,8 +374,8 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     const classColumn = selector.replace(/:where\([^)]*\)/g, '').match(/\.[\w-]+|\[[^\]]+\]/g);
     assert.ok(
       classColumn.length > 2,
-      `${selector.trim()} must out-specify \`.fabricate-manager .manager-field select\` (0,2,1), ` +
-        `but its class column is ${classColumn.length}`
+      `${selector.trim()} must out-specify \`.fabricate-manager .manager-field select\` (0,2,1), `
+        + `but its class column is ${classColumn.length}`
     );
     assert.match(rule[0], /width: auto/, 'and it is the width that is being released');
   });

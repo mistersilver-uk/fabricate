@@ -6,13 +6,11 @@ globalThis.foundry = {
   applications: {
     api: {
       ApplicationV2: class {
-        async _prepareContext() {
-          return {};
-        }
-      },
+        async _prepareContext() { return {}; }
+      }
     },
-    ux: { TextEditor: { implementation: null } },
-  },
+    ux: { TextEditor: { implementation: null } }
+  }
 };
 
 globalThis.game = { settings: { get: () => undefined } };
@@ -21,7 +19,7 @@ const {
   getFabricateAppClass,
   getCraftingSystemManagerAppClass,
   registerFabricateApp,
-  registerCraftingSystemManagerApp,
+  registerCraftingSystemManagerApp
 } = await import('../src/ui/appFactory.js');
 
 // --- getFabricateAppClass ---
@@ -42,10 +40,7 @@ test('getFabricateAppClass returns registered Svelte class', () => {
 
 test('getCraftingSystemManagerAppClass throws when no v2 manager class registered', () => {
   registerCraftingSystemManagerApp(null);
-  assert.throws(
-    () => getCraftingSystemManagerAppClass(),
-    /CraftingSystemManagerApp not registered/
-  );
+  assert.throws(() => getCraftingSystemManagerAppClass(), /CraftingSystemManagerApp not registered/);
 });
 
 test('getCraftingSystemManagerAppClass returns registered v2 manager class', () => {

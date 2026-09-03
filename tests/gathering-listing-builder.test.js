@@ -9,9 +9,7 @@ const gm = { id: 'gm-1', isGM: true };
 const actor = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Gatherer', items: [] };
 
 function sameActor(left, right) {
-  return Boolean(
-    left && right && (left === right || left.id === right.id || left.uuid === right.uuid)
-  );
+  return Boolean(left && right && (left === right || left.id === right.id || left.uuid === right.uuid));
 }
 
 function task(overrides = {}) {
@@ -69,13 +67,11 @@ function makeEngine({
     environmentStore: { list: () => environments },
     getSystems: () => systems,
     getSelectableActors: () => selectableActors,
-    isActorSelectable: ({ actor: candidate }) =>
-      selectableActors.some((entry) => sameActor(entry, candidate)),
+    isActorSelectable: ({ actor: candidate }) => selectableActors.some((entry) => sameActor(entry, candidate)),
     isGamePaused: () => false,
     evaluator: {
       evaluateVisibility: async ({ task: candidate }) => {
-        const result =
-          visibility instanceof Map ? visibility.get(candidate.id) : visibility?.[candidate.id];
+        const result = visibility instanceof Map ? visibility.get(candidate.id) : visibility?.[candidate.id];
         return result ?? { visible: true, reasonCode: 'VISIBLE', diagnostic: null };
       },
     },
@@ -132,12 +128,7 @@ test('targeted listing renders the full task list transparently for a player', a
 
 test('blind listing collapses to one opaque action for a player and redacts task identity', async () => {
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        tasks: [task(), task({ id: 'task-b', name: 'Gather Tin' })],
-      }),
-    ],
+    environments: [environment({ selectionMode: 'blind', tasks: [task(), task({ id: 'task-b', name: 'Gather Tin' })] })],
   });
 
   const listing = await engine.listForActor({ viewer: player, actor });
@@ -156,12 +147,7 @@ test('blind listing collapses to one opaque action for a player and redacts task
 
 test('GM viewer of a blind environment sees the full transparent task list', async () => {
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        tasks: [task(), task({ id: 'task-b', name: 'Gather Tin' })],
-      }),
-    ],
+    environments: [environment({ selectionMode: 'blind', tasks: [task(), task({ id: 'task-b', name: 'Gather Tin' })] })],
   });
 
   const playerListing = await engine.listForActor({ viewer: player, actor });
@@ -210,20 +196,8 @@ test('discovered tasks surface revealed blind tasks with discovery counts', asyn
 test('gathering system options are sorted by name via localeCompare', async () => {
   const engine = makeEngine({
     systems: [
-      {
-        id: 'system-a',
-        enabled: true,
-        features: { gathering: true },
-        name: 'Zephyr Survival',
-        components: [],
-      },
-      {
-        id: 'system-b',
-        enabled: true,
-        features: { gathering: true },
-        name: 'Alpine Foraging',
-        components: [],
-      },
+      { id: 'system-a', enabled: true, features: { gathering: true }, name: 'Zephyr Survival', components: [] },
+      { id: 'system-b', enabled: true, features: { gathering: true }, name: 'Alpine Foraging', components: [] },
     ],
     environments: [
       environment({ id: 'env-a', craftingSystemId: 'system-a' }),
@@ -250,17 +224,7 @@ test('getTaskDropBreakdown returns drops for a visible d100 task and gates hidde
     }),
   };
   const engine = makeEngine({
-    environments: [
-      environment({
-        tasks: [
-          task({
-            id: 'task-d100',
-            resolutionMode: 'd100',
-            dropRows: [{ enabled: true, dropRate: 40, componentId: 'iron', quantity: 1 }],
-          }),
-        ],
-      }),
-    ],
+    environments: [environment({ tasks: [task({ id: 'task-d100', resolutionMode: 'd100', dropRows: [{ enabled: true, dropRate: 40, componentId: 'iron', quantity: 1 }] })] })],
     richState,
   });
 
@@ -298,13 +262,7 @@ test('getTaskDropBreakdown does not leak a blind, undiscovered task to a player'
       environment({
         selectionMode: 'blind',
         rules: { revealPolicy: 'onAttempt', revealScope: 'actor' },
-        tasks: [
-          task({
-            id: 'task-d100',
-            resolutionMode: 'd100',
-            dropRows: [{ enabled: true, dropRate: 40, componentId: 'iron', quantity: 1 }],
-          }),
-        ],
+        tasks: [task({ id: 'task-d100', resolutionMode: 'd100', dropRows: [{ enabled: true, dropRate: 40, componentId: 'iron', quantity: 1 }] })],
       }),
     ],
     richState,

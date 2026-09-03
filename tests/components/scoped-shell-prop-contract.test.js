@@ -727,10 +727,10 @@ actions.copyMembership(entry.id, row.systemId);`),
   });
 
   /**
-   * EVERY `.svelte` under `apps/manager/`, recursively — which is what this ban now scans.
+   * EVERY `.svelte` under `apps/manager/`, recursively - which is what this ban now scans.
    *
-   * ── THE THREE-FILE LIST WAS THE FIRST OF THIS SCAN'S OWN RECORDED BOUNDS (issue 1371) ────
-   * `SHELLS` is hand-maintained, and `scoped/` alone already held twelve unscanned siblings —
+   * -- THE THREE-FILE LIST WAS THE FIRST OF THIS SCAN'S OWN RECORDED BOUNDS (issue 1371) ----
+   * `SHELLS` is hand-maintained, and `scoped/` alone already held twelve unscanned siblings -
    * among them `MembershipActions.svelte`, which is the natural home for the very control this
    * ban is about. Widening it also brings in the ONE real three-argument call site in the
    * repository, which is what makes the scan a measurement rather than an empty set: with the
@@ -759,7 +759,7 @@ actions.copyMembership(entry.id, row.systemId);`),
     );
     // AND IT FINDS THE ONE REAL CALL SITE. `EssenceEditView`'s copy card is the only shipped
     // three-argument `copyMembership` call in the repository, and it lives outside `scoped/`
-    // entirely — so a scan that missed it is a scan that could not fail.
+    // entirely - so a scan that missed it is a scan that could not fail.
     const withCalls = scanned.filter((path) => copyMembershipCalls(sourceOf(path)).length > 0);
     assert.deepEqual(
       withCalls,

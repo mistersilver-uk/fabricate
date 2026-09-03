@@ -38,7 +38,8 @@
 export function makeEssenceRow(overrides = {}) {
   // Either half of the source pair implies the other. An explicit `sourceState` is the
   // stronger statement, because it is the field the store derives FROM.
-  const statedSourceState = typeof overrides.sourceState === 'string' ? overrides.sourceState : '';
+  const statedSourceState =
+    typeof overrides.sourceState === 'string' ? overrides.sourceState : '';
   const carriesSource = statedSourceState
     ? statedSourceState !== 'none'
     : overrides.hasEffectTransfer === true;

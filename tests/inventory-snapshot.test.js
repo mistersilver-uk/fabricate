@@ -34,8 +34,9 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 globalThis.game = { actors: [] };
 
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
-const { buildInventorySnapshot, projectRecipeAvailability } =
-  await import('../src/systems/inventorySnapshot.js');
+const { buildInventorySnapshot, projectRecipeAvailability } = await import(
+  '../src/systems/inventorySnapshot.js'
+);
 const { advanceDefinitionRevision } = await import('../src/utils/definitionIndex.js');
 const { itemMatchesRecipeItemSource } = await import('../src/utils/sourceUuid.js');
 
@@ -617,7 +618,9 @@ describe('the availability projection is indexed and optimistic', () => {
     // And the union is deduped: a tag carried by BOTH the component and the item flag must
     // not count the same held stack twice, or the upper bound would drift twice as high as
     // the stock actually held.
-    const both = talliesFor([makeItem({ uuid: 'i2', name: 'Wood', quantity: 3, tags: ['plank'] })]);
+    const both = talliesFor([
+      makeItem({ uuid: 'i2', name: 'Wood', quantity: 3, tags: ['plank'] }),
+    ]);
     assert.equal(both.quantityByTag.get('plank'), 3, 'counted once, not twice');
   });
 

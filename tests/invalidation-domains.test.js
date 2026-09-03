@@ -191,9 +191,7 @@ const APPROVED_RECIPE_FIELD_DOMAINS = {
  */
 function producedSystemKeys() {
   const manager = new CraftingSystemManager(new RecipeManager({}));
-  return new Set(
-    Object.keys(manager._normalizeSystem({ toolBreakage: { authority: 'checkDriven' } }))
-  );
+  return new Set(Object.keys(manager._normalizeSystem({ toolBreakage: { authority: 'checkDriven' } })));
 }
 
 /**
@@ -233,9 +231,7 @@ describe('the invalidation-domain taxonomy is frozen and exhaustive', () => {
     // Literal, deliberately. See the file header: deriving the expectation the same way the
     // module derives the constant would make this assertion unfailable.
     assert.deepEqual(
-      Object.fromEntries(
-        Object.entries(STORE_DOMAINS).map(([store, domains]) => [store, [...domains]])
-      ),
+      Object.fromEntries(Object.entries(STORE_DOMAINS).map(([store, domains]) => [store, [...domains]])),
       APPROVED_STORE_DOMAINS
     );
   });
@@ -255,10 +251,7 @@ describe('the invalidation-domain taxonomy is frozen and exhaustive', () => {
 
   it('composes a fact scope that cannot collide with an entity scope', () => {
     assert.equal(REVISION_SCOPES.facts('narrative', 'sys-a'), 'facts:narrative:sys-a');
-    assert.notEqual(
-      REVISION_SCOPES.facts('recipes', 'sys-a'),
-      REVISION_SCOPES.recipesOfSystem('sys-a')
-    );
+    assert.notEqual(REVISION_SCOPES.facts('recipes', 'sys-a'), REVISION_SCOPES.recipesOfSystem('sys-a'));
     assert.notEqual(REVISION_SCOPES.facts('system', 'sys-a'), REVISION_SCOPES.system('sys-a'));
   });
 });
@@ -422,9 +415,10 @@ describe('field attribution fails SAFE', () => {
   });
 
   it('resolves through an explicit mirror map when one is supplied', () => {
-    assert.deepEqual(domainsForFields(['alias'], { host: ['labelling'] }, { alias: 'host' }), [
-      'labelling',
-    ]);
+    assert.deepEqual(
+      domainsForFields(['alias'], { host: ['labelling'] }, { alias: 'host' }),
+      ['labelling']
+    );
     assert.deepEqual(domainsForFields(['alias'], { host: ['labelling'] }), [
       ...ALL_INVALIDATION_DOMAINS,
     ]);

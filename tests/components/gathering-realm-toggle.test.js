@@ -18,9 +18,7 @@ const squish = (value) => value.replace(/\s+/g, ' ');
 
 const systemEditSource = squish(read('src/ui/svelte/apps/manager/SystemEditView.svelte'));
 const environmentsBrowserSource = read('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
-const managerRootSource = squish(
-  read('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte')
-);
+const managerRootSource = squish(read('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'));
 const adminStoreSource = read('src/ui/svelte/stores/adminStore.js');
 const systemProjectionSource = read('src/ui/svelte/stores/adminSystemInspectorProjection.js');
 const lang = JSON.parse(read('lang/en.json'));
@@ -31,15 +29,10 @@ describe('Travel & Realms participation toggle', () => {
   // system takes part in a WORLD-scope subsystem authored elsewhere.
   it('renders as a System Settings feature tile beside Currency', () => {
     assert.ok(
-      systemEditSource.includes(
-        '<div class="manager-feature-tile" data-feature-key="gatheringRealms">'
-      ),
+      systemEditSource.includes('<div class="manager-feature-tile" data-feature-key="gatheringRealms">'),
       'the toggle is a feature tile, structured exactly like the Currency tile'
     );
-    assert.ok(
-      systemEditSource.includes('data-gathering-realm-toggle'),
-      'toggle exposes a data hook'
-    );
+    assert.ok(systemEditSource.includes('data-gathering-realm-toggle'), 'toggle exposes a data hook');
     // `on=`, not `aria-pressed=` (issue 1040). The tile renders the shared `<StatusToggle>`,
     // which emits `aria-pressed` from that prop — asserting the attribute here would be
     // asserting on markup this file no longer writes, and would pass forever once the tile
@@ -73,10 +66,7 @@ describe('Travel & Realms participation toggle', () => {
   it('the hint names World > Travel as where realms are authored and states what the toggle does', () => {
     const hint = lang.FABRICATE.Admin.Manager.SystemEdit.FeatureHint.GatheringRealms;
     assert.equal(typeof hint, 'string');
-    assert.ok(
-      hint.includes('World > Travel'),
-      'the hint sends the GM to the world route to author realms'
-    );
+    assert.ok(hint.includes('World > Travel'), 'the hint sends the GM to the world route to author realms');
     assert.ok(
       hint.includes('where the party is'),
       'the hint states the location gate this toggle actually applies'
@@ -97,7 +87,7 @@ describe('Travel & Realms participation toggle', () => {
     );
     assert.ok(
       adminStoreSource.includes(
-        'await systemManager.updateSystem(sysId, {\n      gatheringRealmSettings: { enabled: enabled === true },\n    });'
+        "await systemManager.updateSystem(sysId, {\n      gatheringRealmSettings: { enabled: enabled === true },\n    });"
       ),
       'the action writes participation onto the system'
     );
@@ -111,18 +101,13 @@ describe('Travel & Realms participation toggle', () => {
       'root passes the action down to the System Settings page'
     );
     assert.ok(
-      systemProjectionSource.includes(
-        'gatheringRealmSettings: {\n      enabled: selectedSystem.gatheringRealmSettings?.enabled === true,\n    },'
-      ),
+      systemProjectionSource.includes('gatheringRealmSettings: {\n      enabled: selectedSystem.gatheringRealmSettings?.enabled === true,\n    },'),
       'the selected-system projection carries participation and nothing else'
     );
   });
 
   it('the travel view-model separates system participation from world realm behaviour', () => {
-    assert.ok(
-      adminStoreSource.includes('gatheringRealmSettings: {'),
-      'travel view-model carries gatheringRealmSettings'
-    );
+    assert.ok(adminStoreSource.includes('gatheringRealmSettings: {'), 'travel view-model carries gatheringRealmSettings');
     assert.ok(
       adminStoreSource.includes('enabled: isGatheringRealmsEnabled('),
       'enabled comes from the selected crafting system'
@@ -137,18 +122,10 @@ describe('Travel & Realms participation toggle', () => {
 describe('World and Travel navigation', () => {
   it('exposes World > Travel as an ungated world route', () => {
     assert.ok(managerRootSource.includes('id="manager-world-nav-travel"'), 'World exposes Travel');
+    assert.ok(managerRootSource.includes('data-world-nav-item="travel"'), 'the Travel entry is a World nav item');
+    assert.ok(managerRootSource.includes('id="manager-world-nav-parties"'), 'World still exposes Parties');
     assert.ok(
-      managerRootSource.includes('data-world-nav-item="travel"'),
-      'the Travel entry is a World nav item'
-    );
-    assert.ok(
-      managerRootSource.includes('id="manager-world-nav-parties"'),
-      'World still exposes Parties'
-    );
-    assert.ok(
-      managerRootSource.includes(
-        "const isWorldTravelRoute = $derived(currentView === 'world-travel')"
-      ),
+      managerRootSource.includes("const isWorldTravelRoute = $derived(currentView === 'world-travel')"),
       'the route is its own view token'
     );
     // Ungated: nothing about the selected system may decide whether the route exists.
@@ -178,20 +155,12 @@ describe('World and Travel navigation', () => {
       managerRootSource.includes('{:else if isWorldTravelRoute} <!--'),
       'the route renders its own manager-main straight from the root'
     );
-    assert.ok(
-      managerRootSource.includes('<GatheringRealmsTab realms={worldRealms}'),
-      'Realms destination'
-    );
-    assert.ok(
-      managerRootSource.includes('<GatheringMapLinksTab sceneRegions={mapCurrentSceneRegions}'),
-      'Map destination'
-    );
+    assert.ok(managerRootSource.includes('<GatheringRealmsTab realms={worldRealms}'), 'Realms destination');
+    assert.ok(managerRootSource.includes('<GatheringMapLinksTab sceneRegions={mapCurrentSceneRegions}'), 'Map destination');
     // Unlike World > Currency it KEEPS the right-hand inspector: the realm detail pane is the
     // authoring surface, whereas currency's unit editors expand in place.
     assert.ok(
-      managerRootSource.includes(
-        '{:else if isWorldTravelRoute} <section class="manager-inspector-card manager-travel-inspector"'
-      ),
+      managerRootSource.includes('{:else if isWorldTravelRoute} <section class="manager-inspector-card manager-travel-inspector"'),
       'the realm/map inspector lives under the new route'
     );
     assert.equal(managerRootSource.includes('!isWorldTravelRoute && !isWorldDowntimeRoute'), false);

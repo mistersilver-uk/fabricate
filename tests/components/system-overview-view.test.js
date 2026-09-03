@@ -21,9 +21,9 @@ const harness = createMountedComponentHarness({
     // costs a HUNG suite reported as `# cancelled`, not a failing one. Compiling a module the
     // tree does not yet render is free; discovering the omission from a cancelled count is not.
     'src/ui/svelte/components/ManagerButton.svelte',
-    'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
+    'src/ui/svelte/apps/manager/SystemOverviewView.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/SystemOverviewView.svelte'
 });
 
 function flushRender() {
@@ -43,7 +43,7 @@ const populatedReport = {
       blocks: 'system',
       code: 'progressiveNoCheck',
       message: 'Progressive mode requires a configured progressive crafting check.',
-      nav: { view: 'system-overview' },
+      nav: { view: 'system-overview' }
     },
     {
       kind: 'recipe',
@@ -53,7 +53,7 @@ const populatedReport = {
       blocks: 'enable',
       code: 'noResultGroup',
       message: 'A step is missing a result group.',
-      nav: { view: 'recipe-edit', tab: 'results' },
+      nav: { view: 'recipe-edit', tab: 'results' }
     },
     {
       kind: 'environment',
@@ -64,7 +64,7 @@ const populatedReport = {
       blocks: undefined,
       code: 'noScene',
       message: 'Environment has no linked scene.',
-      nav: { view: 'environment-edit' },
+      nav: { view: 'environment-edit' }
     },
     {
       // A task-kind issue: `entityId` is the task RECORD id; the deep-link must
@@ -77,7 +77,7 @@ const populatedReport = {
       blocks: undefined,
       code: 'taskNoDescription',
       message: 'A gathering task has no description.',
-      nav: { view: 'environment-edit' },
+      nav: { view: 'environment-edit' }
     },
     {
       kind: 'salvage',
@@ -87,11 +87,11 @@ const populatedReport = {
       blocks: 'visibility',
       code: 'invalidSalvage',
       message: 'Salvage is invalid.',
-      nav: { view: 'items' },
-    },
+      nav: { view: 'items' }
+    }
   ],
   counts: { critical: 3, warning: 2, info: 0, blockers: 1 },
-  blocksSystem: true,
+  blocksSystem: true
 };
 
 describe('SystemOverviewView (mounted)', () => {
@@ -119,17 +119,11 @@ describe('SystemOverviewView (mounted)', () => {
 
     const recipeRow = recipeGroup.querySelector('[data-overview-issue="noResultGroup"]');
     assert.ok(recipeRow, 'recipe issue row renders');
-    assert.ok(
-      recipeRow.querySelector('.manager-chip.is-danger'),
-      'critical row carries a danger chip'
-    );
+    assert.ok(recipeRow.querySelector('.manager-chip.is-danger'), 'critical row carries a danger chip');
     assert.match(recipeRow.textContent, /Iron Ingot/, 'recipe entity name shows');
 
     const environmentRow = environmentGroup.querySelector('[data-overview-issue="noScene"]');
-    assert.ok(
-      environmentRow.querySelector('.manager-chip.is-warning'),
-      'warning row carries a warning chip'
-    );
+    assert.ok(environmentRow.querySelector('.manager-chip.is-warning'), 'warning row carries a warning chip');
 
     // The system-blocker banner renders and the system row carries no deep link.
     assert.ok(target.querySelector('[data-system-overview-blocker]'), 'blocker banner renders');
@@ -182,12 +176,10 @@ describe('SystemOverviewView (mounted)', () => {
     const selected = [];
     const target = await harness.mount({
       report: populatedReport,
-      onSelectIssue: (issue) => selected.push(issue),
+      onSelectIssue: (issue) => selected.push(issue)
     });
 
-    const recipeLink = target.querySelector(
-      '[data-overview-issue="noResultGroup"] [data-overview-link="recipe"]'
-    );
+    const recipeLink = target.querySelector('[data-overview-issue="noResultGroup"] [data-overview-link="recipe"]');
     assert.ok(recipeLink, 'a deep-link button renders on the recipe row');
     recipeLink.click();
     await flushRender();
@@ -203,12 +195,10 @@ describe('SystemOverviewView (mounted)', () => {
     const selected = [];
     const target = await harness.mount({
       report: populatedReport,
-      onSelectIssue: (issue) => selected.push(issue),
+      onSelectIssue: (issue) => selected.push(issue)
     });
 
-    const taskLink = target.querySelector(
-      '[data-overview-issue="taskNoDescription"] [data-overview-link="task"]'
-    );
+    const taskLink = target.querySelector('[data-overview-issue="taskNoDescription"] [data-overview-link="task"]');
     assert.ok(taskLink, 'a deep-link button renders on the task row');
     taskLink.click();
     await flushRender();
@@ -217,11 +207,7 @@ describe('SystemOverviewView (mounted)', () => {
     assert.equal(selected[0].kind, 'task');
     // The deep link must carry the OWNING environment id (which selectEnvironment
     // resolves) — the record id `task-7` would never resolve.
-    assert.equal(
-      selected[0].environmentId,
-      'e1',
-      'task deep link forwards the owning environment id'
-    );
+    assert.equal(selected[0].environmentId, 'e1', 'task deep link forwards the owning environment id');
 
     harness.remount();
   });
@@ -241,38 +227,26 @@ describe('SystemOverviewView (mounted)', () => {
             blocks: undefined,
             code: 'taskNoDescription',
             message: 'A gathering task has no description.',
-            nav: { view: 'environment-edit' },
-          },
+            nav: { view: 'environment-edit' }
+          }
         ],
         counts: { critical: 0, warning: 1, info: 0, blockers: 0 },
-        blocksSystem: false,
-      },
+        blocksSystem: false
+      }
     });
     const row = target.querySelector('[data-overview-issue="taskNoDescription"]');
     assert.ok(row, 'the task row still renders');
-    assert.equal(
-      row.querySelector('[data-overview-link]'),
-      null,
-      'no deep-link button without an environmentId'
-    );
+    assert.equal(row.querySelector('[data-overview-link]'), null, 'no deep-link button without an environmentId');
     harness.remount();
   });
 
   it('shows the empty state when no issues are present', async () => {
     const target = await harness.mount({
-      report: {
-        issues: [],
-        counts: { critical: 0, warning: 0, info: 0, blockers: 0 },
-        blocksSystem: false,
-      },
+      report: { issues: [], counts: { critical: 0, warning: 0, info: 0, blockers: 0 }, blocksSystem: false }
     });
     assert.ok(target.querySelector('[data-system-overview-empty]'), 'empty state renders');
     assert.equal(target.querySelector('[data-system-overview-group]'), null, 'no groups rendered');
-    assert.equal(
-      target.querySelector('[data-system-overview-blocker]'),
-      null,
-      'no blocker banner with no blocker'
-    );
+    assert.equal(target.querySelector('[data-system-overview-blocker]'), null, 'no blocker banner with no blocker');
     harness.remount();
   });
 });

@@ -456,7 +456,10 @@ test('the flat contribution playerPicks at cap 1 is byte-identical to highest', 
   };
   const values = { '@med': 3, '@alch': 2, '@herb': 4 };
   const asPlayerPicks = scalarOf(context, evaluatorFor(values));
-  const asHighest = scalarOf({ ...context, systemPolicy: 'highest' }, evaluatorFor(values));
+  const asHighest = scalarOf(
+    { ...context, systemPolicy: 'highest' },
+    evaluatorFor(values)
+  );
   assert.equal(asPlayerPicks, 4, 'capped at one pick, the best legal selection is max(3,2,4)');
   assert.equal(asPlayerPicks, asHighest, 'the 1.20.0-migrated world rolls what it always rolled');
 });
@@ -622,36 +625,9 @@ test('buildCheckModifierChoice maps eligible modifiers + pre-selects the best le
   assert.deepEqual(choice.modifiers, [
     // `formula: null` is the FLAT half of the 1118 shape: a flat entry appends a number and
     // never a fragment, and `display` is the chip the prompt renders for it.
-    {
-      id: 'med',
-      label: 'Medicine',
-      icon: 'fa-med',
-      average: 3,
-      value: 3,
-      formula: null,
-      blocked: false,
-      display: '+3',
-    },
-    {
-      id: 'alch',
-      label: 'Alchemy',
-      icon: 'fa-alch',
-      average: 2,
-      value: 2,
-      formula: null,
-      blocked: false,
-      display: '+2',
-    },
-    {
-      id: 'herb',
-      label: 'Herbalism',
-      icon: 'fa-herb',
-      average: 4,
-      value: 4,
-      formula: null,
-      blocked: false,
-      display: '+4',
-    },
+    { id: 'med', label: 'Medicine', icon: 'fa-med', average: 3, value: 3, formula: null, blocked: false, display: '+3' },
+    { id: 'alch', label: 'Alchemy', icon: 'fa-alch', average: 2, value: 2, formula: null, blocked: false, display: '+2' },
+    { id: 'herb', label: 'Herbalism', icon: 'fa-herb', average: 4, value: 4, formula: null, blocked: false, display: '+4' },
   ]);
   assert.equal(choice.maxPicks, 1, 'the cap the prompt must enforce');
   assert.deepEqual(choice.defaultSelectedIds, ['herb'], 'herb (4) is the highest');
@@ -1306,7 +1282,10 @@ test('the flat contribution makes an INVERTED entry contribute exactly 0', () =>
   ];
   const evaluate = evaluatorFor({ '@ok': 3, '@bad': 100 });
   assert.equal(
-    scalarOf({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ['ok', 'bad'] }, evaluate),
+    scalarOf(
+      { catalogue, systemPolicy: 'addAll', defaultModifierIds: ['ok', 'bad'] },
+      evaluate
+    ),
     3,
     'the blocked entry adds nothing — not its raw value, and not either of its bounds'
   );
@@ -1384,12 +1363,18 @@ test('an AUTHORED EMPTY pick resolves to zero on all three activities', () => {
   const evaluate = evaluatorFor({ '@med': 3, '@alch': 2 });
   for (const activity of ['crafting', 'salvage', 'gathering']) {
     assert.equal(
-      scalarOf(buildCheckModifierContext(system, activity, empty[activity]), evaluate),
+      scalarOf(
+        buildCheckModifierContext(system, activity, empty[activity]),
+        evaluate
+      ),
       0,
       `${activity}: an authored empty array is a real pick of zero`
     );
     assert.equal(
-      scalarOf(buildCheckModifierContext(system, activity, absent[activity]), evaluate),
+      scalarOf(
+        buildCheckModifierContext(system, activity, absent[activity]),
+        evaluate
+      ),
       5,
       `${activity}: …and an ABSENT pick inherits the default set instead — a DIFFERENT roll`
     );

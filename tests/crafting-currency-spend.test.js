@@ -17,10 +17,7 @@ import assert from 'node:assert/strict';
 
 import { DND5E_CURRENCY_PRESETS, PF2E_CURRENCY_PRESETS } from '../src/config/currencyPresets.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import {
-  ActorInventoryCoinSpender,
-  ActorPropertyCoinSpender,
-} from '../src/systems/CoinSpenders.js';
+import { ActorInventoryCoinSpender, ActorPropertyCoinSpender } from '../src/systems/CoinSpenders.js';
 import { Pf2eInventoryCoinAdapter } from '../src/systems/Pf2eInventoryCoinAdapter.js';
 import { CURRENCY_SETUP_INCOMPLETE_MESSAGE } from '../src/systems/currencyAffordance.js';
 
@@ -69,8 +66,7 @@ function makeItem({ id, name = `Item ${id}`, quantity = 1, componentId = null } 
     async update(payload) {
       this.updateCalled = true;
       this.updatePayloads.push(payload);
-      if (payload['system.quantity'] !== undefined)
-        this.system.quantity = payload['system.quantity'];
+      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
     },
   };
 }
@@ -290,10 +286,7 @@ function makeRecipeManager({ craftingActorRef } = {}) {
   return manager;
 }
 
-function makeEngine(
-  system,
-  { actorInventoryCoinSpender = null, actorPropertyCoinSpender = null } = {}
-) {
+function makeEngine(system, { actorInventoryCoinSpender = null, actorPropertyCoinSpender = null } = {}) {
   // Wire the spenders onto game.fabricate so the display probe (canCraft) resolves the
   // same spend strategy → spender chain the engine does.
   if (globalThis.game?.fabricate) {
@@ -303,16 +296,11 @@ function makeEngine(
   const recipeManager = makeRecipeManager();
   // Wire a probe so the stub canCraft mirrors real affordability.
   const { buildCurrencyAffordProbe } = globalThis.__currencyAffordance;
-  recipeManager._probe = (actor) =>
-    buildCurrencyAffordProbe(actor, { craftingSystemId: system.id });
+  recipeManager._probe = (actor) => buildCurrencyAffordProbe(actor, { craftingSystemId: system.id });
   const engine = new CraftingEngine(
     recipeManager,
     null,
-    {
-      getMode: () => 'simple',
-      validateRecipe: () => ({ valid: true }),
-      validateCheckResult: () => true,
-    },
+    { getMode: () => 'simple', validateRecipe: () => ({ valid: true }), validateCheckResult: () => true },
     null,
     null,
     actorInventoryCoinSpender,
@@ -355,10 +343,7 @@ test('selection: currency-fallback when no item satisfies and it is affordable',
   const selection = set.resolveIngredientSelection([], matcher, { affordCurrency: () => true });
   assert.equal(selection.success, true);
   assert.equal(selection.plan.length, 0);
-  assert.deepEqual(
-    selection.currencySpends.map((s) => `${s.amount} ${s.unit}`),
-    ['5 gp']
-  );
+  assert.deepEqual(selection.currencySpends.map((s) => `${s.amount} ${s.unit}`), ['5 gp']);
 });
 
 test('selection: currency-only group unaffordable surfaces a missing entry with need/have', () => {
@@ -404,16 +389,13 @@ test('selection: an essence option still beats currency, and a block that cannot
   const matcher = () => false;
 
   // Enough essence held: the block funds the group and currency is never spent.
-  const funded = set.resolveIngredientSelection([makeItem({ id: 'ember', quantity: 4 })], matcher, {
-    affordCurrency: () => true,
-    resolveItemEssences: () => ({ fire: 1 }),
-  });
-  assert.equal(funded.success, true);
-  assert.equal(
-    funded.currencySpends.length,
-    0,
-    'the essence block beats an affordable currency option'
+  const funded = set.resolveIngredientSelection(
+    [makeItem({ id: 'ember', quantity: 4 })],
+    matcher,
+    { affordCurrency: () => true, resolveItemEssences: () => ({ fire: 1 }) }
   );
+  assert.equal(funded.success, true);
+  assert.equal(funded.currencySpends.length, 0, 'the essence block beats an affordable currency option');
   assert.equal(funded.plan.length, 1);
 
   // Not enough essence held: the failed block backtracks into the currency option.
@@ -423,10 +405,7 @@ test('selection: an essence option still beats currency, and a block that cannot
     { affordCurrency: () => true, resolveItemEssences: () => ({ fire: 1 }) }
   );
   assert.equal(backtracked.success, true, 'the currency option rescues the group');
-  assert.deepEqual(
-    backtracked.currencySpends.map((s) => `${s.amount} ${s.unit}`),
-    ['5 gp']
-  );
+  assert.deepEqual(backtracked.currencySpends.map((s) => `${s.amount} ${s.unit}`), ['5 gp']);
   assert.equal(backtracked.plan.length, 0, 'no essence is consumed on the currency branch');
 });
 
@@ -437,10 +416,7 @@ test('selection: first AFFORDABLE currency option wins among multiple currency o
   const affordCurrency = (m) => m.unit === 'gp';
   const selection = set.resolveIngredientSelection([], () => false, { affordCurrency });
   assert.equal(selection.success, true);
-  assert.deepEqual(
-    selection.currencySpends.map((s) => `${s.amount} ${s.unit}`),
-    ['5 gp']
-  );
+  assert.deepEqual(selection.currencySpends.map((s) => `${s.amount} ${s.unit}`), ['5 gp']);
 });
 
 // ===========================================================================
@@ -516,13 +492,7 @@ test('engine: the insufficient-currency message names the unit, never its genera
   const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 1 } });
   const engine = makeEngine(system, { actorPropertyCoinSpender: new ActorPropertyCoinSpender() });
 
-  const result = await engine.craft(
-    craftingActor,
-    [makeDnd5eActor({ id: 'src' })],
-    recipe,
-    null,
-    {}
-  );
+  const result = await engine.craft(craftingActor, [makeDnd5eActor({ id: 'src' })], recipe, null, {});
 
   assert.equal(result.success, false);
   assert.match(result.message, /Insufficient currency/i, 'the shipped message shape is unchanged');
@@ -559,13 +529,7 @@ test('engine: an INCOMPLETE currency requirement does not render as a zero-amoun
   const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 1 } });
   const engine = makeEngine(system, { actorPropertyCoinSpender: new ActorPropertyCoinSpender() });
 
-  const result = await engine.craft(
-    craftingActor,
-    [makeDnd5eActor({ id: 'src' })],
-    recipe,
-    null,
-    {}
-  );
+  const result = await engine.craft(craftingActor, [makeDnd5eActor({ id: 'src' })], recipe, null, {});
 
   assert.equal(result.success, false, 'the craft still fails on the unsatisfiable item group');
   assert.doesNotMatch(
@@ -636,11 +600,7 @@ test('engine: pf2e currency spends through the inventory adapter (no actor.updat
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   assert.equal(result.success, true, result.message);
-  assert.deepEqual(
-    craftingActor.removeCalls,
-    [{ gp: 3 }],
-    'spent via removeCoins, not actor.update'
-  );
+  assert.deepEqual(craftingActor.removeCalls, [{ gp: 3 }], 'spent via removeCoins, not actor.update');
   assert.equal(craftingActor.inventory.coins.gp, 2, 'gp 5 - 3 = 2');
 });
 
@@ -778,10 +738,7 @@ test('RecipeManager.evaluateCraftability: unaffordable currency shows the Insuff
   setupGame(system);
   globalThis.game.fabricate.getActorPropertyCoinSpender = () => new ActorPropertyCoinSpender();
   const manager = new RecipeManager();
-  const recipe = {
-    craftingSystemId: 'sys-cur',
-    ingredientSets: [makeSet([[currencyOption('gp', 5)]])],
-  };
+  const recipe = { craftingSystemId: 'sys-cur', ingredientSets: [makeSet([[currencyOption('gp', 5)]])] };
   const actor = makeDnd5eActor({ id: 'broke', currency: { gp: 1 } });
 
   const result = manager.evaluateCraftability([actor], recipe, { craftingActor: actor });
@@ -798,21 +755,12 @@ test('RecipeManager.evaluateCraftability: an affordable actor flips a currency-o
   setupGame(system);
   globalThis.game.fabricate.getActorPropertyCoinSpender = () => new ActorPropertyCoinSpender();
   const manager = new RecipeManager();
-  const recipe = {
-    craftingSystemId: 'sys-cur',
-    ingredientSets: [makeSet([[currencyOption('gp', 5)]])],
-  };
+  const recipe = { craftingSystemId: 'sys-cur', ingredientSets: [makeSet([[currencyOption('gp', 5)]])] };
   const rich = makeDnd5eActor({ id: 'rich', currency: { gp: 100 } });
 
-  assert.equal(
-    manager.evaluateCraftability([rich], recipe, { craftingActor: rich }).canCraft,
-    true
-  );
+  assert.equal(manager.evaluateCraftability([rich], recipe, { craftingActor: rich }).canCraft, true);
   // A null crafting actor → currency shows missing (no crash).
-  assert.equal(
-    manager.evaluateCraftability([rich], recipe, { craftingActor: null }).canCraft,
-    false
-  );
+  assert.equal(manager.evaluateCraftability([rich], recipe, { craftingActor: null }).canCraft, false);
 });
 
 test('RecipeManager.evaluateCraftability: currency option costLabel resolves the unit to a human label, never the id', () => {
@@ -894,6 +842,7 @@ test('RecipeManager.evaluateCraftability: currency option NAME and group name re
   );
   // And the sibling cost row still agrees with it, which is the whole complaint.
   assert.equal(currencyOption_.costLabel, '1 Coins');
+
 });
 
 // A group with NO authored name, so `_defaultGroupName` actually runs. `makeSet` always authors
@@ -1171,26 +1120,14 @@ test('engine: a THROWN currency lookup fails closed in both directions', async (
     },
   });
 
-  const engine = new CraftingEngine(
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    new ActorPropertyCoinSpender()
-  );
+  const engine = new CraftingEngine(null, null, null, null, null, null, new ActorPropertyCoinSpender());
   const recipe = { craftingSystemId: system.id };
   const spends = [{ unit: 'gp', amount: 5 }];
   const actor = new CurrencyCraftingActorFake('Spender', { currency: { gp: 47 } });
 
   const spend = await engine._spendCraftCurrency(actor, recipe, spends);
   assert.equal(spend.valid, false, 'a thrown deduction is never reported as valid');
-  assert.deepEqual(
-    spend.settledSpends,
-    [],
-    'a thrown deduction settles NOTHING, so it records nothing'
-  );
+  assert.deepEqual(spend.settledSpends, [], 'a thrown deduction settles NOTHING, so it records nothing');
   assert.deepEqual(spend.groups, []);
 
   const refund = await engine._refundCraftCurrency(actor, recipe, spends);

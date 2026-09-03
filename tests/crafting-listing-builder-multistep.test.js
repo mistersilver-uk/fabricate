@@ -119,11 +119,7 @@ function tentRecipe({ stepDurations = [null, null], ...extra } = {}) {
           ]),
         ],
         resultGroups: [
-          {
-            id: 'rg-1',
-            name: 'Truesilver',
-            results: [{ componentId: 'c-truesilver', quantity: 1 }],
-          },
+          { id: 'rg-1', name: 'Truesilver', results: [{ componentId: 'c-truesilver', quantity: 1 }] },
         ],
       },
       {
@@ -252,13 +248,10 @@ test('projects each timed step duration and a field-wise multi-step aggregate', 
     items: stockedActor(),
   });
 
-  assert.deepEqual(
-    model.steps.map((step) => step.duration),
-    [
-      { minutes: 30, hours: 0, days: 1, months: 0, years: 0 },
-      { minutes: 0, hours: 1, days: 0, months: 2, years: 0 },
-    ]
-  );
+  assert.deepEqual(model.steps.map((step) => step.duration), [
+    { minutes: 30, hours: 0, days: 1, months: 0, years: 0 },
+    { minutes: 0, hours: 1, days: 0, months: 2, years: 0 },
+  ]);
   assert.deepEqual(
     model.duration,
     { minutes: 30, hours: 1, days: 1, months: 2, years: 0 },
@@ -285,10 +278,10 @@ test('omits instant step durations and aggregates only positive timed steps', ()
     months: 0,
     years: 0,
   });
-  assert.deepEqual(
-    model.steps.map((step) => step.duration),
-    [{ minutes: 30, hours: 0, days: 0, months: 0, years: 0 }, null]
-  );
+  assert.deepEqual(model.steps.map((step) => step.duration), [
+    { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
+    null,
+  ]);
 });
 
 test('labels an unnamed step by its 1-based position (never the id)', () => {
@@ -376,7 +369,9 @@ test('does not project stale recipe-level duration for an explicit one-step reci
         id: 'step-rope',
         name: 'Twist rope',
         timeRequirement: { minutes: 30, hours: 0, days: 0, months: 0, years: 0 },
-        ingredientSets: [ingredientSet('set-rope', [{ componentId: 'c-cloth', quantity: 3 }])],
+        ingredientSets: [
+          ingredientSet('set-rope', [{ componentId: 'c-cloth', quantity: 3 }]),
+        ],
         resultGroups: [
           { id: 'rg', name: 'Rope', results: [{ componentId: 'c-tent', quantity: 1 }] },
         ],
@@ -406,10 +401,7 @@ test('suppresses authored recipe and step durations when time requirements are d
   });
 
   assert.equal(model.duration, null);
-  assert.deepEqual(
-    model.steps.map((step) => step.duration),
-    [null, null]
-  );
+  assert.deepEqual(model.steps.map((step) => step.duration), [null, null]);
   assert.equal(source.steps[0].timeRequirement.minutes, 30, 'projection does not mutate authoring');
 });
 
@@ -485,17 +477,13 @@ function toolUnionRecipe() {
         name: 'Stitch',
         toolIds: ['tool-awl'],
         ingredientSets: [ingredientSet('set-1', [{ componentId: 'c-cloth', quantity: 1 }])],
-        resultGroups: [
-          { id: 'rg-1', name: 'Panel', results: [{ componentId: 'c-truesilver', quantity: 1 }] },
-        ],
+        resultGroups: [{ id: 'rg-1', name: 'Panel', results: [{ componentId: 'c-truesilver', quantity: 1 }] }],
       },
       {
         id: 'step-2',
         name: 'Raise',
         ingredientSets: [ingredientSet('set-2', [{ componentId: 'c-lumber', quantity: 1 }])],
-        resultGroups: [
-          { id: 'rg-2', name: 'Tent', results: [{ componentId: 'c-tent', quantity: 1 }] },
-        ],
+        resultGroups: [{ id: 'rg-2', name: 'Tent', results: [{ componentId: 'c-tent', quantity: 1 }] }],
       },
     ],
   });
@@ -539,11 +527,7 @@ test('a missing union tool flips first-step craftability to not craftable', () =
     // Hold the step-level awl but NOT the recipe-level needle.
     items: [new FakeItem('Cloth Scrap', 1), new FakeItem('Iron Awl', 1)],
   });
-  assert.equal(
-    recipe.ingredientSets[0].craftability.canCraft,
-    false,
-    'missing needle → not craftable'
-  );
+  assert.equal(recipe.ingredientSets[0].craftability.canCraft, false, 'missing needle → not craftable');
   assert.equal(recipe.browseStatus, 'missingMaterials');
 });
 

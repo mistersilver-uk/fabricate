@@ -240,7 +240,10 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'and the min-width without which overflow never engages on a flex item'
     );
     // The full name stays reachable. Truncation that loses text is a defect, not a fix.
-    assert.ok(rowSource.includes('nameTitle={essence.name}'), 'the whole name survives as a title');
+    assert.ok(
+      rowSource.includes('nameTitle={essence.name}'),
+      'the whole name survives as a title'
+    );
     // LIST rows are untouched: a 76px row beside a clamped description has the width, and
     // truncating there would hide names the list can show. The card's clamp lives on the
     // card's OWN class now, so it cannot reach the list row's `.manager-system-name` at all.
@@ -402,7 +405,9 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'so the picker + reset row beneath fills the tile width instead of sizing itself'
     );
     assert.ok(
-      globalCss.includes('grid-template-columns: 124px minmax(0, 1fr);'),
+      globalCss.includes(
+        'grid-template-columns: 124px minmax(0, 1fr);'
+      ),
       'in a column narrowed to the square tile width so the controls sit under it'
     );
     // Unset must stay byte-identical, or this re-types ~40 medallions across the manager.

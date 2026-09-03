@@ -845,50 +845,39 @@ test('one d100 decides every drop row, while events roll independently', async (
           rules: {
             rewardSelectionMode: 'allDrops',
             eventSelectionMode: 'allDrops',
-            eventPolicy: 'successWithEvent',
+            eventPolicy: 'successWithEvent'
           },
-          tasks: [
-            {
-              id: 'task-d100',
-              name: 'Forage',
-              dropRows: [
-                { id: 'drop-common', componentId: 'herb', quantity: 1, dropRate: 10 },
-                { id: 'drop-rare', componentId: 'root', quantity: 1, dropRate: 80 },
-              ],
-            },
-          ],
+          tasks: [{
+            id: 'task-d100',
+            name: 'Forage',
+            dropRows: [
+              { id: 'drop-common', componentId: 'herb', quantity: 1, dropRate: 10 },
+              { id: 'drop-rare', componentId: 'root', quantity: 1, dropRate: 80 }
+            ]
+          }],
           events: [
             { id: 'event-a', name: 'Snakebite', dropRate: 10 },
-            { id: 'event-b', name: 'Rockfall', dropRate: 10 },
-          ],
-        },
-      },
-    },
+            { id: 'event-b', name: 'Rockfall', dropRate: 10 }
+          ]
+        }
+      }
+    }
   });
   const calls = {};
   const engine = makeEngine({ richState: service, env: environment(), calls });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-d100',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-d100' });
 
   assert.equal(result.accepted, true);
   const { items, events } = calls.terminal[0].payload.checkResult;
+  assert.deepEqual(items.map(row => row.id), ['drop-rare'], 'only the row the one roll cleared');
   assert.deepEqual(
-    items.map((row) => row.id),
-    ['drop-rare'],
-    'only the row the one roll cleared'
-  );
-  assert.deepEqual(
-    [...new Set(items.map((row) => row.roll))],
+    [...new Set(items.map(row => row.roll))],
     [50],
     'every row was tested against the SAME attempt roll'
   );
   assert.deepEqual(
-    events.map((row) => row.id),
+    events.map(row => row.id),
     ['event-a'],
     'two events at one rate split, so they did not share the attempt roll'
   );

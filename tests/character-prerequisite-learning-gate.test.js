@@ -71,13 +71,7 @@ class FakeActor extends FakeDoc {
 // It is not an assertion about any game system's shape, and specifically not about pf2e,
 // whose real prerequisite paths must root at `actor.` — see
 // tests/character-prerequisites.test.js, which pins the shipped preset bundles.
-const EXPERT = {
-  id: 'p-expert',
-  name: 'Expert Crafter',
-  path: 'skills.cra.rank',
-  op: 'gte',
-  value: 2,
-};
+const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 };
 
 // `limitLearning` defaults ON: the character-prerequisite gate is only enforced when
 // Limited learning is on (issue 544). `capped` additionally sets a finite learn count.
@@ -137,10 +131,7 @@ function buildService(system, recipes) {
 test('learnRecipe: ungated book is learnable', async () => {
   const system = buildSystem({ characterPrerequisiteIds: [] });
   const recipe = buildRecipe();
-  const actor = new FakeActor({
-    items: [new FakeItem()],
-    rollData: { skills: { cra: { rank: 0 } } },
-  });
+  const actor = new FakeActor({ items: [new FakeItem()], rollData: { skills: { cra: { rank: 0 } } } });
   const result = await buildService(system, [recipe]).learnRecipe({ recipe, craftingActor: actor });
   assert.equal(result.success, true);
 });
@@ -148,10 +139,7 @@ test('learnRecipe: ungated book is learnable', async () => {
 test('learnRecipe: gate passes when the actor meets the character prerequisite', async () => {
   const system = buildSystem();
   const recipe = buildRecipe();
-  const actor = new FakeActor({
-    items: [new FakeItem()],
-    rollData: { skills: { cra: { rank: 3 } } },
-  });
+  const actor = new FakeActor({ items: [new FakeItem()], rollData: { skills: { cra: { rank: 3 } } } });
   const result = await buildService(system, [recipe]).learnRecipe({ recipe, craftingActor: actor });
   assert.equal(result.success, true);
 });
@@ -159,10 +147,7 @@ test('learnRecipe: gate passes when the actor meets the character prerequisite',
 test('learnRecipe: gate blocks a failing actor with a reason', async () => {
   const system = buildSystem();
   const recipe = buildRecipe();
-  const actor = new FakeActor({
-    items: [new FakeItem()],
-    rollData: { skills: { cra: { rank: 1 } } },
-  });
+  const actor = new FakeActor({ items: [new FakeItem()], rollData: { skills: { cra: { rank: 1 } } } });
   const result = await buildService(system, [recipe]).learnRecipe({ recipe, craftingActor: actor });
   assert.equal(result.success, false);
   assert.equal(result.message, 'FABRICATE.Knowledge.CharacterPrerequisiteNotMet');
@@ -173,10 +158,7 @@ test('learnRecipe: the gate is NOT enforced when Limited learning is off (issue 
   // A failing actor learns freely because the toggle governs both gates now.
   const system = buildSystem({ limitLearning: false });
   const recipe = buildRecipe();
-  const actor = new FakeActor({
-    items: [new FakeItem()],
-    rollData: { skills: { cra: { rank: 0 } } },
-  });
+  const actor = new FakeActor({ items: [new FakeItem()], rollData: { skills: { cra: { rank: 0 } } } });
   const result = await buildService(system, [recipe]).learnRecipe({ recipe, craftingActor: actor });
   assert.equal(result.success, true);
 });
@@ -192,10 +174,7 @@ test('learnRecipe: a dangling prerequisite id fails open (no definition ⇒ unga
 test('learnRecipeFromOwnedBook: gate blocks a failing actor', async () => {
   const system = buildSystem();
   const recipe = buildRecipe();
-  const actor = new FakeActor({
-    items: [new FakeItem()],
-    rollData: { skills: { cra: { rank: 0 } } },
-  });
+  const actor = new FakeActor({ items: [new FakeItem()], rollData: { skills: { cra: { rank: 0 } } } });
   const result = await buildService(system, [recipe]).learnRecipeFromOwnedBook({
     recipe,
     craftingActor: actor,
@@ -241,7 +220,10 @@ test('previewOwnedItemLearning: a passing actor bulk-learns the book recipes', (
     actor,
     mode: 'auto',
   });
-  assert.deepEqual(preview.learnedRecipes.map((r) => r.id).sort(), ['recipe-1', 'recipe-2']);
+  assert.deepEqual(
+    preview.learnedRecipes.map((r) => r.id).sort(),
+    ['recipe-1', 'recipe-2']
+  );
 });
 
 test('getLearnableRecipesFromItem: a blocked capped recipe is filtered from the picker', () => {
@@ -249,10 +231,7 @@ test('getLearnableRecipesFromItem: a blocked capped recipe is filtered from the 
   const recipes = [buildRecipe(), buildRecipe({ id: 'recipe-2', name: 'Second' })];
   const item = new FakeItem();
   const actor = new FakeActor({ items: [item], rollData: { skills: { cra: { rank: 1 } } } });
-  const state = buildService(system, recipes).getLearnableRecipesFromItem({
-    ownedItem: item,
-    actor,
-  });
+  const state = buildService(system, recipes).getLearnableRecipesFromItem({ ownedItem: item, actor });
   assert.deepEqual(state.recipes, [], 'no recipe offered when the gate fails');
 });
 
@@ -281,26 +260,16 @@ test('learnRecipeFromOwnedBook: gates on the OWNED book, not the recipe’s firs
   };
   const recipe = buildRecipe({ recipeItemId: undefined });
   // The actor owns ONLY book-a and fails p-expert.
-  const ownedA = new FakeItem({
-    uuid: 'Actor.a1.Item.a',
-    sourceId: 'Compendium.world.items.book-a',
-  });
+  const ownedA = new FakeItem({ uuid: 'Actor.a1.Item.a', sourceId: 'Compendium.world.items.book-a' });
   const actor = new FakeActor({ items: [ownedA], rollData: { skills: { cra: { rank: 0 } } } });
   const result = await buildService(system, [recipe]).learnRecipeFromOwnedBook({
     recipe,
     craftingActor: actor,
   });
-  assert.equal(
-    result.success,
-    true,
-    'gates on the owned (ungated) book, not the gated first-member book'
-  );
+  assert.equal(result.success, true, 'gates on the owned (ungated) book, not the gated first-member book');
 
   // Reverse: owning the gated book-b while failing → blocked.
-  const ownedB = new FakeItem({
-    uuid: 'Actor.a1.Item.b',
-    sourceId: 'Compendium.world.items.book-b',
-  });
+  const ownedB = new FakeItem({ uuid: 'Actor.a1.Item.b', sourceId: 'Compendium.world.items.book-b' });
   const actor2 = new FakeActor({ items: [ownedB], rollData: { skills: { cra: { rank: 0 } } } });
   const blocked = await buildService(system, [recipe]).learnRecipeFromOwnedBook({
     recipe,
@@ -313,10 +282,7 @@ test('learnRecipeFromOwnedBook: gates on the OWNED book, not the recipe’s firs
 test('learnRecipeOnCraft: a blocked actor does not auto-learn on craft', async () => {
   const system = buildSystem();
   const recipe = buildRecipe();
-  const actor = new FakeActor({
-    items: [new FakeItem()],
-    rollData: { skills: { cra: { rank: 1 } } },
-  });
+  const actor = new FakeActor({ items: [new FakeItem()], rollData: { skills: { cra: { rank: 1 } } } });
   await buildService(system, [recipe]).learnRecipeOnCraft(recipe, actor);
   assert.equal(actor.getFlag('fabricate', 'fabricate.learnedRecipes'), undefined);
 });

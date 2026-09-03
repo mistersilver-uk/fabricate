@@ -24,8 +24,9 @@ installFoundryEnv();
 
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
-const { SignatureValidator, readSignatureCounters, resetSignatureCounters } =
-  await import('../src/systems/SignatureValidator.js');
+const { SignatureValidator, readSignatureCounters, resetSignatureCounters } = await import(
+  '../src/systems/SignatureValidator.js'
+);
 const { REVISION_SCOPES } = await import('../src/systems/revisionTokens.js');
 const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
 
@@ -130,9 +131,7 @@ function enabledClone(recipe) {
 
 /** Every conflict message the cached activation gate reports for one stored recipe. */
 function gateMessages(manager, recipeId) {
-  return manager
-    .canActivateRecipe(recipeId)
-    .issues.filter((issue) => issue.code === 'signatureCollision');
+  return manager.canActivateRecipe(recipeId).issues.filter((issue) => issue.code === 'signatureCollision');
 }
 
 // A corpus with three distinct collision shapes: a plain colliding pair, a bystander that
@@ -186,9 +185,7 @@ describe('the cached alchemy signature gate agrees with the full-audit oracle', 
     // set, so a naive "conflicts I found, in the order I found them" would invert the pair.
     const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
     const candidate = enabledClone(manager.getRecipe('r-d'));
-    const cached = manager
-      .canActivateRecipe('r-d')
-      .issues.filter((i) => i.code === 'signatureCollision');
+    const cached = manager.canActivateRecipe('r-d').issues.filter((i) => i.code === 'signatureCollision');
     assert.deepEqual(
       cached.map((issue) => issue.message),
       oracleConflicts(manager, systemManager, candidate).map((conflict) => conflict.message)
@@ -202,10 +199,7 @@ describe('the cached alchemy signature gate agrees with the full-audit oracle', 
     // colliders (r-a, r-b). Discovery order is therefore set-by-set while audit order is
     // collider-by-collider, so the two disagree unless the pairs are re-sorted into the audit's
     // own `(cohortIndex, setIndex)` order.
-    const corpus = [
-      ...COLLIDING_CORPUS,
-      recipePayload('r-z', [['c2'], ['c1']], { enabled: false }),
-    ];
+    const corpus = [...COLLIDING_CORPUS, recipePayload('r-z', [['c2'], ['c1']], { enabled: false })];
     const { manager, systemManager } = makeManager({ recipes: corpus });
     const candidate = enabledClone(manager.getRecipe('r-z'));
 
@@ -315,9 +309,7 @@ describe('the signature report invalidates when the world moves under it', () =>
     assert.equal(gateMessages(manager, 'r-e').length, 3);
 
     // Move r-a off the shared signature: r-e now collides with r-b and r-d only.
-    await manager.updateRecipe('r-a', {
-      ingredientSets: recipePayload('r-a', [['c4']]).ingredientSets,
-    });
+    await manager.updateRecipe('r-a', { ingredientSets: recipePayload('r-a', [['c4']]).ingredientSets });
     assert.equal(gateMessages(manager, 'r-e').length, 2, 'a stale report would still report 3');
   });
 
@@ -390,10 +382,7 @@ describe('the signature report invalidates when the world moves under it', () =>
     // consumed rather than inferred from the object graph: the map is the same object at the
     // same size, the system and its components are untouched, and the newcomer is disabled so
     // the enabled cohort does not move either. Only `recipes:<systemId>` advanced.
-    const outsider = {
-      ...recipePayload('r-x', [['c1']], { enabled: false }),
-      craftingSystemId: 'other',
-    };
+    const outsider = { ...recipePayload('r-x', [['c1']], { enabled: false }), craftingSystemId: 'other' };
     const { manager } = makeManager({ recipes: [...COLLIDING_CORPUS, outsider] });
     assert.equal(gateMessages(manager, 'r-e').length, 3, 'warm the report BEFORE the move');
     assert.deepEqual(gateMessages(manager, 'r-x'), [], 'r-x starts in another system');
@@ -664,8 +653,7 @@ describe('non-alchemy systems are untouched by the signature report', () => {
 
       for (const id of [...manager.recipes.keys()]) {
         assert.equal(
-          manager.canActivateRecipe(id).issues.filter((i) => i.code === 'signatureCollision')
-            .length,
+          manager.canActivateRecipe(id).issues.filter((i) => i.code === 'signatureCollision').length,
           0,
           'signature uniqueness is an alchemy-only rule'
         );
@@ -823,11 +811,7 @@ function priorEditorAudit(manager, systemManager, recipeId, draftRecipe = null) 
         String(conflict.recipeA?.id) === String(recipeId) ||
         String(conflict.recipeB?.id) === String(recipeId)
     )
-    .map((conflict) => ({
-      code: conflict.code,
-      params: conflict.params,
-      message: conflict.message,
-    }));
+    .map((conflict) => ({ code: conflict.code, params: conflict.params, message: conflict.message }));
 }
 
 /**
@@ -1049,11 +1033,7 @@ describe('the recipe editor predicts a collision without auditing the system', (
 
     assert.equal(small.cold.reportBuilds, 1, 'the first keystroke compiles the report once');
     assert.equal(large.cold.reportBuilds, 1);
-    assert.equal(
-      small.warm.reportBuilds,
-      0,
-      `${keystrokes} further keystrokes must recompile nothing`
-    );
+    assert.equal(small.warm.reportBuilds, 0, `${keystrokes} further keystrokes must recompile nothing`);
     assert.equal(large.warm.reportBuilds, 0);
 
     // One comparison per keystroke — the draft's single indexed collider — at BOTH sizes.
@@ -1063,11 +1043,7 @@ describe('the recipe editor predicts a collision without auditing the system', (
       small.warm.signatureComparisons,
       'a comparison count that grew with the corpus would be an audit in disguise'
     );
-    assert.equal(
-      small.conflicts.length,
-      1,
-      'the draft really does collide, so the count is not zero-work'
-    );
+    assert.equal(small.conflicts.length, 1, 'the draft really does collide, so the count is not zero-work');
     assert.equal(large.conflicts.length, 1);
 
     // The premise: the two corpora genuinely differ in size, and the cold audit shows it.

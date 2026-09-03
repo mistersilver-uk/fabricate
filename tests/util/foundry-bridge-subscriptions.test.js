@@ -210,12 +210,8 @@ describe('subscribeCraftingDataChange', () => {
 
   it('narrows on the RECOGNISED names when a change mixes known and unknown', () => {
     const seen = [];
-    subscribeCraftingDataChange(() => seen.push('labelling-subscriber'), {
-      domains: ['labelling'],
-    });
-    subscribeCraftingDataChange(() => seen.push('narrative-subscriber'), {
-      domains: ['narrative'],
-    });
+    subscribeCraftingDataChange(() => seen.push('labelling-subscriber'), { domains: ['labelling'] });
+    subscribeCraftingDataChange(() => seen.push('narrative-subscriber'), { domains: ['narrative'] });
 
     hooks.fire(CRAFTING_DATA_CHANGED_HOOK, change('labelling', 'a-domain-from-a-newer-build'));
 

@@ -7,7 +7,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
-  CRAFTING_APP_COMPILED_MODULES,
+  CRAFTING_APP_COMPILED_MODULES
 } from '../helpers/svelte-component-harness.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import { aggregateShoppingList } from '../../src/ui/svelte/util/shoppingListAggregator.js';
@@ -19,7 +19,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-shopping-list-',
   rawModules: CRAFTING_APP_RAW_MODULES,
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
-  componentPath: 'src/ui/svelte/apps/crafting/ShoppingList.svelte',
+  componentPath: 'src/ui/svelte/apps/crafting/ShoppingList.svelte'
 });
 
 function aggregate(overrides = {}) {
@@ -33,7 +33,7 @@ function aggregate(overrides = {}) {
         totalNeed: 4,
         have: 2,
         missing: 2,
-        satisfied: false,
+        satisfied: false
       },
       {
         componentId: 'c2',
@@ -43,15 +43,15 @@ function aggregate(overrides = {}) {
         totalNeed: 2,
         have: 2,
         missing: 0,
-        satisfied: true,
-      },
+        satisfied: true
+      }
     ],
     essences: [],
     tools: [],
     allSatisfied: false,
     totalRecipes: 1,
     totalQuantity: 2,
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -84,11 +84,7 @@ describe('ShoppingList mounted behavior', () => {
     const target = await harness.mount({ aggregate: aggregate(), entries: [ENTRY] });
 
     assert.equal(summaryCount(target, 'recipes'), '1', 'planned recipes');
-    assert.equal(
-      summaryCount(target, 'components'),
-      '1',
-      'one missing component (fully-owned dropped)'
-    );
+    assert.equal(summaryCount(target, 'components'), '1', 'one missing component (fully-owned dropped)');
     assert.equal(summaryCount(target, 'tools'), '0');
 
     assert.ok(target.querySelector('[data-shopping-entry="recipe-1"]'), 'queued recipe rendered');
@@ -114,17 +110,13 @@ describe('ShoppingList mounted behavior', () => {
           totalNeed: 2,
           have: 2,
           missing: 0,
-          satisfied: true,
-        },
+          satisfied: true
+        }
       ],
-      allSatisfied: true,
+      allSatisfied: true
     });
     const target = await harness.mount({ aggregate: satisfied, entries: [ENTRY] });
-    assert.equal(
-      target.querySelector('[data-shopping-acquire-components]'),
-      null,
-      'no components card'
-    );
+    assert.equal(target.querySelector('[data-shopping-acquire-components]'), null, 'no components card');
     assert.equal(summaryCount(target, 'components'), '0');
   });
 
@@ -132,19 +124,9 @@ describe('ShoppingList mounted behavior', () => {
     const target = await harness.mount({
       aggregate: aggregate({
         ingredients: [],
-        essences: [
-          {
-            type: 'fire',
-            name: 'Fire',
-            icon: 'fa-solid fa-fire',
-            totalNeed: 2,
-            have: 0,
-            missing: 2,
-            satisfied: false,
-          },
-        ],
+        essences: [{ type: 'fire', name: 'Fire', icon: 'fa-solid fa-fire', totalNeed: 2, have: 0, missing: 2, satisfied: false }]
       }),
-      entries: [ENTRY],
+      entries: [ENTRY]
     });
     const card = target.querySelector('[data-shopping-acquire-components]');
     assert.ok(card, 'components card rendered for the essence');
@@ -196,24 +178,12 @@ describe('ShoppingList mounted behavior', () => {
     const target = await harness.mount({
       aggregate: aggregate({
         tools: [
-          {
-            componentId: 't1',
-            name: 'Hammer',
-            img: 'icons/hammer.webp',
-            available: false,
-            needsRepair: false,
-          },
-          {
-            componentId: 't2',
-            name: 'Anvil',
-            img: 'icons/anvil.webp',
-            available: false,
-            needsRepair: true,
-          },
-          { componentId: 't3', name: 'Saw', img: null, available: true, needsRepair: false },
-        ],
+          { componentId: 't1', name: 'Hammer', img: 'icons/hammer.webp', available: false, needsRepair: false },
+          { componentId: 't2', name: 'Anvil', img: 'icons/anvil.webp', available: false, needsRepair: true },
+          { componentId: 't3', name: 'Saw', img: null, available: true, needsRepair: false }
+        ]
       }),
-      entries: [ENTRY],
+      entries: [ENTRY]
     });
     const card = target.querySelector('[data-shopping-acquire-tools]');
     assert.ok(card, 'acquire-tools card rendered');
@@ -234,7 +204,7 @@ describe('ShoppingList mounted behavior', () => {
       aggregate: aggregate(),
       entries: [{ recipeId: 'recipe-1', quantity: 3, name: 'Healing Potion', img: null }],
       onIncrement: (id) => inc.push(id),
-      onDecrement: (id) => dec.push(id),
+      onDecrement: (id) => dec.push(id)
     });
 
     const row = target.querySelector('[data-shopping-entry="recipe-1"]');
@@ -254,7 +224,7 @@ describe('ShoppingList mounted behavior', () => {
       aggregate: aggregate(),
       entries: [ENTRY],
       onRemove: (id) => removed.push(id),
-      onIncrement: (id) => inc.push(id),
+      onIncrement: (id) => inc.push(id)
     });
 
     target.querySelector('.crafting-shopping-remove').click();
@@ -311,7 +281,7 @@ describe('ShoppingList mounted behavior', () => {
     const target = await harness.mount({
       aggregate: aggregate(),
       entries: [ENTRY],
-      onIncrement: (id) => inc.push(id),
+      onIncrement: (id) => inc.push(id)
     });
 
     const entry = target.querySelector('[data-shopping-entry="recipe-1"]');
@@ -331,7 +301,7 @@ describe('ShoppingList mounted behavior', () => {
     assert.deepEqual(
       inc,
       [],
-      "no listener of ours answers a keydown — activation is the UA's job now, and it" +
+      'no listener of ours answers a keydown — activation is the UA\'s job now, and it' +
         ' delivers it as the click asserted next'
     );
 
@@ -359,7 +329,7 @@ describe('ShoppingList mounted behavior', () => {
       'height: auto',
       'min-height:',
       'flex: 1 1 auto',
-      'min-width: 0',
+      'min-width: 0'
     ]) {
       assert.ok(
         block.includes(declaration),

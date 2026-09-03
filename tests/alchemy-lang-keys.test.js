@@ -17,9 +17,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function resolveKey(langRoot, dottedKey) {
-  return dottedKey
-    .split('.')
-    .reduce((node, part) => (node == null ? undefined : node[part]), langRoot);
+  return dottedKey.split('.').reduce((node, part) => (node == null ? undefined : node[part]), langRoot);
 }
 
 test('every FABRICATE.App.Alchemy.* key referenced by the alchemy UI resolves in en.json', () => {

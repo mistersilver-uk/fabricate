@@ -4482,7 +4482,10 @@ describe('RecipeEditView (mounted)', () => {
     // `assert.ok(!node)` rather than `assert.equal(node, null)`: on failure `node:assert`
     // serialises the actual value to build its diff and walks a mounted happy-dom element's
     // circular tree until the heap dies, so the assertion surfaces as an unattributed OOM.
-    assert.ok(!row.querySelector('[data-recipe-tags-empty]'), 'the dashed No tags set box is gone');
+    assert.ok(
+      !row.querySelector('[data-recipe-tags-empty]'),
+      'the dashed No tags set box is gone'
+    );
     assert.ok(
       !row.querySelector('.manager-recipe-option-tags-detail'),
       'and so is the full-width second line it sat on'

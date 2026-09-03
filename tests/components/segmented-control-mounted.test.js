@@ -17,17 +17,12 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-segmented-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: ['src/ui/svelte/apps/manager/SegmentedControl.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/SegmentedControl.svelte'
 });
 
 const OPTIONS = [
-  {
-    value: 'destroyed',
-    labelKey: 'FABRICATE.X.Destroyed',
-    fallback: 'Destroyed',
-    icon: 'fas fa-trash',
-  },
-  { value: 'inert', labelKey: 'FABRICATE.X.Inert', fallback: 'Becomes inert' },
+  { value: 'destroyed', labelKey: 'FABRICATE.X.Destroyed', fallback: 'Destroyed', icon: 'fas fa-trash' },
+  { value: 'inert', labelKey: 'FABRICATE.X.Inert', fallback: 'Becomes inert' }
 ];
 
 before(() => harness.setup());
@@ -36,17 +31,13 @@ afterEach(() => harness.remount());
 
 describe('SegmentedControl (mounted)', () => {
   it('renders one radio segment per option with the fallback labels', async () => {
-    const root = await harness.mount({
-      options: OPTIONS,
-      value: 'destroyed',
-      groupName: 'when-spent',
-    });
+    const root = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'when-spent' });
     const segments = root.querySelectorAll('.manager-segment');
     assert.equal(segments.length, 2);
     const radios = root.querySelectorAll('input[type="radio"]');
     assert.equal(radios.length, 2);
     assert.equal(radios[0].getAttribute('name'), 'when-spent');
-    const labels = [...root.querySelectorAll('.manager-segment-label')].map((n) => n.textContent);
+    const labels = [...root.querySelectorAll('.manager-segment-label')].map(n => n.textContent);
     assert.deepEqual(labels, ['Destroyed', 'Becomes inert']);
   });
 
@@ -66,7 +57,7 @@ describe('SegmentedControl (mounted)', () => {
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      onChange: (v) => calls.push(v),
+      onChange: (v) => calls.push(v)
     });
     const inertRadio = root.querySelectorAll('input[type="radio"]')[1];
     inertRadio.checked = true;
@@ -80,7 +71,7 @@ describe('SegmentedControl (mounted)', () => {
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      onChange: (v) => calls.push(v),
+      onChange: (v) => calls.push(v)
     });
     const destroyedRadio = root.querySelectorAll('input[type="radio"]')[0];
     destroyedRadio.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
@@ -99,7 +90,7 @@ describe('SegmentedControl (mounted)', () => {
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      fill: true,
+      fill: true
     });
     assert.ok(
       filled.querySelector('.manager-segmented.is-fill'),
@@ -111,7 +102,7 @@ describe('SegmentedControl (mounted)', () => {
     const options = [
       { value: 'success', variant: 'success', fallback: 'Automatic success' },
       { value: 'none', variant: 'neutral', fallback: 'No effect' },
-      { value: 'failure', variant: 'danger', fallback: 'Automatic failure' },
+      { value: 'failure', variant: 'danger', fallback: 'Automatic failure' }
     ];
     const root = await harness.mount({ options, value: 'failure', groupName: 'g' });
     const seg = (value) =>
@@ -141,12 +132,12 @@ describe('SegmentedControl (mounted)', () => {
     const options = [
       { value: 'minor', variant: 'info', fallback: 'Minor' },
       { value: 'major', variant: 'warning', fallback: 'Major' },
-      { value: 'severe', variant: 'danger', fallback: 'Severe' },
+      { value: 'severe', variant: 'danger', fallback: 'Severe' }
     ];
     for (const { value, variant } of [
       { value: 'minor', variant: 'info' },
       { value: 'major', variant: 'warning' },
-      { value: 'severe', variant: 'danger' },
+      { value: 'severe', variant: 'danger' }
     ]) {
       const root = await harness.mount({ options, value, groupName: 'severity' });
       const active = root.querySelector('.manager-segment.is-active');
@@ -186,14 +177,14 @@ describe('SegmentedControl (mounted)', () => {
     const calls = [];
     const options = [
       { value: 'a', fallback: 'A' },
-      { value: 'b', fallback: 'B', disabled: true },
+      { value: 'b', fallback: 'B', disabled: true }
     ];
     const root = await harness.mount({
       options,
       value: 'a',
       groupName: 'g',
       optionDataAttr: 'data-seg',
-      onChange: (v) => calls.push(v),
+      onChange: (v) => calls.push(v)
     });
     const disabledSegment = root.querySelector('[data-seg="b"]');
     assert.ok(disabledSegment.classList.contains('is-disabled'), 'the segment is marked disabled');
@@ -226,7 +217,7 @@ describe('SegmentedControl (mounted)', () => {
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      iconOnly: true,
+      iconOnly: true
     });
     assert.ok(
       compact.querySelector('.manager-segmented.is-icon-only'),
@@ -245,7 +236,7 @@ describe('SegmentedControl (mounted)', () => {
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      iconOnly: true,
+      iconOnly: true
     });
     assert.deepEqual(
       [...compact.querySelectorAll('.manager-segment-label')].map((n) => n.textContent),
@@ -280,7 +271,7 @@ describe('SegmentedControl (mounted)', () => {
       value: 'destroyed',
       groupName: 'g',
       iconOnly: true,
-      optionDataAttr: 'data-seg',
+      optionDataAttr: 'data-seg'
     });
     const hook = root.querySelector('[data-seg="inert"]');
     assert.ok(Boolean(hook), 'the option hook must resolve to an element');
@@ -316,9 +307,12 @@ describe('SegmentedControl (mounted)', () => {
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      tone: 'tag',
+      tone: 'tag'
     });
-    assert.ok(toned.querySelector('.manager-segmented.is-tag'), 'tone="tag" marks the TRACK');
+    assert.ok(
+      toned.querySelector('.manager-segmented.is-tag'),
+      'tone="tag" marks the TRACK'
+    );
     // The tone is a track statement, so no segment gains a class: painting the chosen one
     // through `is-tag` on the SEGMENT would collide with the per-option variant ramp, which
     // is the axis this prop deliberately is not.
@@ -336,7 +330,7 @@ describe('SegmentedControl (mounted)', () => {
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      tone: 'wat',
+      tone: 'wat'
     });
     assert.equal(
       unknown.querySelector('.manager-segmented').className.includes('is-wat'),
@@ -351,7 +345,7 @@ describe('SegmentedControl (mounted)', () => {
       value: 'destroyed',
       groupName: 'g',
       dataAttr: 'data-when-spent-control',
-      optionDataAttr: 'data-when-spent-option',
+      optionDataAttr: 'data-when-spent-option'
     });
     assert.ok(root.querySelector('[data-when-spent-control]'));
     assert.ok(root.querySelector('[data-when-spent-option="inert"]'));

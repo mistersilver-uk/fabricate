@@ -14,7 +14,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
-    'src/ui/svelte/util/gatheringFormat.js',
+    'src/ui/svelte/util/gatheringFormat.js'
   ],
   // `FillBar` joined the tree when issue 1096 rebuilt ChanceBar on the shared primitive
   // `ui-integration/spec.md` §Shared product UI primitives names. Omitting it does not fail
@@ -22,9 +22,9 @@ const harness = createMountedComponentHarness({
   // which is the loud half of the trap; a hand-rolled harness would have HUNG instead.
   compiledModules: [
     'src/ui/svelte/components/FillBar.svelte',
-    'src/ui/svelte/apps/gathering/ChanceBar.svelte',
+    'src/ui/svelte/apps/gathering/ChanceBar.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/gathering/ChanceBar.svelte',
+  componentPath: 'src/ui/svelte/apps/gathering/ChanceBar.svelte'
 });
 
 before(() => harness.setup());
@@ -52,7 +52,10 @@ describe('ChanceBar (mounted)', () => {
     // an assertion left pointing at the retired `.chance-bar-fill` would have passed
     // vacuously the moment `querySelector` started returning null had it been a truthiness
     // check instead of a read.
-    assert.match(root.querySelector('.fab-fill-bar-fill').getAttribute('style'), /^width: 100%;?$/);
+    assert.match(
+      root.querySelector('.fab-fill-bar-fill').getAttribute('style'),
+      /^width: 100%;?$/
+    );
     assert.equal(root.querySelector('.chance-bar-percent').textContent, '100%');
   });
 
@@ -76,7 +79,7 @@ describe('ChanceBar (mounted)', () => {
       [0.8, 'red'],
       [0.6, 'amber'],
       [0.3, 'yellow'],
-      [0.1, 'green'],
+      [0.1, 'green']
     ];
     for (const [value, tier] of cases) {
       const root = await harness.mount({ value, scale: 'event' });
@@ -108,9 +111,9 @@ describe('ChanceBar (mounted)', () => {
       resolve(repoRoot, 'src/ui/svelte/apps/gathering/ChanceBar.svelte'),
       'utf8'
     );
-    const declared = [
-      ...source.matchAll(/\.chance-bar\.tier-\w+\s*\{\s*--chance-bar-fill:\s*([^;]+);/g),
-    ].map(([, value]) => value.trim());
+    const declared = [...source.matchAll(/\.chance-bar\.tier-\w+\s*\{\s*--chance-bar-fill:\s*([^;]+);/g)].map(
+      ([, value]) => value.trim()
+    );
     assert.equal(declared.length, 4, `expected four tier declarations, got ${declared.length}`);
     assert.equal(new Set(declared).size, 4, `expected four distinct fills, got ${declared}`);
     for (const colour of declared) {
@@ -121,10 +124,9 @@ describe('ChanceBar (mounted)', () => {
     // guaranteed-invalid value, so `background` falls back to `transparent` — a fill that
     // paints nothing, under a caption reading a real percentage. The default is declared at
     // lower specificity than the four tiers, so it can only ever apply when none of them does.
-    const base =
-      /\.chance-bar\s*\{\s*(?:\/\*[\s\S]*?\*\/\s*)?--chance-bar-fill:\s*(var\(--fab-[\w-]+\));/.exec(
-        source
-      );
+    const base = /\.chance-bar\s*\{\s*(?:\/\*[\s\S]*?\*\/\s*)?--chance-bar-fill:\s*(var\(--fab-[\w-]+\));/.exec(
+      source
+    );
     assert.ok(Boolean(base), 'the base .chance-bar rule declares a fallback fill');
     // And it is a NAMED neutral, not "any theme token". Accepting any `--fab-*` let the fill
     // of last resort be `--fab-danger` — byte-identical to `tier-red`, so a bar whose tier

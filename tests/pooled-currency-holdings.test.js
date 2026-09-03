@@ -352,9 +352,11 @@ describe('consumePooledCurrency', () => {
       spend: async () => ({ valid: true }),
     };
 
-    const result = await consume(party, pooledSeams({ actorPropertyCoinSpender: takeOnly }), {
-      amount: 1,
-    });
+    const result = await consume(
+      party,
+      pooledSeams({ actorPropertyCoinSpender: takeOnly }),
+      { amount: 1 }
+    );
 
     assert.equal(result.outcome, COMPANION_OUTCOMES.creditNotConfigured);
     assert.equal(result.wroteNothing, true);

@@ -28,7 +28,7 @@ const harness = createMountedComponentHarness({
     // The essence colour fold: the pool meters tint to the essence being filled.
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-    'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',

@@ -161,8 +161,6 @@ test('an unrecognised harvest source is refused rather than assumed safe', () =>
   // Fail closed on a kind nobody has thought about yet: a future source that turned out to be
   // byte-divergent would otherwise quietly poison the record.
   assert.throws(() =>
-    assertProvenanceWritable({
-      manifest: { source: { kind: 'container' }, foundryVersion: '14.365' },
-    })
+    assertProvenanceWritable({ manifest: { source: { kind: 'container' }, foundryVersion: '14.365' } })
   );
 });

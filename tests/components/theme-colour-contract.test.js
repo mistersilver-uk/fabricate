@@ -7,7 +7,10 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
-const productRoots = [resolve(repoRoot, 'src/ui'), resolve(repoRoot, 'styles')];
+const productRoots = [
+  resolve(repoRoot, 'src/ui'),
+  resolve(repoRoot, 'styles')
+];
 const allowedExtensions = new Set(['.js', '.svelte', '.css']);
 // The READ corpus is deliberately wider than `productRoots` above (issue 1499). Tokens are read
 // from outside `src/ui` — `src/config/playerCharacterTypesMenu.js` and
@@ -32,104 +35,26 @@ const dynamicTagReadSites = Object.freeze([
 const dynamicallyReadTokenPattern = /^--fab-tag-/;
 const colourLiteralPattern = /(#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|(?<![-\w])(?:white|black)(?![-\w]))/g;
 const themeSelectors = Object.freeze({
-  fabricate:
-    ':root,\n:root[data-fabricate-theme="fabricate"],\n.fabricate[data-fabricate-theme="fabricate"]',
-  mythwright:
-    ':root[data-fabricate-theme="mythwright"],\n.fabricate[data-fabricate-theme="mythwright"]',
-  'ironblood-forge':
-    ':root[data-fabricate-theme="ironblood-forge"],\n.fabricate[data-fabricate-theme="ironblood-forge"]',
-  'hearth-herb':
-    ':root[data-fabricate-theme="hearth-herb"],\n.fabricate[data-fabricate-theme="hearth-herb"]',
-  'starglass-arcana':
-    ':root[data-fabricate-theme="starglass-arcana"],\n.fabricate[data-fabricate-theme="starglass-arcana"]',
-  sovereign:
-    ':root[data-fabricate-theme="sovereign"],\n.fabricate[data-fabricate-theme="sovereign"]',
-  'foundry-native':
-    ':root[data-fabricate-theme="foundry-native"],\n.fabricate[data-fabricate-theme="foundry-native"]',
+  fabricate: ':root,\n:root[data-fabricate-theme="fabricate"],\n.fabricate[data-fabricate-theme="fabricate"]',
+  mythwright: ':root[data-fabricate-theme="mythwright"],\n.fabricate[data-fabricate-theme="mythwright"]',
+  'ironblood-forge': ':root[data-fabricate-theme="ironblood-forge"],\n.fabricate[data-fabricate-theme="ironblood-forge"]',
+  'hearth-herb': ':root[data-fabricate-theme="hearth-herb"],\n.fabricate[data-fabricate-theme="hearth-herb"]',
+  'starglass-arcana': ':root[data-fabricate-theme="starglass-arcana"],\n.fabricate[data-fabricate-theme="starglass-arcana"]',
+  sovereign: ':root[data-fabricate-theme="sovereign"],\n.fabricate[data-fabricate-theme="sovereign"]',
+  'foundry-native': ':root[data-fabricate-theme="foundry-native"],\n.fabricate[data-fabricate-theme="foundry-native"]'
 });
 const themePaletteAnchors = Object.freeze({
-  fabricate: [
-    '#111A23',
-    '#15212B',
-    '#1B2833',
-    '#2C3B49',
-    '#F1D1B5',
-    '#D9B89C',
-    '#E8C6A7',
-    '#9AB89C',
-    '#B97C78',
-  ],
-  mythwright: [
-    '#071116',
-    '#0B1720',
-    '#101D27',
-    '#152633',
-    '#F2F7F5',
-    '#63D47B',
-    '#58B7E8',
-    '#F4C04F',
-    '#FF5252',
-  ],
-  'ironblood-forge': [
-    '#141214',
-    '#1F1A1D',
-    '#2C2428',
-    '#5A4A50',
-    '#F0E2D4',
-    '#C58B5A',
-    '#8E9A8F',
-    '#92A78B',
-    '#A86D66',
-  ],
-  'hearth-herb': [
-    '#161C19',
-    '#1F2924',
-    '#2B3831',
-    '#53695E',
-    '#F1E9D8',
-    '#C8A36E',
-    '#9BB79E',
-    '#AFC7A4',
-    '#B98378',
-  ],
-  'starglass-arcana': [
-    '#121824',
-    '#1A2232',
-    '#243147',
-    '#40506B',
-    '#F2ECFF',
-    '#9FC5E8',
-    '#C7A6E6',
-    '#9DC9BD',
-    '#C78A96',
-  ],
-  sovereign: [
-    '#0A0E1A',
-    '#101627',
-    '#182036',
-    '#2A3550',
-    '#F2EAD6',
-    '#CFC198',
-    '#E4C066',
-    '#81BE96',
-    '#C96E66',
-  ],
+  fabricate: ['#111A23', '#15212B', '#1B2833', '#2C3B49', '#F1D1B5', '#D9B89C', '#E8C6A7', '#9AB89C', '#B97C78'],
+  mythwright: ['#071116', '#0B1720', '#101D27', '#152633', '#F2F7F5', '#63D47B', '#58B7E8', '#F4C04F', '#FF5252'],
+  'ironblood-forge': ['#141214', '#1F1A1D', '#2C2428', '#5A4A50', '#F0E2D4', '#C58B5A', '#8E9A8F', '#92A78B', '#A86D66'],
+  'hearth-herb': ['#161C19', '#1F2924', '#2B3831', '#53695E', '#F1E9D8', '#C8A36E', '#9BB79E', '#AFC7A4', '#B98378'],
+  'starglass-arcana': ['#121824', '#1A2232', '#243147', '#40506B', '#F2ECFF', '#9FC5E8', '#C7A6E6', '#9DC9BD', '#C78A96'],
+  sovereign: ['#0A0E1A', '#101627', '#182036', '#2A3550', '#F2EAD6', '#CFC198', '#E4C066', '#81BE96', '#C96E66'],
   // `foundry-native` carries a TENTH anchor. `#BC8963` was this palette's accent AND its
   // warning, byte-identical, so one anchor pinned two roles and the accent could be re-pointed
   // without moving an anchor at all (issue 1096 re-pointed it to `#D9B06D`). Both are listed:
   // the tan still has to be here as `--fab-warning`, and the gold now pins the accent.
-  'foundry-native': [
-    '#0C0A14',
-    '#111018',
-    '#30282F',
-    '#2E2833',
-    '#F3F3F5',
-    '#BC8963',
-    '#D9B06D',
-    '#706B70',
-    '#617054',
-    '#A16C60',
-  ],
+  'foundry-native': ['#0C0A14', '#111018', '#30282F', '#2E2833', '#F3F3F5', '#BC8963', '#D9B06D', '#706B70', '#617054', '#A16C60']
 });
 
 function collectProductFiles(rootPath, extensions = allowedExtensions) {
@@ -182,19 +107,15 @@ function blockFor(source, selector) {
 }
 
 function tokenNames(source) {
-  return [
-    ...new Set([...source.matchAll(/--fab-[A-Za-z0-9-]+(?=\s*:)/g)].map((match) => match[0])),
-  ].sort();
+  return [...new Set([...source.matchAll(/--fab-[A-Za-z0-9-]+(?=\s*:)/g)].map(match => match[0]))].sort();
 }
 
 function tokenReferences(source) {
-  return [
-    ...new Set([...source.matchAll(/var\((--fab-[A-Za-z0-9-]+)/g)].map((match) => match[1])),
-  ].sort();
+  return [...new Set([...source.matchAll(/var\((--fab-[A-Za-z0-9-]+)/g)].map(match => match[1]))].sort();
 }
 
 function fallbackBackedTokens(source) {
-  return new Set([...source.matchAll(/var\((--fab-[A-Za-z0-9-]+)\s*,/g)].map((match) => match[1]));
+  return new Set([...source.matchAll(/var\((--fab-[A-Za-z0-9-]+)\s*,/g)].map(match => match[1]));
 }
 
 /**
@@ -244,9 +165,7 @@ function findColourLiteralOffenders() {
         continue;
       }
 
-      offenders.push(
-        `${relative(repoRoot, filePath)}:${lineNumber(source, match.index)} ${match[1]}`
-      );
+      offenders.push(`${relative(repoRoot, filePath)}:${lineNumber(source, match.index)} ${match[1]}`);
     }
   }
 
@@ -258,10 +177,7 @@ describe('Theme colour contract', () => {
     const css = readFileSync(cssPath, 'utf8');
     const rootBlock = blockFor(css, ':root');
     const themeBlocks = Object.fromEntries(
-      Object.entries(themeSelectors).map(([themeId, selector]) => [
-        themeId,
-        blockFor(css, selector),
-      ])
+      Object.entries(themeSelectors).map(([themeId, selector]) => [themeId, blockFor(css, selector)])
     );
     const referenceThemeTokens = tokenNames(themeBlocks.fabricate);
     const rootTokens = new Set(tokenNames(rootBlock));
@@ -286,12 +202,11 @@ describe('Theme colour contract', () => {
       }
     }
 
-    const unresolvedReferencedTokens = allReferencedFabTokens.filter(
-      (token) =>
-        !referenceThemeTokens.includes(token) &&
-        !rootTokens.has(token) &&
-        !allDefinedTokens.has(token) &&
-        !tokensWithFallbacks.has(token)
+    const unresolvedReferencedTokens = allReferencedFabTokens.filter(token =>
+      !referenceThemeTokens.includes(token)
+      && !rootTokens.has(token)
+      && !allDefinedTokens.has(token)
+      && !tokensWithFallbacks.has(token)
     );
     assert.deepEqual(
       unresolvedReferencedTokens,

@@ -286,9 +286,7 @@ describe('the check-modifier catalogue card (mounted)', () => {
         'to a reader who never sees the rule grid'
     );
     assert.equal(
-      card
-        .querySelector('[data-crafting-modifier-eligibility="huge"]')
-        .getAttribute('aria-pressed'),
+      card.querySelector('[data-crafting-modifier-eligibility="huge"]').getAttribute('aria-pressed'),
       'false',
       'and an unselected entry reads as unpressed rather than merely differently coloured'
     );
@@ -502,7 +500,9 @@ describe('the Validation tab reads each activity’s OWN modifier context', () =
   /** The issue ids listed inside one subsystem's validation section. */
   function issuesIn(target, subsystem) {
     return [
-      ...target.querySelectorAll(`[data-checks-validation-section="${subsystem}"] [data-issue]`),
+      ...target.querySelectorAll(
+        `[data-checks-validation-section="${subsystem}"] [data-issue]`
+      ),
     ].map((node) => node.dataset.issue);
   }
 

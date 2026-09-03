@@ -20,26 +20,18 @@ function baseData() {
         'sys-a': {
           vocabularies: { regions: { values: [{ id: 'north', label: 'North' }] } },
           tasks: [{ id: 't1', name: 'Forage', region: 'north', biomes: ['forest'] }],
-          events: [
-            {
-              id: 'h1',
-              name: 'Bears',
-              regions: ['north'],
-              biomes: ['forest'],
-              dangerTags: ['hazardous'],
-            },
-          ],
-        },
-      },
+          events: [{ id: 'h1', name: 'Bears', regions: ['north'], biomes: ['forest'], dangerTags: ['hazardous'] }]
+        }
+      }
     },
     environments: [
-      { id: 'env-a', craftingSystemId: 'sys-a', region: 'north', includedRegionIds: [] },
-    ],
+      { id: 'env-a', craftingSystemId: 'sys-a', region: 'north', includedRegionIds: [] }
+    ]
   };
 }
 
 function findRegion(system, id) {
-  return (system.gatheringRegions || []).find((r) => r.id === id) || null;
+  return (system.gatheringRegions || []).find(r => r.id === id) || null;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,12 +43,7 @@ test('derives a GatheringRegion per vocabulary entry, keyed by crafting-system i
   const sys = result.systems[0];
   assert.equal(sys.gatheringRegions.length, 1);
   const region = findRegion(sys, 'north');
-  assert.deepEqual(region, {
-    id: 'north',
-    craftingSystemId: 'sys-a',
-    name: 'North',
-    enabled: true,
-  });
+  assert.deepEqual(region, { id: 'north', craftingSystemId: 'sys-a', name: 'North', enabled: true });
 });
 
 test('a vocabulary entry with no explicit label uses the id as the name', () => {
@@ -131,14 +118,9 @@ test('running twice is a no-op (second run produces identical output)', () => {
 
 test('orphan environment.region with no derived region leaves includedRegionIds empty and region inert', () => {
   const data = baseData();
-  data.environments.push({
-    id: 'env-orphan',
-    craftingSystemId: 'sys-a',
-    region: 'free-text-place',
-    includedRegionIds: [],
-  });
+  data.environments.push({ id: 'env-orphan', craftingSystemId: 'sys-a', region: 'free-text-place', includedRegionIds: [] });
   const result = migrateUnifyGatheringRegions(data);
-  const orphan = result.environments.find((e) => e.id === 'env-orphan');
+  const orphan = result.environments.find(e => e.id === 'env-orphan');
   assert.deepEqual(orphan.includedRegionIds, []);
   assert.equal(orphan.region, 'free-text-place');
 });
@@ -147,38 +129,26 @@ test('distinct ids with duplicate labels produce distinct regions (dedupe by id)
   const data = baseData();
   data.gatheringConfig.systems['sys-a'].vocabularies.regions.values = [
     { id: 'north-a', label: 'North' },
-    { id: 'north-b', label: 'North' },
+    { id: 'north-b', label: 'North' }
   ];
   const result = migrateUnifyGatheringRegions(data);
-  const ids = result.systems[0].gatheringRegions.map((r) => r.id).sort();
+  const ids = result.systems[0].gatheringRegions.map(r => r.id).sort();
   assert.deepEqual(ids, ['north-a', 'north-b']);
 });
 
 test('partially-migrated system: existing region survives, new vocab entry is appended, dedupe holds', () => {
   const data = baseData();
-  data.systems[0].gatheringRegions = [
-    { id: 'north', craftingSystemId: 'sys-a', name: 'North (existing)', enabled: false },
-  ];
+  data.systems[0].gatheringRegions = [{ id: 'north', craftingSystemId: 'sys-a', name: 'North (existing)', enabled: false }];
   data.gatheringConfig.systems['sys-a'].vocabularies.regions.values = [
     { id: 'north', label: 'North' }, // already present → id-dedupe, not re-added
-    { id: 'south', label: 'South' }, // new → appended
+    { id: 'south', label: 'South' }  // new → appended
   ];
   const result = migrateUnifyGatheringRegions(data);
   const regions = result.systems[0].gatheringRegions;
   assert.equal(regions.length, 2);
   // The pre-existing region is preserved verbatim (name + enabled untouched).
-  assert.deepEqual(findRegion(result.systems[0], 'north'), {
-    id: 'north',
-    craftingSystemId: 'sys-a',
-    name: 'North (existing)',
-    enabled: false,
-  });
-  assert.deepEqual(findRegion(result.systems[0], 'south'), {
-    id: 'south',
-    craftingSystemId: 'sys-a',
-    name: 'South',
-    enabled: true,
-  });
+  assert.deepEqual(findRegion(result.systems[0], 'north'), { id: 'north', craftingSystemId: 'sys-a', name: 'North (existing)', enabled: false });
+  assert.deepEqual(findRegion(result.systems[0], 'south'), { id: 'south', craftingSystemId: 'sys-a', name: 'South', enabled: true });
 });
 
 test('config system id with no matching crafting system is skipped (no region written, no notice)', () => {
@@ -186,21 +156,17 @@ test('config system id with no matching crafting system is skipped (no region wr
     systems: [{ id: 'sys-a', name: 'Alpha' }],
     gatheringConfig: {
       systems: {
-        'sys-ghost': {
-          vocabularies: { regions: { values: [{ id: 'phantom', label: 'Phantom' }] } },
-        },
-      },
+        'sys-ghost': { vocabularies: { regions: { values: [{ id: 'phantom', label: 'Phantom' }] } } }
+      }
     },
-    environments: [],
+    environments: []
   };
   const result = migrateUnifyGatheringRegions(data);
   // sys-a is untouched (no regions array materialized).
   assert.equal('gatheringRegions' in result.systems[0], false);
   // The ghost config still gets its vocab cleared (so a re-run is a no-op) but
   // produces no GM notice (nowhere to write the regions).
-  assert.deepEqual(result.gatheringConfig.systems['sys-ghost'].vocabularies.regions, {
-    values: [],
-  });
+  assert.deepEqual(result.gatheringConfig.systems['sys-ghost'].vocabularies.regions, { values: [] });
   assert.equal('_unifiedRegionSystems' in result, false);
 });
 
@@ -208,16 +174,13 @@ test('a system with no region vocabulary is left byte-for-byte unchanged', () =>
   const data = {
     systems: [{ id: 'sys-a', name: 'Alpha' }],
     gatheringConfig: { systems: { 'sys-a': { tasks: [{ id: 't1', biomes: ['forest'] }] } } },
-    environments: [],
+    environments: []
   };
   const before = clone(data);
   const result = migrateUnifyGatheringRegions(data);
   // No vocabularies key was injected; the task (no region tag) is untouched.
   assert.equal('vocabularies' in result.gatheringConfig.systems['sys-a'], false);
-  assert.deepEqual(
-    result.gatheringConfig.systems['sys-a'].tasks[0],
-    before.gatheringConfig.systems['sys-a'].tasks[0]
-  );
+  assert.deepEqual(result.gatheringConfig.systems['sys-a'].tasks[0], before.gatheringConfig.systems['sys-a'].tasks[0]);
   assert.equal('_unifiedRegionSystems' in result, false);
 });
 
@@ -240,23 +203,17 @@ test('purity: the input objects are not mutated', () => {
 // ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
-  const store = new Map(
-    Object.entries({
-      recipes: [],
-      craftingSystems: [],
-      gatheringConfig: {},
-      gatheringEnvironments: [],
-      migrationVersion: '0.0.0',
-      ...initial,
-    })
-  );
+  const store = new Map(Object.entries({
+    recipes: [],
+    craftingSystems: [],
+    gatheringConfig: {},
+    gatheringEnvironments: [],
+    migrationVersion: '0.0.0',
+    ...initial
+  }));
   const calls = { set: [] };
-  const getSetting = (key) => store.get(key) ?? null;
-  const setSetting = async (key, value) => {
-    calls.set.push({ key, value });
-    store.set(key, value);
-    return value;
-  };
+  const getSetting = key => store.get(key) ?? null;
+  const setSetting = async (key, value) => { calls.set.push({ key, value }); store.set(key, value); return value; };
   return { store, calls, getSetting, setSetting };
 }
 
@@ -266,20 +223,13 @@ test('runner: surfaces the GM-notice system names and never persists the transie
     migrationVersion: '0.8.0', // the 0.9.0, 1.0.0, and 1.1.0 migrations are pending
     craftingSystems: clone(data.systems),
     gatheringConfig: clone(data.gatheringConfig),
-    gatheringEnvironments: clone(data.environments),
+    gatheringEnvironments: clone(data.environments)
   });
-  const runner = new MigrationRunner({
-    getSetting: settings.getSetting,
-    setSetting: settings.setSetting,
-  });
+  const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
   const summary = await runner.run();
 
-  assert.deepEqual(
-    summary.unifiedRegionSystems,
-    ['Alpha'],
-    'system names surfaced for the GM notice'
-  );
+  assert.deepEqual(summary.unifiedRegionSystems, ['Alpha'], 'system names surfaced for the GM notice');
   assert.equal(settings.store.get('migrationVersion'), '1.31.0');
 
   // The transient field is never written into any persisted setting payload.
@@ -310,12 +260,9 @@ test('runner: re-importing pre-unification data upgrades on the next migration r
     migrationVersion: '0.8.0',
     craftingSystems: clone(data.systems),
     gatheringConfig: clone(data.gatheringConfig),
-    gatheringEnvironments: clone(data.environments),
+    gatheringEnvironments: clone(data.environments)
   });
-  const runner = new MigrationRunner({
-    getSetting: settings.getSetting,
-    setSetting: settings.setSetting,
-  });
+  const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
   // First run upgrades.
   await runner.run();
@@ -330,21 +277,13 @@ test('runner: re-importing pre-unification data upgrades on the next migration r
   settings.store.set('migrationVersion', '0.8.0');
 
   const summary = await runner.run();
-  assert.deepEqual(
-    summary.unifiedRegionSystems,
-    ['Alpha'],
-    'the re-imported legacy data is upgraded again'
-  );
+  assert.deepEqual(summary.unifiedRegionSystems, ['Alpha'], 'the re-imported legacy data is upgraded again');
   // The re-imported realms are stripped from the system again, but 1.27.0's idempotence guard
   // holds: the already-populated world library is authoritative and is NOT re-merged, so the GM
   // keeps whatever they have since edited there rather than having the import re-imposed on it.
   const savedSystems = settings.store.get('craftingSystems');
   assert.equal(savedSystems[0].gatheringRealms, undefined);
-  assert.deepEqual(
-    settings.store.get('travelConfig'),
-    afterFirst,
-    'the world library is untouched'
-  );
+  assert.deepEqual(settings.store.get('travelConfig'), afterFirst, 'the world library is untouched');
   const savedEnvs = settings.store.get('gatheringEnvironments');
   assert.deepEqual(savedEnvs[0].includedRealmIds, ['north']);
 });
@@ -354,22 +293,15 @@ test('runner: no GM notice and no gatheringConfig rewrite when there is no legac
     migrationVersion: '0.8.0',
     craftingSystems: [{ id: 'sys-a', name: 'Alpha', visibilityMode: 'knowledge' }],
     gatheringConfig: { systems: { 'sys-a': { tasks: [{ id: 't1', biomes: ['forest'] }] } } },
-    gatheringEnvironments: [],
+    gatheringEnvironments: []
   });
-  const runner = new MigrationRunner({
-    getSetting: settings.getSetting,
-    setSetting: settings.setSetting,
-  });
+  const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
   const summary = await runner.run();
 
   assert.deepEqual(summary.unifiedRegionSystems, []);
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.includes('gatheringConfig'), false, 'no rewrite when nothing to unify');
-  assert.equal(
-    setKeys.includes('craftingSystems'),
-    false,
-    'systems untouched when no regions derived'
-  );
+  assert.equal(setKeys.includes('craftingSystems'), false, 'systems untouched when no regions derived');
   assert.equal(settings.store.get('migrationVersion'), '1.31.0');
 });

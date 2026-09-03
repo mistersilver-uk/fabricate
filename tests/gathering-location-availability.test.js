@@ -1,10 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  environmentHasLocationRules,
-  evaluateLocationAvailability,
-} from '../src/systems/gatheringLocation.js';
+import { environmentHasLocationRules, evaluateLocationAvailability } from '../src/systems/gatheringLocation.js';
 
 function context(realms) {
   return { resolved: realms.length > 0, realms };
@@ -21,12 +18,7 @@ test('ungated environment (no rule fields) is always available, not location-gat
 });
 
 test('empty-after-normalization arrays are ungated, identical to absent fields', () => {
-  const env = {
-    includedRealmIds: [],
-    excludedRealmIds: [],
-    includedBiomeIds: [],
-    excludedBiomeIds: [],
-  };
+  const env = { includedRealmIds: [], excludedRealmIds: [], includedBiomeIds: [], excludedBiomeIds: [] };
   assert.equal(environmentHasLocationRules(env), false);
   const result = evaluateLocationAvailability(env, unresolved);
   assert.equal(result.gated, false);
@@ -78,13 +70,10 @@ test('realm exclusion wins over inclusion in mixed current realms', () => {
 
 test('biome exclusion on any current realm wins over inclusion matched by another', () => {
   const env = { includedRealmIds: ['r1'], excludedBiomeIds: ['volcanic'] };
-  const result = evaluateLocationAvailability(
-    env,
-    context([
-      { id: 'r1', biomes: ['forest'] },
-      { id: 'r2', biomes: ['volcanic'] },
-    ])
-  );
+  const result = evaluateLocationAvailability(env, context([
+    { id: 'r1', biomes: ['forest'] },
+    { id: 'r2', biomes: ['volcanic'] }
+  ]));
   assert.equal(result.available, false);
   assert.deepEqual(result.reasons, ['LOCATION_BLOCKED']);
   assert.deepEqual(result.excludedRealmIds, ['r2']);

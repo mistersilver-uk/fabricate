@@ -115,9 +115,7 @@ function applicationRootClasses() {
     for (const array of source.matchAll(/classes:\s*\[([^\]]*)\]/g)) {
       for (const literal of array[1].matchAll(/['"]([^'"]+)['"]/g)) classes.add(literal[1]);
     }
-    for (const imported of source.matchAll(
-      /import\s+\w+\s+from\s+['"](\.[^'"]+Root\.svelte)['"]/g
-    )) {
+    for (const imported of source.matchAll(/import\s+\w+\s+from\s+['"](\.[^'"]+Root\.svelte)['"]/g)) {
       rootComponents.add(resolve(uiDir, imported[1]));
     }
   }
@@ -530,8 +528,7 @@ test('no component hard-codes an application root as a portal host', () => {
     if (file === RESOLVER) continue;
     for (const { call, selector } of hostLookups(stripped[file])) {
       const named = applicationRootsNamedBy(selector, roots);
-      if (named.length > 0)
-        offenders.push(`${file}: .${call}('${selector}') names ${named.join(', ')}`);
+      if (named.length > 0) offenders.push(`${file}: .${call}('${selector}') names ${named.join(', ')}`);
     }
   }
 

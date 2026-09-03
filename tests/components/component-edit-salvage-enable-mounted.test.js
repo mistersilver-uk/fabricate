@@ -36,11 +36,7 @@ const harness = createMountedComponentHarness({
 });
 
 const RESULT_GROUPS = [
-  {
-    id: 'grp-1',
-    name: 'Scraps',
-    results: [{ id: 'res-1', componentId: 'cmp-scrap', quantity: 1 }],
-  },
+  { id: 'grp-1', name: 'Scraps', results: [{ id: 'res-1', componentId: 'cmp-scrap', quantity: 1 }] },
 ];
 
 const TIERS = [
@@ -172,12 +168,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     // `{enabled: true}` would silently wipe the authored result groups.
     const { drafts, props: mountProps } = track({
       component: {
-        salvage: {
-          enabled: false,
-          resultGroups: RESULT_GROUPS,
-          ingredientQuantity: 3,
-          toolIds: ['tool-a'],
-        },
+        salvage: { enabled: false, resultGroups: RESULT_GROUPS, ingredientQuantity: 3, toolIds: ['tool-a'] },
       },
     });
     const target = await harness.mount(mountProps);
@@ -204,11 +195,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     );
     // Chrome — meaningful only once salvage RUNS.
     assert.equal(target.querySelector('[data-salvage-routing]'), null, 'routing collapses');
-    assert.equal(
-      target.querySelector('[data-salvage-dc-override]'),
-      null,
-      'the DC control collapses'
-    );
+    assert.equal(target.querySelector('[data-salvage-dc-override]'), null, 'the DC control collapses');
     // ...but the result-group editor does NOT.
     assert.ok(target.querySelector('[data-salvage-result-groups]'), 'the group editor stays');
     assert.ok(addGroup(target), 'the add-group control stays reachable');
@@ -373,11 +360,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     groupName.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
     await flushRender();
 
-    assert.equal(
-      drafts.at(-1).updates.salvage.dcOverride,
-      14,
-      'the off-tier DC rode through untouched'
-    );
+    assert.equal(drafts.at(-1).updates.salvage.dcOverride, 14, 'the off-tier DC rode through untouched');
     harness.remount();
   });
 
@@ -411,16 +394,10 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
 
   it('a persisted dcOverride matching a tier selects that tier, not Custom…', async () => {
     const target = await harness.mount(
-      props({
-        component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS, dcOverride: 17 } },
-      })
+      props({ component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS, dcOverride: 17 } } })
     );
     assert.equal(target.querySelector('[data-salvage-dc-preset]').value, 'dc:17');
-    assert.equal(
-      target.querySelector('[data-salvage-dc-custom]'),
-      null,
-      'no custom input for a tier match'
-    );
+    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'no custom input for a tier match');
     harness.remount();
   });
 
@@ -479,11 +456,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     custom.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
     await flushRender();
 
-    assert.equal(
-      drafts.at(-1).updates.salvage.dcOverride,
-      14,
-      'the arbitrary DC reaches the payload'
-    );
+    assert.equal(drafts.at(-1).updates.salvage.dcOverride, 14, 'the arbitrary DC reaches the payload');
     assert.equal(
       target.querySelector('[data-salvage-dc-preset]').value,
       'custom',
@@ -542,9 +515,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const target = await harness.mount(
       props({ salvageCheckTiers: [], onManageCheckPresets: () => calls.push(true) })
     );
-    const options = [...target.querySelectorAll('[data-salvage-dc-preset] option')].map(
-      (o) => o.value
-    );
+    const options = [...target.querySelectorAll('[data-salvage-dc-preset] option')].map((o) => o.value);
     assert.deepEqual(options, ['system', 'custom'], 'no presets to offer');
 
     target.querySelector('[data-salvage-manage-presets]').click();
@@ -563,7 +534,10 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     assert.ok(pill, 'the salvage card names its mode');
     assert.equal(pill.dataset.salvageMode, 'routed', 'the PERSISTED token is unchanged');
     assert.match(pill.textContent, /Routed by check/, 'and is displayed as "Routed by check"');
-    assert.ok(!/\brouted\b/.test(pill.textContent), 'the raw token is never shown to the GM');
+    assert.ok(
+      !/\brouted\b/.test(pill.textContent),
+      'the raw token is never shown to the GM'
+    );
     harness.remount();
   });
 
@@ -589,10 +563,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     // with nothing on screen naming which shape they were looking at — the mode is a
     // SYSTEM-level setting they cannot see from this route at all.
     const off = await harness.mount(
-      props({
-        component: { salvage: { enabled: false, resultGroups: RESULT_GROUPS } },
-        salvageResolutionMode: 'routed',
-      })
+      props({ component: { salvage: { enabled: false, resultGroups: RESULT_GROUPS } }, salvageResolutionMode: 'routed' })
     );
     const pill = off.querySelector('[data-salvage-mode]');
     assert.ok(pill, 'the mode pill still names the mode while salvage is off');
@@ -600,11 +571,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     assert.ok(off.querySelector('[data-add-salvage-group]'), 'and the group editor stays');
     // The rest of the chrome still collapses — the exemption is the PILL, not Ruling A.
     assert.equal(off.querySelector('[data-salvage-routing]'), null, 'routing still collapses');
-    assert.equal(
-      off.querySelector('[data-salvage-dc-override]'),
-      null,
-      'the DC control still collapses'
-    );
+    assert.equal(off.querySelector('[data-salvage-dc-override]'), null, 'the DC control still collapses');
     harness.remount();
   });
 

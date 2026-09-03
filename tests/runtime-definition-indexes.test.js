@@ -41,8 +41,9 @@ const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { REVISION_SCOPES } = await import('../src/systems/revisionTokens.js');
-const { resetNameOnlyMatchTelemetry, findComponentByName, matchComponentByName } =
-  await import('../src/utils/componentNameMatch.js');
+const { resetNameOnlyMatchTelemetry, findComponentByName, matchComponentByName } = await import(
+  '../src/utils/componentNameMatch.js'
+);
 const {
   advanceDefinitionRevision,
   readIdentityCounters,
@@ -165,11 +166,7 @@ describe('issue 1076 bound — identity resolution is independent of library siz
     const components = library(LIBRARY);
     warm(components);
 
-    const resolved = findMatchingComponent(
-      unstampedItem('Rusty Camp Spoon'),
-      components,
-      SYSTEM_ID
-    );
+    const resolved = findMatchingComponent(unstampedItem('Rusty Camp Spoon'), components, SYSTEM_ID);
 
     assert.equal(resolved, null, 'the fixture item must genuinely match nothing');
     assert.equal(
@@ -190,10 +187,7 @@ describe('issue 1076 bound — identity resolution is independent of library siz
     const components = countingCandidates(library(LIBRARY), counters, 'componentCandidates');
     warm(components);
 
-    assert.equal(
-      findMatchingComponent(unstampedItem('Nothing At All'), components, SYSTEM_ID),
-      null
-    );
+    assert.equal(findMatchingComponent(unstampedItem('Nothing At All'), components, SYSTEM_ID), null);
 
     assert.equal(
       counters.get('componentCandidates'),
@@ -370,8 +364,7 @@ function ownedStack(componentId, index) {
       this.deleted = true;
     },
     async update(payload) {
-      if (payload['system.quantity'] !== undefined)
-        this.system.quantity = payload['system.quantity'];
+      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
     },
     toObject() {
       return { name: this.name, type: this.type, system: { quantity: this.system.quantity } };
@@ -455,10 +448,7 @@ function bulkWorld({ componentCount = LIBRARY, itemCount = HELD_ITEMS } = {}) {
     name: 'Bulk Actor',
     system: {},
     flags: {},
-    items: [
-      ...makeActor({ itemCount }).items,
-      ...targets.map((c, index) => ownedStack(c.id, index)),
-    ],
+    items: [...makeActor({ itemCount }).items, ...targets.map((c, index) => ownedStack(c.id, index))],
     async createEmbeddedDocuments(_type, payloads) {
       return payloads.map((payload) => {
         const item = {
@@ -593,10 +583,7 @@ async function measureBulkRun(componentCount) {
       // Net of the index build's own `definitions.entries()` walk, which `definitionIndex`
       // already counts on its own seam. Clamped at zero so a build of some OTHER array can
       // only under-report a surplus, never invent one.
-      entries: Math.max(
-        0,
-        world.counters.get('componentEntries') - identity.indexBuilds * componentCount
-      ),
+      entries: Math.max(0, world.counters.get('componentEntries') - identity.indexBuilds * componentCount),
       identity: identity.candidatesExamined,
       salvagedRows: salvaged.items.filter((item) => item.outcome === 'succeeded').length,
       destroyedRows: destroyed.items.filter((item) => item.outcome === 'succeeded').length,
@@ -760,18 +747,11 @@ describe('issue 1076 — name-match precedence and case semantics are unchanged'
     const original = console.warn;
     console.warn = (message) => warnings.push(message);
     try {
+      assert.equal(matchComponentByName({ name: 'Iron Ingot' }, { id: 'x', name: 'iron ingot' }), true);
       assert.equal(
-        matchComponentByName({ name: 'Iron Ingot' }, { id: 'x', name: 'iron ingot' }),
-        true
-      );
-      assert.equal(
-        matchComponentByName(
-          { name: 'Iron Ingot' },
-          { id: 'x', name: 'iron ingot' },
-          {
-            caseSensitive: true,
-          }
-        ),
+        matchComponentByName({ name: 'Iron Ingot' }, { id: 'x', name: 'iron ingot' }, {
+          caseSensitive: true,
+        }),
         false
       );
     } finally {
@@ -848,10 +828,7 @@ describe('issue 1076 staleness — an index is a cache, so its invalidation is t
   it('sees a component ADDED through createItem', async () => {
     const { manager, systemId } = await managerWithSystem();
     const system = manager.getSystem(systemId);
-    assert.equal(
-      findMatchingComponent(unstampedItem('Copper Wire'), system.components, systemId),
-      null
-    );
+    assert.equal(findMatchingComponent(unstampedItem('Copper Wire'), system.components, systemId), null);
 
     const added = await manager.createItem(systemId, { name: 'Copper Wire' });
 
@@ -1112,12 +1089,10 @@ describe('issue 1076 — getRecipes starts from the indexed cohort', () => {
     const { manager } = recipeManagerWithSettings();
     const cohorts = () => manager._recipeCohorts();
     for (const [index, systemId] of ['a', 'b', 'b', 'b'].entries()) {
-      manager.recipes.set(`r-${index}`, {
-        id: `r-${index}`,
-        craftingSystemId: `sys-${systemId}`,
-        name: 'x',
-        description: '',
-      });
+      manager.recipes.set(
+        `r-${index}`,
+        { id: `r-${index}`, craftingSystemId: `sys-${systemId}`, name: 'x', description: '' }
+      );
     }
     assert.deepEqual(cohorts().get('sys-a'), ['r-0']);
     assert.equal(cohorts().get('sys-b').length, 3);

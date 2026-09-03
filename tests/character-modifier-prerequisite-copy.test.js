@@ -161,11 +161,7 @@ describe('mapPrerequisiteToModifier (issue 768)', () => {
 
 describe('modifier ↔ prerequisite round trip (issue 768)', () => {
   it('preserves name/icon and the bare @path across a round trip', () => {
-    const modifier = {
-      label: 'Herbalism',
-      icon: 'fa-solid fa-leaf',
-      expression: '@skills.nature.value',
-    };
+    const modifier = { label: 'Herbalism', icon: 'fa-solid fa-leaf', expression: '@skills.nature.value' };
     const back = mapPrerequisiteToModifier(mapModifierToPrerequisite(modifier));
     assert.equal(back.label, modifier.label);
     assert.equal(back.icon, modifier.icon);

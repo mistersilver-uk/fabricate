@@ -110,10 +110,7 @@ test('all THREE check normalizers emit the policy, at NON-DEFAULT values', () =>
     }
     // An unrecognized value normalizes on READ rather than being preserved verbatim, so
     // no engine ever has to interpret one.
-    assert.equal(
-      emitters[key]({ failureResultPolicy: 'sometimes' }).failureResultPolicy,
-      'perRecord'
-    );
+    assert.equal(emitters[key]({ failureResultPolicy: 'sometimes' }).failureResultPolicy, 'perRecord');
     // A newly-created system — no key at all — gets the permitting default. The seed
     // migration is what keeps an UPGRADED world off it.
     assert.equal(emitters[key]({}).failureResultPolicy, 'perRecord');
@@ -315,7 +312,9 @@ test('minSuccessOutcomeId is UNAFFECTED by the policy, under every value', () =>
       failureResultPolicy: policy,
     };
     assert.deepEqual(
-      resolveRecipeFixedOutcomeTierOptions(craftingCheck, 'routedByCheck').map((tier) => tier.id),
+      resolveRecipeFixedOutcomeTierOptions(craftingCheck, 'routedByCheck').map(
+        (tier) => tier.id
+      ),
       ['f-good'],
       `the fixed success tier list is unchanged under ${String(policy)}`
     );

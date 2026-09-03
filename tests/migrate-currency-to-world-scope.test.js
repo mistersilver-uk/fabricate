@@ -201,10 +201,7 @@ describe('migrateCurrencyToWorldScope', () => {
     const systems = [
       systemWithCurrency('alchemy', {
         enabled: true,
-        units: [
-          { id: 'gp', label: 'Gold' },
-          { id: 'sp', label: 'Silver' },
-        ],
+        units: [{ id: 'gp', label: 'Gold' }, { id: 'sp', label: 'Silver' }],
       }),
     ];
     const once = migrateCurrencyToWorldScope({ systems, currencyConfig: {} });

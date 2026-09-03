@@ -128,11 +128,7 @@ export class DocumentShapedDefinitionRepository extends CraftingDefinitionReposi
    * @param {(raw: object) => object} [options.hydrate]
    * @param {(record: object) => string|null} [options.scopeOf]
    */
-  constructor({
-    serialize = (record) => record,
-    hydrate = (raw) => raw,
-    scopeOf = () => null,
-  } = {}) {
+  constructor({ serialize = (record) => record, hydrate = (raw) => raw, scopeOf = () => null } = {}) {
     super();
     /** One serialized "document" per record, keyed by id. */
     this.documents = new Map();

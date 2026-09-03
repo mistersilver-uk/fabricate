@@ -36,8 +36,7 @@ globalThis.fromUuid = async (uuid) => _registry.get(uuid) ?? null;
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
-const { matchRecipeItemDefinition, resolveComponentForItem } =
-  await import('../src/utils/sourceUuid.js');
+const { matchRecipeItemDefinition, resolveComponentForItem } = await import('../src/utils/sourceUuid.js');
 const { RECIPE_ITEM_FLAG_STAMP_TARGET } = await import('../src/config/settings.js');
 
 // ---------------------------------------------------------------------------
@@ -121,12 +120,7 @@ function roleLeaf(doc, systemId, role) {
 }
 
 function makeRecipeManager() {
-  return {
-    getRecipes: () => [],
-    deleteRecipe: async () => {},
-    updateRecipe: async () => {},
-    save: async () => {},
-  };
+  return { getRecipes: () => [], deleteRecipe: async () => {}, updateRecipe: async () => {}, save: async () => {} };
 }
 
 function packCollection(packs = []) {
@@ -250,22 +244,14 @@ test('555 — flow 1 double-import (NOT the bug): the same pack book imported to
   register(makeDoc({ uuid: 'Compendium.mod.books.book', name: 'Book (pack)' }));
   // Two DISTINCT world imports of the same pack item — both carry the same compendiumSource
   // and neither is a clone (no duplicateSource).
-  register(
-    makeDoc({ uuid: 'Item.book-a', name: 'Book', compendiumSource: 'Compendium.mod.books.book' })
-  );
-  register(
-    makeDoc({ uuid: 'Item.book-b', name: 'Book', compendiumSource: 'Compendium.mod.books.book' })
-  );
+  register(makeDoc({ uuid: 'Item.book-a', name: 'Book', compendiumSource: 'Compendium.mod.books.book' }));
+  register(makeDoc({ uuid: 'Item.book-b', name: 'Book', compendiumSource: 'Compendium.mod.books.book' }));
   const mgr = buildManager({ systems: [{ id: 'sys', name: 'S', recipeItemDefinitions: [] }] });
 
   const first = await mgr.addRecipeItemFromUuid('sys', 'Item.book-a');
   const second = await mgr.addRecipeItemFromUuid('sys', 'Item.book-b');
 
-  assert.equal(
-    firstSystem(mgr).recipeItemDefinitions.length,
-    1,
-    'the re-import dedups to one definition'
-  );
+  assert.equal(firstSystem(mgr).recipeItemDefinitions.length, 1, 'the re-import dedups to one definition');
   assert.equal(second.item.id, first.item.id);
 });
 
@@ -288,20 +274,14 @@ test('555 — clone registration stamps the flag, strips duplicateSource, and cl
       duplicateSource: 'Item.book',
       // Inherited stale roles-leaf marker from the original — the clone keys on its own
       // uuid, so registration stamps the clone's own def id into the per-system roles leaf.
-      flags: {
-        fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'original-def-id' } } } },
-      },
+      flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'original-def-id' } } } } },
     })
   );
   const result = await mgr.addRecipeItemFromUuid('sys', 'Item.scroll');
 
   assert.equal(scroll._stats.duplicateSource, null, 'stale duplicateSource stripped');
   assert.equal(scroll._stats.compendiumSource, null, 'stale compendiumSource cleared');
-  assert.equal(
-    recipeItemFlag(scroll),
-    result.item.id,
-    'per-system roles leaf stamped with the clone def id'
-  );
+  assert.equal(recipeItemFlag(scroll), result.item.id, 'per-system roles leaf stamped with the clone def id');
   assert.notEqual(result.item.id, 'original-def-id');
 });
 
@@ -316,11 +296,7 @@ test('555 — the skipped branch stamps and strips a pre-flag source (recovery p
 
   const second = await mgr.addRecipeItemFromUuid('sys', 'Item.book');
   assert.equal(second.action, 'skipped', 'an unchanged definition is skipped');
-  assert.equal(
-    recipeItemFlag(book),
-    first.item.id,
-    'the skipped branch re-stamped the durable flag'
-  );
+  assert.equal(recipeItemFlag(book), first.item.id, 'the skipped branch re-stamped the durable flag');
 });
 
 // ---------------------------------------------------------------------------
@@ -334,16 +310,8 @@ test('555 — a compendium-imported book records union source refs (registeredIt
   const mgr = buildManager({ systems: [{ id: 'sys', name: 'S', recipeItemDefinitions: [] }] });
 
   const def = (await mgr.addRecipeItemFromUuid('sys', 'Item.book')).item;
-  assert.equal(
-    def.registeredItemUuid,
-    'Item.book',
-    'registeredItemUuid is the registered live document'
-  );
-  assert.equal(
-    def.originItemUuid,
-    'Compendium.mod.books.book',
-    'originItemUuid is the canonical compendium uuid'
-  );
+  assert.equal(def.registeredItemUuid, 'Item.book', 'registeredItemUuid is the registered live document');
+  assert.equal(def.originItemUuid, 'Compendium.mod.books.book', 'originItemUuid is the canonical compendium uuid');
 });
 
 test('555 — the normalizer preserves registeredItemUuid + aliasItemUuids across a save/load round-trip', () => {
@@ -371,15 +339,9 @@ test('555 — the normalizer preserves registeredItemUuid + aliasItemUuids acros
 
 test('555 R3 — auto-stamp flags world sources, is idempotent, and skips locked packs', async () => {
   resetRegistry();
-  const worldBook = register(
-    makeDoc({ uuid: 'Item.book', name: 'Book', duplicateSource: 'Item.template' })
-  );
-  const packBook = register(
-    makeDoc({ uuid: 'Compendium.world.pack.book2', name: 'Book2', pack: 'world.pack' })
-  );
-  const lockedBook = register(
-    makeDoc({ uuid: 'Compendium.mod.pack.book3', name: 'Book3', pack: 'mod.pack' })
-  );
+  const worldBook = register(makeDoc({ uuid: 'Item.book', name: 'Book', duplicateSource: 'Item.template' }));
+  const packBook = register(makeDoc({ uuid: 'Compendium.world.pack.book2', name: 'Book2', pack: 'world.pack' }));
+  const lockedBook = register(makeDoc({ uuid: 'Compendium.mod.pack.book3', name: 'Book3', pack: 'mod.pack' }));
 
   const mgr = buildManager({
     systems: [
@@ -421,11 +383,7 @@ test('555 R4 — one repair pass stamps a component source, a recipe-item source
   resetRegistry();
   const compSource = makeDoc({ uuid: 'Item.ore', name: 'Ore' });
   const bookSource = makeDoc({ uuid: 'Item.book', name: 'Book', duplicateSource: 'Item.template' });
-  const ownedBook = makeDoc({
-    uuid: 'Actor.a.Item.copy',
-    name: 'Book',
-    duplicateSource: 'Item.book',
-  });
+  const ownedBook = makeDoc({ uuid: 'Actor.a.Item.copy', name: 'Book', duplicateSource: 'Item.book' });
   const actor = { id: 'a', items: [ownedBook] };
 
   const mgr = buildManager({
@@ -433,14 +391,7 @@ test('555 R4 — one repair pass stamps a component source, a recipe-item source
       {
         id: 'sys',
         name: 'S',
-        components: [
-          {
-            id: 'comp-ore',
-            name: 'Ore',
-            registeredItemUuid: 'Item.ore',
-            originItemUuid: 'Item.ore',
-          },
-        ],
+        components: [{ id: 'comp-ore', name: 'Ore', registeredItemUuid: 'Item.ore', originItemUuid: 'Item.ore' }],
         recipeItemDefinitions: [{ id: 'def-book', name: 'Book', originItemUuid: 'Item.book' }],
       },
     ],
@@ -452,11 +403,7 @@ test('555 R4 — one repair pass stamps a component source, a recipe-item source
   assert.equal(componentFlag(compSource), 'comp-ore');
   assert.equal(recipeItemFlag(bookSource), 'def-book');
   assert.equal(bookSource._stats.duplicateSource, null, 'clone source stripped');
-  assert.equal(
-    recipeItemFlag(ownedBook),
-    'def-book',
-    'the actor-owned copy is stamped via the four-tier matcher'
-  );
+  assert.equal(recipeItemFlag(ownedBook), 'def-book', 'the actor-owned copy is stamped via the four-tier matcher');
   assert.ok(summary.stamped >= 3);
 
   const second = await mgr.repairItemData();
@@ -487,37 +434,21 @@ test('555 R4 — a world SOURCE clone is NOT identity-matched onto the original 
   });
 
   await mgr.repairItemData();
-  assert.equal(
-    recipeItemFlag(cloneSource),
-    undefined,
-    'the clone source is not mis-stamped with the original id'
-  );
+  assert.equal(recipeItemFlag(cloneSource), undefined, 'the clone source is not mis-stamped with the original id');
 });
 
 test('555 R4 name-assist — an owned copy whose unique name matches a different definition is re-pointed, with an audit log', async () => {
   resetRegistry();
   // Owned scroll copy: its transitive duplicateSource points at the BOOK, but its name
   // uniquely matches the SCROLL definition.
-  const ownedScroll = makeDoc({
-    uuid: 'Actor.a.Item.scroll',
-    name: 'Scroll',
-    duplicateSource: 'Item.book',
-  });
+  const ownedScroll = makeDoc({ uuid: 'Actor.a.Item.scroll', name: 'Scroll', duplicateSource: 'Item.book' });
   const mgr = ownedRepairManager(BOOK_SCROLL_DEFS, [ownedScroll]);
 
   const summary = await mgr.repairItemData();
-  assert.equal(
-    recipeItemFlag(ownedScroll),
-    'def-scroll',
-    're-pointed by unique name to the scroll def'
-  );
+  assert.equal(recipeItemFlag(ownedScroll), 'def-scroll', 're-pointed by unique name to the scroll def');
   assert.equal(summary.repointed, 1);
   assert.deepEqual(summary.repointLog, [
-    {
-      itemUuid: 'Actor.a.Item.scroll',
-      oldDuplicateSourceTarget: 'Item.book',
-      newlyStampedDefinitionId: 'def-scroll',
-    },
+    { itemUuid: 'Actor.a.Item.scroll', oldDuplicateSourceTarget: 'Item.book', newlyStampedDefinitionId: 'def-scroll' },
   ]);
 });
 
@@ -526,11 +457,7 @@ test('555/567 R4 name-assist — a name matching TWO definitions WITHIN the syst
   // Recipe-item repair is now PER SYSTEM (issue 567), so name uniqueness — and therefore
   // the ambiguity guard — is scoped to the system being reconciled. Two 'Tome' definitions
   // in the SAME system make the name-assist ambiguous.
-  const ownedCopy = makeDoc({
-    uuid: 'Actor.a.Item.dup',
-    name: 'Tome',
-    duplicateSource: 'Item.book',
-  });
+  const ownedCopy = makeDoc({ uuid: 'Actor.a.Item.dup', name: 'Tome', duplicateSource: 'Item.book' });
   const mgr = ownedRepairManager(
     [
       { id: 'def-book', name: 'Book', originItemUuid: 'Item.book' },
@@ -568,10 +495,7 @@ test('555 R4 name-assist — a flagged owned copy is authoritative and left unto
 test('555/567 — _clearSourceFlag unsets a stale recipe-item roles leaf on the old source', async () => {
   resetRegistry();
   const old = register(
-    makeDoc({
-      uuid: 'Item.old',
-      flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-1' } } } } },
-    })
+    makeDoc({ uuid: 'Item.old', flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-1' } } } } } })
   );
   const mgr = buildManager({ systems: [] });
   await mgr._clearSourceFlag('Item.old', 'roles.sys.recipeItemDefinitionId', 'def-1');
@@ -581,10 +505,7 @@ test('555/567 — _clearSourceFlag unsets a stale recipe-item roles leaf on the 
 test('555/567 — _clearSourceFlag leaves a roles leaf that belongs to a different definition', async () => {
   resetRegistry();
   const other = register(
-    makeDoc({
-      uuid: 'Item.other',
-      flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-2' } } } } },
-    })
+    makeDoc({ uuid: 'Item.other', flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-2' } } } } } })
   );
   const mgr = buildManager({ systems: [] });
   await mgr._clearSourceFlag('Item.other', 'roles.sys.recipeItemDefinitionId', 'def-1');
@@ -600,19 +521,11 @@ test('555 — RecipeVisibilityService and InventoryListingBuilder resolve identi
     { id: 'def-book', registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book' },
     { id: 'def-scroll', registeredItemUuid: 'Item.scroll', originItemUuid: 'Item.scroll' },
   ];
-  const item = {
-    uuid: 'Actor.a.Item.copy',
-    _stats: { compendiumSource: 'Compendium.mod.book' },
-    getFlag: () => undefined,
-  };
+  const item = { uuid: 'Actor.a.Item.copy', _stats: { compendiumSource: 'Compendium.mod.book' }, getFlag: () => undefined };
   const shared = matchRecipeItemDefinition(item, defs).definition;
 
   // InventoryListingBuilder._matchRecipeItemDefinition does not touch `this`.
-  const fromBuilder = InventoryListingBuilder.prototype._matchRecipeItemDefinition.call(
-    null,
-    item,
-    defs
-  );
+  const fromBuilder = InventoryListingBuilder.prototype._matchRecipeItemDefinition.call(null, item, defs);
   assert.equal(fromBuilder, shared, 'the inventory builder resolves via the shared matcher');
 
   // RecipeVisibilityService._matchDefinitionForItem routes a supplied item through the
@@ -652,14 +565,10 @@ test('567 #1 — a source shared by two systems keeps a per-system roles leaf in
   assert.equal(recipeItemFlag(shared, 'sysB'), second.item.id, "B's leaf lands alongside A's");
   assert.notEqual(first.item.id, second.item.id, 'each system owns its own definition');
   // The retired scalar is not written on a fresh registration.
-  assert.equal(
-    recipeItemScalarFlag(shared),
-    undefined,
-    'no legacy scalar is written on a fresh registration'
-  );
+  assert.equal(recipeItemScalarFlag(shared), undefined, 'no legacy scalar is written on a fresh registration');
 });
 
-test("567 #1 — a SEPARATE owned copy linked ONLY by roles.A resolves to A's def in A's set (reader half, isolated)", async () => {
+test('567 #1 — a SEPARATE owned copy linked ONLY by roles.A resolves to A\'s def in A\'s set (reader half, isolated)', async () => {
   resetRegistry();
   register(makeDoc({ uuid: 'Item.shared', name: 'Shared Book' }));
   const mgr = buildManager({
@@ -686,10 +595,7 @@ test("567 #1 — a SEPARATE owned copy linked ONLY by roles.A resolves to A's de
     flags: {
       fabricate: {
         fabricate: {
-          roles: {
-            sysA: { recipeItemDefinitionId: defA.id },
-            sysB: { recipeItemDefinitionId: defB.id },
-          },
+          roles: { sysA: { recipeItemDefinitionId: defA.id }, sysB: { recipeItemDefinitionId: defB.id } },
           // Legacy scalar names B's def — out of A's candidate set, so on scalar-only the
           // reader falls through to NOTHING in A's set (independently RED without #567).
           recipeItemDefinitionId: defB.id,
@@ -701,18 +607,18 @@ test("567 #1 — a SEPARATE owned copy linked ONLY by roles.A resolves to A's de
   // Sanity: the reader shares NO source ref with A's definition (tiers 2/3/4 isolated).
   const { getItemMatchUuids } = await import('../src/utils/sourceUuid.js');
   const aRefs = new Set(getItemMatchUuids(defA));
-  assert.ok(!aRefs.has('Actor.x.Item.readerCopy'), "reader uuid is not in A's source refs");
+  assert.ok(!aRefs.has('Actor.x.Item.readerCopy'), 'reader uuid is not in A\'s source refs');
 
   // Reader half (THE independently-red assertion): resolves to A's def via the roles tier.
   const inA = matchRecipeItemDefinition(readerCopy, sysADefs, 'sysA');
-  assert.equal(inA.definition, defA, "reader resolves to A's definition via roles.sysA");
+  assert.equal(inA.definition, defA, 'reader resolves to A\'s definition via roles.sysA');
   assert.equal(inA.tier, 'identity', 'resolved through the durable identity tier');
 
   // Coexistence: the same copy resolves to B's def in B's set via roles.sysB.
   assert.equal(
     matchRecipeItemDefinition(readerCopy, sysBDefs, 'sysB').definition,
     defB,
-    "the same copy resolves to B's definition in B's set via roles.sysB"
+    'the same copy resolves to B\'s definition in B\'s set via roles.sysB'
   );
 
   // Cross-check: under the wrong system id the roles tier finds nothing, and the isolated
@@ -720,7 +626,7 @@ test("567 #1 — a SEPARATE owned copy linked ONLY by roles.A resolves to A's de
   assert.equal(
     matchRecipeItemDefinition(readerCopy, sysADefs, 'sysB').definition,
     null,
-    "reader shares no source ref with A's def, so a non-A roles scope resolves NOTHING in A's set (proves tiers 2/3/4 are isolated)"
+    'reader shares no source ref with A\'s def, so a non-A roles scope resolves NOTHING in A\'s set (proves tiers 2/3/4 are isolated)'
   );
 });
 
@@ -734,58 +640,19 @@ test('555 — addRecipeItemFromUuid updated branch clears the flag on the OLD so
   // A non-clone source whose stored originItemUuid has drifted (the definition still
   // points at an old world source) but which carries the durable roles leaf, so
   // find-existing resolves it by that leaf and the updated branch re-points it.
-  register(
-    makeDoc({
-      uuid: 'Item.old-source',
-      name: 'Book',
-      flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-1' } } } } },
-    })
-  );
-  register(
-    makeDoc({
-      uuid: 'Item.book',
-      name: 'Book',
-      flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-1' } } } } },
-    })
-  );
+  register(makeDoc({ uuid: 'Item.old-source', name: 'Book', flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-1' } } } } } }));
+  register(makeDoc({ uuid: 'Item.book', name: 'Book', flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-1' } } } } } }));
   const mgr = buildManager({
     systems: [
-      {
-        id: 'sys',
-        name: 'S',
-        recipeItemDefinitions: [
-          {
-            id: 'def-1',
-            name: 'Book',
-            registeredItemUuid: 'Item.old-source',
-            originItemUuid: 'Item.old-source',
-          },
-        ],
-      },
+      { id: 'sys', name: 'S', recipeItemDefinitions: [{ id: 'def-1', name: 'Book', registeredItemUuid: 'Item.old-source', originItemUuid: 'Item.old-source' }] },
     ],
   });
 
   const result = await mgr.addRecipeItemFromUuid('sys', 'Item.book');
-  assert.equal(
-    result.action,
-    'updated',
-    'the drifted source re-registers through the updated branch'
-  );
-  assert.equal(
-    firstSystem(mgr).recipeItemDefinitions[0].originItemUuid,
-    'Item.book',
-    'the definition re-points to the new source'
-  );
-  assert.equal(
-    recipeItemFlag(_registry.get('Item.old-source')),
-    undefined,
-    'the OLD source roles leaf is cleared on re-point'
-  );
-  assert.equal(
-    recipeItemFlag(_registry.get('Item.book')),
-    'def-1',
-    'the new source keeps the roles leaf'
-  );
+  assert.equal(result.action, 'updated', 'the drifted source re-registers through the updated branch');
+  assert.equal(firstSystem(mgr).recipeItemDefinitions[0].originItemUuid, 'Item.book', 'the definition re-points to the new source');
+  assert.equal(recipeItemFlag(_registry.get('Item.old-source')), undefined, 'the OLD source roles leaf is cleared on re-point');
+  assert.equal(recipeItemFlag(_registry.get('Item.book')), 'def-1', 'the new source keeps the roles leaf');
 });
 
 test('555 R4 — an actor-owned copy carrying BOTH compendiumSource and duplicateSource is stamped via tier 3', async () => {
@@ -799,71 +666,33 @@ test('555 R4 — an actor-owned copy carrying BOTH compendiumSource and duplicat
     duplicateSource: 'Item.book',
   });
   const mgr = ownedRepairManager(
-    [
-      {
-        id: 'def-book',
-        name: 'Book',
-        registeredItemUuid: 'Item.book',
-        originItemUuid: 'Compendium.mod.book',
-      },
-    ],
+    [{ id: 'def-book', name: 'Book', registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book' }],
     [ownedCopy]
   );
 
   const summary = await mgr.repairItemData();
-  assert.equal(
-    recipeItemFlag(ownedCopy),
-    'def-book',
-    'resolved via tier 3 (compendium) despite the duplicateSource'
-  );
+  assert.equal(recipeItemFlag(ownedCopy), 'def-book', 'resolved via tier 3 (compendium) despite the duplicateSource');
   assert.equal(summary.repointed, 0, 'a reliable tier-3 match is not a name-assist re-point');
-  assert.equal(
-    ownedCopy._stats.duplicateSource,
-    null,
-    'the owned copy is stripped of its transitive duplicateSource'
-  );
+  assert.equal(ownedCopy._stats.duplicateSource, null, 'the owned copy is stripped of its transitive duplicateSource');
 });
 
 test('555 A2 — a compendium-imported component resolves owned copies dragged from BOTH the compendium item and the imported world item', async () => {
   resetRegistry();
   register(makeDoc({ uuid: 'Compendium.mod.items.ore', name: 'Ore (pack)' }));
-  register(
-    makeDoc({ uuid: 'Item.ore', name: 'Ore', compendiumSource: 'Compendium.mod.items.ore' })
-  );
+  register(makeDoc({ uuid: 'Item.ore', name: 'Ore', compendiumSource: 'Compendium.mod.items.ore' }));
   const mgr = buildManager({ systems: [{ id: 'sys', name: 'S', components: [] }] });
   const component = (await mgr.addItemFromUuid('sys', 'Item.ore')).item;
 
-  const fromCompendium = makeDoc({
-    uuid: 'Actor.a.Item.a',
-    compendiumSource: 'Compendium.mod.items.ore',
-  });
-  const fromWorldItem = makeDoc({
-    uuid: 'Actor.a.Item.b',
-    compendiumSource: 'Compendium.mod.items.ore',
-    duplicateSource: 'Item.ore',
-  });
-  assert.equal(
-    resolveComponentForItem(fromCompendium, [component], 'sys'),
-    component,
-    'the compendium-drag copy matches'
-  );
-  assert.equal(
-    resolveComponentForItem(fromWorldItem, [component], 'sys'),
-    component,
-    'the world-item-drag copy matches'
-  );
+  const fromCompendium = makeDoc({ uuid: 'Actor.a.Item.a', compendiumSource: 'Compendium.mod.items.ore' });
+  const fromWorldItem = makeDoc({ uuid: 'Actor.a.Item.b', compendiumSource: 'Compendium.mod.items.ore', duplicateSource: 'Item.ore' });
+  assert.equal(resolveComponentForItem(fromCompendium, [component], 'sys'), component, 'the compendium-drag copy matches');
+  assert.equal(resolveComponentForItem(fromWorldItem, [component], 'sys'), component, 'the world-item-drag copy matches');
 });
 
 test('555 R3 — auto-stamp counts a definition whose source item no longer resolves as skippedMissing', async () => {
   resetRegistry(); // empty registry → fromUuid returns null for the deleted source
   const mgr = buildManager({
-    systems: [
-      {
-        id: 'sys',
-        name: 'S',
-        recipeItemDefinitions: [{ id: 'd1', name: 'Gone', originItemUuid: 'Item.deleted' }],
-      },
-    ],
+    systems: [{ id: 'sys', name: 'S', recipeItemDefinitions: [{ id: 'd1', name: 'Gone', originItemUuid: 'Item.deleted' }] }],
   });
   const summary = await mgr.autoStampRecipeItemSources();
   assert.equal(summary.skippedMissing, 1);
@@ -895,62 +724,27 @@ test('567 #2 — the addRecipeItemFromUuid re-point clears ONLY the recipe-item 
   resetRegistry();
   // The old source carries all three role leaves; only the recipe-item leaf must be cleared
   // on re-point. The new source carries the recipe-item leaf so find-existing resolves it.
-  register(
-    makeDoc({
-      uuid: 'Item.old-source',
-      name: 'Book',
-      flags: {
-        fabricate: {
-          fabricate: {
-            roles: {
-              sys: { componentId: 'comp-x', toolId: 'tool-x', recipeItemDefinitionId: 'def-1' },
-            },
-          },
-        },
-      },
-    })
-  );
-  register(
-    makeDoc({
-      uuid: 'Item.new-source',
-      name: 'Book',
-      flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-1' } } } } },
-    })
-  );
+  register(makeDoc({
+    uuid: 'Item.old-source',
+    name: 'Book',
+    flags: { fabricate: { fabricate: { roles: { sys: { componentId: 'comp-x', toolId: 'tool-x', recipeItemDefinitionId: 'def-1' } } } } },
+  }));
+  register(makeDoc({
+    uuid: 'Item.new-source',
+    name: 'Book',
+    flags: { fabricate: { fabricate: { roles: { sys: { recipeItemDefinitionId: 'def-1' } } } } },
+  }));
   const mgr = buildManager({
     systems: [
-      {
-        id: 'sys',
-        name: 'S',
-        recipeItemDefinitions: [
-          {
-            id: 'def-1',
-            name: 'Book',
-            registeredItemUuid: 'Item.old-source',
-            originItemUuid: 'Item.old-source',
-          },
-        ],
-      },
+      { id: 'sys', name: 'S', recipeItemDefinitions: [{ id: 'def-1', name: 'Book', registeredItemUuid: 'Item.old-source', originItemUuid: 'Item.old-source' }] },
     ],
   });
 
   const result = await mgr.addRecipeItemFromUuid('sys', 'Item.new-source');
-  assert.equal(
-    result.action,
-    'updated',
-    'the drifted source re-registers through the updated branch'
-  );
+  assert.equal(result.action, 'updated', 'the drifted source re-registers through the updated branch');
   const old = _registry.get('Item.old-source');
-  assert.equal(
-    roleLeaf(old, 'sys', 'recipeItemDefinitionId'),
-    undefined,
-    'the recipe-item leaf is cleared on the old source'
-  );
-  assert.equal(
-    roleLeaf(old, 'sys', 'componentId'),
-    'comp-x',
-    'the sibling componentId leaf is preserved'
-  );
+  assert.equal(roleLeaf(old, 'sys', 'recipeItemDefinitionId'), undefined, 'the recipe-item leaf is cleared on the old source');
+  assert.equal(roleLeaf(old, 'sys', 'componentId'), 'comp-x', 'the sibling componentId leaf is preserved');
   assert.equal(roleLeaf(old, 'sys', 'toolId'), 'tool-x', 'the sibling toolId leaf is preserved');
 });
 
@@ -962,29 +756,14 @@ test('567 #2 — the repair owner-null branch clears ONLY the recipe-item leaf, 
   const orphan = makeDoc({
     uuid: 'Item.orphan',
     name: 'Whetstone',
-    flags: {
-      fabricate: {
-        fabricate: {
-          roles: {
-            sys: { componentId: 'comp-x', toolId: 'tool-x', recipeItemDefinitionId: 'def-gone' },
-          },
-        },
-      },
-    },
+    flags: { fabricate: { fabricate: { roles: { sys: { componentId: 'comp-x', toolId: 'tool-x', recipeItemDefinitionId: 'def-gone' } } } } },
   });
   const mgr = buildManager({
     systems: [
       {
         id: 'sys',
         name: 'S',
-        components: [
-          {
-            id: 'comp-x',
-            name: 'X',
-            registeredItemUuid: 'Item.orphan',
-            originItemUuid: 'Item.orphan',
-          },
-        ],
+        components: [{ id: 'comp-x', name: 'X', registeredItemUuid: 'Item.orphan', originItemUuid: 'Item.orphan' }],
         tools: [{ id: 'tool-x', name: 'T', originItemUuid: 'Item.orphan' }],
         recipeItemDefinitions: [{ id: 'def-real', name: 'R', originItemUuid: 'Item.other' }],
       },
@@ -993,16 +772,8 @@ test('567 #2 — the repair owner-null branch clears ONLY the recipe-item leaf, 
   });
 
   await mgr.repairItemData();
-  assert.equal(
-    roleLeaf(orphan, 'sys', 'recipeItemDefinitionId'),
-    undefined,
-    'the stale recipe-item leaf is cleared'
-  );
-  assert.equal(
-    roleLeaf(orphan, 'sys', 'componentId'),
-    'comp-x',
-    'the sibling componentId leaf is preserved'
-  );
+  assert.equal(roleLeaf(orphan, 'sys', 'recipeItemDefinitionId'), undefined, 'the stale recipe-item leaf is cleared');
+  assert.equal(roleLeaf(orphan, 'sys', 'componentId'), 'comp-x', 'the sibling componentId leaf is preserved');
   assert.equal(roleLeaf(orphan, 'sys', 'toolId'), 'tool-x', 'the sibling toolId leaf is preserved');
 });
 
@@ -1042,24 +813,14 @@ test('567 #3 — a dotted systemId does not throw and degrades to the source-uui
 // ---------------------------------------------------------------------------
 
 test('567 #4 — RECIPE_ITEM_FLAG_STAMP_TARGET is 2 so a v1-stamped world re-runs the roles backfill', () => {
-  assert.equal(
-    RECIPE_ITEM_FLAG_STAMP_TARGET,
-    2,
-    'the restamp target is bumped 1 → 2 for the roles backfill'
-  );
+  assert.equal(RECIPE_ITEM_FLAG_STAMP_TARGET, 2, 'the restamp target is bumped 1 → 2 for the roles backfill');
 });
 
 test('567 #4 — autoStampRecipeItemSources is idempotent: a second run performs zero writes', async () => {
   resetRegistry();
   const worldBook = register(makeDoc({ uuid: 'Item.book', name: 'Book' }));
   const mgr = buildManager({
-    systems: [
-      {
-        id: 'sys',
-        name: 'S',
-        recipeItemDefinitions: [{ id: 'd1', name: 'Book', originItemUuid: 'Item.book' }],
-      },
-    ],
+    systems: [{ id: 'sys', name: 'S', recipeItemDefinitions: [{ id: 'd1', name: 'Book', originItemUuid: 'Item.book' }] }],
   });
 
   const first = await mgr.autoStampRecipeItemSources();
@@ -1080,16 +841,8 @@ test('567 #5 — autoStampRecipeItemSources stamps BOTH roles.A and roles.B for 
   const shared = register(makeDoc({ uuid: 'Item.shared', name: 'Shared Book' }));
   const mgr = buildManager({
     systems: [
-      {
-        id: 'sysA',
-        name: 'A',
-        recipeItemDefinitions: [{ id: 'defA', name: 'Shared Book', originItemUuid: 'Item.shared' }],
-      },
-      {
-        id: 'sysB',
-        name: 'B',
-        recipeItemDefinitions: [{ id: 'defB', name: 'Shared Book', originItemUuid: 'Item.shared' }],
-      },
+      { id: 'sysA', name: 'A', recipeItemDefinitions: [{ id: 'defA', name: 'Shared Book', originItemUuid: 'Item.shared' }] },
+      { id: 'sysB', name: 'B', recipeItemDefinitions: [{ id: 'defB', name: 'Shared Book', originItemUuid: 'Item.shared' }] },
     ],
   });
 
@@ -1122,10 +875,6 @@ test('567 #6 — a pre-upgrade owned copy carrying ONLY the legacy scalar still 
     flags: { fabricate: { fabricate: { recipeItemDefinitionId: 'def-book' } } },
   });
   const match = matchRecipeItemDefinition(copy, defs, 'sys');
-  assert.equal(
-    match.definition,
-    defs[0],
-    'the scalar-only copy resolves via the transitional legacy fallback'
-  );
+  assert.equal(match.definition, defs[0], 'the scalar-only copy resolves via the transitional legacy fallback');
   assert.equal(match.tier, 'identity', 'reported as the durable identity tier');
 });

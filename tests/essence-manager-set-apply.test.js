@@ -76,11 +76,7 @@ function recipeRequiring(id, essences, overrides = {}) {
         id: `${id}-set`,
         name: 'Primary',
         ingredientGroups: [
-          {
-            id: `${id}-grp`,
-            name: 'Ingredients',
-            options: [{ componentId: 'comp-a', quantity: 1 }],
-          },
+          { id: `${id}-grp`, name: 'Ingredients', options: [{ componentId: 'comp-a', quantity: 1 }] },
         ],
         essences,
       },
@@ -210,7 +206,9 @@ test('1036/3: a first-class essence OPTION is blocked too, and reported ONCE per
   });
 
   const validation = recipeManager._validateEnabledEssenceReferences(Recipe.fromJSON(data));
-  const raised = validation.issues.filter((issue) => issue.code === 'ingredientSetDisabledEssence');
+  const raised = validation.issues.filter(
+    (issue) => issue.code === 'ingredientSetDisabledEssence'
+  );
   assert.equal(raised.length, 1, 'one set naming one essence twice is ONE authoring fact');
 });
 
@@ -245,11 +243,7 @@ test('1036/3: disabling an essence does NOT retro-disable an already-enabled rec
   );
   // ... and an ordinary edit to the still-enabled recipe still SAVES.
   const saved = await recipeManager.updateRecipe('r1', { name: 'Renamed' });
-  assert.equal(
-    saved.name,
-    'Renamed',
-    'a recipe may still be SAVED while requiring a disabled essence'
-  );
+  assert.equal(saved.name, 'Renamed', 'a recipe may still be SAVED while requiring a disabled essence');
 });
 
 // ---------------------------------------------------------------------------
@@ -305,11 +299,7 @@ test('1036: a staged `enabled: false` and `colorToken: null` are FALSY BUT REAL'
   });
 
   await manager.applyBulkEditToEssences(SYSTEM_ID, ['fire'], { colorToken: null });
-  assert.equal(
-    manager.getSystem(SYSTEM_ID).essenceDefinitions[0].colorToken,
-    null,
-    'Clear colour landed'
-  );
+  assert.equal(manager.getSystem(SYSTEM_ID).essenceDefinitions[0].colorToken, null, 'Clear colour landed');
 
   await manager.applyBulkEditToEssences(SYSTEM_ID, ['fire'], { enabled: false });
   assert.equal(manager.getSystem(SYSTEM_ID).essenceDefinitions[0].enabled, false, 'Disable landed');
@@ -380,14 +370,12 @@ test('1036/15: a set whose ONLY requirement is the deleted essence is DROPPED, n
     'the definition really was removed'
   );
   assert.deepEqual(
-    manager.getSystem(SYSTEM_ID).components.find((component) => component.id === 'comp-b').essences,
+    manager.getSystem(SYSTEM_ID).components.find((component) => component.id === 'comp-b')
+      .essences,
     {},
     'and the carrying component was stripped'
   );
-  assert.ok(
-    countWrites('craftingSystems') >= 1,
-    'the system was PERSISTED, not left in memory only'
-  );
+  assert.ok(countWrites('craftingSystems') >= 1, 'the system was PERSISTED, not left in memory only');
   assert.ok(countWrites('recipes') >= 1, 'and so was the rewritten recipe');
 });
 
@@ -797,11 +785,7 @@ test('1036/16: the ALCHEMY write bound is 3, not 2 — reconciliation writes aga
     2,
     'the batched cascade write, PLUS the one disableSignatureConflicts issues after it'
   );
-  assert.equal(
-    settingWrites.length,
-    3,
-    'so "exactly 2" is a non-alchemy bound, not a universal one'
-  );
+  assert.equal(settingWrites.length, 3, 'so "exactly 2" is a non-alchemy bound, not a universal one');
 });
 
 test('1036/5: a recipe left with no ingredient sets is clamped to DISABLED by the set form', async () => {
@@ -908,17 +892,11 @@ test('1036: a bulk essence edit is BLOCKED while the alchemy system carries a si
   );
 
   assert.deepEqual(
-    manager
-      .getSystem(SYSTEM_ID)
-      .essenceDefinitions.map((def) => [def.id, def.enabled, def.colorToken]),
+    manager.getSystem(SYSTEM_ID).essenceDefinitions.map((def) => [def.id, def.enabled, def.colorToken]),
     [['fire', true, 'rose']],
     'and the stored definitions are untouched — nothing was half-applied'
   );
-  assert.equal(
-    settingWrites.length,
-    0,
-    'the block lands BEFORE the write, so there is nothing to revert'
-  );
+  assert.equal(settingWrites.length, 0, 'the block lands BEFORE the write, so there is nothing to revert');
 });
 
 test('1036 negative control: the same edit lands once the collision is resolved', async () => {

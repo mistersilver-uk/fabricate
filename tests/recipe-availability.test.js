@@ -5,7 +5,7 @@ const {
   RECIPE_AVAILABILITY_STATES,
   applyRecipeAvailabilityState,
   getRecipeAvailabilityFlags,
-  getRecipeAvailabilityState,
+  getRecipeAvailabilityState
 } = await import('../src/ui/recipeAvailability.js');
 
 test('getRecipeAvailabilityState returns enabled by default', () => {
@@ -37,17 +37,17 @@ test('getRecipeAvailabilityState returns locked when enabled and locked are both
 });
 
 test('getRecipeAvailabilityFlags maps disabled to enabled=false and locked=false', () => {
-  assert.deepEqual(getRecipeAvailabilityFlags(RECIPE_AVAILABILITY_STATES.DISABLED), {
-    enabled: false,
-    locked: false,
-  });
+  assert.deepEqual(
+    getRecipeAvailabilityFlags(RECIPE_AVAILABILITY_STATES.DISABLED),
+    { enabled: false, locked: false }
+  );
 });
 
 test('getRecipeAvailabilityFlags maps locked to enabled=true and locked=true', () => {
-  assert.deepEqual(getRecipeAvailabilityFlags(RECIPE_AVAILABILITY_STATES.LOCKED), {
-    enabled: true,
-    locked: true,
-  });
+  assert.deepEqual(
+    getRecipeAvailabilityFlags(RECIPE_AVAILABILITY_STATES.LOCKED),
+    { enabled: true, locked: true }
+  );
 });
 
 test('applyRecipeAvailabilityState mutates the target with normalized flags', () => {

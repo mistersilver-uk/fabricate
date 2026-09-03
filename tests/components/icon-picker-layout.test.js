@@ -14,14 +14,8 @@ test('manager establishes a positioning root for portaled picker overlays', () =
   assert.ok(match, 'manager root block should exist');
   const block = match[0];
 
-  assert.ok(
-    block.includes('position: relative;'),
-    'manager root should anchor absolutely positioned overlays'
-  );
-  assert.ok(
-    block.includes('isolation: isolate;'),
-    'manager root should isolate picker z-index from host chrome'
-  );
+  assert.ok(block.includes('position: relative;'), 'manager root should anchor absolutely positioned overlays');
+  assert.ok(block.includes('isolation: isolate;'), 'manager root should isolate picker z-index from host chrome');
 });
 
 test('essence icon picker popover uses an absolute layered overlay', () => {
@@ -40,15 +34,9 @@ test('essence icon picker popover uses an absolute layered overlay', () => {
   assert.ok(match, 'icon picker popover block should exist');
   const block = match[0];
 
-  assert.ok(
-    block.includes('position: absolute;'),
-    'popover should be removed from scroll-layout flow and anchored to the manager shell'
-  );
+  assert.ok(block.includes('position: absolute;'), 'popover should be removed from scroll-layout flow and anchored to the manager shell');
   assert.ok(block.includes('z-index: 120;'), 'popover should layer above surrounding manager UI');
-  assert.ok(
-    block.includes('overflow: hidden;'),
-    'popover should clip its own interior scroll region'
-  );
+  assert.ok(block.includes('overflow: hidden;'), 'popover should clip its own interior scroll region');
 });
 
 test('essence icon picker options use a fixed icon column with compact padding', () => {
@@ -59,25 +47,18 @@ test('essence icon picker options use a fixed icon column with compact padding',
   assert.ok(match, 'icon picker option layout block should exist');
   const block = match[0];
 
-  assert.ok(
-    block.includes('grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr);'),
-    'option rows should reserve a fixed icon column'
-  );
-  assert.ok(
-    block.includes('padding: var(--fab-space-1) var(--fab-space-2);'),
-    'option rows should use compact row padding'
-  );
+  assert.ok(block.includes('grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr);'), 'option rows should reserve a fixed icon column');
+  assert.ok(block.includes('padding: var(--fab-space-1) var(--fab-space-2);'), 'option rows should use compact row padding');
   // Was `min-height: 34px`, pinned as "a stable row height" — which is how a row 4px too short
   // for its own 28px chip stayed green for so long. The height is DERIVED now (issue 1280); the
   // arithmetic behind the token is asserted at the bottom of this file.
-  assert.ok(
-    block.includes('min-height: var(--fab-icon-picker-row);'),
-    'option rows should derive their height from the chip they contain'
-  );
+  assert.ok(block.includes('min-height: var(--fab-icon-picker-row);'), 'option rows should derive their height from the chip they contain');
 });
 
 test('essence icon picker trigger shares the option icon column and padding', () => {
-  const match = css.match(/\.fabricate-icon-picker \.essence-icon-picker-trigger \{[\s\S]*?\}/);
+  const match = css.match(
+    /\.fabricate-icon-picker \.essence-icon-picker-trigger \{[\s\S]*?\}/
+  );
 
   assert.ok(match, 'icon picker trigger block should exist');
   const block = match[0];

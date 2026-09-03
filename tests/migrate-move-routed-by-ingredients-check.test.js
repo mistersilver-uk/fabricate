@@ -118,16 +118,8 @@ test('no-op when the routed slot has no authored formula', () => {
 
 test('leaves non-routedByIngredients systems untouched', () => {
   const input = [
-    {
-      id: 'rc',
-      resolutionMode: 'routedByCheck',
-      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 15 } },
-    },
-    {
-      id: 's',
-      resolutionMode: 'simple',
-      craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 15 } },
-    },
+    { id: 'rc', resolutionMode: 'routedByCheck', craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 15 } } },
+    { id: 's', resolutionMode: 'simple', craftingCheck: { simple: {}, routed: { rollFormula: '1d20', dc: 15 } } },
   ];
   const before = JSON.stringify(input);
   const out = migrate(input);
@@ -137,7 +129,9 @@ test('leaves non-routedByIngredients systems untouched', () => {
 // --- Idempotency + raw shape + purity ---------------------------------------
 
 test('is idempotent (a second run over migrated data no-ops)', () => {
-  const first = migrate([riSystem({ simple: {}, routed: { rollFormula: '1d20', dc: 12 } })]);
+  const first = migrate([
+    riSystem({ simple: {}, routed: { rollFormula: '1d20', dc: 12 } }),
+  ]);
   const afterFirst = JSON.stringify(first.systems);
   const second = migrateMoveRoutedByIngredientsCheck({ systems: first.systems });
   assert.equal(JSON.stringify(second.systems), afterFirst, 're-run changes nothing');

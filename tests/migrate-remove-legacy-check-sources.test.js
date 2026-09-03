@@ -6,8 +6,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { migrateRemoveLegacyCheckSources } =
-  await import('../src/migration/migrateRemoveLegacyCheckSources.js');
+const { migrateRemoveLegacyCheckSources } = await import(
+  '../src/migration/migrateRemoveLegacyCheckSources.js'
+);
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 
 // ---------------------------------------------------------------------------
@@ -61,7 +62,11 @@ test('strips the deprecated check-source fields from all three checks', () => {
 
   for (const checkKey of ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck']) {
     for (const field of DEAD_FIELDS) {
-      assert.equal(field in system[checkKey], false, `${checkKey}.${field} should be removed`);
+      assert.equal(
+        field in system[checkKey],
+        false,
+        `${checkKey}.${field} should be removed`
+      );
     }
   }
 });
@@ -171,11 +176,7 @@ test('runs through MigrationRunner from 1.7.0, strips the fields, and lands at t
 
   await runner.run();
 
-  assert.equal(
-    settings.store.get('migrationVersion'),
-    '1.31.0',
-    'advances to the new highest version'
-  );
+  assert.equal(settings.store.get('migrationVersion'), '1.31.0', 'advances to the new highest version');
   const system = settings.store.get('craftingSystems')[0];
   assert.equal('macroUuid' in system.craftingCheck, false);
   assert.equal('builtIn' in system.salvageCraftingCheck, false);

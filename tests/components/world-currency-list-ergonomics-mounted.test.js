@@ -26,7 +26,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
-    'src/ui/svelte/util/overlayHost.js',
+    'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
@@ -39,9 +39,9 @@ const harness = createMountedComponentHarness({
     // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
+    'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
 });
 
 function flushRender() {
@@ -54,13 +54,7 @@ function clickEvent() {
 
 const CURRENCY_UNITS = Object.freeze([
   { id: 'cur-gold', label: 'Gold', abbreviation: 'gp', icon: 'fa-solid fa-coins', contains: [] },
-  {
-    id: 'cur-silver',
-    label: 'Silver',
-    abbreviation: 'sp',
-    icon: 'fa-solid fa-coins',
-    contains: [],
-  },
+  { id: 'cur-silver', label: 'Silver', abbreviation: 'sp', icon: 'fa-solid fa-coins', contains: [] }
 ]);
 
 before(() => harness.setup());
@@ -72,9 +66,7 @@ describe('world currency list ergonomics (mounted, issue 768)', () => {
     const calls = [];
     const root = await harness.mount({
       currencyUnits: CURRENCY_UNITS,
-      onReorderCurrencyUnit: async (fromIndex, toIndex) => {
-        calls.push([fromIndex, toIndex]);
-      },
+      onReorderCurrencyUnit: async (fromIndex, toIndex) => { calls.push([fromIndex, toIndex]); }
     });
 
     const firstUp = root.querySelector('[data-move-currency-up="cur-gold"]');

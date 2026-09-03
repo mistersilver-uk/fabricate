@@ -324,21 +324,14 @@ describe('1132/copy the post-delete toast reports every non-zero outcome', () =>
 
 describe('1132/copy the singular dialog reports the same arithmetic', () => {
   it('carries both counts, and its own confirm-button label', () => {
-    const content = interpolate(deleteConfirm.Content, {
-      name: 'Sunfire Draught',
-      items: 2,
-      learners: 4,
-    });
+    const content = interpolate(deleteConfirm.Content, { name: 'Sunfire Draught', items: 2, learners: 4 });
     assert.match(content, /Sunfire Draught/);
     assert.match(content, /2 of your books & scrolls/);
     assert.match(content, /4 character\(s\)/);
     // `DialogV2.confirm` merges `yes` over a default carrying `label: "COMMON.Yes"`, so a
     // destructive confirm needs its OWN label or it reads as the generic *Yes*.
     assert.equal(deleteConfirm.Confirm, 'Delete');
-    assert.equal(
-      interpolate(deleteConfirm.Title, { name: 'Sunfire Draught' }),
-      'Delete Sunfire Draught?'
-    );
+    assert.equal(interpolate(deleteConfirm.Title, { name: 'Sunfire Draught' }), 'Delete Sunfire Draught?');
   });
 
   it('has a numberless branch, so a recipe reaching nothing says so plainly', () => {
@@ -357,10 +350,7 @@ describe('1132/copy the singular dialog reports the same arithmetic', () => {
   // same action has to obey the same rule, and each single-consequence branch must carry
   // only the number it is for.
   it('has a branch per consequence, so neither is ever stated as a nought', () => {
-    const itemsOnly = interpolate(deleteConfirm.ContentItems, {
-      name: 'Sunfire Draught',
-      items: 2,
-    });
+    const itemsOnly = interpolate(deleteConfirm.ContentItems, { name: 'Sunfire Draught', items: 2 });
     assert.match(itemsOnly, /2 of your books & scrolls/);
     assert.equal(/character/i.test(itemsOnly), false, 'and says nothing about characters');
 

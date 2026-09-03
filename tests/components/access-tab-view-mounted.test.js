@@ -15,7 +15,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
-    'src/utils/recipeCategories.js',
+    'src/utils/recipeCategories.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -31,9 +31,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
-    'src/ui/svelte/apps/manager/AccessTabView.svelte',
+    'src/ui/svelte/apps/manager/AccessTabView.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/AccessTabView.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/AccessTabView.svelte'
 });
 
 function makeRecipe(overrides = {}) {
@@ -45,7 +45,7 @@ function makeRecipe(overrides = {}) {
     img: 'icons/svg/book.svg',
     category: overrides.category || 'smithing',
     accessSummary: { characterCount, playerCount },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -62,9 +62,9 @@ describe('AccessTabView (mounted)', () => {
     const root = await harness.mount({
       recipes: [
         makeRecipe({ id: 'alloy', name: 'Alloy Bronze', characterCount: 2, playerCount: 0 }),
-        makeRecipe({ id: 'soul', name: 'Soul-Ash', characterCount: 0, playerCount: 1 }),
+        makeRecipe({ id: 'soul', name: 'Soul-Ash', characterCount: 0, playerCount: 1 })
       ],
-      selectedSystemName: 'Mythwright',
+      selectedSystemName: 'Mythwright'
     });
 
     assert.equal(root.querySelectorAll('[data-access-row]').length, 2);
@@ -74,9 +74,7 @@ describe('AccessTabView (mounted)', () => {
 
   it('renders the danger "No access" chip when no one is granted', async () => {
     const root = await harness.mount({
-      recipes: [
-        makeRecipe({ id: 'longsword', name: 'Longsword', characterCount: 0, playerCount: 0 }),
-      ],
+      recipes: [makeRecipe({ id: 'longsword', name: 'Longsword', characterCount: 0, playerCount: 0 })]
     });
     const chip = root.querySelector('[data-access-grant="longsword"]');
     assert.equal(chip.querySelector('span').textContent.trim(), 'No access');
@@ -87,8 +85,8 @@ describe('AccessTabView (mounted)', () => {
     const root = await harness.mount({
       recipes: [
         makeRecipe({ id: 'granted', name: 'Granted One', characterCount: 1, playerCount: 0 }),
-        makeRecipe({ id: 'open', name: 'Open One', characterCount: 0, playerCount: 0 }),
-      ],
+        makeRecipe({ id: 'open', name: 'Open One', characterCount: 0, playerCount: 0 })
+      ]
     });
     assert.equal(root.querySelectorAll('[data-access-row]').length, 2);
 
@@ -105,13 +103,9 @@ describe('AccessTabView (mounted)', () => {
   it('marks the selected row and fires onSelectRecipe on click', async () => {
     let selected = null;
     const root = await harness.mount({
-      recipes: [
-        makeRecipe({ id: 'alloy', name: 'Alloy Bronze', characterCount: 1, playerCount: 0 }),
-      ],
+      recipes: [makeRecipe({ id: 'alloy', name: 'Alloy Bronze', characterCount: 1, playerCount: 0 })],
       selectedRecipeId: 'alloy',
-      onSelectRecipe: (id) => {
-        selected = id;
-      },
+      onSelectRecipe: (id) => { selected = id; }
     });
 
     const row = root.querySelector('[data-access-row="alloy"]');
@@ -131,7 +125,7 @@ describe('AccessTabView (mounted)', () => {
   // was not operable. It is now a real `<ul>`/`<li>` with the button inside the item.
   it('renders the access list as a real ul/li with the button inside the item', async () => {
     const root = await harness.mount({
-      recipes: [makeRecipe({ id: 'alloy', name: 'Alloy Bronze', characterCount: 1 })],
+      recipes: [makeRecipe({ id: 'alloy', name: 'Alloy Bronze', characterCount: 1 })]
     });
 
     const list = root.querySelector('.manager-access-list');
@@ -156,9 +150,9 @@ describe('AccessTabView (mounted)', () => {
     const root = await harness.mount({
       recipes: [
         makeRecipe({ id: 'alloy', name: 'Alloy Bronze', characterCount: 1 }),
-        makeRecipe({ id: 'soul', name: 'Soul-Ash', playerCount: 1 }),
+        makeRecipe({ id: 'soul', name: 'Soul-Ash', playerCount: 1 })
       ],
-      selectedRecipeId: 'alloy',
+      selectedRecipeId: 'alloy'
     });
 
     const selected = root.querySelector('[data-access-row="alloy"]');
@@ -201,7 +195,6 @@ describe('AccessTabView (mounted)', () => {
   itResolvesTheRecipesOwnImage({
     harness,
     mountProps: (imageOverrides) => ({ recipes: [makeRecipe({ id: 'alloy', ...imageOverrides })] }),
-    selectImg: (root) =>
-      root.querySelector('[data-access-row="alloy"] img.manager-recipe-thumb').getAttribute('src'),
+    selectImg: (root) => root.querySelector('[data-access-row="alloy"] img.manager-recipe-thumb').getAttribute('src')
   });
 });

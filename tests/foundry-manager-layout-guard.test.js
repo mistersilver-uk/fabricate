@@ -55,7 +55,10 @@ test('passes with the pre-summarised {selector,count} shape', () => {
 test('throws naming the expected selector when a class is renamed to zero matches', () => {
   // Simulate `.manager-recipe-row` renamed away: the surface still renders other
   // selectors, but the pinned critical one matched nothing.
-  const metrics = elementMetrics('.manager-recipe-renamed', '.manager-recipe-identity');
+  const metrics = elementMetrics(
+    '.manager-recipe-renamed',
+    '.manager-recipe-identity'
+  );
   assert.throws(
     () => assertExpectedSelectorsPresent(metrics, ['.manager-recipe-row'], 'recipes normal'),
     (error) => {
@@ -79,7 +82,9 @@ test('names EVERY missing expected selector, not just the first', () => {
 });
 
 test('an expected selector with zero matches (absent from metrics) throws', () => {
-  assert.throws(() => assertExpectedSelectorsPresent([], ['.manager-tools-row'], 'tools normal'));
+  assert.throws(() =>
+    assertExpectedSelectorsPresent([], ['.manager-tools-row'], 'tools normal')
+  );
 });
 
 // ── Tolerant of extra/unexpected selectors ──────────────────────────────────
@@ -162,7 +167,9 @@ test('expectedSelectorsForManagerSurface returns [] for an unmapped label', () =
 
 test('every pinned selector is in the harness measured-selector list', async () => {
   const source = await readFile(HARNESS_PATH, 'utf8');
-  const measured = new Set(Array.from(source.matchAll(/'(\.[a-z-]+)'/g)).map((match) => match[1]));
+  const measured = new Set(
+    Array.from(source.matchAll(/'(\.[a-z-]+)'/g)).map((match) => match[1])
+  );
   const pinned = new Set(
     Object.values(MANAGER_SURFACE_EXPECTED_SELECTORS).flatMap((selectors) => selectors)
   );

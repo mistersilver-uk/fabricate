@@ -42,14 +42,7 @@ describe('component category helpers (issue 676)', () => {
 
   it('never persists the reserved general bucket in the custom array, and dedupes/trims', () => {
     assert.deepEqual(
-      normalizeCustomComponentCategories([
-        'Reagent',
-        'general',
-        ' Metal ',
-        'Reagent',
-        'General',
-        '',
-      ]),
+      normalizeCustomComponentCategories(['Reagent', 'general', ' Metal ', 'Reagent', 'General', '']),
       ['Reagent', 'Metal']
     );
     assert.deepEqual(normalizeCustomComponentCategories(null), []);

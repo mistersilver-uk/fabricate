@@ -56,10 +56,7 @@ const run = (engine, system, component = {}) =>
 test('salvage simple: roll at/above the DC passes', async () => {
   const engine = makeEngine();
   stubRoll(16, [{ number: 1, faces: 20, total: 16 }]);
-  const r = await run(
-    engine,
-    sys({ simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet' } }, 'simple')
-  );
+  const r = await run(engine, sys({ simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet' } }, 'simple'));
   assert.equal(r.success, true);
   assert.equal(r.outcome, 'pass');
   assert.equal(r.value, 16);
@@ -88,9 +85,7 @@ test('salvage simple: a forced-success trigger passes below the DC', async () =>
         simple: {
           rollFormula: '1d20',
           dc: 15,
-          checkBreakage: {
-            triggers: [totalTrigger({ groupId: 0, value: 20, outcome: 'success' })],
-          },
+          checkBreakage: { triggers: [totalTrigger({ groupId: 0, value: 20, outcome: 'success' })] },
         },
       },
       'simple'
@@ -104,10 +99,7 @@ test('salvage simple: a forced-success trigger passes below the DC', async () =>
 test('salvage progressive: the roll total is the numeric value', async () => {
   const engine = makeEngine();
   stubRoll(8, [{ number: 2, faces: 6, total: 8 }]);
-  const r = await run(
-    engine,
-    sys({ progressive: { rollFormula: '2d6', awardMode: 'equal' } }, 'progressive')
-  );
+  const r = await run(engine, sys({ progressive: { rollFormula: '2d6', awardMode: 'equal' } }, 'progressive'));
   assert.equal(r.success, true);
   assert.equal(r.value, 8);
 });
@@ -117,32 +109,14 @@ test('salvage progressive: a success trigger awards all (MAX_SAFE_INTEGER), a fa
   stubRoll(7, [{ number: 2, faces: 6, total: 12 }]);
   const all = await run(
     engine,
-    sys(
-      {
-        progressive: {
-          rollFormula: '2d6',
-          checkBreakage: {
-            triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })],
-          },
-        },
-      },
-      'progressive'
-    )
+    sys({ progressive: { rollFormula: '2d6', checkBreakage: { triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })] } } }, 'progressive')
   );
   assert.equal(all.value, Number.MAX_SAFE_INTEGER);
 
   stubRoll(11, [{ number: 2, faces: 6, total: 2 }]);
   const none = await run(
     engine,
-    sys(
-      {
-        progressive: {
-          rollFormula: '2d6',
-          checkBreakage: { triggers: [totalTrigger({ groupId: 0, value: 2, outcome: 'failure' })] },
-        },
-      },
-      'progressive'
-    )
+    sys({ progressive: { rollFormula: '2d6', checkBreakage: { triggers: [totalTrigger({ groupId: 0, value: 2, outcome: 'failure' })] } } }, 'progressive')
   );
   assert.equal(none.value, 0);
 });
@@ -335,10 +309,7 @@ test('salvage simple: a dcOverride of 0 is honoured as a valid DC (not treated a
 test('salvage simple is engine-evaluated and surfaces data.diceGroups', async () => {
   const engine = makeEngine();
   stubRoll(16, [{ number: 1, faces: 20, total: 16, results: [{ result: 16, active: true }] }]);
-  const r = await run(
-    engine,
-    sys({ simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet' } }, 'simple')
-  );
+  const r = await run(engine, sys({ simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet' } }, 'simple'));
   assert.equal(r.engineEvaluated, true);
   assert.deepEqual(r.data.diceGroups, [{ groupId: 0, group: '1d20', sum: 16, results: [16] }]);
 });
@@ -347,20 +318,11 @@ test('checkDriven salvage: the active salvage check checkBreakage decides forced
   const engine = makeEngine();
   stubRoll(1, [{ number: 1, faces: 20, total: 1, results: [{ result: 1, active: true }] }]);
   const checkBreakage = {
-    triggers: [
-      {
-        id: 'nat1',
-        breakTools: true,
-        outcome: 'none',
-        condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
-      },
-    ],
+    triggers: [{ id: 'nat1', breakTools: true, outcome: 'none', condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
   };
   const system = {
     salvageResolutionMode: 'simple',
-    salvageCraftingCheck: {
-      simple: { rollFormula: '1d20', dc: 1, thresholdMode: 'meet', checkBreakage },
-    },
+    salvageCraftingCheck: { simple: { rollFormula: '1d20', dc: 1, thresholdMode: 'meet', checkBreakage } },
     toolBreakage: { authority: 'checkDriven' },
   };
   const r = await run(engine, system);
@@ -379,11 +341,7 @@ test('toolSpecific salvage: a breakTools trigger never force-breaks (either-or a
       simple: {
         rollFormula: '1d20',
         dc: 15,
-        checkBreakage: {
-          triggers: [
-            totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'success', breakTools: true }),
-          ],
-        },
+        checkBreakage: { triggers: [totalTrigger({ id: 'bt', groupId: 0, value: 20, outcome: 'success', breakTools: true })] },
       },
     },
   };

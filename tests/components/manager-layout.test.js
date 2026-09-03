@@ -1681,12 +1681,8 @@ test('manager gathering settings condition panels use a two-column responsive gr
   const colorPickerPopoverBlock = blockFor(
     '.fabricate-color-picker-popover.manager-color-picker-popover'
   );
-  const colorPresetGridBlock = blockFor(
-    '.fabricate-color-picker-popover .manager-color-preset-grid'
-  );
-  const colorCustomInputBlock = blockFor(
-    '.fabricate-color-picker-popover .manager-color-custom input'
-  );
+  const colorPresetGridBlock = blockFor('.fabricate-color-picker-popover .manager-color-preset-grid');
+  const colorCustomInputBlock = blockFor('.fabricate-color-picker-popover .manager-color-custom input');
   const labelInputBlock = blockFor('.fabricate-manager .manager-condition-label-input');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
 
@@ -3654,7 +3650,9 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
     'essence edit route reserves a row for the tab strip and gives the body the slack'
   );
   assert.ok(
-    editGridBlock.includes('grid-template-columns: 124px minmax(0, 1fr);'),
+    editGridBlock.includes(
+      'grid-template-columns: 124px minmax(0, 1fr);'
+    ),
     'essence edit identity fields should reserve stable square-icon picker space'
   );
   // TWO tracks. The third reserved an inline clear button that no surface renders any more
@@ -3752,7 +3750,9 @@ test('manager environments browser and edit route define compact responsive geom
   // and the environment editor's own name. Everything asserted below is the same declaration set
   // at the same specificity — the item rules keep their `button` type selector precisely so that
   // re-rooting moves nothing in this screen's cascade.
-  const compMenuBlock = blockFor('.fabricate-action-menu-panel.manager-action-menu-panel');
+  const compMenuBlock = blockFor(
+    '.fabricate-action-menu-panel.manager-action-menu-panel'
+  );
   const compMenuButtonBlock = blockFor(
     '.fabricate-action-menu-panel button.manager-action-menu-item'
   );
@@ -4408,9 +4408,9 @@ test('manager environment composition overflow menu renders bounded single-line 
         viewportWidth: window.innerWidth,
         wrap: rectFor(document.querySelector('.fabricate-action-menu')),
         menu: rectFor(document.querySelector('.fabricate-action-menu-panel')),
-        rows: Array.from(document.querySelectorAll('.fabricate-action-menu-panel button')).map(
-          rowFor
-        ),
+        rows: Array.from(
+          document.querySelectorAll('.fabricate-action-menu-panel button')
+        ).map(rowFor),
       };
     });
 
@@ -5752,10 +5752,7 @@ test('every declaration on the recipe tag chip rule wins the real cascade', asyn
     .filter(Boolean)
     .map((declaration) => {
       const colon = declaration.indexOf(':');
-      return {
-        property: declaration.slice(0, colon).trim(),
-        value: declaration.slice(colon + 1).trim(),
-      };
+      return { property: declaration.slice(0, colon).trim(), value: declaration.slice(colon + 1).trim() };
     });
   assert.ok(
     declarations.length >= 4,
@@ -6191,10 +6188,7 @@ test('a suggestion reads from the left edge the typed query does, under the host
         // The offset of the row's FIRST item from its own padding edge. Zero means the glyph
         // starts where the row starts; anything else is slack the row put in front of it.
         glyphIndent:
-          left(glyph) -
-          (left(suggestion) +
-            Number.parseFloat(style.paddingLeft) +
-            Number.parseFloat(style.borderLeftWidth)),
+          left(glyph) - (left(suggestion) + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth)),
         // …and where the LABEL lands against the query it is completing, which is the thing the
         // maintainer actually saw: `ingot` at the field's left edge, `Iron Ingot` mid-panel.
         labelIndent: left(label) - left(field),
@@ -6635,6 +6629,7 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
     await context.close();
   }
 });
+
 
 // Until issue 785 the Books & Scrolls surface carried its own duplicate page header, so it
 // had FOUR unconditional grid children against the shared three-track `auto auto 1fr`: the
@@ -8247,10 +8242,7 @@ test('the Tool rule card eyebrow carries the reference type, not the shared kick
   // may do is name a DIFFERENT figure, which is the defect returning under a new address.
   const kickerFontSize = /font-size: ([^;]+);/;
   for (const [file, selector] of [
-    [
-      'tools/ToolInheritCard.svelte',
-      '.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow',
-    ],
+    ['tools/ToolInheritCard.svelte', '.manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow'],
     ['tools/ToolBrowserInspector.svelte', '.manager-tool-inspector-kicker'],
     ['tools/ToolRequirementsTab.svelte', '.manager-tool-bonus-kicker {'],
   ]) {
@@ -11234,6 +11226,8 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
   );
   assert.match(orMenuGroupCardSource, /maxWidth=\{150\}/, 'and must not let it grow past it');
 });
+
+
 
 test("the requirement row's two dashed affordances paint at all, and at the design's two scales", async () => {
   // MEASURED, BECAUSE THE SHEET SAID OTHERWISE AND WAS NOT PAINTING (issue 1373, round 8).

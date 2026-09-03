@@ -10,7 +10,7 @@ import {
   notifyWarn,
   notifyError,
   getDragEventData,
-  viewScene,
+  viewScene
 } from '../src/ui/svelte/util/foundryBridge.js';
 
 // deepClone that preserves functions (button callbacks), like foundry.utils.deepClone
@@ -28,12 +28,10 @@ function preservingDeepClone(obj) {
 // or invokes close() when action is the literal 'close'.
 function dialogClicking(action) {
   return class FakeDialogV2 {
-    constructor(opts) {
-      this.opts = opts;
-    }
+    constructor(opts) { this.opts = opts; }
     render() {
       if (action === 'close') this.opts.close?.();
-      else this.opts.buttons.find((b) => b.action === action)?.callback?.();
+      else this.opts.buttons.find(b => b.action === action)?.callback?.();
       return this;
     }
   };
@@ -43,14 +41,7 @@ function dialogClicking(action) {
 
 test('viewScene resolves the uuid and calls scene.view()', async () => {
   let viewed = 0;
-  globalThis.fromUuid = async (uuid) =>
-    uuid === 'Scene.a'
-      ? {
-          view: async () => {
-            viewed++;
-          },
-        }
-      : null;
+  globalThis.fromUuid = async (uuid) => uuid === 'Scene.a' ? { view: async () => { viewed++; } } : null;
   const ok = await viewScene('Scene.a');
   assert.equal(ok, true);
   assert.equal(viewed, 1);
@@ -82,8 +73,8 @@ test('localize(key, data) calls game.i18n.format and returns result', () => {
       format: (k, d) => {
         calls.push({ key: k, data: d });
         return `formatted:${k}:${d.name}`;
-      },
-    },
+      }
+    }
   };
   const result = localize('MY.Key', data);
   assert.equal(result, 'formatted:MY.Key:foo');
@@ -114,10 +105,10 @@ test('confirmDialog calls DialogV2.confirm and returns result', async () => {
     applications: {
       api: {
         DialogV2: {
-          confirm: async (o) => ({ confirmed: true, options: o }),
-        },
-      },
-    },
+          confirm: async (o) => ({ confirmed: true, options: o })
+        }
+      }
+    }
   };
   const result = await confirmDialog(opts);
   assert.equal(result.confirmed, true);
@@ -136,22 +127,14 @@ test('confirmDialog without DialogV2 returns false', async () => {
 test('renderDialog constructs DialogV2 and calls render(true)', () => {
   const renderCalls = [];
   class FakeDialogV2 {
-    constructor(opts) {
-      this.opts = opts;
-    }
-    render(force) {
-      renderCalls.push(force);
-      return this;
-    }
+    constructor(opts) { this.opts = opts; }
+    render(force) { renderCalls.push(force); return this; }
   }
   globalThis.foundry = {
     applications: { api: { DialogV2: FakeDialogV2 } },
-    utils: { deepClone: (o) => JSON.parse(JSON.stringify(o)) },
+    utils: { deepClone: (o) => JSON.parse(JSON.stringify(o)) }
   };
-  const result = renderDialog({
-    title: 'Hello',
-    buttons: [{ action: 'ok', label: 'OK', default: true }],
-  });
+  const result = renderDialog({ title: 'Hello', buttons: [{ action: 'ok', label: 'OK', default: true }] });
   assert.ok(result instanceof FakeDialogV2);
   assert.deepEqual(renderCalls, [true]);
   delete globalThis.foundry;
@@ -166,24 +149,16 @@ test('renderDialog without DialogV2 returns null', () => {
 test('renderDialog namespaces the dialog (.fabricate-dialog) and gives it a sensible width', () => {
   let captured = null;
   class FakeDialogV2 {
-    constructor(opts) {
-      this.opts = opts;
-      captured = opts;
-    }
-    render() {
-      return this;
-    }
+    constructor(opts) { this.opts = opts; captured = opts; }
+    render() { return this; }
   }
   globalThis.foundry = {
     applications: { api: { DialogV2: FakeDialogV2 } },
-    utils: { deepClone: (o) => JSON.parse(JSON.stringify(o)) },
+    utils: { deepClone: (o) => JSON.parse(JSON.stringify(o)) }
   };
   renderDialog({ title: 'Hello', buttons: [{ action: 'ok', label: 'OK', default: true }] });
   assert.ok(captured.classes.includes('fabricate'), 'carries the .fabricate root class');
-  assert.ok(
-    captured.classes.includes('fabricate-dialog'),
-    'carries the .fabricate-dialog class for button CSS'
-  );
+  assert.ok(captured.classes.includes('fabricate-dialog'), 'carries the .fabricate-dialog class for button CSS');
   assert.ok(Number(captured.position?.width) >= 360, 'default width fits a multi-button row');
   delete globalThis.foundry;
 });
@@ -191,25 +166,16 @@ test('renderDialog namespaces the dialog (.fabricate-dialog) and gives it a sens
 test('renderDialog respects an explicit caller width + does not duplicate classes', () => {
   let captured = null;
   class FakeDialogV2 {
-    constructor(opts) {
-      this.opts = opts;
-      captured = opts;
-    }
-    render() {
-      return this;
-    }
+    constructor(opts) { this.opts = opts; captured = opts; }
+    render() { return this; }
   }
   globalThis.foundry = {
     applications: { api: { DialogV2: FakeDialogV2 } },
-    utils: { deepClone: (o) => JSON.parse(JSON.stringify(o)) },
+    utils: { deepClone: (o) => JSON.parse(JSON.stringify(o)) }
   };
   renderDialog({ title: 'Hello', classes: ['fabricate'], position: { width: 600 } });
   assert.equal(captured.position.width, 600, 'explicit width is preserved');
-  assert.equal(
-    captured.classes.filter((c) => c === 'fabricate').length,
-    1,
-    'no duplicate fabricate class'
-  );
+  assert.equal(captured.classes.filter((c) => c === 'fabricate').length, 1, 'no duplicate fabricate class');
   delete globalThis.foundry;
 });
 
@@ -218,37 +184,32 @@ test('renderDialog respects an explicit caller width + does not duplicate classe
 const CHOICES = [
   { action: 'save', label: 'Save' },
   { action: 'discard', label: 'Discard' },
-  { action: 'cancel', label: 'Keep Editing' },
+  { action: 'cancel', label: 'Keep Editing' }
 ];
 
 for (const action of ['save', 'discard', 'cancel']) {
   test(`choiceDialog resolves '${action}' when that button is clicked`, async () => {
     globalThis.foundry = {
       applications: { api: { DialogV2: dialogClicking(action) } },
-      utils: { deepClone: preservingDeepClone },
+      utils: { deepClone: preservingDeepClone }
     };
-    const result = await choiceDialog({
-      title: 'T',
-      content: '<p>C</p>',
-      choices: CHOICES,
-      defaultAction: 'save',
-    });
+    const result = await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES, defaultAction: 'save' });
     assert.equal(result, action);
     delete globalThis.foundry;
   });
 }
 
-test("choiceDialog resolves 'cancel' when the dialog is closed", async () => {
+test('choiceDialog resolves \'cancel\' when the dialog is closed', async () => {
   globalThis.foundry = {
     applications: { api: { DialogV2: dialogClicking('close') } },
-    utils: { deepClone: preservingDeepClone },
+    utils: { deepClone: preservingDeepClone }
   };
   const result = await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES });
   assert.equal(result, 'cancel');
   delete globalThis.foundry;
 });
 
-test("choiceDialog resolves 'cancel' when DialogV2 is unavailable", async () => {
+test('choiceDialog resolves \'cancel\' when DialogV2 is unavailable', async () => {
   delete globalThis.foundry;
   const result = await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES });
   assert.equal(result, 'cancel');
@@ -257,29 +218,11 @@ test("choiceDialog resolves 'cancel' when DialogV2 is unavailable", async () => 
 test('choiceDialog marks the defaultAction button as default', async () => {
   let captured = null;
   globalThis.foundry = {
-    applications: {
-      api: {
-        DialogV2: class {
-          constructor(opts) {
-            this.opts = opts;
-            captured = opts;
-          }
-          render() {
-            this.opts.close?.();
-            return this;
-          }
-        },
-      },
-    },
-    utils: { deepClone: preservingDeepClone },
+    applications: { api: { DialogV2: class { constructor(opts) { this.opts = opts; captured = opts; } render() { this.opts.close?.(); return this; } } } },
+    utils: { deepClone: preservingDeepClone }
   };
-  await choiceDialog({
-    title: 'T',
-    content: '<p>C</p>',
-    choices: CHOICES,
-    defaultAction: 'discard',
-  });
-  const defaults = captured.buttons.filter((b) => b.default).map((b) => b.action);
+  await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES, defaultAction: 'discard' });
+  const defaults = captured.buttons.filter(b => b.default).map(b => b.action);
   assert.deepEqual(defaults, ['discard']);
   delete globalThis.foundry;
 });
@@ -338,11 +281,11 @@ test('getDragEventData calls TextEditor.getDragEventData and returns result', ()
       ux: {
         TextEditor: {
           implementation: {
-            getDragEventData: (e) => ({ type: 'Item', event: e }),
-          },
-        },
-      },
-    },
+            getDragEventData: (e) => ({ type: 'Item', event: e })
+          }
+        }
+      }
+    }
   };
   const result = getDragEventData(fakeEvent);
   assert.deepEqual(result, { type: 'Item', event: fakeEvent });
@@ -359,7 +302,7 @@ test('getDragEventData without TextEditor falls back to text/plain JSON', () => 
   delete globalThis.foundry;
   const payload = { type: 'Item', uuid: 'Item.abc123' };
   const fakeEvent = {
-    dataTransfer: { getData: (type) => (type === 'text/plain' ? JSON.stringify(payload) : '') },
+    dataTransfer: { getData: (type) => type === 'text/plain' ? JSON.stringify(payload) : '' }
   };
   const result = getDragEventData(fakeEvent);
   assert.deepEqual(result, payload);
@@ -368,7 +311,7 @@ test('getDragEventData without TextEditor falls back to text/plain JSON', () => 
 test('getDragEventData without TextEditor returns null for invalid JSON in text/plain', () => {
   delete globalThis.foundry;
   const fakeEvent = {
-    dataTransfer: { getData: (type) => (type === 'text/plain' ? 'not-valid-json' : '') },
+    dataTransfer: { getData: (type) => type === 'text/plain' ? 'not-valid-json' : '' }
   };
   const result = getDragEventData(fakeEvent);
   assert.equal(result, null);
@@ -383,7 +326,7 @@ test('getDragEventData without TextEditor returns null when dataTransfer is abse
 test('getDragEventData without TextEditor returns null when text/plain is empty', () => {
   delete globalThis.foundry;
   const fakeEvent = {
-    dataTransfer: { getData: () => '' },
+    dataTransfer: { getData: () => '' }
   };
   const result = getDragEventData(fakeEvent);
   assert.equal(result, null);

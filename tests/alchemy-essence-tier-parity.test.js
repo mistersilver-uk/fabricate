@@ -272,12 +272,7 @@ function makeSystem({ checkMode }) {
     id: SYS,
     resolutionMode: 'alchemy',
     features: { essences: true, effectTransfer: true, chatOutput: false },
-    alchemy: {
-      checkMode,
-      learnOnCraft: false,
-      consumeOnFail: true,
-      showAttemptHistoryToPlayers: false,
-    },
+    alchemy: { checkMode, learnOnCraft: false, consumeOnFail: true, showAttemptHistoryToPlayers: false },
     craftingCheck: { enabled: false, consumption: {} },
     components: components(),
     essenceDefinitions: [{ id: 'fire', sourceItemUuid: FIRE_ESSENCE_SRC }],
@@ -346,11 +341,8 @@ function brewRecords(sourceActor, comps) {
 // 1. Non-timed success — RED (signature gate) → GREEN (result + effect transfer)
 // ===========================================================================
 
-test("non-timed: a purely-tier-4 submission brews and transfers X's essence-sourced effect", async () => {
-  const { engine, validator, comps } = setup({
-    checkMode: 'simple',
-    resultGroups: [SUCCESS_GROUP],
-  });
+test('non-timed: a purely-tier-4 submission brews and transfers X\'s essence-sourced effect', async () => {
+  const { engine, validator, comps } = setup({ checkMode: 'simple', resultGroups: [SUCCESS_GROUP] });
   engine._runCraftingCheck = async () => ({ success: true, outcome: 'pass', value: 18, data: {} });
 
   const tier4 = new Tier4Item('owned-x', 'Item.X');
@@ -368,14 +360,11 @@ test("non-timed: a purely-tier-4 submission brews and transfers X's essence-sour
   });
 
   assert.equal(result.success, true, 'the tier-4-only brew completes end-to-end');
-  assert.ok(
-    Array.isArray(result.results) && result.results.length === 1,
-    'a result item is created'
-  );
+  assert.ok(Array.isArray(result.results) && result.results.length === 1, 'a result item is created');
   assert.equal(result.results[0].name, 'Elixir');
   assert.equal(tier4._deleted, true, 'the tier-4 ingredient is consumed');
   // The essence-sourced active effect from X's { fire } essence is transferred.
-  assert.equal(result.results[0].effects.length, 1, "X's essence-sourced effect is transferred");
+  assert.equal(result.results[0].effects.length, 1, 'X\'s essence-sourced effect is transferred');
   assert.equal(result.results[0].effects[0].name, 'Fire Ward');
 });
 
@@ -415,7 +404,7 @@ test('time-gated: a purely-tier-4 submission starts, prepares an essence snapsho
   assert.deepEqual(
     run.steps[0].preparedConsumption.resolvedEssences,
     { fire: 2 },
-    "the START snapshot carries X's component-defined essences"
+    'the START snapshot carries X\'s component-defined essences'
   );
 
   // Advance world time past the gate and FINISH.
@@ -440,7 +429,7 @@ test('time-gated: a purely-tier-4 submission starts, prepares an essence snapsho
 //    carries X's essence-sourced effect)
 // ===========================================================================
 
-test("non-timed Simple FAILURE: the reserved failure result carries X's essence-sourced effect (site 7)", async () => {
+test('non-timed Simple FAILURE: the reserved failure result carries X\'s essence-sourced effect (site 7)', async () => {
   const { engine, validator, comps } = setup({
     checkMode: 'simple',
     resultGroups: [SUCCESS_GROUP, FAILURE_GROUP],
@@ -461,17 +450,14 @@ test("non-timed Simple FAILURE: the reserved failure result carries X's essence-
   // no-match fizzle) and consumes the tier-4 ingredient.
   assert.equal(result.success, false);
   assert.equal(result.disposition, 'produced-on-failure', 'NOT the no-match fizzle path');
-  assert.ok(
-    Array.isArray(result.results) && result.results.length === 1,
-    'the failure result is produced'
-  );
+  assert.ok(Array.isArray(result.results) && result.results.length === 1, 'the failure result is produced');
   assert.equal(result.results[0].name, 'Sludge');
   assert.equal(tier4._deleted, true, 'the tier-4 ingredient is consumed on a matched fail');
   // Site 7: the failure result receives X's essence-sourced effect.
   assert.equal(
     result.results[0].effects.length,
     1,
-    "X's essence-sourced effect is transferred to the failure result"
+    'X\'s essence-sourced effect is transferred to the failure result'
   );
   assert.equal(result.results[0].effects[0].name, 'Fire Ward');
 });
@@ -490,11 +476,7 @@ test('standard (non-alchemy) craft of the same tier-4 item stays unrecognized', 
 
   // A STANDARD craft — no isAlchemyAttempt, so no injected resolver.
   const result = await engine.craft(crafter, [source], recipe, null, {});
-  assert.equal(
-    result.success,
-    false,
-    'the tier-4-only item is not recognized by standard crafting'
-  );
+  assert.equal(result.success, false, 'the tier-4-only item is not recognized by standard crafting');
   assert.match(result.message, /Missing required items/i);
   assert.equal(tier4._deleted, false, 'nothing is consumed');
 });
@@ -521,21 +503,13 @@ test('own-flag short-circuit: an item carrying its own essences brews even again
   const source = new FakeActor('src', [owned]);
   const crafter = new FakeActor('pc');
   const records = brewRecords(source, comps);
-  assert.equal(
-    records[0].componentId,
-    'cX',
-    'the own-flag item still buckets to X (by source ref)'
-  );
+  assert.equal(records[0].componentId, 'cX', 'the own-flag item still buckets to X (by source ref)');
 
   const result = await engine.craftAlchemy(crafter, [source], records, {
     craftingSystemId: SYS,
     signatureValidator: validator,
   });
-  assert.equal(
-    result.success,
-    true,
-    'the own-essences submission satisfies the essence requirement and brews'
-  );
+  assert.equal(result.success, true, 'the own-essences submission satisfies the essence requirement and brews');
   assert.equal(result.results[0].name, 'Elixir');
 });
 
@@ -557,10 +531,7 @@ test('own-flag short-circuit: an item carrying its own essences brews even again
 // fails loudly rather than silently over-spending.
 const BLOCK_GROUPS = [
   { id: 'g-comp', options: [{ match: { type: 'component', componentId: 'cX' }, quantity: 1 }] },
-  {
-    id: 'g-ess',
-    options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } }],
-  },
+  { id: 'g-ess', options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
 ];
 
 test('alchemy consumes the whole submission unchanged when an essence block splits the plan', async () => {
@@ -623,11 +594,7 @@ test('an essence allocation riding on the options never reaches an alchemy brew'
   const result = await engine.craftAlchemy(new FakeActor('pc'), [source], records, {
     craftingSystemId: SYS,
     signatureValidator: validator,
-    ingredientEssenceAllocation: {
-      stepId: 'implicit-step',
-      ingredientSetId: 'brew-set',
-      allocation: {},
-    },
+    ingredientEssenceAllocation: { stepId: 'implicit-step', ingredientSetId: 'brew-set', allocation: {} },
   });
 
   assert.equal(result.success, true, 'the brew is unaffected by a foreign allocation');

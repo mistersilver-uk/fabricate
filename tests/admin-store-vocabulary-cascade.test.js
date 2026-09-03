@@ -157,11 +157,7 @@ describe('adminStore vocabulary cascade + icons (issue 689)', () => {
     assert.deepEqual(services._recipeWrites, [
       [
         'r3',
-        {
-          ingredientSets: [
-            { ingredientGroups: [{ options: [{ match: { type: 'tags', tags: [] } }] }] },
-          ],
-        },
+        { ingredientSets: [{ ingredientGroups: [{ options: [{ match: { type: 'tags', tags: [] } }] }] }] },
       ],
     ]);
     assert.deepEqual(services._system.itemTags, ['herb']);

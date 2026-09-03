@@ -155,11 +155,7 @@ test('600: an item durably flagged for another system is NOT stamped into a mere
   });
 
   const writes = planOwnedItemComponentRestamp(item, [SYS_A]);
-  assert.deepEqual(
-    writes,
-    [],
-    'a component-flagged item is skipped entirely (no sysA write planned)'
-  );
+  assert.deepEqual(writes, [], 'a component-flagged item is skipped entirely (no sysA write planned)');
 
   const summary = await restampOwnedItemComponentIdentity({
     actors: [makeActor([item])],

@@ -204,10 +204,7 @@ test('a resolution that does not resolve is UNVERIFIABLE, and no override is off
   assert.equal(status, 2, output);
   assert.match(output, /does not resolve to a commit in this repository/);
   assert.match(output, /UNVERIFIABLE rather than refused/);
-  assert.ok(
-    !new RegExp(OVERRIDE_HINT).test(output),
-    'an unverifiable state is never offered a hint'
-  );
+  assert.ok(!new RegExp(OVERRIDE_HINT).test(output), 'an unverifiable state is never offered a hint');
   assert.equal(git('rev-parse', 'HEAD'), topology.mainTip, 'nothing was committed');
   assert.equal(git('ls-files', '--unmerged'), '', 'the merge was still aborted');
 });

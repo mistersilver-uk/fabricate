@@ -42,7 +42,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-    'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
@@ -219,7 +219,9 @@ describe('TagsCategoriesView (mounted)', () => {
   // along with the element.
   it('moves focus along the strip on Arrow/Home/End and reports the next tab', async () => {
     const changes = [];
-    const root = await harness.mount(mountProps({ onTabChange: (id) => changes.push(id) }));
+    const root = await harness.mount(
+      mountProps({ onTabChange: (id) => changes.push(id) })
+    );
     const activeElement = () => root.ownerDocument.activeElement;
     // The focused tab BY ID, never the element itself. `assert.equal` on two mounted happy-dom
     // nodes serialises their circular trees to build a failure diff and kills the heap, so a
@@ -260,7 +262,9 @@ describe('TagsCategoriesView (mounted)', () => {
 
   it('ignores keys that are not part of the strip contract', async () => {
     const changes = [];
-    const root = await harness.mount(mountProps({ onTabChange: (id) => changes.push(id) }));
+    const root = await harness.mount(
+      mountProps({ onTabChange: (id) => changes.push(id) })
+    );
 
     const recipe = tabButton(root, 'recipe');
     recipe.focus();
@@ -290,7 +294,9 @@ describe('TagsCategoriesView (mounted)', () => {
 
   it('fires onTabChange when a tab is clicked', async () => {
     const changes = [];
-    const root = await harness.mount(mountProps({ onTabChange: (id) => changes.push(id) }));
+    const root = await harness.mount(
+      mountProps({ onTabChange: (id) => changes.push(id) })
+    );
 
     tabButton(root, 'component').click();
     flushSync();

@@ -43,11 +43,7 @@ import {
 import { readPooledHoldings } from '../src/systems/companionPooledHoldings.js';
 import { resetNameOnlyMatchTelemetry } from '../src/utils/componentNameMatch.js';
 
-import {
-  POOLED_LADDER,
-  POOLED_MACROS,
-  PooledActorFake,
-} from './helpers/pooled-currency-fixtures.js';
+import { POOLED_LADDER, POOLED_MACROS, PooledActorFake } from './helpers/pooled-currency-fixtures.js';
 
 /**
  * A `game` global, because `resolveCoinSpender` reads a BARE `game.fabricate?.…` on its accessor
@@ -168,12 +164,8 @@ const summarize = (result) =>
 describe('readPooledHoldings — components', () => {
   it('sums a component across the party and hands back the ids a consume needs', async () => {
     const party = [
-      makeActor('Idrin', {
-        items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 2 })],
-      }),
-      makeActor('Sera', {
-        items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 3 })],
-      }),
+      makeActor('Idrin', { items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 2 })] }),
+      makeActor('Sera', { items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 3 })] }),
       makeActor('Bram', { items: [new HeldItem('Rope')] }),
     ];
 
@@ -250,14 +242,16 @@ describe('readPooledHoldings — components', () => {
     const party = [makeActor('Idrin', { items: [new HeldItem('Ember Dust', { quantity: 4 })] })];
 
     const beforeMigration = makeSystems();
-    const beforeReading = (await read(party, [cost('component', 'ember', 1)], {}, beforeMigration))
-      .readings[0];
+    const beforeReading = (
+      await read(party, [cost('component', 'ember', 1)], {}, beforeMigration)
+    ).readings[0];
     assert.equal(beforeReading.ambiguous, false, 'two DIFFERENT ids, so only one system answered');
 
     const afterMigration = makeSystems();
     afterMigration[1].components[0].id = 'ember';
-    const afterReading = (await read(party, [cost('component', 'ember', 1)], {}, afterMigration))
-      .readings[0];
+    const afterReading = (
+      await read(party, [cost('component', 'ember', 1)], {}, afterMigration)
+    ).readings[0];
     assert.equal(afterReading.ambiguous, true, 'ONE world id, so both member systems answer');
     assert.equal(afterReading.componentId, 'ember');
     assert.equal(afterReading.systemId, SMITHING, 'and the seam order still decides which wins');
@@ -284,10 +278,7 @@ describe('readPooledHoldings — tools', () => {
   const toolCost = [cost('tool', "Smith's Hammer")];
 
   it('answers a state and no quantity when the party holds a working tool', async () => {
-    const party = [
-      makeActor('Idrin'),
-      makeActor('Sera', { items: [new HeldItem("Smith's Hammer")] }),
-    ];
+    const party = [makeActor('Idrin'), makeActor('Sera', { items: [new HeldItem("Smith's Hammer")] })];
 
     const [reading] = (await read(party, toolCost)).readings;
 
@@ -301,9 +292,7 @@ describe('readPooledHoldings — tools', () => {
     // The whole reason a tool's `sufficient` is `state === 'present'` and nothing else: the
     // hammer is physically in the party's hands, and the shipped start-attempt gate still
     // refuses it.
-    const party = [
-      makeActor('Idrin', { items: [new HeldItem("Smith's Hammer", { broken: true })] }),
-    ];
+    const party = [makeActor('Idrin', { items: [new HeldItem("Smith's Hammer", { broken: true })] })];
 
     const [reading] = (await read(party, toolCost)).readings;
 
@@ -417,20 +406,13 @@ describe('readPooledHoldings — currency', () => {
     const party = [
       makeActor('Idrin', {
         currency: { gp: 9 },
-        items: [
-          new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 2 }),
-          new HeldItem("Smith's Hammer"),
-        ],
+        items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 2 }), new HeldItem("Smith's Hammer")],
       }),
     ];
 
     const result = await read(
       party,
-      [
-        cost('currency', 'gp', 1),
-        cost('component', 'Iron Ingot', 2),
-        cost('tool', "Smith's Hammer"),
-      ],
+      [cost('currency', 'gp', 1), cost('component', 'Iron Ingot', 2), cost('tool', "Smith's Hammer")],
       { spendStrategy: 'macro', macros: withoutBalance }
     );
 
@@ -518,10 +500,7 @@ describe('readPooledHoldings — the request itself', () => {
       ['empty', []],
       ['over-bound', overBound],
       ['an entry missing a key', [{ type: 'component', name: 'Iron Ingot' }]],
-      [
-        'an entry carrying an extra key',
-        [{ ...cost('component', 'Iron Ingot', 1), systemId: SMITHING }],
-      ],
+      ['an entry carrying an extra key', [{ ...cost('component', 'Iron Ingot', 1), systemId: SMITHING }]],
       ['an entry that is not an object', ['Iron Ingot']],
     ];
 
@@ -608,10 +587,7 @@ describe('readPooledHoldings — the promises it makes to a companion', () => {
     assert.ok(Object.isFrozen(result));
     assert.ok(Object.isFrozen(result.actorUuids));
     assert.ok(Object.isFrozen(result.readings));
-    assert.ok(
-      Object.isFrozen(result.readings[0]),
-      'a mutable reading is a published mutable record'
-    );
+    assert.ok(Object.isFrozen(result.readings[0]), 'a mutable reading is a published mutable record');
   });
 
   it('never throws: a seam that rejects becomes a refusal, at whichever level it broke', async () => {
@@ -658,9 +634,7 @@ describe('readPooledHoldings — the deprecated name tier’s telemetry', () => 
     // `definitionIndex`'s own maps and never through the warn-once reporter. A companion polling
     // holdings every stage must not register as reliance on the tier #540 exists to remove.
     const party = [
-      makeActor('Idrin', {
-        items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 2 })],
-      }),
+      makeActor('Idrin', { items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 2 })] }),
     ];
 
     const result = await read(party, [cost('component', 'Iron Ingot', 1)]);
@@ -721,14 +695,11 @@ describe('readPooledHoldings — a cost names its coin the way it names its comp
       ],
     });
 
-    const result = await read(
-      [holder],
-      [
-        cost('component', 'iron ingot', 2),
-        cost('tool', "smith's hammer"),
-        cost('currency', 'Gold', 4),
-      ]
-    );
+    const result = await read([holder], [
+      cost('component', 'iron ingot', 2),
+      cost('tool', "smith's hammer"),
+      cost('currency', 'Gold', 4),
+    ]);
 
     assert.deepEqual(summarize(result), [
       [COMPANION_OUTCOMES.read, 2, true],
@@ -840,9 +811,7 @@ describe('readPooledHoldings — a cost may name a definition by the id the read
 
   it('resolves a component cost by its definition id', async () => {
     const party = [
-      makeActor('Idrin', {
-        items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 4 })],
-      }),
+      makeActor('Idrin', { items: [new HeldItem('Iron Ingot', { uuid: IRON_SOURCE, quantity: 4 })] }),
     ];
 
     const result = await read(party, [cost('component', 'iron', 1)]);
@@ -877,9 +846,7 @@ describe('readPooledHoldings — a cost may name a definition by the id the read
       },
     ];
     const party = [
-      makeActor('Idrin', {
-        items: [new HeldItem('Grave Ashes', { uuid: IRON_SOURCE, quantity: 7 })],
-      }),
+      makeActor('Idrin', { items: [new HeldItem('Grave Ashes', { uuid: IRON_SOURCE, quantity: 7 })] }),
     ];
 
     const result = await read(party, [cost('component', 'ashes', 1)], {}, systems);

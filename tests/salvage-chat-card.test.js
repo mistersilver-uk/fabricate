@@ -42,10 +42,7 @@ function failureModel(overrides = {}) {
 
 test('renders the SAME card markup as crafting (shared fabricate-craft-chat styles)', () => {
   const content = buildSalvageChatContent(successModel());
-  assert.ok(
-    content.includes('fabricate-craft-chat fabricate-craft-chat--success'),
-    'shared wrapper + state class'
-  );
+  assert.ok(content.includes('fabricate-craft-chat fabricate-craft-chat--success'), 'shared wrapper + state class');
   assert.ok(content.includes('fabricate-craft-chat__header'), 'shared header');
   assert.ok(content.includes('fabricate-craft-chat__grid'), 'shared icon grid');
 });
@@ -81,10 +78,7 @@ test('failure card uses failure modifier, reason notice, and one merged forfeite
   assert.ok(content.includes('FABRICATE.Chat.ConsumedOnFailure'), 'merged forfeited heading');
   assert.ok(content.includes('Iron Ore'), 'source forfeited');
   assert.ok(content.includes('Prospector Hammer'), 'broken tool forfeited in the same section');
-  assert.ok(
-    !content.includes('FABRICATE.Chat.SalvageRecovered'),
-    'no recovered section on failure'
-  );
+  assert.ok(!content.includes('FABRICATE.Chat.SalvageRecovered'), 'no recovered section on failure');
 });
 
 test('omits empty sections (nothing recovered / no tools broke)', () => {
@@ -110,9 +104,7 @@ test('renders the roll total row when a finite check value is present', () => {
 
 test('omits the roll row for a guaranteed no-check salvage (null / absent value)', () => {
   assert.ok(
-    !buildSalvageChatContent(successModel({ rollValue: null })).includes(
-      'fabricate-craft-chat__roll'
-    ),
+    !buildSalvageChatContent(successModel({ rollValue: null })).includes('fabricate-craft-chat__roll'),
     'no roll row when value is null'
   );
   assert.ok(
@@ -160,9 +152,7 @@ test('the retired natural-step model key and CSS hook are gone', () => {
 
 test('escapes HTML in user-authored names', () => {
   const content = buildSalvageChatContent(
-    successModel({
-      results: [{ name: '<script>x</script> & "rare"', img: 'icons/x.png', quantity: 1 }],
-    })
+    successModel({ results: [{ name: '<script>x</script> & "rare"', img: 'icons/x.png', quantity: 1 }] })
   );
   assert.ok(!content.includes('<script>x</script>'), 'raw script tag not present');
   assert.ok(content.includes('&lt;script&gt;'), 'angle brackets escaped');
@@ -176,14 +166,7 @@ test('routes every label through the localize function', () => {
     seen.push(key);
     return `loc:${key}`;
   });
-  for (const key of [
-    'SalvageSuccess',
-    'SalvageActor',
-    'SalvageSource',
-    'SalvageRecovered',
-    'SalvageConsumed',
-    'SalvageTools',
-  ]) {
+  for (const key of ['SalvageSuccess', 'SalvageActor', 'SalvageSource', 'SalvageRecovered', 'SalvageConsumed', 'SalvageTools']) {
     assert.ok(seen.includes(`FABRICATE.Chat.${key}`), `localize asked for FABRICATE.Chat.${key}`);
   }
 });

@@ -33,41 +33,11 @@ test('report: empty state when there are no references', () => {
 test('report: groups reported refs by kind with per-kind counts + localized labels', () => {
   const content = buildImportReportContent(
     summaryWith([
-      {
-        kind: 'sourceItem',
-        ownerType: 'component',
-        ownerName: 'Iron Ore',
-        referenceValue: 'Compendium.x',
-        disposition: 'reported',
-      },
-      {
-        kind: 'scene',
-        ownerType: 'environment',
-        ownerName: 'Grove',
-        referenceValue: 'Scene.a',
-        disposition: 'reported',
-      },
-      {
-        kind: 'scene',
-        ownerType: 'realm',
-        ownerName: 'Verdant',
-        referenceValue: 'Scene.b',
-        disposition: 'reported',
-      },
-      {
-        kind: 'sourceItem',
-        ownerType: 'component',
-        ownerName: 'Herb',
-        referenceValue: 'Compendium.y',
-        disposition: 'remapped',
-      },
-      {
-        kind: 'dropRowItem',
-        ownerType: 'dropRow',
-        ownerName: 'Forage',
-        referenceValue: 'Compendium.z',
-        disposition: 'retained',
-      },
+      { kind: 'sourceItem', ownerType: 'component', ownerName: 'Iron Ore', referenceValue: 'Compendium.x', disposition: 'reported' },
+      { kind: 'scene', ownerType: 'environment', ownerName: 'Grove', referenceValue: 'Scene.a', disposition: 'reported' },
+      { kind: 'scene', ownerType: 'realm', ownerName: 'Verdant', referenceValue: 'Scene.b', disposition: 'reported' },
+      { kind: 'sourceItem', ownerType: 'component', ownerName: 'Herb', referenceValue: 'Compendium.y', disposition: 'remapped' },
+      { kind: 'dropRowItem', ownerType: 'dropRow', ownerName: 'Forage', referenceValue: 'Compendium.z', disposition: 'retained' },
     ]),
     localize
   );
@@ -78,10 +48,7 @@ test('report: groups reported refs by kind with per-kind counts + localized labe
   assert.equal(content.headline, 'FABRICATE.Admin.ImportReport.HeadlineNeedsAttention#3');
 
   // Stable kind order: sourceItem before scene.
-  assert.deepEqual(
-    content.groups.map((g) => g.kind),
-    ['sourceItem', 'scene']
-  );
+  assert.deepEqual(content.groups.map((g) => g.kind), ['sourceItem', 'scene']);
   const scene = content.groups.find((g) => g.kind === 'scene');
   assert.equal(scene.count, 2);
   assert.equal(scene.kindLabel, 'FABRICATE.Admin.ImportReport.Kind.scene');

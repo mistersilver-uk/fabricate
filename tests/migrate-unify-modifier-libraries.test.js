@@ -166,10 +166,7 @@ test('1.23.0 rewrites EVERY gathering reference to a re-keyed entry', () => {
     ...task.staminaCostModifiers.map((ref) => ref.modifierId),
     ...config.events.flatMap((event) => event.characterModifiers.map((ref) => ref.modifierId)),
   ];
-  assert.deepEqual(
-    referenced.filter((id) => !libraryIds.has(id)),
-    []
-  );
+  assert.deepEqual(referenced.filter((id) => !libraryIds.has(id)), []);
 });
 
 test('1.23.0 keeps counting up when the derived id is ALSO taken', () => {

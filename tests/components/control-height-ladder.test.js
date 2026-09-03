@@ -236,8 +236,7 @@ test('every live rung is still in use in BOTH corpora', () => {
     missing,
     [],
     'the scan can no longer see values it certainly still reads, which means it is answering ' +
-      'about a smaller corpus than it claims:\n  ' +
-      missing.join('\n  ')
+      'about a smaller corpus than it claims:\n  ' + missing.join('\n  ')
   );
 });
 
@@ -261,8 +260,7 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
     retired.capReached,
     [],
     'these declarations hit the resolution depth cap, so their candidate sets are INCOMPLETE and ' +
-      'a retired value beyond the cap reads as absent:\n  ' +
-      retired.capReached.join('\n  ')
+      'a retired value beyond the cap reads as absent:\n  ' + retired.capReached.join('\n  ')
   );
 });
 
@@ -335,9 +333,7 @@ test('every baselined row still carries the raw and resolved text it was measure
     const found = [...(texts.get(row.key) ?? new Set())].sort(byCodePoint);
     const pinned = [...row.texts].sort(byCodePoint);
     if (found.join(' ; ') !== pinned.join(' ; ')) {
-      drifted.push(
-        `${row.key}\n      pinned: ${pinned.join(' ; ')}\n      found:  ${found.join(' ; ') || '(none)'}`
-      );
+      drifted.push(`${row.key}\n      pinned: ${pinned.join(' ; ')}\n      found:  ${found.join(' ; ') || '(none)'}`);
     }
   }
 
@@ -351,8 +347,7 @@ test('every baselined row still carries the raw and resolved text it was measure
     'a baselined declaration is no longer written the way it was measured. If you moved the ' +
       'literal into a custom property the debt has NOT been paid — the control is still that ' +
       'many pixels tall. Update the row only when the text genuinely changed for another ' +
-      'reason:\n  ' +
-      drifted.join('\n  ')
+      'reason:\n  ' + drifted.join('\n  ')
   );
 });
 

@@ -247,10 +247,7 @@ function runScopedEntityContract(contract) {
     const [record] = contract.normalizeRecords([
       { entityId: ENTITY_ID, systemId: SYSTEM_ID, inherit: { [section]: false } },
     ]);
-    assert.ok(
-      !(section in record),
-      'the normalizer preserves switch-off-with-no-value as authored'
-    );
+    assert.ok(!(section in record), 'the normalizer preserves switch-off-with-no-value as authored');
     assert.equal(record.inherit[section], false, 'the switch is kept, never repaired back to true');
 
     const resolved = contract.resolve(worldDefault, record);
@@ -271,11 +268,7 @@ function runScopedEntityContract(contract) {
     const beforeOverride = structuredClone(membership);
     const overridden = setSectionInheritance(membership, section, false, worldDefault);
     assert.notEqual(overridden, membership, 'the answer is a NEW record');
-    assert.notEqual(
-      overridden.inherit,
-      membership.inherit,
-      'the inherit map is copied, not shared'
-    );
+    assert.notEqual(overridden.inherit, membership.inherit, 'the inherit map is copied, not shared');
     assert.deepStrictEqual(
       membership,
       beforeOverride,
@@ -293,25 +286,14 @@ function runScopedEntityContract(contract) {
       { id: ENTITY_ID, ...worldSections },
       { id: OTHER_ENTITY_ID, [section]: localValue },
     ]);
-    assert.equal(
-      worldDefaults.length,
-      2,
-      'a two-entity corpus, so position cannot stand in for id'
-    );
+    assert.equal(worldDefaults.length, 2, 'a two-entity corpus, so position cannot stand in for id');
     assert.deepStrictEqual(
       findWorldDefault(worldDefaults, OTHER_ENTITY_ID)?.[section],
       localValue,
       'the SECOND entity is found by id, not by position'
     );
-    assert.deepStrictEqual(
-      findWorldDefault(worldDefaults, ENTITY_ID)?.[section],
-      worldSections[section]
-    );
-    assert.equal(
-      findWorldDefault(worldDefaults, 'no-such-entity'),
-      null,
-      'an unknown id answers null'
-    );
+    assert.deepStrictEqual(findWorldDefault(worldDefaults, ENTITY_ID)?.[section], worldSections[section]);
+    assert.equal(findWorldDefault(worldDefaults, 'no-such-entity'), null, 'an unknown id answers null');
 
     const memberships = contract.normalizeRecords([
       { entityId: ENTITY_ID, systemId: SYSTEM_ID },
@@ -323,16 +305,8 @@ function runScopedEntityContract(contract) {
     for (const entityId of [ENTITY_ID, OTHER_ENTITY_ID]) {
       for (const systemId of [SYSTEM_ID, OTHER_SYSTEM_ID]) {
         const found = findMembership(memberships, entityId, systemId);
-        assert.equal(
-          found?.entityId,
-          entityId,
-          `the entity half of (${entityId}, ${systemId}) is keyed on`
-        );
-        assert.equal(
-          found?.systemId,
-          systemId,
-          `the system half of (${entityId}, ${systemId}) is keyed on`
-        );
+        assert.equal(found?.entityId, entityId, `the entity half of (${entityId}, ${systemId}) is keyed on`);
+        assert.equal(found?.systemId, systemId, `the system half of (${entityId}, ${systemId}) is keyed on`);
       }
     }
     assert.equal(
@@ -470,14 +444,7 @@ function runScopedEntityContract(contract) {
     const fixtures = [
       ...adversarialInputs(section).map(([, input]) => input),
       [{ id: ENTITY_ID, ...worldSections }],
-      [
-        {
-          entityId: ENTITY_ID,
-          systemId: SYSTEM_ID,
-          inherit: { [section]: false },
-          [section]: localValue,
-        },
-      ],
+      [{ entityId: ENTITY_ID, systemId: SYSTEM_ID, inherit: { [section]: false }, [section]: localValue }],
       [
         { entityId: ENTITY_ID, systemId: SYSTEM_ID },
         { entityId: ENTITY_ID, systemId: SYSTEM_ID, [section]: localValue },
@@ -543,13 +510,9 @@ test('defineScope answers a frozen descriptor over a DEFENSIVE copy of the secti
   assert.ok(Object.isFrozen(scope), 'the descriptor itself is frozen');
   assert.ok(Object.isFrozen(scope.sections), 'and so is its section list');
   assert.throws(() => scope.sections.push('delta'), TypeError, 'the frozen list refuses a push');
-  assert.throws(
-    () => {
-      scope.enableable = true;
-    },
-    TypeError,
-    'the frozen descriptor refuses a structural flip'
-  );
+  assert.throws(() => {
+    scope.enableable = true;
+  }, TypeError, 'the frozen descriptor refuses a structural flip');
 });
 
 // --- The dependency boundary (criterion 9) ----------------------------------------------------

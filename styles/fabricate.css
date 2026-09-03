@@ -23970,7 +23970,10 @@
   background: var(--fab-bg-1);
 }
 
-.fabricate-manager[data-manager-view='world-components']
-  .manager-scoped-list-row.is-bulk-selected {
+/* ON ONE LINE, and that is load-bearing rather than a formatting choice: the joined-selector
+   guard in `manager-layout.test.js` takes each `.is-bulk-selected` selector back to the start of
+   its own LINE so the route attribute travels with it, and a wrapped selector reads as an
+   UNSCOPED second statement of the shared rule. */
+.fabricate-manager[data-manager-view='world-components'] .manager-scoped-list-row.is-bulk-selected {
   background: var(--fab-surface-active);
 }

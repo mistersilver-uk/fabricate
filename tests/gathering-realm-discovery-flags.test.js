@@ -6,16 +6,14 @@ import {
   getDiscoveredRealmIds,
   hideGatheringRealm,
   isGatheringRealmDiscovered,
-  revealGatheringRealm,
+  revealGatheringRealm
 } from '../src/systems/gatheringRealmDiscovery.js';
 
 function getPathValue(object, path) {
-  return String(path)
-    .split('.')
-    .reduce((value, part) => {
-      if (value == null || typeof value !== 'object') return undefined;
-      return value[part];
-    }, object);
+  return String(path).split('.').reduce((value, part) => {
+    if (value == null || typeof value !== 'object') return undefined;
+    return value[part];
+  }, object);
 }
 
 function setPathValue(object, path, value) {
@@ -34,9 +32,7 @@ class FakeDocument {
     this.activeScopes = new Set(activeScopes);
     this._flags = flags;
   }
-  get flags() {
-    return this._flags;
-  }
+  get flags() { return this._flags; }
   getFlag(scope, key) {
     if (!this.activeScopes.has(scope)) throw new Error(`scope "${scope}" not active`);
     return getPathValue(this._flags[scope], key);
@@ -54,10 +50,7 @@ const travelConfig = { realms: [{ id: 'r1' }, { id: 'r2' }] };
 test('revealGatheringRealm writes a discovery entry validated against the WORLD library', async () => {
   const doc = new FakeDocument();
   const ok = await revealGatheringRealm(doc, {
-    realmId: 'r1',
-    source: 'manual',
-    validateRealmExists: travelConfig,
-    now: () => 42,
+    realmId: 'r1', source: 'manual', validateRealmExists: travelConfig, now: () => 42
   });
   assert.equal(ok, true);
   assert.equal(isGatheringRealmDiscovered(doc, 'r1'), true);
@@ -69,9 +62,7 @@ test('revealGatheringRealm writes a discovery entry validated against the WORLD 
 test('revealGatheringRealm rejects a realm that does not exist in the world', async () => {
   const doc = new FakeDocument();
   const ok = await revealGatheringRealm(doc, {
-    realmId: 'r-foreign',
-    source: 'manual',
-    validateRealmExists: travelConfig,
+    realmId: 'r-foreign', source: 'manual', validateRealmExists: travelConfig
   });
   assert.equal(ok, false);
   assert.equal(isGatheringRealmDiscovered(doc, 'r-foreign'), false);
@@ -80,25 +71,15 @@ test('revealGatheringRealm rejects a realm that does not exist in the world', as
 test('revealGatheringRealm rejects an unknown source token', async () => {
   const doc = new FakeDocument();
   const ok = await revealGatheringRealm(doc, {
-    realmId: 'r1',
-    source: 'telepathy',
-    validateRealmExists: travelConfig,
+    realmId: 'r1', source: 'telepathy', validateRealmExists: travelConfig
   });
   assert.equal(ok, false);
 });
 
 test('hideGatheringRealm removes the entry by re-setting the map', async () => {
   const doc = new FakeDocument();
-  await revealGatheringRealm(doc, {
-    realmId: 'r1',
-    source: 'manual',
-    validateRealmExists: travelConfig,
-  });
-  await revealGatheringRealm(doc, {
-    realmId: 'r2',
-    source: 'api',
-    validateRealmExists: travelConfig,
-  });
+  await revealGatheringRealm(doc, { realmId: 'r1', source: 'manual', validateRealmExists: travelConfig });
+  await revealGatheringRealm(doc, { realmId: 'r2', source: 'api', validateRealmExists: travelConfig });
   const removed = await hideGatheringRealm(doc, { realmId: 'r1' });
   assert.equal(removed, true);
   assert.equal(isGatheringRealmDiscovered(doc, 'r1'), false);
@@ -108,10 +89,7 @@ test('hideGatheringRealm removes the entry by re-setting the map', async () => {
 test('discovery entry with a stale partyId remains readable', async () => {
   const doc = new FakeDocument();
   await revealGatheringRealm(doc, {
-    realmId: 'r1',
-    source: 'partyToken',
-    partyId: 'party-gone',
-    validateRealmExists: travelConfig,
+    realmId: 'r1', source: 'partyToken', partyId: 'party-gone', validateRealmExists: travelConfig
   });
   const entry = getDiscoveredGatheringRealms(doc).r1;
   assert.equal(entry.partyId, 'party-gone');
@@ -121,10 +99,7 @@ test('discovery entry with a stale partyId remains readable', async () => {
 test('actor knowledge survives a party change (discovery is actor-scoped)', async () => {
   const doc = new FakeDocument();
   await revealGatheringRealm(doc, {
-    realmId: 'r1',
-    source: 'partyToken',
-    partyId: 'party-1',
-    validateRealmExists: travelConfig,
+    realmId: 'r1', source: 'partyToken', partyId: 'party-1', validateRealmExists: travelConfig
   });
   assert.deepEqual([...getDiscoveredRealmIds(doc)], ['r1']);
 });
@@ -137,16 +112,10 @@ test('actor knowledge survives a party change (discovery is actor-scoped)', asyn
 
 test('flattens a legacy per-system map on read, so knowledge is not lost', () => {
   const doc = new FakeDocument({
-    flags: {
-      fabricate: {
-        fabricate: {
-          discoveredGatheringRealms: {
-            'system-a': { r1: { discoveredAt: 7, source: 'manual' } },
-            'system-b': { r2: { discoveredAt: 8, source: 'api' } },
-          },
-        },
-      },
-    },
+    flags: { fabricate: { fabricate: { discoveredGatheringRealms: {
+      'system-a': { r1: { discoveredAt: 7, source: 'manual' } },
+      'system-b': { r2: { discoveredAt: 8, source: 'api' } }
+    } } } }
   });
   assert.deepEqual([...getDiscoveredRealmIds(doc)].sort(), ['r1', 'r2']);
   assert.equal(isGatheringRealmDiscovered(doc, 'r1'), true);
@@ -157,16 +126,10 @@ test('a realm discovered under two systems keeps the EARLIEST sighting', () => {
   // Discovery records the first time a character saw a place. A later duplicate arriving from
   // another system's bucket is not a re-discovery.
   const doc = new FakeDocument({
-    flags: {
-      fabricate: {
-        fabricate: {
-          discoveredGatheringRealms: {
-            'system-a': { r1: { discoveredAt: 900, source: 'api' } },
-            'system-b': { r1: { discoveredAt: 100, source: 'manual' } },
-          },
-        },
-      },
-    },
+    flags: { fabricate: { fabricate: { discoveredGatheringRealms: {
+      'system-a': { r1: { discoveredAt: 900, source: 'api' } },
+      'system-b': { r1: { discoveredAt: 100, source: 'manual' } }
+    } } } }
   });
   const entry = getDiscoveredGatheringRealms(doc).r1;
   assert.equal(entry.discoveredAt, 100);
@@ -177,29 +140,17 @@ test('a HALF-UPGRADED map resolves — both shapes at once', () => {
   // Reachable in normal use, not hypothetical: upgrade an actor, write, then discover a second
   // realm, and the map carries a flat entry beside a legacy bucket until the next full read.
   const doc = new FakeDocument({
-    flags: {
-      fabricate: {
-        fabricate: {
-          discoveredGatheringRealms: {
-            r1: { discoveredAt: 50, source: 'manual' },
-            'system-b': { r2: { discoveredAt: 60, source: 'api' } },
-          },
-        },
-      },
-    },
+    flags: { fabricate: { fabricate: { discoveredGatheringRealms: {
+      r1: { discoveredAt: 50, source: 'manual' },
+      'system-b': { r2: { discoveredAt: 60, source: 'api' } }
+    } } } }
   });
   assert.deepEqual([...getDiscoveredRealmIds(doc)].sort(), ['r1', 'r2']);
 });
 
 test('legacy-read fallback: reads a pre-rename discoveredGatheringRegions flag', () => {
   const doc = new FakeDocument({
-    flags: {
-      fabricate: {
-        fabricate: {
-          discoveredGatheringRegions: { 'system-a': { r1: { discoveredAt: 7, source: 'manual' } } },
-        },
-      },
-    },
+    flags: { fabricate: { fabricate: { discoveredGatheringRegions: { 'system-a': { r1: { discoveredAt: 7, source: 'manual' } } } } } }
   });
   assert.deepEqual([...getDiscoveredRealmIds(doc)], ['r1']);
   assert.equal(isGatheringRealmDiscovered(doc, 'r1'), true);
@@ -207,21 +158,12 @@ test('legacy-read fallback: reads a pre-rename discoveredGatheringRegions flag',
 
 test('a write persists ONLY the new flat shape, upgrading the actor lazily', async () => {
   const doc = new FakeDocument({
-    flags: {
-      fabricate: {
-        fabricate: {
-          discoveredGatheringRealms: {
-            'system-a': { r1: { discoveredAt: 7, source: 'manual' } },
-          },
-        },
-      },
-    },
+    flags: { fabricate: { fabricate: { discoveredGatheringRealms: {
+      'system-a': { r1: { discoveredAt: 7, source: 'manual' } }
+    } } } }
   });
   await revealGatheringRealm(doc, {
-    realmId: 'r2',
-    source: 'api',
-    validateRealmExists: travelConfig,
-    now: () => 9,
+    realmId: 'r2', source: 'api', validateRealmExists: travelConfig, now: () => 9
   });
 
   const written = doc.flags.fabricate.fabricate.discoveredGatheringRealms;

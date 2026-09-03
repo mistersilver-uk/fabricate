@@ -78,10 +78,7 @@ function relativePage(file) {
 }
 
 test('the map, the committed images and the declared slots are all alive', () => {
-  assert.ok(
-    map.screenshots.length > 0,
-    'the map names no cases at all — every gate below is vacuous'
-  );
+  assert.ok(map.screenshots.length > 0, 'the map names no cases at all — every gate below is vacuous');
   assert.ok(
     committed.length > 0,
     `no images were enumerated in ${LAB_SCREENSHOT_DIRECTORY}, so the reverse gate is vacuous`

@@ -150,10 +150,7 @@ describe('buildRequirementSlots', () => {
   });
 
   it('maps a fixed slot to met or short on its own numbers only', () => {
-    assert.equal(
-      buildRequirementSlots({ ingredientStates: [fixedState()] })[0].state,
-      SLOT_STATE.MET
-    );
+    assert.equal(buildRequirementSlots({ ingredientStates: [fixedState()] })[0].state, SLOT_STATE.MET);
     assert.equal(
       buildRequirementSlots({ ingredientStates: [fixedState({ satisfied: false, have: 1 })] })[0]
         .state,
@@ -300,33 +297,11 @@ describe('resolveOpenSlotId', () => {
 describe('buildConsumptionPlan', () => {
   const pool = {
     requirements: [
-      {
-        groupId: 'g-radiant',
-        essenceId: 'radiant',
-        name: 'Radiant',
-        icon: 'fas fa-sun',
-        colorToken: 'butter',
-        need: 4,
-        delivered: 2,
-      },
+      { groupId: 'g-radiant', essenceId: 'radiant', name: 'Radiant', icon: 'fas fa-sun', colorToken: 'butter', need: 4, delivered: 2 },
     ],
     carriers: [
-      {
-        itemKey: 'Item.a',
-        name: 'Duskcrystal',
-        img: 'icons/gem.webp',
-        ownedUnits: 3,
-        allocatedUnits: 1,
-        perUnit: { radiant: 2, shadow: 1 },
-      },
-      {
-        itemKey: 'Item.b',
-        name: 'Prism Ash',
-        img: null,
-        ownedUnits: 2,
-        allocatedUnits: 0,
-        perUnit: { radiant: 1 },
-      },
+      { itemKey: 'Item.a', name: 'Duskcrystal', img: 'icons/gem.webp', ownedUnits: 3, allocatedUnits: 1, perUnit: { radiant: 2, shadow: 1 } },
+      { itemKey: 'Item.b', name: 'Prism Ash', img: null, ownedUnits: 2, allocatedUnits: 0, perUnit: { radiant: 1 } },
     ],
   };
 
@@ -372,13 +347,7 @@ describe('buildConsumptionPlan', () => {
         fixedState({ satisfied: false, have: 0 }),
         choiceState(),
         essenceState(),
-        essenceState({
-          groupId: 'g-shadow',
-          name: 'Shadow',
-          delivered: 3,
-          need: 3,
-          satisfied: true,
-        }),
+        essenceState({ groupId: 'g-shadow', name: 'Shadow', delivered: 3, need: 3, satisfied: true }),
       ],
       essencePool: pool,
     });

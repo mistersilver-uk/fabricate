@@ -91,11 +91,7 @@ test('the frame class list is what ApplicationV2 would build', () => {
   // at all, which is exactly how the first version of this frame builder was wrong.
   for (const [appId, app] of Object.entries(APP_CHROME)) {
     const classes = frameClassesFor(app);
-    assert.equal(
-      classes[0],
-      'application',
-      `${appId} frame must lead with the "application" class`
-    );
+    assert.equal(classes[0], 'application', `${appId} frame must lead with the "application" class`);
     assert.deepEqual(classes, ['application', ...app.classes], `${appId} frame classes`);
     assert.equal(new Set(classes).size, classes.length, `${appId} frame classes must be deduped`);
   }

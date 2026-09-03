@@ -7,10 +7,10 @@ function makeRecipeManager(system) {
     user: { isGM: true },
     fabricate: {
       getCraftingSystemManager: () => ({
-        getSystem: (id) => (id === system.id ? system : null),
+        getSystem: (id) => id === system.id ? system : null
       }),
-      getResolutionModeService: () => null,
-    },
+      getResolutionModeService: () => null
+    }
   };
   return new RecipeManager();
 }
@@ -30,14 +30,14 @@ function makeRecipe(tag) {
                 match: {
                   type: 'tags',
                   tags: [tag],
-                  tagMatch: 'any',
-                },
-              },
-            ],
-          },
-        ],
-      },
-    ],
+                  tagMatch: 'any'
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
   };
 }
 
@@ -45,7 +45,7 @@ test('tag placeholders validate when legacy itemTags feature is disabled', () =>
   const manager = makeRecipeManager({
     id: 'sys-tags',
     features: { itemTags: false },
-    itemTags: ['herb'],
+    itemTags: ['herb']
   });
 
   const result = manager._validateTagPlaceholders(makeRecipe('herb'));
@@ -57,7 +57,7 @@ test('tag placeholders still reject unknown tag ids', () => {
   const manager = makeRecipeManager({
     id: 'sys-tags',
     features: { itemTags: false },
-    itemTags: ['herb'],
+    itemTags: ['herb']
   });
 
   const result = manager._validateTagPlaceholders(makeRecipe('ore'));

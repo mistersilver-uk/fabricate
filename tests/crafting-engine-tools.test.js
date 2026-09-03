@@ -20,9 +20,7 @@ import { resolveToolForItem, itemIsToolByDurableIdentity } from '../src/utils/so
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
-  return String(path)
-    .split('.')
-    .reduce((value, key) => (value == null ? undefined : value[key]), object);
+  return String(path).split('.').reduce((value, key) => (value == null ? undefined : value[key]), object);
 }
 function setProperty(object, path, value) {
   const parts = String(path).split('.');
@@ -35,9 +33,7 @@ function setProperty(object, path, value) {
   t[last] = value;
 }
 
-globalThis.foundry = {
-  utils: { getProperty, setProperty, deepClone: (v) => JSON.parse(JSON.stringify(v)) },
-};
+globalThis.foundry = { utils: { getProperty, setProperty, deepClone: v => JSON.parse(JSON.stringify(v)) } };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 
 let installedSystem = null;
@@ -47,10 +43,10 @@ function installSystem({ components = [] } = {}) {
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({ getSystem: () => system }),
-      getResolutionModeService: () => null,
+      getResolutionModeService: () => null
     },
     user: { id: 'user-1', isGM: true },
-    time: { worldTime: 0 },
+    time: { worldTime: 0 }
   };
   return system;
 }
@@ -67,9 +63,7 @@ function replacementEngine(resolveItemUuid = async () => null) {
 // ---------------------------------------------------------------------------
 
 function getPath(obj, path) {
-  return String(path)
-    .split('.')
-    .reduce((v, k) => (v == null ? undefined : v[k]), obj);
+  return String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj);
 }
 function setPath(obj, path, value) {
   const parts = String(path).split('.');
@@ -101,9 +95,7 @@ class FakeItem {
     setPath(this._flags[scope], key, value);
     return value;
   }
-  async delete() {
-    this.deleted = true;
-  }
+  async delete() { this.deleted = true; }
   async update() {}
 }
 
@@ -114,8 +106,7 @@ function recipe() {
 // A recipeManager that matches tools by componentId === item.id.
 function toolMatcherManager() {
   return {
-    toolMatchesItem: (_recipe, tool, item) =>
-      Boolean(tool?.componentId) && tool.componentId === item?.id,
+    toolMatchesItem: (_recipe, tool, item) => Boolean(tool?.componentId) && tool.componentId === item?.id
   };
 }
 
@@ -128,11 +119,7 @@ test('_validateTools: returns matched { tool, item } pairs when present', async 
   const engine = new CraftingEngine(toolMatcherManager());
   const axe = new FakeItem('c-axe');
   const actor = { items: [axe] };
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } };
 
   const result = await engine._validateTools([actor], recipe(), [tool]);
   assert.equal(result.valid, true);
@@ -144,11 +131,7 @@ test('_validateTools: missing tool fails validation with a message', async () =>
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
   const actor = { items: [] };
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } };
 
   const result = await engine._validateTools([actor], recipe(), [tool]);
   assert.equal(result.valid, false);
@@ -199,11 +182,7 @@ test('_validateTools: a broken matching item does NOT satisfy the tool', async (
   const engine = new CraftingEngine(toolMatcherManager());
   const brokenAxe = new FakeItem('c-axe', { flags: { fabricate: { toolBroken: true } } });
   const actor = { items: [brokenAxe] };
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } };
 
   const result = await engine._validateTools([actor], recipe(), [tool]);
   assert.equal(result.valid, false);
@@ -225,38 +204,20 @@ test('_applyToolBreakage: limitedUses increments toolUsage and records usedTools
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
   const actorRef = { uuid: 'Actor.a' };
-  const axe = new FakeItem('c-axe', {
-    flags: { fabricate: { toolUsage: { timesUsed: 1 } } },
-    parent: actorRef,
-  });
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 5 },
-    onBreak: { mode: 'destroy' },
-  };
+  const axe = new FakeItem('c-axe', { flags: { fabricate: { toolUsage: { timesUsed: 1 } } }, parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 5 }, onBreak: { mode: 'destroy' } };
 
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
   assert.deepEqual(getPath(axe._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 2 });
   assert.equal(used.length, 1);
-  assert.deepEqual(used[0], {
-    actorUuid: 'Actor.a',
-    itemUuid: 'Item.c-axe',
-    quantity: 1,
-    componentId: 'c-axe',
-    toolId: null,
-    broken: false,
-  });
+  assert.deepEqual(used[0], { actorUuid: 'Actor.a', itemUuid: 'Item.c-axe', quantity: 1, componentId: 'c-axe', toolId: null, broken: false });
 });
 
 test('_applyToolBreakage: breakageChance 100 destroys via onBreak destroy', async () => {
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
   const axe = new FakeItem('c-axe', { parent: { uuid: 'Actor.a' } });
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'destroy' } };
 
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
   assert.equal(axe.deleted, true);
@@ -269,11 +230,7 @@ test('_applyToolBreakage: breakageChance 0 never breaks and writes no usage flag
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
   const axe = new FakeItem('c-axe', { parent: { uuid: 'Actor.a' } });
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'breakageChance', breakageChance: 0 },
-    onBreak: { mode: 'flagBroken' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
 
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
   assert.equal(used[0].broken, false);
@@ -284,11 +241,7 @@ test('_applyToolBreakage: flagBroken sets toolBroken when broken', async () => {
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
   const axe = new FakeItem('c-axe', { parent: { uuid: 'Actor.a' } });
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 },
-    onBreak: { mode: 'flagBroken' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 }, onBreak: { mode: 'flagBroken' } };
 
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
   // No evaluateExpression injected → result null → not broken.
@@ -297,12 +250,7 @@ test('_applyToolBreakage: flagBroken sets toolBroken when broken', async () => {
 });
 
 test('_applyToolBreakage: replaceWith deletes and creates the replacement component', async () => {
-  const replacementComponent = {
-    id: 'c-axe-broken',
-    name: 'Broken Axe',
-    type: 'loot',
-    system: { quantity: 1 },
-  };
+  const replacementComponent = { id: 'c-axe-broken', name: 'Broken Axe', type: 'loot', system: { quantity: 1 } };
   installSystem({ components: [replacementComponent] });
   const engine = replacementEngine();
   const created = [];
@@ -317,7 +265,7 @@ test('_applyToolBreakage: replaceWith deletes and creates the replacement compon
   const tool = {
     componentId: 'c-axe',
     breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'replaceWith', replacementComponentId: 'c-axe-broken' },
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'c-axe-broken' }
   };
 
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
@@ -332,12 +280,7 @@ test('_applyToolBreakage: direct Item replacement preserves source identity with
   const source = {
     documentName: 'Item',
     uuid: 'Item.direct-replacement',
-    toObject: () => ({
-      name: 'Direct Replacement',
-      type: 'loot',
-      system: { quantity: 5 },
-      flags: {},
-    }),
+    toObject: () => ({ name: 'Direct Replacement', type: 'loot', system: { quantity: 5 }, flags: {} }),
   };
   const engine = replacementEngine(async () => source);
   const created = [];
@@ -385,12 +328,7 @@ function asOwnedItem(itemData) {
 }
 
 async function runReplacementCreator({ tools = [] } = {}) {
-  const replacementComponent = {
-    id: 'c-axe-broken',
-    name: 'Broken Axe',
-    type: 'loot',
-    system: { quantity: 1 },
-  };
+  const replacementComponent = { id: 'c-axe-broken', name: 'Broken Axe', type: 'loot', system: { quantity: 1 } };
   const system = installSystem({ components: [replacementComponent] });
   system.tools = tools;
   const engine = replacementEngine();
@@ -406,7 +344,7 @@ async function runReplacementCreator({ tools = [] } = {}) {
   const tool = {
     componentId: 'c-axe',
     breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'replaceWith', replacementComponentId: 'c-axe-broken' },
+    onBreak: { mode: 'replaceWith', replacementComponentId: 'c-axe-broken' }
   };
   await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
   return { created, system };
@@ -415,19 +353,11 @@ async function runReplacementCreator({ tools = [] } = {}) {
 test('780 replacement (crafting): stamps roles[systemId].componentId = replacementComponentId', async () => {
   const { created } = await runReplacementCreator();
   assert.equal(created.length, 1);
-  assert.equal(
-    created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
-    'c-axe-broken'
-  );
+  assert.equal(created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId, 'c-axe-broken');
 });
 
 test('780 replacement (crafting): co-stamps toolId + round-trips when exactly one tool links the component', async () => {
-  const linkingTool = {
-    id: 'tool-broken',
-    componentId: 'c-axe-broken',
-    name: 'Broken Axe Tool',
-    registeredItemUuid: 'Item.unrelated',
-  };
+  const linkingTool = { id: 'tool-broken', componentId: 'c-axe-broken', name: 'Broken Axe Tool', registeredItemUuid: 'Item.unrelated' };
   const { created, system } = await runReplacementCreator({ tools: [linkingTool] });
   assert.equal(created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId, 'tool-broken');
 
@@ -446,10 +376,7 @@ test('780 replacement (crafting): skips toolId on zero or multiple linking tools
       { id: 't2', componentId: 'c-axe-broken' },
     ],
   });
-  assert.equal(
-    many.created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
-    'c-axe-broken'
-  );
+  assert.equal(many.created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId, 'c-axe-broken');
   assert.equal(many.created[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId, undefined);
 });
 
@@ -466,11 +393,7 @@ test('780 replacement (crafting): an unresolvable replacement component stamps n
     },
   };
   const axe = new FakeItem('c-axe', { parent: actorRef });
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'replaceWith', replacementComponentId: 'c-axe-broken' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'replaceWith', replacementComponentId: 'c-axe-broken' } };
   await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
   assert.equal(created.length, 0, 'no replacement created when the component does not resolve');
 });
@@ -482,32 +405,22 @@ test('780 replacement (crafting): an unresolvable replacement component stamps n
 function fullCraftRecipeManager({ ingredientItem, toolItem, fakeTool, ingredientSet }) {
   return {
     canCraft() {
-      return {
-        canCraft: true,
-        satisfiableSet: ingredientSet,
-        missing: { ingredients: [], essences: [], tools: [] },
-      };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
-    getToolsForSet() {
-      return fakeTool ? [fakeTool] : [];
-    },
+    getToolsForSet() { return fakeTool ? [fakeTool] : []; },
     toolMatchesItem: (_recipe, tool, item) => tool === fakeTool && item === toolItem,
-    ingredientMatchesItem: (_recipe, _ingredient, item) => item === ingredientItem,
+    ingredientMatchesItem: (_recipe, _ingredient, item) => item === ingredientItem
   };
 }
 
 function fakeIngredientSet(ingredientItem) {
-  const ingredient = {
-    systemItemId: ingredientItem.id,
-    quantity: 1,
-    getDescription: () => ingredientItem.name,
-  };
+  const ingredient = { systemItemId: ingredientItem.id, quantity: 1, getDescription: () => ingredientItem.name };
   return {
     id: 'set-1',
     matchIngredients(availableItems) {
-      const matched = availableItems.find((i) => i === ingredientItem);
+      const matched = availableItems.find(i => i === ingredientItem);
       return matched ? [{ item: matched, quantity: 1, ingredient }] : [];
-    },
+    }
   };
 }
 
@@ -524,12 +437,8 @@ function fakeRecipe(ingredientSet) {
     steps: [],
     transferEffects: false,
     getExecutionSteps: null,
-    validate() {
-      return { valid: true, errors: [] };
-    },
-    toJSON() {
-      return { id: this.id, name: this.name };
-    },
+    validate() { return { valid: true, errors: [] }; },
+    toJSON() { return { id: this.id, name: this.name }; }
   };
 }
 
@@ -537,79 +446,39 @@ test('craft(): records usedTools on the success run record and increments toolUs
   installSystem();
   const ingredientItem = new FakeItem('ing-1', { quantity: 2 });
   const actorRef = { uuid: 'Actor.a1' };
-  const toolItem = new FakeItem('c-axe', {
-    flags: { fabricate: { toolUsage: { timesUsed: 0 } } },
-    parent: actorRef,
-  });
-  const fakeTool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 3 },
-    onBreak: { mode: 'destroy' },
-  };
+  const toolItem = new FakeItem('c-axe', { flags: { fabricate: { toolUsage: { timesUsed: 0 } } }, parent: actorRef });
+  const fakeTool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
   const ingredientSet = fakeIngredientSet(ingredientItem);
 
-  const recipeManager = fullCraftRecipeManager({
-    ingredientItem,
-    toolItem,
-    fakeTool,
-    ingredientSet,
-  });
+  const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem, fakeTool, ingredientSet });
 
   let successPayload = null;
   const runManager = {
     findActiveRunForRecipe: () => null,
     getActiveRun: () => null,
-    async createRun() {
-      return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 };
-    },
+    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 }; },
     canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) {
-      return run;
-    },
-    async markStepWaitingForTime(_actor, run) {
-      return run;
-    },
-    async completeStepSuccess(_actor, run, _idx, payload) {
-      successPayload = payload;
-      return { ...run, status: 'succeeded' };
-    },
-    async completeStepFailure() {
-      return {};
-    },
+    async markStepInProgress(_actor, run) { return run; },
+    async markStepWaitingForTime(_actor, run) { return run; },
+    async completeStepSuccess(_actor, run, _idx, payload) { successPayload = payload; return { ...run, status: 'succeeded' }; },
+    async completeStepFailure() { return {}; }
   };
 
   const engine = new CraftingEngine(recipeManager, runManager, null);
-  engine._runCraftingCheck = async () => ({
-    success: true,
-    message: 'ok',
-    outcome: null,
-    value: null,
-    data: {},
-  });
+  engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
 
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem, toolItem] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
 
-  const result = await engine.craft(
-    craftingActor,
-    [sourceActor],
-    fakeRecipe(ingredientSet),
-    null,
-    {}
-  );
+  const result = await engine.craft(craftingActor, [sourceActor], fakeRecipe(ingredientSet), null, {});
 
   assert.equal(result.success, true);
   assert.ok(successPayload, 'a success run payload was recorded');
   assert.equal(successPayload.usedTools.length, 1);
   assert.deepEqual(successPayload.usedTools[0], {
-    actorUuid: 'Actor.a1',
-    itemUuid: 'Item.c-axe',
-    quantity: 1,
-    componentId: 'c-axe',
-    toolId: null,
-    broken: false,
+    actorUuid: 'Actor.a1', itemUuid: 'Item.c-axe', quantity: 1, componentId: 'c-axe', toolId: null, broken: false
   });
   assert.deepEqual(getPath(toolItem._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 1 });
 });
@@ -755,16 +624,9 @@ test('_validateTools: an unowned tool present as activeCanvasTool is satisfied a
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
   const actor = { items: [] };
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 3 },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
 
-  const result = await engine._validateTools([actor], recipe(), [tool], {
-    systemId: 'sys-1',
-    componentIds: ['c-axe'],
-  });
+  const result = await engine._validateTools([actor], recipe(), [tool], { systemId: 'sys-1', componentIds: ['c-axe'] });
   assert.equal(result.valid, true);
   assert.equal(result.tools.length, 1);
   assert.equal(result.tools[0].virtual, true);
@@ -776,15 +638,13 @@ test('_validateTools: a present tool from another system does NOT satisfy this r
   // not satisfy a sys-1 recipe whose required tool shares the same componentId.
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 3 },
-    onBreak: { mode: 'destroy' },
-  };
-  const result = await engine._validateTools([{ items: [] }], recipe(), [tool], {
-    systemId: 'system-other',
-    componentIds: ['c-axe'],
-  });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
+  const result = await engine._validateTools(
+    [{ items: [] }],
+    recipe(),
+    [tool],
+    { systemId: 'system-other', componentIds: ['c-axe'] }
+  );
   assert.equal(result.valid, false, 'an out-of-system present tool is inert');
   assert.match(result.message, /Missing required tool/);
 });
@@ -792,11 +652,7 @@ test('_validateTools: a present tool from another system does NOT satisfy this r
 test('_validateTools: WITHOUT the active tool the same unowned requirement still fails (regression guard)', async () => {
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 3 },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
   const result = await engine._validateTools([{ items: [] }], recipe(), [tool], null);
   assert.equal(result.valid, false);
   assert.match(result.message, /Missing required tool/);
@@ -806,12 +662,7 @@ test('_validateTools: an owned non-broken item wins over a virtual match', async
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
   const axe = new FakeItem('c-axe');
-  const result = await engine._validateTools(
-    [{ items: [axe] }],
-    recipe(),
-    [{ componentId: 'c-axe' }],
-    { systemId: 'sys-1', componentIds: ['c-axe'] }
-  );
+  const result = await engine._validateTools([{ items: [axe] }], recipe(), [{ componentId: 'c-axe' }], { systemId: 'sys-1', componentIds: ['c-axe'] });
   assert.equal(result.valid, true);
   assert.equal(result.tools[0].item, axe);
   assert.equal(result.tools[0].virtual, undefined);
@@ -820,11 +671,7 @@ test('_validateTools: an owned non-broken item wins over a virtual match', async
 test('_applyToolBreakage: skips a virtual tool — no usage, no breakage, no usedTools entry', async () => {
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 1 },
-    onBreak: { mode: 'destroy' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
 
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: null, virtual: true }]);
   assert.deepEqual(used, [], 'a virtual tool produces no usedTools run-record entry');
@@ -833,51 +680,25 @@ test('_applyToolBreakage: skips a virtual tool — no usage, no breakage, no use
 test('craft(): a tool absent from inventory but present as activeCanvasTool crafts with no breakage/usage', async () => {
   installSystem();
   const ingredientItem = new FakeItem('ing-1', { quantity: 2 });
-  const fakeTool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 3 },
-    onBreak: { mode: 'destroy' },
-  };
+  const fakeTool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
   const ingredientSet = fakeIngredientSet(ingredientItem);
   // No tool item in inventory — only the active canvas tool provides it.
-  const recipeManager = fullCraftRecipeManager({
-    ingredientItem,
-    toolItem: null,
-    fakeTool,
-    ingredientSet,
-  });
+  const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem: null, fakeTool, ingredientSet });
 
   let successPayload = null;
   const runManager = {
     findActiveRunForRecipe: () => null,
     getActiveRun: () => null,
-    async createRun() {
-      return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 };
-    },
+    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 }; },
     canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) {
-      return run;
-    },
-    async markStepWaitingForTime(_actor, run) {
-      return run;
-    },
-    async completeStepSuccess(_actor, run, _idx, payload) {
-      successPayload = payload;
-      return { ...run, status: 'succeeded' };
-    },
-    async completeStepFailure() {
-      return {};
-    },
+    async markStepInProgress(_actor, run) { return run; },
+    async markStepWaitingForTime(_actor, run) { return run; },
+    async completeStepSuccess(_actor, run, _idx, payload) { successPayload = payload; return { ...run, status: 'succeeded' }; },
+    async completeStepFailure() { return {}; }
   };
 
   const engine = new CraftingEngine(recipeManager, runManager, null);
-  engine._runCraftingCheck = async () => ({
-    success: true,
-    message: 'ok',
-    outcome: null,
-    value: null,
-    data: {},
-  });
+  engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
 
@@ -885,54 +706,29 @@ test('craft(): a tool absent from inventory but present as activeCanvasTool craf
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
 
   const result = await engine.craft(craftingActor, [sourceActor], fakeRecipe(ingredientSet), null, {
-    presentTools: { systemId: 'sys-1', componentIds: ['c-axe'] },
+    presentTools: { systemId: 'sys-1', componentIds: ['c-axe'] }
   });
 
   assert.equal(result.success, true);
   assert.ok(successPayload, 'a success run payload was recorded');
-  assert.deepEqual(
-    successPayload.usedTools,
-    [],
-    'the virtual canvas tool contributes no usedTools entry'
-  );
+  assert.deepEqual(successPayload.usedTools, [], 'the virtual canvas tool contributes no usedTools entry');
 });
 
 test('craft(): missing required tool blocks the craft before consuming ingredients', async () => {
   installSystem();
   const ingredientItem = new FakeItem('ing-1', { quantity: 2 });
-  const fakeTool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 3 },
-    onBreak: { mode: 'destroy' },
-  };
+  const fakeTool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 3 }, onBreak: { mode: 'destroy' } };
   const ingredientSet = fakeIngredientSet(ingredientItem);
   // No tool item in inventory.
-  const recipeManager = fullCraftRecipeManager({
-    ingredientItem,
-    toolItem: null,
-    fakeTool,
-    ingredientSet,
-  });
+  const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem: null, fakeTool, ingredientSet });
 
   const engine = new CraftingEngine(recipeManager, null, null);
-  engine._runCraftingCheck = async () => ({
-    success: true,
-    message: 'ok',
-    outcome: null,
-    value: null,
-    data: {},
-  });
+  engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
 
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingredientItem] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
 
-  const result = await engine.craft(
-    craftingActor,
-    [sourceActor],
-    fakeRecipe(ingredientSet),
-    null,
-    {}
-  );
+  const result = await engine.craft(craftingActor, [sourceActor], fakeRecipe(ingredientSet), null, {});
   assert.equal(result.success, false);
   assert.match(result.message, /Missing required tool/);
 });
@@ -941,13 +737,7 @@ test('craft(): missing required tool blocks the craft before consuming ingredien
 // _applyToolBreakage under checkDriven authority (issue 419)
 // ---------------------------------------------------------------------------
 
-const checkDrivenOpts = (overrides = {}) => ({
-  forceBreak: true,
-  authority: 'checkDriven',
-  reason: '1d20 group rolled 1',
-  triggerId: 'natural1',
-  ...overrides,
-});
+const checkDrivenOpts = (overrides = {}) => ({ forceBreak: true, authority: 'checkDriven', reason: '1d20 group rolled 1', triggerId: 'natural1', ...overrides });
 
 test('_applyToolBreakage checkDriven: forceBreak breaks all required non-immune tools', async () => {
   installSystem();
@@ -955,11 +745,7 @@ test('_applyToolBreakage checkDriven: forceBreak breaks all required non-immune 
   const actorRef = { uuid: 'Actor.a' };
   // breakageChance-0 tool would never break on its own; checkDriven forces it.
   const axe = new FakeItem('c-axe', { parent: actorRef });
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'breakageChance', breakageChance: 0 },
-    onBreak: { mode: 'flagBroken' },
-  };
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], checkDrivenOpts());
   assert.equal(used[0].broken, true);
   assert.equal(used[0].authority, 'checkDriven');
@@ -982,7 +768,11 @@ test('_applyToolBreakage checkDriven: forceBreak does not increment retained lim
     onBreak: { mode: 'flagBroken' },
   };
 
-  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], checkDrivenOpts());
+  const used = await engine._applyToolBreakage(
+    recipe(),
+    [{ tool, item: axe }],
+    checkDrivenOpts()
+  );
 
   assert.equal(used[0].broken, true, 'the check trigger still controls breakage');
   assert.equal(
@@ -997,16 +787,8 @@ test('_applyToolBreakage checkDriven: immune tool is filtered out of the forced 
   const engine = new CraftingEngine(toolMatcherManager());
   const actorRef = { uuid: 'Actor.a' };
   const anvil = new FakeItem('c-anvil', { parent: actorRef });
-  const tool = {
-    componentId: 'c-anvil',
-    breakage: { mode: 'immune' },
-    onBreak: { mode: 'flagBroken' },
-  };
-  const used = await engine._applyToolBreakage(
-    recipe(),
-    [{ tool, item: anvil }],
-    checkDrivenOpts()
-  );
+  const tool = { componentId: 'c-anvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: anvil }], checkDrivenOpts());
   assert.equal(used[0].broken, false);
   assert.equal(used[0].skippedImmune, true);
   assert.equal(getPath(anvil._flags.fabricate, 'fabricate.toolBroken'), undefined);
@@ -1017,19 +799,9 @@ test('_applyToolBreakage checkDriven: no forceBreak breaks nothing (per-tool mod
   const engine = new CraftingEngine(toolMatcherManager());
   const actorRef = { uuid: 'Actor.a' };
   // limitedUses past maxUses would break under toolSpecific; checkDriven ignores it.
-  const axe = new FakeItem('c-axe', {
-    flags: { fabricate: { toolUsage: { timesUsed: 9 } } },
-    parent: actorRef,
-  });
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'limitedUses', maxUses: 1 },
-    onBreak: { mode: 'flagBroken' },
-  };
-  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], {
-    forceBreak: false,
-    authority: 'checkDriven',
-  });
+  const axe = new FakeItem('c-axe', { flags: { fabricate: { toolUsage: { timesUsed: 9 } } }, parent: actorRef });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], { forceBreak: false, authority: 'checkDriven' });
   assert.equal(used[0].broken, false);
   assert.equal(
     getPath(axe._flags.fabricate, 'fabricate.toolUsage.timesUsed'),
@@ -1041,16 +813,8 @@ test('_applyToolBreakage checkDriven: no forceBreak breaks nothing (per-tool mod
 test('_applyToolBreakage checkDriven: virtual-present tool recorded as skipped evidence (not mutated)', async () => {
   installSystem();
   const engine = new CraftingEngine(toolMatcherManager());
-  const tool = {
-    componentId: 'c-station',
-    breakage: { mode: 'limitedUses', maxUses: 1 },
-    onBreak: { mode: 'destroy' },
-  };
-  const used = await engine._applyToolBreakage(
-    recipe(),
-    [{ tool, item: null, virtual: true }],
-    checkDrivenOpts()
-  );
+  const tool = { componentId: 'c-station', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: null, virtual: true }], checkDrivenOpts());
   assert.equal(used.length, 1);
   assert.equal(used[0].virtual, true);
   assert.equal(used[0].broken, false);
@@ -1061,15 +825,8 @@ test('_applyToolBreakage toolSpecific: legacy forceBreak still breaks (superset 
   const engine = new CraftingEngine(toolMatcherManager());
   const actorRef = { uuid: 'Actor.a' };
   const axe = new FakeItem('c-axe', { parent: actorRef });
-  const tool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'breakageChance', breakageChance: 0 },
-    onBreak: { mode: 'flagBroken' },
-  };
-  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], {
-    forceBreak: true,
-    authority: 'toolSpecific',
-  });
+  const tool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }], { forceBreak: true, authority: 'toolSpecific' });
   assert.equal(used[0].broken, true);
   assert.equal(used[0].authority, undefined, 'toolSpecific carries no authority evidence');
 });
@@ -1079,17 +836,10 @@ test('_applyToolBreakage toolSpecific: immune tool never breaks even with a lega
   const engine = new CraftingEngine(toolMatcherManager());
   const actorRef = { uuid: 'Actor.a' };
   const anvil = new FakeItem('c-anvil', { parent: actorRef });
-  const tool = {
-    componentId: 'c-anvil',
-    breakage: { mode: 'immune' },
-    onBreak: { mode: 'flagBroken' },
-  };
+  const tool = { componentId: 'c-anvil', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } };
   // "An immune Tool never breaks under either authority" — a legacy crit/tier
   // forceBreak must NOT break an immune tool under toolSpecific.
-  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: anvil }], {
-    forceBreak: true,
-    authority: 'toolSpecific',
-  });
+  const used = await engine._applyToolBreakage(recipe(), [{ tool, item: anvil }], { forceBreak: true, authority: 'toolSpecific' });
   assert.equal(used[0].broken, false);
   assert.equal(getPath(anvil._flags.fabricate, 'fabricate.toolBroken'), undefined);
 });
@@ -1121,12 +871,7 @@ const FAILED_NATURAL_ONE_CHECK = {
   outcome: null,
   value: null,
   engineEvaluated: true,
-  data: {
-    total: 1,
-    outcomeId: null,
-    diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }],
-    breakTools: false,
-  },
+  data: { total: 1, outcomeId: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }], breakTools: false },
 };
 
 function checkDrivenSystem({ breakToolsOnFail }) {
@@ -1161,39 +906,19 @@ function failingCraftEngine() {
   const ingredientItem = new FakeItem('ing-1', { quantity: 2 });
   const actorRef = { uuid: 'Actor.a1' };
   const toolItem = new FakeItem('c-axe', { parent: actorRef });
-  const fakeTool = {
-    componentId: 'c-axe',
-    breakage: { mode: 'breakageChance', breakageChance: 0 },
-    onBreak: { mode: 'flagBroken' },
-  };
+  const fakeTool = { componentId: 'c-axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
   const ingredientSet = fakeIngredientSet(ingredientItem);
-  const recipeManager = fullCraftRecipeManager({
-    ingredientItem,
-    toolItem,
-    fakeTool,
-    ingredientSet,
-  });
+  const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem, fakeTool, ingredientSet });
   let failurePayload = null;
   const runManager = {
     findActiveRunForRecipe: () => null,
     getActiveRun: () => null,
-    async createRun() {
-      return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 };
-    },
+    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 }; },
     canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) {
-      return run;
-    },
-    async markStepWaitingForTime(_actor, run) {
-      return run;
-    },
-    async completeStepSuccess() {
-      return {};
-    },
-    async completeStepFailure(_actor, run, _idx, _reason, payload) {
-      failurePayload = payload;
-      return { ...run, status: 'failed' };
-    },
+    async markStepInProgress(_actor, run) { return run; },
+    async markStepWaitingForTime(_actor, run) { return run; },
+    async completeStepSuccess() { return {}; },
+    async completeStepFailure(_actor, run, _idx, _reason, payload) { failurePayload = payload; return { ...run, status: 'failed' }; },
   };
   const engine = new CraftingEngine(recipeManager, runManager, null);
   // The check FAILS with an engine-evaluated natural-1 roll (so the checkDriven
@@ -1215,16 +940,8 @@ test('craft() checkDriven FAIL: a matched trigger breaks NO tools when breakTool
   const { toolItem, run, failurePayload } = failingCraftEngine();
   const result = await run();
   assert.equal(result.success, false);
-  assert.equal(
-    getPath(toolItem._flags.fabricate, 'fabricate.toolBroken'),
-    undefined,
-    'no break without the failure gate'
-  );
-  assert.deepEqual(
-    failurePayload()?.usedTools ?? [],
-    [],
-    'no usedTools breakage evidence on the gated failure path'
-  );
+  assert.equal(getPath(toolItem._flags.fabricate, 'fabricate.toolBroken'), undefined, 'no break without the failure gate');
+  assert.deepEqual(failurePayload()?.usedTools ?? [], [], 'no usedTools breakage evidence on the gated failure path');
 });
 
 test('craft() checkDriven FAIL: a matched trigger breaks the non-immune tool when breakToolsOnFail is true (criterion 10)', async () => {
@@ -1232,11 +949,7 @@ test('craft() checkDriven FAIL: a matched trigger breaks the non-immune tool whe
   const { toolItem, run, failurePayload } = failingCraftEngine();
   const result = await run();
   assert.equal(result.success, false);
-  assert.equal(
-    getPath(toolItem._flags.fabricate, 'fabricate.toolBroken'),
-    true,
-    'the failure path breaks the required tool under the gate'
-  );
+  assert.equal(getPath(toolItem._flags.fabricate, 'fabricate.toolBroken'), true, 'the failure path breaks the required tool under the gate');
   const used = failurePayload()?.usedTools ?? [];
   assert.equal(used.length, 1);
   assert.equal(used[0].broken, true);
@@ -1265,22 +978,13 @@ function applySalvageBreak(engine, system, checkResultSuccess) {
   const actorRef = { uuid: 'Actor.s' };
   const hammer = new FakeItem('c-hammer', { parent: actorRef });
   // breakageChance-0 tool never breaks on its own; only checkDriven can break it.
-  const tool = {
-    componentId: 'c-hammer',
-    breakage: { mode: 'breakageChance', breakageChance: 0 },
-    onBreak: { mode: 'flagBroken' },
-  };
+  const tool = { componentId: 'c-hammer', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } };
   const checkResult = {
     success: checkResultSuccess,
     engineEvaluated: true,
     outcome: null,
     value: null,
-    data: {
-      total: 1,
-      outcomeId: null,
-      diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }],
-      breakTools: false,
-    },
+    data: { total: 1, outcomeId: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 1, results: [1] }], breakTools: false },
   };
   const decision = engine._resolveSalvageBreakageDecision(system, checkResult);
   return { hammer, tool, decision };
@@ -1310,11 +1014,7 @@ test('salvage checkDriven: the failure path resolver + apply actually breaks the
   // The failure path is gated by breakToolsOnFail in salvage(); when the gate
   // is open the same resolver+apply runs, so a failed salvage check still breaks.
   const { hammer, tool, decision } = applySalvageBreak(engine, system, false);
-  assert.equal(
-    decision.forceBreak,
-    true,
-    'the salvage failure resolver forces the break on a matched trigger'
-  );
+  assert.equal(decision.forceBreak, true, 'the salvage failure resolver forces the break on a matched trigger');
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: hammer }], {
     forceBreak: decision.forceBreak,
     authority: decision.authority,

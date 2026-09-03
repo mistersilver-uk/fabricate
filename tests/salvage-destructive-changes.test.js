@@ -18,8 +18,8 @@ let idSeq = 0;
 globalThis.foundry = {
   utils: {
     randomID: () => `rid-${++idSeq}`,
-    getProperty: () => undefined,
-  },
+    getProperty: () => undefined
+  }
 };
 globalThis.ui = { notifications: { warn: () => {}, info: () => {}, error: () => {} } };
 // Default game stub; individual tests may override globalThis.game before calling SUT
@@ -36,7 +36,7 @@ function makeManager(resolutionService = null) {
   const recipeManagerStub = {
     getRecipes: () => [],
     deleteRecipe: async () => {},
-    updateRecipe: async () => {},
+    updateRecipe: async () => {}
   };
   const mgr = new CraftingSystemManager(recipeManagerStub);
   mgr.initialized = true;
@@ -71,7 +71,7 @@ function makeActor(id, salvageRunsHistory = null) {
       flags[ns][key] = value;
       this._setFlagCalled = true;
     },
-    _flags: flags,
+    _flags: flags
   };
 }
 
@@ -100,28 +100,20 @@ test('Changing salvageResolutionMode from simple to routed disables components w
         rollFormula: '1d20',
         relativeOutcomes: [
           { id: 't-pass', name: 'pass', success: true, dc: 0 },
-          { id: 't-fail', name: 'fail', success: false, dc: -5 },
-        ],
-      },
+          { id: 't-fail', name: 'fail', success: false, dc: -5 }
+        ]
+      }
     },
-    components: [
-      {
-        id: 'comp-1',
-        name: 'Iron Ore',
-        salvage: {
-          enabled: true,
-          ingredientQuantity: 1,
-          resultGroups: [
-            {
-              id: 'rg-1',
-              name: 'Scraps',
-              results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }],
-            },
-          ],
-          // no outcomeRouting → the "pass" success tier is unrouted → invalid for routed
-        },
-      },
-    ],
+    components: [{
+      id: 'comp-1',
+      name: 'Iron Ore',
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
+        // no outcomeRouting → the "pass" success tier is unrouted → invalid for routed
+      }
+    }]
   };
 
   // Use real ResolutionModeService wired to a system manager returning our system
@@ -135,12 +127,8 @@ test('Changing salvageResolutionMode from simple to routed disables components w
   await mgr.updateSystem(normalized.id, { salvageResolutionMode: 'routed' });
 
   const updated = mgr.getSystem(normalized.id);
-  const comp = updated.components.find((c) => c.id === 'comp-1');
-  assert.equal(
-    comp.salvage.enabled,
-    false,
-    'Component without outcomeRouting should be disabled in routed mode'
-  );
+  const comp = updated.components.find(c => c.id === 'comp-1');
+  assert.equal(comp.salvage.enabled, false, 'Component without outcomeRouting should be disabled in routed mode');
 });
 
 test('Changing salvageResolutionMode from routed to simple clamps to one success group and stays enabled (issue 764)', async () => {
@@ -157,35 +145,23 @@ test('Changing salvageResolutionMode from routed to simple clamps to one success
     features: { salvage: true },
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
-      enabled: true,
-      macroUuid: 'Macro.check',
-      outcomes: ['pass', 'fail'],
+      enabled: true, macroUuid: 'Macro.check', outcomes: ['pass', 'fail'],
       consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
-      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false }
     },
-    components: [
-      {
-        id: 'comp-1',
-        name: 'Dragon Scale',
-        salvage: {
-          enabled: true,
-          ingredientQuantity: 1,
-          resultGroups: [
-            {
-              id: 'rg-pass',
-              name: 'Pass',
-              results: [{ id: 'r-1', componentId: 'gem', quantity: 1 }],
-            },
-            {
-              id: 'rg-fail',
-              name: 'Fail',
-              results: [{ id: 'r-2', componentId: 'dust', quantity: 1 }],
-            },
-          ],
-          outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' },
-        },
-      },
-    ],
+    components: [{
+      id: 'comp-1',
+      name: 'Dragon Scale',
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [
+          { id: 'rg-pass', name: 'Pass', results: [{ id: 'r-1', componentId: 'gem', quantity: 1 }] },
+          { id: 'rg-fail', name: 'Fail', results: [{ id: 'r-2', componentId: 'dust', quantity: 1 }] }
+        ],
+        outcomeRouting: { pass: 'rg-pass', fail: 'rg-fail' }
+      }
+    }]
   };
 
   const resolutionService = new ResolutionModeService({ getSystem: () => null });
@@ -196,19 +172,12 @@ test('Changing salvageResolutionMode from routed to simple clamps to one success
   await mgr.updateSystem(normalized.id, { salvageResolutionMode: 'simple' });
 
   const updated = mgr.getSystem(normalized.id);
-  const comp = updated.components.find((c) => c.id === 'comp-1');
+  const comp = updated.components.find(c => c.id === 'comp-1');
   assert.equal(comp.salvage.enabled, true, 'salvage stays enabled after the clamp');
   assert.equal(comp.salvage.resultGroups.length, 1, 'clamped to a single result group');
-  assert.equal(
-    comp.salvage.resultGroups[0].id,
-    'rg-pass',
-    'the first success group is retained at index 0'
-  );
+  assert.equal(comp.salvage.resultGroups[0].id, 'rg-pass', 'the first success group is retained at index 0');
   const combined = warnMessages.join('\n');
-  assert.ok(
-    /Dragon Scale/.test(combined),
-    `the drop warn names the affected component. Got: ${combined}`
-  );
+  assert.ok(/Dragon Scale/.test(combined), `the drop warn names the affected component. Got: ${combined}`);
 });
 
 test('Mode change does not disable components that are already valid for the new mode', async () => {
@@ -219,29 +188,19 @@ test('Mode change does not disable components that are already valid for the new
     features: { salvage: true },
     salvageResolutionMode: 'routed',
     salvageCraftingCheck: {
-      enabled: false,
-      macroUuid: null,
-      outcomes: [],
+      enabled: false, macroUuid: null, outcomes: [],
       consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
-      progressive: { awardMode: 'equal', allowPlayerReorder: false },
+      progressive: { awardMode: 'equal', allowPlayerReorder: false }
     },
-    components: [
-      {
-        id: 'comp-1',
-        name: 'Iron Ore',
-        salvage: {
-          enabled: true,
-          ingredientQuantity: 1,
-          resultGroups: [
-            {
-              id: 'rg-1',
-              name: 'Scraps',
-              results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }],
-            },
-          ],
-        },
-      },
-    ],
+    components: [{
+      id: 'comp-1',
+      name: 'Iron Ore',
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
+      }
+    }]
   };
 
   const resolutionService = new ResolutionModeService({ getSystem: () => null });
@@ -253,7 +212,7 @@ test('Mode change does not disable components that are already valid for the new
   await mgr.updateSystem(normalized.id, { salvageResolutionMode: 'simple' });
 
   const updated = mgr.getSystem(normalized.id);
-  const comp = updated.components.find((c) => c.id === 'comp-1');
+  const comp = updated.components.find(c => c.id === 'comp-1');
   assert.equal(comp.salvage.enabled, true, 'Component valid for new mode should remain enabled');
 });
 
@@ -267,9 +226,7 @@ test('GM notification sent when components are disabled by mode change', async (
     features: { salvage: true },
     salvageResolutionMode: 'simple',
     salvageCraftingCheck: {
-      enabled: true,
-      macroUuid: 'Macro.check',
-      outcomes: ['pass', 'fail'],
+      enabled: true, macroUuid: 'Macro.check', outcomes: ['pass', 'fail'],
       consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
       progressive: { awardMode: 'equal', allowPlayerReorder: false },
       routed: {
@@ -277,28 +234,20 @@ test('GM notification sent when components are disabled by mode change', async (
         rollFormula: '1d20',
         relativeOutcomes: [
           { id: 't-pass', name: 'pass', success: true, dc: 0 },
-          { id: 't-fail', name: 'fail', success: false, dc: -5 },
-        ],
-      },
+          { id: 't-fail', name: 'fail', success: false, dc: -5 }
+        ]
+      }
     },
-    components: [
-      {
-        id: 'comp-1',
-        name: 'Ore Fragment',
-        salvage: {
-          enabled: true,
-          ingredientQuantity: 1,
-          resultGroups: [
-            {
-              id: 'rg-1',
-              name: 'Scraps',
-              results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }],
-            },
-          ],
-          // no outcomeRouting → the "pass" success tier is unrouted → invalid for routed
-        },
-      },
-    ],
+    components: [{
+      id: 'comp-1',
+      name: 'Ore Fragment',
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [{ id: 'r-1', componentId: 'scrap', quantity: 1 }] }]
+        // no outcomeRouting → the "pass" success tier is unrouted → invalid for routed
+      }
+    }]
   };
 
   const resolutionService = new ResolutionModeService({ getSystem: () => null });
@@ -320,21 +269,16 @@ test('GM notification sent when components are disabled by mode change', async (
 // Group 2: Feature disable cleans up salvage runs
 // ---------------------------------------------------------------------------
 
-test("Disabling salvage takes effect and cleans up this system's salvage runs", async () => {
+test('Disabling salvage takes effect and cleans up this system\'s salvage runs', async () => {
   const systemId = 'sys-cleanup';
-  const runForThisSystem = {
-    id: 'run-1',
-    craftingSystemId: systemId,
-    componentId: 'comp-1',
-    status: 'succeeded',
-  };
+  const runForThisSystem = { id: 'run-1', craftingSystemId: systemId, componentId: 'comp-1', status: 'succeeded' };
   const actor = makeActor('actor-1', [runForThisSystem]);
 
   const mgr = makeManager();
   mgr._getResolutionModeService = () => null;
   globalThis.game = {
     user: { isGM: true },
-    actors: [actor],
+    actors: [actor]
   };
 
   // System starts with salvage enabled
@@ -343,7 +287,7 @@ test("Disabling salvage takes effect and cleans up this system's salvage runs", 
     name: 'Test',
     features: { salvage: true },
     salvageResolutionMode: 'simple',
-    components: [],
+    components: []
   });
   mgr.systems.set(normalized.id, normalized);
 
@@ -354,40 +298,27 @@ test("Disabling salvage takes effect and cleans up this system's salvage runs", 
 
   const stored = actor.getFlag('fabricate', 'fabricate.salvageRuns');
   const history = stored?.history || [];
-  const remaining = history.filter((r) => r.craftingSystemId === systemId);
-  assert.equal(remaining.length, 0, "Disabling salvage cleans up this system's run history");
+  const remaining = history.filter(r => r.craftingSystemId === systemId);
+  assert.equal(remaining.length, 0, 'Disabling salvage cleans up this system\'s run history');
 });
 
 test('Disabling salvage on one system never removes runs from other systems', async () => {
   const systemId = 'sys-a';
   const otherSystemId = 'sys-b';
-  const runForA = {
-    id: 'run-a',
-    craftingSystemId: systemId,
-    componentId: 'comp-1',
-    status: 'succeeded',
-  };
-  const runForB = {
-    id: 'run-b',
-    craftingSystemId: otherSystemId,
-    componentId: 'comp-x',
-    status: 'succeeded',
-  };
+  const runForA = { id: 'run-a', craftingSystemId: systemId, componentId: 'comp-1', status: 'succeeded' };
+  const runForB = { id: 'run-b', craftingSystemId: otherSystemId, componentId: 'comp-x', status: 'succeeded' };
   const actor = makeActor('actor-1', [runForA, runForB]);
 
   const mgr = makeManager();
   mgr._getResolutionModeService = () => null;
   globalThis.game = {
     user: { isGM: true },
-    actors: [actor],
+    actors: [actor]
   };
 
   const normalized = mgr._normalizeSystem({
-    id: systemId,
-    name: 'System A',
-    features: { salvage: true },
-    salvageResolutionMode: 'simple',
-    components: [],
+    id: systemId, name: 'System A', features: { salvage: true },
+    salvageResolutionMode: 'simple', components: []
   });
   mgr.systems.set(normalized.id, normalized);
 
@@ -395,7 +326,7 @@ test('Disabling salvage on one system never removes runs from other systems', as
 
   const stored = actor.getFlag('fabricate', 'fabricate.salvageRuns');
   const history = stored?.history || [];
-  const bRuns = history.filter((r) => r.craftingSystemId === otherSystemId);
+  const bRuns = history.filter(r => r.craftingSystemId === otherSystemId);
   assert.equal(bRuns.length, 1, 'Runs for other systems should NOT be removed');
 });
 
@@ -405,15 +336,12 @@ test('A salvage feature update is a safe no-op when no actors exist', async () =
   mgr._getResolutionModeService = () => null;
   globalThis.game = {
     user: { isGM: true },
-    actors: [],
+    actors: []
   };
 
   const normalized = mgr._normalizeSystem({
-    id: systemId,
-    name: 'Test',
-    features: { salvage: true },
-    salvageResolutionMode: 'simple',
-    components: [],
+    id: systemId, name: 'Test', features: { salvage: true },
+    salvageResolutionMode: 'simple', components: []
   });
   mgr.systems.set(normalized.id, normalized);
 
@@ -433,27 +361,20 @@ test('Salvage stays on, so a no-op feature update triggers no salvage-run flag w
   mgr._getResolutionModeService = () => null;
   globalThis.game = {
     user: { isGM: true },
-    actors: [actor],
+    actors: [actor]
   };
 
   // Salvage is always on; an explicit `false` normalizes back to true, so this
   // update changes nothing salvage-related and writes no salvage-run flags.
   const normalized = mgr._normalizeSystem({
-    id: systemId,
-    name: 'Test',
-    features: { salvage: false },
-    salvageResolutionMode: 'simple',
-    components: [],
+    id: systemId, name: 'Test', features: { salvage: false },
+    salvageResolutionMode: 'simple', components: []
   });
   mgr.systems.set(normalized.id, normalized);
 
   await mgr.updateSystem(systemId, { features: { salvage: false } });
 
-  assert.equal(
-    actor._setFlagCalled,
-    false,
-    'setFlag should NOT be called when salvage was already disabled'
-  );
+  assert.equal(actor._setFlagCalled, false, 'setFlag should NOT be called when salvage was already disabled');
 });
 
 // ---------------------------------------------------------------------------
@@ -469,21 +390,17 @@ test('Deleting a component removes salvage run history referencing that componen
   const mgr = makeManager();
   globalThis.game = {
     user: { isGM: true },
-    actors: [actor],
+    actors: [actor]
   };
   mgr.recipeManager.getRecipes = () => [];
 
   const comp = {
-    id: componentId,
-    name: 'Deletable Component',
-    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] },
+    id: componentId, name: 'Deletable Component',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const normalized = mgr._normalizeSystem({
-    id: systemId,
-    name: 'Test',
-    features: { salvage: true },
-    salvageResolutionMode: 'simple',
-    components: [comp],
+    id: systemId, name: 'Test', features: { salvage: true },
+    salvageResolutionMode: 'simple', components: [comp]
   });
   mgr.systems.set(normalized.id, normalized);
 
@@ -491,7 +408,7 @@ test('Deleting a component removes salvage run history referencing that componen
 
   const stored = actor.getFlag('fabricate', 'fabricate.salvageRuns');
   const history = stored?.history || [];
-  const remaining = history.filter((r) => r.componentId === componentId);
+  const remaining = history.filter(r => r.componentId === componentId);
   assert.equal(remaining.length, 0, 'History entries for the deleted component should be removed');
 });
 
@@ -499,43 +416,28 @@ test('Deleting a component does not remove runs for other components', async () 
   const systemId = 'sys-del2';
   const componentId = 'comp-to-delete';
   const otherComponentId = 'comp-other';
-  const runForDeleted = {
-    id: 'run-del',
-    craftingSystemId: systemId,
-    componentId,
-    status: 'succeeded',
-  };
-  const runForOther = {
-    id: 'run-other',
-    craftingSystemId: systemId,
-    componentId: otherComponentId,
-    status: 'succeeded',
-  };
+  const runForDeleted = { id: 'run-del', craftingSystemId: systemId, componentId, status: 'succeeded' };
+  const runForOther = { id: 'run-other', craftingSystemId: systemId, componentId: otherComponentId, status: 'succeeded' };
   const actor = makeActor('actor-1', [runForDeleted, runForOther]);
 
   const mgr = makeManager();
   globalThis.game = {
     user: { isGM: true },
-    actors: [actor],
+    actors: [actor]
   };
   mgr.recipeManager.getRecipes = () => [];
 
   const comp = {
-    id: componentId,
-    name: 'Deletable',
-    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] },
+    id: componentId, name: 'Deletable',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const otherComp = {
-    id: otherComponentId,
-    name: 'Other',
-    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] },
+    id: otherComponentId, name: 'Other',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const normalized = mgr._normalizeSystem({
-    id: systemId,
-    name: 'Test',
-    features: { salvage: true },
-    salvageResolutionMode: 'simple',
-    components: [comp, otherComp],
+    id: systemId, name: 'Test', features: { salvage: true },
+    salvageResolutionMode: 'simple', components: [comp, otherComp]
   });
   mgr.systems.set(normalized.id, normalized);
 
@@ -543,7 +445,7 @@ test('Deleting a component does not remove runs for other components', async () 
 
   const stored = actor.getFlag('fabricate', 'fabricate.salvageRuns');
   const history = stored?.history || [];
-  const otherRuns = history.filter((r) => r.componentId === otherComponentId);
+  const otherRuns = history.filter(r => r.componentId === otherComponentId);
   assert.equal(otherRuns.length, 1, 'Runs for other components should NOT be removed');
 });
 
@@ -555,21 +457,17 @@ test('Deleting a component works when no salvageRuns flag exists on actor', asyn
   const mgr = makeManager();
   globalThis.game = {
     user: { isGM: true },
-    actors: [actor],
+    actors: [actor]
   };
   mgr.recipeManager.getRecipes = () => [];
 
   const comp = {
-    id: componentId,
-    name: 'Iron Ore',
-    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] },
+    id: componentId, name: 'Iron Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const normalized = mgr._normalizeSystem({
-    id: systemId,
-    name: 'Test',
-    features: { salvage: true },
-    salvageResolutionMode: 'simple',
-    components: [comp],
+    id: systemId, name: 'Test', features: { salvage: true },
+    salvageResolutionMode: 'simple', components: [comp]
   });
   mgr.systems.set(normalized.id, normalized);
 
@@ -588,21 +486,17 @@ test('Deleting a component works when history is empty', async () => {
   const mgr = makeManager();
   globalThis.game = {
     user: { isGM: true },
-    actors: [actor],
+    actors: [actor]
   };
   mgr.recipeManager.getRecipes = () => [];
 
   const comp = {
-    id: componentId,
-    name: 'Iron Ore',
-    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] },
+    id: componentId, name: 'Iron Ore',
+    salvage: { enabled: true, ingredientQuantity: 1, resultGroups: [] }
   };
   const normalized = mgr._normalizeSystem({
-    id: systemId,
-    name: 'Test',
-    features: { salvage: true },
-    salvageResolutionMode: 'simple',
-    components: [comp],
+    id: systemId, name: 'Test', features: { salvage: true },
+    salvageResolutionMode: 'simple', components: [comp]
   });
   mgr.systems.set(normalized.id, normalized);
 
@@ -612,9 +506,5 @@ test('Deleting a component works when history is empty', async () => {
   );
 
   // setFlag should NOT be called since no history entries were removed
-  assert.equal(
-    actor._setFlagCalled,
-    false,
-    'setFlag should NOT be called when history is already empty'
-  );
+  assert.equal(actor._setFlagCalled, false, 'setFlag should NOT be called when history is already empty');
 });

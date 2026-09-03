@@ -16,15 +16,13 @@ import { FatalMigrationError, isFatalMigrationError } from '../src/migration/mig
 // ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
-  const store = new Map(
-    Object.entries({
-      recipes: [],
-      craftingSystems: [],
-      gatheringConfig: {},
-      migrationVersion: '0.0.0',
-      ...initial,
-    })
-  );
+  const store = new Map(Object.entries({
+    recipes: [],
+    craftingSystems: [],
+    gatheringConfig: {},
+    migrationVersion: '0.0.0',
+    ...initial
+  }));
   const calls = { get: [], set: [] };
 
   function getSetting(key) {
@@ -45,7 +43,7 @@ function makeRunner(overrides = {}) {
   const settings = makeSettings(overrides.initial ?? {});
   const runner = new MigrationRunner({
     getSetting: settings.getSetting,
-    setSetting: settings.setSetting,
+    setSetting: settings.setSetting
   });
   return { runner, settings };
 }
@@ -59,8 +57,8 @@ test('migrations run in version order: componentId migration applied from 0.0.0'
     initial: {
       migrationVersion: '0.0.0',
       recipes: [],
-      craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }],
-    },
+      craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }]
+    }
   });
 
   await runner.run();
@@ -77,22 +75,16 @@ test('only pending migrations run: skip all when migrationVersion is 0.1.0', asy
     initial: {
       migrationVersion: '0.1.0',
       recipes: [{ id: 'r1' }],
-      craftingSystems: [],
-    },
+      craftingSystems: []
+    }
   });
 
   await runner.run();
 
   // recipes/systems should NOT be touched (no pending migration mutates this data)
-  const setKeys = settings.calls.set.map((c) => c.key);
-  assert.ok(
-    !setKeys.includes('recipes'),
-    'recipes should not be persisted when no migrations are pending'
-  );
-  assert.ok(
-    !setKeys.includes('craftingSystems'),
-    'craftingSystems should not be persisted when no migrations are pending'
-  );
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'), 'recipes should not be persisted when no migrations are pending');
+  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems should not be persisted when no migrations are pending');
 });
 
 test('no migrations pending returns without persisting anything', async () => {
@@ -100,8 +92,8 @@ test('no migrations pending returns without persisting anything', async () => {
     initial: {
       migrationVersion: '99.0.0',
       recipes: [{ id: 'r1' }],
-      craftingSystems: [{ id: 's1' }],
-    },
+      craftingSystems: [{ id: 's1' }]
+    }
   });
 
   await runner.run();
@@ -117,7 +109,7 @@ test('running twice from 0.0.0 produces identical output', async () => {
   const initial = {
     migrationVersion: '0.0.0',
     recipes: [{ catalysts: [{ systemItemId: 'x' }] }],
-    craftingSystems: [],
+    craftingSystems: []
   };
 
   const { runner: r1, settings: s1 } = makeRunner({ initial });
@@ -129,8 +121,8 @@ test('running twice from 0.0.0 produces identical output', async () => {
     initial: {
       migrationVersion: '0.0.0',
       recipes: JSON.parse(firstRecipes),
-      craftingSystems: [],
-    },
+      craftingSystems: []
+    }
   });
   await r2.run();
   const secondRecipes = JSON.stringify(s2.store.get('recipes'));
@@ -144,18 +136,15 @@ test('data already in target shape passes through unchanged', async () => {
     initial: {
       migrationVersion: '0.0.0',
       recipes: alreadyMigrated,
-      craftingSystems: [],
-    },
+      craftingSystems: []
+    }
   });
 
   await runner.run();
 
   // migrationVersion should be updated, but recipes setSetting should NOT be called
-  const setKeys = settings.calls.set.map((c) => c.key);
-  assert.ok(
-    !setKeys.includes('recipes'),
-    'recipes should not be re-persisted when data is unchanged'
-  );
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('recipes'), 'recipes should not be re-persisted when data is unchanged');
 });
 
 test('runner does not persist recipes/systems when data is identical after migration', async () => {
@@ -163,13 +152,13 @@ test('runner does not persist recipes/systems when data is identical after migra
     initial: {
       migrationVersion: '0.0.0',
       recipes: [{ id: 'r1' }],
-      craftingSystems: [{ id: 's1', components: [], visibilityMode: 'knowledge' }],
-    },
+      craftingSystems: [{ id: 's1', components: [], visibilityMode: 'knowledge' }]
+    }
   });
 
   await runner.run();
 
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('recipes'));
   assert.ok(!setKeys.includes('craftingSystems'));
   // but migrationVersion should be updated
@@ -184,12 +173,9 @@ test('null in recipes array is handled gracefully, valid entries still migrated'
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.0.0',
-      recipes: [
-        null,
-        { id: 'keep', craftingSystemId: 'sys-1', catalysts: [{ systemItemId: 'iron' }] },
-      ],
-      craftingSystems: [{ id: 'sys-1' }],
-    },
+      recipes: [null, { id: 'keep', craftingSystemId: 'sys-1', catalysts: [{ systemItemId: 'iron' }] }],
+      craftingSystems: [{ id: 'sys-1' }]
+    }
   });
 
   await runner.run();
@@ -199,7 +185,7 @@ test('null in recipes array is handled gracefully, valid entries still migrated'
   assert.ok(Array.isArray(recipes));
   // The non-null entry should be migrated: 0.1.0 renames systemItemId -> componentId,
   // 0.6.0 converts the catalyst into a system Tool, 1.7.0 strips the residual array.
-  const validEntry = recipes.find((r) => r !== null && typeof r === 'object');
+  const validEntry = recipes.find(r => r !== null && typeof r === 'object');
   assert.ok(validEntry, 'valid entry should remain');
   assert.equal('catalysts' in validEntry, false);
   assert.equal(systems[0].tools[0].componentId, 'iron');
@@ -210,8 +196,8 @@ test('non-object in recipes array is skipped without crashing', async () => {
     initial: {
       migrationVersion: '0.0.0',
       recipes: [42, { catalysts: [{ systemItemId: 'x' }] }],
-      craftingSystems: [],
-    },
+      craftingSystems: []
+    }
   });
 
   await assert.doesNotReject(() => runner.run());
@@ -246,12 +232,12 @@ test('full run from 0.0.0 applies componentId migration correctly', async () => 
           catalysts: [{ systemItemId: 'cat-a' }],
           resultGroups: [{ results: [{ systemItemId: 'result-a', quantity: 1 }] }],
           ingredientSets: [
-            { ingredients: [{ match: { type: 'systemItem', systemItemId: 'ing-a' } }] },
-          ],
-        },
+            { ingredients: [{ match: { type: 'systemItem', systemItemId: 'ing-a' } }] }
+          ]
+        }
       ],
-      craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }],
-    },
+      craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }]
+    }
   });
 
   await runner.run();
@@ -273,8 +259,8 @@ test('full run from 0.1.0 skips componentId migration', async () => {
     initial: {
       migrationVersion: '0.1.0',
       recipes: [],
-      craftingSystems: [{ managedItems: [{ id: 'comp-1' }], visibilityMode: 'knowledge' }],
-    },
+      craftingSystems: [{ managedItems: [{ id: 'comp-1' }], visibilityMode: 'knowledge' }]
+    }
   });
 
   await runner.run();
@@ -283,7 +269,7 @@ test('full run from 0.1.0 skips componentId migration', async () => {
   // system is left untouched (no later migration touches a managedItems-only system).
   const systems = settings.store.get('craftingSystems');
   assert.ok('managedItems' in systems[0], 'managedItems left untouched when 0.1.0 is gated');
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('craftingSystems'));
 });
 
@@ -292,13 +278,13 @@ test('migrationVersion setting is updated to the highest migration version after
     initial: {
       migrationVersion: '0.0.0',
       recipes: [],
-      craftingSystems: [],
-    },
+      craftingSystems: []
+    }
   });
 
   await runner.run();
 
-  const versionCall = settings.calls.set.find((c) => c.key === 'migrationVersion');
+  const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
   assert.equal(versionCall.value, '1.31.0');
 });
@@ -312,18 +298,15 @@ test('changed data triggers setSetting for recipes and systems', async () => {
     initial: {
       migrationVersion: '0.0.0',
       recipes: [{ catalysts: [{ systemItemId: 'item-x' }] }],
-      craftingSystems: [{ managedItems: [{ id: 'comp-a' }] }],
-    },
+      craftingSystems: [{ managedItems: [{ id: 'comp-a' }] }]
+    }
   });
 
   await runner.run();
 
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(setKeys.includes('recipes'), 'recipes should be persisted when changed');
-  assert.ok(
-    setKeys.includes('craftingSystems'),
-    'craftingSystems should be persisted when changed'
-  );
+  assert.ok(setKeys.includes('craftingSystems'), 'craftingSystems should be persisted when changed');
 });
 
 test('unchanged data only triggers setSetting for migrationVersion', async () => {
@@ -331,22 +314,16 @@ test('unchanged data only triggers setSetting for migrationVersion', async () =>
     initial: {
       migrationVersion: '0.0.0',
       recipes: [{ id: 'r1' }],
-      craftingSystems: [{ id: 's1', components: [], visibilityMode: 'knowledge' }],
-    },
+      craftingSystems: [{ id: 's1', components: [], visibilityMode: 'knowledge' }]
+    }
   });
 
   await runner.run();
 
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('recipes'), 'recipes should NOT be persisted when unchanged');
-  assert.ok(
-    !setKeys.includes('craftingSystems'),
-    'craftingSystems should NOT be persisted when unchanged'
-  );
-  assert.ok(
-    setKeys.includes('migrationVersion'),
-    'migrationVersion should always be updated after migrations run'
-  );
+  assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems should NOT be persisted when unchanged');
+  assert.ok(setKeys.includes('migrationVersion'), 'migrationVersion should always be updated after migrations run');
 });
 
 // ---------------------------------------------------------------------------
@@ -361,11 +338,11 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
         conditions: { weather: 'rain', timeOfDay: 'dusk' },
         vocabularies: {
           regions: ['northreach'],
-          biomes: ['forest', 'mountain'],
+          biomes: ['forest', 'mountain']
         },
-        systems: { 'sys-a': { tools: [{ id: 't1' }] } },
-      },
-    },
+        systems: { 'sys-a': { tools: [{ id: 't1' }] } }
+      }
+    }
   });
 
   await runner.run();
@@ -373,14 +350,10 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   const saved = settings.store.get('gatheringConfig');
   assert.deepEqual(saved.vocabularies.regions, [], 'regions cleared');
   assert.deepEqual(saved.vocabularies.biomes, ['forest', 'mountain'], 'biomes preserved');
-  assert.deepEqual(
-    saved.conditions,
-    { weather: 'rain', timeOfDay: 'dusk' },
-    'conditions preserved'
-  );
+  assert.deepEqual(saved.conditions, { weather: 'rain', timeOfDay: 'dusk' }, 'conditions preserved');
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
-  const versionCall = settings.calls.set.find((c) => c.key === 'migrationVersion');
+  const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.equal(versionCall.value, '1.31.0');
 });
 
@@ -390,51 +363,48 @@ test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empt
       migrationVersion: '0.1.0',
       gatheringConfig: {
         vocabularies: { regions: [], biomes: ['forest'] },
-        systems: {},
-      },
-    },
+        systems: {}
+      }
+    }
   });
 
   await runner.run();
 
-  const setKeys = settings.calls.set.map((c) => c.key);
-  assert.ok(
-    !setKeys.includes('gatheringConfig'),
-    'gatheringConfig should NOT be persisted when regions already empty'
-  );
-  assert.ok(
-    setKeys.includes('migrationVersion'),
-    'migrationVersion still advances to record the run'
-  );
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('gatheringConfig'),
+    'gatheringConfig should NOT be persisted when regions already empty');
+  assert.ok(setKeys.includes('migrationVersion'),
+    'migrationVersion still advances to record the run');
 });
 
 test('0.2.0 is a no-op when gatheringConfig has no vocabularies key at all', async () => {
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.1.0',
-      gatheringConfig: { systems: { 'sys-a': {} } },
-    },
+      gatheringConfig: { systems: { 'sys-a': {} } }
+    }
   });
 
   await runner.run();
 
-  const setKeys = settings.calls.set.map((c) => c.key);
-  assert.ok(!setKeys.includes('gatheringConfig'), 'no rewrite when there is nothing to clear');
+  const setKeys = settings.calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('gatheringConfig'),
+    'no rewrite when there is nothing to clear');
 });
 
 test('0.1.0 backward-compat: gatheringConfig is preserved across the spread-merge refactor', async () => {
   const originalGathering = {
     conditions: { weather: 'clear', timeOfDay: 'day' },
     vocabularies: { regions: ['legacy-region'], biomes: ['forest'] },
-    systems: { 'legacy-sys': { tools: [{ id: 'legacy-tool' }] } },
+    systems: { 'legacy-sys': { tools: [{ id: 'legacy-tool' }] } }
   };
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.0.0',
       recipes: [{ catalysts: [{ systemItemId: 'forge' }] }],
       craftingSystems: [{ managedItems: [{ id: 'comp-1' }] }],
-      gatheringConfig: JSON.parse(JSON.stringify(originalGathering)),
-    },
+      gatheringConfig: JSON.parse(JSON.stringify(originalGathering))
+    }
   });
 
   await runner.run();
@@ -444,11 +414,7 @@ test('0.1.0 backward-compat: gatheringConfig is preserved across the spread-merg
   // only regions should change.
   const saved = settings.store.get('gatheringConfig');
   assert.deepEqual(saved.vocabularies.regions, [], 'regions cleared by 0.2.0');
-  assert.deepEqual(
-    saved.vocabularies.biomes,
-    ['forest'],
-    'biomes preserved across both migrations'
-  );
+  assert.deepEqual(saved.vocabularies.biomes, ['forest'], 'biomes preserved across both migrations');
   assert.deepEqual(saved.conditions, originalGathering.conditions, 'conditions preserved');
   assert.deepEqual(saved.systems, originalGathering.systems, 'systems preserved');
 
@@ -477,15 +443,13 @@ test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode
     initial: {
       migrationVersion: '0.2.0',
       gatheringConfig: { systems: { 'sys-1': { tasks: [] } } },
-      gatheringEnvironments: [
-        {
-          id: 'env-1',
-          craftingSystemId: 'sys-1',
-          economyMode: 'nodes',
-          tasks: [{ id: 't1', staminaCost: 2, attemptLimit: { scope: 'actor', max: 3 } }],
-        },
-      ],
-    },
+      gatheringEnvironments: [{
+        id: 'env-1',
+        craftingSystemId: 'sys-1',
+        economyMode: 'nodes',
+        tasks: [{ id: 't1', staminaCost: 2, attemptLimit: { scope: 'actor', max: 3 } }]
+      }]
+    }
   });
 
   await runner.run();
@@ -509,47 +473,15 @@ test('0.4.0 collapses legacy node respawn policies in library tasks and environm
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.3.0',
-      gatheringConfig: {
-        systems: {
-          'sys-1': {
-            economy: { mode: 'nodes' },
-            tasks: [
-              {
-                id: 'lib-1',
-                nodes: {
-                  max: 2,
-                  current: 0,
-                  respawn: { policy: 'elapsedTime', intervalSeconds: 3600 },
-                },
-              },
-            ],
-          },
-        },
-      },
-      gatheringEnvironments: [
-        {
-          id: 'env-1',
-          craftingSystemId: 'sys-1',
-          tasks: [
-            {
-              id: 't1',
-              nodes: {
-                max: 3,
-                current: 1,
-                respawn: { policy: 'probability', intervalSeconds: 7200, chance: 0.4 },
-              },
-            },
-          ],
-          nodeRuntime: {
-            t1: {
-              max: 3,
-              current: 0,
-              respawn: { policy: 'manualAndElapsedTime', intervalSeconds: 60, chance: 0.2 },
-            },
-          },
-        },
-      ],
-    },
+      gatheringConfig: { systems: { 'sys-1': { economy: { mode: 'nodes' }, tasks: [
+        { id: 'lib-1', nodes: { max: 2, current: 0, respawn: { policy: 'elapsedTime', intervalSeconds: 3600 } } }
+      ] } } },
+      gatheringEnvironments: [{
+        id: 'env-1', craftingSystemId: 'sys-1',
+        tasks: [{ id: 't1', nodes: { max: 3, current: 1, respawn: { policy: 'probability', intervalSeconds: 7200, chance: 0.4 } } }],
+        nodeRuntime: { 't1': { max: 3, current: 0, respawn: { policy: 'manualAndElapsedTime', intervalSeconds: 60, chance: 0.2 } } }
+      }]
+    }
   });
 
   await runner.run();
@@ -557,28 +489,11 @@ test('0.4.0 collapses legacy node respawn policies in library tasks and environm
   // The full runner also applies 0.5.0, converting the legacy intervalSeconds to
   // the calendar-aware intervalUnit + intervalAmount schema.
   const config = settings.store.get('gatheringConfig');
-  assert.deepEqual(config.systems['sys-1'].tasks[0].nodes.respawn, {
-    policy: 'overTime',
-    gainMode: 'guaranteed',
-    intervalUnit: 'hours',
-    intervalAmount: 1,
-  });
+  assert.deepEqual(config.systems['sys-1'].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1 });
 
   const envs = settings.store.get('gatheringEnvironments');
-  assert.deepEqual(envs[0].tasks[0].nodes.respawn, {
-    policy: 'overTime',
-    gainMode: 'chance',
-    chance: 0.4,
-    intervalUnit: 'hours',
-    intervalAmount: 2,
-  });
-  assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, {
-    policy: 'overTime',
-    gainMode: 'chance',
-    chance: 0.2,
-    intervalUnit: 'minutes',
-    intervalAmount: 1,
-  });
+  assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.4, intervalUnit: 'hours', intervalAmount: 2 });
+  assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.2, intervalUnit: 'minutes', intervalAmount: 1 });
 
   assert.equal(settings.store.get('migrationVersion'), '1.31.0');
 });
@@ -590,9 +505,9 @@ test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
       gatheringConfig: { systems: { 'sys-h': {}, 'sys-t': {} } },
       gatheringEnvironments: [
         { id: 'e-h', craftingSystemId: 'sys-h', economyMode: 'hybrid', tasks: [] },
-        { id: 'e-t', craftingSystemId: 'sys-t', economyMode: 'time', tasks: [] },
-      ],
-    },
+        { id: 'e-t', craftingSystemId: 'sys-t', economyMode: 'time', tasks: [] }
+      ]
+    }
   });
 
   await runner.run();
@@ -623,14 +538,12 @@ test('0.8.0 rewrites legacy economy.mode into independent stamina/nodes flags', 
       migrationVersion: '0.7.0',
       gatheringConfig: {
         systems: {
-          'sys-stamina': {
-            economy: { mode: 'stamina', stamina: { max: '40', regen: { policy: 'none' } } },
-          },
+          'sys-stamina': { economy: { mode: 'stamina', stamina: { max: '40', regen: { policy: 'none' } } } },
           'sys-nodes': { economy: { mode: 'nodes' } },
-          'sys-none': { economy: { mode: 'none' } },
-        },
-      },
-    },
+          'sys-none': { economy: { mode: 'none' } }
+        }
+      }
+    }
   });
 
   await runner.run();
@@ -660,21 +573,21 @@ test('0.8.0 rewrites legacy economy.mode into independent stamina/nodes flags', 
 test('0.8.0 is idempotent and leaves already-migrated economies untouched', async () => {
   const alreadyMigrated = {
     systems: {
-      'sys-1': { economy: { stamina: { enabled: true, max: '30' }, nodes: { enabled: false } } },
-    },
+      'sys-1': { economy: { stamina: { enabled: true, max: '30' }, nodes: { enabled: false } } }
+    }
   };
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '0.7.0',
-      gatheringConfig: JSON.parse(JSON.stringify(alreadyMigrated)),
-    },
+      gatheringConfig: JSON.parse(JSON.stringify(alreadyMigrated))
+    }
   });
 
   await runner.run();
 
   // No `mode` to rewrite ⇒ economy passes through unchanged; gatheringConfig
   // should not be re-persisted.
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('gatheringConfig'), 'unchanged config should not be re-persisted');
   assert.deepEqual(settings.store.get('gatheringConfig'), alreadyMigrated);
 });
@@ -686,15 +599,10 @@ test('0.3.0 -> 0.8.0 compose: env-level economyMode becomes the two flags', asyn
     initial: {
       migrationVersion: '0.2.0',
       gatheringConfig: { systems: { 'sys-1': { tasks: [] } } },
-      gatheringEnvironments: [
-        {
-          id: 'env-1',
-          craftingSystemId: 'sys-1',
-          economyMode: 'stamina',
-          tasks: [],
-        },
-      ],
-    },
+      gatheringEnvironments: [{
+        id: 'env-1', craftingSystemId: 'sys-1', economyMode: 'stamina', tasks: []
+      }]
+    }
   });
 
   await runner.run();
@@ -716,18 +624,10 @@ test('1.2.0 rewrites a legacy elapsedTime stamina-regen policy to overTime', asy
       migrationVersion: '1.1.0',
       gatheringConfig: {
         systems: {
-          'sys-1': {
-            economy: {
-              stamina: {
-                enabled: true,
-                max: '20',
-                regen: { policy: 'elapsedTime', unit: 'days', amount: 5 },
-              },
-            },
-          },
-        },
-      },
-    },
+          'sys-1': { economy: { stamina: { enabled: true, max: '20', regen: { policy: 'elapsedTime', unit: 'days', amount: 5 } } } }
+        }
+      }
+    }
   });
 
   await runner.run();
@@ -744,24 +644,19 @@ test('1.2.0 rewrites a legacy elapsedTime stamina-regen policy to overTime', asy
 test('1.2.0 is idempotent and leaves already-overTime economies untouched (no re-persist)', async () => {
   const alreadyMigrated = {
     systems: {
-      'sys-1': {
-        economy: {
-          stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: 3 } },
-          nodes: { enabled: false },
-        },
-      },
-    },
+      'sys-1': { economy: { stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: 3 } }, nodes: { enabled: false } } }
+    }
   };
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '1.1.0',
-      gatheringConfig: JSON.parse(JSON.stringify(alreadyMigrated)),
-    },
+      gatheringConfig: JSON.parse(JSON.stringify(alreadyMigrated))
+    }
   });
 
   await runner.run();
 
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('gatheringConfig'), 'unchanged config should not be re-persisted');
   assert.deepEqual(settings.store.get('gatheringConfig'), alreadyMigrated);
 });
@@ -778,12 +673,8 @@ async function captureConsole(fn) {
   const lines = { error: [], warn: [] };
   const originalError = console.error;
   const originalWarn = console.warn;
-  console.error = (...args) => {
-    lines.error.push(args.join(' '));
-  };
-  console.warn = (...args) => {
-    lines.warn.push(args.join(' '));
-  };
+  console.error = (...args) => { lines.error.push(args.join(' ')); };
+  console.warn = (...args) => { lines.warn.push(args.join(' ')); };
   try {
     await fn();
   } finally {
@@ -804,7 +695,7 @@ function makeRunnerWithMigrations(migrations, overrides = {}) {
     setSetting: settings.setSetting,
     moduleVersion: overrides.moduleVersion,
     promptRecovery: overrides.promptRecovery,
-    migrations,
+    migrations
   });
   return { runner, settings };
 }
@@ -837,18 +728,10 @@ test('fatal abort persists no data and leaves migrationVersion unchanged', async
     downgradeTo: '1.2.0',
     migrate() {
       throw new FatalMigrationError('Recipe missing required result group', {
-        documents: [
-          {
-            type: 'recipe',
-            id: 'r1',
-            name: 'Iron Sword',
-            error: 'missing resultSelection',
-            fix: 'Add a result selection or delete the recipe',
-          },
-        ],
-        downgradeTo: '1.2.0',
+        documents: [{ type: 'recipe', id: 'r1', name: 'Iron Sword', error: 'missing resultSelection', fix: 'Add a result selection or delete the recipe' }],
+        downgradeTo: '1.2.0'
       });
-    },
+    }
   };
   const { runner, settings } = makeRunnerWithMigrations([fatal], {
     initial: {
@@ -857,27 +740,19 @@ test('fatal abort persists no data and leaves migrationVersion unchanged', async
       craftingSystems: [{ id: 's1' }],
       gatheringConfig: { systems: {} },
       gatheringEnvironments: [{ id: 'env-1' }],
-      gatheringParties: [{ id: 'p1' }],
-    },
+      gatheringParties: [{ id: 'p1' }]
+    }
   });
 
   let summary;
-  await captureConsole(async () => {
-    summary = await runner.run();
-  });
+  await captureConsole(async () => { summary = await runner.run(); });
 
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('recipes'), 'recipes must not be persisted on abort');
   assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems must not be persisted on abort');
   assert.ok(!setKeys.includes('gatheringConfig'), 'gatheringConfig must not be persisted on abort');
-  assert.ok(
-    !setKeys.includes('gatheringEnvironments'),
-    'gatheringEnvironments must not be persisted on abort'
-  );
-  assert.ok(
-    !setKeys.includes('gatheringParties'),
-    'gatheringParties must not be persisted on abort'
-  );
+  assert.ok(!setKeys.includes('gatheringEnvironments'), 'gatheringEnvironments must not be persisted on abort');
+  assert.ok(!setKeys.includes('gatheringParties'), 'gatheringParties must not be persisted on abort');
   assert.ok(!setKeys.includes('migrationVersion'), 'migrationVersion must not be bumped on abort');
   assert.equal(setKeys.length, 0, 'no settings writes at all on abort');
 
@@ -892,12 +767,10 @@ test('migrationVersion is unchanged after a fatal abort', async () => {
   const fatal = {
     version: '2.0.0',
     label: 'Fatal',
-    migrate() {
-      throw new FatalMigrationError('unusable', { downgradeTo: '1.2.0' });
-    },
+    migrate() { throw new FatalMigrationError('unusable', { downgradeTo: '1.2.0' }); }
   };
   const { runner, settings } = makeRunnerWithMigrations([fatal], {
-    initial: { migrationVersion: '1.2.0', recipes: [], craftingSystems: [] },
+    initial: { migrationVersion: '1.2.0', recipes: [], craftingSystems: [] }
   });
 
   await captureConsole(() => runner.run());
@@ -917,10 +790,10 @@ test('fatal abort persists no partially-mutated data even when a migration mutat
     label: 'Succeeds first (fresh payload)',
     migrate(data) {
       return {
-        recipes: data.recipes.map((r) => ({ ...r })),
-        systems: data.systems.map((s) => ({ ...s })),
+        recipes: data.recipes.map(r => ({ ...r })),
+        systems: data.systems.map(s => ({ ...s }))
       };
-    },
+    }
   };
   const fatal = {
     version: '2.1.0',
@@ -932,16 +805,16 @@ test('fatal abort persists no partially-mutated data even when a migration mutat
       data.systems[0].name = 'CorruptedSystem';
       throw new FatalMigrationError('blew up mid-transform', {
         documents: [{ type: 'recipe', id: 'r2', error: 'invalid', fix: 'remove it' }],
-        downgradeTo: '1.2.0',
+        downgradeTo: '1.2.0'
       });
-    },
+    }
   };
   const { runner, settings } = makeRunnerWithMigrations([succeed, fatal], {
     initial: {
       migrationVersion: '1.2.0',
       recipes: JSON.parse(JSON.stringify(originalRecipes)),
-      craftingSystems: JSON.parse(JSON.stringify(originalSystems)),
-    },
+      craftingSystems: JSON.parse(JSON.stringify(originalSystems))
+    }
   });
 
   await captureConsole(() => runner.run());
@@ -956,8 +829,8 @@ test('a successful migration followed by a fatal one persists nothing and keeps 
     version: '2.0.0',
     label: 'Succeeds and rewrites recipes',
     migrate(data) {
-      return { recipes: data.recipes.map((r) => ({ ...r, migrated: true })) };
-    },
+      return { recipes: data.recipes.map(r => ({ ...r, migrated: true })) };
+    }
   };
   const fatal = {
     version: '2.1.0',
@@ -965,24 +838,22 @@ test('a successful migration followed by a fatal one persists nothing and keeps 
     migrate() {
       throw new FatalMigrationError('unusable after second step', {
         documents: [{ type: 'craftingSystem', id: 's1', error: 'bad', fix: 'fix' }],
-        downgradeTo: '1.2.0',
+        downgradeTo: '1.2.0'
       });
-    },
+    }
   };
   const { runner, settings } = makeRunnerWithMigrations([succeed, fatal], {
     initial: {
       migrationVersion: '1.2.0',
       recipes: [{ id: 'r1' }],
-      craftingSystems: [{ id: 's1' }],
-    },
+      craftingSystems: [{ id: 's1' }]
+    }
   });
 
   let summary;
-  await captureConsole(async () => {
-    summary = await runner.run();
-  });
+  await captureConsole(async () => { summary = await runner.run(); });
 
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.equal(setKeys.length, 0, 'the earlier success is rolled back / not written');
   // The earlier successful transform is not visible in the store.
   assert.deepEqual(settings.store.get('recipes'), [{ id: 'r1' }]);
@@ -1003,15 +874,15 @@ test('fatal abort emits GM recovery guidance: header, downgrade target, per-docu
             name: 'Potion of Healing',
             error: 'macroOutcome provider has no return keys',
             fix: 'Update the recipe macro to return { components } or delete the recipe',
-            macroHint: 'return { components: [{ componentId, quantity }] }',
-          },
+            macroHint: 'return { components: [{ componentId, quantity }] }'
+          }
         ],
-        downgradeTo: '1.2.0',
+        downgradeTo: '1.2.0'
       });
-    },
+    }
   };
   const { runner } = makeRunnerWithMigrations([fatal], {
-    initial: { migrationVersion: '1.2.0', recipes: [], craftingSystems: [] },
+    initial: { migrationVersion: '1.2.0', recipes: [], craftingSystems: [] }
   });
 
   const lines = await captureConsole(() => runner.run());
@@ -1041,15 +912,13 @@ test('promptRecovery seam is invoked with downgrade/documents/label on abort', a
     migrate() {
       throw new FatalMigrationError('unusable', {
         documents: [{ type: 'recipe', id: 'r1', error: 'e', fix: 'f' }],
-        downgradeTo: '1.2.0',
+        downgradeTo: '1.2.0'
       });
-    },
+    }
   };
   const { runner } = makeRunnerWithMigrations([fatal], {
     initial: { migrationVersion: '1.2.0', recipes: [], craftingSystems: [] },
-    promptRecovery: (ctx) => {
-      calls.push(ctx);
-    },
+    promptRecovery: (ctx) => { calls.push(ctx); }
   });
 
   await captureConsole(() => runner.run());
@@ -1066,35 +935,27 @@ test('downgradeTo falls back to migration metadata then moduleVersion when error
     version: '2.0.0',
     label: 'Fatal, downgrade on migration',
     downgradeTo: '1.1.0',
-    migrate() {
-      throw new FatalMigrationError('unusable');
-    },
+    migrate() { throw new FatalMigrationError('unusable'); }
   };
   const r1 = makeRunnerWithMigrations([fromMigration], {
-    initial: { migrationVersion: '1.0.0', recipes: [], craftingSystems: [] },
+    initial: { migrationVersion: '1.0.0', recipes: [], craftingSystems: [] }
   });
   let s1;
-  await captureConsole(async () => {
-    s1 = await r1.runner.run();
-  });
+  await captureConsole(async () => { s1 = await r1.runner.run(); });
   assert.equal(s1.downgradeTo, '1.1.0');
 
   // No downgradeTo anywhere except moduleVersion.
   const noDowngrade = {
     version: '2.0.0',
     label: 'Fatal, no downgrade',
-    migrate() {
-      throw new FatalMigrationError('unusable');
-    },
+    migrate() { throw new FatalMigrationError('unusable'); }
   };
   const r2 = makeRunnerWithMigrations([noDowngrade], {
     initial: { migrationVersion: '1.0.0', recipes: [], craftingSystems: [] },
-    moduleVersion: '1.3.0',
+    moduleVersion: '1.3.0'
   });
   let s2;
-  await captureConsole(async () => {
-    s2 = await r2.runner.run();
-  });
+  await captureConsole(async () => { s2 = await r2.runner.run(); });
   assert.equal(s2.downgradeTo, '1.3.0');
 });
 
@@ -1102,35 +963,29 @@ test('non-fatal migration error still warns, continues, persists later results, 
   const throwsNonFatal = {
     version: '2.0.0',
     label: 'Non-fatal flaky migration',
-    migrate() {
-      throw new Error('soft failure');
-    },
+    migrate() { throw new Error('soft failure'); }
   };
   const succeeds = {
     version: '2.1.0',
     label: 'Succeeds after the soft failure',
     migrate(data) {
-      return { recipes: data.recipes.map((r) => ({ ...r, touched: true })) };
-    },
+      return { recipes: data.recipes.map(r => ({ ...r, touched: true })) };
+    }
   };
   const { runner, settings } = makeRunnerWithMigrations([throwsNonFatal, succeeds], {
     initial: {
       migrationVersion: '1.2.0',
       recipes: [{ id: 'r1' }],
-      craftingSystems: [],
-    },
+      craftingSystems: []
+    }
   });
 
   let summary;
-  const lines = await captureConsole(async () => {
-    summary = await runner.run();
-  });
+  const lines = await captureConsole(async () => { summary = await runner.run(); });
 
   // Warned about the non-fatal failure with the exact spec phrasing.
   assert.ok(
-    lines.warn.some((l) =>
-      l.includes('Fabricate | Migration "Non-fatal flaky migration" failed: soft failure')
-    ),
+    lines.warn.some(l => l.includes('Fabricate | Migration "Non-fatal flaky migration" failed: soft failure')),
     'non-fatal failure is warned, not aborted'
   );
 
@@ -1138,7 +993,7 @@ test('non-fatal migration error still warns, continues, persists later results, 
   assert.equal(summary.ran, 2);
 
   // The later migration's result is persisted and version is bumped.
-  const setKeys = settings.calls.set.map((c) => c.key);
+  const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(setKeys.includes('recipes'), 'later migration result persisted');
   assert.equal(settings.store.get('recipes')[0].touched, true);
   assert.equal(settings.getSetting('migrationVersion'), '2.1.0');
@@ -1148,12 +1003,10 @@ test('successful injected run reports aborted:false and preserves the summary sh
   const succeeds = {
     version: '2.0.0',
     label: 'Plain success',
-    migrate(data) {
-      return { recipes: data.recipes.map((r) => ({ ...r, ok: true })) };
-    },
+    migrate(data) { return { recipes: data.recipes.map(r => ({ ...r, ok: true })) }; }
   };
   const { runner } = makeRunnerWithMigrations([succeeds], {
-    initial: { migrationVersion: '1.2.0', recipes: [{ id: 'r1' }], craftingSystems: [] },
+    initial: { migrationVersion: '1.2.0', recipes: [{ id: 'r1' }], craftingSystems: [] }
   });
 
   const summary = await runner.run();
@@ -1173,32 +1026,27 @@ test('1.6.0 recovery-warning payload is surfaced in the summary and never persis
           id: 'recipe-rt',
           name: 'Roll Table Recipe',
           craftingSystemId: 'sys-1',
-          resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'RollTable.a' },
-        },
+          resultSelection: { provider: 'rollTableOutcome', rollTableUuid: 'RollTable.a' }
+        }
       ],
       craftingSystems: [],
       gatheringConfig: {
         systems: {
           'sys-1': {
             tasks: [
-              {
-                id: 'task-1',
-                name: 'Task 1',
-                resolutionMode: 'routed',
-                resultSelection: { provider: 'macroOutcome' },
-              },
-            ],
-          },
-        },
-      },
-    },
+              { id: 'task-1', name: 'Task 1', resolutionMode: 'routed', resultSelection: { provider: 'macroOutcome' } }
+            ]
+          }
+        }
+      }
+    }
   });
 
   const summary = await runner.run();
 
   // Surfaced in the summary for the GM notice.
   assert.deepEqual(
-    summary.removedResultSelectionProviders.droppedRollTableRecipes.map((r) => r.recipeId),
+    summary.removedResultSelectionProviders.droppedRollTableRecipes.map(r => r.recipeId),
     ['recipe-rt']
   );
   assert.equal(summary.removedResultSelectionProviders.strippedGatheringTasks.length, 1);
@@ -1275,23 +1123,23 @@ test('1.26.0 lifts per-system currency into the currencyConfig setting', async (
             currency: {
               enabled: true,
               spendStrategy: 'macro',
-              units: [{ id: 'gp', label: 'Gold' }],
-            },
-          },
+              units: [{ id: 'gp', label: 'Gold' }]
+            }
+          }
         },
         {
           id: 'smithing',
-          requirements: { currency: { enabled: false, units: [{ id: 'sp', label: 'Silver' }] } },
-        },
-      ],
-    },
+          requirements: { currency: { enabled: false, units: [{ id: 'sp', label: 'Silver' }] } }
+        }
+      ]
+    }
   });
 
   await runner.run();
 
   const written = settings.store.get('currencyConfig');
   assert.deepEqual(
-    written.units.map((unit) => unit.id),
+    written.units.map(unit => unit.id),
     ['gp', 'sp'],
     "a disabled system's units are lifted too: its recipes may still reference them"
   );
@@ -1310,14 +1158,14 @@ test('the currencyConfig write PRECEDES the craftingSystems write, so a tear is 
     initial: {
       migrationVersion: '1.25.0',
       craftingSystems: [
-        { id: 'alchemy', requirements: { currency: { enabled: true, units: [{ id: 'gp' }] } } },
-      ],
-    },
+        { id: 'alchemy', requirements: { currency: { enabled: true, units: [{ id: 'gp' }] } } }
+      ]
+    }
   });
 
   await runner.run();
 
-  const order = settings.calls.set.map((call) => call.key);
+  const order = settings.calls.set.map(call => call.key);
   assert.ok(
     order.indexOf('currencyConfig') < order.indexOf('craftingSystems'),
     `currencyConfig must be written before craftingSystems, got ${order.join(' -> ')}`
@@ -1331,14 +1179,14 @@ test('a world that never used currency acquires no currencyConfig write at all',
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '1.25.0',
-      craftingSystems: [{ id: 'alchemy', requirements: { time: { enabled: false } } }],
-    },
+      craftingSystems: [{ id: 'alchemy', requirements: { time: { enabled: false } } }]
+    }
   });
 
   await runner.run();
 
   assert.equal(
-    settings.calls.set.some((call) => call.key === 'currencyConfig'),
+    settings.calls.set.some(call => call.key === 'currencyConfig'),
     false,
     'no currency write for a world with nothing to lift'
   );
@@ -1353,16 +1201,16 @@ test('a populated world ladder is authoritative: a re-run never re-merges stale 
       craftingSystems: [
         {
           id: 'alchemy',
-          requirements: { currency: { enabled: true, units: [{ id: 'gp' }, { id: 'sp' }] } },
-        },
-      ],
-    },
+          requirements: { currency: { enabled: true, units: [{ id: 'gp' }, { id: 'sp' }] } }
+        }
+      ]
+    }
   });
 
   await runner.run();
 
   assert.deepEqual(
-    settings.store.get('currencyConfig').units.map((unit) => unit.id),
+    settings.store.get('currencyConfig').units.map(unit => unit.id),
     ['gp'],
     'the deleted unit must not come back'
   );

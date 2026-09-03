@@ -31,9 +31,7 @@ function makeRecipeData(overrides = {}) {
         essences: {},
       },
     ],
-    resultGroups: [
-      { id: 'result-group-1', results: [{ id: 'result-1', itemUuid: 'Item.result', quantity: 1 }] },
-    ],
+    resultGroups: [{ id: 'result-group-1', results: [{ id: 'result-1', itemUuid: 'Item.result', quantity: 1 }] }],
     ...overrides,
   };
 }

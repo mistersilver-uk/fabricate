@@ -12,7 +12,7 @@ import {
   layoutGraph,
   filterGraph,
   DEFAULT_GRAPH_MAX_NODES,
-  DEFAULT_GRAPH_MAX_EDGES,
+  DEFAULT_GRAPH_MAX_EDGES
 } from '../src/ui/svelte/util/recipeGraphBuilder.js';
 import { createOperationCounters } from './helpers/scale/scaleProbes.js';
 
@@ -20,32 +20,18 @@ import { createOperationCounters } from './helpers/scale/scaleProbes.js';
 // Helper factories
 // ---------------------------------------------------------------------------
 
-function makeRecipe({
-  id,
-  name = id,
-  category = '',
-  inputComponentIds = [],
-  outputComponentIds = [],
-} = {}) {
+function makeRecipe({ id, name = id, category = '', inputComponentIds = [], outputComponentIds = [] } = {}) {
   return {
     id,
     name,
     img: 'icon.png',
     category,
-    ingredientSets:
-      inputComponentIds.length > 0
-        ? [
-            {
-              ingredientGroups: [
-                { options: inputComponentIds.map((cid) => ({ match: { componentId: cid } })) },
-              ],
-            },
-          ]
-        : [],
-    resultGroups:
-      outputComponentIds.length > 0
-        ? [{ results: outputComponentIds.map((cid) => ({ componentId: cid })) }]
-        : [],
+    ingredientSets: inputComponentIds.length > 0
+      ? [{ ingredientGroups: [{ options: inputComponentIds.map(cid => ({ match: { componentId: cid } })) }] }]
+      : [],
+    resultGroups: outputComponentIds.length > 0
+      ? [{ results: outputComponentIds.map(cid => ({ componentId: cid })) }]
+      : []
   };
 }
 
@@ -56,14 +42,12 @@ function makeRecipeLegacy({ id, name = id, inputComponentIds = [], outputCompone
     name,
     img: 'icon.png',
     category: '',
-    ingredientSets:
-      inputComponentIds.length > 0
-        ? [{ ingredients: inputComponentIds.map((cid) => ({ componentId: cid })) }]
-        : [],
-    resultGroups:
-      outputComponentIds.length > 0
-        ? [{ results: outputComponentIds.map((cid) => ({ componentId: cid })) }]
-        : [],
+    ingredientSets: inputComponentIds.length > 0
+      ? [{ ingredients: inputComponentIds.map(cid => ({ componentId: cid })) }]
+      : [],
+    resultGroups: outputComponentIds.length > 0
+      ? [{ results: outputComponentIds.map(cid => ({ componentId: cid })) }]
+      : []
   };
 }
 
@@ -121,12 +105,12 @@ describe('buildRecipeGraph — construction', () => {
     const recipes = [
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', inputComponentIds: ['c1'], outputComponentIds: ['c2'] }),
-      makeRecipe({ id: 'C', inputComponentIds: ['c2'] }),
+      makeRecipe({ id: 'C', inputComponentIds: ['c2'] })
     ];
     const graph = buildRecipeGraph(recipes);
     assert.equal(graph.nodes.length, 3);
     assert.equal(graph.edges.length, 2);
-    const edgeIds = graph.edges.map((e) => e.id);
+    const edgeIds = graph.edges.map(e => e.id);
     assert.ok(edgeIds.includes('A->B'));
     assert.ok(edgeIds.includes('B->C'));
   });
@@ -135,11 +119,11 @@ describe('buildRecipeGraph — construction', () => {
     const recipes = [
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', inputComponentIds: ['c1'] }),
-      makeRecipe({ id: 'C', inputComponentIds: ['c1'] }),
+      makeRecipe({ id: 'C', inputComponentIds: ['c1'] })
     ];
     const graph = buildRecipeGraph(recipes);
     assert.equal(graph.edges.length, 2);
-    const edgeIds = graph.edges.map((e) => e.id);
+    const edgeIds = graph.edges.map(e => e.id);
     assert.ok(edgeIds.includes('A->B'));
     assert.ok(edgeIds.includes('A->C'));
   });
@@ -148,11 +132,11 @@ describe('buildRecipeGraph — construction', () => {
     const recipes = [
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', outputComponentIds: ['c2'] }),
-      makeRecipe({ id: 'C', inputComponentIds: ['c1', 'c2'] }),
+      makeRecipe({ id: 'C', inputComponentIds: ['c1', 'c2'] })
     ];
     const graph = buildRecipeGraph(recipes);
     assert.equal(graph.edges.length, 2);
-    const edgeIds = graph.edges.map((e) => e.id);
+    const edgeIds = graph.edges.map(e => e.id);
     assert.ok(edgeIds.includes('A->C'));
     assert.ok(edgeIds.includes('B->C'));
   });
@@ -160,11 +144,11 @@ describe('buildRecipeGraph — construction', () => {
   it('6. Cycle (A->B->A) detects back-edge', () => {
     const recipes = [
       makeRecipe({ id: 'A', inputComponentIds: ['c2'], outputComponentIds: ['c1'] }),
-      makeRecipe({ id: 'B', inputComponentIds: ['c1'], outputComponentIds: ['c2'] }),
+      makeRecipe({ id: 'B', inputComponentIds: ['c1'], outputComponentIds: ['c2'] })
     ];
     const rawGraph = buildRecipeGraph(recipes);
     const graph = layoutGraph(rawGraph);
-    const cycleEdges = graph.edges.filter((e) => e.isCycleEdge);
+    const cycleEdges = graph.edges.filter(e => e.isCycleEdge);
     assert.equal(cycleEdges.length, 1);
   });
 
@@ -173,7 +157,7 @@ describe('buildRecipeGraph — construction', () => {
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', inputComponentIds: ['c1'] }),
       makeRecipe({ id: 'C', outputComponentIds: ['c2'] }),
-      makeRecipe({ id: 'D', inputComponentIds: ['c2'] }),
+      makeRecipe({ id: 'D', inputComponentIds: ['c2'] })
     ];
     const graph = buildRecipeGraph(recipes);
     assert.equal(graph.nodes.length, 4);
@@ -188,14 +172,17 @@ describe('buildRecipeGraph — construction', () => {
         img: '',
         category: '',
         ingredientSets: [],
-        resultGroups: [{ results: [{ componentId: 'c1' }] }, { results: [{ componentId: 'c2' }] }],
+        resultGroups: [
+          { results: [{ componentId: 'c1' }] },
+          { results: [{ componentId: 'c2' }] }
+        ]
       },
       makeRecipe({ id: 'B', inputComponentIds: ['c1'] }),
-      makeRecipe({ id: 'C', inputComponentIds: ['c2'] }),
+      makeRecipe({ id: 'C', inputComponentIds: ['c2'] })
     ];
     const graph = buildRecipeGraph(recipes);
     assert.equal(graph.edges.length, 2);
-    const edgeIds = graph.edges.map((e) => e.id);
+    const edgeIds = graph.edges.map(e => e.id);
     assert.ok(edgeIds.includes('A->B'));
     assert.ok(edgeIds.includes('A->C'));
   });
@@ -211,21 +198,21 @@ describe('buildRecipeGraph — construction', () => {
         category: '',
         ingredientSets: [
           { ingredientGroups: [{ options: [{ match: { componentId: 'c1' } }] }] },
-          { ingredientGroups: [{ options: [{ match: { componentId: 'c2' } }] }] },
+          { ingredientGroups: [{ options: [{ match: { componentId: 'c2' } }] }] }
         ],
-        resultGroups: [],
-      },
+        resultGroups: []
+      }
     ];
     const graph = buildRecipeGraph(recipes);
     assert.equal(graph.edges.length, 2);
-    const edgeIds = graph.edges.map((e) => e.id);
+    const edgeIds = graph.edges.map(e => e.id);
     assert.ok(edgeIds.includes('A->C'));
     assert.ok(edgeIds.includes('B->C'));
   });
 
   it('10. Self-referencing recipe (output = input) is handled without crash', () => {
     const recipes = [
-      makeRecipe({ id: 'A', inputComponentIds: ['c1'], outputComponentIds: ['c1'] }),
+      makeRecipe({ id: 'A', inputComponentIds: ['c1'], outputComponentIds: ['c1'] })
     ];
     // Should not throw
     const graph = buildRecipeGraph(recipes);
@@ -243,10 +230,10 @@ describe('layoutGraph — layout', () => {
   it('11. Root nodes (no inputs) are assigned layer 0', () => {
     const recipes = [
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
-      makeRecipe({ id: 'B', inputComponentIds: ['c1'] }),
+      makeRecipe({ id: 'B', inputComponentIds: ['c1'] })
     ];
     const graph = layoutGraph(buildRecipeGraph(recipes));
-    const nodeA = graph.nodes.find((n) => n.id === 'A');
+    const nodeA = graph.nodes.find(n => n.id === 'A');
     assert.equal(nodeA.layer, 0);
   });
 
@@ -254,12 +241,12 @@ describe('layoutGraph — layout', () => {
     const recipes = [
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', inputComponentIds: ['c1'], outputComponentIds: ['c2'] }),
-      makeRecipe({ id: 'C', inputComponentIds: ['c2'] }),
+      makeRecipe({ id: 'C', inputComponentIds: ['c2'] })
     ];
     const graph = layoutGraph(buildRecipeGraph(recipes));
-    const nodeA = graph.nodes.find((n) => n.id === 'A');
-    const nodeB = graph.nodes.find((n) => n.id === 'B');
-    const nodeC = graph.nodes.find((n) => n.id === 'C');
+    const nodeA = graph.nodes.find(n => n.id === 'A');
+    const nodeB = graph.nodes.find(n => n.id === 'B');
+    const nodeC = graph.nodes.find(n => n.id === 'C');
     assert.ok(nodeA.layer < nodeB.layer);
     assert.ok(nodeB.layer < nodeC.layer);
   });
@@ -268,11 +255,11 @@ describe('layoutGraph — layout', () => {
     const recipes = [
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', outputComponentIds: ['c2'] }),
-      makeRecipe({ id: 'C', inputComponentIds: ['c1', 'c2'] }),
+      makeRecipe({ id: 'C', inputComponentIds: ['c1', 'c2'] })
     ];
     const graph = layoutGraph(buildRecipeGraph(recipes));
-    const nodeA = graph.nodes.find((n) => n.id === 'A');
-    const nodeB = graph.nodes.find((n) => n.id === 'B');
+    const nodeA = graph.nodes.find(n => n.id === 'A');
+    const nodeB = graph.nodes.find(n => n.id === 'B');
     // A and B are both in layer 0 — they should have different y positions
     if (nodeA.layer === nodeB.layer) {
       assert.notEqual(nodeA.y, nodeB.y);
@@ -282,7 +269,7 @@ describe('layoutGraph — layout', () => {
   it('14. Cycle nodes get valid layer assignments (no infinite loop)', () => {
     const recipes = [
       makeRecipe({ id: 'A', inputComponentIds: ['c2'], outputComponentIds: ['c1'] }),
-      makeRecipe({ id: 'B', inputComponentIds: ['c1'], outputComponentIds: ['c2'] }),
+      makeRecipe({ id: 'B', inputComponentIds: ['c1'], outputComponentIds: ['c2'] })
     ];
     // Should not throw or loop infinitely
     const graph = layoutGraph(buildRecipeGraph(recipes));
@@ -304,12 +291,7 @@ describe('filterGraph — filtering', () => {
     const recipes = [
       makeRecipe({ id: 'A', name: 'Iron Sword', category: 'weapons', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', name: 'Iron Shield', category: 'armor', inputComponentIds: ['c1'] }),
-      makeRecipe({
-        id: 'C',
-        name: 'Health Potion',
-        category: 'potions',
-        outputComponentIds: ['c2'],
-      }),
+      makeRecipe({ id: 'C', name: 'Health Potion', category: 'potions', outputComponentIds: ['c2'] })
     ];
     return layoutGraph(buildRecipeGraph(recipes));
   }
@@ -327,7 +309,7 @@ describe('filterGraph — filtering', () => {
     const graph = buildTestGraph();
     const filtered = filterGraph(graph, { searchTerm: 'iron' });
     assert.equal(filtered.nodes.length, 2);
-    const ids = filtered.nodes.map((n) => n.id);
+    const ids = filtered.nodes.map(n => n.id);
     assert.ok(ids.includes('A'));
     assert.ok(ids.includes('B'));
   });
@@ -370,11 +352,10 @@ function makeChain(depth) {
       name: `Chain Link ${index}`,
       img: 'icon.png',
       category: '',
-      ingredientSets:
-        index === 0
-          ? []
-          : [{ ingredientGroups: [{ options: [{ match: { componentId: `c${index - 1}` } }] }] }],
-      resultGroups: [{ results: [{ componentId: `c${index}` }] }],
+      ingredientSets: index === 0
+        ? []
+        : [{ ingredientGroups: [{ options: [{ match: { componentId: `c${index - 1}` } }] }] }],
+      resultGroups: [{ results: [{ componentId: `c${index}` }] }]
     });
   }
   return recipes;
@@ -417,9 +398,9 @@ describe('layoutGraph — deep dependency chains (issue 1082)', () => {
     recipes[0].ingredientSets = [
       {
         ingredientGroups: [
-          { options: [{ match: { componentId: `c${OVERFLOWING_CHAIN_DEPTH - 1}` } }] },
-        ],
-      },
+          { options: [{ match: { componentId: `c${OVERFLOWING_CHAIN_DEPTH - 1}` } }] }
+        ]
+      }
     ];
 
     const graph = layoutGraph(buildRecipeGraph(recipes));
@@ -438,7 +419,7 @@ describe('createRecipeGraphIndex', () => {
     const index = createRecipeGraphIndex([
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', inputComponentIds: ['c1'], outputComponentIds: ['c2'] }),
-      makeRecipe({ id: 'C', inputComponentIds: ['c1'] }),
+      makeRecipe({ id: 'C', inputComponentIds: ['c1'] })
     ]);
 
     assert.equal(index.recipeCount, 3);
@@ -452,7 +433,7 @@ describe('createRecipeGraphIndex', () => {
     // objects would carry the first query's coordinates into the second.
     const index = createRecipeGraphIndex([
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
-      makeRecipe({ id: 'B', inputComponentIds: ['c1'] }),
+      makeRecipe({ id: 'B', inputComponentIds: ['c1'] })
     ]);
 
     const first = layoutGraph(buildBoundedRecipeGraph(index));
@@ -474,14 +455,10 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
   function makeHub({ producers, consumers }) {
     const recipes = [];
     for (let index = 0; index < producers; index++) {
-      recipes.push(
-        makeRecipe({ id: `p${index}`, name: `Producer ${index}`, outputComponentIds: ['hub'] })
-      );
+      recipes.push(makeRecipe({ id: `p${index}`, name: `Producer ${index}`, outputComponentIds: ['hub'] }));
     }
     for (let index = 0; index < consumers; index++) {
-      recipes.push(
-        makeRecipe({ id: `q${index}`, name: `Consumer ${index}`, inputComponentIds: ['hub'] })
-      );
+      recipes.push(makeRecipe({ id: `q${index}`, name: `Consumer ${index}`, inputComponentIds: ['hub'] }));
     }
     return recipes;
   }
@@ -523,14 +500,11 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
   it('28. A cohort scope returns exactly the cohort and the edges among it', () => {
     const index = makeChainIndex(10);
     const graph = buildBoundedRecipeGraph(index, {
-      scope: { type: 'cohort', recipeIds: ['chain-3', 'chain-4', 'chain-9'] },
+      scope: { type: 'cohort', recipeIds: ['chain-3', 'chain-4', 'chain-9'] }
     });
 
     assert.deepEqual(graph.nodes.map((node) => node.id).sort(), ['chain-3', 'chain-4', 'chain-9']);
-    assert.deepEqual(
-      graph.edges.map((edge) => edge.id),
-      ['chain-3->chain-4']
-    );
+    assert.deepEqual(graph.edges.map((edge) => edge.id), ['chain-3->chain-4']);
     assert.equal(graph.bound.complete, true);
   });
 
@@ -538,16 +512,13 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
     const index = makeChainIndex(10);
     const graph = buildBoundedRecipeGraph(index, {
       scope: { type: 'recipe', recipeId: 'chain-5' },
-      hops: 2,
+      hops: 2
     });
 
-    assert.deepEqual(graph.nodes.map((node) => node.id).sort(), [
-      'chain-3',
-      'chain-4',
-      'chain-5',
-      'chain-6',
-      'chain-7',
-    ]);
+    assert.deepEqual(
+      graph.nodes.map((node) => node.id).sort(),
+      ['chain-3', 'chain-4', 'chain-5', 'chain-6', 'chain-7']
+    );
     assert.equal(graph.bound.hops, 2);
     assert.equal(graph.bound.complete, true);
   });
@@ -555,7 +526,7 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
   it('30. A component scope returns that component’s producers and consumers', () => {
     const index = createRecipeGraphIndex(makeHub({ producers: 3, consumers: 2 }));
     const graph = buildBoundedRecipeGraph(index, {
-      scope: { type: 'component', componentId: 'hub' },
+      scope: { type: 'component', componentId: 'hub' }
     });
 
     assert.equal(graph.nodes.length, 5);
@@ -570,19 +541,13 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
     const index = createRecipeGraphIndex(makeHub({ producers: 40, consumers: 40 }));
     const graph = buildBoundedRecipeGraph(index, {
       scope: { type: 'component', componentId: 'hub' },
-      maxNodes: 10,
+      maxNodes: 10
     });
 
     const ids = graph.nodes.map((node) => node.id);
     assert.equal(ids.length, 10);
-    assert.ok(
-      ids.some((id) => id.startsWith('p')),
-      'producers are represented'
-    );
-    assert.ok(
-      ids.some((id) => id.startsWith('q')),
-      'consumers are represented'
-    );
+    assert.ok(ids.some((id) => id.startsWith('p')), 'producers are represented');
+    assert.ok(ids.some((id) => id.startsWith('q')), 'consumers are represented');
     assert.ok(graph.edges.length > 0, 'a truncated neighbourhood still shows dependencies');
     assert.equal(graph.bound.complete, false);
     assert.equal(graph.bound.candidateNodeCount, 80);
@@ -598,7 +563,7 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
     const scoped = buildBoundedRecipeGraph(index, {
       scope: { type: 'component', componentId: 'hub' },
       maxNodes: 20,
-      maxEdges: 50,
+      maxEdges: 50
     });
     assert.ok(scoped.edges.length <= 50, `edges bounded, got ${scoped.edges.length}`);
     assert.equal(scoped.bound.limitedBy, 'nodes');
@@ -610,7 +575,7 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
     const graph = buildBoundedRecipeGraph(index, {
       scope: { type: 'cohort', recipeIds: [...index.nodeSeedById.keys()] },
       maxNodes: 100,
-      maxEdges: 25,
+      maxEdges: 25
     });
 
     assert.equal(graph.edges.length, 25);
@@ -644,7 +609,7 @@ describe('layoutGraph — adjacency instrumentation (issue 1082)', () => {
             id: `n${layer}-${slot}`,
             name: `Node ${layer}-${slot}`,
             inputComponentIds: layer === 0 ? [] : [`c${layer - 1}`],
-            outputComponentIds: [`c${layer}`],
+            outputComponentIds: [`c${layer}`]
           })
         );
       }
@@ -670,12 +635,12 @@ describe('layoutGraph — adjacency instrumentation (issue 1082)', () => {
       makeRecipe({ id: 'A', outputComponentIds: ['c1'] }),
       makeRecipe({ id: 'B', inputComponentIds: ['c1'], outputComponentIds: ['c2'] }),
       makeRecipe({ id: 'C', inputComponentIds: ['c1'], outputComponentIds: ['c2'] }),
-      makeRecipe({ id: 'D', inputComponentIds: ['c2'] }),
+      makeRecipe({ id: 'D', inputComponentIds: ['c2'] })
     ];
 
     const plain = layoutGraph(buildRecipeGraph(recipes));
     const counted = layoutGraph(buildRecipeGraph(recipes), {
-      instrumentation: createOperationCounters(),
+      instrumentation: createOperationCounters()
     });
 
     assert.deepEqual(

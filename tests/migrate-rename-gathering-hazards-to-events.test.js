@@ -25,11 +25,11 @@ function legacyData() {
             id: 'north',
             modifiers: [
               { id: 'm1', kind: 'hazardChance', operation: 'add', value: 10 },
-              { id: 'm2', kind: 'dropRate', operation: 'multiply', value: 2 },
-            ],
-          },
-        ],
-      },
+              { id: 'm2', kind: 'dropRate', operation: 'multiply', value: 2 }
+            ]
+          }
+        ]
+      }
     ],
     gatheringConfig: {
       systems: {
@@ -38,7 +38,7 @@ function legacyData() {
             hazardSelectionMode: 'highestRankedDrop',
             hazardLimit: 3,
             hazardPolicy: 'failureWithHazard',
-            hazardVisibility: 'encounterChance',
+            hazardVisibility: 'encounterChance'
           },
           hazards: [
             {
@@ -47,11 +47,11 @@ function legacyData() {
               img: 'icons/svg/hazard.svg',
               dangerTags: ['hazardous'],
               dropRate: 40,
-              hazardModifier: { provider: 'macro', macroUuid: 'Macro.x' },
-            },
-          ],
-        },
-      },
+              hazardModifier: { provider: 'macro', macroUuid: 'Macro.x' }
+            }
+          ]
+        }
+      }
     },
     environments: [
       {
@@ -64,9 +64,9 @@ function legacyData() {
         hazardSelectionMode: 'allDrops',
         hazardPolicy: 'successWithHazard',
         hazardDropRateAdjustments: { h1: 15 },
-        hazardDropRateAdjustmentsEnabled: { h1: false },
-      },
-    ],
+        hazardDropRateAdjustmentsEnabled: { h1: false }
+      }
+    ]
   };
 }
 
@@ -107,14 +107,8 @@ test('renames per-environment composition keys and remaps the policy value', () 
   assert.deepEqual(env.eventDropRateAdjustmentsEnabled, { h1: false });
 
   for (const legacyKey of [
-    'enabledHazardIds',
-    'disabledHazardIds',
-    'forcedHazardIds',
-    'hazardOrder',
-    'hazardSelectionMode',
-    'hazardPolicy',
-    'hazardDropRateAdjustments',
-    'hazardDropRateAdjustmentsEnabled',
+    'enabledHazardIds', 'disabledHazardIds', 'forcedHazardIds', 'hazardOrder',
+    'hazardSelectionMode', 'hazardPolicy', 'hazardDropRateAdjustments', 'hazardDropRateAdjustmentsEnabled'
   ]) {
     assert.equal(env[legacyKey], undefined, `${legacyKey} removed`);
   }
@@ -163,11 +157,7 @@ test('does not clobber an already-migrated collection; leaves a stale legacy key
   data.gatheringConfig.systems['sys-a'].events = [{ id: 'already', name: 'Merchant' }];
   const { gatheringConfig } = migrateRenameGatheringHazardsToEvents(data);
   const sys = gatheringConfig.systems['sys-a'];
-  assert.deepEqual(
-    sys.events.map((e) => e.id),
-    ['already'],
-    'existing events not clobbered'
-  );
+  assert.deepEqual(sys.events.map(e => e.id), ['already'], 'existing events not clobbered');
   // The stale hazards array is left inert (no data loss), not merged.
   assert.ok(Array.isArray(sys.hazards), 'stale legacy collection left inert');
 });
@@ -209,13 +199,11 @@ test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at t
     ['migrationVersion', '0.9.0'],
     ['craftingSystems', clone(data.systems)],
     ['gatheringConfig', clone(data.gatheringConfig)],
-    ['gatheringEnvironments', clone(data.environments)],
+    ['gatheringEnvironments', clone(data.environments)]
   ]);
   const runner = new MigrationRunner({
-    getSetting: (key) => store.get(key) ?? null,
-    setSetting: async (key, value) => {
-      store.set(key, value);
-    },
+    getSetting: key => store.get(key) ?? null,
+    setSetting: async (key, value) => { store.set(key, value); }
   });
 
   await runner.run();

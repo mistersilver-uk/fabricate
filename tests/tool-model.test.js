@@ -16,12 +16,10 @@ const { Tool } = await import('../src/models/Tool.js');
 // ---------------------------------------------------------------------------
 
 function getPathValue(object, path) {
-  return String(path)
-    .split('.')
-    .reduce((value, part) => {
-      if (value == null || typeof value !== 'object') return undefined;
-      return value[part];
-    }, object);
+  return String(path).split('.').reduce((value, part) => {
+    if (value == null || typeof value !== 'object') return undefined;
+    return value[part];
+  }, object);
 }
 
 function setPathValue(object, path, value) {
@@ -211,7 +209,7 @@ test('Tool accepts diceExpression configuration', () => {
 test('Tool.validate - requires componentId', () => {
   const result = new Tool({ componentId: '' }).validate();
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some((e) => e.includes('componentId')));
+  assert.ok(result.errors.some(e => e.includes('componentId')));
 });
 
 test('Tool.validate - requirement requires formula', () => {
@@ -220,7 +218,7 @@ test('Tool.validate - requirement requires formula', () => {
     requirement: { formula: '' },
   }).validate();
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some((e) => e.includes('formula')));
+  assert.ok(result.errors.some(e => e.includes('formula')));
 });
 
 test('Tool.validate - requirement with a formula is valid', () => {
@@ -237,7 +235,7 @@ test('Tool.validate - limitedUses rejects zero maxUses', () => {
     breakage: { mode: 'limitedUses', maxUses: 0 },
   }).validate();
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some((e) => e.includes('maxUses')));
+  assert.ok(result.errors.some(e => e.includes('maxUses')));
 });
 
 test('Tool.validate - limitedUses accepts null maxUses (unlimited)', () => {
@@ -254,7 +252,7 @@ test('Tool.validate - breakageChance must be integer 0..100', () => {
     breakage: { mode: 'breakageChance', breakageChance: 150 },
   }).validate();
   assert.equal(overHundred.valid, false);
-  assert.ok(overHundred.errors.some((e) => e.includes('breakageChance')));
+  assert.ok(overHundred.errors.some(e => e.includes('breakageChance')));
 
   const negative = new Tool({
     componentId: 'comp-axe',
@@ -281,7 +279,7 @@ test('Tool.validate - diceExpression requires non-empty formula and finite thres
     breakage: { mode: 'diceExpression', formula: '', threshold: 5 },
   }).validate();
   assert.equal(noFormula.valid, false);
-  assert.ok(noFormula.errors.some((e) => e.includes('formula')));
+  assert.ok(noFormula.errors.some(e => e.includes('formula')));
 
   const ok = new Tool({
     componentId: 'comp-axe',
@@ -296,7 +294,7 @@ test('Tool.validate - replaceWith requires one discriminated target distinct fro
     onBreak: { mode: 'replaceWith', replacementComponentId: 'comp-axe' },
   }).validate();
   assert.equal(same.valid, false);
-  assert.ok(same.errors.some((e) => e.includes('replacementTarget')));
+  assert.ok(same.errors.some(e => e.includes('replacementTarget')));
 
   const missing = new Tool({
     componentId: 'comp-axe',
@@ -589,9 +587,7 @@ test('applyBreakage flagBroken - flags without renaming when item.update is abse
 
 test('applyBreakage flagBroken - uses the localized suffix when game.i18n resolves it', async () => {
   const priorGame = globalThis.game;
-  globalThis.game = {
-    i18n: { localize: (key) => (key === 'FABRICATE.Tool.BrokenNameSuffix' ? ' [kaputt]' : key) },
-  };
+  globalThis.game = { i18n: { localize: (key) => (key === 'FABRICATE.Tool.BrokenNameSuffix' ? ' [kaputt]' : key) } };
   try {
     const item = makeNamedItem('Hammer');
     await flagBrokenTool().applyBreakage({ item });
@@ -656,30 +652,19 @@ test('applyBreakage replaceWith - a failed creation preserves the original', asy
 // ---------------------------------------------------------------------------
 
 test('legacy immune: reads forward to unlimited limitedUses plus check-driven immunity', () => {
-  const tool = new Tool({
-    componentId: 'c',
-    breakage: { mode: 'immune', maxUses: 5, breakageChance: 9 },
-  });
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune', maxUses: 5, breakageChance: 9 } });
   assert.deepEqual(tool.breakage, { mode: 'limitedUses', maxUses: null });
   assert.equal(tool.checkBreakable, false);
 });
 
 test('legacy immune: validates after read-forward conversion', () => {
-  const tool = new Tool({
-    componentId: 'c',
-    breakage: { mode: 'immune' },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
   const { valid, errors } = tool.validate();
   assert.equal(valid, true, errors.join(', '));
 });
 
 test('legacy immune: unlimited specific configuration never breaks', async () => {
-  const tool = new Tool({
-    componentId: 'c',
-    breakage: { mode: 'immune' },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
   const result = await tool.evaluateBreakage({ item: new FakeItem({}) });
   assert.deepEqual(result, {
     broken: false,
@@ -689,11 +674,7 @@ test('legacy immune: unlimited specific configuration never breaks', async () =>
 });
 
 test('legacy immune: canonical limitedUses configuration records usage safely', async () => {
-  const tool = new Tool({
-    componentId: 'c',
-    breakage: { mode: 'immune' },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = new Tool({ componentId: 'c', breakage: { mode: 'immune' }, onBreak: { mode: 'destroy' } });
   const item = new FakeItem({});
   await tool.applyUsage(item);
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 1 });
@@ -709,8 +690,5 @@ test('validate: unknown mode error string lists only canonical specific modes', 
     errors.some((e) => /limitedUses, breakageChance, or diceExpression/.test(e)),
     'the breakage.mode error enumerates canonical specific modes'
   );
-  assert.equal(
-    errors.some((error) => /immune/.test(error)),
-    false
-  );
+  assert.equal(errors.some((error) => /immune/.test(error)), false);
 });

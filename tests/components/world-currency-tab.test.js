@@ -34,7 +34,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
-    'src/ui/svelte/util/overlayHost.js',
+    'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
@@ -47,9 +47,9 @@ const harness = createMountedComponentHarness({
     // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
+    'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
 });
 
 function flushRender() {
@@ -62,7 +62,7 @@ function clickEvent() {
 
 const UNITS = Object.freeze([
   { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp', contains: [] },
-  { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [] },
+  { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [] }
 ]);
 
 before(() => harness.setup());
@@ -144,9 +144,7 @@ describe('World > Currency tab (mounted)', () => {
     const calls = [];
     const root = await harness.mount({
       currencyUnits: UNITS,
-      onReorderCurrencyUnit: async (fromIndex, toIndex) => {
-        calls.push([fromIndex, toIndex]);
-      },
+      onReorderCurrencyUnit: async (fromIndex, toIndex) => { calls.push([fromIndex, toIndex]); }
     });
 
     const announcement = root.querySelector('[data-list-reorder-announcement]');

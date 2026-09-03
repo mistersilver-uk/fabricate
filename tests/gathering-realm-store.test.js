@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   GatheringRealmStore,
-  GatheringRealmValidationError,
+  GatheringRealmValidationError
 } from '../src/systems/GatheringRealmStore.js';
 
 /**
@@ -23,7 +23,7 @@ function makeStore(seed = null) {
     setSetting: async (key, value) => {
       settings[key] = value;
     },
-    randomID: () => `r-${++counter}`,
+    randomID: () => `r-${++counter}`
   });
   return { store, settings, persisted: () => settings.travelConfig };
 }
@@ -43,7 +43,7 @@ test('create appends a realm to the world library, with no owning system', async
 
 test('update merges over the existing record, leaving untouched fields intact', async () => {
   const { store } = makeStore({
-    realms: [{ id: 'r1', name: 'Old', description: 'keep me', secret: true, biomes: ['forest'] }],
+    realms: [{ id: 'r1', name: 'Old', description: 'keep me', secret: true, biomes: ['forest'] }]
   });
   const updated = await store.update('r1', { name: 'New', enabled: false });
 
@@ -56,11 +56,7 @@ test('update merges over the existing record, leaving untouched fields intact', 
 
 test('reorder moves the named realms and keeps the rest in place', async () => {
   const { store } = makeStore({
-    realms: [
-      { id: 'r1', name: 'A' },
-      { id: 'r2', name: 'B' },
-      { id: 'r3', name: 'C' },
-    ],
+    realms: [{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }, { id: 'r3', name: 'C' }]
   });
   const reordered = await store.reorder(['r3', 'r1']);
   assert.deepEqual(
@@ -70,25 +66,20 @@ test('reorder moves the named realms and keeps the rest in place', async () => {
 });
 
 test('delete returns repair evidence from environment and party stores; never blocks', async () => {
-  const { store } = makeStore({
-    realms: [
-      { id: 'r1', name: 'A' },
-      { id: 'r2', name: 'B' },
-    ],
-  });
+  const { store } = makeStore({ realms: [{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }] });
   // Environments from DIFFERENT crafting systems both cite the realm — which is the point of a
   // world library, and why the evidence is collected across the whole world rather than one
   // system's slice.
   const environmentStore = {
     list: () => [
       { id: 'env1', name: 'Forest', craftingSystemId: 'system-a', includedRealmIds: ['r1'] },
-      { id: 'env2', name: 'Cave', craftingSystemId: 'system-b', excludedRealmIds: ['r1'] },
-    ],
+      { id: 'env2', name: 'Cave', craftingSystemId: 'system-b', excludedRealmIds: ['r1'] }
+    ]
   };
   const partyStore = {
     list: () => [
-      { id: 'p1', name: 'Heroes', currentRealmOverride: { mode: 'manual', realmIds: ['r1'] } },
-    ],
+      { id: 'p1', name: 'Heroes', currentRealmOverride: { mode: 'manual', realmIds: ['r1'] } }
+    ]
   };
 
   const result = await store.delete('r1', { environmentStore, partyStore });
@@ -144,7 +135,7 @@ test('create rejects an invalid modifier enum at the save boundary', async () =>
     () =>
       store.create({
         name: 'Bad',
-        modifiers: [{ id: 'm1', kind: 'bogus', operation: 'add', visibility: 'visible', value: 1 }],
+        modifiers: [{ id: 'm1', kind: 'bogus', operation: 'add', visibility: 'visible', value: 1 }]
       }),
     GatheringRealmValidationError
   );
@@ -156,8 +147,8 @@ test('setSceneRegionLink moves a region between realms in ONE write', async () =
   const { store, settings } = makeStore({
     realms: [
       { id: 'r1', name: 'A', sceneMappings: [{ sceneUuid: 'S', sceneRegionUuid: 'S.R1' }] },
-      { id: 'r2', name: 'B' },
-    ],
+      { id: 'r2', name: 'B' }
+    ]
   });
   let writes = 0;
   const originalSet = store.setSetting;
@@ -177,7 +168,7 @@ test('setSceneRegionLink moves a region between realms in ONE write', async () =
 
 test('setSceneRegionLink with no realm unlinks the region entirely', async () => {
   const { store } = makeStore({
-    realms: [{ id: 'r1', name: 'A', sceneMappings: [{ sceneUuid: 'S', sceneRegionUuid: 'S.R1' }] }],
+    realms: [{ id: 'r1', name: 'A', sceneMappings: [{ sceneUuid: 'S', sceneRegionUuid: 'S.R1' }] }]
   });
   await store.setSceneRegionLink('S.R1', '');
   assert.deepEqual(store.list()[0].sceneMappings, []);
@@ -196,7 +187,7 @@ test('the cache is published BEFORE the write, so overlapping edits cannot clobb
           resolve(value);
         }, 20);
       }),
-    randomID: () => 'gen',
+    randomID: () => 'gen'
   });
 
   const first = store.updateRealmSettings({ revealMode: 'alwaysVisible' });

@@ -38,15 +38,18 @@ installFoundryEnv();
 
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
-const { readSignatureCounters, resetSignatureCounters } =
-  await import('../src/systems/SignatureValidator.js');
+const { readSignatureCounters, resetSignatureCounters } = await import(
+  '../src/systems/SignatureValidator.js'
+);
 const { buildRecipeList } = await import('../src/ui/svelte/stores/adminRecipeRowProjection.js');
-const { buildItemCards, hydrateItemCards } =
-  await import('../src/ui/svelte/stores/adminComponentRowProjection.js');
+const { buildItemCards, hydrateItemCards } = await import(
+  '../src/ui/svelte/stores/adminComponentRowProjection.js'
+);
 const { buildRecipeBrowserModel } = await import('../src/utils/recipeBrowserModel.js');
 const { buildComponentBrowserModel } = await import('../src/utils/componentBrowserModel.js');
-const { buildVocabularyUsage, countRecipeTagPlaceholderUsage } =
-  await import('../src/utils/vocabularyUsage.js');
+const { buildVocabularyUsage, countRecipeTagPlaceholderUsage } = await import(
+  '../src/utils/vocabularyUsage.js'
+);
 
 /** More than two pages, so "the page" and "the cohort" are different numbers. */
 const COHORT = 60;
@@ -214,7 +217,11 @@ describe('GM recipe browser: off-page definitions are not richly projected', () 
         COHORT,
         'the attention sort answers every row — proving the counter is live'
       );
-      assert.equal(counters.get('recipeDetailProjections'), 0, 'and still builds no detail bundle');
+      assert.equal(
+        counters.get('recipeDetailProjections'),
+        0,
+        'and still builds no detail bundle'
+      );
 
       // SECOND POSITIVE CONTROL, against the DETAIL counter itself. The control above moves
       // `gateCanActivateRecipe`, which is a different counter — so on its own it leaves
@@ -311,16 +318,21 @@ async function projectComponents(
     return { name: 'Source', system: { description: { value: 'Live prose' } }, uuid };
   };
 
-  const cards = await buildItemCards({ getItems: () => components }, system, '', {
-    showTags: true,
-    showEssences,
-    essenceDefinitionById,
-    enrichToHtml: async (raw) => {
-      counters.bump('enrichToHtml');
-      return raw;
-    },
-    cache: countingFacade(cache, counters, { prefix: 'memo', methods: ['get', 'set'] }),
-  });
+  const cards = await buildItemCards(
+    { getItems: () => components },
+    system,
+    '',
+    {
+      showTags: true,
+      showEssences,
+      essenceDefinitionById,
+      enrichToHtml: async (raw) => {
+        counters.bump('enrichToHtml');
+        return raw;
+      },
+      cache: countingFacade(cache, counters, { prefix: 'memo', methods: ['get', 'set'] }),
+    }
+  );
 
   return {
     cards,
@@ -480,9 +492,7 @@ function tagPlaceholderSet(id, tags) {
   return {
     id,
     name: 'Placeholder',
-    ingredientGroups: [
-      { id: `${id}-g`, options: [{ match: { type: 'tags', tags }, quantity: 1 }] },
-    ],
+    ingredientGroups: [{ id: `${id}-g`, options: [{ match: { type: 'tags', tags }, quantity: 1 }] }],
   };
 }
 
@@ -670,10 +680,7 @@ describe('the Tags & Categories reference count reads the cohort without materia
         id: 'top-level',
         name: 'Top level sets',
         craftingSystemId: 'sys-scale',
-        ingredientSets: [
-          tagPlaceholderSet('s1', ['Herb', 'moon']),
-          tagPlaceholderSet('s2', ['herb']),
-        ],
+        ingredientSets: [tagPlaceholderSet('s1', ['Herb', 'moon']), tagPlaceholderSet('s2', ['herb'])],
         resultGroups: [{ id: 'rg', results: [{ id: 'res', itemUuid: 'Item.r', quantity: 1 }] }],
       }),
       Recipe.fromJSON({

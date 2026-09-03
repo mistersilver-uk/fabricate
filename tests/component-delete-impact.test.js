@@ -30,9 +30,7 @@ function recipe(id, { options = [], resultId = 'output', enabled = true, essence
       {
         id: `${id}-set`,
         essences,
-        ingredientGroups: [
-          { id: `${id}-group`, options: options.map((c) => ({ componentId: c })) },
-        ],
+        ingredientGroups: [{ id: `${id}-group`, options: options.map((c) => ({ componentId: c })) }],
         ingredients: options.map((c) => ({ componentId: c })),
       },
     ],
@@ -103,11 +101,7 @@ test('stripComponentsFromRecipeJson keeps an ESSENCE-only set alive after its op
   const r = recipe('r1', { options: ['iron'], essences: { fire: 2 } });
   const { json } = stripComponentsFromRecipeJson(r, new Set(['iron']));
 
-  assert.equal(
-    json.ingredientSets.length,
-    1,
-    'a set carrying essences survives losing its options'
-  );
+  assert.equal(json.ingredientSets.length, 1, 'a set carrying essences survives losing its options');
   assert.deepEqual(json.ingredientSets[0].essences, { fire: 2 });
 });
 

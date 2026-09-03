@@ -1072,11 +1072,7 @@ export function canonicaliseProjection(projection, { ids, systemIds }) {
 
 /** Rewrite the ids a projection KEY embeds — both the pipe form and the dotted path form. */
 function canonicaliseKey(key, mapId) {
-  if (key.includes('|'))
-    return key
-      .split('|')
-      .map((segment) => mapId(segment))
-      .join('|');
+  if (key.includes('|')) return key.split('|').map((segment) => mapId(segment)).join('|');
   const dotted = /^(systems|recipes|gatheringConfig)\.([^.[]+)(.*)$/.exec(key);
   return dotted ? `${dotted[1]}.${mapId(dotted[2])}${dotted[3]}` : key;
 }

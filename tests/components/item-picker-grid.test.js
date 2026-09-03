@@ -122,8 +122,8 @@ describe('ItemPickerGrid: header structure', () => {
     const items = [{ id: 'item-1', name: 'Herb', img: '' }];
     const panel = buildItemPickerGrid({ items });
     const children = [...panel.children];
-    const headerIdx = children.findIndex((c) => c.classList.contains('picker-header'));
-    const scrollIdx = children.findIndex((c) => c.classList.contains('picker-grid-scroll'));
+    const headerIdx = children.findIndex(c => c.classList.contains('picker-header'));
+    const scrollIdx = children.findIndex(c => c.classList.contains('picker-grid-scroll'));
     assert.ok(headerIdx < scrollIdx, 'picker header should come before the scroll region');
   });
 });
@@ -168,7 +168,7 @@ describe('ItemPickerGrid: card structure', () => {
     const items = [
       { id: 'i-1', name: 'Herb', img: 'icons/herb.svg' },
       { id: 'i-2', name: 'Water', img: 'icons/water.svg' },
-      { id: 'i-3', name: 'Fire Crystal', img: 'icons/fire.svg' },
+      { id: 'i-3', name: 'Fire Crystal', img: 'icons/fire.svg' }
     ];
     const panel = buildItemPickerGrid({ items });
     const cards = panel.querySelectorAll('.picker-card');
@@ -240,10 +240,7 @@ describe('ItemPickerGrid: card structure', () => {
     const items = [{ id: 'i-1', name: 'A Very Long Item Name That Could Overflow', img: '' }];
     const panel = buildItemPickerGrid({ items });
     const nameSpan = panel.querySelector('.picker-card-name');
-    assert.ok(
-      nameSpan.classList.contains('picker-card-name'),
-      'picker-card-name class should be present'
-    );
+    assert.ok(nameSpan.classList.contains('picker-card-name'), 'picker-card-name class should be present');
   });
 });
 

@@ -41,8 +41,9 @@ import {
 } from './helpers/scopedInvalidationWorld.js';
 
 const { handleFabricateSettingChange } = await import('../src/config/settingChangeBridge.js');
-const { CRAFTING_DATA_CHANGED_HOOK, craftingDataChange, PendingChangeDomains } =
-  await import('../src/systems/craftingDataChange.js');
+const { CRAFTING_DATA_CHANGED_HOOK, craftingDataChange, PendingChangeDomains } = await import(
+  '../src/systems/craftingDataChange.js'
+);
 const { INVALIDATION_DOMAINS } = await import('../src/systems/invalidationDomains.js');
 
 const RECIPES_SETTING_KEY = `fabricate.${SETTING_KEYS.RECIPES}`;
@@ -676,10 +677,7 @@ describe('batch and import stay bounded', () => {
     assert.equal(outcome.imported, 3, 'the premise: all three really landed');
     assert.equal(bus.scopedEmissions().length, 1, 'three records, one invalidation boundary');
     assert.deepEqual(
-      bus
-        .scopedEmissions()[0]
-        .scopes.map((scope) => scope.systemId)
-        .sort(),
+      bus.scopedEmissions()[0].scopes.map((scope) => scope.systemId).sort(),
       [SYS_A, SYS_B]
     );
   });

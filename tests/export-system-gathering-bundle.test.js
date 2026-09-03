@@ -120,11 +120,7 @@ test('the dropped 3-arg call is exactly what emptied the bundle (defect reproduc
   const fiveArg = exportViaPublicApiResolution(h, FIXTURE_SYSTEM_ID);
 
   assert.equal(threeArg.gatheringEnvironments.length, 0, '3-arg drops every environment');
-  assert.equal(
-    Object.keys(threeArg.gatheringConfig.system).length,
-    0,
-    '3-arg drops the config slice'
-  );
+  assert.equal(Object.keys(threeArg.gatheringConfig.system).length, 0, '3-arg drops the config slice');
   assert.ok(fiveArg.gatheringEnvironments.length > 0, '5-arg restores the environments');
   assert.ok(
     Object.keys(fiveArg.gatheringConfig.system).length > 0,
@@ -176,7 +172,11 @@ test('source contract: game.fabricate.exportSystem passes the gathering args to 
   // The three world-scope entity stores (issue 1364) are reached through the READY-UNGATED
   // accessors, not through the raw instance fields the four slices above use, because those
   // accessors are what `CraftingSystemManager` itself reads them through.
-  for (const accessor of ['getComponentScopeStore', 'getEssenceScopeStore', 'getToolScopeStore']) {
+  for (const accessor of [
+    'getComponentScopeStore',
+    'getEssenceScopeStore',
+    'getToolScopeStore',
+  ]) {
     assert.ok(
       closure.includes(`fabricate.${accessor}?.()?.get?.() ?? {}`),
       `exportSystem should resolve the world scope through ${accessor}`
@@ -218,7 +218,11 @@ test("source contract: the Manager's Export button passes the same args as the p
     closure.includes('services.getCharacterLibrariesStore?.()?.get?.() || {}'),
     'the Manager export resolves both character libraries from the world store'
   );
-  for (const accessor of ['getComponentScopeStore', 'getEssenceScopeStore', 'getToolScopeStore']) {
+  for (const accessor of [
+    'getComponentScopeStore',
+    'getEssenceScopeStore',
+    'getToolScopeStore',
+  ]) {
     assert.ok(
       closure.includes(`services.${accessor}?.()?.get?.() || {}`),
       `the Manager export resolves the world scope through ${accessor}`

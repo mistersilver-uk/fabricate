@@ -27,9 +27,7 @@ import assert from 'node:assert/strict';
 // ---------------------------------------------------------------------------
 
 function getPath(obj, path) {
-  return String(path)
-    .split('.')
-    .reduce((v, k) => (v == null ? undefined : v[k]), obj);
+  return String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj);
 }
 function setPath(obj, path, value) {
   const parts = String(path).split('.');
@@ -47,8 +45,8 @@ globalThis.foundry = {
     randomID: () => `id-${Math.random().toString(36).slice(2, 10)}`,
     getProperty: getPath,
     setProperty: setPath,
-    deepClone: (v) => JSON.parse(JSON.stringify(v)),
-  },
+    deepClone: v => JSON.parse(JSON.stringify(v))
+  }
 };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 
@@ -79,9 +77,7 @@ class FakeItem {
     setPath(this._flags[scope], key, value);
     return value;
   }
-  async delete() {
-    this.deleted = true;
-  }
+  async delete() { this.deleted = true; }
   async update(changes = {}) {
     for (const [k, v] of Object.entries(changes)) setPath(this, k, v);
   }
@@ -98,25 +94,20 @@ function installSystem() {
       { id: 'c-ore', name: 'Ore' },
       { id: 'c-ingot', name: 'Ingot' },
       { id: 'c-bar', name: 'Bar' },
-      { id: 'c-hammer', name: 'Hammer' },
+      { id: 'c-hammer', name: 'Hammer' }
     ],
     tools: [
-      {
-        id: 'tool-hammer',
-        componentId: 'c-hammer',
-        breakage: { mode: 'limitedUses', maxUses: 5 },
-        onBreak: { mode: 'destroy' },
-      },
+      { id: 'tool-hammer', componentId: 'c-hammer', breakage: { mode: 'limitedUses', maxUses: 5 }, onBreak: { mode: 'destroy' } }
     ],
-    features: {},
+    features: {}
   };
   globalThis.game = {
     fabricate: {
-      getCraftingSystemManager: () => ({ getSystem: (id) => (id === 'sys-1' ? system : null) }),
-      getResolutionModeService: () => null,
+      getCraftingSystemManager: () => ({ getSystem: id => (id === 'sys-1' ? system : null) }),
+      getResolutionModeService: () => null
     },
     user: { id: 'user-1', isGM: true },
-    time: { worldTime: 0 },
+    time: { worldTime: 0 }
   };
   return system;
 }
@@ -132,39 +123,23 @@ function twoStepRecipe() {
     steps: [
       {
         name: 'Smelt',
-        ingredientSets: [
-          {
-            id: 'set-smelt',
-            ingredientGroups: [
-              { id: 'g1', name: 'G1', options: [{ componentId: 'c-ore', quantity: 1 }] },
-            ],
-          },
-        ],
-        resultGroups: [
-          {
-            id: 'rg1',
-            name: 'Ingot',
-            results: [{ id: 'r1', componentId: 'c-ingot', quantity: 1 }],
-          },
-        ],
+        ingredientSets: [{
+          id: 'set-smelt',
+          ingredientGroups: [{ id: 'g1', name: 'G1', options: [{ componentId: 'c-ore', quantity: 1 }] }]
+        }],
+        resultGroups: [{ id: 'rg1', name: 'Ingot', results: [{ id: 'r1', componentId: 'c-ingot', quantity: 1 }] }]
       },
       {
         name: 'Forge',
         // STEP-tier tool requirement — the regression target.
         toolIds: ['tool-hammer'],
-        ingredientSets: [
-          {
-            id: 'set-forge',
-            ingredientGroups: [
-              { id: 'g2', name: 'G2', options: [{ componentId: 'c-ingot', quantity: 1 }] },
-            ],
-          },
-        ],
-        resultGroups: [
-          { id: 'rg2', name: 'Bar', results: [{ id: 'r2', componentId: 'c-bar', quantity: 1 }] },
-        ],
-      },
-    ],
+        ingredientSets: [{
+          id: 'set-forge',
+          ingredientGroups: [{ id: 'g2', name: 'G2', options: [{ componentId: 'c-ingot', quantity: 1 }] }]
+        }],
+        resultGroups: [{ id: 'rg2', name: 'Bar', results: [{ id: 'r2', componentId: 'c-bar', quantity: 1 }] }]
+      }
+    ]
   });
 }
 
@@ -195,10 +170,7 @@ test('(a) evaluateCraftability gates the step-tier tool: missing hammer -> not c
   const forgeView = stepView(engine, recipe, 1);
 
   // Ingot present, hammer absent.
-  const missing = manager.evaluateCraftability(
-    [{ items: [new FakeItem('i1', { name: 'Ingot' })] }],
-    forgeView
-  );
+  const missing = manager.evaluateCraftability([{ items: [new FakeItem('i1', { name: 'Ingot' })] }], forgeView);
   assert.equal(missing.toolStates.length, 1);
   assert.equal(missing.toolStates[0].name, 'Hammer');
   assert.equal(missing.toolStates[0].available, false);
@@ -255,22 +227,10 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
   installSystem();
   const manager = new RecipeManager();
   let lastSuccess = null;
-  const engine = new CraftingEngine(
-    manager,
-    makeRunManager(1, (payload) => {
-      lastSuccess = payload;
-    }),
-    null
-  );
+  const engine = new CraftingEngine(manager, makeRunManager(1, payload => { lastSuccess = payload; }), null);
 
   // Skip side effects unrelated to tools.
-  engine._runCraftingCheck = async () => ({
-    success: true,
-    message: 'ok',
-    outcome: null,
-    value: null,
-    data: {},
-  });
+  engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
   engine._createResultItems = async () => ({ items: [], rollTableMeta: null, resolutionMeta: {} });
   engine._postCraftChatMessage = async () => {};
 
@@ -282,10 +242,8 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
   // spared). getFabricateFlag reads the doubly-nested `flags.fabricate.<key>` path.
   const hammer = new FakeItem('h1', {
     name: 'Hammer',
-    flags: {
-      fabricate: { roles: { 'sys-1': { toolId: 'tool-hammer' } }, toolUsage: { timesUsed: 0 } },
-    },
-    parent: actorRef,
+    flags: { fabricate: { roles: { 'sys-1': { toolId: 'tool-hammer' } }, toolUsage: { timesUsed: 0 } } },
+    parent: actorRef
   });
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingot, hammer] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
@@ -297,12 +255,7 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
   assert.ok(lastSuccess, 'success payload recorded');
   assert.equal(lastSuccess.usedTools.length, 1);
   assert.deepEqual(lastSuccess.usedTools[0], {
-    actorUuid: 'Actor.a1',
-    itemUuid: 'Item.h1',
-    quantity: 1,
-    componentId: 'c-hammer',
-    toolId: 'tool-hammer',
-    broken: false,
+    actorUuid: 'Actor.a1', itemUuid: 'Item.h1', quantity: 1, componentId: 'c-hammer', toolId: 'tool-hammer', broken: false
   });
   assert.deepEqual(getPath(hammer._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 1 });
 });
@@ -310,18 +263,8 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
 test('(c) craft() of the step-tier step is blocked when the tool is absent', async () => {
   installSystem();
   const manager = new RecipeManager();
-  const engine = new CraftingEngine(
-    manager,
-    makeRunManager(1, () => {}),
-    null
-  );
-  engine._runCraftingCheck = async () => ({
-    success: true,
-    message: 'ok',
-    outcome: null,
-    value: null,
-    data: {},
-  });
+  const engine = new CraftingEngine(manager, makeRunManager(1, () => {}), null);
+  engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
 
   const recipe = twoStepRecipe();
   const ingot = new FakeItem('i1', { name: 'Ingot', parent: { uuid: 'Actor.a1' } });
@@ -338,27 +281,16 @@ test('(c) failure-path: a failed check breaks the step-tier tool when breakTools
   const system = installSystem();
   // Enable failure-path tool consumption (the gate at CraftingEngine
   // ~line 233/306 that drives _applyToolBreakage on a failed check).
-  system.craftingCheck = {
-    consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
-  };
+  system.craftingCheck = { consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true } };
 
   const manager = new RecipeManager();
   let failurePayload = null;
   const runManager = makeRunManager(1, () => {});
-  runManager.completeStepFailure = async (_actor, run, _idx, _msg, payload) => {
-    failurePayload = payload;
-    return { ...run, status: 'failed' };
-  };
+  runManager.completeStepFailure = async (_actor, run, _idx, _msg, payload) => { failurePayload = payload; return { ...run, status: 'failed' }; };
   const engine = new CraftingEngine(manager, runManager, null);
 
   // Force the crafting check to FAIL so the failure-path consumption runs.
-  engine._runCraftingCheck = async () => ({
-    success: false,
-    message: 'check failed',
-    outcome: null,
-    value: null,
-    data: {},
-  });
+  engine._runCraftingCheck = async () => ({ success: false, message: 'check failed', outcome: null, value: null, data: {} });
   engine._postCraftChatMessage = async () => {};
 
   const recipe = twoStepRecipe();
@@ -369,7 +301,7 @@ test('(c) failure-path: a failed check breaks the step-tier tool when breakTools
   const hammer = new FakeItem('h1', {
     name: 'Hammer',
     flags: { fabricate: { roles: { 'sys-1': { toolId: 'tool-hammer' } } } },
-    parent: actorRef,
+    parent: actorRef
   });
   const sourceActor = { id: 'a1', uuid: 'Actor.a1', items: [ingot, hammer] };
   const craftingActor = { id: 'a1', uuid: 'Actor.a1', items: { contents: [] } };
@@ -388,22 +320,11 @@ function makeRunManager(stepIndex, onSuccess) {
   return {
     findActiveRunForRecipe: () => null,
     getActiveRun: () => null,
-    async createRun() {
-      return { id: 'run-1', status: 'inProgress', currentStepIndex: stepIndex };
-    },
+    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: stepIndex }; },
     canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) {
-      return run;
-    },
-    async markStepWaitingForTime(_actor, run) {
-      return run;
-    },
-    async completeStepSuccess(_actor, run, _idx, payload) {
-      onSuccess(payload);
-      return { ...run, status: 'succeeded' };
-    },
-    async completeStepFailure() {
-      return {};
-    },
+    async markStepInProgress(_actor, run) { return run; },
+    async markStepWaitingForTime(_actor, run) { return run; },
+    async completeStepSuccess(_actor, run, _idx, payload) { onSuccess(payload); return { ...run, status: 'succeeded' }; },
+    async completeStepFailure() { return {}; }
   };
 }

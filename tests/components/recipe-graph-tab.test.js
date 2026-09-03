@@ -20,13 +20,7 @@ function makeGraphEdge({ id, sourceId, targetId, isCycleEdge = false, path = '' 
   return { id, sourceId, targetId, isCycleEdge, path, componentIds: [] };
 }
 
-function buildGraphTabDOM({
-  nodes = [],
-  edges = [],
-  categories = [],
-  onNodeClick = null,
-  onSearch = null,
-} = {}) {
+function buildGraphTabDOM({ nodes = [], edges = [], categories = [], onNodeClick = null, onSearch = null } = {}) {
   const section = document.createElement('section');
   section.className = 'admin-panel recipe-graph-tab';
 
@@ -157,14 +151,14 @@ describe('RecipeGraphTab — component', () => {
   it('1. Renders graph nodes for each recipe', () => {
     const nodes = [
       makeGraphNode({ id: 'A', name: 'Iron Ingot', x: 0, y: 0 }),
-      makeGraphNode({ id: 'B', name: 'Iron Sword', x: 250, y: 0 }),
+      makeGraphNode({ id: 'B', name: 'Iron Sword', x: 250, y: 0 })
     ];
     const edges = [makeGraphEdge({ id: 'A->B', sourceId: 'A', targetId: 'B' })];
     const el = buildGraphTabDOM({ nodes, edges });
 
     const nodeButtons = el.querySelectorAll('.graph-node');
     assert.equal(nodeButtons.length, 2);
-    const names = Array.from(nodeButtons).map((b) => b.querySelector('.node-name').textContent);
+    const names = Array.from(nodeButtons).map(b => b.querySelector('.node-name').textContent);
     assert.ok(names.includes('Iron Ingot'));
     assert.ok(names.includes('Iron Sword'));
   });
@@ -172,16 +166,9 @@ describe('RecipeGraphTab — component', () => {
   it('2. Renders SVG edges between connected recipes', () => {
     const nodes = [
       makeGraphNode({ id: 'A', name: 'Iron Ingot' }),
-      makeGraphNode({ id: 'B', name: 'Iron Sword', x: 250 }),
+      makeGraphNode({ id: 'B', name: 'Iron Sword', x: 250 })
     ];
-    const edges = [
-      makeGraphEdge({
-        id: 'A->B',
-        sourceId: 'A',
-        targetId: 'B',
-        path: 'M 0 0 C 100 0, 150 0, 250 0',
-      }),
-    ];
+    const edges = [makeGraphEdge({ id: 'A->B', sourceId: 'A', targetId: 'B', path: 'M 0 0 C 100 0, 150 0, 250 0' })];
     const el = buildGraphTabDOM({ nodes, edges });
 
     const svgEdges = el.querySelectorAll('.graph-edges path');
@@ -203,13 +190,13 @@ describe('RecipeGraphTab — component', () => {
   it('4. Category filter dropdown renders categories', () => {
     const categories = [
       { name: 'weapons', count: 3 },
-      { name: 'armor', count: 2 },
+      { name: 'armor', count: 2 }
     ];
     const el = buildGraphTabDOM({ categories });
     const select = el.querySelector('.graph-category-filter');
     const options = Array.from(select.querySelectorAll('option'));
     assert.ok(options.length >= 3, 'Should have at least 3 options (default + 2 categories)');
-    const values = options.map((o) => o.value);
+    const values = options.map(o => o.value);
     assert.ok(values.includes('weapons'));
     assert.ok(values.includes('armor'));
   });

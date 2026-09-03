@@ -29,7 +29,7 @@ test('migrateRecipes: catalyst systemItemId -> componentId', () => {
 
 test('migrateRecipes: result systemItemId -> componentId in resultGroups', () => {
   const input = [
-    { resultGroups: [{ id: 'rg-1', results: [{ systemItemId: 'item-sword', quantity: 1 }] }] },
+    { resultGroups: [{ id: 'rg-1', results: [{ systemItemId: 'item-sword', quantity: 1 }] }] }
   ];
   const [recipe] = migrateRecipes(input);
 
@@ -46,10 +46,12 @@ test('migrateRecipes: ingredient match.systemItemId -> match.componentId and typ
     {
       ingredientSets: [
         {
-          ingredients: [{ match: { type: 'systemItem', systemItemId: 'item-iron' } }],
-        },
-      ],
-    },
+          ingredients: [
+            { match: { type: 'systemItem', systemItemId: 'item-iron' } }
+          ]
+        }
+      ]
+    }
   ];
   const [recipe] = migrateRecipes(input);
   const ing = recipe.ingredientSets[0].ingredients[0];
@@ -68,10 +70,10 @@ test('migrateRecipes: ingredient top-level systemItemId -> componentId', () => {
     {
       ingredientSets: [
         {
-          ingredients: [{ systemItemId: 'item-wood', quantity: 2 }],
-        },
-      ],
-    },
+          ingredients: [{ systemItemId: 'item-wood', quantity: 2 }]
+        }
+      ]
+    }
   ];
   const [recipe] = migrateRecipes(input);
   const ing = recipe.ingredientSets[0].ingredients[0];
@@ -93,16 +95,13 @@ test('migrateRecipes: ingredient alternatives[] recursively migrated', () => {
             {
               systemItemId: 'item-primary',
               alternatives: [
-                {
-                  systemItemId: 'item-alt',
-                  match: { type: 'systemItem', systemItemId: 'item-alt' },
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
+                { systemItemId: 'item-alt', match: { type: 'systemItem', systemItemId: 'item-alt' } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
   ];
   const [recipe] = migrateRecipes(input);
   const ing = recipe.ingredientSets[0].ingredients[0];
@@ -124,8 +123,10 @@ test('migrateRecipes: ingredient alternatives[] recursively migrated', () => {
 test('migrateRecipes: ingredientSets[].catalysts[].systemItemId migrated', () => {
   const input = [
     {
-      ingredientSets: [{ catalysts: [{ systemItemId: 'item-acid', degradesOnUse: true }] }],
-    },
+      ingredientSets: [
+        { catalysts: [{ systemItemId: 'item-acid', degradesOnUse: true }] }
+      ]
+    }
   ];
   const [recipe] = migrateRecipes(input);
   const cat = recipe.ingredientSets[0].catalysts[0];
@@ -144,13 +145,13 @@ test('migrateRecipes: steps[].catalysts, resultGroups, and ingredientSets all mi
       steps: [
         {
           catalysts: [{ systemItemId: 'cat-step', degradesOnUse: false }],
-          resultGroups: [
-            { id: 'rg-step', results: [{ systemItemId: 'result-step', quantity: 1 }] },
-          ],
-          ingredientSets: [{ ingredients: [{ systemItemId: 'ing-step', quantity: 1 }] }],
-        },
-      ],
-    },
+          resultGroups: [{ id: 'rg-step', results: [{ systemItemId: 'result-step', quantity: 1 }] }],
+          ingredientSets: [
+            { ingredients: [{ systemItemId: 'ing-step', quantity: 1 }] }
+          ]
+        }
+      ]
+    }
   ];
   const [recipe] = migrateRecipes(input);
   const step = recipe.steps[0];
@@ -189,11 +190,11 @@ test('migrateCraftingSystems: components[].salvage.catalysts[].systemItemId migr
         {
           id: 'comp-x',
           salvage: {
-            catalysts: [{ systemItemId: 'salvage-cat', degradesOnUse: true }],
-          },
-        },
-      ],
-    },
+            catalysts: [{ systemItemId: 'salvage-cat', degradesOnUse: true }]
+          }
+        }
+      ]
+    }
   ];
   const [system] = migrateCraftingSystems(input);
   const cat = system.components[0].salvage.catalysts[0];
@@ -214,12 +215,12 @@ test('migrateCraftingSystems: components[].salvage.resultGroups[].results[].syst
           id: 'comp-y',
           salvage: {
             resultGroups: [
-              { id: 'rg-s', results: [{ systemItemId: 'salvage-result', quantity: 2 }] },
-            ],
-          },
-        },
-      ],
-    },
+              { id: 'rg-s', results: [{ systemItemId: 'salvage-result', quantity: 2 }] }
+            ]
+          }
+        }
+      ]
+    }
   ];
   const [system] = migrateCraftingSystems(input);
   const result = system.components[0].salvage.resultGroups[0].results[0];
@@ -239,12 +240,10 @@ test('idempotency: already-migrated data with componentId is unchanged', () => {
       resultGroups: [{ id: 'rg-1', results: [{ componentId: 'item-sword', quantity: 1 }] }],
       ingredientSets: [
         {
-          ingredients: [
-            { componentId: 'item-wood', match: { type: 'component', componentId: 'item-wood' } },
-          ],
-        },
-      ],
-    },
+          ingredients: [{ componentId: 'item-wood', match: { type: 'component', componentId: 'item-wood' } }]
+        }
+      ]
+    }
   ];
 
   const migrated = migrateRecipes(alreadyMigrated);
@@ -260,16 +259,12 @@ test('idempotency: f(f(x)) === f(x) for recipes and systems', () => {
     {
       catalysts: [{ systemItemId: 'cat-1' }],
       ingredientSets: [
-        {
-          ingredients: [
-            { systemItemId: 'ing-1', match: { type: 'systemItem', systemItemId: 'ing-1' } },
-          ],
-        },
-      ],
-    },
+        { ingredients: [{ systemItemId: 'ing-1', match: { type: 'systemItem', systemItemId: 'ing-1' } }] }
+      ]
+    }
   ];
   const systems = [
-    { managedItems: [{ id: 'c-1', salvage: { catalysts: [{ systemItemId: 'sc-1' }] } }] },
+    { managedItems: [{ id: 'c-1', salvage: { catalysts: [{ systemItemId: 'sc-1' }] } }] }
   ];
 
   const once = runComponentIdMigration(recipes, systems);
@@ -298,8 +293,8 @@ test('edge cases: empty arrays, null values, and missing keys do not throw', () 
       catalysts: [null],
       resultGroups: [{ results: [null] }],
       ingredientSets: [{ ingredients: [null] }],
-      steps: [null],
-    },
+      steps: [null]
+    }
   ]);
   assert.ok(Array.isArray(nullishRecipe[0].catalysts));
 

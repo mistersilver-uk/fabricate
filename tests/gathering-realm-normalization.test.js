@@ -11,7 +11,7 @@ import {
   validateGatheringRealm,
   validateGatheringRealmList,
   validateGatheringRealmSettings,
-  validateTravelConfig,
+  validateTravelConfig
 } from '../src/systems/gatheringRealms.js';
 
 let counter = 0;
@@ -35,13 +35,7 @@ test('normalizeGatheringRealm applies defaults and carries NO owning system', ()
 
 test('normalizeGatheringRealm honors explicit enabled/secret/biomes', () => {
   const realm = normalizeGatheringRealm(
-    {
-      id: 'r1',
-      name: 'Ashen March',
-      enabled: false,
-      secret: true,
-      biomes: ['Volcanic', 'volcanic', 'Ash'],
-    },
+    { id: 'r1', name: 'Ashen March', enabled: false, secret: true, biomes: ['Volcanic', 'volcanic', 'Ash'] },
     { randomID }
   );
   assert.equal(realm.id, 'r1');
@@ -64,14 +58,7 @@ test('normalizeGatheringRealmModifier coerces unknown enums and non-finite value
 
 test('normalizeGatheringRealmModifier keeps known enums, finite values, and default enabled', () => {
   const modifier = normalizeGatheringRealmModifier(
-    {
-      id: 'm1',
-      kind: 'yield',
-      operation: 'multiply',
-      visibility: 'gmOnly',
-      value: 1.5,
-      note: ' extra ',
-    },
+    { id: 'm1', kind: 'yield', operation: 'multiply', visibility: 'gmOnly', value: 1.5, note: ' extra ' },
     { randomID }
   );
   assert.equal(modifier.kind, 'yield');
@@ -97,14 +84,14 @@ test('validateGatheringRealm rejects unknown modifier enums and non-finite value
       { id: 'm1', kind: 'bogus', operation: 'add', visibility: 'visible', value: 1 },
       { id: 'm2', kind: 'yield', operation: 'divide', visibility: 'visible', value: 1 },
       { id: 'm3', kind: 'yield', operation: 'add', visibility: 'private', value: 1 },
-      { id: 'm4', kind: 'yield', operation: 'add', visibility: 'visible', value: Infinity },
-    ],
+      { id: 'm4', kind: 'yield', operation: 'add', visibility: 'visible', value: Infinity }
+    ]
   });
   assert.equal(errors.length, 4);
-  assert.ok(errors.some((e) => e.includes('kind')));
-  assert.ok(errors.some((e) => e.includes('operation')));
-  assert.ok(errors.some((e) => e.includes('visibility')));
-  assert.ok(errors.some((e) => e.includes('value')));
+  assert.ok(errors.some(e => e.includes('kind')));
+  assert.ok(errors.some(e => e.includes('operation')));
+  assert.ok(errors.some(e => e.includes('visibility')));
+  assert.ok(errors.some(e => e.includes('value')));
 });
 
 test('validateGatheringRealm rejects duplicate modifier ids and duplicate scene mapping ids', () => {
@@ -112,23 +99,23 @@ test('validateGatheringRealm rejects duplicate modifier ids and duplicate scene 
     name: 'Dupes',
     modifiers: [
       { id: 'm1', kind: 'yield', operation: 'add', visibility: 'visible', value: 1 },
-      { id: 'm1', kind: 'yield', operation: 'add', visibility: 'visible', value: 1 },
+      { id: 'm1', kind: 'yield', operation: 'add', visibility: 'visible', value: 1 }
     ],
     sceneMappings: [
       { id: 'sm1', sceneUuid: 'a', sceneRegionUuid: 'b' },
-      { id: 'sm1', sceneUuid: 'c', sceneRegionUuid: 'd' },
-    ],
+      { id: 'sm1', sceneUuid: 'c', sceneRegionUuid: 'd' }
+    ]
   });
-  assert.ok(errors.some((e) => e.includes('duplicate modifier id')));
-  assert.ok(errors.some((e) => e.includes('duplicate scene mapping id')));
+  assert.ok(errors.some(e => e.includes('duplicate modifier id')));
+  assert.ok(errors.some(e => e.includes('duplicate scene mapping id')));
 });
 
 test('validateGatheringRealmList rejects duplicate realm ids', () => {
   const errors = validateGatheringRealmList([
     { id: 'r1', name: 'A' },
-    { id: 'r1', name: 'B' },
+    { id: 'r1', name: 'B' }
   ]);
-  assert.ok(errors.some((e) => e.includes('Duplicate realm id "r1"')));
+  assert.ok(errors.some(e => e.includes('Duplicate realm id "r1"')));
 });
 
 test('normalizeGatheringRealmSettings emits PARTICIPATION ONLY', () => {
@@ -139,11 +126,7 @@ test('normalizeGatheringRealmSettings emits PARTICIPATION ONLY', () => {
   // `manual` one with no error anywhere. Omitting it makes a missed reader fail loudly.
   assert.deepEqual(normalizeGatheringRealmSettings({}), { enabled: false });
   assert.deepEqual(
-    normalizeGatheringRealmSettings({
-      enabled: true,
-      revealMode: 'alwaysVisible',
-      modifierVisibility: 'gmOnly',
-    }),
+    normalizeGatheringRealmSettings({ enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }),
     { enabled: true }
   );
 });
@@ -153,32 +136,25 @@ test('normalizeGatheringRealmSettings: enabled defaults false and only explicit 
   assert.equal(normalizeGatheringRealmSettings({ enabled: true }).enabled, true, 'true → true');
   assert.equal(normalizeGatheringRealmSettings({ enabled: false }).enabled, false, 'false → false');
   // Non-boolean truthy/falsey coerce to false (only an explicit boolean true enables).
-  assert.equal(
-    normalizeGatheringRealmSettings({ enabled: 'true' }).enabled,
-    false,
-    'string "true" → false'
-  );
+  assert.equal(normalizeGatheringRealmSettings({ enabled: 'true' }).enabled, false, 'string "true" → false');
   assert.equal(normalizeGatheringRealmSettings({ enabled: 1 }).enabled, false, 'number 1 → false');
 });
 
 test('validateTravelConfig rejects unknown WORLD values at the save boundary', () => {
   // The scalars are validated where they now live. `validateGatheringRealmSettings` keeps only
   // the participation flag.
-  assert.deepEqual(
-    validateTravelConfig({ revealMode: 'manual', modifierVisibility: 'visible' }),
-    []
-  );
+  assert.deepEqual(validateTravelConfig({ revealMode: 'manual', modifierVisibility: 'visible' }), []);
   const errors = validateTravelConfig({ revealMode: 'bogus', modifierVisibility: 'whoKnows' });
   assert.equal(errors.length, 2);
-  assert.ok(errors.some((e) => e.includes('revealMode')));
-  assert.ok(errors.some((e) => e.includes('modifierVisibility')));
+  assert.ok(errors.some(e => e.includes('revealMode')));
+  assert.ok(errors.some(e => e.includes('modifierVisibility')));
 });
 
 test('normalizeTravelConfig coerces unknown WORLD values to defaults on read', () => {
   assert.deepEqual(normalizeTravelConfig({}), {
     revealMode: 'manual',
     modifierVisibility: 'visible',
-    realms: [],
+    realms: []
   });
   const coerced = normalizeTravelConfig({ revealMode: 'bogus', modifierVisibility: 'whoKnows' });
   assert.equal(coerced.revealMode, 'manual');
@@ -195,13 +171,7 @@ test('validateGatheringRealmSettings rejects a non-boolean enabled but accepts b
 
 test('normalizeGatheringRealmList preserves stale scene mappings as readable', () => {
   const list = normalizeGatheringRealmList(
-    [
-      {
-        id: 'r1',
-        name: 'A',
-        sceneMappings: [{ id: 'sm1', sceneUuid: 'Scene.stale', sceneRegionUuid: 'gone' }],
-      },
-    ],
+    [{ id: 'r1', name: 'A', sceneMappings: [{ id: 'sm1', sceneUuid: 'Scene.stale', sceneRegionUuid: 'gone' }] }],
     { randomID }
   );
   assert.equal(list[0].sceneMappings[0].sceneUuid, 'Scene.stale');

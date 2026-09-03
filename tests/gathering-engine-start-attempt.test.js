@@ -10,7 +10,7 @@ const actor = {
   id: 'actor-1',
   uuid: 'Actor.actor-1',
   name: 'Gatherer',
-  items: [],
+  items: []
 };
 
 // A gathering system with no routed roll formula: routed tasks under it are
@@ -20,15 +20,7 @@ function systemWithoutRoutedCheck() {
 }
 
 function makeEngine({
-  systems = [
-    {
-      id: 'system-a',
-      enabled: true,
-      features: { gathering: true },
-      components: [],
-      gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
-    },
-  ],
+  systems = [{ id: 'system-a', enabled: true, features: { gathering: true }, components: [], gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }) }],
   environments = [environment()],
   selectableActors = [actor],
   paused = false,
@@ -45,7 +37,7 @@ function makeEngine({
   usedTools = [],
   richState = null,
   random = Math.random,
-  calls = {},
+  calls = {}
 } = {}) {
   calls.steps = [];
   calls.visibility = [];
@@ -68,13 +60,12 @@ function makeEngine({
         calls.validate.push(candidate);
         if (typeof validation === 'function') return validation(candidate);
         return validation ?? { valid: true, errors: [] };
-      },
+      }
     },
     richState,
     getSystems: () => systems,
     getSelectableActors: () => selectableActors,
-    isActorSelectable: ({ actor: candidate }) =>
-      selectableActors.some((entry) => sameActor(entry, candidate)),
+    isActorSelectable: ({ actor: candidate }) => selectableActors.some(entry => sameActor(entry, candidate)),
     isGamePaused: () => {
       calls.steps.push('pause');
       return paused;
@@ -89,29 +80,22 @@ function makeEngine({
       evaluateCheck: async (payload) => {
         calls.steps.push('check');
         calls.evaluateCheck.push(payload);
-        return {
-          success: null,
-          status: null,
-          value: 10,
-          reasonCode: 'CHECK_VALUE',
-          diagnostic: null,
-        };
-      },
+        return { success: null, status: null, value: 10, reasonCode: 'CHECK_VALUE', diagnostic: null };
+      }
     },
     sceneAccess: sceneAccessCollaborator ?? {
       canAttempt: ({ environment, actor: selectedActor, viewer: selectedViewer }) => {
         calls.steps.push('scene');
         calls.scene.push({ environment, actor: selectedActor, viewer: selectedViewer });
-        if (typeof sceneAccess === 'function')
-          return sceneAccess({ environment, actor: selectedActor, viewer: selectedViewer });
+        if (typeof sceneAccess === 'function') return sceneAccess({ environment, actor: selectedActor, viewer: selectedViewer });
         return sceneAccess ?? { allowed: true };
-      },
+      }
     },
     runManager: {
       findActiveRunForTask: (selectedActor, taskId) => {
         calls.steps.push('activeRun');
         calls.activeRuns.push({ actor: selectedActor, taskId });
-        return activeRuns instanceof Map ? activeRuns.get(taskId) : (activeRuns?.[taskId] ?? null);
+        return activeRuns instanceof Map ? activeRuns.get(taskId) : activeRuns?.[taskId] ?? null;
       },
       createTerminalRun: (...args) => calls.createTerminalRun.push(args),
       createWaitingRun: async (...args) => {
@@ -126,10 +110,10 @@ function makeEngine({
           timeGate: {
             requiredSeconds: 3600,
             availableAt: 4600,
-            initiatedAt: 1000,
-          },
+            initiatedAt: 1000
+          }
         };
-      },
+      }
     },
     toolAvailability: {
       check: (payload) => {
@@ -137,44 +121,42 @@ function makeEngine({
         calls.tools.push(payload);
         if (typeof toolAvailability === 'function') return toolAvailability(payload);
         return toolAvailability ?? { available: true, missing: [], failedRequirements: [] };
-      },
+      }
     },
     resultResolver: {
       resolveProgressive: async (payload) => {
         calls.steps.push('resolveProgressive');
         calls.resolveProgressive.push(payload);
-        return (
-          progressiveOutcome ?? {
-            status: 'succeeded',
-            resultGroups: [payload.task.resultGroups[0]],
-            checkResult: payload.checkResult,
-          }
-        );
-      },
+        return progressiveOutcome ?? {
+          status: 'succeeded',
+          resultGroups: [payload.task.resultGroups[0]],
+          checkResult: payload.checkResult
+        };
+      }
     },
     resultCreator: {
       create: async (payload) => {
         calls.steps.push('createResults');
         calls.createResults.push(payload);
         return createdResults;
-      },
+      }
     },
     toolBreakage: {
       apply: async (payload) => {
         calls.steps.push('applyTools');
         calls.applyTools.push(payload);
         return usedTools;
-      },
+      }
     },
     random,
-    localize: (key, data) => (data ? `${key}:${JSON.stringify(data)}` : key),
+    localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
   });
 }
 
 const LIBRARY_TOOLS = [
   { id: 'tool-tool', componentId: 'tool', enabled: true },
   { id: 'tool-sickle', componentId: 'silver-sickle', enabled: true },
-  { id: 'tool-herb', componentId: 'rare-herb', enabled: true },
+  { id: 'tool-herb', componentId: 'rare-herb', enabled: true }
 ];
 
 function environment(overrides = {}) {
@@ -187,14 +169,14 @@ function environment(overrides = {}) {
     selectionMode: 'targeted',
     sceneUuid: null,
     tasks: [task()],
-    ...overrides,
+    ...overrides
   };
   // The production composed environment exposes a non-enumerable `__libraryTools`
   // Map resolving task `toolIds` to per-system library Tools.
   Object.defineProperty(env, '__libraryTools', {
-    value: new Map(LIBRARY_TOOLS.map((t) => [t.id, t])),
+    value: new Map(LIBRARY_TOOLS.map(t => [t.id, t])),
     enumerable: false,
-    configurable: true,
+    configurable: true
   });
   return env;
 }
@@ -209,18 +191,16 @@ function task(overrides = {}) {
     resolutionMode: 'routed',
     toolIds: [],
     resultGroups: [{ id: 'group-a', name: 'Iron', results: [] }],
-    ...overrides,
+    ...overrides
   };
 }
 
 function sameActor(left, right) {
-  return Boolean(
-    left && right && (left === right || left.id === right.id || left.uuid === right.uuid)
-  );
+  return Boolean(left && right && (left === right || left.id === right.id || left.uuid === right.uuid));
 }
 
 function codes(result) {
-  return result.blockedReasons.map((reason) => reason.code);
+  return result.blockedReasons.map(reason => reason.code);
 }
 
 function assertNoRunMutation(calls) {
@@ -231,18 +211,16 @@ function assertNoRunMutation(calls) {
 test('startAttempt resolves a fully guarded immediate task into terminal history', async () => {
   const calls = {};
   const immediateTask = task({
-    resultGroups: [
-      {
-        id: 'group-a',
-        name: 'Iron',
-        results: [{ id: 'result-a', componentId: 'iron', quantity: 2 }],
-      },
-    ],
+    resultGroups: [{
+      id: 'group-a',
+      name: 'Iron',
+      results: [{ id: 'result-a', componentId: 'iron', quantity: 2 }]
+    }]
   });
   const engine = makeEngine({
     environments: [environment({ tasks: [immediateTask] })],
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
-    calls,
+    calls
   });
 
   let result;
@@ -252,7 +230,7 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
       viewer,
       actor,
       environmentId: 'env-a',
-      taskId: 'task-a',
+      taskId: 'task-a'
     });
   } finally {
     delete globalThis.Roll;
@@ -267,10 +245,7 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
   assert.equal(result.taskId, 'task-a');
   assert.deepEqual(result.blockedReasons, []);
   assert.deepEqual(calls.visibility, ['task-a']);
-  assert.deepEqual(
-    calls.activeRuns.map((call) => call.taskId),
-    ['task-a']
-  );
+  assert.deepEqual(calls.activeRuns.map(call => call.taskId), ['task-a']);
   assert.deepEqual(calls.validate, []);
   assert.equal(calls.createTerminalRun.length, 1);
   assert.equal(calls.createTerminalRun[0][0], actor);
@@ -278,7 +253,7 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
     craftingSystemId: 'system-a',
     environmentId: 'env-a',
     taskId: 'task-a',
-    userId: viewer.id,
+    userId: viewer.id
   });
   assert.equal(calls.createTerminalRun[0][2], 'succeeded');
   assert.deepEqual(calls.createTerminalRun[0][3].createdResults, []);
@@ -297,8 +272,8 @@ test('startAttempt creates one waitingTime run for a fully guarded timed task', 
       hours: '1',
       minutes: 30,
       days: 0,
-      ignored: 99,
-    },
+      ignored: 99
+    }
   });
   const createdRun = {
     id: 'run-timed',
@@ -309,22 +284,22 @@ test('startAttempt creates one waitingTime run for a fully guarded timed task', 
     timeGate: {
       requiredSeconds: 5400,
       availableAt: 6400,
-      initiatedAt: 1000,
+      initiatedAt: 1000
     },
     usedTools: [],
-    createdResults: [],
+    createdResults: []
   };
   const engine = makeEngine({
     environments: [environment({ sceneUuid: 'Scene.old-mine', tasks: [timedTask] })],
     waitingRunResult: createdRun,
-    calls,
+    calls
   });
 
   const result = await engine.startAttempt({
     viewer,
     actor,
     environmentId: 'env-a',
-    taskId: 'timed-task',
+    taskId: 'timed-task'
   });
 
   assert.equal(result.accepted, true);
@@ -341,7 +316,7 @@ test('startAttempt creates one waitingTime run for a fully guarded timed task', 
     'visibility',
     'activeRun',
     'tools',
-    'createWaitingRun',
+    'createWaitingRun'
   ]);
   assert.deepEqual(calls.createTerminalRun, []);
   assert.equal(calls.createWaitingRun.length, 1);
@@ -356,13 +331,13 @@ test('startAttempt creates one waitingTime run for a fully guarded timed task', 
     // viewer's id here the run manager's ambient fallback stamps the GM, and
     // `getGatheringRunViewer` reads that back at maturity as a GM viewer — which
     // un-blinds the terminal history written to the player's own actor flag.
-    userId: viewer.id,
+    userId: viewer.id
   });
   assert.equal('usedTools' in calls.createWaitingRun[0][1], false);
   assert.equal('createdResults' in calls.createWaitingRun[0][1], false);
   assert.deepEqual(calls.createWaitingRun[0][2], {
     hours: 1,
-    minutes: 30,
+    minutes: 30
   });
 });
 
@@ -371,12 +346,12 @@ test('startAttempt accepts selected valid targeted task when an unrelated task i
   const validTask = task({ id: 'valid-task', name: 'Gather Iron' });
   const invalidTask = task({
     id: 'invalid-task',
-    name: 'Broken Gold Route',
+    name: 'Broken Gold Route'
   });
   const engine = makeEngine({
     environments: [environment({ tasks: [validTask, invalidTask] })],
     validation: { valid: false, errors: ['unrelated task is invalid'] },
-    calls,
+    calls
   });
 
   let result;
@@ -386,7 +361,7 @@ test('startAttempt accepts selected valid targeted task when an unrelated task i
       viewer,
       actor,
       environmentId: 'env-a',
-      taskId: 'valid-task',
+      taskId: 'valid-task'
     });
   } finally {
     delete globalThis.Roll;
@@ -397,10 +372,7 @@ test('startAttempt accepts selected valid targeted task when an unrelated task i
   assert.equal(result.taskId, 'valid-task');
   assert.deepEqual(result.blockedReasons, []);
   assert.deepEqual(calls.visibility, ['valid-task']);
-  assert.deepEqual(
-    calls.activeRuns.map((call) => call.taskId),
-    ['valid-task']
-  );
+  assert.deepEqual(calls.activeRuns.map(call => call.taskId), ['valid-task']);
   assert.deepEqual(calls.validate, []);
   assert.equal(calls.createTerminalRun.length, 1);
   assert.deepEqual(calls.createWaitingRun, []);
@@ -411,15 +383,10 @@ test('startAttempt rejects paused game before tool checks, validation, or run wr
   const engine = makeEngine({
     paused: true,
     environments: [environment({ tasks: [task({ toolIds: ['tool-tool'] })] })],
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['GAME_PAUSED']);
@@ -435,12 +402,7 @@ test('startAttempt rejects missing references before later guards', async () => 
   const calls = {};
   const engine = makeEngine({ environments: [], calls });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'missing-env',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'missing-env', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['MISSING_REFERENCE']);
@@ -458,14 +420,14 @@ test('startAttempt rejects missing system and task references without later guar
   const missingSystemCalls = {};
   const missingSystemEngine = makeEngine({
     systems: [],
-    calls: missingSystemCalls,
+    calls: missingSystemCalls
   });
 
   const missingSystem = await missingSystemEngine.startAttempt({
     viewer,
     actor,
     environmentId: 'env-a',
-    taskId: 'task-a',
+    taskId: 'task-a'
   });
 
   assert.equal(missingSystem.accepted, false);
@@ -482,7 +444,7 @@ test('startAttempt rejects missing system and task references without later guar
     viewer,
     actor,
     environmentId: 'env-a',
-    taskId: 'missing-task',
+    taskId: 'missing-task'
   });
 
   assert.equal(missingTask.accepted, false);
@@ -497,15 +459,10 @@ test('startAttempt rejects disabled gathering systems before record guards', asy
   const calls = {};
   const engine = makeEngine({
     systems: [{ id: 'system-a', enabled: true, features: { gathering: false }, components: [] }],
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['SYSTEM_DISABLED']);
@@ -526,19 +483,14 @@ const blockedGatheringSystem = {
   features: { gathering: true, multiStepRecipes: true },
   resolutionMode: 'alchemy',
   components: [],
-  gatheringCraftingCheck: routedSystemCheck(),
+  gatheringCraftingCheck: routedSystemCheck()
 };
 
 test('startAttempt rejects a system-blocked system for a non-GM before record guards', async () => {
   const calls = {};
   const engine = makeEngine({ systems: [blockedGatheringSystem], calls });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['SYSTEM_DISABLED']);
@@ -552,21 +504,12 @@ test('startAttempt does not reject a system-blocked system for a GM (GM bypass)'
   const calls = {};
   const engine = makeEngine({ systems: [blockedGatheringSystem], calls });
 
-  const result = await engine.startAttempt({
-    viewer: gmViewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   // The GM bypasses the system-validity guard: whatever the eventual outcome, it
   // is NOT the SYSTEM_DISABLED rejection from this branch, and the attempt reached
   // the downstream record guards a non-GM (blocked at the gate) never gets to.
-  assert.equal(
-    codes(result).includes('SYSTEM_DISABLED'),
-    false,
-    'GM bypasses the system-blocker guard'
-  );
+  assert.equal(codes(result).includes('SYSTEM_DISABLED'), false, 'GM bypasses the system-blocker guard');
   assert.ok(
     calls.activeRuns.length > 0,
     'GM attempt reached the active-run guard past the system-validity gate'
@@ -577,14 +520,14 @@ test('startAttempt rejects disabled environment and disabled task before visibil
   const environmentCalls = {};
   const disabledEnvironmentEngine = makeEngine({
     environments: [environment({ enabled: false, tasks: [task({ toolIds: ['tool-tool'] })] })],
-    calls: environmentCalls,
+    calls: environmentCalls
   });
 
   const disabledEnvironment = await disabledEnvironmentEngine.startAttempt({
     viewer,
     actor,
     environmentId: 'env-a',
-    taskId: 'task-a',
+    taskId: 'task-a'
   });
 
   assert.equal(disabledEnvironment.accepted, false);
@@ -596,14 +539,14 @@ test('startAttempt rejects disabled environment and disabled task before visibil
   const taskCalls = {};
   const disabledTaskEngine = makeEngine({
     environments: [environment({ tasks: [task({ enabled: false, toolIds: ['tool-tool'] })] })],
-    calls: taskCalls,
+    calls: taskCalls
   });
 
   const disabledTask = await disabledTaskEngine.startAttempt({
     viewer,
     actor,
     environmentId: 'env-a',
-    taskId: 'task-a',
+    taskId: 'task-a'
   });
 
   assert.equal(disabledTask.accepted, false);
@@ -622,7 +565,7 @@ test('startAttempt rejects actors that are not selectable before environment gat
     viewer,
     actor: unownedActor,
     environmentId: 'env-a',
-    taskId: 'task-a',
+    taskId: 'task-a'
   });
 
   assert.equal(result.accepted, false);
@@ -636,23 +579,12 @@ test('startAttempt rejects actors that are not selectable before environment gat
 test('startAttempt rejects scene/token blockers before visibility, duplicate, tools, or validation', async () => {
   const calls = {};
   const engine = makeEngine({
-    environments: [
-      environment({ sceneUuid: 'Scene.old-mine', tasks: [task({ toolIds: ['tool-tool'] })] }),
-    ],
-    sceneAccess: {
-      allowed: false,
-      code: 'SCENE_TOKEN_BLOCKED',
-      messageKey: 'FABRICATE.Gathering.Blocked.TokenMissing',
-    },
-    calls,
+    environments: [environment({ sceneUuid: 'Scene.old-mine', tasks: [task({ toolIds: ['tool-tool'] })] })],
+    sceneAccess: { allowed: false, code: 'SCENE_TOKEN_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.TokenMissing' },
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['SCENE_TOKEN_BLOCKED']);
@@ -667,19 +599,12 @@ test('startAttempt rejects scene/token blockers before visibility, duplicate, to
 test('startAttempt fails closed for scene-linked environments without a sceneAccess implementation', async () => {
   const calls = {};
   const engine = makeEngine({
-    environments: [
-      environment({ sceneUuid: 'Scene.old-mine', tasks: [task({ toolIds: ['tool-tool'] })] }),
-    ],
+    environments: [environment({ sceneUuid: 'Scene.old-mine', tasks: [task({ toolIds: ['tool-tool'] })] })],
     sceneAccessCollaborator: {},
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['SCENE_TOKEN_BLOCKED']);
@@ -695,19 +620,12 @@ test('startAttempt rejects hidden visibility before duplicate active run or tool
   const calls = {};
   const engine = makeEngine({
     environments: [environment({ tasks: [task({ toolIds: ['tool-tool'] })] })],
-    visibility: new Map([
-      ['task-a', { visible: false, reasonCode: 'HIDDEN', diagnostic: { taskId: 'task-a' } }],
-    ]),
+    visibility: new Map([['task-a', { visible: false, reasonCode: 'HIDDEN', diagnostic: { taskId: 'task-a' } }]]),
     activeRuns: new Map([['task-a', { id: 'run-active', taskId: 'task-a' }]]),
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_HIDDEN']);
@@ -723,22 +641,14 @@ test('startAttempt rejects duplicate active run before tool availability or vali
   const engine = makeEngine({
     environments: [environment({ tasks: [task({ toolIds: ['tool-tool'] })] })],
     activeRuns: new Map([['task-a', { id: 'run-active', taskId: 'task-a' }]]),
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['DUPLICATE_ACTIVE_RUN']);
-  assert.deepEqual(
-    calls.activeRuns.map((call) => call.taskId),
-    ['task-a']
-  );
+  assert.deepEqual(calls.activeRuns.map(call => call.taskId), ['task-a']);
   assert.deepEqual(calls.tools, []);
   assert.deepEqual(calls.validate, []);
   assertNoRunMutation(calls);
@@ -749,27 +659,19 @@ test('startAttempt rejects timed task with an existing active run before waiting
   const timedTask = task({
     id: 'timed-task',
     toolIds: ['tool-tool'],
-    timeRequirement: { hours: 1 },
+    timeRequirement: { hours: 1 }
   });
   const engine = makeEngine({
     environments: [environment({ tasks: [timedTask] })],
     activeRuns: new Map([['timed-task', { id: 'run-active', taskId: 'timed-task' }]]),
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'timed-task',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'timed-task' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['DUPLICATE_ACTIVE_RUN']);
-  assert.deepEqual(
-    calls.activeRuns.map((call) => call.taskId),
-    ['timed-task']
-  );
+  assert.deepEqual(calls.activeRuns.map(call => call.taskId), ['timed-task']);
   assert.deepEqual(calls.tools, []);
   assert.deepEqual(calls.createWaitingRun, []);
 });
@@ -780,15 +682,10 @@ test('startAttempt rejects missing tools before task misconfiguration validation
     environments: [environment({ tasks: [task({ toolIds: ['tool-tool'] })] })],
     toolAvailability: { available: false, missing: [{ componentId: 'tool' }] },
     validation: { valid: false, errors: ['task is invalid'] },
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TOOL_BLOCKED']);
@@ -805,19 +702,19 @@ test('startAttempt evaluates rich node, stamina, and attempt-limit blockers befo
   const richTask = task({
     nodes: { current: 0, max: 2, depletionTiming: 'onStart', respawn: { policy: 'manual' } },
     staminaCost: 5,
-    attemptLimit: { scope: 'actor', max: 1 },
+    attemptLimit: { scope: 'actor', max: 1 }
   });
   const richState = {
     evaluateStart: async () => ({
       blockedReasons: [
         { code: 'NODE_DEPLETED', messageKey: 'FABRICATE.Gathering.Blocked.NodeDepleted' },
-        { code: 'STAMINA_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.StaminaBlocked' },
+        { code: 'STAMINA_BLOCKED', messageKey: 'FABRICATE.Gathering.Blocked.StaminaBlocked' }
       ],
       evidence: {
         nodes: { current: 0, max: 2 },
-        stamina: { cost: 5, state: { current: 0, max: 10 } },
-      },
-    }),
+        stamina: { cost: 5, state: { current: 0, max: 10 } }
+      }
+    })
   };
   const engine = makeEngine({
     environments: [environment({ tasks: [richTask] })],
@@ -825,15 +722,10 @@ test('startAttempt evaluates rich node, stamina, and attempt-limit blockers befo
     validation: () => {
       throw new Error('validation should not run after rich blockers');
     },
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['NODE_DEPLETED']);
@@ -846,20 +738,15 @@ test('startAttempt rejects timed task with missing tools before waiting run crea
   const timedTask = task({
     id: 'timed-task',
     toolIds: ['tool-tool'],
-    timeRequirement: { hours: 1 },
+    timeRequirement: { hours: 1 }
   });
   const engine = makeEngine({
     environments: [environment({ tasks: [timedTask] })],
     toolAvailability: { available: false, missing: [{ componentId: 'tool' }] },
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'timed-task',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'timed-task' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TOOL_BLOCKED']);
@@ -872,21 +759,14 @@ test('startAttempt rejects task misconfiguration after tools but before run writ
   const engine = makeEngine({
     // No system routed roll formula → the routed task is misconfigured.
     systems: [systemWithoutRoutedCheck()],
-    calls,
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'task-a',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
-  assert.deepEqual(result.blockedReasons[0].data.errors, [
-    'Routed gathering task requires a system-level gathering check roll formula',
-  ]);
+  assert.deepEqual(result.blockedReasons[0].data.errors, ['Routed gathering task requires a system-level gathering check roll formula']);
   assert.deepEqual(calls.validate, []);
   assertNoRunMutation(calls);
 });
@@ -895,25 +775,16 @@ test('startAttempt rejects timed task misconfiguration before waiting run creati
   const calls = {};
   const engine = makeEngine({
     systems: [systemWithoutRoutedCheck()],
-    environments: [
-      environment({
-        tasks: [
-          task({
-            id: 'timed-task',
-            timeRequirement: { hours: 1 },
-          }),
-        ],
-      }),
-    ],
-    calls,
+    environments: [environment({
+      tasks: [task({
+        id: 'timed-task',
+        timeRequirement: { hours: 1 }
+      })]
+    })],
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'timed-task',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'timed-task' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -923,25 +794,16 @@ test('startAttempt rejects timed task misconfiguration before waiting run creati
 test('startAttempt rejects invalid timed task gate before waiting run creation', async () => {
   const calls = {};
   const engine = makeEngine({
-    environments: [
-      environment({
-        tasks: [
-          task({
-            id: 'timed-task',
-            timeRequirement: { minutes: 0, hours: 'nope' },
-          }),
-        ],
-      }),
-    ],
-    calls,
+    environments: [environment({
+      tasks: [task({
+        id: 'timed-task',
+        timeRequirement: { minutes: 0, hours: 'nope' }
+      })]
+    })],
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'timed-task',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'timed-task' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -955,21 +817,16 @@ test('startAttempt rejects invalid timed task gate before waiting run creation',
 // configuration was entirely valid.
 for (const [label, timeRequirement] of [
   ['an empty object', {}],
-  ['an all-zero object', { minutes: 0, hours: 0, days: 0, months: 0, years: 0 }],
+  ['an all-zero object', { minutes: 0, hours: 0, days: 0, months: 0, years: 0 }]
 ]) {
   test(`startAttempt treats ${label} timeRequirement as an immediate task`, async () => {
     const calls = {};
     const engine = makeEngine({
       environments: [environment({ tasks: [task({ id: 'zero-task', timeRequirement })] })],
-      calls,
+      calls
     });
 
-    const result = await engine.startAttempt({
-      viewer,
-      actor,
-      environmentId: 'env-a',
-      taskId: 'zero-task',
-    });
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'zero-task' });
 
     assert.equal(result.accepted, true, 'a task with no duration is not misconfigured');
     assert.deepEqual(calls.createWaitingRun, [], 'and it resolves now rather than waiting');
@@ -978,7 +835,7 @@ for (const [label, timeRequirement] of [
 
 test('a zero-duration task does not advertise a delay in the listing', async () => {
   const engine = makeEngine({
-    environments: [environment({ tasks: [task({ id: 'zero-task', timeRequirement: {} })] })],
+    environments: [environment({ tasks: [task({ id: 'zero-task', timeRequirement: {} })] })]
   });
 
   const listing = await engine.listForActor({ viewer, actor });
@@ -990,20 +847,13 @@ test('a zero-duration task does not advertise a delay in the listing', async () 
 test('startAttempt names the duration field it cannot use', async () => {
   const calls = {};
   const engine = makeEngine({
-    environments: [
-      environment({
-        tasks: [task({ id: 'timed-task', timeRequirement: { days: -3 } })],
-      }),
-    ],
-    calls,
+    environments: [environment({
+      tasks: [task({ id: 'timed-task', timeRequirement: { days: -3 } })]
+    })],
+    calls
   });
 
-  const result = await engine.startAttempt({
-    viewer,
-    actor,
-    environmentId: 'env-a',
-    taskId: 'timed-task',
-  });
+  const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'timed-task' });
 
   assert.equal(result.accepted, false);
   assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
@@ -1020,27 +870,23 @@ test('non-GM blind hidden start response does not expose task identity or visibi
   const blindTask = task({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    toolIds: ['tool-sickle'],
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        tasks: [blindTask],
-      }),
-    ],
-    visibility: new Map([
-      [
-        blindTask.id,
-        {
-          visible: false,
-          reasonCode: 'SECRET_MOONCAP_HIDDEN',
-          description: 'Secret Mooncap Patch is concealed',
-          diagnostic: { taskId: blindTask.id, componentId: 'silver-sickle' },
-        },
-      ],
-    ]),
-    calls,
+    environments: [environment({
+      selectionMode: 'blind',
+      tasks: [blindTask]
+    })],
+    visibility: new Map([[
+      blindTask.id,
+      {
+        visible: false,
+        reasonCode: 'SECRET_MOONCAP_HIDDEN',
+        description: 'Secret Mooncap Patch is concealed',
+        diagnostic: { taskId: blindTask.id, componentId: 'silver-sickle' }
+      }
+    ]]),
+    calls
   });
 
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -1065,17 +911,15 @@ test('non-GM blind start response does not expose task identity when waiting run
   const blindTask = task({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    timeRequirement: { hours: 1 },
+    timeRequirement: { hours: 1 }
   });
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        tasks: [blindTask],
-      }),
-    ],
+    environments: [environment({
+      selectionMode: 'blind',
+      tasks: [blindTask]
+    })],
     waitingRunError: new Error('Secret Mooncap Patch failed for secret-mooncap-task'),
-    calls,
+    calls
   });
 
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -1095,19 +939,17 @@ test('non-GM blind start response does not expose task identity when waiting run
   const blindTask = task({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    timeRequirement: { hours: 1 },
+    timeRequirement: { hours: 1 }
   });
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        tasks: [blindTask],
-      }),
-    ],
+    environments: [environment({
+      selectionMode: 'blind',
+      tasks: [blindTask]
+    })],
     waitingRunResult: {
-      diagnostics: [{ taskId: blindTask.id, message: 'Secret Mooncap Patch failed' }],
+      diagnostics: [{ taskId: blindTask.id, message: 'Secret Mooncap Patch failed' }]
     },
-    calls,
+    calls
   });
 
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -1127,30 +969,26 @@ test('non-GM blind misconfigured start response does not expose task identity, t
   const blindTask = task({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    toolIds: ['tool-sickle'],
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
     // No system routed roll formula → the routed task is misconfigured.
     systems: [systemWithoutRoutedCheck()],
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        rules: { blindCandidateGate: 'allMatching' },
-        tasks: [blindTask],
-      }),
-    ],
-    visibility: new Map([
-      [
-        blindTask.id,
-        {
-          visible: true,
-          reasonCode: 'SECRET_MOONCAP_VISIBLE',
-          description: 'Secret Mooncap Patch',
-          diagnostic: { taskId: blindTask.id, componentId: 'silver-sickle' },
-        },
-      ],
-    ]),
-    calls,
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
+      tasks: [blindTask]
+    })],
+    visibility: new Map([[
+      blindTask.id,
+      {
+        visible: true,
+        reasonCode: 'SECRET_MOONCAP_VISIBLE',
+        description: 'Secret Mooncap Patch',
+        diagnostic: { taskId: blindTask.id, componentId: 'silver-sickle' }
+      }
+    ]]),
+    calls
   });
 
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -1173,22 +1011,17 @@ test('non-GM blind blocked start response does not expose task identity in dupli
   const blindTask = task({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    toolIds: ['tool-sickle'],
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        rules: { blindCandidateGate: 'allMatching' },
-        tasks: [blindTask],
-      }),
-    ],
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
+      tasks: [blindTask]
+    })],
     activeRuns: new Map([[blindTask.id, { id: 'run-active', taskId: blindTask.id }]]),
-    toolAvailability: {
-      available: false,
-      missing: [{ componentId: 'silver-sickle', taskId: blindTask.id }],
-    },
-    calls,
+    toolAvailability: { available: false, missing: [{ componentId: 'silver-sickle', taskId: blindTask.id }] },
+    calls
   });
 
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -1209,21 +1042,16 @@ test('non-GM blind tool-blocked start response does not expose missing tool deta
   const blindTask = task({
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch',
-    toolIds: ['tool-sickle'],
+    toolIds: ['tool-sickle']
   });
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        rules: { blindCandidateGate: 'allMatching' },
-        tasks: [blindTask],
-      }),
-    ],
-    toolAvailability: {
-      available: false,
-      missing: [{ componentId: 'silver-sickle', taskId: blindTask.id }],
-    },
-    calls,
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
+      tasks: [blindTask]
+    })],
+    toolAvailability: { available: false, missing: [{ componentId: 'silver-sickle', taskId: blindTask.id }] },
+    calls
   });
 
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -1242,17 +1070,15 @@ test('non-GM blind tool-blocked start response does not expose missing tool deta
 test('GM blind blocked start response may expose task identity for inspection', async () => {
   const blindTask = task({
     id: 'secret-mooncap-task',
-    name: 'Secret Mooncap Patch',
+    name: 'Secret Mooncap Patch'
   });
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        rules: { blindCandidateGate: 'allMatching' },
-        tasks: [blindTask],
-      }),
-    ],
-    activeRuns: new Map([[blindTask.id, { id: 'run-active', taskId: blindTask.id }]]),
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
+      tasks: [blindTask]
+    })],
+    activeRuns: new Map([[blindTask.id, { id: 'run-active', taskId: blindTask.id }]])
   });
 
   const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
@@ -1268,11 +1094,10 @@ test('blind attemptableOnly gate skips a blocked task and starts an attemptable 
   const good = task({ id: 'good-task', name: 'Good' });
   const engine = makeEngine({
     environments: [environment({ selectionMode: 'blind', tasks: [blocked, good] })],
-    toolAvailability: (payload) =>
-      payload.task.id === 'blocked-task'
-        ? { available: false, missing: [{ componentId: 'rare-herb' }] }
-        : { available: true, missing: [] },
-    calls,
+    toolAvailability: (payload) => payload.task.id === 'blocked-task'
+      ? { available: false, missing: [{ componentId: 'rare-herb' }] }
+      : { available: true, missing: [] },
+    calls
   });
 
   // GM viewer so the resolved task identity is exposed for the assertion.
@@ -1288,7 +1113,7 @@ test('blind attemptableOnly gate yields no candidate when the sole task is block
   const engine = makeEngine({
     environments: [environment({ selectionMode: 'blind', tasks: [blocked] })],
     toolAvailability: { available: false, missing: [{ componentId: 'rare-herb' }] },
-    calls,
+    calls
   });
 
   const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a' });
@@ -1303,12 +1128,11 @@ test('blind attemptableOnly gate yields no candidate when the sole task is block
 test('blind selection honors per-task weights with a seeded RNG', async () => {
   const x = task({ id: 'task-x', name: 'X' });
   const y = task({ id: 'task-y', name: 'Y' });
-  const makeBlindEnv = () =>
-    environment({
-      selectionMode: 'blind',
-      blindSelection: { weights: { 'task-x': 3, 'task-y': 1 } },
-      tasks: [x, y],
-    });
+  const makeBlindEnv = () => environment({
+    selectionMode: 'blind',
+    blindSelection: { weights: { 'task-x': 3, 'task-y': 1 } },
+    tasks: [x, y]
+  });
 
   const low = makeEngine({ environments: [makeBlindEnv()], random: () => 0 });
   const lowResult = await low.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
@@ -1323,14 +1147,12 @@ test('blind selection excludes a task weighted to zero', async () => {
   const x = task({ id: 'task-x', name: 'X' });
   const y = task({ id: 'task-y', name: 'Y' });
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        blindSelection: { weights: { 'task-x': 0, 'task-y': 1 } },
-        tasks: [x, y],
-      }),
-    ],
-    random: () => 0,
+    environments: [environment({
+      selectionMode: 'blind',
+      blindSelection: { weights: { 'task-x': 0, 'task-y': 1 } },
+      tasks: [x, y]
+    })],
+    random: () => 0
   });
 
   const result = await engine.startAttempt({ viewer: gmViewer, actor, environmentId: 'env-a' });
@@ -1341,19 +1163,16 @@ test('blind allMatching gate keeps blocked tasks in the pool so they can still b
   const blocked = task({ id: 'blocked-task', name: 'Blocked', toolIds: ['tool-herb'] });
   const good = task({ id: 'good-task', name: 'Good' });
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        rules: { blindCandidateGate: 'allMatching' },
-        tasks: [blocked, good],
-      }),
-    ],
-    toolAvailability: (payload) =>
-      payload.task.id === 'blocked-task'
-        ? { available: false, missing: [{ componentId: 'rare-herb' }] }
-        : { available: true, missing: [] },
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { blindCandidateGate: 'allMatching' },
+      tasks: [blocked, good]
+    })],
+    toolAvailability: (payload) => payload.task.id === 'blocked-task'
+      ? { available: false, missing: [{ componentId: 'rare-herb' }] }
+      : { available: true, missing: [] },
     // Seed the weighted pick to land on the first pool entry (both tasks weight 1 by default).
-    random: () => 0,
+    random: () => 0
   });
 
   // allMatching ignores attemptability: the blocked task remains a draw candidate
@@ -1363,34 +1182,21 @@ test('blind allMatching gate keeps blocked tasks in the pool so they can still b
   assert.deepEqual(codes(result), ['TOOL_BLOCKED']);
 });
 
-const ironTask = (overrides = {}) =>
-  task({
-    resultGroups: [
-      {
-        id: 'group-iron',
-        name: 'Iron',
-        results: [{ id: 'result-iron', componentId: 'iron', quantity: 1 }],
-      },
-    ],
-    ...overrides,
-  });
+const ironTask = (overrides = {}) => task({
+  resultGroups: [{ id: 'group-iron', name: 'Iron', results: [{ id: 'result-iron', componentId: 'iron', quantity: 1 }] }],
+  ...overrides
+});
 
 test('blind reveal policy onAttempt reveals the resolved task on success', async () => {
   const captured = [];
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        rules: { revealPolicy: 'onAttempt', revealScope: 'party' },
-        tasks: [ironTask({ id: 'reveal-task' })],
-      }),
-    ],
-    richState: {
-      revealTask: async (_actor, payload) => {
-        captured.push(payload);
-      },
-    },
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }],
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onAttempt', revealScope: 'party' },
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
   });
 
   let result;
@@ -1409,18 +1215,12 @@ test('blind reveal policy onAttempt reveals the resolved task on success', async
 test('blind reveal policy onSuccess does not reveal a failed attempt', async () => {
   const captured = [];
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        rules: { revealPolicy: 'onSuccess' },
-        tasks: [ironTask({ id: 'reveal-task' })],
-      }),
-    ],
-    richState: {
-      revealTask: async (_actor, payload) => {
-        captured.push(payload);
-      },
-    },
+    environments: [environment({
+      selectionMode: 'blind',
+      rules: { revealPolicy: 'onSuccess' },
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } }
   });
 
   let result;
@@ -1437,18 +1237,12 @@ test('blind reveal policy onSuccess does not reveal a failed attempt', async () 
 test('blind reveal policy never (default) does not reveal', async () => {
   const captured = [];
   const engine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'blind',
-        tasks: [ironTask({ id: 'reveal-task' })],
-      }),
-    ],
-    richState: {
-      revealTask: async (_actor, payload) => {
-        captured.push(payload);
-      },
-    },
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }],
+    environments: [environment({
+      selectionMode: 'blind',
+      tasks: [ironTask({ id: 'reveal-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { captured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
   });
 
   let result;
@@ -1465,28 +1259,17 @@ test('blind reveal policy never (default) does not reveal', async () => {
 test('targeted mode never auto-reveals even when the system policy would reveal', async () => {
   const targetedCaptured = [];
   const targetedEngine = makeEngine({
-    environments: [
-      environment({
-        selectionMode: 'targeted',
-        rules: { revealPolicy: 'onAttempt' },
-        tasks: [ironTask({ id: 'targeted-task' })],
-      }),
-    ],
-    richState: {
-      revealTask: async (_actor, payload) => {
-        targetedCaptured.push(payload);
-      },
-    },
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }],
+    environments: [environment({
+      selectionMode: 'targeted',
+      rules: { revealPolicy: 'onAttempt' },
+      tasks: [ironTask({ id: 'targeted-task' })]
+    })],
+    richState: { revealTask: async (_actor, payload) => { targetedCaptured.push(payload); } },
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 1 }]
   });
   routedRoll(true);
   try {
-    await targetedEngine.startAttempt({
-      viewer,
-      actor,
-      environmentId: 'env-a',
-      taskId: 'targeted-task',
-    });
+    await targetedEngine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'targeted-task' });
   } finally {
     delete globalThis.Roll;
   }

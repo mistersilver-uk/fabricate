@@ -243,9 +243,7 @@ function markupRegion(file) {
       'Retarget the extractor rather than deleting the assertion.'
   );
   const beforeStyle = source.lastIndexOf('<style>');
-  return beforeStyle > afterScript
-    ? source.slice(afterScript, beforeStyle)
-    : source.slice(afterScript);
+  return beforeStyle > afterScript ? source.slice(afterScript, beforeStyle) : source.slice(afterScript);
 }
 
 /** Every class-attribute VALUE in a markup region — `class="..."` and `class={`...`}` alike. */
@@ -275,8 +273,7 @@ function selectorsIn(css) {
   while (match !== null) {
     const head = match[2].trim();
     if (head.includes('.') || head.includes('[') || /^[a-zA-Z]/.test(head)) {
-      for (const selector of splitSelectorList(head))
-        out.push(selector.replace(/\s+/g, ' ').trim());
+      for (const selector of splitSelectorList(head)) out.push(selector.replace(/\s+/g, ' ').trim());
     }
     match = pattern.exec(text);
   }
@@ -439,8 +436,7 @@ test('every rule a primitive owns is rooted at the primitive, not at an applicat
       rootless,
       [],
       `these selectors are ${primitive.name}'s own but are not rooted at one of its namespace ` +
-        'classes, so they either bleed page-wide or match nothing:\n  ' +
-        rootless.join('\n  ')
+        'classes, so they either bleed page-wide or match nothing:\n  ' + rootless.join('\n  ')
     );
   }
 });
@@ -496,18 +492,7 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
  */
 function elementsWithAncestry(text) {
   const VOID_ELEMENTS = new Set([
-    'area',
-    'base',
-    'br',
-    'col',
-    'embed',
-    'hr',
-    'img',
-    'input',
-    'link',
-    'meta',
-    'source',
-    'track',
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track',
     'wbr',
   ]);
   const out = [];
@@ -521,14 +506,8 @@ function elementsWithAncestry(text) {
       const open = stack.map((entry) => entry.name).lastIndexOf(name);
       if (open !== -1) stack.length = open;
     } else {
-      const classes = (attributes.match(/class="([^"]*)"/) ?? [, ''])[1]
-        .split(/\s+/)
-        .filter(Boolean);
-      out.push({
-        name,
-        classes,
-        ancestry: [...stack.flatMap((entry) => entry.classes), ...classes],
-      });
+      const classes = (attributes.match(/class="([^"]*)"/) ?? [, ''])[1].split(/\s+/).filter(Boolean);
+      out.push({ name, classes, ancestry: [...stack.flatMap((entry) => entry.classes), ...classes] });
       if (!selfClosing && !VOID_ELEMENTS.has(name)) stack.push({ name, classes });
     }
     match = pattern.exec(text);
@@ -538,9 +517,7 @@ function elementsWithAncestry(text) {
 
 test('hand-built fixture markup carries the namespace roots the primitive writes', () => {
   const sources = collectWorkingTreeSources(['tests'], ['.js']);
-  const exempt = new Set(
-    DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`)
-  );
+  const exempt = new Set(DETECTOR_FIXTURE_EXEMPTIONS.map((entry) => `${entry.file}|${entry.primitive}`));
   const exemptHits = new Map();
   const offenders = [];
   let attributes = 0;
@@ -576,8 +553,7 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
     [],
     'these fixtures write a primitive’s root class without the namespace class beside it, so ' +
       'they render a copy no rule in the sheet reaches and measure a default rather than the ' +
-      'product:\n  ' +
-      offenders.join('\n  ')
+      'product:\n  ' + offenders.join('\n  ')
   );
 
   // The exemption is only earned while it is still USED, and at the count it was recorded with.

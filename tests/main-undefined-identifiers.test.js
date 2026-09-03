@@ -115,11 +115,7 @@ async function undefinedIdentifiers(files) {
   const ignored = results
     .filter((result) => result.messages.some((m) => /File ignored/i.test(m.message ?? '')))
     .map((result) => posix(result.filePath).split('/src/').pop());
-  assert.deepEqual(
-    ignored,
-    [],
-    'these files were IGNORED rather than linted, so they are unchecked'
-  );
+  assert.deepEqual(ignored, [], 'these files were IGNORED rather than linted, so they are unchecked');
   // A PARSE FAILURE IS NOT A CLEAN FILE. ESLint reports one as `{ ruleId: null, fatal: true }`,
   // which the `ruleId === 'no-undef'` filter below drops - so a file with broken syntax AND an
   // undefined call read as clean, having been checked for nothing at all.

@@ -110,10 +110,7 @@ export function remoteClient({ systems = [], recipes = [] } = {}) {
  */
 export function twoSystemWorld() {
   return remoteClient({
-    systems: [
-      persistedSystem(SYS_A, ['Iron Ore', 'Copper Ore']),
-      persistedSystem(SYS_B, ['Tin Ore']),
-    ],
+    systems: [persistedSystem(SYS_A, ['Iron Ore', 'Copper Ore']), persistedSystem(SYS_B, ['Tin Ore'])],
     recipes: [
       persistedRecipe('r-a1', SYS_A, `${SYS_A}-c0`),
       persistedRecipe('r-a2', SYS_A, `${SYS_A}-c1`),

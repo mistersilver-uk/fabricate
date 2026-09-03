@@ -9,13 +9,10 @@ function makeEvaluator({ expressionResults = new Map() } = {}) {
     evaluateExpression: async (payload) => {
       expressionCalls.push(payload);
       const { expression } = payload;
-      const result =
-        expressionResults instanceof Map
-          ? expressionResults.get(expression)
-          : expressionResults[expression];
+      const result = expressionResults instanceof Map ? expressionResults.get(expression) : expressionResults[expression];
       if (result instanceof Error) throw result;
       return result;
-    },
+    }
   });
 
   return { evaluator, expressionCalls };
@@ -40,8 +37,8 @@ test('visibility compares numeric formula against threshold', async () => {
   const { evaluator, expressionCalls } = makeEvaluator({
     expressionResults: new Map([
       ['1d20 + @skills.sur.mod', 15],
-      ['12', 12],
-    ]),
+      ['12', 12]
+    ])
   });
 
   const result = await evaluator.evaluateVisibility({
@@ -49,7 +46,7 @@ test('visibility compares numeric formula against threshold', async () => {
     actor,
     viewer,
     environment,
-    task,
+    task
   });
 
   assert.equal(result.visible, true);
@@ -69,8 +66,8 @@ test('visibility accepts boolean threshold comparison outcomes', async () => {
   const { evaluator } = makeEvaluator({
     expressionResults: new Map([
       ['@skills.sur.mod', 4],
-      ['@skills.sur.mod >= 6', false],
-    ]),
+      ['@skills.sur.mod >= 6', false]
+    ])
   });
 
   const result = await evaluator.evaluateVisibility({
@@ -78,7 +75,7 @@ test('visibility accepts boolean threshold comparison outcomes', async () => {
     actor,
     viewer,
     environment,
-    task,
+    task
   });
 
   assert.equal(result.visible, false);
@@ -87,7 +84,9 @@ test('visibility accepts boolean threshold comparison outcomes', async () => {
 
 test('thrown expression errors return diagnostics without raw throws', async () => {
   const { evaluator: expressionEvaluator } = makeEvaluator({
-    expressionResults: new Map([['@skills.sur.mod', new Error('expression exploded')]]),
+    expressionResults: new Map([
+      ['@skills.sur.mod', new Error('expression exploded')]
+    ])
   });
 
   const expressionVisibility = await expressionEvaluator.evaluateVisibility({
@@ -95,7 +94,7 @@ test('thrown expression errors return diagnostics without raw throws', async () 
     actor,
     viewer,
     environment,
-    task,
+    task
   });
   assert.equal(expressionVisibility.visible, false);
   assert.equal(expressionVisibility.reasonCode, 'PROVIDER_ERROR');
@@ -116,11 +115,11 @@ test('null requirement is allowed with NO_REQUIREMENT reason', async () => {
 
 test('requirement allows when expression is truthy', async () => {
   const { evaluator, expressionCalls } = makeEvaluator({
-    expressionResults: new Map([['@flags.proficient', 1]]),
+    expressionResults: new Map([['@flags.proficient', 1]])
   });
   const result = await evaluator.evaluateRequirement({
     requirement: { formula: '@flags.proficient' },
-    actor,
+    actor
   });
   assert.equal(result.allowed, true);
   assert.equal(result.reasonCode, 'REQUIREMENT_MET');
@@ -129,11 +128,11 @@ test('requirement allows when expression is truthy', async () => {
 
 test('requirement blocks when expression is zero', async () => {
   const { evaluator } = makeEvaluator({
-    expressionResults: new Map([['@flags.proficient', 0]]),
+    expressionResults: new Map([['@flags.proficient', 0]])
   });
   const result = await evaluator.evaluateRequirement({
     requirement: { formula: '@flags.proficient' },
-    actor,
+    actor
   });
   assert.equal(result.allowed, false);
   assert.equal(result.reasonCode, 'REQUIREMENT_FAILED');
@@ -141,11 +140,11 @@ test('requirement blocks when expression is zero', async () => {
 
 test('requirement blocks when expression returns boolean false', async () => {
   const { evaluator } = makeEvaluator({
-    expressionResults: new Map([['@flags.proficient', false]]),
+    expressionResults: new Map([['@flags.proficient', false]])
   });
   const result = await evaluator.evaluateRequirement({
     requirement: { formula: '@flags.proficient' },
-    actor,
+    actor
   });
   assert.equal(result.allowed, false);
 });
@@ -154,7 +153,7 @@ test('requirement without formula is misconfigured', async () => {
   const { evaluator } = makeEvaluator();
   const result = await evaluator.evaluateRequirement({
     requirement: { formula: '' },
-    actor,
+    actor
   });
   assert.equal(result.allowed, false);
   assert.equal(result.reasonCode, 'MISCONFIGURED_PROVIDER');

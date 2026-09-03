@@ -5,18 +5,19 @@ globalThis.game = { user: { id: 'user-1', name: 'Player', isGM: false } };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
-const { registerRecipeItemLearningHook, canMutateOwnedItem, notifyOwnedItemLearningResult } =
-  await import('../src/systems/RecipeItemLearningHook.js');
+const {
+  registerRecipeItemLearningHook,
+  canMutateOwnedItem,
+  notifyOwnedItemLearningResult
+} = await import('../src/systems/RecipeItemLearningHook.js');
 
 const ALARA_IMAGE = 'icons/svg/mystery-man.svg';
 
 function getPathValue(object, path) {
-  return String(path)
-    .split('.')
-    .reduce((value, part) => {
-      if (value == null || typeof value !== 'object') return undefined;
-      return value[part];
-    }, object);
+  return String(path).split('.').reduce((value, part) => {
+    if (value == null || typeof value !== 'object') return undefined;
+    return value[part];
+  }, object);
 }
 
 function setPathValue(object, path, value) {
@@ -54,7 +55,7 @@ class FakeItem extends FakeDocument {
     uuid = 'Actor.actor-1.Item.formula',
     name = 'Formula',
     sourceId = 'shared-source',
-    flagsArg = {},
+    flagsArg = {}
   } = {}) {
     super(flagsArg);
     this.uuid = uuid;
@@ -64,14 +65,7 @@ class FakeItem extends FakeDocument {
 }
 
 class FakeActor extends FakeDocument {
-  constructor({
-    id = 'actor-1',
-    name = 'Alara',
-    img = ALARA_IMAGE,
-    items = [],
-    flagsArg = {},
-    canUpdate = true,
-  } = {}) {
+  constructor({ id = 'actor-1', name = 'Alara', img = ALARA_IMAGE, items = [], flagsArg = {}, canUpdate = true } = {}) {
     super(flagsArg);
     this.id = id;
     this.name = name;
@@ -91,7 +85,7 @@ function buildRecipe({
   name = 'Potion',
   craftingSystemId = 'system-1',
   recipeItemId = 'book',
-  linkedRecipeItemUuid = null,
+  linkedRecipeItemUuid = null
 } = {}) {
   return {
     id,
@@ -101,7 +95,7 @@ function buildRecipe({
     linkedRecipeItemUuid,
     visibility: { restricted: false, allowedUserIds: [] },
     locked: false,
-    enabled: true,
+    enabled: true
   };
 }
 
@@ -110,7 +104,7 @@ function buildSystem({
   dragDropEnabled = true,
   originItemUuid = 'shared-source',
   listMode = 'knowledge',
-  knowledgeMode = 'learned',
+  knowledgeMode = 'learned'
 } = {}) {
   return {
     id,
@@ -119,23 +113,21 @@ function buildSystem({
       knowledge: {
         mode: knowledgeMode,
         item: { limitUses: false },
-        learn: { consumeOnLearn: false, dragDropEnabled },
-      },
+        learn: { consumeOnLearn: false, dragDropEnabled }
+      }
     },
-    recipeItemDefinitions: [{ id: 'book', originItemUuid }],
+    recipeItemDefinitions: [{ id: 'book', originItemUuid }]
   };
 }
 
 function buildService({ systems, recipes }) {
   const recipeManager = {
-    getRecipes: () => recipes,
+    getRecipes: () => recipes
   };
   const craftingSystemManager = {
     getSystem: (id) => systems[id] || null,
     getRecipeItemDefinition: (systemId, definitionId) =>
-      (systems[systemId]?.recipeItemDefinitions || []).find(
-        (definition) => definition.id === definitionId
-      ) || null,
+      (systems[systemId]?.recipeItemDefinitions || []).find(definition => definition.id === definitionId) || null
   };
   return new RecipeVisibilityService(recipeManager, craftingSystemManager);
 }
@@ -144,13 +136,13 @@ function createScenario({
   item = new FakeItem(),
   recipes = [buildRecipe()],
   systems = { 'system-1': buildSystem() },
-  actorCanUpdate = true,
+  actorCanUpdate = true
 } = {}) {
   const actor = new FakeActor({ items: [item], canUpdate: actorCanUpdate });
   return {
     actor,
     item,
-    service: buildService({ systems, recipes }),
+    service: buildService({ systems, recipes })
   };
 }
 
@@ -164,7 +156,7 @@ function makeResult(overrides = {}) {
     learnedRecipes: [{ name: 'Potion' }],
     matchedRecipes: [{ name: 'Potion' }],
     messageData: {},
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -186,14 +178,14 @@ describe('RecipeItemLearningHook', () => {
         on: (event, handler) => {
           hookRegistrations.push({ event, handler });
           return handler;
-        },
+        }
       },
       notify: {
         info: (message) => infoMessages.push(message),
-        warn: (message) => warnMessages.push(message),
+        warn: (message) => warnMessages.push(message)
       },
       localize: (key, data) => `${key}:${data.actor}:${data.recipes || data.matchedRecipes}`,
-      ...overrides,
+      ...overrides
     };
   }
 
@@ -201,13 +193,10 @@ describe('RecipeItemLearningHook', () => {
     const { actor, item, service } = createScenario();
 
     registerRecipeItemLearningHook(service, deps());
-    const createItemHook = hookRegistrations.find((entry) => entry.event === 'createItem');
+    const createItemHook = hookRegistrations.find(entry => entry.event === 'createItem');
     await createItemHook.handler(item, {}, 'user-1');
 
-    assert.deepEqual(
-      hookRegistrations.map((entry) => entry.event),
-      ['createItem']
-    );
+    assert.deepEqual(hookRegistrations.map(entry => entry.event), ['createItem']);
     const learned = actor.getFlag('fabricate', 'fabricate.learnedRecipes');
     assert.equal(learned['recipe-1'].sourceItemUuid, item.uuid);
     assert.equal(infoMessages.length, 1);
@@ -219,8 +208,8 @@ describe('RecipeItemLearningHook', () => {
     const { actor, service } = createScenario({
       item,
       systems: {
-        'system-1': buildSystem({ originItemUuid: 'Actor.actor-1.Item.exact' }),
-      },
+        'system-1': buildSystem({ originItemUuid: 'Actor.actor-1.Item.exact' })
+      }
     });
 
     registerRecipeItemLearningHook(service, deps());
@@ -269,8 +258,8 @@ describe('RecipeItemLearningHook', () => {
   it('remains silent when no recipe matches the created owned item', async () => {
     const { actor, item, service } = createScenario({
       systems: {
-        'system-1': buildSystem({ originItemUuid: 'different-source' }),
-      },
+        'system-1': buildSystem({ originItemUuid: 'different-source' })
+      }
     });
 
     registerRecipeItemLearningHook(service, deps());
@@ -287,14 +276,13 @@ describe('RecipeItemLearningHook', () => {
     item.parent = actor;
     item.canUserModify = actor.canUserModify;
     const service = {
-      learnRecipesFromOwnedItem: async () =>
-        makeResult({
-          shouldNotify: false,
-          notificationKind: 'silent',
-          message: null,
-          learnedRecipes: [],
-          matchedRecipes: [],
-        }),
+      learnRecipesFromOwnedItem: async () => makeResult({
+        shouldNotify: false,
+        notificationKind: 'silent',
+        message: null,
+        learnedRecipes: [],
+        matchedRecipes: []
+      })
     };
 
     registerRecipeItemLearningHook(service, deps());
@@ -307,8 +295,8 @@ describe('RecipeItemLearningHook', () => {
   it('remains silent when drag-drop learning is disabled by recipe visibility settings', async () => {
     const { actor, item, service } = createScenario({
       systems: {
-        'system-1': buildSystem({ dragDropEnabled: false }),
-      },
+        'system-1': buildSystem({ dragDropEnabled: false })
+      }
     });
 
     registerRecipeItemLearningHook(service, deps());
@@ -322,18 +310,14 @@ describe('RecipeItemLearningHook', () => {
   it('auto-learns only the auto-enabled scope when one item matches mixed systems', async () => {
     const recipes = [
       buildRecipe({ id: 'auto-recipe', name: 'Auto Recipe', craftingSystemId: 'auto-system' }),
-      buildRecipe({
-        id: 'manual-recipe',
-        name: 'Manual Recipe',
-        craftingSystemId: 'manual-system',
-      }),
+      buildRecipe({ id: 'manual-recipe', name: 'Manual Recipe', craftingSystemId: 'manual-system' })
     ];
     const { actor, item, service } = createScenario({
       recipes,
       systems: {
         'auto-system': buildSystem({ id: 'auto-system', dragDropEnabled: true }),
-        'manual-system': buildSystem({ id: 'manual-system', dragDropEnabled: false }),
-      },
+        'manual-system': buildSystem({ id: 'manual-system', dragDropEnabled: false })
+      }
     });
 
     registerRecipeItemLearningHook(service, deps());
@@ -348,8 +332,8 @@ describe('RecipeItemLearningHook', () => {
   it('remains silent for non-knowledge recipe visibility systems', async () => {
     const { actor, item, service } = createScenario({
       systems: {
-        'system-1': buildSystem({ listMode: 'global' }),
-      },
+        'system-1': buildSystem({ listMode: 'global' })
+      }
     });
 
     registerRecipeItemLearningHook(service, deps());
@@ -363,8 +347,8 @@ describe('RecipeItemLearningHook', () => {
   it('remains silent when knowledge mode is item-only', async () => {
     const { actor, item, service } = createScenario({
       systems: {
-        'system-1': buildSystem({ knowledgeMode: 'item' }),
-      },
+        'system-1': buildSystem({ knowledgeMode: 'item' })
+      }
     });
 
     registerRecipeItemLearningHook(service, deps());
@@ -375,12 +359,7 @@ describe('RecipeItemLearningHook', () => {
     assert.equal(warnMessages.length, 0);
   });
 
-  function buildCappedSystem({
-    id = 'system-1',
-    maxRecipes = 2,
-    dragDropEnabled = true,
-    originItemUuid = 'shared-source',
-  } = {}) {
+  function buildCappedSystem({ id = 'system-1', maxRecipes = 2, dragDropEnabled = true, originItemUuid = 'shared-source' } = {}) {
     return {
       id,
       recipeVisibility: {
@@ -388,8 +367,8 @@ describe('RecipeItemLearningHook', () => {
         // mode + dragDropEnabled stay system-wide; the learn cap is per-item (issue 511).
         knowledge: {
           mode: 'learned',
-          learn: { dragDropEnabled },
-        },
+          learn: { dragDropEnabled }
+        }
       },
       recipeItemDefinitions: [
         {
@@ -397,16 +376,16 @@ describe('RecipeItemLearningHook', () => {
           originItemUuid,
           caps: {
             item: { limitUses: false },
-            learn: { consumeOnLearn: false, limitRecipes: true, maxRecipes },
-          },
-        },
-      ],
+            learn: { consumeOnLearn: false, limitRecipes: true, maxRecipes }
+          }
+        }
+      ]
     };
   }
 
   it('does not auto-learn a capped-system book on drop (routes it to the item-sheet picker)', async () => {
     const { actor, item, service } = createScenario({
-      systems: { 'system-1': buildCappedSystem() },
+      systems: { 'system-1': buildCappedSystem() }
     });
 
     registerRecipeItemLearningHook(service, deps());
@@ -420,23 +399,15 @@ describe('RecipeItemLearningHook', () => {
 
   it('auto-learns the uncapped-system recipe of a mixed drop while suppressing the capped one', async () => {
     const recipes = [
-      buildRecipe({
-        id: 'capped-recipe',
-        name: 'Capped Recipe',
-        craftingSystemId: 'capped-system',
-      }),
-      buildRecipe({
-        id: 'uncapped-recipe',
-        name: 'Uncapped Recipe',
-        craftingSystemId: 'uncapped-system',
-      }),
+      buildRecipe({ id: 'capped-recipe', name: 'Capped Recipe', craftingSystemId: 'capped-system' }),
+      buildRecipe({ id: 'uncapped-recipe', name: 'Uncapped Recipe', craftingSystemId: 'uncapped-system' })
     ];
     const { actor, item, service } = createScenario({
       recipes,
       systems: {
         'capped-system': buildCappedSystem({ id: 'capped-system' }),
-        'uncapped-system': buildSystem({ id: 'uncapped-system', dragDropEnabled: true }),
-      },
+        'uncapped-system': buildSystem({ id: 'uncapped-system', dragDropEnabled: true })
+      }
     });
 
     registerRecipeItemLearningHook(service, deps());
@@ -451,7 +422,7 @@ describe('RecipeItemLearningHook', () => {
 
   it('FN1: a capped book with dragDropEnabled ON still surfaces the item-sheet picker eligibility', () => {
     const { service } = createScenario({
-      systems: { 'system-1': buildCappedSystem({ dragDropEnabled: true }) },
+      systems: { 'system-1': buildCappedSystem({ dragDropEnabled: true }) }
     });
     const recipe = buildRecipe();
 
@@ -462,15 +433,12 @@ describe('RecipeItemLearningHook', () => {
   });
 
   it('warns for already-known outcomes and reports one notification max', () => {
-    const notified = notifyOwnedItemLearningResult(
-      makeResult({
-        notificationKind: 'alreadyKnown',
-        message: 'FABRICATE.Knowledge.NoNewRecipesLearned',
-        learnedRecipes: [],
-        matchedRecipes: [{ name: 'Potion' }],
-      }),
-      deps()
-    );
+    const notified = notifyOwnedItemLearningResult(makeResult({
+      notificationKind: 'alreadyKnown',
+      message: 'FABRICATE.Knowledge.NoNewRecipesLearned',
+      learnedRecipes: [],
+      matchedRecipes: [{ name: 'Potion' }]
+    }), deps());
 
     assert.equal(notified, true);
     assert.equal(infoMessages.length, 0);
@@ -482,7 +450,7 @@ describe('RecipeItemLearningHook', () => {
     const item = {
       parent: actor,
       isOwner: true,
-      canUserModify: () => false,
+      canUserModify: () => false
     };
 
     assert.equal(canMutateOwnedItem(item, actor, globalThis.game.user), false);

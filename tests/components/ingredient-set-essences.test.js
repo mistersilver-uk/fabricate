@@ -14,16 +14,12 @@ const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
 function sortEssenceDefinitions(definitions = []) {
   return [...definitions].sort((left, right) => {
-    const nameCompare = String(left?.name || '').localeCompare(
-      String(right?.name || ''),
-      undefined,
-      {
-        sensitivity: 'base',
-      }
-    );
+    const nameCompare = String(left?.name || '').localeCompare(String(right?.name || ''), undefined, {
+      sensitivity: 'base'
+    });
     if (nameCompare !== 0) return nameCompare;
     return String(left?.id || '').localeCompare(String(right?.id || ''), undefined, {
-      sensitivity: 'base',
+      sensitivity: 'base'
     });
   });
 }
@@ -44,11 +40,11 @@ function buildEssenceSection(set, allEssences, showEssences, callbacks = {}) {
   heading.textContent = 'Essence Requirements';
   container.appendChild(heading);
 
-  const essenceOptions = sortEssenceDefinitions(allEssences).map((def) => ({
+  const essenceOptions = sortEssenceDefinitions(allEssences).map(def => ({
     id: def.id,
     name: def.name || def.id,
     icon: String(def.icon || '').trim() || DEFAULT_ESSENCE_ICON,
-    quantity: clampQuantity(set?.essences?.[def.id]),
+    quantity: clampQuantity(set?.essences?.[def.id])
   }));
 
   if (essenceOptions.length === 0) {
@@ -73,8 +69,7 @@ function buildEssenceSection(set, allEssences, showEssences, callbacks = {}) {
     minusBtn.className = 'essence-step essence-step-minus';
     minusBtn.title = `Decrease ${option.name}`;
     minusBtn.setAttribute('aria-label', `Decrease ${option.name}`);
-    minusBtn.onclick = () =>
-      callbacks.onUpdateEssence?.(0, option.id, Math.max(0, option.quantity - 1));
+    minusBtn.onclick = () => callbacks.onUpdateEssence?.(0, option.id, Math.max(0, option.quantity - 1));
     minusBtn.appendChild(document.createElement('i')).className = 'fas fa-minus';
     card.appendChild(minusBtn);
 
@@ -149,9 +144,13 @@ describe('IngredientSetPanel essence requirements section', () => {
   it('renders one card per system essence definition', () => {
     const allEssences = [
       { id: 'fire', name: 'Fire', icon: 'fas fa-fire' },
-      { id: 'water', name: 'Water', icon: 'fas fa-water' },
+      { id: 'water', name: 'Water', icon: 'fas fa-water' }
     ];
-    const section = buildEssenceSection({ essences: { fire: 3 } }, allEssences, true);
+    const section = buildEssenceSection(
+      { essences: { fire: 3 } },
+      allEssences,
+      true
+    );
 
     const cards = section.querySelectorAll('.essence-card');
     assert.equal(cards.length, 2);
@@ -164,12 +163,12 @@ describe('IngredientSetPanel essence requirements section', () => {
       { essences: { 'ess-z': 4, 'ess-a': 1 } },
       [
         { id: 'ess-z', name: 'Zephyr', icon: 'fas fa-wind' },
-        { id: 'ess-a', name: 'Amber', icon: 'fas fa-gem' },
+        { id: 'ess-a', name: 'Amber', icon: 'fas fa-gem' }
       ],
       true
     );
 
-    const names = [...section.querySelectorAll('.essence-name')].map((el) => el.textContent);
+    const names = [...section.querySelectorAll('.essence-name')].map(el => el.textContent);
     assert.deepEqual(names, ['Amber', 'Zephyr']);
   });
 
@@ -178,7 +177,7 @@ describe('IngredientSetPanel essence requirements section', () => {
       { essences: { fire: 2 } },
       [
         { id: 'fire', name: 'Fire', icon: 'fas fa-fire' },
-        { id: 'water', name: 'Water', icon: 'fas fa-water' },
+        { id: 'water', name: 'Water', icon: 'fas fa-water' }
       ],
       true
     );

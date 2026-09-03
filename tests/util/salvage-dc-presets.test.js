@@ -23,7 +23,7 @@ const values = (options) => options.map((option) => option.value);
 const labels = (options) => options.map((option) => option.label);
 
 describe('salvage DC presets (issue 676, decision 7)', () => {
-  it("offers the SYSTEM'S OWN authored tiers, not a hard-coded DC list", () => {
+  it('offers the SYSTEM\'S OWN authored tiers, not a hard-coded DC list', () => {
     // The brief's hard-coded `Standard 12 / Difficult 15 / Hard 17 / Very Hard 19` was
     // rejected precisely because it misreports the world's real DCs.
     const options = buildSalvageDcOptions({ tiers: TIERS, systemDc: 15 });
@@ -48,10 +48,7 @@ describe('salvage DC presets (issue 676, decision 7)', () => {
   it('case 2: zero authored tiers — the COMMON case — degrades to System default + Custom…', () => {
     // `tiers` defaults to []. A preset control with no presets; this case is exactly
     // why decision 7 kept the "Manage presets" link.
-    assert.deepEqual(values(buildSalvageDcOptions({ tiers: [], systemDc: 15 })), [
-      'system',
-      'custom',
-    ]);
+    assert.deepEqual(values(buildSalvageDcOptions({ tiers: [], systemDc: 15 })), ['system', 'custom']);
     assert.deepEqual(values(buildSalvageDcOptions({})), ['system', 'custom']);
   });
 
@@ -65,15 +62,8 @@ describe('salvage DC presets (issue 676, decision 7)', () => {
       { id: 'd', name: 'Negative', dc: -3 },
       { id: 'e', name: 'Real', dc: 13 },
     ];
-    assert.deepEqual(
-      usableSalvageDcTiers(messy).map((tier) => tier.id),
-      ['e']
-    );
-    assert.deepEqual(values(buildSalvageDcOptions({ tiers: messy })), [
-      'system',
-      'dc:13',
-      'custom',
-    ]);
+    assert.deepEqual(usableSalvageDcTiers(messy).map((tier) => tier.id), ['e']);
+    assert.deepEqual(values(buildSalvageDcOptions({ tiers: messy })), ['system', 'dc:13', 'custom']);
   });
 
   it('case 4: duplicate-DC tiers match the FIRST tier, and the ambiguity is immaterial', () => {

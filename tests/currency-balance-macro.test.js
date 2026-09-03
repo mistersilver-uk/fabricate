@@ -83,11 +83,7 @@ describe('interpretMacroBalanceResult', () => {
       [250],
     ]) {
       const result = interpretMacroBalanceResult(answer);
-      assert.equal(
-        result.valid,
-        false,
-        `${JSON.stringify(answer) ?? 'undefined'} is not an answer`
-      );
+      assert.equal(result.valid, false, `${JSON.stringify(answer) ?? 'undefined'} is not an answer`);
       assert.equal(
         'copperValue' in result,
         false,
@@ -233,7 +229,10 @@ describe('the surfaces that do not follow the vocabulary automatically', () => {
     // arrives, and nothing reports it.
     for (const path of PROJECTIONS) {
       const text = source(path);
-      const counts = CURRENCY_MACRO_KEYS.map((key) => [key, text.split(`${key}: ''`).length - 1]);
+      const counts = CURRENCY_MACRO_KEYS.map((key) => [
+        key,
+        text.split(`${key}: ''`).length - 1,
+      ]);
       const expected = counts[0][1];
       assert.ok(expected > 0, `${path} should carry at least one empty macro projection`);
       for (const [key, count] of counts) {

@@ -78,9 +78,7 @@ function toolStore(payload = {}) {
   const seam = settingsSeam({
     [SETTING_KEYS.TOOL_SCOPE]: {
       entities: { [TOOL_ID]: { id: TOOL_ID, name: 'Mining Pick' } },
-      defaults: {
-        [TOOL_ID]: { id: TOOL_ID, breakage: { mode: 'breakageChance', breakageChance: 8 } },
-      },
+      defaults: { [TOOL_ID]: { id: TOOL_ID, breakage: { mode: 'breakageChance', breakageChance: 8 } } },
       membership: {
         [`${TOOL_ID}|${SYSTEM_ID}`]: { entityId: TOOL_ID, systemId: SYSTEM_ID, inherit: {} },
       },

@@ -122,10 +122,7 @@ describe('the system Tool Rules inspector (issue 1373)', () => {
     // THE PILL STATES MEMBERSHIP, NOT AN ENABLED FLAG. `Enabled here` over a Tool with no rules
     // record would claim rules that do not exist.
     assert.ok(Boolean(panel.querySelector('[data-tool-inspector-no-rules]')));
-    assert.match(
-      panel.querySelector('[data-tool-inspector-no-rules]').textContent,
-      /No rules here/
-    );
+    assert.match(panel.querySelector('[data-tool-inspector-no-rules]').textContent, /No rules here/);
 
     // The button NAMES BOTH HALVES, which is exactly what it could not do before the system
     // name reached this component.

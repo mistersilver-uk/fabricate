@@ -40,8 +40,7 @@ function legacySystem(overrides = {}) {
   };
 }
 
-const migrateOne = (system) =>
-  migrateSystemCheckModifierCatalogue({ systems: [system] }).systems[0];
+const migrateOne = (system) => migrateSystemCheckModifierCatalogue({ systems: [system] }).systems[0];
 
 // ── the move ──────────────────────────────────────────────────────────────────
 

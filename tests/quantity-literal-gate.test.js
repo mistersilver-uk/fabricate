@@ -112,14 +112,7 @@ export function findQuantityLiterals(sources) {
 describe('the comment stripper', () => {
   it('blanks a line comment, a block comment and a JSDoc block', () => {
     const stripped = stripComments(
-      [
-        '/** doc system.quantity */',
-        'const a = 1; // trailing system.quantity',
-        '/*',
-        ' * system.quantity',
-        ' */',
-        'const b = 2;',
-      ].join('\n')
+      ['/** doc system.quantity */', 'const a = 1; // trailing system.quantity', '/*', ' * system.quantity', ' */', 'const b = 2;'].join('\n')
     );
     assert.equal(/system\.quantity/.test(stripped), false);
     assert.match(stripped, /const a = 1;/, 'code before a trailing comment survives');
@@ -127,16 +120,12 @@ describe('the comment stripper', () => {
   });
 
   it('does NOT treat a `//` inside a string as a comment', () => {
-    const stripped = stripComments(
-      "const url = 'https://example.test'; const q = item.system.quantity;"
-    );
+    const stripped = stripComments("const url = 'https://example.test'; const q = item.system.quantity;");
     assert.match(stripped, /system\.quantity/);
   });
 
   it('recovers on the next line from an unbalanced quote inside a regex', () => {
-    const stripped = stripComments(
-      ['const q = /[\'"]/;', 'const n = item.system.quantity;'].join('\n')
-    );
+    const stripped = stripComments(["const q = /['\"]/;", 'const n = item.system.quantity;'].join('\n'));
     assert.match(stripped, /system\.quantity/, 'quote state resets at every newline');
   });
 
@@ -150,9 +139,7 @@ describe('the comment stripper', () => {
 describe('the quantity literal gate can actually fail', () => {
   it('reports exactly one finding for a corpus holding one real literal', () => {
     const findings = findQuantityLiterals({
-      'src/fake/one.js': ['function have(item) {', '  return item.system.quantity;', '}'].join(
-        '\n'
-      ),
+      'src/fake/one.js': ['function have(item) {', '  return item.system.quantity;', '}'].join('\n'),
     });
     assert.deepEqual(
       findings.map((finding) => [finding.path, finding.line, finding.shape]),
@@ -175,7 +162,7 @@ describe('the quantity literal gate can actually fail', () => {
     const findings = findQuantityLiterals({
       'src/fake/write.js': "await item.update({ 'system.quantity': qty - count });",
       'src/fake/double.js': 'await item.update({ "system.quantity": 1 });',
-      'src/fake/const.js': 'const PATH = `system.quantity`;',
+      'src/fake/const.js': "const PATH = `system.quantity`;",
     });
     assert.equal(findings.length, 3);
     assert.deepEqual([...new Set(findings.map((finding) => finding.shape))], ['quoted path']);

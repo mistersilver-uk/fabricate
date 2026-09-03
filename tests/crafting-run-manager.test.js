@@ -562,7 +562,10 @@ test('CraftingRunManager: cleanupInvalidRuns keeps a fizzle on a valid system, p
   const history = manager.getRunHistory(actor);
   assert.equal(history.length, 1, 'the fizzle on the removed system is pruned');
   assert.equal(history[0].id, kept.id, 'the fizzle on a still-valid system survives');
-  assert.ok(!history.some((run) => run.id === dropped.id), 'the removed-system fizzle is gone');
+  assert.ok(
+    !history.some((run) => run.id === dropped.id),
+    'the removed-system fizzle is gone'
+  );
 });
 
 // Issue 970: both startup cleanup passes run on EVERY client and write directly to
@@ -671,7 +674,7 @@ test('CraftingRunManager: pruneInstantaneousActiveRuns removes single-step no-ti
   );
 });
 
-test("createRun snapshots each step's component ingredient requirements (issue 738)", async () => {
+test('createRun snapshots each step\'s component ingredient requirements (issue 738)', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();
   const actor = new FakeActor('Snapshotter');

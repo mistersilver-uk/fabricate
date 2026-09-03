@@ -3,10 +3,7 @@
 // across each crafting test file (the SonarCloud new-code duplication gate counts
 // duplicated fixture lines exactly like production code).
 
-import {
-  buildRequirementSlots,
-  resolveOpenSlotId,
-} from '../../src/ui/svelte/util/requirementSlots.js';
+import { buildRequirementSlots, resolveOpenSlotId } from '../../src/ui/svelte/util/requirementSlots.js';
 
 export function craftability(overrides = {}) {
   return {
@@ -19,13 +16,13 @@ export function craftability(overrides = {}) {
         description: '2x Spring Water',
         need: 2,
         have: 2,
-        satisfied: true,
-      },
+        satisfied: true
+      }
     ],
     essenceStates: [],
     toolStates: [],
     missing: [],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -51,8 +48,8 @@ export function essencePool(overrides = {}) {
         need: 4,
         delivered: 2,
         owned: 6,
-        satisfied: false,
-      },
+        satisfied: false
+      }
     ],
     carriers: [
       {
@@ -62,13 +59,13 @@ export function essencePool(overrides = {}) {
         img: 'icons/commodities/gems/gem-faceted-navette-purple.webp',
         ownedUnits: 3,
         allocatedUnits: 1,
-        perUnit: { radiant: 2 },
-      },
+        perUnit: { radiant: 2 }
+      }
     ],
     allocation: { 'Item.dusk-1': 1 },
     totals: { radiant: 2 },
     suggested: { 'Item.dusk-1': 2 },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -89,11 +86,11 @@ export function essenceCraftability(overrides = {}) {
         need: 4,
         delivered: 2,
         owned: 6,
-        satisfied: false,
-      },
+        satisfied: false
+      }
     ],
     essencePool: essencePool(),
-    ...overrides,
+    ...overrides
   });
 }
 
@@ -113,7 +110,7 @@ export function sharedEssenceCraftability(overrides = {}) {
       need: 2,
       delivered: 2,
       owned: 4,
-      satisfied: true,
+      satisfied: true
     },
     {
       groupId: 'g-shadow',
@@ -124,8 +121,8 @@ export function sharedEssenceCraftability(overrides = {}) {
       need: 3,
       delivered: 1,
       owned: 2,
-      satisfied: false,
-    },
+      satisfied: false
+    }
   ];
   return craftability({
     canCraft: false,
@@ -141,7 +138,7 @@ export function sharedEssenceCraftability(overrides = {}) {
       need: requirement.need,
       delivered: requirement.delivered,
       owned: requirement.owned,
-      satisfied: requirement.satisfied,
+      satisfied: requirement.satisfied
     })),
     essencePool: essencePool({
       requirements,
@@ -153,7 +150,7 @@ export function sharedEssenceCraftability(overrides = {}) {
           img: 'icons/commodities/gems/gem-faceted-navette-purple.webp',
           ownedUnits: 3,
           allocatedUnits: 1,
-          perUnit: { radiant: 2, shadow: 1 },
+          perUnit: { radiant: 2, shadow: 1 }
         },
         {
           itemKey: 'Item.prism-1',
@@ -162,14 +159,14 @@ export function sharedEssenceCraftability(overrides = {}) {
           img: 'icons/commodities/materials/powder-pink.webp',
           ownedUnits: 2,
           allocatedUnits: 0,
-          perUnit: { radiant: 1, ember: 1 },
-        },
+          perUnit: { radiant: 1, ember: 1 }
+        }
       ],
       allocation: { 'Item.dusk-1': 1 },
       totals: { radiant: 2, shadow: 1 },
-      suggested: { 'Item.dusk-1': 2, 'Item.prism-1': 1 },
+      suggested: { 'Item.dusk-1': 2, 'Item.prism-1': 1 }
     }),
-    ...overrides,
+    ...overrides
   });
 }
 
@@ -202,7 +199,7 @@ export function recipe(overrides = {}) {
     outcomeTiers: null,
     duration: null,
     result: { items: [{ name: 'Healing Potion', img: null, qty: 1 }], timeLabel: null, xp: null },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -228,7 +225,7 @@ export function multiStepRecipe(overrides = {}) {
               description: '5x Rough Leather Scraps',
               need: 5,
               have: 5,
-              satisfied: true,
+              satisfied: true
             },
             {
               componentId: 'c-cloth',
@@ -237,14 +234,14 @@ export function multiStepRecipe(overrides = {}) {
               description: '15x Cloth Scrap',
               need: 15,
               have: 15,
-              satisfied: true,
-            },
-          ],
+              satisfied: true
+            }
+          ]
         }),
-        products: [],
-      },
+        products: []
+      }
     ],
-    products: [],
+    products: []
   };
   const stepTwo = {
     id: 'step-2',
@@ -263,14 +260,14 @@ export function multiStepRecipe(overrides = {}) {
               description: '1x Lumber',
               need: 1,
               have: 1,
-              satisfied: true,
-            },
-          ],
+              satisfied: true
+            }
+          ]
         }),
-        products: [],
-      },
+        products: []
+      }
     ],
-    products: [],
+    products: []
   };
   return recipe({
     id: 'recipe-tent',
@@ -285,9 +282,9 @@ export function multiStepRecipe(overrides = {}) {
     result: {
       items: [{ name: 'Tent', img: 'icons/environment/settlement/tent.webp', qty: 1 }],
       timeLabel: null,
-      xp: null,
+      xp: null
     },
-    ...overrides,
+    ...overrides
   });
 }
 
@@ -302,23 +299,18 @@ export function steppedEssenceRecipe(overrides = {}) {
     label: 'Infuse',
     duration: null,
     ingredientSets: [
-      {
-        id: 'set-ess-1',
-        label: 'Option A',
-        craftability: sharedEssenceCraftability(),
-        products: [],
-      },
+      { id: 'set-ess-1', label: 'Option A', craftability: sharedEssenceCraftability(), products: [] }
     ],
-    products: [],
+    products: []
   };
   const stepTwo = {
     id: 'step-ess-2',
     label: 'Temper',
     duration: null,
     ingredientSets: [
-      { id: 'set-ess-2', label: 'Option A', craftability: essenceCraftability(), products: [] },
+      { id: 'set-ess-2', label: 'Option A', craftability: essenceCraftability(), products: [] }
     ],
-    products: [],
+    products: []
   };
   return recipe({
     id: 'recipe-sunblade',
@@ -332,7 +324,7 @@ export function steppedEssenceRecipe(overrides = {}) {
     activeStepId: 'step-ess-1',
     displayedStepId: 'step-ess-1',
     activeStepTimeGateArmed: false,
-    ...overrides,
+    ...overrides
   });
 }
 
@@ -347,7 +339,7 @@ export function listing(recipes, overrides = {}) {
     summaries: recipes,
     total: recipes.length,
     counts: { available: recipes.length, total: recipes.length },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -402,17 +394,10 @@ export function fakeCraftingStore(overrides = {}) {
     openSlotId: resolveOpenSlotId({
       slots: buildRequirementSlots(selectedCraftability),
       scopeKey,
-      rememberedKey: null,
+      rememberedKey: null
     }),
     slotAnnouncement: '',
-    shoppingAggregate: {
-      ingredients: [],
-      essences: [],
-      tools: [],
-      allSatisfied: true,
-      totalRecipes: 0,
-      totalQuantity: 0,
-    },
+    shoppingAggregate: { ingredients: [], essences: [], tools: [], allSatisfied: true, totalRecipes: 0, totalQuantity: 0 },
     load() {},
     select() {},
     setSearch() {},
@@ -433,6 +418,6 @@ export function fakeCraftingStore(overrides = {}) {
     clearShoppingList() {},
     craft() {},
     tickWorldTime() {},
-    ...overrides,
+    ...overrides
   };
 }

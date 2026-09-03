@@ -233,10 +233,7 @@ test('an expression the reducer cannot read never reaches the engine at all', ()
   const context = buildCheckModifierContext(
     {
       modifiers: CATALOGUE,
-      craftingCheck: {
-        defaultModifierPolicy: 'addAll',
-        defaultModifierIds: ['unreadable', 'flat'],
-      },
+      craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['unreadable', 'flat'] },
     },
     'crafting',
     {}
@@ -253,10 +250,7 @@ test('the resolver actually CONSULTS the engine about each rolling fragment', ()
   // identical, because a dropped entry and an un-emitted one produce the same formula.
   const calls = [];
   const context = buildCheckModifierContext(
-    {
-      modifiers: CATALOGUE,
-      craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['die', 'flat'] },
-    },
+    { modifiers: CATALOGUE, craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['die', 'flat'] } },
     'crafting',
     {}
   );

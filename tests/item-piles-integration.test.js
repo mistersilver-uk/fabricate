@@ -18,16 +18,10 @@ import assert from 'node:assert/strict';
 // ---------------------------------------------------------------------------
 // Minimal Foundry stubs (loaded before any src/ import)
 // ---------------------------------------------------------------------------
-globalThis.foundry = {
-  utils: {
-    randomID: () => `id-${Math.random().toString(36).slice(2)}`,
-    getProperty: () => undefined,
-  },
-};
+globalThis.foundry = { utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}`, getProperty: () => undefined } };
 globalThis.game = { modules: new Map(), itempiles: undefined };
 
-const { ItemPilesIntegration, ITEM_PILES_MINIMUM_VERSION } =
-  await import('../src/integrations/ItemPilesIntegration.js');
+const { ItemPilesIntegration, ITEM_PILES_MINIMUM_VERSION } = await import('../src/integrations/ItemPilesIntegration.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -166,10 +160,10 @@ test('canAfford - returns true when actor has sufficient currency', async () => 
       API: {
         getActorCurrencies: async () => [
           { abbreviation: 'gp', quantity: 100 },
-          { abbreviation: 'sp', quantity: 50 },
-        ],
-      },
-    },
+          { abbreviation: 'sp', quantity: 50 }
+        ]
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -183,9 +177,9 @@ test('canAfford - returns false when actor has insufficient currency', async () 
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
     itempiles: {
       API: {
-        getActorCurrencies: async () => [{ abbreviation: 'gp', quantity: 5 }],
-      },
-    },
+        getActorCurrencies: async () => [{ abbreviation: 'gp', quantity: 5 }]
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -199,9 +193,9 @@ test('canAfford - returns false when currency abbreviation not found', async () 
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
     itempiles: {
       API: {
-        getActorCurrencies: async () => [{ abbreviation: 'sp', quantity: 100 }],
-      },
-    },
+        getActorCurrencies: async () => [{ abbreviation: 'sp', quantity: 100 }]
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -215,9 +209,9 @@ test('canAfford - returns true when currencies array is empty', async () => {
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
     itempiles: {
       API: {
-        getActorCurrencies: async () => [],
-      },
-    },
+        getActorCurrencies: async () => []
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -231,11 +225,9 @@ test('canAfford - returns false when API throws', async () => {
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
     itempiles: {
       API: {
-        getActorCurrencies: async () => {
-          throw new Error('API error');
-        },
-      },
-    },
+        getActorCurrencies: async () => { throw new Error('API error'); }
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -249,7 +241,10 @@ test('canAfford - throws when integration is not available', async () => {
   const integration = new ItemPilesIntegration();
   integration.detect();
 
-  await assert.rejects(() => integration.canAfford(makeActor(), []), /not available/i);
+  await assert.rejects(
+    () => integration.canAfford(makeActor(), []),
+    /not available/i
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -264,9 +259,9 @@ test('deductCurrency - calls removeCurrencies with mapped abbreviation object', 
       API: {
         removeCurrencies: async (actor, currencyMap) => {
           calls.push({ actor, currencyMap });
-        },
-      },
-    },
+        }
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -274,7 +269,7 @@ test('deductCurrency - calls removeCurrencies with mapped abbreviation object', 
   const actor = makeActor();
   await integration.deductCurrency(actor, [
     { abbreviation: 'gp', amount: 25 },
-    { abbreviation: 'sp', amount: 5 },
+    { abbreviation: 'sp', amount: 5 }
   ]);
 
   assert.equal(calls.length, 1);
@@ -290,9 +285,9 @@ test('deductCurrency - skips entries with zero or negative amount', async () => 
       API: {
         removeCurrencies: async (actor, currencyMap) => {
           calls.push(currencyMap);
-        },
-      },
-    },
+        }
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -300,7 +295,7 @@ test('deductCurrency - skips entries with zero or negative amount', async () => 
   await integration.deductCurrency(makeActor(), [
     { abbreviation: 'gp', amount: 0 },
     { abbreviation: 'sp', amount: -1 },
-    { abbreviation: 'cp', amount: 3 },
+    { abbreviation: 'cp', amount: 3 }
   ]);
 
   assert.deepEqual(calls[0], { cp: 3 });
@@ -311,7 +306,10 @@ test('deductCurrency - throws when integration is not available', async () => {
   const integration = new ItemPilesIntegration();
   integration.detect();
 
-  await assert.rejects(() => integration.deductCurrency(makeActor(), []), /not available/i);
+  await assert.rejects(
+    () => integration.deductCurrency(makeActor(), []),
+    /not available/i
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -324,9 +322,9 @@ test('getMerchantItems - returns array from API', async () => {
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
     itempiles: {
       API: {
-        getMerchantItems: async () => fakeItems,
-      },
-    },
+        getMerchantItems: async () => fakeItems
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -338,7 +336,7 @@ test('getMerchantItems - returns array from API', async () => {
 test('getMerchantItems - returns empty array when API returns non-array', async () => {
   globalThis.game = {
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
-    itempiles: { API: { getMerchantItems: async () => null } },
+    itempiles: { API: { getMerchantItems: async () => null } }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -350,13 +348,7 @@ test('getMerchantItems - returns empty array when API returns non-array', async 
 test('getMerchantItems - returns empty array when API throws', async () => {
   globalThis.game = {
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
-    itempiles: {
-      API: {
-        getMerchantItems: async () => {
-          throw new Error('fail');
-        },
-      },
-    },
+    itempiles: { API: { getMerchantItems: async () => { throw new Error('fail'); } } }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -370,7 +362,10 @@ test('getMerchantItems - throws when integration is not available', async () => 
   const integration = new ItemPilesIntegration();
   integration.detect();
 
-  await assert.rejects(() => integration.getMerchantItems(makeActor()), /not available/i);
+  await assert.rejects(
+    () => integration.getMerchantItems(makeActor()),
+    /not available/i
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -383,9 +378,9 @@ test('getContainerContents - returns array from API', async () => {
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
     itempiles: {
       API: {
-        getItemPileItems: async () => fakeContents,
-      },
-    },
+        getItemPileItems: async () => fakeContents
+      }
+    }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -397,7 +392,7 @@ test('getContainerContents - returns array from API', async () => {
 test('getContainerContents - returns empty array when API returns non-array', async () => {
   globalThis.game = {
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
-    itempiles: { API: { getItemPileItems: async () => undefined } },
+    itempiles: { API: { getItemPileItems: async () => undefined } }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -409,13 +404,7 @@ test('getContainerContents - returns empty array when API returns non-array', as
 test('getContainerContents - returns empty array when API throws', async () => {
   globalThis.game = {
     modules: new Map([['item-piles', makeModule(true, '3.1.0')]]),
-    itempiles: {
-      API: {
-        getItemPileItems: async () => {
-          throw new Error('fail');
-        },
-      },
-    },
+    itempiles: { API: { getItemPileItems: async () => { throw new Error('fail'); } } }
   };
   const integration = new ItemPilesIntegration();
   integration.detect();
@@ -429,7 +418,10 @@ test('getContainerContents - throws when integration is not available', async ()
   const integration = new ItemPilesIntegration();
   integration.detect();
 
-  await assert.rejects(() => integration.getContainerContents(makeActor()), /not available/i);
+  await assert.rejects(
+    () => integration.getContainerContents(makeActor()),
+    /not available/i
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -453,7 +445,7 @@ test('CraftingEngine integration - canAfford consulted when currencyCost present
     },
     deductCurrency: async (actor, currencies) => {
       deductCalled = true;
-    },
+    }
   };
 
   // Simulate the logic that CraftingEngine performs:
@@ -483,7 +475,7 @@ test('CraftingEngine integration - craft fails when canAfford returns false', as
     canAfford: async () => false,
     deductCurrency: async () => {
       throw new Error('Should not be called');
-    },
+    }
   };
 
   const actor = makeActor();
@@ -516,7 +508,7 @@ test('CraftingEngine integration - no currency check when integration is disable
     canAfford: async () => {
       canAffordCalled = true;
       return true;
-    },
+    }
   };
 
   const actor = makeActor();
@@ -539,7 +531,7 @@ test('CraftingEngine integration - no currency check when recipe has no currency
     canAfford: async () => {
       canAffordCalled = true;
       return true;
-    },
+    }
   };
 
   const actor = makeActor();
@@ -591,7 +583,7 @@ test('CraftingEngine ordering - deductCurrency not called when ingredient consum
     canAfford: async () => true,
     deductCurrency: async () => {
       deductCalled = true;
-    },
+    }
   };
 
   const actor = makeActor();

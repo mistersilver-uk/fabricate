@@ -111,22 +111,14 @@ function restoreGlobal(key) {
   const saved = _originals.get(key);
   if (saved === undefined) {
     // Property did not exist as an own descriptor before; remove it.
-    try {
-      delete globalThis[key];
-    } catch {
-      /* non-configurable — leave it */
-    }
+    try { delete globalThis[key]; } catch { /* non-configurable — leave it */ }
   } else {
     try {
       Object.defineProperty(globalThis, key, saved);
     } catch {
       // If re-defining fails (e.g. the original was non-configurable),
       // fall back to a simple assignment so we at least restore the value.
-      try {
-        globalThis[key] = saved.value;
-      } catch {
-        /* give up */
-      }
+      try { globalThis[key] = saved.value; } catch { /* give up */ }
     }
   }
   _originals.delete(key);
@@ -179,9 +171,7 @@ export function teardownDOM() {
  */
 function describeElement(element) {
   const attributes = Array.from(element.attributes || [])
-    .map((attribute) =>
-      attribute.value ? `${attribute.name}="${attribute.value}"` : attribute.name
-    )
+    .map((attribute) => (attribute.value ? `${attribute.name}="${attribute.value}"` : attribute.name))
     .join(' ');
   return `<${element.tagName.toLowerCase()}${attributes ? ` ${attributes}` : ''}>`;
 }

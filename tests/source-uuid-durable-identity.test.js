@@ -68,9 +68,6 @@ test('a legacy scalar componentId flag is NEVER a tool identity (tools have no l
 
 test('null/empty inputs never match', () => {
   assert.equal(isTX(null), false);
-  assert.equal(
-    registeredItemUuid.itemIsToolByDurableIdentity(roleItem({}), null, TOOLS, SYSTEM_ID),
-    false
-  );
+  assert.equal(registeredItemUuid.itemIsToolByDurableIdentity(roleItem({}), null, TOOLS, SYSTEM_ID), false);
   assert.equal(isTX(roleItem({})), false);
 });

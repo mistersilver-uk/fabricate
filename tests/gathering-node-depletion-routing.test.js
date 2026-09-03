@@ -21,7 +21,7 @@ import {
   createGatheringNodeDepletionWriter,
   createDepletionRateLimiter,
   routeGatheringNodeDepleteMessage,
-  validateGatheringNodeDepletePayload,
+  validateGatheringNodeDepletePayload
 } from '../src/systems/gatheringNodeSocket.js';
 
 const SYS = 'sys-node';
@@ -38,8 +38,8 @@ function libraryTask(nodes = {}) {
       current: 3,
       depletionTiming: 'onStart',
       respawn: { policy: 'manual' },
-      ...nodes,
-    },
+      ...nodes
+    }
   };
 }
 
@@ -52,7 +52,7 @@ function fakeEnvironmentStore(record) {
       env = { ...env, ...patch };
       return env;
     },
-    _peek: () => env,
+    _peek: () => env
   };
 }
 
@@ -61,7 +61,7 @@ function makeService({
   config = { systems: { [SYS]: { tasks: [libraryTask()] } } },
   depleteEnvironmentNode = null,
   nodesEnabled = null,
-  nowWorldTime = () => 0,
+  nowWorldTime = () => 0
 } = {}) {
   return new GatheringNodeService({
     environmentStore: store,
@@ -70,7 +70,7 @@ function makeService({
     rollD100: () => 1,
     nowWorldTime,
     depleteEnvironmentNode,
-    nodesEnabled,
+    nodesEnabled
   });
 }
 
@@ -119,7 +119,7 @@ test('validateGatheringNodeDepletePayload normalizes a well-formed payload', () 
     validateGatheringNodeDepletePayload({
       action: GATHERING_NODE_DEPLETE,
       environmentId: ' env-1 ',
-      taskId: ' lib-1 ',
+      taskId: ' lib-1 '
     }),
     { action: GATHERING_NODE_DEPLETE, environmentId: 'env-1', taskId: 'lib-1' }
   );
@@ -132,7 +132,7 @@ test('validateGatheringNodeDepletePayload rejects malformed payloads', () => {
     { action: 'somethingElse', environmentId: 'env-1', taskId: 'lib-1' },
     { action: GATHERING_NODE_DEPLETE, taskId: 'lib-1' },
     { action: GATHERING_NODE_DEPLETE, environmentId: 'env-1' },
-    { action: GATHERING_NODE_DEPLETE, environmentId: '  ', taskId: 'lib-1' },
+    { action: GATHERING_NODE_DEPLETE, environmentId: '  ', taskId: 'lib-1' }
   ];
   for (const payload of cases) {
     assert.equal(validateGatheringNodeDepletePayload(payload), null, JSON.stringify(payload));
@@ -144,7 +144,7 @@ test('the payload carries no node object, so a forged message cannot restock or 
     action: GATHERING_NODE_DEPLETE,
     environmentId: 'env-1',
     taskId: 'lib-1',
-    node: { max: 9999, current: 9999, showCountsToPlayers: true },
+    node: { max: 9999, current: 9999, showCountsToPlayers: true }
   });
   assert.deepEqual(Object.keys(normalized).sort(), ['action', 'environmentId', 'taskId']);
 });
@@ -157,11 +157,11 @@ test('a non-GM client emits the depletion instead of writing it', () => {
   const writer = createGatheringNodeDepletionWriter({
     isActiveGM: () => false,
     emitDeplete: (payload) => emitted.push(payload),
-    applyDeplete: (args) => applied.push(args),
+    applyDeplete: (args) => applied.push(args)
   });
   writer.deplete({ environmentId: 'env-1', taskId: 'lib-1' });
   assert.deepEqual(emitted, [
-    { action: GATHERING_NODE_DEPLETE, environmentId: 'env-1', taskId: 'lib-1' },
+    { action: GATHERING_NODE_DEPLETE, environmentId: 'env-1', taskId: 'lib-1' }
   ]);
   assert.equal(applied.length, 0);
 });
@@ -172,7 +172,7 @@ test('the active GM applies locally — a socket emit never reaches the emitter'
   const writer = createGatheringNodeDepletionWriter({
     isActiveGM: () => true,
     emitDeplete: (payload) => emitted.push(payload),
-    applyDeplete: (args) => applied.push(args),
+    applyDeplete: (args) => applied.push(args)
   });
   writer.deplete({ environmentId: 'env-1', taskId: 'lib-1' });
   assert.deepEqual(applied, [{ environmentId: 'env-1', taskId: 'lib-1' }]);
@@ -189,7 +189,7 @@ test('a GM-less session reports the unroutable depletion instead of emitting int
     isActiveGM: () => false,
     hasActiveGM: () => false,
     onUnroutable: (args) => unroutable.push(args),
-    emitDeplete: (payload) => emitted.push(payload),
+    emitDeplete: (payload) => emitted.push(payload)
   });
   writer.deplete({ environmentId: 'env-1', taskId: 'lib-1' });
   assert.deepEqual(unroutable, [{ environmentId: 'env-1', taskId: 'lib-1' }]);
@@ -200,7 +200,7 @@ test('an omitted hasActiveGM seam keeps the plain emit behaviour', () => {
   const emitted = [];
   const writer = createGatheringNodeDepletionWriter({
     isActiveGM: () => false,
-    emitDeplete: (payload) => emitted.push(payload),
+    emitDeplete: (payload) => emitted.push(payload)
   });
   writer.deplete({ environmentId: 'env-1', taskId: 'lib-1' });
   assert.equal(emitted.length, 1);
@@ -210,7 +210,7 @@ test('the writer drops a payload it cannot address', () => {
   const emitted = [];
   const writer = createGatheringNodeDepletionWriter({
     isActiveGM: () => false,
-    emitDeplete: (payload) => emitted.push(payload),
+    emitDeplete: (payload) => emitted.push(payload)
   });
   writer.deplete({ environmentId: 'env-1' });
   writer.deplete();
@@ -224,16 +224,10 @@ test('only the active GM applies an inbound depletion', () => {
   const deps = { senderId: 'user-1', applyDeplete: (args) => applied.push(args) };
   const payload = { action: GATHERING_NODE_DEPLETE, environmentId: 'env-1', taskId: 'lib-1' };
 
-  assert.equal(
-    routeGatheringNodeDepleteMessage(payload, { ...deps, isActiveGM: () => false }),
-    false
-  );
+  assert.equal(routeGatheringNodeDepleteMessage(payload, { ...deps, isActiveGM: () => false }), false);
   assert.equal(applied.length, 0);
 
-  assert.equal(
-    routeGatheringNodeDepleteMessage(payload, { ...deps, isActiveGM: () => true }),
-    true
-  );
+  assert.equal(routeGatheringNodeDepleteMessage(payload, { ...deps, isActiveGM: () => true }), true);
   assert.deepEqual(applied, [{ environmentId: 'env-1', taskId: 'lib-1' }]);
 });
 
@@ -265,7 +259,7 @@ test('_resolveNodeSource routes deplete through the seam and writes nothing dire
   const service = makeService({ store, depleteEnvironmentNode: (args) => routed.push(args) });
   const source = service._resolveNodeSource({
     environment: { id: 'env-1' },
-    task: { id: 'lib-1', nodes: { max: 3, current: 3 } },
+    task: { id: 'lib-1', nodes: { max: 3, current: 3 } }
   });
 
   assert.equal(source.kind, 'environment');
@@ -279,7 +273,7 @@ test('without the seam, deplete writes in place (GM-only worlds and tests)', asy
   const service = makeService({ store });
   const source = service._resolveNodeSource({
     environment: { id: 'env-1' },
-    task: { id: 'lib-1', nodes: { max: 3, current: 3 } },
+    task: { id: 'lib-1', nodes: { max: 3, current: 3 } }
   });
 
   await source.deplete({ max: 3, current: 2 });
@@ -292,7 +286,7 @@ test('applyEnvironmentNodeDepletion consumes one unit from the STORED pool', asy
   const store = fakeEnvironmentStore({
     id: 'env-1',
     craftingSystemId: SYS,
-    nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 2, respawn: { policy: 'manual' } } },
+    nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 2, respawn: { policy: 'manual' } } }
   });
   const service = makeService({ store });
 
@@ -314,7 +308,7 @@ test('concurrent depletions are additive rather than last-write-wins', async () 
   const store = fakeEnvironmentStore({
     id: 'env-1',
     craftingSystemId: SYS,
-    nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } },
+    nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } }
   });
   const service = makeService({ store });
 
@@ -330,9 +324,7 @@ test('applyEnvironmentNodeDepletion keeps library capacity authoritative', async
     id: 'env-1',
     craftingSystemId: SYS,
     // A stale snapshot claiming a bigger pool than the library task allows.
-    nodeRuntime: {
-      'lib-1': { enabled: true, max: 99, current: 99, respawn: { policy: 'manual' } },
-    },
+    nodeRuntime: { 'lib-1': { enabled: true, max: 99, current: 99, respawn: { policy: 'manual' } } }
   });
   const service = makeService({ store });
 
@@ -346,7 +338,7 @@ test('applyEnvironmentNodeDepletion re-checks the node economy toggle', async ()
   const store = fakeEnvironmentStore({
     id: 'env-1',
     craftingSystemId: SYS,
-    nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } },
+    nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } }
   });
   const service = makeService({ store, nodesEnabled: () => false });
 
@@ -382,9 +374,9 @@ function makeRoutedRichState({ store, routed }) {
     systems: {
       [SYS]: {
         tasks: [libraryTask()],
-        economy: { nodes: { enabled: true }, stamina: { enabled: false } },
-      },
-    },
+        economy: { nodes: { enabled: true }, stamina: { enabled: false } }
+      }
+    }
   };
   return new GatheringRichStateService({
     environmentStore: store,
@@ -393,7 +385,7 @@ function makeRoutedRichState({ store, routed }) {
     settingKey: 'gatheringConfig',
     nowWorldTime: () => 0,
     hooks: { callAll: () => {} },
-    depleteEnvironmentNode: (args) => routed.push(args),
+    depleteEnvironmentNode: (args) => routed.push(args)
   });
 }
 
@@ -406,11 +398,8 @@ test('commitAcceptedAttempt routes the environment decrement instead of writing 
     actor: { id: 'a1', uuid: 'Actor.a1' },
     system: { id: SYS },
     environment: { id: 'env-1', craftingSystemId: SYS },
-    task: {
-      id: 'lib-1',
-      nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } },
-    },
-    outcome: { status: 'succeeded' },
+    task: { id: 'lib-1', nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } },
+    outcome: { status: 'succeeded' }
   });
 
   assert.deepEqual(routed, [{ environmentId: 'env-1', taskId: 'lib-1' }], 'relayed to the GM');
@@ -427,11 +416,8 @@ test('a relayed decrement is flagged non-authoritative so no guessed count is pu
     actor: { id: 'a1', uuid: 'Actor.a1' },
     system: { id: SYS },
     environment: { id: 'env-1', craftingSystemId: SYS },
-    task: {
-      id: 'lib-1',
-      nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } },
-    },
-    outcome: { status: 'succeeded' },
+    task: { id: 'lib-1', nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } },
+    outcome: { status: 'succeeded' }
   });
 
   assert.equal(evidence.node.authoritative, false, 'the count is this client, not the world');
@@ -441,8 +427,8 @@ test('without the seam the decrement is authoritative and written in place', asy
   const store = fakeEnvironmentStore({ id: 'env-1', craftingSystemId: SYS, nodeRuntime: {} });
   const config = {
     systems: {
-      [SYS]: { tasks: [libraryTask()], economy: { nodes: { enabled: true } } },
-    },
+      [SYS]: { tasks: [libraryTask()], economy: { nodes: { enabled: true } } }
+    }
   };
   const service = new GatheringRichStateService({
     environmentStore: store,
@@ -450,18 +436,15 @@ test('without the seam the decrement is authoritative and written in place', asy
     setSetting: async () => config,
     settingKey: 'gatheringConfig',
     nowWorldTime: () => 0,
-    hooks: { callAll: () => {} },
+    hooks: { callAll: () => {} }
   });
 
   const evidence = await service.commitAcceptedAttempt({
     actor: { id: 'a1', uuid: 'Actor.a1' },
     system: { id: SYS },
     environment: { id: 'env-1', craftingSystemId: SYS },
-    task: {
-      id: 'lib-1',
-      nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } },
-    },
-    outcome: { status: 'succeeded' },
+    task: { id: 'lib-1', nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } },
+    outcome: { status: 'succeeded' }
   });
 
   assert.equal(evidence.node.authoritative, true);
@@ -481,9 +464,9 @@ function makeLocalRichState(store, depletionTiming) {
     systems: {
       [SYS]: {
         tasks: [libraryTask({ depletionTiming })],
-        economy: { nodes: { enabled: true } },
-      },
-    },
+        economy: { nodes: { enabled: true } }
+      }
+    }
   };
   return new GatheringRichStateService({
     environmentStore: store,
@@ -491,14 +474,14 @@ function makeLocalRichState(store, depletionTiming) {
     setSetting: async () => config,
     settingKey: 'gatheringConfig',
     nowWorldTime: () => 0,
-    hooks: { callAll: () => {} },
+    hooks: { callAll: () => {} }
   });
 }
 
 function timedTask(depletionTiming) {
   return {
     id: 'lib-1',
-    nodes: { enabled: true, max: 3, current: 3, depletionTiming, respawn: { policy: 'manual' } },
+    nodes: { enabled: true, max: 3, current: 3, depletionTiming, respawn: { policy: 'manual' } }
   };
 }
 
@@ -509,7 +492,7 @@ async function commitPhase(service, task, phase, status) {
     environment: { id: 'env-1', craftingSystemId: SYS },
     task,
     outcome: { status },
-    phase,
+    phase
   });
 }
 
@@ -616,7 +599,7 @@ test('the router refuses a rate-limited sender without applying', () => {
       isActiveGM: () => true,
       senderId: 'user-1',
       allowSender: () => false,
-      applyDeplete: (args) => applied.push(args),
+      applyDeplete: (args) => applied.push(args)
     }
   );
   assert.equal(result, false);
@@ -633,7 +616,7 @@ test('a refused message does not consume the sender budget', () => {
       consulted.push(id);
       return true;
     },
-    applyDeplete: () => {},
+    applyDeplete: () => {}
   };
   routeGatheringNodeDepleteMessage({ action: 'unrelated' }, { ...deps, senderId: 'user-1' });
   routeGatheringNodeDepleteMessage(

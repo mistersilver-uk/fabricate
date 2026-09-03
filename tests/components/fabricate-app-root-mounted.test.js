@@ -82,7 +82,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-    'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -547,14 +547,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
 
     assert.deepEqual(
       railKeys(root),
-      [
-        'crafting',
-        'gathering',
-        'journal',
-        'inventory',
-        'ext:downtime:board',
-        'ext:downtime:ledger',
-      ],
+      ['crafting', 'gathering', 'journal', 'inventory', 'ext:downtime:board', 'ext:downtime:ledger'],
       "the faulted surface's rail entries STAY — removing them is indistinguishable from a mis-click"
     );
     assert.equal(host.activeTab, 'ext:downtime:board', 'and the active tab does not move');
@@ -659,11 +652,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     };
 
     press('crafting', 'ArrowUp');
-    assert.equal(
-      host.activeTab,
-      'ext:downtime:ledger',
-      'Up from the first entry wraps to the last'
-    );
+    assert.equal(host.activeTab, 'ext:downtime:ledger', 'Up from the first entry wraps to the last');
     await settle();
     assert.equal(focusedNavTab(root), 'ext:downtime:ledger', 'and focus wraps with it');
     press('crafting', 'End');
@@ -698,14 +687,14 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.deepEqual(
       railButtons(root).map((button) => button.getAttribute('tabindex')),
       ['0', '-1', '-1', '-1'],
-      'the tab stop falls back to the first entry rather than leaving every button at -1, ' +
-        'which would take the whole rail out of the Tab order'
+      'the tab stop falls back to the first entry rather than leaving every button at -1, '
+        + 'which would take the whole rail out of the Tab order'
     );
     assert.deepEqual(
       railButtons(root).map((button) => button.getAttribute('aria-selected')),
       ['false', 'false', 'false', 'false'],
-      'only the tab STOP falls back; aria-selected stays bound to the active tab, so nothing ' +
-        'claims a selection the panel is not showing'
+      'only the tab STOP falls back; aria-selected stays bound to the active tab, so nothing '
+        + 'claims a selection the panel is not showing'
     );
   });
 
@@ -716,8 +705,8 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.deepEqual(
       Array.from(tablist.children).map((child) => child.getAttribute('role')),
       ['tab', 'tab', 'tab', 'tab', 'tab', 'tab'],
-      "a tablist's only permitted owned role is tab, so a tooltip child is unallowed content " +
-        "axe-core's aria-required-children reports"
+      "a tablist's only permitted owned role is tab, so a tooltip child is unallowed content "
+        + "axe-core's aria-required-children reports"
     );
     // Selected by ATTRIBUTE, never by id: an id selector containing a colon is invalid CSS.
     const tooltip = root.querySelector('[id="player-nav-tooltip-ext:downtime:board"]');
@@ -725,8 +714,8 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.ok(!tablist.contains(tooltip), 'and it is no longer owned by the tablist');
     assert.ok(
       Boolean(tooltip.closest('.fabricate-app-shell')),
-      'it stays inside the shell, and an IDREF resolves document-wide, so the association the ' +
-        'rail button declares is unchanged'
+      'it stays inside the shell, and an IDREF resolves document-wide, so the association the '
+        + 'rail button declares is unchanged'
     );
     assert.equal(
       railButton(root, 'ext:downtime:board').getAttribute('aria-describedby'),
@@ -746,14 +735,14 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.match(
       ruleBody(css, 'fabricate-app-nav-item'),
       /width:\s*min\(64px,\s*100%\)/,
-      'a non-shrinkable 64px button inside a 68px content box puts a VISIBLE horizontal ' +
-        'scrollbar in the rail once a thin classic scrollbar takes its ~12px'
+      'a non-shrinkable 64px button inside a 68px content box puts a VISIBLE horizontal '
+        + 'scrollbar in the rail once a thin classic scrollbar takes its ~12px'
     );
     assert.match(
       ruleBody(css, 'fabricate-app-nav'),
       /scrollbar-gutter:\s*stable/,
-      'and the gutter is reserved up front, so crossing the entry count that starts the scroll ' +
-        'does not reflow the whole column'
+      'and the gutter is reserved up front, so crossing the entry count that starts the scroll '
+        + 'does not reflow the whole column'
     );
   });
 });
@@ -1021,8 +1010,8 @@ describe('FabricateAppRoot companion disposal (mounted)', () => {
     assert.deepEqual(
       calls.cleanups,
       [{ tabId: 'board', connected: true }],
-      'the {#if activeRoute} branch destroys the host, and destroy_effect removes its DOM ' +
-        'BEFORE running teardowns, so without the shell disposing first this ran detached'
+      'the {#if activeRoute} branch destroys the host, and destroy_effect removes its DOM '
+        + 'BEFORE running teardowns, so without the shell disposing first this ran detached'
     );
     assert.ok(!root.querySelector('[data-player-extension-mounted]'), 'and the target is gone');
   });
@@ -1131,8 +1120,8 @@ describe('FabricateAppRoot companion context stability (mounted)', () => {
     assert.equal(
       calls.mounts.length,
       1,
-      "another companion registering must not churn an unrelated live panel's scroll position, " +
-        'focus and in-flight state'
+      "another companion registering must not churn an unrelated live panel's scroll position, "
+        + 'focus and in-flight state'
     );
     assert.deepEqual(calls.cleanups, []);
   });

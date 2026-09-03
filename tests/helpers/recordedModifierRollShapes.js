@@ -120,9 +120,7 @@ export const RECORDED_FRAGMENT_VALIDITY = Object.freeze([
 
 /** The fragments `Roll.validate` accepts but the engine cannot actually roll. */
 export const VALIDATE_ONLY_HOLES = Object.freeze(
-  RECORDED_FRAGMENT_VALIDITY.filter(
-    ([, validates, evaluates]) => validates && evaluates !== 'rolls'
-  )
+  RECORDED_FRAGMENT_VALIDITY.filter(([, validates, evaluates]) => validates && evaluates !== 'rolls')
 );
 
 /**

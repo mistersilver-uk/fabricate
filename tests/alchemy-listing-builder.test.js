@@ -46,16 +46,8 @@ function plainRecipe(id, name, systemId, sig, resultComponentId, resultQty = 1) 
     description: `${name} description`,
     enabled: true,
     craftingSystemId: systemId,
-    ingredientSets: [
-      { id: `${id}-set`, ingredientGroups: groups, essences: {}, resultGroupId: `${id}-rg` },
-    ],
-    resultGroups: [
-      {
-        id: `${id}-rg`,
-        name: `${name} result`,
-        results: [{ componentId: resultComponentId, quantity: resultQty }],
-      },
-    ],
+    ingredientSets: [{ id: `${id}-set`, ingredientGroups: groups, essences: {}, resultGroupId: `${id}-rg` }],
+    resultGroups: [{ id: `${id}-rg`, name: `${name} result`, results: [{ componentId: resultComponentId, quantity: resultQty }] }],
   };
 }
 
@@ -75,16 +67,8 @@ function richRecipe(id, name, systemId) {
           {
             id: `${id}-g`,
             options: [
-              {
-                match: { type: 'component', componentId: 'emberroot' },
-                componentId: 'emberroot',
-                quantity: 1,
-              },
-              {
-                match: { type: 'component', componentId: 'ashsalt' },
-                componentId: 'ashsalt',
-                quantity: 1,
-              },
+              { match: { type: 'component', componentId: 'emberroot' }, componentId: 'emberroot', quantity: 1 },
+              { match: { type: 'component', componentId: 'ashsalt' }, componentId: 'ashsalt', quantity: 1 },
             ],
           },
         ],
@@ -92,13 +76,7 @@ function richRecipe(id, name, systemId) {
         resultGroupId: `${id}-rg`,
       },
     ],
-    resultGroups: [
-      {
-        id: `${id}-rg`,
-        name: 'Rich result',
-        results: [{ componentId: 'quicksilver', quantity: 1 }],
-      },
-    ],
+    resultGroups: [{ id: `${id}-rg`, name: 'Rich result', results: [{ componentId: 'quicksilver', quantity: 1 }] }],
   };
 }
 
@@ -134,9 +112,7 @@ function makeManagers(systems) {
 /** An actor with a fabricate flag store (doubly-nested, as setFabricateFlag
  *  persists it: `flags.fabricate.fabricate.<key>`) + owned items. */
 function makeActor(id, { learned = {}, deadEnds = {}, owned = {} } = {}) {
-  const flags = {
-    fabricate: { fabricate: { learnedRecipes: learned, alchemyDeadEnds: deadEnds } },
-  };
+  const flags = { fabricate: { fabricate: { learnedRecipes: learned, alchemyDeadEnds: deadEnds } } };
   const items = Object.entries(owned).map(([name, quantity]) => ({
     name,
     system: { quantity },
@@ -172,11 +148,7 @@ function stubVisibility(revealFn) {
 
 function buildWithVisibility(systems, options, recipeVisibility) {
   const { craftingSystemManager, recipeManager } = makeManagers(systems);
-  const builder = new AlchemyListingBuilder({
-    recipeManager,
-    craftingSystemManager,
-    recipeVisibility,
-  });
+  const builder = new AlchemyListingBuilder({ recipeManager, craftingSystemManager, recipeVisibility });
   return builder.buildListing(options);
 }
 
@@ -192,22 +164,8 @@ const COMPONENTS = [
 ];
 
 function singleSystemSetup() {
-  const vigor = plainRecipe(
-    'vigor',
-    'Elixir of Vigor',
-    'sys-a',
-    { emberroot: 1, springwater: 2 },
-    'quicksilver',
-    1
-  );
-  const toxin = plainRecipe(
-    'toxin',
-    "Serpent's Kiss",
-    'sys-a',
-    { ashsalt: 1, quicksilver: 1 },
-    'emberroot',
-    1
-  );
+  const vigor = plainRecipe('vigor', 'Elixir of Vigor', 'sys-a', { emberroot: 1, springwater: 2 }, 'quicksilver', 1);
+  const toxin = plainRecipe('toxin', "Serpent's Kiss", 'sys-a', { ashsalt: 1, quicksilver: 1 }, 'emberroot', 1);
   const system = makeSystem('sys-a', 'Herbalism', [vigor, toxin], COMPONENTS);
   return { system, recipes: [vigor, toxin] };
 }
@@ -247,11 +205,7 @@ test('the learned-recipe projection carries a rich signature summary + concrete 
   const vigor = listing.recipes[0];
   assert.equal(vigor.signatureSummary.length, 1);
   assert.equal(vigor.signatureSummary[0].groups.length, 2);
-  assert.deepEqual(
-    vigor.concrete,
-    { emberroot: 1, springwater: 2 },
-    'reduces to a concrete multiset'
-  );
+  assert.deepEqual(vigor.concrete, { emberroot: 1, springwater: 2 }, 'reduces to a concrete multiset');
   assert.equal(vigor.result.name, 'Quicksilver');
   assert.equal(vigor.result.quantity, 1);
 });
@@ -267,16 +221,8 @@ test('a rich signature (alternatives + essence) is projected but NOT reducible t
   });
   const projected = listing.recipes[0];
   assert.equal(projected.concrete, null, 'rich recipes fail safe to no concrete reduction');
-  assert.equal(
-    projected.signatureSummary[0].groups[0].options.length,
-    2,
-    'both alternatives shown'
-  );
-  assert.equal(
-    projected.signatureSummary[0].essences.length,
-    1,
-    'the essence requirement is shown'
-  );
+  assert.equal(projected.signatureSummary[0].groups[0].options.length, 2, 'both alternatives shown');
+  assert.equal(projected.signatureSummary[0].essences.length, 1, 'the essence requirement is shown');
 });
 
 test('an essence-type ingredient option projects the essence NAME + AMOUNT + icon, never the raw id', () => {
@@ -298,21 +244,13 @@ test('an essence-type ingredient option projects the essence NAME + AMOUNT + ico
           {
             id: 'bv-g1',
             options: [
-              {
-                match: { type: 'essence', essenceId: 'toxic-id', amount: 2 },
-                componentId: null,
-                quantity: 1,
-              },
+              { match: { type: 'essence', essenceId: 'toxic-id', amount: 2 }, componentId: null, quantity: 1 },
             ],
           },
           {
             id: 'bv-g2',
             options: [
-              {
-                match: { type: 'essence', essenceId: 'water-id', amount: 1 },
-                componentId: null,
-                quantity: 1,
-              },
+              { match: { type: 'essence', essenceId: 'water-id', amount: 1 }, componentId: null, quantity: 1 },
             ],
           },
         ],
@@ -320,13 +258,7 @@ test('an essence-type ingredient option projects the essence NAME + AMOUNT + ico
         resultGroupId: 'bv-rg',
       },
     ],
-    resultGroups: [
-      {
-        id: 'bv-rg',
-        name: 'Blade Venom result',
-        results: [{ componentId: 'quicksilver', quantity: 1 }],
-      },
-    ],
+    resultGroups: [{ id: 'bv-rg', name: 'Blade Venom result', results: [{ componentId: 'quicksilver', quantity: 1 }] }],
   };
   const system = makeSystem('sys-a', 'Herbalism', [bladeVenom], COMPONENTS);
   system.essenceDefinitions = [
@@ -349,11 +281,7 @@ test('an essence-type ingredient option projects the essence NAME + AMOUNT + ico
   assert.equal(toxic.quantity, 2, 'the display quantity is the required essence amount');
   assert.equal(toxic.icon, 'fas fa-skull', 'the essence icon is carried for display');
   assert.equal(toxic.componentId, null);
-  assert.equal(
-    toxic.essenceId,
-    'toxic-id',
-    'the essence id is carried in its own field, as set-level essences do'
-  );
+  assert.equal(toxic.essenceId, 'toxic-id', 'the essence id is carried in its own field, as set-level essences do');
 
   const water = groups[1].options[0];
   assert.equal(water.name, 'Water');
@@ -375,11 +303,7 @@ test('an essence option with a missing definition falls back to the raw id as th
           {
             id: 'o-g',
             options: [
-              {
-                match: { type: 'essence', essenceId: 'ghost-id', amount: 3 },
-                componentId: null,
-                quantity: 1,
-              },
+              { match: { type: 'essence', essenceId: 'ghost-id', amount: 3 }, componentId: null, quantity: 1 },
             ],
           },
         ],
@@ -387,9 +311,7 @@ test('an essence option with a missing definition falls back to the raw id as th
         resultGroupId: 'o-rg',
       },
     ],
-    resultGroups: [
-      { id: 'o-rg', name: 'r', results: [{ componentId: 'quicksilver', quantity: 1 }] },
-    ],
+    resultGroups: [{ id: 'o-rg', name: 'r', results: [{ componentId: 'quicksilver', quantity: 1 }] }],
   };
   const system = makeSystem('sys-a', 'Herbalism', [recipe], COMPONENTS);
   system.essenceDefinitions = [];
@@ -400,11 +322,7 @@ test('an essence option with a missing definition falls back to the raw id as th
     craftingSystemId: 'sys-a',
   });
   const option = listing.recipes[0].signatureSummary[0].groups[0].options[0];
-  assert.equal(
-    option.name,
-    'ghost-id',
-    'with no definition, the raw id is the only available label'
-  );
+  assert.equal(option.name, 'ghost-id', 'with no definition, the raw id is the only available label');
   assert.equal(option.quantity, 3, 'the amount is still the required essence amount');
   assert.equal(option.icon, null);
 });
@@ -433,23 +351,16 @@ test('projects owned components (held qty) and the actor fizzle keys for the act
     viewer: { isGM: false },
     craftingSystemId: 'sys-a',
   });
-  assert.deepEqual(listing.components.map((row) => [row.componentId, row.held]).sort(), [
-    ['ashsalt', 5],
-    ['emberroot', 4],
-  ]);
+  assert.deepEqual(
+    listing.components.map((row) => [row.componentId, row.held]).sort(),
+    [['ashsalt', 5], ['emberroot', 4]]
+  );
   assert.deepEqual(listing.fizzleKeys, ['ashsalt:2'], 'only the active system fizzle keys');
 });
 
 test('chooser summaries span every enabled alchemy system with N known . M total', () => {
   const a = singleSystemSetup();
-  const potion = plainRecipe(
-    'potion',
-    'Healing Potion',
-    'sys-b',
-    { emberroot: 2 },
-    'springwater',
-    1
-  );
+  const potion = plainRecipe('potion', 'Healing Potion', 'sys-b', { emberroot: 2 }, 'springwater', 1);
   const systemB = makeSystem('sys-b', 'Distillation', [potion], COMPONENTS);
   const actor = makeActor('pc', { learned: { vigor: {} } });
 
@@ -474,14 +385,7 @@ test('a resolved actor with no discipline chosen (>1 systems) is NOT no-actor an
   // reads as no-actor — which made the discipline chooser unreachable whenever an
   // actor was selected but no discipline chosen yet.
   const a = singleSystemSetup();
-  const potion = plainRecipe(
-    'potion',
-    'Healing Potion',
-    'sys-b',
-    { emberroot: 2 },
-    'springwater',
-    1
-  );
+  const potion = plainRecipe('potion', 'Healing Potion', 'sys-b', { emberroot: 2 }, 'springwater', 1);
   const systemB = makeSystem('sys-b', 'Distillation', [potion], COMPONENTS);
   const actor = makeActor('pc', { learned: { vigor: {} } });
 
@@ -541,20 +445,13 @@ test('routes reveal through the collaborator (not the learned map): reveals exac
   // reveal would show `vigor`, so this proves the decision is routed.
   const actor = makeActor('pc', { learned: {} });
   const vis = stubVisibility(({ recipe }) => recipe.id === 'toxin');
-  const listing = buildWithVisibility(
-    [{ system, recipes }],
-    {
-      craftingActor: actor,
-      viewer: { isGM: false },
-      craftingSystemId: 'sys-a',
-    },
-    vis
-  );
+  const listing = buildWithVisibility([{ system, recipes }], {
+    craftingActor: actor,
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  }, vis);
 
-  assert.deepEqual(
-    listing.recipes.map((r) => r.id),
-    ['toxin']
-  );
+  assert.deepEqual(listing.recipes.map((r) => r.id), ['toxin']);
   assert.equal(listing.undiscoveredCount, 1, 'the non-revealed valid recipe is a count only');
 });
 
@@ -565,15 +462,11 @@ test('reads `visible`, never `craftable`: a craftable-but-not-visible recipe is 
   const vis = {
     evaluateRecipeAccess: () => ({ visible: false, craftable: true }),
   };
-  const listing = buildWithVisibility(
-    [{ system, recipes }],
-    {
-      craftingActor: actor,
-      viewer: { isGM: false },
-      craftingSystemId: 'sys-a',
-    },
-    vis
-  );
+  const listing = buildWithVisibility([{ system, recipes }], {
+    craftingActor: actor,
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  }, vis);
 
   assert.deepEqual(listing.recipes, []);
   assert.equal(listing.undiscoveredCount, 2);
@@ -591,21 +484,14 @@ test('threads componentSourceActors into the reveal decision (component-source-o
       Array.isArray(componentSourceActors) &&
       componentSourceActors.some((a) => a.id === 'vault')
   );
-  const listing = buildWithVisibility(
-    [{ system, recipes }],
-    {
-      craftingActor: actor,
-      componentSourceActors: [sourceActor],
-      viewer: { isGM: false },
-      craftingSystemId: 'sys-a',
-    },
-    vis
-  );
+  const listing = buildWithVisibility([{ system, recipes }], {
+    craftingActor: actor,
+    componentSourceActors: [sourceActor],
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  }, vis);
 
-  assert.deepEqual(
-    listing.recipes.map((r) => r.id),
-    ['vigor']
-  );
+  assert.deepEqual(listing.recipes.map((r) => r.id), ['vigor']);
   assert.ok(
     vis.calls.every((call) => Array.isArray(call.componentSourceActors)),
     'the reveal decision always receives the threaded component-source actors'
@@ -616,15 +502,11 @@ test('GM-sees-all flows THROUGH the routed decision (no _isKnown short-circuit)'
   const { system, recipes } = singleSystemSetup();
   const gm = makeActor('gm', {});
   const vis = stubVisibility(({ viewer }) => viewer?.isGM === true);
-  const listing = buildWithVisibility(
-    [{ system, recipes }],
-    {
-      craftingActor: gm,
-      viewer: { isGM: true },
-      craftingSystemId: 'sys-a',
-    },
-    vis
-  );
+  const listing = buildWithVisibility([{ system, recipes }], {
+    craftingActor: gm,
+    viewer: { isGM: true },
+    craftingSystemId: 'sys-a',
+  }, vis);
 
   assert.equal(listing.recipes.length, 2, 'the GM sees all recipes via the routed decision');
   assert.equal(listing.undiscoveredCount, 0);
@@ -637,15 +519,11 @@ test('a recipe revealed by BOTH grant and brew is projected/counted exactly once
   // Collaborator admits `vigor` (e.g. both a grant AND brew-discovery). Reveal is a
   // single boolean per recipe, so it can only be projected once.
   const vis = stubVisibility(({ recipe }) => recipe.id === 'vigor');
-  const listing = buildWithVisibility(
-    [{ system, recipes }],
-    {
-      craftingActor: actor,
-      viewer: { isGM: false },
-      craftingSystemId: 'sys-a',
-    },
-    vis
-  );
+  const listing = buildWithVisibility([{ system, recipes }], {
+    craftingActor: actor,
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  }, vis);
 
   assert.equal(listing.recipes.filter((r) => r.id === 'vigor').length, 1);
   assert.equal(listing.recipes.length, 1);
@@ -659,20 +537,13 @@ test('LEAK INVARIANT (generalized): a non-revealed recipe leaks no name/signatur
   // (mode-specific un-reveal, e.g. an item-mode book that was dropped). It must be
   // count-only, with no identity in the serialized payload.
   const vis = stubVisibility(({ recipe }) => recipe.id === 'vigor');
-  const listing = buildWithVisibility(
-    [{ system, recipes }],
-    {
-      craftingActor: actor,
-      viewer: { isGM: false },
-      craftingSystemId: 'sys-a',
-    },
-    vis
-  );
+  const listing = buildWithVisibility([{ system, recipes }], {
+    craftingActor: actor,
+    viewer: { isGM: false },
+    craftingSystemId: 'sys-a',
+  }, vis);
 
-  assert.deepEqual(
-    listing.recipes.map((r) => r.id),
-    ['vigor']
-  );
+  assert.deepEqual(listing.recipes.map((r) => r.id), ['vigor']);
   assert.equal(listing.undiscoveredCount, 1);
   const serialized = JSON.stringify(listing);
   assert.ok(!serialized.includes("Serpent's Kiss"), 'non-revealed name must not leak');
@@ -684,14 +555,7 @@ test('LEAK INVARIANT (generalized): a non-revealed recipe leaks no name/signatur
 
 test('chooser knownCount counts REVEALED recipes and threads componentSourceActors', () => {
   const a = singleSystemSetup();
-  const potion = plainRecipe(
-    'potion',
-    'Healing Potion',
-    'sys-b',
-    { emberroot: 2 },
-    'springwater',
-    1
-  );
+  const potion = plainRecipe('potion', 'Healing Potion', 'sys-b', { emberroot: 2 }, 'springwater', 1);
   const systemB = makeSystem('sys-b', 'Distillation', [potion], COMPONENTS);
   const actor = makeActor('pc', { learned: {} });
   const sourceActor = makeActor('vault', {});
@@ -728,11 +592,7 @@ test('null-collaborator default: reveals GM-all / learned-only when no recipeVis
     viewer: { isGM: false },
     craftingSystemId: 'sys-a',
   });
-  assert.deepEqual(
-    listing.recipes.map((r) => r.id),
-    ['vigor'],
-    'learned-only default'
-  );
+  assert.deepEqual(listing.recipes.map((r) => r.id), ['vigor'], 'learned-only default');
   assert.equal(listing.undiscoveredCount, 1);
 
   const gm = makeActor('gm', {});
@@ -750,37 +610,14 @@ test('decoupling edge (real service): learnOnCraft:false + a held book is REVEAL
   // through the builder (not a stub): `learnOnCraft` governs only brew-discovery, so
   // a held book reveals under item mode yet the same recipe stays count-only under
   // global mode (discovery-only, nothing learned).
-  const vigor = plainRecipe(
-    'vigor',
-    'Elixir of Vigor',
-    'sys-a',
-    { emberroot: 1, springwater: 2 },
-    'quicksilver',
-    1
-  );
+  const vigor = plainRecipe('vigor', 'Elixir of Vigor', 'sys-a', { emberroot: 1, springwater: 2 }, 'quicksilver', 1);
   vigor.linkedRecipeItemUuid = 'book-vigor';
-  const toxin = plainRecipe(
-    'toxin',
-    "Serpent's Kiss",
-    'sys-a',
-    { ashsalt: 1, quicksilver: 1 },
-    'emberroot',
-    1
-  );
-  const system = {
-    ...makeSystem('sys-a', 'Herbalism', [vigor, toxin], COMPONENTS),
-    alchemy: { learnOnCraft: false },
-  };
+  const toxin = plainRecipe('toxin', "Serpent's Kiss", 'sys-a', { ashsalt: 1, quicksilver: 1 }, 'emberroot', 1);
+  const system = { ...makeSystem('sys-a', 'Herbalism', [vigor, toxin], COMPONENTS), alchemy: { learnOnCraft: false } };
 
-  const { craftingSystemManager, recipeManager } = makeManagers([
-    { system, recipes: [vigor, toxin] },
-  ]);
+  const { craftingSystemManager, recipeManager } = makeManagers([{ system, recipes: [vigor, toxin] }]);
   const service = new RecipeVisibilityService(recipeManager, craftingSystemManager);
-  const builder = new AlchemyListingBuilder({
-    recipeManager,
-    craftingSystemManager,
-    recipeVisibility: service,
-  });
+  const builder = new AlchemyListingBuilder({ recipeManager, craftingSystemManager, recipeVisibility: service });
 
   // Actor holds the vigor book (uuid matches linkedRecipeItemUuid), learned nothing.
   const actor = {
@@ -791,28 +628,12 @@ test('decoupling edge (real service): learnOnCraft:false + a held book is REVEAL
   const viewer = { isGM: false };
 
   system.visibilityMode = 'item';
-  const itemListing = builder.buildListing({
-    craftingActor: actor,
-    viewer,
-    craftingSystemId: 'sys-a',
-  });
-  assert.deepEqual(
-    itemListing.recipes.map((r) => r.id),
-    ['vigor'],
-    'item mode reveals the held-book recipe'
-  );
+  const itemListing = builder.buildListing({ craftingActor: actor, viewer, craftingSystemId: 'sys-a' });
+  assert.deepEqual(itemListing.recipes.map((r) => r.id), ['vigor'], 'item mode reveals the held-book recipe');
 
   system.visibilityMode = 'global';
-  const globalListing = builder.buildListing({
-    craftingActor: actor,
-    viewer,
-    craftingSystemId: 'sys-a',
-  });
-  assert.deepEqual(
-    globalListing.recipes,
-    [],
-    'global mode (discovery-only, learnOnCraft off) reveals nothing'
-  );
+  const globalListing = builder.buildListing({ craftingActor: actor, viewer, craftingSystemId: 'sys-a' });
+  assert.deepEqual(globalListing.recipes, [], 'global mode (discovery-only, learnOnCraft off) reveals nothing');
   assert.equal(globalListing.undiscoveredCount, 2, 'both recipes stay count-only under global');
 });
 
@@ -824,22 +645,9 @@ test('_projectOwnedComponents surfaces resolved essences when the system has ess
   const emberEss = { ...component('emberroot', 'Emberroot'), essences: { fire: 2 } };
   const water = component('springwater', 'Spring Water'); // no essences
   const comps = [emberEss, water];
-  const vigor = plainRecipe(
-    'vigor',
-    'Elixir of Vigor',
-    'sys-a',
-    { emberroot: 1 },
-    'springwater',
-    1
-  );
-  const system = {
-    ...makeSystem('sys-a', 'Herbalism', [vigor], comps),
-    features: { essences: true },
-  };
-  const actor = makeActor('pc', {
-    learned: { vigor: {} },
-    owned: { Emberroot: 3, 'Spring Water': 2 },
-  });
+  const vigor = plainRecipe('vigor', 'Elixir of Vigor', 'sys-a', { emberroot: 1 }, 'springwater', 1);
+  const system = { ...makeSystem('sys-a', 'Herbalism', [vigor], comps), features: { essences: true } };
+  const actor = makeActor('pc', { learned: { vigor: {} }, owned: { Emberroot: 3, 'Spring Water': 2 } });
 
   const listing = build([{ system, recipes: [vigor] }], {
     craftingActor: actor,
@@ -849,9 +657,7 @@ test('_projectOwnedComponents surfaces resolved essences when the system has ess
 
   const ember = listing.components.find((c) => c.componentId === 'emberroot');
   const springwater = listing.components.find((c) => c.componentId === 'springwater');
-  assert.deepEqual(ember.essences, [
-    { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: null, quantity: 2 },
-  ]);
+  assert.deepEqual(ember.essences, [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: null, quantity: 2 }]);
   assert.deepEqual(springwater.essences, [], 'a component with no essences projects an empty list');
   // The Produces result surfaces the result component's essences too.
   assert.deepEqual(listing.recipes[0].result.essences, []);
@@ -860,14 +666,7 @@ test('_projectOwnedComponents surfaces resolved essences when the system has ess
 test('_projectOwnedComponents omits essences when the system has essences disabled', () => {
   const emberEss = { ...component('emberroot', 'Emberroot'), essences: { fire: 2 } };
   const comps = [emberEss, component('springwater', 'Spring Water')];
-  const vigor = plainRecipe(
-    'vigor',
-    'Elixir of Vigor',
-    'sys-a',
-    { emberroot: 1 },
-    'springwater',
-    1
-  );
+  const vigor = plainRecipe('vigor', 'Elixir of Vigor', 'sys-a', { emberroot: 1 }, 'springwater', 1);
   const system = makeSystem('sys-a', 'Herbalism', [vigor], comps); // no features.essences
   const actor = makeActor('pc', { learned: { vigor: {} }, owned: { Emberroot: 3 } });
 
@@ -899,42 +698,21 @@ function simpleFailRecipe(id, name, systemId) {
       {
         id: `${id}-set`,
         ingredientGroups: [
-          {
-            id: `${id}-g`,
-            options: [
-              {
-                match: { type: 'component', componentId: 'emberroot' },
-                componentId: 'emberroot',
-                quantity: 1,
-              },
-            ],
-          },
+          { id: `${id}-g`, options: [{ match: { type: 'component', componentId: 'emberroot' }, componentId: 'emberroot', quantity: 1 }] },
         ],
         essences: {},
       },
     ],
     resultGroups: [
-      {
-        id: `${id}-ok`,
-        name: 'On success',
-        results: [{ componentId: 'quicksilver', quantity: 1 }],
-      },
-      {
-        id: `${id}-fail`,
-        name: 'On a failed check',
-        role: 'failure',
-        results: [{ componentId: 'sludge', quantity: 1 }],
-      },
+      { id: `${id}-ok`, name: 'On success', results: [{ componentId: 'quicksilver', quantity: 1 }] },
+      { id: `${id}-fail`, name: 'On a failed check', role: 'failure', results: [{ componentId: 'sludge', quantity: 1 }] },
     ],
   };
 }
 
 test('LEAK INVARIANT: a Simple recipe never surfaces its reserved failure-group result to the workbench', () => {
   const brew = simpleFailRecipe('brew', 'Volatile Draught', 'sys-a');
-  const system = {
-    ...makeSystem('sys-a', 'Herbalism', [brew], [...COMPONENTS, SECRET_COMPONENT]),
-    alchemy: { checkMode: 'simple' },
-  };
+  const system = { ...makeSystem('sys-a', 'Herbalism', [brew], [...COMPONENTS, SECRET_COMPONENT]), alchemy: { checkMode: 'simple' } };
   const actor = makeActor('pc', { learned: { brew: {} } });
   const listing = build([{ system, recipes: [brew] }], {
     craftingActor: actor,
@@ -962,36 +740,11 @@ test('Tiered projection surfaces the top success tier group and carries checkMod
     enabled: true,
     craftingSystemId: 'sys-a',
     ingredientSets: [
-      {
-        id: 'tonic-set',
-        ingredientGroups: [
-          {
-            id: 'tonic-g',
-            options: [
-              {
-                match: { type: 'component', componentId: 'emberroot' },
-                componentId: 'emberroot',
-                quantity: 1,
-              },
-            ],
-          },
-        ],
-        essences: {},
-      },
+      { id: 'tonic-set', ingredientGroups: [{ id: 'tonic-g', options: [{ match: { type: 'component', componentId: 'emberroot' }, componentId: 'emberroot', quantity: 1 }] }], essences: {} },
     ],
     resultGroups: [
-      {
-        id: 'tonic-fine',
-        name: 'Fine',
-        checkOutcomeIds: ['t-fine'],
-        results: [{ componentId: 'quicksilver', quantity: 1 }],
-      },
-      {
-        id: 'tonic-superb',
-        name: 'Superb',
-        checkOutcomeIds: ['t-superb'],
-        results: [{ componentId: 'ashsalt', quantity: 2 }],
-      },
+      { id: 'tonic-fine', name: 'Fine', checkOutcomeIds: ['t-fine'], results: [{ componentId: 'quicksilver', quantity: 1 }] },
+      { id: 'tonic-superb', name: 'Superb', checkOutcomeIds: ['t-superb'], results: [{ componentId: 'ashsalt', quantity: 2 }] },
     ],
   };
   const system = {
@@ -1044,15 +797,9 @@ function essenceOnlyRecipe(id, name, essences) {
     description: '',
     enabled: true,
     craftingSystemId: 'sys-e',
-    ingredientSets: [
-      { id: `${id}-set`, ingredientGroups: [], essences, resultGroupId: `${id}-rg` },
-    ],
+    ingredientSets: [{ id: `${id}-set`, ingredientGroups: [], essences, resultGroupId: `${id}-rg` }],
     resultGroups: [
-      {
-        id: `${id}-rg`,
-        name: `${name} result`,
-        results: [{ componentId: 'quicksilver', quantity: 1 }],
-      },
+      { id: `${id}-rg`, name: `${name} result`, results: [{ componentId: 'quicksilver', quantity: 1 }] },
     ],
   };
 }

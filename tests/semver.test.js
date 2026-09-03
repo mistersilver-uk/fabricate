@@ -5,7 +5,7 @@ import {
   compareSemver,
   foundryIsNewerVersion,
   isNumeric,
-  parseSemver,
+  parseSemver
 } from '../scripts/lib/semver.js';
 
 /**
@@ -30,18 +30,8 @@ const FOUNDRY_CASES = [
   // ('1.4.10' > '1.4.9'), and neither counter rolls over badly on its own — see the pairs below.
   ['1.4.10-beta.1', '1.4.9-beta.3', false, 'string compare on a suffixed part; 10 loses to 9'],
   ['1.4.10', '1.4.9', true, 'a pure-stable channel can never stall — no suffix to glue to'],
-  [
-    '1.5.0-beta.10',
-    '1.5.0-beta.9',
-    true,
-    'the beta counter is its own dot-part; it compares numerically',
-  ],
-  [
-    '1.10.0-beta.1',
-    '1.9.0-beta.1',
-    true,
-    'minor is its own dot-part too; only the glued part stalls',
-  ],
+  ['1.5.0-beta.10', '1.5.0-beta.9', true, 'the beta counter is its own dot-part; it compares numerically'],
+  ['1.10.0-beta.1', '1.9.0-beta.1', true, 'minor is its own dot-part too; only the glued part stalls'],
 
   // Prerelease ids are compared as strings: beta < rc alphabetically.
   ['1.3.0-beta.1', '1.3.0-rc.85', false, 'beta sorts below rc as a string'],
@@ -88,7 +78,7 @@ const FOUNDRY_CASES = [
 
   // Extra parts.
   ['1.4.0.1', '1.4.0', true, 'a longer target wins'],
-  ['1.4.0', '1.4.0.1', false, 'a longer reference is not beaten'],
+  ['1.4.0', '1.4.0.1', false, 'a longer reference is not beaten']
 ];
 
 for (const [v1, v0, expected, why] of FOUNDRY_CASES) {
@@ -114,7 +104,7 @@ const IS_NUMERIC_CASES = [
   ['0-beta', false],
   ['beta', false],
   [Number.NaN, false],
-  [undefined, false],
+  [undefined, false]
 ];
 
 for (const [value, expected, why] of IS_NUMERIC_CASES) {
@@ -144,7 +134,7 @@ const SEMVER_CASES = [
   ['1.4.0', '1.4.0+build.1', null],
   ['not-a-version', '1.4.0', null],
   ['1.4.0', 'v1.4.0', null],
-  [undefined, '1.4.0', null],
+  [undefined, '1.4.0', null]
 ];
 
 for (const [a, b, expected] of SEMVER_CASES) {
@@ -160,7 +150,7 @@ for (const [a, b, expected] of SEMVER_CASES) {
  */
 const DISAGREEMENT_CASES = [
   ['1.5.0-beta.7', '1.5.0'],
-  ['1.4.10-beta.1', '1.4.9-beta.3'],
+  ['1.4.10-beta.1', '1.4.9-beta.3']
 ];
 
 for (const [v1, v0] of DISAGREEMENT_CASES) {
@@ -175,7 +165,7 @@ test('parseSemver splits prerelease identifiers and refuses build metadata', () 
     major: 1,
     minor: 5,
     patch: 0,
-    prerelease: ['beta', '7'],
+    prerelease: ['beta', '7']
   });
   assert.deepEqual(parseSemver('1.5.0'), { major: 1, minor: 5, patch: 0, prerelease: [] });
   assert.equal(parseSemver('1.5.0-beta.7+abc123'), null, 'build metadata is not accepted');

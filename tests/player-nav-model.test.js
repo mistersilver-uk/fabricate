@@ -125,10 +125,7 @@ test('the downtime surface is the only id the gate names, and the gate defaults 
 
   // Every OTHER surface is untouched, gate open or shut. Core still enumerates no id it will
   // accept — this is one named id it withholds, which is a strictly narrower claim.
-  for (const gate of [
-    { experimentalFeaturesEnabled: false },
-    { experimentalFeaturesEnabled: true },
-  ])
+  for (const gate of [{ experimentalFeaturesEnabled: false }, { experimentalFeaturesEnabled: true }])
     for (const surfaceId of ['crew-quarters', 'downtime-tracker', 'bogus'])
       assert.ok(isPlayerSurfaceAvailable(surfaceId, gate), `${surfaceId} is never gated`);
 });

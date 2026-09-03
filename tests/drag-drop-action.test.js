@@ -17,11 +17,11 @@ globalThis.foundry = {
             } catch (_) {
               return null;
             }
-          },
-        },
-      },
-    },
-  },
+          }
+        }
+      }
+    }
+  }
 };
 
 const { dragDrop } = await import('../src/ui/svelte/actions/dragDrop.js');
@@ -41,28 +41,20 @@ function makeNode(children = []) {
     },
     removeEventListener(type, fn) {
       if (listeners[type]) {
-        listeners[type] = listeners[type].filter((f) => f !== fn);
+        listeners[type] = listeners[type].filter(f => f !== fn);
       }
     },
     // classList mock
     classList: {
-      add(cls) {
-        classes.add(cls);
-      },
-      remove(cls) {
-        classes.delete(cls);
-      },
-      has(cls) {
-        return classes.has(cls);
-      },
+      add(cls) { classes.add(cls); },
+      remove(cls) { classes.delete(cls); },
+      has(cls) { return classes.has(cls); }
     },
     // contains: returns true if relatedTarget is in children array
-    contains(target) {
-      return children.includes(target);
-    },
+    contains(target) { return children.includes(target); },
     // Expose internals for assertions
     _listeners: listeners,
-    _classes: classes,
+    _classes: classes
   };
 
   return node;
@@ -75,13 +67,13 @@ function makeDragEvent(type, { relatedTarget = null, data = null } = {}) {
     preventDefault: () => {},
     relatedTarget,
     dataTransfer: {
-      getData: () => raw,
-    },
+      getData: () => raw
+    }
   };
 }
 
 function fire(node, type, event) {
-  for (const fn of node._listeners[type] ?? []) {
+  for (const fn of (node._listeners[type] ?? [])) {
     fn(event);
   }
 }
@@ -165,11 +157,7 @@ test('drop removes activeClass and calls onDrop with the extracted drag data', (
 test('drop with null drag data does not call onDrop', () => {
   const node = makeNode();
   let called = false;
-  dragDrop(node, {
-    onDrop: () => {
-      called = true;
-    },
-  });
+  dragDrop(node, { onDrop: () => { called = true; } });
 
   // data: null means getDragEventData returns null
   fire(node, 'drop', makeDragEvent('drop', { data: null }));

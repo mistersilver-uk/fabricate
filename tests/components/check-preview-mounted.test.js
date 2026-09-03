@@ -667,9 +667,8 @@ describe('the progressive PREVIEW SANDBOX', () => {
       ['award-2', '45%'],
     ]);
     assert.equal(
-      root
-        .querySelector('[data-checks-odds-row="award-0"] .manager-checks-odds-label')
-        .textContent.trim(),
+      root.querySelector('[data-checks-odds-row="award-0"] .manager-checks-odds-label').textContent
+        .trim(),
       '0 of 4',
       'an award of nothing is a real outcome and IS listed, out of the authored four'
     );

@@ -7,14 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
-const {
-  rewriteModuleJson,
-  getRequiredFiles,
-  validateDist,
-  getFlag,
-  parseReleaseVersionOptions,
-  applyReleaseUrls,
-} = await import('../scripts/release.js');
+const { rewriteModuleJson, getRequiredFiles, validateDist, getFlag, parseReleaseVersionOptions, applyReleaseUrls } = await import('../scripts/release.js');
 
 // ───────────────────────────────────────────────────────────────────────────
 // rewriteModuleJson() tests
@@ -26,7 +19,7 @@ test('rewriteModuleJson strips dist/ prefix from esmodules', () => {
     esmodules: ['dist/main.js'],
     styles: [],
     languages: [],
-    packs: [],
+    packs: []
   };
   const result = rewriteModuleJson(manifest);
   assert.deepEqual(result.esmodules, ['main.js']);
@@ -37,7 +30,7 @@ test('rewriteModuleJson strips dist/ prefix from multiple esmodules', () => {
     esmodules: ['dist/main.js', 'dist/vendor.js'],
     styles: [],
     languages: [],
-    packs: [],
+    packs: []
   };
   const result = rewriteModuleJson(manifest);
   assert.deepEqual(result.esmodules, ['main.js', 'vendor.js']);
@@ -48,7 +41,7 @@ test('rewriteModuleJson leaves esmodules without dist/ prefix unchanged', () => 
     esmodules: ['main.js'],
     styles: [],
     languages: [],
-    packs: [],
+    packs: []
   };
   const result = rewriteModuleJson(manifest);
   assert.deepEqual(result.esmodules, ['main.js']);
@@ -59,7 +52,7 @@ test('rewriteModuleJson preserves styles paths unchanged', () => {
     esmodules: [],
     styles: ['styles/fabricate.css'],
     languages: [],
-    packs: [],
+    packs: []
   };
   const result = rewriteModuleJson(manifest);
   assert.deepEqual(result.styles, ['styles/fabricate.css']);
@@ -70,7 +63,7 @@ test('rewriteModuleJson preserves languages paths unchanged', () => {
     esmodules: [],
     styles: [],
     languages: [{ lang: 'en', name: 'English', path: 'lang/en.json' }],
-    packs: [],
+    packs: []
   };
   const result = rewriteModuleJson(manifest);
   assert.deepEqual(result.languages[0].path, 'lang/en.json');
@@ -81,7 +74,9 @@ test('rewriteModuleJson normalizes legacy .db pack paths', () => {
     esmodules: [],
     styles: [],
     languages: [],
-    packs: [{ name: 'sample-pack', path: 'packs/sample-pack-v1.db', type: 'Item' }],
+    packs: [
+      { name: 'sample-pack', path: 'packs/sample-pack-v1.db', type: 'Item' }
+    ]
   };
   const result = rewriteModuleJson(manifest);
   assert.equal(result.packs[0].path, 'packs/sample-pack-v1');
@@ -92,7 +87,9 @@ test('rewriteModuleJson leaves pack paths without .db suffix unchanged', () => {
     esmodules: [],
     styles: [],
     languages: [],
-    packs: [{ name: 'test-pack', path: 'packs/test-pack', type: 'Item' }],
+    packs: [
+      { name: 'test-pack', path: 'packs/test-pack', type: 'Item' }
+    ]
   };
   const result = rewriteModuleJson(manifest);
   assert.equal(result.packs[0].path, 'packs/test-pack');
@@ -104,14 +101,8 @@ test('rewriteModuleJson preserves non-path fields on packs', () => {
     styles: [],
     languages: [],
     packs: [
-      {
-        name: 'sample-pack',
-        label: 'Sample Pack',
-        path: 'packs/sample-pack-v1.db',
-        type: 'Item',
-        system: 'dnd5e',
-      },
-    ],
+      { name: 'sample-pack', label: 'Sample Pack', path: 'packs/sample-pack-v1.db', type: 'Item', system: 'dnd5e' }
+    ]
   };
   const result = rewriteModuleJson(manifest);
   assert.equal(result.packs[0].name, 'sample-pack');
@@ -131,7 +122,7 @@ test('rewriteModuleJson preserves non-path top-level fields', () => {
     packs: [],
     url: 'https://example.com',
     manifest: 'https://example.com/module.json',
-    download: 'https://example.com/module.zip',
+    download: 'https://example.com/module.zip'
   };
   const result = rewriteModuleJson(manifest);
   assert.equal(result.id, 'fabricate');
@@ -145,7 +136,7 @@ test('rewriteModuleJson does not mutate the original manifest', () => {
     esmodules: ['dist/main.js'],
     styles: [],
     languages: [],
-    packs: [{ name: 'test', path: 'packs/test.db', type: 'Item' }],
+    packs: [{ name: 'test', path: 'packs/test.db', type: 'Item' }]
   };
   rewriteModuleJson(manifest);
   assert.equal(manifest.esmodules[0], 'dist/main.js');
@@ -208,10 +199,7 @@ test('applyReleaseUrls bakes the LATEST-release manifest URL, not a version-pinn
   );
   // The manifest URL must be stable across releases: it must NOT carry the version anywhere.
   assert.ok(!manifest.manifest.includes('1.5.0'), 'manifest URL must not be version-pinned');
-  assert.ok(
-    manifest.manifest.includes('/releases/latest/'),
-    'manifest URL must be the latest-release URL'
-  );
+  assert.ok(manifest.manifest.includes('/releases/latest/'), 'manifest URL must be the latest-release URL');
 });
 
 test('applyReleaseUrls keeps the download URL version-pinned', () => {
@@ -220,10 +208,7 @@ test('applyReleaseUrls keeps the download URL version-pinned', () => {
     manifest.download,
     'https://github.com/mistersilver-uk/fabricate/releases/download/v1.5.0/fabricate-v1.5.0.zip'
   );
-  assert.ok(
-    manifest.download.includes('/v1.5.0/'),
-    'download URL must be pinned to the version tag'
-  );
+  assert.ok(manifest.download.includes('/v1.5.0/'), 'download URL must be pinned to the version tag');
 });
 
 test('applyReleaseUrls never points at an S3 channel feed', () => {
@@ -289,7 +274,7 @@ test('getRequiredFiles returns esmodule paths', () => {
     esmodules: ['main.js'],
     styles: [],
     languages: [],
-    packs: [],
+    packs: []
   };
   const files = getRequiredFiles(manifest);
   assert.ok(files.includes('main.js'), 'should include main.js');
@@ -300,7 +285,7 @@ test('getRequiredFiles returns styles paths', () => {
     esmodules: [],
     styles: ['styles/fabricate.css'],
     languages: [],
-    packs: [],
+    packs: []
   };
   const files = getRequiredFiles(manifest);
   assert.ok(files.includes('styles/fabricate.css'), 'should include styles path');
@@ -311,7 +296,7 @@ test('getRequiredFiles returns language paths', () => {
     esmodules: [],
     styles: [],
     languages: [{ lang: 'en', name: 'English', path: 'lang/en.json' }],
-    packs: [],
+    packs: []
   };
   const files = getRequiredFiles(manifest);
   assert.ok(files.includes('lang/en.json'), 'should include language path');
@@ -328,7 +313,7 @@ test('getRequiredFiles returns all entries from full manifest', () => {
     esmodules: ['main.js'],
     styles: ['styles/fabricate.css'],
     languages: [{ path: 'lang/en.json' }],
-    packs: [{ path: 'packs/sample-pack-v1' }],
+    packs: [{ path: 'packs/sample-pack-v1' }]
   };
   const files = getRequiredFiles(manifest);
   assert.ok(files.includes('main.js'));
@@ -343,7 +328,7 @@ test('getRequiredFiles returns pack paths', () => {
     esmodules: [],
     styles: [],
     languages: [],
-    packs: [{ path: 'packs/sample-pack-v1' }],
+    packs: [{ path: 'packs/sample-pack-v1' }]
   };
   const files = getRequiredFiles(manifest);
   assert.ok(files.includes('packs/sample-pack-v1'), 'should include pack path');
@@ -354,7 +339,7 @@ test('getRequiredFiles handles multiple esmodules', () => {
     esmodules: ['main.js', 'vendor.js'],
     styles: [],
     languages: [],
-    packs: [],
+    packs: []
   };
   const files = getRequiredFiles(manifest);
   assert.ok(files.includes('main.js'));
@@ -387,13 +372,10 @@ test('validateDist returns success when all required files are present', async (
     esmodules: ['main.js'],
     styles: ['styles/fabricate.css'],
     languages: [{ path: 'lang/en.json' }],
-    packs: [{ path: 'packs/sample-pack-v1' }],
+    packs: [{ path: 'packs/sample-pack-v1' }]
   };
   const distManifest = { ...manifest, id: 'fabricate', version: '0.1.0' };
-  const dir = await makeTempDist(
-    ['main.js', 'styles/fabricate.css', 'lang/en.json', 'packs/sample-pack-v1/CURRENT'],
-    distManifest
-  );
+  const dir = await makeTempDist(['main.js', 'styles/fabricate.css', 'lang/en.json', 'packs/sample-pack-v1/CURRENT'], distManifest);
   try {
     const result = await validateDist(dir, manifest);
     assert.equal(result.valid, true);
@@ -408,17 +390,14 @@ test('validateDist returns failure when a pack path is missing', async () => {
     esmodules: ['main.js'],
     styles: [],
     languages: [],
-    packs: [{ path: 'packs/sample-pack-v1' }],
+    packs: [{ path: 'packs/sample-pack-v1' }]
   };
   const distManifest = { ...manifest, id: 'fabricate', version: '0.1.0' };
   const dir = await makeTempDist(['main.js'], distManifest);
   try {
     const result = await validateDist(dir, manifest);
     assert.equal(result.valid, false);
-    assert.ok(
-      result.missing.some((f) => f.includes('sample-pack-v1')),
-      `Expected missing to include pack path, got: ${result.missing}`
-    );
+    assert.ok(result.missing.some(f => f.includes('sample-pack-v1')), `Expected missing to include pack path, got: ${result.missing}`);
   } finally {
     await rm(dir, { recursive: true });
   }
@@ -429,7 +408,7 @@ test('validateDist returns failure when a required file is missing', async () =>
     esmodules: ['main.js'],
     styles: ['styles/fabricate.css'],
     languages: [],
-    packs: [],
+    packs: []
   };
   // Only create main.js, not fabricate.css
   const distManifest = { ...manifest, id: 'fabricate', version: '0.1.0' };
@@ -437,10 +416,7 @@ test('validateDist returns failure when a required file is missing', async () =>
   try {
     const result = await validateDist(dir, manifest);
     assert.equal(result.valid, false);
-    assert.ok(
-      result.missing.some((f) => f.includes('fabricate.css')),
-      `Expected missing to include fabricate.css, got: ${result.missing}`
-    );
+    assert.ok(result.missing.some(f => f.includes('fabricate.css')), `Expected missing to include fabricate.css, got: ${result.missing}`);
   } finally {
     await rm(dir, { recursive: true });
   }
@@ -453,7 +429,7 @@ test('validateDist returns failure when module.json is missing', async () => {
   try {
     const result = await validateDist(dir, manifest);
     assert.equal(result.valid, false);
-    assert.ok(result.missing.some((f) => f.includes('module.json')));
+    assert.ok(result.missing.some(f => f.includes('module.json')));
   } finally {
     await rm(dir, { recursive: true });
   }
@@ -466,7 +442,7 @@ test('validateDist returns failure when module.json is invalid JSON', async () =
   try {
     const result = await validateDist(dir, manifest);
     assert.equal(result.valid, false);
-    assert.ok(result.errors.some((e) => e.toLowerCase().includes('module.json')));
+    assert.ok(result.errors.some(e => e.toLowerCase().includes('module.json')));
   } finally {
     await rm(dir, { recursive: true });
   }
@@ -477,7 +453,7 @@ test('validateDist returns failure when multiple files are missing', async () =>
     esmodules: ['main.js'],
     styles: ['styles/fabricate.css'],
     languages: [{ path: 'lang/en.json' }],
-    packs: [],
+    packs: []
   };
   const distManifest = { id: 'fabricate' };
   const dir = await makeTempDist([], distManifest); // nothing in dist

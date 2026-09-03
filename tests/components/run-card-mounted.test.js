@@ -19,13 +19,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/systems/foundryCalendar.js',
-    'src/ui/svelte/apps/journal/journalRunStatus.js',
+    'src/ui/svelte/apps/journal/journalRunStatus.js'
   ],
   compiledModules: [
     'src/ui/svelte/apps/journal/RunStatusPill.svelte',
-    'src/ui/svelte/apps/journal/RunCard.svelte',
+    'src/ui/svelte/apps/journal/RunCard.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/journal/RunCard.svelte',
+  componentPath: 'src/ui/svelte/apps/journal/RunCard.svelte'
 });
 
 describe('RunCard mounted behavior', () => {
@@ -42,34 +42,17 @@ describe('RunCard mounted behavior', () => {
     assert.ok(card.textContent.includes('Healing Potion'), 'run name rendered');
     const pill = card.querySelector('.journal-status-pill');
     assert.equal(pill.getAttribute('data-run-status'), 'waiting', 'pill carries the run status');
-    assert.ok(
-      pill.textContent.includes('Status.waiting'),
-      'pill renders the localized waiting label'
-    );
+    assert.ok(pill.textContent.includes('Status.waiting'), 'pill renders the localized waiting label');
   });
 
   it('shows a remaining countdown while waiting and a progress bar', async () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 500 });
     const countdown = target.querySelector('[data-run-countdown]');
-    assert.ok(
-      countdown.textContent.includes('Countdown.Remaining'),
-      'waiting card shows the remaining countdown'
-    );
-    assert.ok(
-      countdown.textContent.includes('8m 20s'),
-      'countdown formats availableAt - now (1000 - 500 = 500s)'
-    );
+    assert.ok(countdown.textContent.includes('Countdown.Remaining'), 'waiting card shows the remaining countdown');
+    assert.ok(countdown.textContent.includes('8m 20s'), 'countdown formats availableAt - now (1000 - 500 = 500s)');
     const progress = target.querySelector('[data-run-progress]');
-    assert.equal(
-      progress.getAttribute('data-run-progress'),
-      '50',
-      'progress is 50% at the halfway point'
-    );
-    assert.equal(
-      progress.getAttribute('role'),
-      'progressbar',
-      'progress bar exposes the progressbar role'
-    );
+    assert.equal(progress.getAttribute('data-run-progress'), '50', 'progress is 50% at the halfway point');
+    assert.equal(progress.getAttribute('role'), 'progressbar', 'progress bar exposes the progressbar role');
     // The reused Progress.Label key now resolves to run-neutral "Crafting progress"
     // copy (issue 734); the bar tracks the time gate, not a step count.
     assert.equal(
@@ -98,13 +81,7 @@ describe('RunCard mounted behavior', () => {
 
   it('invokes onSelect with the run id on click', async () => {
     let selectedId = null;
-    const target = await harness.mount({
-      run: makeCraftingRun(),
-      now: 0,
-      onSelect: (id) => {
-        selectedId = id;
-      },
-    });
+    const target = await harness.mount({ run: makeCraftingRun(), now: 0, onSelect: (id) => { selectedId = id; } });
     target.querySelector('.journal-run-card').click();
     assert.equal(selectedId, 'run-craft-1', 'clicking the card selects it');
   });

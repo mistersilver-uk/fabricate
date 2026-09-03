@@ -20,17 +20,17 @@ import assert from 'node:assert/strict';
 
 globalThis.foundry = {
   utils: {
-    randomID: () => Math.random().toString(36).slice(2, 10),
-  },
+    randomID: () => Math.random().toString(36).slice(2, 10)
+  }
 };
 
 globalThis.ui = {
-  notifications: { info: () => {}, warn: () => {}, error: () => {} },
+  notifications: { info: () => {}, warn: () => {}, error: () => {} }
 };
 
 // game stub — isGM is toggled per test where needed
 globalThis.game = {
-  user: { isGM: true, name: 'GM' },
+  user: { isGM: true, name: 'GM' }
 };
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ function makeManager() {
 
   // Stub save/load so tests don't need real game settings
   manager.save = async () => {
-    savedData = Array.from(manager.recipes.values()).map((r) => r.toJSON());
+    savedData = Array.from(manager.recipes.values()).map(r => r.toJSON());
   };
 
   return manager;
@@ -68,20 +68,20 @@ function makeRecipe(overrides = {}) {
         ingredientGroups: [
           {
             id: 'group-1',
-            options: [{ itemUuid: 'Item.abc123', quantity: 1 }],
-          },
-        ],
-      },
+            options: [{ itemUuid: 'Item.abc123', quantity: 1 }]
+          }
+        ]
+      }
     ],
     resultGroups: [
       {
         id: 'result-group-1',
         name: 'Default',
-        results: [{ id: 'result-1', itemUuid: 'Item.xyz789', quantity: 1 }],
-      },
+        results: [{ id: 'result-1', itemUuid: 'Item.xyz789', quantity: 1 }]
+      }
     ],
     enabled: true,
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -143,7 +143,7 @@ test('AC4 - re-enabled recipe persists in saved data', async () => {
 
   // savedData is populated by the stubbed save()
   assert.ok(savedData, 'save() should have been called');
-  const saved = savedData.find((r) => r.id === recipe.id);
+  const saved = savedData.find(r => r.id === recipe.id);
   assert.ok(saved, 'recipe should be in saved data');
   assert.equal(saved.enabled, true, 'saved data should reflect enabled: true');
 });

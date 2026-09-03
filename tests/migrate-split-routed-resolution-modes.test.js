@@ -20,12 +20,7 @@ function routedSystem(id = 'sys-r') {
 }
 
 function recipe(systemId, provider, id = 'recipe-1') {
-  const base = {
-    id,
-    name: id,
-    craftingSystemId: systemId,
-    resultGroups: [{ id: 'g1', name: 'A' }],
-  };
+  const base = { id, name: id, craftingSystemId: systemId, resultGroups: [{ id: 'g1', name: 'A' }] };
   return provider ? { ...base, resultSelection: { provider } } : base;
 }
 
@@ -83,7 +78,10 @@ test('minority recipes are logged for re-authoring, never silently mis-routed', 
       logged.some((line) => line.includes('minority') && line.includes('routedByCheck')),
       'the disagreeing recipe is flagged'
     );
-    assert.ok(!logged.some((line) => line.includes('maj-1')), 'agreeing recipes are not flagged');
+    assert.ok(
+      !logged.some((line) => line.includes('maj-1')),
+      'agreeing recipes are not flagged'
+    );
   } finally {
     console.log = original;
   }

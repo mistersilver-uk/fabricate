@@ -17,10 +17,7 @@ import assert from 'node:assert/strict';
 
 globalThis.foundry = {
   utils: {
-    getProperty: (obj, path) =>
-      String(path)
-        .split('.')
-        .reduce((v, k) => (v == null ? undefined : v[k]), obj),
+    getProperty: (obj, path) => String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj),
     setProperty: (obj, path, value) => {
       const parts = String(path).split('.');
       const last = parts.pop();
@@ -29,7 +26,7 @@ globalThis.foundry = {
       target[last] = value;
     },
     deepClone: (value) => JSON.parse(JSON.stringify(value)),
-  },
+  }
 };
 
 const { Tool } = await import('../src/models/Tool.js');
@@ -40,10 +37,9 @@ const {
   applyToolUsageAndBreakage,
   createToolReplacementCreator,
   createToolBreakageRuntime,
-  stampReplacementComponentIdentity,
+  stampReplacementComponentIdentity
 } = await import('../src/toolBreakageRuntime.js');
-const { resolveToolForItem, itemIsToolByDurableIdentity } =
-  await import('../src/utils/sourceUuid.js');
+const { resolveToolForItem, itemIsToolByDurableIdentity } = await import('../src/utils/sourceUuid.js');
 
 // ---------------------------------------------------------------------------
 // FakeItem — getFlag('fabricate', 'fabricate.<key>') dot-path resolution,
@@ -51,9 +47,7 @@ const { resolveToolForItem, itemIsToolByDurableIdentity } =
 // ---------------------------------------------------------------------------
 
 function getPath(obj, path) {
-  return String(path)
-    .split('.')
-    .reduce((v, k) => (v == null ? undefined : v[k]), obj);
+  return String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj);
 }
 function setPath(obj, path, value) {
   const parts = String(path).split('.');
@@ -82,9 +76,7 @@ class FakeItem {
     setPath(this._flags[scope], key, value);
     return value;
   }
-  async delete() {
-    this.deleted = true;
-  }
+  async delete() { this.deleted = true; }
 }
 
 // ---------------------------------------------------------------------------
@@ -106,11 +98,7 @@ test('readToolUsage defaults to { timesUsed: 0 } when absent', () => {
 // ---------------------------------------------------------------------------
 
 test('evaluateToolBreakagePlan projects post-increment timesUsed for limitedUses', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: 2 },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 2 }, onBreak: { mode: 'destroy' } });
   const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 1 } } });
   const plan = await evaluateToolBreakagePlan(tool, { item });
   // current 1 + 1 = 2 >= maxUses 2 → broken
@@ -120,21 +108,13 @@ test('evaluateToolBreakagePlan projects post-increment timesUsed for limitedUses
 });
 
 test('evaluateToolBreakagePlan: limitedUses with null maxUses never breaks', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: null },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } });
   const plan = await evaluateToolBreakagePlan(tool, { item: new FakeItem({}) });
   assert.equal(plan.broken, false);
 });
 
 test('Tool.evaluateBreakage: breakageChance honored via injected random', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'breakageChance', breakageChance: 50 },
-    onBreak: { mode: 'flagBroken' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 50 }, onBreak: { mode: 'flagBroken' } });
   const broke = await tool.evaluateBreakage({ random: () => 0.1 }); // 10 < 50
   assert.equal(broke.broken, true);
   const safe = await tool.evaluateBreakage({ random: () => 0.9 }); // 90 >= 50
@@ -142,11 +122,7 @@ test('Tool.evaluateBreakage: breakageChance honored via injected random', async 
 });
 
 test('evaluateToolBreakagePlan: diceExpression honored via injected evaluator', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'diceExpression', formula: '1d20', threshold: 10 }, onBreak: { mode: 'destroy' } });
   const broke = await evaluateToolBreakagePlan(tool, { evaluateExpression: async () => 5 });
   assert.equal(broke.broken, true);
   const safe = await evaluateToolBreakagePlan(tool, { evaluateExpression: async () => 15 });
@@ -158,23 +134,10 @@ test('evaluateToolBreakagePlan: diceExpression honored via injected evaluator', 
 // ---------------------------------------------------------------------------
 
 test('plannedToolBreakageOutcome shapes each onBreak mode', () => {
+  assert.deepEqual(plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'destroy' } })), { action: 'destroyed' });
+  assert.deepEqual(plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'flagBroken' } })), { action: 'flagged' });
   assert.deepEqual(
-    plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'destroy' } })),
-    { action: 'destroyed' }
-  );
-  assert.deepEqual(
-    plannedToolBreakageOutcome(
-      Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'flagBroken' } })
-    ),
-    { action: 'flagged' }
-  );
-  assert.deepEqual(
-    plannedToolBreakageOutcome(
-      Tool.fromJSON({
-        componentId: 'c',
-        onBreak: { mode: 'replaceWith', replacementComponentId: 'r' },
-      })
-    ),
+    plannedToolBreakageOutcome(Tool.fromJSON({ componentId: 'c', onBreak: { mode: 'replaceWith', replacementComponentId: 'r' } })),
     { action: 'replaced', replacementTarget: { type: 'component', componentId: 'r' } }
   );
 });
@@ -184,17 +147,9 @@ test('plannedToolBreakageOutcome shapes each onBreak mode', () => {
 // ---------------------------------------------------------------------------
 
 test('applyToolUsageAndBreakage: limitedUses increments toolUsage', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: 5 },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 5 }, onBreak: { mode: 'destroy' } });
   const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 1 } } });
-  const entry = await applyToolUsageAndBreakage({
-    tool,
-    item,
-    buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }),
-  });
+  const entry = await applyToolUsageAndBreakage({ tool, item, buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }) });
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 2 });
   assert.equal(entry.broken, false);
   assert.equal(entry.componentId, 'c');
@@ -205,51 +160,27 @@ test('applyToolUsageAndBreakage: limitedUses does NOT break one use early (post-
   // must read the POST-increment timesUsed (Tool#evaluateBreakage), NOT re-project it
   // with evaluateToolBreakagePlan's +1. A fresh maxUses:2 tool must survive the first
   // apply (timesUsed 0→1, 1<2) and break only on the second (1→2, 2>=2).
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: 2 },
-    onBreak: { mode: 'flagBroken' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 2 }, onBreak: { mode: 'flagBroken' } });
   const item = new FakeItem({});
-  const first = await applyToolUsageAndBreakage({
-    tool,
-    item,
-    buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }),
-  });
+  const first = await applyToolUsageAndBreakage({ tool, item, buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }) });
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 1 });
   assert.equal(first.broken, false, 'first use (timesUsed 1) is below maxUses 2 → not broken');
   assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), undefined);
-  const second = await applyToolUsageAndBreakage({
-    tool,
-    item,
-    buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }),
-  });
+  const second = await applyToolUsageAndBreakage({ tool, item, buildItemRef: (_a, i) => ({ itemUuid: i.uuid, quantity: 1 }) });
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 2 });
   assert.equal(second.broken, true, 'second use (timesUsed 2) reaches maxUses 2 → broken');
   assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), true);
 });
 
 test('applyToolUsageAndBreakage: breakageChance (non-limitedUses) writes NO usage flag', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'breakageChance', breakageChance: 0 },
-    onBreak: { mode: 'flagBroken' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } });
   const item = new FakeItem({});
   await applyToolUsageAndBreakage({ tool, item, buildItemRef: () => ({}) });
-  assert.equal(
-    item._flags.fabricate.fabricate,
-    undefined,
-    'no toolUsage flag written for presence-only tool'
-  );
+  assert.equal(item._flags.fabricate.fabricate, undefined, 'no toolUsage flag written for presence-only tool');
 });
 
 test('applyToolUsageAndBreakage: destroy onBreak deletes the item when broken', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'destroy' } });
   const item = new FakeItem({});
   const entry = await applyToolUsageAndBreakage({ tool, item, buildItemRef: () => ({}) });
   assert.equal(entry.broken, true);
@@ -258,11 +189,7 @@ test('applyToolUsageAndBreakage: destroy onBreak deletes the item when broken', 
 });
 
 test('applyToolUsageAndBreakage: flagBroken onBreak sets toolBroken when broken', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'flagBroken' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'flagBroken' } });
   const item = new FakeItem({});
   const entry = await applyToolUsageAndBreakage({ tool, item, buildItemRef: () => ({}) });
   assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), true);
@@ -270,11 +197,7 @@ test('applyToolUsageAndBreakage: flagBroken onBreak sets toolBroken when broken'
 });
 
 test('applyToolUsageAndBreakage: replaceWith deletes and invokes createReplacement', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'breakageChance', breakageChance: 100 },
-    onBreak: { mode: 'replaceWith', replacementComponentId: 'r' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 100 }, onBreak: { mode: 'replaceWith', replacementComponentId: 'r' } });
   const item = new FakeItem({});
   let replacedWith = null;
   const entry = await applyToolUsageAndBreakage({
@@ -284,7 +207,7 @@ test('applyToolUsageAndBreakage: replaceWith deletes and invokes createReplaceme
     createReplacement: async ({ target }) => {
       replacedWith = target;
       return { documentName: 'Item' };
-    },
+    }
   });
   assert.equal(item.deleted, true);
   assert.deepEqual(replacedWith, { type: 'component', componentId: 'r' });
@@ -310,17 +233,13 @@ test('applyToolUsageAndBreakage: failed replacement preserves the original Tool'
 
 test('applyToolUsageAndBreakage: prefers a prior plan decision over re-evaluating', async () => {
   // Tool would NOT break on its own (chance 0), but a planned-broken entry forces it.
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'breakageChance', breakageChance: 0 },
-    onBreak: { mode: 'flagBroken' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } });
   const item = new FakeItem({});
   const entry = await applyToolUsageAndBreakage({
     tool,
     item,
     planned: { mode: 'breakageChance', broken: true, evidence: { roll: 1, breakageChance: 0 } },
-    buildItemRef: () => ({}),
+    buildItemRef: () => ({})
   });
   assert.equal(entry.broken, true);
   assert.equal(getPath(item._flags.fabricate, 'fabricate.toolBroken'), true);
@@ -334,16 +253,12 @@ function runtimeFixture({ toolData, item }) {
   const matchTools = () => ({ items: [{ tool: toolData, item }], missing: [] });
   return createToolBreakageRuntime({
     matchTools,
-    buildItemRef: (_actor, i) => ({ actorUuid: 'Actor.a', itemUuid: i.uuid, quantity: 1 }),
+    buildItemRef: (_actor, i) => ({ actorUuid: 'Actor.a', itemUuid: i.uuid, quantity: 1 })
   });
 }
 
 test('createToolBreakageRuntime: plan records the decision and apply reuses it', async () => {
-  const toolData = {
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: 2 },
-    onBreak: { mode: 'flagBroken' },
-  };
+  const toolData = { componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 2 }, onBreak: { mode: 'flagBroken' } };
   const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 1 } } });
   const runtime = runtimeFixture({ toolData, item });
 
@@ -362,18 +277,10 @@ test('createToolBreakageRuntime: plan records the decision and apply reuses it',
 });
 
 test('createToolBreakageRuntime: apply with no prior plan evaluates fresh', async () => {
-  const toolData = {
-    componentId: 'c',
-    breakage: { mode: 'breakageChance', breakageChance: 0 },
-    onBreak: { mode: 'destroy' },
-  };
+  const toolData = { componentId: 'c', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'destroy' } };
   const item = new FakeItem({});
   const runtime = runtimeFixture({ toolData, item });
-  const applied = await runtime.apply({
-    actor: { uuid: 'Actor.a' },
-    task: { id: 't' },
-    tools: [toolData],
-  });
+  const applied = await runtime.apply({ actor: { uuid: 'Actor.a' }, task: { id: 't' }, tools: [toolData] });
   assert.equal(applied[0].broken, false);
   assert.equal(item.deleted, false);
 });
@@ -381,7 +288,7 @@ test('createToolBreakageRuntime: apply with no prior plan evaluates fresh', asyn
 test('createToolBreakageRuntime: no matched tools yields empty evidence', async () => {
   const runtime = createToolBreakageRuntime({
     matchTools: () => ({ items: [], missing: [] }),
-    buildItemRef: () => ({}),
+    buildItemRef: () => ({})
   });
   assert.deepEqual(await runtime.plan({ tools: [] }), []);
   assert.deepEqual(await runtime.apply({ tools: [] }), []);
@@ -398,18 +305,12 @@ test('readToolUsage falls back to catalystItemUsage when toolUsage is absent', (
 });
 
 test('readToolUsage prefers toolUsage when both flags are present', () => {
-  const item = new FakeItem({
-    fabricate: { toolUsage: { timesUsed: 1 }, catalystItemUsage: { timesUsed: 9 } },
-  });
+  const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 1 }, catalystItemUsage: { timesUsed: 9 } } });
   assert.deepEqual(readToolUsage(item), { timesUsed: 1 });
 });
 
 test('Tool.evaluateBreakage (limitedUses) reads catalystItemUsage when toolUsage absent', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: 4 },
-    onBreak: { mode: 'destroy' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 4 }, onBreak: { mode: 'destroy' } });
   // Migrated item already used 4 times as a catalyst → at maxUses → broken.
   const item = new FakeItem({ fabricate: { catalystItemUsage: { timesUsed: 4 } } });
   const result = await tool.evaluateBreakage({ item });
@@ -418,25 +319,15 @@ test('Tool.evaluateBreakage (limitedUses) reads catalystItemUsage when toolUsage
 });
 
 test('Tool.evaluateBreakage (limitedUses) prefers toolUsage over catalystItemUsage', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: 4 },
-    onBreak: { mode: 'destroy' },
-  });
-  const item = new FakeItem({
-    fabricate: { toolUsage: { timesUsed: 1 }, catalystItemUsage: { timesUsed: 9 } },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 4 }, onBreak: { mode: 'destroy' } });
+  const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 1 }, catalystItemUsage: { timesUsed: 9 } } });
   const result = await tool.evaluateBreakage({ item });
   assert.equal(result.broken, false, 'toolUsage (1) wins, not catalystItemUsage (9)');
   assert.equal(result.evidence.timesUsed, 1);
 });
 
 test('Tool.applyUsage seeds from catalystItemUsage on first post-migration write, writes toolUsage', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: 10 },
-    onBreak: { mode: 'flagBroken' },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 10 }, onBreak: { mode: 'flagBroken' } });
   const item = new FakeItem({ fabricate: { catalystItemUsage: { timesUsed: 2 } } });
   await tool.applyUsage(item);
   // First write continues the catalyst count (2 + 1) and lands on the authoritative flag.
@@ -446,14 +337,8 @@ test('Tool.applyUsage seeds from catalystItemUsage on first post-migration write
 });
 
 test('Tool.applyUsage prefers toolUsage over catalystItemUsage once toolUsage exists', async () => {
-  const tool = Tool.fromJSON({
-    componentId: 'c',
-    breakage: { mode: 'limitedUses', maxUses: 10 },
-    onBreak: { mode: 'flagBroken' },
-  });
-  const item = new FakeItem({
-    fabricate: { toolUsage: { timesUsed: 5 }, catalystItemUsage: { timesUsed: 2 } },
-  });
+  const tool = Tool.fromJSON({ componentId: 'c', breakage: { mode: 'limitedUses', maxUses: 10 }, onBreak: { mode: 'flagBroken' } });
+  const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 5 }, catalystItemUsage: { timesUsed: 2 } } });
   await tool.applyUsage(item);
   assert.deepEqual(item._flags.fabricate.fabricate.toolUsage, { timesUsed: 6 });
 });
@@ -544,11 +429,7 @@ test('target-aware replacement rejects stale, index, non-Item, API, throw, and e
     let creates = 0;
     const creator = createToolReplacementCreator({ resolveItemUuid: async () => source });
     const result = await creator({
-      actor: {
-        createEmbeddedDocuments: async () => {
-          creates += 1;
-        },
-      },
+      actor: { createEmbeddedDocuments: async () => { creates += 1; } },
       target: { type: 'item', itemUuid: 'Item.bad' },
     });
     assert.equal(result, null);
@@ -570,9 +451,7 @@ test('target-aware replacement rejects stale, index, non-Item, API, throw, and e
     );
   }
   const throwingResolver = createToolReplacementCreator({
-    resolveItemUuid: async () => {
-      throw new Error('stale');
-    },
+    resolveItemUuid: async () => { throw new Error('stale'); },
   });
   assert.equal(
     await throwingResolver({
@@ -584,11 +463,7 @@ test('target-aware replacement rejects stale, index, non-Item, API, throw, and e
   const throwingCreate = createToolReplacementCreator({ resolveItemUuid: async () => source });
   assert.equal(
     await throwingCreate({
-      actor: {
-        createEmbeddedDocuments: async () => {
-          throw new Error('create');
-        },
-      },
+      actor: { createEmbeddedDocuments: async () => { throw new Error('create'); } },
       target: { type: 'item', itemUuid: 'Item.source' },
     }),
     null
@@ -602,10 +477,7 @@ test('target-aware replacement rejects stale, index, non-Item, API, throw, and e
 test('replacement is created successfully before the original Tool is deleted', async () => {
   const events = [];
   const item = new FakeItem({});
-  item.delete = async () => {
-    events.push('delete');
-    item.deleted = true;
-  };
+  item.delete = async () => { events.push('delete'); item.deleted = true; };
   const tool = Tool.fromJSON({
     componentId: 'c-tool',
     breakage: { mode: 'breakageChance', breakageChance: 100 },
@@ -636,10 +508,7 @@ test('replacement is created successfully before the original Tool is deleted', 
 
 test('780 replacement: always stamps roles[systemId].componentId = replacementComponentId', async () => {
   const system = { id: 'sys-1', tools: [] };
-  const captured = await runReplacement({
-    system,
-    resolveReplacementSource: resolveToReplacementSource,
-  });
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
   assert.equal(captured.length, 1, 'the replacement item is created');
   assert.equal(
     captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
@@ -656,10 +525,7 @@ test('780 replacement: co-stamps toolId when EXACTLY ONE first-class tool links 
     registeredItemUuid: 'Item.unrelated-tool-src',
   };
   const system = { id: 'sys-1', tools: [linkingTool] };
-  const captured = await runReplacement({
-    system,
-    resolveReplacementSource: resolveToReplacementSource,
-  });
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
   assert.equal(captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.toolId, 'tool-link');
 
   // Round-trip: the stamped replacement resolves to that exact tool by durable identity,
@@ -679,10 +545,7 @@ test('780 replacement: co-stamps toolId when EXACTLY ONE first-class tool links 
 
 test('780 replacement: skips toolId when NO first-class tool links the component', async () => {
   const system = { id: 'sys-1', tools: [{ id: 't-other', componentId: 'comp-unrelated' }] };
-  const captured = await runReplacement({
-    system,
-    resolveReplacementSource: resolveToReplacementSource,
-  });
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
   assert.equal(
     captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
     REPLACEMENT_COMPONENT_ID
@@ -702,10 +565,7 @@ test('780 replacement: skips toolId when MULTIPLE first-class tools link the com
       { id: 't2', componentId: REPLACEMENT_COMPONENT_ID },
     ],
   };
-  const captured = await runReplacement({
-    system,
-    resolveReplacementSource: resolveToReplacementSource,
-  });
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
   assert.equal(
     captured[0].flags?.fabricate?.fabricate?.roles?.['sys-1']?.componentId,
     REPLACEMENT_COMPONENT_ID
@@ -718,27 +578,14 @@ test('780 replacement: skips toolId when MULTIPLE first-class tools link the com
 });
 
 test('780 replacement: an unresolvable replacement stamps nothing (no item created)', async () => {
-  const system = {
-    id: 'sys-1',
-    tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }],
-  };
+  const system = { id: 'sys-1', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
   const captured = await runReplacement({ system, resolveReplacementSource: () => null });
-  assert.equal(
-    captured.length,
-    0,
-    'no replacement item is created when the component does not resolve'
-  );
+  assert.equal(captured.length, 0, 'no replacement item is created when the component does not resolve');
 });
 
 test('780 replacement: a dotted systemId stamps nothing', async () => {
-  const system = {
-    id: 'sys.with.dots',
-    tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }],
-  };
-  const captured = await runReplacement({
-    system,
-    resolveReplacementSource: resolveToReplacementSource,
-  });
+  const system = { id: 'sys.with.dots', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
+  const captured = await runReplacement({ system, resolveReplacementSource: resolveToReplacementSource });
   assert.equal(captured.length, 1);
   assert.equal(
     captured[0].flags?.fabricate?.fabricate?.roles,
@@ -749,10 +596,7 @@ test('780 replacement: a dotted systemId stamps nothing', async () => {
 
 test('780 replacement: the shared helper is faithful when called directly (componentId + single toolId)', () => {
   const itemData = {};
-  const system = {
-    id: 'sys-1',
-    tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }],
-  };
+  const system = { id: 'sys-1', tools: [{ id: 'tool-link', componentId: REPLACEMENT_COMPONENT_ID }] };
   stampReplacementComponentIdentity(itemData, system, REPLACEMENT_COMPONENT_ID);
   assert.deepEqual(itemData.flags.fabricate.fabricate.roles['sys-1'], {
     componentId: REPLACEMENT_COMPONENT_ID,
@@ -765,8 +609,12 @@ test('780 replacement: the shared helper is faithful when called directly (compo
 // ---------------------------------------------------------------------------
 
 const { evaluateCheckBreakage } = await import('../src/toolBreakageRuntime.js');
-const { engineCheckResult, NATURAL_ONE_TRIGGER, NATURAL_ONE_RESULT, CHECK_DRIVEN_SYSTEM } =
-  await import('./helpers/checkDrivenBreakageFixtures.js');
+const {
+  engineCheckResult,
+  NATURAL_ONE_TRIGGER,
+  NATURAL_ONE_RESULT,
+  CHECK_DRIVEN_SYSTEM,
+} = await import('./helpers/checkDrivenBreakageFixtures.js');
 
 test('evaluateCheckBreakage: a non-engine-evaluated result never force-breaks', () => {
   const result = { engineEvaluated: false, data: { breakTools: true } };
@@ -786,280 +634,81 @@ test('evaluateCheckBreakage: legacy data.breakTools is an implicit always-on tri
 
 test('evaluateCheckBreakage: rollTotal trigger (breakTools opt-in)', () => {
   const checkBreakage = {
-    triggers: [
-      { id: 'r', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: 3 } },
-    ],
+    triggers: [{ id: 'r', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: 3 } }],
   };
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 2 }) })
-      .forceBreak,
-    true
-  );
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 4 }) })
-      .forceBreak,
-    false
-  );
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 2 }) }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 4 }) }).forceBreak, false);
 });
 
 test('evaluateCheckBreakage: a matching trigger that does NOT opt into breakTools never force-breaks', () => {
   // A trigger may force an outcome only (breakTools false/absent); it must not break tools.
-  const outcomeOnly = {
-    triggers: [
-      {
-        id: 'o',
-        outcome: 'failure',
-        breakTools: false,
-        condition: { type: 'rollTotal', operator: '<=', value: 99 },
-      },
-    ],
-  };
-  assert.equal(
-    evaluateCheckBreakage({
-      checkBreakage: outcomeOnly,
-      checkResult: engineCheckResult({ total: 1 }),
-    }).forceBreak,
-    false
-  );
+  const outcomeOnly = { triggers: [{ id: 'o', outcome: 'failure', breakTools: false, condition: { type: 'rollTotal', operator: '<=', value: 99 } }] };
+  assert.equal(evaluateCheckBreakage({ checkBreakage: outcomeOnly, checkResult: engineCheckResult({ total: 1 }) }).forceBreak, false);
 });
 
 test('evaluateCheckBreakage: progressiveValue trigger; absent value on a non-progressive check never matches', () => {
   const checkBreakage = {
-    triggers: [
-      {
-        id: 'p',
-        breakTools: true,
-        condition: { type: 'progressiveValue', operator: '>=', value: 100 },
-      },
-    ],
+    triggers: [{ id: 'p', breakTools: true, condition: { type: 'progressiveValue', operator: '>=', value: 100 } }],
   };
-  assert.equal(
-    evaluateCheckBreakage({
-      checkBreakage,
-      checkResult: engineCheckResult({ value: 120, total: 12 }),
-    }).forceBreak,
-    true
-  );
-  assert.equal(
-    evaluateCheckBreakage({
-      checkBreakage,
-      checkResult: engineCheckResult({ value: null, total: 12 }),
-    }).forceBreak,
-    false
-  );
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ value: 120, total: 12 }) }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ value: null, total: 12 }) }).forceBreak, false);
 });
 
 test('evaluateCheckBreakage: rollTotal and progressiveValue resolve from distinct sources on the same roll', () => {
   const checkResult = engineCheckResult({ value: Number.MAX_SAFE_INTEGER, total: 1 });
-  const rollTotalTrigger = {
-    triggers: [
-      { id: 'rt', breakTools: true, condition: { type: 'rollTotal', operator: '==', value: 1 } },
-    ],
-  };
-  const progValueTrigger = {
-    triggers: [
-      {
-        id: 'pv',
-        breakTools: true,
-        condition: { type: 'progressiveValue', operator: '<=', value: 5 },
-      },
-    ],
-  };
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: rollTotalTrigger, checkResult }).forceBreak,
-    true,
-    'rollTotal sees the raw 1'
-  );
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: progValueTrigger, checkResult }).forceBreak,
-    false,
-    'progressiveValue sees the awarded MAX'
-  );
+  const rollTotalTrigger = { triggers: [{ id: 'rt', breakTools: true, condition: { type: 'rollTotal', operator: '==', value: 1 } }] };
+  const progValueTrigger = { triggers: [{ id: 'pv', breakTools: true, condition: { type: 'progressiveValue', operator: '<=', value: 5 } }] };
+  assert.equal(evaluateCheckBreakage({ checkBreakage: rollTotalTrigger, checkResult }).forceBreak, true, 'rollTotal sees the raw 1');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: progValueTrigger, checkResult }).forceBreak, false, 'progressiveValue sees the awarded MAX');
 });
 
 test('evaluateCheckBreakage: outcomeTier trigger matches by tierId or outcome key', () => {
-  const byId = {
-    triggers: [
-      {
-        id: 'o',
-        breakTools: true,
-        condition: { type: 'outcomeTier', tierIds: ['t-danger'], outcomeKeys: [] },
-      },
-    ],
-  };
-  const byKey = {
-    triggers: [
-      {
-        id: 'o',
-        breakTools: true,
-        condition: { type: 'outcomeTier', tierIds: [], outcomeKeys: ['danger'] },
-      },
-    ],
-  };
+  const byId = { triggers: [{ id: 'o', breakTools: true, condition: { type: 'outcomeTier', tierIds: ['t-danger'], outcomeKeys: [] } }] };
+  const byKey = { triggers: [{ id: 'o', breakTools: true, condition: { type: 'outcomeTier', tierIds: [], outcomeKeys: ['danger'] } }] };
   const result = engineCheckResult({ outcome: 'Danger', outcomeId: 't-danger' });
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: byId, checkResult: result }).forceBreak,
-    true
-  );
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: byKey, checkResult: result }).forceBreak,
-    true
-  );
+  assert.equal(evaluateCheckBreakage({ checkBreakage: byId, checkResult: result }).forceBreak, true);
+  assert.equal(evaluateCheckBreakage({ checkBreakage: byKey, checkResult: result }).forceBreak, true);
 });
 
 test('evaluateCheckBreakage: diceGroup anyDie natural-1', () => {
   const checkBreakage = {
-    triggers: [
-      {
-        id: 'g',
-        breakTools: true,
-        condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
-      },
-    ],
+    triggers: [{ id: 'g', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }],
   };
   const groups = [{ groupId: 0, group: '2d20', sum: 21, results: [1, 20] }];
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) })
-      .forceBreak,
-    true
-  );
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, true);
   const noOne = [{ groupId: 0, group: '2d20', sum: 30, results: [10, 20] }];
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: noOne }) })
-      .forceBreak,
-    false
-  );
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: noOne }) }).forceBreak, false);
 });
 
 test('evaluateCheckBreakage: diceGroup total, lowestDie, highestDie, and allDice aggregates', () => {
-  const lowest = {
-    triggers: [
-      {
-        id: 'l',
-        breakTools: true,
-        condition: {
-          type: 'diceGroup',
-          groupId: 1,
-          aggregate: 'lowestDie',
-          operator: '<=',
-          value: 2,
-        },
-      },
-    ],
-  };
-  const total = {
-    triggers: [
-      {
-        id: 't',
-        breakTools: true,
-        condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '>=', value: 18 },
-      },
-    ],
-  };
+  const lowest = { triggers: [{ id: 'l', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'lowestDie', operator: '<=', value: 2 } }] };
+  const total = { triggers: [{ id: 't', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'total', operator: '>=', value: 18 } }] };
   // highestDie: the single d20 face is 19, so >= 18 matches.
-  const highest = {
-    triggers: [
-      {
-        id: 'h',
-        breakTools: true,
-        condition: {
-          type: 'diceGroup',
-          groupId: 0,
-          aggregate: 'highestDie',
-          operator: '>=',
-          value: 18,
-        },
-      },
-    ],
-  };
+  const highest = { triggers: [{ id: 'h', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'highestDie', operator: '>=', value: 18 } }] };
   // allDice: every die in the 2d6 group is <= 6 → matches; >= 6 would NOT (the 2 fails).
-  const allLow = {
-    triggers: [
-      {
-        id: 'a',
-        breakTools: true,
-        condition: {
-          type: 'diceGroup',
-          groupId: 1,
-          aggregate: 'allDice',
-          operator: '<=',
-          value: 6,
-        },
-      },
-    ],
-  };
-  const allHigh = {
-    triggers: [
-      {
-        id: 'a2',
-        breakTools: true,
-        condition: {
-          type: 'diceGroup',
-          groupId: 1,
-          aggregate: 'allDice',
-          operator: '>=',
-          value: 6,
-        },
-      },
-    ],
-  };
+  const allLow = { triggers: [{ id: 'a', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '<=', value: 6 } }] };
+  const allHigh = { triggers: [{ id: 'a2', breakTools: true, condition: { type: 'diceGroup', groupId: 1, aggregate: 'allDice', operator: '>=', value: 6 } }] };
   const groups = [
     { groupId: 0, group: '1d20', sum: 19, results: [19] },
     { groupId: 1, group: '2d6', sum: 8, results: [2, 6] },
   ];
   const checkResult = engineCheckResult({ diceGroups: groups });
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: lowest, checkResult }).forceBreak,
-    true,
-    'lowestDie 2 <= 2'
-  );
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: total, checkResult }).forceBreak,
-    true,
-    'total 19 >= 18'
-  );
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: highest, checkResult }).forceBreak,
-    true,
-    'highestDie 19 >= 18'
-  );
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: allLow, checkResult }).forceBreak,
-    true,
-    'allDice (2,6) all <= 6'
-  );
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage: allHigh, checkResult }).forceBreak,
-    false,
-    'allDice (2,6) NOT all >= 6'
-  );
+  assert.equal(evaluateCheckBreakage({ checkBreakage: lowest, checkResult }).forceBreak, true, 'lowestDie 2 <= 2');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: total, checkResult }).forceBreak, true, 'total 19 >= 18');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: highest, checkResult }).forceBreak, true, 'highestDie 19 >= 18');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: allLow, checkResult }).forceBreak, true, 'allDice (2,6) all <= 6');
+  assert.equal(evaluateCheckBreakage({ checkBreakage: allHigh, checkResult }).forceBreak, false, 'allDice (2,6) NOT all >= 6');
 });
 
 test('evaluateCheckBreakage: non-total aggregate fails open when per-die results are missing', () => {
-  const checkBreakage = {
-    triggers: [
-      {
-        id: 'g',
-        breakTools: true,
-        condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
-      },
-    ],
-  };
+  const checkBreakage = { triggers: [{ id: 'g', breakTools: true, condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 } }] };
   const groups = [{ groupId: 0, group: '2d20', sum: 21 }];
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) })
-      .forceBreak,
-    false
-  );
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ diceGroups: groups }) }).forceBreak, false);
 });
 
 test('evaluateCheckBreakage: an empty trigger list with no legacy breakTools never matches', () => {
   const checkBreakage = { triggers: [] };
-  assert.equal(
-    evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 1 }) })
-      .forceBreak,
-    false
-  );
+  assert.equal(evaluateCheckBreakage({ checkBreakage, checkResult: engineCheckResult({ total: 1 }) }).forceBreak, false);
 });
 
 // ---------------------------------------------------------------------------
@@ -1082,38 +731,11 @@ test('checkDriven runtime: forces breakage on all non-immune tools while immune 
   const hammer = new FakeItem({}, { uuid: 'Item.hammer' });
   const immune = new FakeItem({}, { uuid: 'Item.immune' });
   const runtime = checkDrivenRuntime([
-    {
-      tool: {
-        componentId: 'axe',
-        breakage: { mode: 'breakageChance', breakageChance: 0 },
-        onBreak: { mode: 'flagBroken' },
-      },
-      item: axe,
-    },
-    {
-      tool: {
-        componentId: 'hammer',
-        breakage: { mode: 'limitedUses', maxUses: null },
-        onBreak: { mode: 'flagBroken' },
-      },
-      item: hammer,
-    },
-    {
-      tool: {
-        componentId: 'immune',
-        breakage: { mode: 'immune' },
-        onBreak: { mode: 'flagBroken' },
-      },
-      item: immune,
-    },
+    { tool: { componentId: 'axe', breakage: { mode: 'breakageChance', breakageChance: 0 }, onBreak: { mode: 'flagBroken' } }, item: axe },
+    { tool: { componentId: 'hammer', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'flagBroken' } }, item: hammer },
+    { tool: { componentId: 'immune', breakage: { mode: 'immune' }, onBreak: { mode: 'flagBroken' } }, item: immune },
   ]);
-  const args = {
-    actor: { uuid: 'Actor.a' },
-    task: { id: 't' },
-    system: checkDrivenSystem,
-    checkResult: FORCE_RESULT,
-    checkBreakage: FORCE_TRIGGER,
-  };
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: FORCE_RESULT, checkBreakage: FORCE_TRIGGER };
   await runtime.plan(args);
   const applied = await runtime.apply(args);
   const byId = Object.fromEntries(applied.map((e) => [e.componentId, e]));
@@ -1127,32 +749,13 @@ test('checkDriven runtime: forces breakage on all non-immune tools while immune 
 test('checkDriven runtime: no trigger match breaks nothing', async () => {
   const axe = new FakeItem({}, { uuid: 'Item.axe' });
   const runtime = checkDrivenRuntime([
-    {
-      tool: {
-        componentId: 'axe',
-        breakage: { mode: 'limitedUses', maxUses: 1 },
-        onBreak: { mode: 'flagBroken' },
-      },
-      item: axe,
-    },
+    { tool: { componentId: 'axe', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'flagBroken' } }, item: axe },
   ]);
-  const noMatch = engineCheckResult({
-    diceGroups: [{ groupId: 0, group: '1d20', sum: 15, results: [15] }],
-  });
-  const args = {
-    actor: { uuid: 'Actor.a' },
-    task: { id: 't' },
-    system: checkDrivenSystem,
-    checkResult: noMatch,
-    checkBreakage: FORCE_TRIGGER,
-  };
+  const noMatch = engineCheckResult({ diceGroups: [{ groupId: 0, group: '1d20', sum: 15, results: [15] }] });
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: noMatch, checkBreakage: FORCE_TRIGGER };
   await runtime.plan(args);
   const applied = await runtime.apply(args);
-  assert.equal(
-    applied[0].broken,
-    false,
-    'limitedUses own-mode is ignored under checkDriven; no trigger then no break'
-  );
+  assert.equal(applied[0].broken, false, 'limitedUses own-mode is ignored under checkDriven; no trigger then no break');
 });
 
 for (const [label, checkResult] of [
@@ -1170,7 +773,10 @@ for (const [label, checkResult] of [
       breakage: { mode: 'limitedUses', maxUses: 10 },
       onBreak: { mode: 'flagBroken' },
     });
-    const item = new FakeItem({ fabricate: { toolUsage: { timesUsed: 4 } } }, { uuid: 'Item.axe' });
+    const item = new FakeItem(
+      { fabricate: { toolUsage: { timesUsed: 4 } } },
+      { uuid: 'Item.axe' }
+    );
     const originalApplyUsage = tool.applyUsage.bind(tool);
     let applyUsageCalls = 0;
     tool.applyUsage = async (...args) => {
@@ -1200,23 +806,9 @@ for (const [label, checkResult] of [
 
 test('checkDriven runtime: virtual-present tools are recorded as skipped, not mutated', async () => {
   const runtime = checkDrivenRuntime([
-    {
-      tool: {
-        componentId: 'station',
-        breakage: { mode: 'limitedUses', maxUses: 1 },
-        onBreak: { mode: 'destroy' },
-      },
-      item: null,
-      virtual: true,
-    },
+    { tool: { componentId: 'station', breakage: { mode: 'limitedUses', maxUses: 1 }, onBreak: { mode: 'destroy' } }, item: null, virtual: true },
   ]);
-  const args = {
-    actor: { uuid: 'Actor.a' },
-    task: { id: 't' },
-    system: checkDrivenSystem,
-    checkResult: FORCE_RESULT,
-    checkBreakage: FORCE_TRIGGER,
-  };
+  const args = { actor: { uuid: 'Actor.a' }, task: { id: 't' }, system: checkDrivenSystem, checkResult: FORCE_RESULT, checkBreakage: FORCE_TRIGGER };
   const applied = await runtime.apply(args);
   assert.equal(applied.length, 1);
   assert.equal(applied[0].virtual, true);
@@ -1272,11 +864,7 @@ test('drift: crafting and gathering resolvers reach the identical break decision
   assert.equal(craftingDecision.forceBreak, true, 'crafting forces breakage on the natural 1');
   assert.equal(gatheringDecision.forceBreak, true, 'gathering forces breakage on the natural 1');
   assert.deepEqual(
-    {
-      forceBreak: craftingDecision.forceBreak,
-      triggerId: craftingDecision.triggerId,
-      reason: craftingDecision.reason,
-    },
+    { forceBreak: craftingDecision.forceBreak, triggerId: craftingDecision.triggerId, reason: craftingDecision.reason },
     gatheringDecision,
     'both surfaces resolve the identical { forceBreak, triggerId, reason } decision'
   );

@@ -25,7 +25,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-    'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/dropUtils.js',
     // The browse view-state the environments browser and its two gathering children
     // read (issue 1438).

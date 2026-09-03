@@ -388,11 +388,7 @@ test('salvage() cannot consume and use the same physical Item as a Tool', async 
 
   assert.equal(result.success, false);
   assert.match(result.message, /tool/i);
-  assert.equal(
-    sharedItem.deleteCalled,
-    false,
-    'validation blocks before consuming the shared Item'
-  );
+  assert.equal(sharedItem.deleteCalled, false, 'validation blocks before consuming the shared Item');
   assert.equal(sharedItem.updateCalled, false, 'validation blocks before mutating the shared Item');
 });
 
@@ -2689,13 +2685,7 @@ test('_resolveSalvageResultGroups: the disposition argument selects by ROLE on f
   // selects nothing whatever the policy says.
   const progressiveSystem = makeSystem({ salvageResolutionMode: 'progressive' });
   assert.deepEqual(
-    engine._resolveSalvageResultGroups(
-      component,
-      progressiveSystem,
-      { value: 99 },
-      null,
-      'failure'
-    ),
+    engine._resolveSalvageResultGroups(component, progressiveSystem, { value: 99 }, null, 'failure'),
     []
   );
 });
@@ -2978,7 +2968,7 @@ test('salvage(): a component listed twice fires TWICE, once per result entry', a
       ['r-1', 'full'],
       ['r-2', 'halted'],
     ],
-    "one request per firing, each naming its own entry and reporting that entry's own bucket"
+    'one request per firing, each naming its own entry and reporting that entry\'s own bucket'
   );
   const [first, second] = writer.calls[0].complications;
   assert.equal(

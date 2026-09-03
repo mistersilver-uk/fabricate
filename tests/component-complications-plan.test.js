@@ -620,10 +620,7 @@ test('1286: neither player projection ever emits when, rollCondition, effectRoll
   });
   const leaked = ['when', 'rollCondition', 'effectRoll', 'macroUuid', 'activities', 'match'];
 
-  const [forecast] = forecastComplications(component('iron', [secretive]), {
-    activity: 'salvage',
-    checkTriggerIds: [],
-  });
+  const [forecast] = forecastComplications(component('iron', [secretive]), { activity: 'salvage', checkTriggerIds: [] });
   for (const key of leaked) assert.ok(!(key in forecast), `forecast leaked ${key}`);
   assert.equal(forecast.name, 'Shrapnel');
   assert.equal(forecast.severity, 'major');

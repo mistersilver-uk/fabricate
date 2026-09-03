@@ -60,19 +60,11 @@ test('renames the consumption key on both crafting and salvage checks', () => {
 
   assert.equal(system.craftingCheck.consumption.breakToolsOnFail, true);
   assert.equal('consumeCatalystsOnFail' in system.craftingCheck.consumption, false);
-  assert.equal(
-    system.craftingCheck.consumption.consumeIngredientsOnFail,
-    true,
-    'sibling preserved'
-  );
+  assert.equal(system.craftingCheck.consumption.consumeIngredientsOnFail, true, 'sibling preserved');
 
   assert.equal(system.salvageCraftingCheck.consumption.breakToolsOnFail, true);
   assert.equal('consumeCatalystsOnFail' in system.salvageCraftingCheck.consumption, false);
-  assert.equal(
-    system.salvageCraftingCheck.consumption.consumeComponentOnFail,
-    false,
-    'sibling preserved'
-  );
+  assert.equal(system.salvageCraftingCheck.consumption.consumeComponentOnFail, false, 'sibling preserved');
 });
 
 // ---------------------------------------------------------------------------
@@ -84,11 +76,7 @@ test('strips residual dead catalysts at every recipe level', () => {
   const recipe = recipes[0];
   assert.equal('catalysts' in recipe, false, 'recipe-level catalysts stripped');
   assert.equal('catalysts' in recipe.steps[0], false, 'step-level catalysts stripped');
-  assert.equal(
-    'catalysts' in recipe.steps[0].ingredientSets[0],
-    false,
-    'step-set catalysts stripped'
-  );
+  assert.equal('catalysts' in recipe.steps[0].ingredientSets[0], false, 'step-set catalysts stripped');
   assert.equal('catalysts' in recipe.ingredientSets[0], false, 'recipe-set catalysts stripped');
   // Non-catalyst data is preserved.
   assert.equal(recipe.id, 'r1');
@@ -97,16 +85,8 @@ test('strips residual dead catalysts at every recipe level', () => {
 
 test('strips residual dead salvage catalysts and the dead gathering task.catalysts', () => {
   const { systems, gatheringConfig } = migrateBreakToolsOnFail(legacyData());
-  assert.equal(
-    'catalysts' in systems[0].components[0].salvage,
-    false,
-    'salvage catalysts stripped'
-  );
-  assert.equal(
-    systems[0].components[0].salvage.enabled,
-    true,
-    'salvage sub-object otherwise preserved'
-  );
+  assert.equal('catalysts' in systems[0].components[0].salvage, false, 'salvage catalysts stripped');
+  assert.equal(systems[0].components[0].salvage.enabled, true, 'salvage sub-object otherwise preserved');
   assert.equal(
     'catalysts' in gatheringConfig.systems['sys-1'].tasks[0],
     false,
@@ -138,11 +118,7 @@ test('does not clobber an already-present breakToolsOnFail; leaves a stale legac
 });
 
 test('handles missing checks / consumption blocks without throwing', () => {
-  const data = {
-    systems: [{ id: 's' }, null, { id: 's2', craftingCheck: {} }],
-    recipes: [],
-    gatheringConfig: {},
-  };
+  const data = { systems: [{ id: 's' }, null, { id: 's2', craftingCheck: {} }], recipes: [], gatheringConfig: {} };
   assert.doesNotThrow(() => migrateBreakToolsOnFail(data));
 });
 
@@ -197,11 +173,7 @@ test('runs through MigrationRunner from 1.6.0, renames the key, and lands at the
 
   await runner.run();
 
-  assert.equal(
-    settings.store.get('migrationVersion'),
-    '1.31.0',
-    'advances to the new highest version'
-  );
+  assert.equal(settings.store.get('migrationVersion'), '1.31.0', 'advances to the new highest version');
   const system = settings.store.get('craftingSystems')[0];
   assert.equal(system.craftingCheck.consumption.breakToolsOnFail, true);
   assert.equal('consumeCatalystsOnFail' in system.craftingCheck.consumption, false);
@@ -214,11 +186,7 @@ test('runner: craftingSystems left untouched (no write) when nothing needs renam
   const settings = makeSettings({
     migrationVersion: '1.6.0',
     craftingSystems: [
-      {
-        id: 'sys-1',
-        visibilityMode: 'knowledge',
-        craftingCheck: { enabled: true, consumption: { breakToolsOnFail: true } },
-      },
+      { id: 'sys-1', visibilityMode: 'knowledge', craftingCheck: { enabled: true, consumption: { breakToolsOnFail: true } } },
     ],
   });
   const runner = new MigrationRunner({

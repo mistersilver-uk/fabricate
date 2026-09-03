@@ -1,13 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  makeRichState,
-  makeEngine,
-  makeFakeActor,
-  environment,
-  DEFAULT_TEST_SYSTEM,
-} from './helpers/gathering.js';
+import { makeRichState, makeEngine, makeFakeActor, environment, DEFAULT_TEST_SYSTEM } from './helpers/gathering.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 
 // The modifier library moved onto the crafting SYSTEM (issue 1117); the gathering config
@@ -18,38 +12,22 @@ function configFor({ tasks = [], events = [] } = {}) {
       'system-test': {
         rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
         tasks,
-        events,
-      },
-    },
+        events
+      }
+    }
   };
 }
 
-const STR_LIB = [
-  {
-    id: 'strength',
-    label: 'Strength',
-    icon: 'fa-solid fa-dumbbell',
-    expression: '@abilities.str.mod',
-  },
-];
+const STR_LIB = [{ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' }];
 
 function envWithLibrary(service, system, { events = [] } = {}) {
-  const composed = service.composeEnvironment(
-    {
-      id: 'env-test',
-      craftingSystemId: 'system-test',
-      tasks: [],
-    },
-    system
-  );
+  const composed = service.composeEnvironment({
+    id: 'env-test',
+    craftingSystemId: 'system-test',
+    tasks: []
+  }, system);
   if (events.length > 0) composed.events = events;
-  composed.rules = {
-    rewardSelectionMode: 'allDrops',
-    eventSelectionMode: 'allDrops',
-    rewardLimit: 99,
-    eventLimit: 99,
-    eventPolicy: 'successWithEvent',
-  };
+  composed.rules = { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops', rewardLimit: 99, eventLimit: 99, eventPolicy: 'successWithEvent' };
   return composed;
 }
 
@@ -58,33 +36,15 @@ test('terminal run records characterModifierSnapshot evidence per row and event'
     config: configFor(),
     modifiers: STR_LIB,
     rolls: [100, 100],
-    evaluateExpression: () => 3,
+    evaluateExpression: () => 3
   });
   const env = envWithLibrary(service, system, {
-    events: [
-      {
-        id: 'h1',
-        name: 'Trap',
-        dropRate: 50,
-        characterModifiers: [{ id: 'rh', modifierId: 'strength', operator: '-' }],
-      },
-    ],
+    events: [{ id: 'h1', name: 'Trap', dropRate: 50, characterModifiers: [{ id: 'rh', modifierId: 'strength', operator: '-' }] }]
   });
   const result = await service.resolveD100Attempt({
-    task: {
-      id: 't',
-      dropRows: [
-        {
-          id: 'd1',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 50,
-          characterModifiers: [{ id: 'rd', modifierId: 'strength', operator: '+' }],
-        },
-      ],
-    },
+    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'rd', modifierId: 'strength', operator: '+' }] }] },
     environment: env,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   assert.ok(result.characterModifierSnapshot, 'snapshot returned');
   assert.equal(result.characterModifierSnapshot.rows.length, 1);
@@ -102,27 +62,13 @@ test('dice term rolled total is captured in evidence', async () => {
     config: configFor(),
     modifiers: [{ id: 'roll-d6', label: 'Roll d6', expression: '1d6 + @abilities.str.mod' }],
     rolls: [100],
-    evaluateExpression: ({ expression }) => {
-      evaluatedExpression = expression;
-      return 7;
-    },
+    evaluateExpression: ({ expression }) => { evaluatedExpression = expression; return 7; }
   });
   const env = envWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
-    task: {
-      id: 't',
-      dropRows: [
-        {
-          id: 'd1',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 50,
-          characterModifiers: [{ id: 'r', modifierId: 'roll-d6', operator: '+' }],
-        },
-      ],
-    },
+    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'r', modifierId: 'roll-d6', operator: '+' }] }] },
     environment: env,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   assert.equal(evaluatedExpression, '1d6 + @abilities.str.mod');
   const evidence = result.characterModifierSnapshot.rows[0].contributions[0];
@@ -135,55 +81,29 @@ test('replay invariance: terminal payload is snapshot-driven not library-driven'
     config: configFor(),
     modifiers: STR_LIB,
     rolls: [100],
-    evaluateExpression: () => 5,
+    evaluateExpression: () => 5
   });
   const env = envWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
-    task: {
-      id: 't',
-      dropRows: [
-        {
-          id: 'd1',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 50,
-          characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }],
-        },
-      ],
-    },
+    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }] }] },
     environment: env,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   const snapshot = result.characterModifierSnapshot;
   // Mutating after the fact does not affect captured snapshot
   snapshot.rows[0].contributions[0].contribution = 999;
   // resolve a new attempt; underlying library is unchanged so still resolves to +5
   const second = await service.resolveD100Attempt({
-    task: {
-      id: 't',
-      dropRows: [
-        {
-          id: 'd2',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 50,
-          characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }],
-        },
-      ],
-    },
+    task: { id: 't', dropRows: [{ id: 'd2', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }] }] },
     environment: env,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   assert.equal(second.characterModifierSnapshot.rows[0].contributions[0].contribution, 5);
 });
 
 test('GatheringRunManager preserves characterModifierSnapshot on terminal runs', async () => {
   const actor = makeFakeActor();
-  const manager = new GatheringRunManager({
-    randomID: () => 'run-1',
-    nowWorldTime: () => 100,
-    getUserId: () => 'u',
-  });
+  const manager = new GatheringRunManager({ randomID: () => 'run-1', nowWorldTime: () => 100, getUserId: () => 'u' });
   const run = await manager.createTerminalRun(
     actor,
     { craftingSystemId: 'system-test', environmentId: 'env-test', taskId: 'task-1' },
@@ -192,8 +112,8 @@ test('GatheringRunManager preserves characterModifierSnapshot on terminal runs',
       createdResults: [],
       characterModifierSnapshot: {
         rows: [{ rowId: 'd1', contributions: [{ contribution: 5, modifierId: 'strength' }] }],
-        events: [],
-      },
+        events: []
+      }
     }
   );
   assert.ok(run.characterModifierSnapshot);
@@ -207,32 +127,21 @@ test('commitAcceptedAttempt records snapshot in evidence', async () => {
     config: configFor(),
     modifiers: STR_LIB,
     rolls: [100],
-    evaluateExpression: () => 4,
+    evaluateExpression: () => 4
   });
   const actor = makeFakeActor();
   const env = envWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
-    task: {
-      id: 't',
-      dropRows: [
-        {
-          id: 'd1',
-          componentId: 'herb',
-          quantity: 1,
-          dropRate: 50,
-          characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }],
-        },
-      ],
-    },
+    task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }] }] },
     environment: env,
-    actor: { uuid: 'Actor.x' },
+    actor: { uuid: 'Actor.x' }
   });
   const evidence = await service.commitAcceptedAttempt({
     actor,
     system: DEFAULT_TEST_SYSTEM,
     environment: { id: 'env-test', craftingSystemId: 'system-test', conditions: {} },
     task: { id: 't' },
-    outcome: result,
+    outcome: result
   });
   assert.ok(evidence.characterModifierSnapshot);
   assert.equal(evidence.characterModifierSnapshot.rows[0].contributions[0].contribution, 4);

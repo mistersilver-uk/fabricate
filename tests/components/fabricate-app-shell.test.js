@@ -17,7 +17,10 @@ const gatheringSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/gathering/GatheringView.svelte'),
   'utf8'
 );
-const navModelSource = readFileSync(resolve(__dirname, '../../src/ui/playerNavModel.js'), 'utf8');
+const navModelSource = readFileSync(
+  resolve(__dirname, '../../src/ui/playerNavModel.js'),
+  'utf8'
+);
 const extensionHostSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/PlayerExtensionHost.svelte'),
   'utf8'
@@ -117,7 +120,10 @@ describe('FabricateAppRoot shell', () => {
         !rootSource.includes('.subscribeSurfaceIds('),
         'the shell must never subscribe to the registry itself'
       );
-      assert.ok(!extensionHostSource.includes('.subscribeSurfaceIds('), 'nor may the mount host');
+      assert.ok(
+        !extensionHostSource.includes('.subscribeSurfaceIds('),
+        'nor may the mount host'
+      );
     });
   });
 
@@ -559,7 +565,7 @@ describe('SvelteFabricateApp shell window', () => {
       assert.ok(body.includes('deriveExtensionSurfaces(playerExtensions, {'), 'fresh snapshot');
       assert.ok(
         body.includes('experimentalFeaturesEnabled: isExperimentalFeaturesEnabled()'),
-        "and re-reads the experimental gate rather than caching the first frame's answer"
+        'and re-reads the experimental gate rather than caching the first frame\'s answer'
       );
       assert.ok(body.includes('resolveActiveTab('), 'and the shared fallback rule');
       assert.ok(body.includes('this.updateProps({ extensionSurfaces'), 'pushed down reactively');
@@ -653,11 +659,11 @@ describe('SvelteFabricateApp shell window', () => {
       // it, which the smoke run counts and fails on. The stores report failure by
       // return status rather than rejecting; this is the second line of defence.
       assert.ok(
-        appSource.includes('flushProgressiveOrder?.()?.catch?.(noop)'),
+        appSource.includes("flushProgressiveOrder?.()?.catch?.(noop)"),
         'the crafting flush cannot reject out of the teardown'
       );
       assert.ok(
-        appSource.includes('flushSalvageOrder?.()?.catch?.(noop)'),
+        appSource.includes("flushSalvageOrder?.()?.catch?.(noop)"),
         'nor the inventory flush'
       );
     });

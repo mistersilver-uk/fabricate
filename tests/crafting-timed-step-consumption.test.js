@@ -110,11 +110,7 @@ class FakeActor {
       return data;
     }
     const created = data.map((d, i) => {
-      const item = new FakeItem(
-        `created-${this._createdDocs.length + i}`,
-        d.name,
-        d.system?.quantity || 1
-      );
+      const item = new FakeItem(`created-${this._createdDocs.length + i}`, d.name, d.system?.quantity || 1);
       item.parent = this;
       item.createEmbeddedDocuments = async (t, effectData) => {
         item.effects.push(...effectData);
@@ -156,13 +152,7 @@ function buildIngredientSet(id, ingredientDefs, currencySpends = []) {
   };
 }
 
-function buildRecipe({
-  craftingSystemId,
-  ingredientSets,
-  resultGroups = [],
-  steps,
-  transferEffects = false,
-}) {
+function buildRecipe({ craftingSystemId, ingredientSets, resultGroups = [], steps, transferEffects = false }) {
   return {
     id: 'recipe-timed',
     name: 'Timed Recipe',
@@ -306,12 +296,7 @@ test('timed step consumes components at START (gate arm), leaving a waitingTime 
     craftingSystemId: 'sys-timed',
     ingredientSets: [set],
     resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }],
-    steps: [
-      timedStep({
-        ingredientSets: [set],
-        resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }],
-      }),
-    ],
+    steps: [timedStep({ ingredientSets: [set], resultGroups: [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }] })],
   });
 
   const runManager = new CraftingRunManager();
@@ -344,8 +329,9 @@ test('timed step consumes components at START (gate arm), leaving a waitingTime 
 //     carried both would stay green either way.
 // ---------------------------------------------------------------------------
 
-const { configureItemStackQuantityPath, resetItemStackQuantityPath } =
-  await import('../src/systems/itemStackQuantity.js');
+const { configureItemStackQuantityPath, resetItemStackQuantityPath } = await import(
+  '../src/systems/itemStackQuantity.js'
+);
 
 test('a timed step START decrements the CONFIGURED stack-quantity field, never deleting the stack', async (t) => {
   // FIRST statement, before the configure call, so a mid-test throw still resets the
@@ -369,9 +355,7 @@ test('a timed step START decrements the CONFIGURED stack-quantity field, never d
   const craftingActor = new FakeActor('Crafter');
   const sourceActor = new FakeActor('Source', [wood]);
   const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
-  const resultGroups = [
-    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
-  ];
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
   const recipe = buildRecipe({
     craftingSystemId: system.id,
     ingredientSets: [set],
@@ -387,11 +371,7 @@ test('a timed step START decrements the CONFIGURED stack-quantity field, never d
 
   assert.equal(result.success, false, 'START arms the timed gate');
   assert.equal(wood._deleted, false, 'a stack of five must survive consuming two');
-  assert.deepEqual(
-    wood._updates,
-    [{ 'system.qtd': 3 }],
-    'and only the configured field is written'
-  );
+  assert.deepEqual(wood._updates, [{ 'system.qtd': 3 }], 'and only the configured field is written');
   assert.equal(wood.system.qtd, 3);
   assert.equal(wood.system.quantity, undefined, 'the item never grew a default-path key');
 });
@@ -416,9 +396,7 @@ test('a timed step resolves immediately when requirements.time.enabled === false
   const plank = new FakeItem('plank-result', 'Plank', 1);
   const craftingActor = new FakeActor('Crafter');
   const sourceActor = new FakeActor('Source', [wood]);
-  const resultGroups = [
-    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
-  ];
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
   const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
   const recipe = buildRecipe({
     craftingSystemId: 'sys-time-off',
@@ -458,9 +436,7 @@ test('a timed step still arms a gate when requirements.time is absent (default o
   const wood = new FakeItem('wood', 'Wood', 5);
   const craftingActor = new FakeActor('Crafter');
   const sourceActor = new FakeActor('Source', [wood]);
-  const resultGroups = [
-    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
-  ];
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
   const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
   const recipe = buildRecipe({
     craftingSystemId: 'sys-time-default',
@@ -500,9 +476,7 @@ test('timed step FINISH produces results without the components present and comp
   const plank = new FakeItem('plank-result', 'Plank', 1);
   const craftingActor = new FakeActor('Crafter');
   const sourceActor = new FakeActor('Source', [wood]);
-  const resultGroups = [
-    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
-  ];
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
   const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
   const recipe = buildRecipe({
     craftingSystemId: 'sys-timed3',
@@ -533,11 +507,7 @@ test('timed step FINISH produces results without the components present and comp
   assert.equal(finishResult.results.length, 1);
   assert.equal(finishResult.results[0].name, 'Plank');
 
-  assert.equal(
-    runManager.getActiveRuns(craftingActor).length,
-    0,
-    'no active run remains after FINISH'
-  );
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run remains after FINISH');
   const history = runManager.getRunHistory(craftingActor);
   assert.equal(history.length, 1, 'the completed run is archived to history');
   assert.equal(history[0].status, 'succeeded');
@@ -548,11 +518,7 @@ test('timed step FINISH produces results without the components present and comp
   // the immediate craft paths do via mapConsumedIngredientRef. Regression guard: this ref
   // previously dropped to a bare {actorUuid,itemUuid,quantity}, blanking the history row.
   assert.equal(consumed[0].name, 'Wood', 'the timed-step run persists the consume-time name');
-  assert.equal(
-    consumed[0].img,
-    'icons/wood.png',
-    'the timed-step run persists the consume-time img'
-  );
+  assert.equal(consumed[0].img, 'icons/wood.png', 'the timed-step run persists the consume-time img');
   assert.equal(consumed[0].componentId, 'wood', 'the timed-step run persists the componentId');
   assert.equal(consumed[0].itemUuid, 'Item.wood');
   assert.equal(consumed[0].quantity, 2);
@@ -615,8 +581,8 @@ test('timed FINISH excludes partially consumed ingredient docs while revalidatin
     'the ingredient stack remains live after partial consumption'
   );
   assert.equal(
-    runManager.getActiveRuns(craftingActor)[0].steps[0].preparedConsumption.consumedSummary[0]
-      .itemUuid,
+    runManager.getActiveRuns(craftingActor)[0].steps[0].preparedConsumption
+      .consumedSummary[0].itemUuid,
     ingredientStack.uuid,
     'START persists the consumed live document UUID'
   );
@@ -651,9 +617,7 @@ test('an already-armed gate still resumes (no double consume) when time requirem
   const plank = new FakeItem('plank-result', 'Plank', 1);
   const craftingActor = new FakeActor('Crafter');
   const sourceActor = new FakeActor('Source', [wood]);
-  const resultGroups = [
-    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
-  ];
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
   const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
   const recipe = buildRecipe({
     craftingSystemId: 'sys-toggle-midrun',
@@ -685,18 +649,10 @@ test('an already-armed gate still resumes (no double consume) when time requirem
   };
 
   const finishResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
-  assert.equal(
-    finishResult.success,
-    true,
-    'the armed gate still resumes despite the disabled flag'
-  );
+  assert.equal(finishResult.success, true, 'the armed gate still resumes despite the disabled flag');
   assert.equal(finishResult.results.length, 1, 'results are produced on resume');
   assert.equal(consumeSpy.called, false, 'FINISH never re-consumes (no double count)');
-  assert.equal(
-    runManager.getActiveRuns(craftingActor).length,
-    0,
-    'no active run remains after resume'
-  );
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run remains after resume');
   assert.equal(runManager.getRunHistory(craftingActor).length, 1, 'the completed run is archived');
 });
 
@@ -727,9 +683,7 @@ test('timed step transfers effects via the persisted resolvedEssences snapshot',
   const ember = new FakeItem('ember', 'Ember', 1);
   const craftingActor = new FakeActor('Crafter');
   const sourceActor = new FakeActor('Source', [ember]);
-  const resultGroups = [
-    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'ember', quantity: 1 }] },
-  ];
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'ember', quantity: 1 }] }];
   const set = buildIngredientSet('set-1', [{ componentId: 'ember', quantity: 1 }]);
   const recipe = buildRecipe({
     craftingSystemId: 'sys-ess',
@@ -746,11 +700,7 @@ test('timed step transfers effects via the persisted resolvedEssences snapshot',
   // START consumes the ember; snapshot resolvedEssences = { fire: 1 }.
   await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   const run = runManager.getActiveRuns(craftingActor)[0];
-  assert.deepEqual(
-    run.steps[0].preparedConsumption.resolvedEssences,
-    { fire: 1 },
-    'essence snapshot persisted'
-  );
+  assert.deepEqual(run.steps[0].preparedConsumption.resolvedEssences, { fire: 1 }, 'essence snapshot persisted');
 
   sourceActor.items = [];
   game.time.worldTime = 500 + 3600 + 1;
@@ -774,10 +724,7 @@ test('timed step failed FINISH check does not refund and completes the run as fa
     id: 'sys-fail',
     resolutionMode: 'simple',
     features: { craftingChecks: true, essences: false },
-    craftingCheck: {
-      enabled: true,
-      consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
-    },
+    craftingCheck: { enabled: true, consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false } },
     components: [{ id: 'wood', name: 'Wood' }],
   };
   setupGame(system, 2000);
@@ -807,13 +754,7 @@ test('timed step failed FINISH check does not refund and completes the run as fa
   game.time.worldTime = 2000 + 3600 + 1;
 
   // FINISH: the check now fails.
-  engine._runCraftingCheck = async () => ({
-    success: false,
-    message: 'Bad roll',
-    outcome: null,
-    value: null,
-    data: {},
-  });
+  engine._runCraftingCheck = async () => ({ success: false, message: 'Bad roll', outcome: null, value: null, data: {} });
   const consumeSpy = { called: false };
   engine._consumeIngredients = async () => {
     consumeSpy.called = true;
@@ -858,10 +799,7 @@ test('timed step with missing components at START leaves no active run and names
   const missing = {
     ingredients: [
       {
-        ingredient: {
-          match: { type: 'component', componentId: 'iron-rivet' },
-          getDescription: () => '2x component',
-        },
+        ingredient: { match: { type: 'component', componentId: 'iron-rivet' }, getDescription: () => '2x component' },
         have: 0,
         need: 2,
       },
@@ -870,11 +808,7 @@ test('timed step with missing components at START leaves no active run and names
     tools: [],
   };
   const runManager = new CraftingRunManager();
-  const engine = new CraftingEngine(
-    buildRecipeManager({ ingredientSet: set, canCraft: false, missing }),
-    runManager,
-    null
-  );
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set, canCraft: false, missing }), runManager, null);
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -882,16 +816,8 @@ test('timed step with missing components at START leaves no active run and names
   assert.match(result.message, /Missing required items/i);
   assert.match(result.message, /2x Iron Rivet: have 0, need 2/, 'the message names the component');
 
-  assert.equal(
-    runManager.getActiveRuns(craftingActor).length,
-    0,
-    'no zombie active run (gate never armed)'
-  );
-  assert.equal(
-    runManager.getRunHistory(craftingActor).length,
-    0,
-    'no history entry — the attempt never began'
-  );
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no zombie active run (gate never armed)');
+  assert.equal(runManager.getRunHistory(craftingActor).length, 0, 'no history entry — the attempt never began');
 });
 
 // ---------------------------------------------------------------------------
@@ -912,9 +838,7 @@ test('non-timed step still consumes at finish and produces results (regression g
   const plank = new FakeItem('plank', 'Plank', 1);
   const craftingActor = new FakeActor('Crafter');
   const sourceActor = new FakeActor('Source', [wood]);
-  const resultGroups = [
-    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
-  ];
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
   const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 1 }]);
   const nonTimedStep = {
     id: 'step-1',
@@ -942,11 +866,7 @@ test('non-timed step still consumes at finish and produces results (regression g
   assert.equal(result.success, true, 'a non-timed craft completes in a single call');
   assert.equal(result.results.length, 1);
   assert.equal(wood.system.quantity, 2, 'wood consumed at finish (3 -> 2)');
-  assert.equal(
-    runManager.getActiveRuns(craftingActor).length,
-    0,
-    'no active run for a single-step instant craft'
-  );
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run for a single-step instant craft');
   assert.equal(runManager.getRunHistory(craftingActor).length, 1, 'the completed run is archived');
 });
 
@@ -1101,11 +1021,7 @@ test('collapsed chain mid-chain failure keeps prior-step consumption and fails t
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
   assert.equal(result.success, false, 'the chain fails when a mid-chain step fails');
-  assert.equal(
-    wood.system.quantity,
-    8,
-    'only the first step consumed (10 -> 8); it stays consumed'
-  );
+  assert.equal(wood.system.quantity, 8, 'only the first step consumed (10 -> 8); it stays consumed');
   const history = runManager.getRunHistory(craftingActor);
   assert.equal(history.length, 1, 'the failed run is archived');
   assert.equal(history[0].status, 'failed');
@@ -1133,11 +1049,7 @@ test('collapsed chain sums step durations into ONE time gate for the single acti
   const armResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   assert.equal(armResult.success, false, 'the chain waits for its summed gate to mature');
   assert.match(armResult.message, /in progress/i);
-  assert.equal(
-    wood.system.quantity,
-    10,
-    'a collapsed chain consumes nothing when the gate is armed'
-  );
+  assert.equal(wood.system.quantity, 10, 'a collapsed chain consumes nothing when the gate is armed');
 
   const active = runManager.getActiveRuns(craftingActor);
   assert.equal(active.length, 1, 'one waiting run is kept active');
@@ -1183,11 +1095,7 @@ test('multi-step feature ON is NOT collapsed: one craft call resolves a single s
   assert.equal(wood.system.quantity, 8, 'only the first step consumed (10 -> 8) — no auto-advance');
   const active = runManager.getActiveRuns(craftingActor);
   assert.equal(active.length, 1, 'the run stays active for the next step (normal multi-step flow)');
-  assert.equal(
-    active[0].currentStepIndex,
-    1,
-    'the run advanced to the second step, awaiting a new trigger'
-  );
+  assert.equal(active[0].currentStepIndex, 1, 'the run advanced to the second step, awaiting a new trigger');
 });
 
 // ---------------------------------------------------------------------------
@@ -1244,9 +1152,7 @@ async function startTimedCurrencyCraft({
   });
   const craftingActor = new CurrencyCraftingActorFake('Crafter', { currency: startingCurrency });
 
-  const resultGroups = [
-    { id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] },
-  ];
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
   const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }], currencySpends);
   const recipe = buildRecipe({
     craftingSystemId: system.id,
@@ -1435,28 +1341,23 @@ test('reverseRunConsumption reports a PARTIAL refund when one group returns and 
     'both groups settled, so both are recorded and both are attempted on reversal'
   );
 
-  const reversal = await context.engine.reverseRunConsumption(context.craftingActor, context.run);
+  const reversal = await context.engine.reverseRunConsumption(
+    context.craftingActor,
+    context.run
+  );
 
   assert.equal(context.spy.refundCalls.length, 2, 'the failing group did not abort the other');
   assert.equal(reversal.currencyRefund.status, 'partial', 'neither a full refund nor a total loss');
   assert.equal(reversal.currencyRefund.refundedGroups, 1);
   assert.equal(reversal.currencyRefund.attempted, true);
-  assert.equal(
-    reversal.restoreFailures,
-    0,
-    'the ingredient half succeeded, isolating the currency'
-  );
+  assert.equal(reversal.restoreFailures, 0, 'the ingredient half succeeded, isolating the currency');
   assert.equal(
     reversal.ok,
     false,
     'a partial refund is NOT a complete reversal — reporting it complete strands money silently'
   );
   assert.equal(context.craftingActor.system.currency.gp, 47, 'gp came back (45 -> 47)');
-  assert.equal(
-    context.craftingActor.system.currency.gem,
-    6,
-    'gem is stranded at the spent balance'
-  );
+  assert.equal(context.craftingActor.system.currency.gem, 6, 'gem is stranded at the spent balance');
 });
 
 test('cancel reports refunded:false + partialRefund:true when one currency group fails to refund', async (t) => {
@@ -1494,10 +1395,6 @@ test('cancel reports refunded:false + partialRefund:true when one currency group
   assert.equal(cancel.restoredCount, 1, 'the ingredient half succeeded');
   assert.equal(context.spy.refundCalls.length, 2);
   assert.equal(context.craftingActor.system.currency.gp, 47);
-  assert.equal(
-    context.craftingActor.system.currency.gem,
-    6,
-    'the player is NOT told this returned'
-  );
+  assert.equal(context.craftingActor.system.currency.gem, 6, 'the player is NOT told this returned');
   assert.equal(context.runManager.getActiveRuns(context.craftingActor).length, 0, 'run archived');
 });

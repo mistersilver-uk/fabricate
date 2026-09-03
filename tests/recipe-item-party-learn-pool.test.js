@@ -29,11 +29,11 @@ function installGame({ isGM = true, initial = {} } = {}) {
       },
       async set(scope, key, value) {
         stored = value;
-      },
-    },
+      }
+    }
   };
   return {
-    read: () => stored,
+    read: () => stored
   };
 }
 

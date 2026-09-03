@@ -13,8 +13,7 @@ import assert from 'node:assert/strict';
 
 globalThis.foundry = { utils: { randomID: () => crypto.randomUUID() } };
 
-const { IngredientSet, INGREDIENT_SEARCH_NODE_CAP } =
-  await import('../src/models/IngredientSet.js');
+const { IngredientSet, INGREDIENT_SEARCH_NODE_CAP } = await import('../src/models/IngredientSet.js');
 
 // A minimal item: uuid, quantity, and Fabricate essence flags (resolved as a path
 // within the fabricate scope, mirroring getFabricateFlag).
@@ -58,7 +57,9 @@ function essenceProbe(table) {
 }
 
 function planKey(selection) {
-  return selection.plan.map((entry) => `${entry.item.uuid}x${entry.quantity}`).join('|');
+  return selection.plan
+    .map((entry) => `${entry.item.uuid}x${entry.quantity}`)
+    .join('|');
 }
 
 function consumedByUuid(selection) {
@@ -98,11 +99,7 @@ for (const groupOrder of ['tag-first', 'essence-first']) {
         resolveItemEssences: WORKED_PROBE,
       });
 
-      assert.equal(
-        selection.success,
-        true,
-        'a valid Ingot->tag, Blazing->essence assignment exists'
-      );
+      assert.equal(selection.success, true, 'a valid Ingot->tag, Blazing->essence assignment exists');
       assert.equal(selection.missingGroups.length, 0);
       // No double-count: exactly two distinct single-unit stacks consumed.
       assert.equal(selection.plan.length, 2);
@@ -130,10 +127,7 @@ test('component-vs-tag overlap is craftable in both group orders', () => {
     const groups = groupOrder === 'tag-first' ? [tag, component] : [component, tag];
     const set = new IngredientSet({ id: 's', ingredientGroups: groups });
 
-    const selection = set.resolveIngredientSelection(
-      [item('dual', 1), item('plain-iron', 1)],
-      matcher
-    );
+    const selection = set.resolveIngredientSelection([item('dual', 1), item('plain-iron', 1)], matcher);
 
     assert.equal(selection.success, true, `craftable (${groupOrder})`);
     const consumed = consumedByUuid(selection);
@@ -165,11 +159,7 @@ test('multi-essence overlap funds both essence requirements from one shared carr
   assert.equal(selection.success, true, 'the block funds fire and earth together');
   const consumed = consumedByUuid(selection);
   assert.equal(consumed.dual, 1, 'the dual carrier is consumed once and credits both essences');
-  assert.equal(
-    consumed['fire-only'],
-    undefined,
-    'no second unit is spent on an already-funded essence'
-  );
+  assert.equal(consumed['fire-only'], undefined, 'no second unit is spent on an already-funded essence');
   assert.equal(selection.plan.length, 1, 'one plan entry — one item key, one draw');
 });
 
@@ -198,11 +188,7 @@ test('quantity>1 unit-subset contention is resolved by unit-count enumeration', 
   const consumed = consumedByUuid(selection);
   assert.equal(consumed.a, 2, 'both units of A are used (1 tag + 1 component)');
   assert.equal(consumed.b, 2, 'both units of B are used by the tag group');
-  assert.equal(
-    consumed.a <= 2 && consumed.b <= 2,
-    true,
-    'no stack is over-drawn (no double-count)'
-  );
+  assert.equal(consumed.a <= 2 && consumed.b <= 2, true, 'no stack is over-drawn (no double-count)');
 });
 
 // ---------------------------------------------------------------------------
@@ -247,17 +233,9 @@ test('a pinned-but-short optionOverrides group reports THAT option (pin-aware, n
     resolveItemEssences: essenceProbe({ fire: { fire: 1 } }),
   });
 
-  assert.equal(
-    selection.success,
-    false,
-    'the pinned component option is short and blocks the craft'
-  );
+  assert.equal(selection.success, false, 'the pinned component option is short and blocks the craft');
   assert.equal(selection.missingGroups.length, 1);
-  assert.equal(
-    selection.missingGroups[0].ingredient.match.type,
-    'component',
-    'pin is honoured, not redirected'
-  );
+  assert.equal(selection.missingGroups[0].ingredient.match.type, 'component', 'pin is honoured, not redirected');
   assert.equal(selection.missingGroups[0].have, 1);
   assert.equal(selection.missingGroups[0].need, 2);
 });
@@ -296,11 +274,7 @@ test('determinism: craftability is invariant under shuffled item and group order
       const selection = set.resolveIngredientSelection(makeItems(), WORKED_MATCHER, {
         resolveItemEssences: WORKED_PROBE,
       });
-      assert.equal(
-        selection.success,
-        true,
-        `craftable for ${groupOrder} under a shuffled item order`
-      );
+      assert.equal(selection.success, true, `craftable for ${groupOrder} under a shuffled item order`);
     }
   }
 });
@@ -408,10 +382,7 @@ test('stress: a large mostly-uncontended recipe costs about one node per group',
 test('stress: a fully contended recipe stays two orders of magnitude under the search cap', () => {
   const PINNED = 6;
   const groups = [
-    {
-      id: 'g-broad',
-      options: [{ quantity: 2, match: { type: 'tags', tags: ['shared'], tagMatch: 'any' } }],
-    },
+    { id: 'g-broad', options: [{ quantity: 2, match: { type: 'tags', tags: ['shared'], tagMatch: 'any' } }] },
   ];
   const items = [];
   for (let i = 0; i < PINNED; i += 1) {
@@ -427,8 +398,7 @@ test('stress: a fully contended recipe stays two orders of magnitude under the s
   // names, which is what makes the groups pin each other rather than being interchangeable.
   const matcher = (ingredient, held) => {
     if (ingredient?.match?.type === 'tags') return !held.uuid.startsWith('filler-');
-    if (ingredient?.match?.type === 'component')
-      return `cmp-${held.uuid}` === ingredient.match.componentId;
+    if (ingredient?.match?.type === 'component') return `cmp-${held.uuid}` === ingredient.match.componentId;
     return false;
   };
   const probe = essenceProbe({ ember: { fire: 1 } });

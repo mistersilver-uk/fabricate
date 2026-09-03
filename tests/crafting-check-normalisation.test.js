@@ -64,10 +64,10 @@ test('_normalizeCraftingCheck defaults outcomes to [fail, pass] regardless of mo
   // is supplied.
   assert.deepEqual(mgr._normalizeCraftingCheck({}).outcomes, ['fail', 'pass']);
   assert.deepEqual(mgr._normalizeCraftingCheck({ mode: 'tiered' }).outcomes, ['fail', 'pass']);
-  assert.deepEqual(mgr._normalizeCraftingCheck({ mode: 'namedOutcomes', outcomes: [] }).outcomes, [
-    'fail',
-    'pass',
-  ]);
+  assert.deepEqual(
+    mgr._normalizeCraftingCheck({ mode: 'namedOutcomes', outcomes: [] }).outcomes,
+    ['fail', 'pass']
+  );
 });
 
 test('_normalizeCraftingCheck preserves authored outcomes trimmed, lowercased, and deduped', () => {

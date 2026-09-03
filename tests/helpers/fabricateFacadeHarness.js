@@ -832,10 +832,7 @@ export class FabricateFacadeUnderTest {
   // fidelity has to be checkable, not merely asserted in a comment.
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component = findById(
-      getDefinitionIndex(resolvedComponentsFor(system)),
-      target?.componentId
-    );
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId);
     return {
       actorId: target?.actorId ?? null,
       actorName: '',

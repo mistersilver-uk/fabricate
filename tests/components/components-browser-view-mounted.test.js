@@ -27,21 +27,21 @@ const browser = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-components-browser-',
   rawModules: [
-    // ── THE COMPONENT SCOPE LEAVES (issue 1371) ─────────────────────────────────────────────
-    // Both system-scope component screens now read the world projection: the rules list for its
-    // ghost cohort and its inherit summary, the rules editor for the category inherit switch and
-    // the read-only world tag card. These are the pure leaves behind that, and every one of them
-    // is in the STATIC graph — so an omission here does not fail one test, it HANGS the suite.
-    'src/ui/svelte/apps/manager/scoped/componentScoped.js',
-    'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
-    'src/ui/svelte/stores/worldScopeProjection.js',
-    'src/systems/scopedDefinitions.js',
-    'src/systems/scopedDefinitionStore.js',
-    'src/systems/componentScope.js',
-    'src/systems/essenceScope.js',
-    'src/systems/toolScope.js',
-    'src/migration/worldScopeEntityGrouping.js',
-    'src/utils/sourceReferenceUnion.js',
+  // -- THE COMPONENT SCOPE LEAVES (issue 1371) --------------------------------------------
+  // Both system-scope component screens now read the world projection: the rules list for its
+  // ghost cohort and its inherit summary, the rules editor for the category inherit switch and
+  // the read-only world tag card. These are the pure leaves behind that, and every one of them
+  // is in the STATIC graph - so an omission here does not fail one test, it HANGS the suite.
+  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
+  'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
+  'src/ui/svelte/stores/worldScopeProjection.js',
+  'src/systems/scopedDefinitions.js',
+  'src/systems/scopedDefinitionStore.js',
+  'src/systems/componentScope.js',
+  'src/systems/essenceScope.js',
+  'src/systems/toolScope.js',
+  'src/migration/worldScopeEntityGrouping.js',
+  'src/utils/sourceReferenceUnion.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dragDrop.js',
@@ -57,17 +57,17 @@ const browser = createMountedComponentHarness({
     'src/utils/componentBulkEditModel.js',
     // Its shared leaf (issue 1010): those selection helpers now live here and
     // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
-    'src/utils/bulkSelectionModel.js',
+    'src/utils/bulkSelectionModel.js'
   ],
   compiledModules: [
-    // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
-    // the two system-scope component screens.
-    'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
-    'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
-    'src/ui/svelte/components/StatusToggle.svelte',
-    'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+  // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
+  // the two system-scope component screens.
+  'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
+  'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/StatusPill.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
@@ -91,9 +91,9 @@ const browser = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
-    'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
+    'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
 });
 
 function makeComponent(overrides = {}) {
@@ -104,7 +104,7 @@ function makeComponent(overrides = {}) {
     img: 'icons/svg/item-bag.svg',
     essences: [],
     salvageSummary: { resultGroupCount: 0 },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -114,7 +114,7 @@ function manyGeneral(count) {
     makeComponent({
       id: `g${index + 1}`,
       // Zero-padded so name-ascending order is also numeric order.
-      name: `Scrap ${String(index + 1).padStart(2, '0')}`,
+      name: `Scrap ${String(index + 1).padStart(2, '0')}`
     })
   );
 }
@@ -162,18 +162,17 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
   it('pairs the rendered count with the category total when the group spans pages', async () => {
     const root = await browser.mount({ itemCards: manyGeneral(30) });
 
-    assert.equal(
-      root.querySelectorAll('.manager-component-row').length,
-      25,
-      'the default page holds 25'
-    );
+    assert.equal(root.querySelectorAll('.manager-component-row').length, 25, 'the default page holds 25');
     assert.deepEqual(
       countTexts(root),
       ['25 of 30 components'],
       'the header must not say the General bucket holds 25'
     );
     // The pager and the header now agree about the same library.
-    assert.equal(root.querySelector('[data-component-count]').textContent.trim(), '1–25 of 30');
+    assert.equal(
+      root.querySelector('[data-component-count]').textContent.trim(),
+      '1–25 of 30'
+    );
   });
 
   it('says it once when the group is shown WHOLE', async () => {
@@ -194,23 +193,15 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
     paged.querySelector('[data-pagination-next]').click();
     flushSync();
 
-    assert.equal(
-      paged.querySelectorAll('.manager-component-row').length,
-      1,
-      'page 2 holds one row'
-    );
-    assert.deepEqual(
-      countTexts(paged),
-      ['1 of 26 components'],
-      'never "1 components", never a bare "1"'
-    );
+    assert.equal(paged.querySelectorAll('.manager-component-row').length, 1, 'page 2 holds one row');
+    assert.deepEqual(countTexts(paged), ['1 of 26 components'], 'never "1 components", never a bare "1"');
   });
 
   it('counts the total over the FILTERED rows, so an active filter is respected', async () => {
     const rows = [
       ...manyGeneral(2),
       makeComponent({ id: 'm1', name: 'Copper Ore', category: 'Metal' }),
-      makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' }),
+      makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' })
     ];
     const root = await browser.mount({ itemCards: rows, categoryVocabulary: ['Metal'] });
     assert.deepEqual(countTexts(root), ['2 components', '2 components'], 'Metal then general');
@@ -246,18 +237,12 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
           id: `m${i}`,
           name: `Metal ${String(i + 1).padStart(2, '0')}`,
           category: 'Metal',
-          essences: [{ id: 'fire', name: 'Fire', quantity: 1 }],
+          essences: [{ id: 'fire', name: 'Fire', quantity: 1 }]
         })
       );
     }
     for (let i = 0; i < 5; i += 1) {
-      rows.push(
-        makeComponent({
-          id: `h${i}`,
-          name: `Herb ${String(i + 1).padStart(2, '0')}`,
-          category: 'Herb',
-        })
-      );
+      rows.push(makeComponent({ id: `h${i}`, name: `Herb ${String(i + 1).padStart(2, '0')}`, category: 'Herb' }));
     }
     return rows;
   }
@@ -266,12 +251,7 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
     const shared = createComponentBrowserState();
     const itemCards = metalWithFireLibrary();
 
-    await browser.mount({
-      itemCards,
-      categoryVocabulary: ['Metal', 'Herb'],
-      selectedSystemId: 'sys-1',
-      browserState: shared,
-    });
+    await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-1', browserState: shared });
     assert.equal(shared.systemId, 'sys-1', 'the first mount stamps the persisted system sentinel');
 
     shared.categoryFilter = 'Metal';
@@ -282,21 +262,12 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
     shared.sortKey = 'salvage';
 
     browser.remount();
-    await browser.mount({
-      itemCards,
-      categoryVocabulary: ['Metal', 'Herb'],
-      selectedSystemId: 'sys-1',
-      browserState: shared,
-    });
+    await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-1', browserState: shared });
 
     assert.equal(shared.categoryFilter, 'Metal', 'the category filter survives the round-trip');
     assert.equal(shared.essenceFilter, 'Fire', 'the essence filter survives the round-trip');
     assert.equal(shared.pageIndex, 1, 'the page survives the round-trip');
-    assert.equal(
-      shared.collapsedCategories.has('Metal'),
-      true,
-      'the collapsed group survives the round-trip'
-    );
+    assert.equal(shared.collapsedCategories.has('Metal'), true, 'the collapsed group survives the round-trip');
     assert.equal(shared.sortKey, 'salvage', 'the sort key is a preference and is untouched');
   });
 
@@ -304,12 +275,7 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
     const shared = createComponentBrowserState();
     const itemCards = metalWithFireLibrary();
 
-    await browser.mount({
-      itemCards,
-      categoryVocabulary: ['Metal', 'Herb'],
-      selectedSystemId: 'sys-1',
-      browserState: shared,
-    });
+    await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-1', browserState: shared });
 
     // Default page size keeps the 20-row library on one page, so the page index reads 0
     // deterministically: the plain-object `browserState` (not a `$state` proxy) cannot
@@ -324,28 +290,15 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
     shared.groupByCategory = false;
 
     browser.remount();
-    await browser.mount({
-      itemCards,
-      categoryVocabulary: ['Metal', 'Herb'],
-      selectedSystemId: 'sys-2',
-      browserState: shared,
-    });
+    await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-2', browserState: shared });
 
-    assert.equal(
-      shared.categoryFilter,
-      'all',
-      'a switch clears the vocabulary-scoped category filter'
-    );
+    assert.equal(shared.categoryFilter, 'all', 'a switch clears the vocabulary-scoped category filter');
     assert.equal(shared.essenceFilter, 'all', 'a switch clears the essence filter too');
     assert.equal(shared.pageIndex, 0, 'a switch returns to the first page');
     assert.equal(shared.collapsedCategories.size, 0, 'a switch re-expands every group');
     assert.equal(shared.systemId, 'sys-2', 'the persisted sentinel advances to the new system');
     assert.equal(shared.sortKey, 'salvage', 'sort key is a cross-system preference and is kept');
-    assert.equal(
-      shared.groupByCategory,
-      false,
-      'group-by-category is a cross-system preference and is kept'
-    );
+    assert.equal(shared.groupByCategory, false, 'group-by-category is a cross-system preference and is kept');
   });
 });
 
@@ -434,12 +387,12 @@ describeBrowserBulkSelection({
     makeComponent({ id: 'm1', name: 'Copper Ore', category: 'Metal' }),
     makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' }),
     makeComponent({ id: 'h1', name: 'Sage', category: 'Herb' }),
-    makeComponent({ id: 'h2', name: 'Thyme', category: 'Herb' }),
+    makeComponent({ id: 'h2', name: 'Thyme', category: 'Herb' })
   ],
   grouped: {
     collapseHeader: 'Metal',
     hiddenIds: ['m1', 'm2'],
-    visibleIds: ['h1', 'h2'],
+    visibleIds: ['h1', 'h2']
   },
   props: (itemCards, extra = {}) => ({
     itemCards,
@@ -448,13 +401,13 @@ describeBrowserBulkSelection({
     // vocabulary empty) and the grouped one (which must offer both categories or the grouped
     // branch of `pageIds` is never exercised).
     categoryVocabulary: [...new Set(itemCards.map((item) => item.category).filter(Boolean))],
-    ...extra,
+    ...extra
   }),
   rowControls: {
     scope: '.manager-action-group',
     count: 1,
-    why: 'the row still carries exactly ONE button — the smoke walk reaches Edit through it',
-  },
+    why: 'the row still carries exactly ONE button — the smoke walk reaches Edit through it'
+  }
 });
 
 // Issue 772, acceptance 13 (row half). The badge used to gate on the CRAFTING resolution
@@ -469,7 +422,7 @@ describe('ComponentsBrowserView progressive DC badge re-gate (issue 772)', () =>
     const root = await browser.mount({
       itemCards: withDifficulty,
       selectedSystemResolutionMode: 'simple',
-      difficultyAxisProgressive: true,
+      difficultyAxisProgressive: true
     });
 
     const badge = root.querySelector('[data-component-id="d1"] [data-component-difficulty]');
@@ -481,7 +434,7 @@ describe('ComponentsBrowserView progressive DC badge re-gate (issue 772)', () =>
     const root = await browser.mount({
       itemCards: withDifficulty,
       selectedSystemResolutionMode: 'progressive',
-      difficultyAxisProgressive: false,
+      difficultyAxisProgressive: false
     });
 
     assert.ok(
@@ -528,10 +481,7 @@ describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 
     assert.equal(root.querySelectorAll('.manager-component-row').length, 25, 'page 1 holds 25');
     assert.deepEqual(
       [...requested].sort(),
-      cards
-        .slice(0, 25)
-        .map((card) => card.id)
-        .sort(),
+      cards.slice(0, 25).map((card) => card.id).sort(),
       'the browser asked exactly the page it rendered'
     );
     // The negative half stated against the same set: the five off-page cards cost nothing,
@@ -563,13 +513,13 @@ describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 
   });
 });
 
-// ── THE WIDENED MEMBERSHIP COHORT (issue 1371) ────────────────────────────────────────────────
+// -- THE WIDENED MEMBERSHIP COHORT (issue 1371) -----------------------------------------------
 //
 // The one route in the product to adopt a world component into a crafting system, and the state
 // that made the sibling Tool Rules list ship it unreachable: three places asked "is there anything
 // on this screen" and all three answered with the RAW `itemCards` prop, while the counts, the
 // list, the pager and the result summary were all computed over the widened cohort. For a system
-// that has adopted nothing the two disagree the moment the segment moves — the toolbar reads three
+// that has adopted nothing the two disagree the moment the segment moves - the toolbar reads three
 // rows over a body drawing the zero state, because `itemCards.length === 0` is true and stays true
 // whatever the segment says.
 //

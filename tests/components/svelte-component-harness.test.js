@@ -8,60 +8,59 @@ import {
   CRAFTING_APP_RAW_MODULES,
   assertClientSvelteReactivity,
   createMountedComponentHarness,
-  rewriteClientImports,
+  rewriteClientImports
 } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const componentPath = 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte';
 
-function createRecipeBrowserHarness({
-  rawModules = CRAFTING_APP_RAW_MODULES,
-  compiledModules = CRAFTING_APP_COMPILED_MODULES,
-}) {
+function createRecipeBrowserHarness({ rawModules = CRAFTING_APP_RAW_MODULES, compiledModules = CRAFTING_APP_COMPILED_MODULES }) {
   return createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-svelte-harness-closure-',
     rawModules,
     compiledModules,
-    componentPath,
+    componentPath
   });
 }
 
 describe('createMountedComponentHarness dependency validation', () => {
   it('reports the full importer chain for an omitted indirect raw import before component import', async () => {
     const harness = createRecipeBrowserHarness({
-      rawModules: CRAFTING_APP_RAW_MODULES.filter(
-        (modulePath) => modulePath !== 'src/ui/svelte/util/craftingImageDefaults.js'
-      ),
+      rawModules: CRAFTING_APP_RAW_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/util/craftingImageDefaults.js')
     });
 
-    await assert.rejects(harness.setup(), (error) => {
-      assert.match(
-        error.message,
-        /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/apps\/crafting\/CraftingThumb\.svelte -> src\/ui\/svelte\/util\/craftingImageDefaults\.js/
-      );
-      assert.match(error.message, /rawModules/);
-      return true;
-    });
+    await assert.rejects(
+      harness.setup(),
+      (error) => {
+        assert.match(
+          error.message,
+          /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/apps\/crafting\/CraftingThumb\.svelte -> src\/ui\/svelte\/util\/craftingImageDefaults\.js/
+        );
+        assert.match(error.message, /rawModules/);
+        return true;
+      }
+    );
 
     harness.teardown();
   });
 
   it('reports the full importer chain for an omitted indirect compiled component before component import', async () => {
     const harness = createRecipeBrowserHarness({
-      compiledModules: CRAFTING_APP_COMPILED_MODULES.filter(
-        (modulePath) => modulePath !== 'src/ui/svelte/apps/crafting/CraftingThumb.svelte'
-      ),
+      compiledModules: CRAFTING_APP_COMPILED_MODULES.filter((modulePath) => modulePath !== 'src/ui/svelte/apps/crafting/CraftingThumb.svelte')
     });
 
-    await assert.rejects(harness.setup(), (error) => {
-      assert.match(
-        error.message,
-        /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/apps\/crafting\/CraftingThumb\.svelte/
-      );
-      assert.match(error.message, /compiledModules/);
-      return true;
-    });
+    await assert.rejects(
+      harness.setup(),
+      (error) => {
+        assert.match(
+          error.message,
+          /src\/ui\/svelte\/apps\/crafting\/RecipeBrowser\.svelte -> src\/ui\/svelte\/apps\/crafting\/RecipeListRow\.svelte -> src\/ui\/svelte\/apps\/crafting\/CraftingThumb\.svelte/
+        );
+        assert.match(error.message, /compiledModules/);
+        return true;
+      }
+    );
 
     harness.teardown();
   });
@@ -88,18 +87,17 @@ describe('rewriteClientImports', () => {
     const exportedNames = Object.keys(await import('svelte')).filter((name) => name !== 'default');
     assert.ok(
       exportedNames.length > 5,
-      `the installed Svelte reports only ${exportedNames.length} exports, which is fewer than the ` +
-        'five-name allowlist this test replaced — read that as a broken probe, not a small API'
+      `the installed Svelte reports only ${exportedNames.length} exports, which is fewer than the `
+        + 'five-name allowlist this test replaced — read that as a broken probe, not a small API'
     );
 
     const rewritten = rewriteClientImports(`import { ${exportedNames.join(', ')} } from 'svelte';`);
     const routes = [...rewritten.matchAll(/import \{([^}]*)\} from ['"]([^'"]+)['"];/g)].flatMap(
-      ([, names, specifier]) =>
-        names
-          .split(',')
-          .map((name) => name.trim())
-          .filter(Boolean)
-          .map((name) => [name, specifier])
+      ([, names, specifier]) => names
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .map((name) => [name, specifier])
     );
 
     assert.deepEqual(
@@ -113,9 +111,9 @@ describe('rewriteClientImports', () => {
       if (!loaded.has(specifier)) loaded.set(specifier, await import(specifier));
       assert.ok(
         loaded.get(specifier)[name] !== undefined,
-        `rewriteClientImports routes '${name}' to '${specifier}', which does not export it. A ` +
-          `component importing '${name}' from 'svelte' would report every suite sharing this ` +
-          "harness as '# cancelled', never '# fail' — issue 1185's symptom, rebuilt."
+        `rewriteClientImports routes '${name}' to '${specifier}', which does not export it. A `
+          + `component importing '${name}' from 'svelte' would report every suite sharing this `
+          + "harness as '# cancelled', never '# fail' — issue 1185's symptom, rebuilt."
       );
     }
   });
@@ -130,7 +128,7 @@ describe('rewriteClientImports', () => {
       "import { getContext, onDestroy, tick, untrack } from 'svelte';",
       "import Child from './Child.svelte';",
       'import Sibling from "../nested/Sibling.svelte";',
-      "import { helper } from '../util/helper.js';",
+      "import { helper } from '../util/helper.js';"
     ].join('\n');
 
     assert.equal(
@@ -141,7 +139,7 @@ describe('rewriteClientImports', () => {
         "import { getContext, onDestroy, tick, untrack } from 'svelte';",
         "import Child from './Child.svelte.js';",
         'import Sibling from "../nested/Sibling.svelte.js";',
-        "import { helper } from '../util/helper.js';",
+        "import { helper } from '../util/helper.js';"
       ].join('\n'),
       'only `.svelte` specifiers move; the bare `svelte` import must survive intact and unsplit'
     );
@@ -155,9 +153,7 @@ describe('rewriteClientImports', () => {
  * the chokepoint because all 59 mounted suites reach it, including the six travel/realm/party
  * suites that build their own harness instead of `createMountedComponentHarness`.
  */
-const harnessUrl = pathToFileURL(
-  resolve(repoRoot, 'tests/helpers/svelte-component-harness.js')
-).href;
+const harnessUrl = pathToFileURL(resolve(repoRoot, 'tests/helpers/svelte-component-harness.js')).href;
 
 // Each probe runs in a fresh process so the condition set under test is the process's own.
 // The reactivity barrel is only ever EVALUATED here, never in the guard: its client build
@@ -166,7 +162,7 @@ function probe(source, { browser }) {
   const conditions = browser ? ['--conditions=browser'] : [];
   return execFileSync(process.execPath, [...conditions, '--input-type=module', '-e', source], {
     encoding: 'utf8',
-    cwd: repoRoot,
+    cwd: repoRoot
   });
 }
 

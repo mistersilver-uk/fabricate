@@ -194,7 +194,11 @@ describe('1156/copy the essence delete dialog omits zero consequences', () => {
       ['ContentRecipes', { name: 'X', recipes: 3 }],
       ['ContentPlain', { name: 'X' }],
     ]) {
-      assert.match(interpolate(deleteConfirm[key], data), /permanent/i, `${key} states permanence`);
+      assert.match(
+        interpolate(deleteConfirm[key], data),
+        /permanent/i,
+        `${key} states permanence`
+      );
     }
   });
 
@@ -208,7 +212,11 @@ describe('1156/copy the essence delete dialog uses correct verb agreement at rec
 
   it('uses singular "requires" in ContentRecipesOne when recipes count is 1', () => {
     const sentence = interpolate(deleteConfirm.ContentRecipesOne, { name: 'Fire' });
-    assert.match(sentence, /1 recipe that requires it/, 'singular verb "requires" at recipes: 1');
+    assert.match(
+      sentence,
+      /1 recipe that requires it/,
+      'singular verb "requires" at recipes: 1'
+    );
     assert.ok(!sentence.includes('that require it'), 'not plural "require"');
     assert.match(sentence, /Fire/);
   });
@@ -223,7 +231,11 @@ describe('1156/copy the essence delete dialog uses correct verb agreement at rec
 
   it('uses singular "requires" in ContentOne when recipes count is 1 and components are present', () => {
     const sentence = interpolate(deleteConfirm.ContentOne, { name: 'Fire', components: 2 });
-    assert.match(sentence, /1 recipe that requires it/, 'singular verb "requires" at recipes: 1');
+    assert.match(
+      sentence,
+      /1 recipe that requires it/,
+      'singular verb "requires" at recipes: 1'
+    );
     assert.ok(!sentence.includes('that require it'), 'not plural "require"');
     assert.match(sentence, /2 component\(s\)/);
     assert.match(sentence, /Fire/);

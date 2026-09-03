@@ -27,7 +27,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
-    'src/ui/svelte/util/overlayHost.js',
+    'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -41,9 +41,9 @@ const harness = createMountedComponentHarness({
     // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
+    'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
+  componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
 });
 
 // Let Svelte's scheduler flush DOM updates triggered by an event handler.
@@ -59,7 +59,7 @@ const COPPER_ID = 'K9grZcOMgO9Xbm41';
 // reachable sets), so expanding one reveals the other in the sub-unit builder.
 const CURRENCY_UNITS = Object.freeze([
   { id: GOLD_ID, label: 'Gold', abbreviation: 'gp', actorPath: '', contains: [] },
-  { id: COPPER_ID, label: 'Copper', abbreviation: '', actorPath: '', contains: [] },
+  { id: COPPER_ID, label: 'Copper', abbreviation: '', actorPath: '', contains: [] }
 ]);
 
 function expandUnit(root, unitId) {
@@ -82,7 +82,7 @@ function subUnitOptionTexts(root, unitId) {
   assert.ok(select, `sub-unit builder select for ${unitId} exists`);
   return [...select.querySelectorAll('option')].map((option) => ({
     value: option.value,
-    text: option.textContent,
+    text: option.textContent
   }));
 }
 

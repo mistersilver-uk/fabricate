@@ -180,8 +180,7 @@ function makeEssenceItem(uuid, quantity, essences) {
       this.deleted = true;
     },
     async update(payload) {
-      if (payload['system.quantity'] !== undefined)
-        this.system.quantity = payload['system.quantity'];
+      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
     },
   };
 }
@@ -256,10 +255,7 @@ test('1036/4: a DISABLED essence is still CONSUMED — the plan draws its items 
   const set = new IngredientSet({
     id: 'set-1',
     ingredientGroups: [
-      {
-        id: 'g-fire',
-        options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 3 } }],
-      },
+      { id: 'g-fire', options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 3 } }] },
     ],
   });
   const items = [makeEssenceItem('i1', 2, { fire: 1 }), makeEssenceItem('i2', 5, { fire: 1 })];
@@ -281,11 +277,7 @@ test('1036/4: a DISABLED essence is still CONSUMED — the plan draws its items 
     if (quantity >= held) {
       assert.ok(item.deleted, `${item.uuid} was drawn down entirely and deleted`);
     } else {
-      assert.equal(
-        item.system.quantity,
-        held - quantity,
-        `${item.uuid} was drawn down by ${quantity}`
-      );
+      assert.equal(item.system.quantity, held - quantity, `${item.uuid} was drawn down by ${quantity}`);
     }
   }
   assert.deepEqual(
@@ -326,11 +318,7 @@ test('1036/19: the stacking veto is UNCHANGED by a disable — a transferring re
     0,
     '`transfersEffects` is flag-derived and evaluated BEFORE the walk, so a disable must not re-open stacking'
   );
-  assert.equal(
-    actor.captured.length,
-    1,
-    'a distinct item was created, as it is for an unresolvable source'
-  );
+  assert.equal(actor.captured.length, 1, 'a distinct item was created, as it is for an unresolvable source');
 });
 
 test('1036/19 negative control: a NON-transferring recipe with the same disabled essence DOES stack', async () => {
@@ -349,11 +337,7 @@ test('1036/19 negative control: a NON-transferring recipe with the same disabled
     { precomputedEssences: { fire: 1 } }
   );
 
-  assert.equal(
-    owned.system.quantity,
-    6,
-    'the veto really is the recipe flag, not the essence state'
-  );
+  assert.equal(owned.system.quantity, 6, 'the veto really is the recipe flag, not the essence state');
 });
 
 test('1036/8: a timed craft follows the START snapshot, not the live enabled state', async () => {
@@ -498,11 +482,7 @@ test('1036/21: a COLLAPSED chain has no snapshot at all and evaluates enabled-ne
   // neither a precomputed map nor a snapshot.
   const actor = makeCapturingActor();
   const consumed = [
-    {
-      item: { id: 'i1', name: 'Ember', getFlag: () => ({ fire: 1 }) },
-      quantity: 1,
-      ingredient: null,
-    },
+    { item: { id: 'i1', name: 'Ember', getFlag: () => ({ fire: 1 }) }, quantity: 1, ingredient: null },
   ];
   await engine._createSingleResult(
     actor,
@@ -536,11 +516,7 @@ test('1036/20: an essence property macro applies to a SALVAGE result', async () 
   const engine = makeEngine();
   const actor = makeCapturingActor();
   const consumed = [
-    {
-      item: { id: 'i1', name: 'Iron Ore', getFlag: () => ({ fire: 1 }) },
-      quantity: 1,
-      ingredient: null,
-    },
+    { item: { id: 'i1', name: 'Iron Ore', getFlag: () => ({ fire: 1 }) }, quantity: 1, ingredient: null },
   ];
 
   await engine._createSingleResult(
@@ -580,11 +556,7 @@ test('1036/20: a salvage essence macro is suppressed when the essence is disable
   const engine = makeEngine();
   const actor = makeCapturingActor();
   const consumed = [
-    {
-      item: { id: 'i1', name: 'Iron Ore', getFlag: () => ({ fire: 1 }) },
-      quantity: 1,
-      ingredient: null,
-    },
+    { item: { id: 'i1', name: 'Iron Ore', getFlag: () => ({ fire: 1 }) }, quantity: 1, ingredient: null },
   ];
 
   await engine._createSingleResult(

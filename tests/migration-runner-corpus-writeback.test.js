@@ -325,10 +325,7 @@ test('a permuted corpus disables the same SET of colliding alchemy recipes', asy
         {
           id: 'sA',
           ingredientGroups: [
-            {
-              id: 'gA',
-              options: [{ quantity: 1, match: { type: 'component', componentId: 'C' } }],
-            },
+            { id: 'gA', options: [{ quantity: 1, match: { type: 'component', componentId: 'C' } }] },
           ],
         },
       ],

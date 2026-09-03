@@ -129,7 +129,7 @@ for (const awardMode of ['equal', 'exceed', 'partial']) {
   });
 }
 
-test('invalidCost treats a sub-1 cost as invalid', () => {
+test("invalidCost treats a sub-1 cost as invalid", () => {
   const cost = (result) => (result.id === 'r-2' ? 0 : COSTS[result.componentId]);
   const skip = run({ initialRemaining: 100, awardMode: 'equal', invalidCost: 'skip', cost });
   assert.deepEqual(awardedIds(skip), ['r-1', 'r-3']);

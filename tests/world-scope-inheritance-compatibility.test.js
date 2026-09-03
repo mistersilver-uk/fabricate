@@ -78,9 +78,7 @@ function migrate(raw) {
 
 /** A REAL essence scope store over a REAL persisted value, loaded through `load()`. */
 function loadedEssenceStore(persisted) {
-  const seam = settingsSeam(
-    persisted === undefined ? {} : { [SETTING_KEYS.ESSENCE_SCOPE]: persisted }
-  );
+  const seam = settingsSeam(persisted === undefined ? {} : { [SETTING_KEYS.ESSENCE_SCOPE]: persisted });
   const store = createEssenceScopeStore(seam);
   store.load();
   return { store, seam };
@@ -120,10 +118,7 @@ describe('state 1 — a world that never wrote the setting', () => {
   it('and an EMPTY roster is treated the same way, which is what keeps the answer cheap', () => {
     const { store } = loadedEssenceStore({ entities: [], defaults: {}, membership: {} });
     const essenceDefinitions = [{ id: 'fire', name: 'Fire' }];
-    assert.equal(
-      resolvedEssencesFor({ id: 'sys-a', essenceDefinitions }, store.corpus()),
-      essenceDefinitions
-    );
+    assert.equal(resolvedEssencesFor({ id: 'sys-a', essenceDefinitions }, store.corpus()), essenceDefinitions);
   });
 });
 
@@ -178,11 +173,7 @@ describe('state 3 — the GM opts one section in, and only that section moves', 
     // A GM edit through the persisted shape, saved and re-published exactly as
     // `worldScopeActions` does it: the world default is authored, then one switch is flipped.
     const payload = store.get();
-    payload.defaults[target.id] = {
-      ...(payload.defaults[target.id] ?? {}),
-      id: target.id,
-      macro: 'Macro.world-authored',
-    };
+    payload.defaults[target.id] = { ...(payload.defaults[target.id] ?? {}), id: target.id, macro: 'Macro.world-authored' };
     payload.membership[`${target.id}|${migratedSystem.id}`].inherit.macro = true;
     await store.save(payload);
 

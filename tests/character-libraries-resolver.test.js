@@ -86,10 +86,7 @@ test('a seam that THROWS degrades to the legacy copy rather than propagating', (
 test('accepts the store itself or a getter for it', () => {
   const seam = store({ modifiers: [WORLD_MOD] });
   assert.deepEqual(resolveModifierLibrary(null, seam), [WORLD_MOD]);
-  assert.deepEqual(
-    resolveModifierLibrary(null, () => seam),
-    [WORLD_MOD]
-  );
+  assert.deepEqual(resolveModifierLibrary(null, () => seam), [WORLD_MOD]);
 });
 
 // The module registry is the production path: no call site passes a seam, so a broken global

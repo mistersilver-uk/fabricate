@@ -7,14 +7,14 @@ import { SETTING_KEYS } from '../src/config/settings.js';
 function makeService({ config = {}, userId = 'user-1' } = {}) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
   const service = new GatheringRichStateService({
-    getSetting: (key) => settings.get(key),
+    getSetting: key => settings.get(key),
     setSetting: async (key, value) => {
       settings.set(key, value);
       return value;
     },
     settingKey: SETTING_KEYS.GATHERING_CONFIG,
     getUserId: () => userId,
-    hooks: { callAll: () => {} },
+    hooks: { callAll: () => {} }
   });
   return { service, settings };
 }
@@ -26,7 +26,7 @@ function makeService({ config = {}, userId = 'user-1' } = {}) {
 // re-shaped into `reveals["actor:Actor"]["actor-1:env-a:task-1"]`, which no reader can
 // find, and the verbatim double hid that completely.
 function expandDottedKeys(value) {
-  if (Array.isArray(value)) return value.map((entry) => expandDottedKeys(entry));
+  if (Array.isArray(value)) return value.map(entry => expandDottedKeys(entry));
   if (!value || typeof value !== 'object') return value;
   const expanded = {};
   for (const [key, entry] of Object.entries(value)) {
@@ -52,7 +52,7 @@ function makeActor({ id = 'actor-1', uuid = 'Actor.actor-1' } = {}) {
     setFlag: (ns, key, value) => {
       flags[`${ns}.${key}`] = expandDottedKeys(value);
       return Promise.resolve(value);
-    },
+    }
   };
 }
 
@@ -141,18 +141,9 @@ test('countRevealedTasks returns 0 for empty or missing state without throwing',
   const { service } = makeService();
   const emptyActor = makeActor();
 
-  assert.equal(
-    service.countRevealedTasks({ actor: emptyActor, environmentId: 'env-a', scope: 'actor' }),
-    0
-  );
-  assert.equal(
-    service.countRevealedTasks({ actor: null, environmentId: 'env-a', scope: 'actor' }),
-    0
-  );
-  assert.equal(
-    service.countRevealedTasks({ actor: emptyActor, environmentId: '', scope: 'actor' }),
-    0
-  );
+  assert.equal(service.countRevealedTasks({ actor: emptyActor, environmentId: 'env-a', scope: 'actor' }), 0);
+  assert.equal(service.countRevealedTasks({ actor: null, environmentId: 'env-a', scope: 'actor' }), 0);
+  assert.equal(service.countRevealedTasks({ actor: emptyActor, environmentId: '', scope: 'actor' }), 0);
 });
 
 test('listRevealedTaskIds returns the distinct revealed task ids per scope', async () => {
@@ -170,16 +161,9 @@ test('listRevealedTaskIds returns the distinct revealed task ids per scope', asy
     service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'actor' }).sort(),
     ['task-1', 'task-2']
   );
-  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-b', scope: 'actor' }), [
-    'task-9',
-  ]);
-  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'user' }), [
-    'task-u',
-  ]);
-  assert.deepEqual(
-    service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'global' }),
-    ['task-g']
-  );
+  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-b', scope: 'actor' }), ['task-9']);
+  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'user' }), ['task-u']);
+  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'global' }), ['task-g']);
 });
 
 test('listRevealedTaskIds counts party reveals via the actor key', async () => {
@@ -188,31 +172,18 @@ test('listRevealedTaskIds counts party reveals via the actor key', async () => {
 
   await service.revealTask(actor, { environmentId: 'env-a', taskId: 'task-1', scope: 'party' });
 
-  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'party' }), [
-    'task-1',
-  ]);
+  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'party' }), ['task-1']);
   // party collapses onto the actor key, so the actor scope sees the same reveal.
-  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'actor' }), [
-    'task-1',
-  ]);
+  assert.deepEqual(service.listRevealedTaskIds({ actor, environmentId: 'env-a', scope: 'actor' }), ['task-1']);
 });
 
 test('listRevealedTaskIds returns [] for empty or missing state without throwing', () => {
   const { service } = makeService();
   const emptyActor = makeActor();
 
-  assert.deepEqual(
-    service.listRevealedTaskIds({ actor: emptyActor, environmentId: 'env-a', scope: 'actor' }),
-    []
-  );
-  assert.deepEqual(
-    service.listRevealedTaskIds({ actor: null, environmentId: 'env-a', scope: 'actor' }),
-    []
-  );
-  assert.deepEqual(
-    service.listRevealedTaskIds({ actor: emptyActor, environmentId: '', scope: 'actor' }),
-    []
-  );
+  assert.deepEqual(service.listRevealedTaskIds({ actor: emptyActor, environmentId: 'env-a', scope: 'actor' }), []);
+  assert.deepEqual(service.listRevealedTaskIds({ actor: null, environmentId: 'env-a', scope: 'actor' }), []);
+  assert.deepEqual(service.listRevealedTaskIds({ actor: emptyActor, environmentId: '', scope: 'actor' }), []);
 });
 
 test('countRevealedTasks equals listRevealedTaskIds length (shared implementation)', async () => {
@@ -234,19 +205,13 @@ test('resolveBiomeTags lets a per-system vocabulary override win over defaults',
           vocabularies: {
             biomes: {
               values: [
-                {
-                  id: 'forest',
-                  label: 'Moon Forest',
-                  icon: 'fas fa-moon',
-                  colorToken: 'lavender',
-                  customColor: '#112233',
-                },
-              ],
-            },
-          },
-        },
-      },
-    },
+                { id: 'forest', label: 'Moon Forest', icon: 'fas fa-moon', colorToken: 'lavender', customColor: '#112233' }
+              ]
+            }
+          }
+        }
+      }
+    }
   });
 
   const tags = service.resolveBiomeTags(['forest'], 'system-a');

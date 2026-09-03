@@ -35,10 +35,7 @@ const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js
 function getPathValue(object, path) {
   return String(path)
     .split('.')
-    .reduce(
-      (value, part) => (value == null || typeof value !== 'object' ? undefined : value[part]),
-      object
-    );
+    .reduce((value, part) => (value == null || typeof value !== 'object' ? undefined : value[part]), object);
 }
 function setPathValue(object, path, value) {
   const parts = String(path).split('.');
@@ -73,10 +70,7 @@ function component(id, registeredItemUuid) {
 }
 
 function group(componentId, quantity = 1) {
-  return {
-    id: `g-${componentId}`,
-    options: [{ match: { type: 'component', componentId }, quantity }],
-  };
+  return { id: `g-${componentId}`, options: [{ match: { type: 'component', componentId }, quantity }] };
 }
 
 function recipe(id, groups) {
@@ -100,11 +94,7 @@ function system(alchemyCfg, components) {
 }
 
 function submissions(registeredItemUuid, count) {
-  return Array.from({ length: count }, () => ({
-    uuid: registeredItemUuid,
-    name: registeredItemUuid,
-    registeredItemUuid,
-  }));
+  return Array.from({ length: count }, () => ({ uuid: registeredItemUuid, name: registeredItemUuid, registeredItemUuid }));
 }
 
 // The collector hands `craftAlchemy` pre-bucketed `{ item, componentId }` records
@@ -116,9 +106,7 @@ function records(components, registeredItemUuid, count) {
 
 function setup(alchemyCfg, { recipes, components }) {
   const sys = system(alchemyCfg, components);
-  game.fabricate.getCraftingSystemManager = () => ({
-    getSystem: (id) => (id === 'sys-a' ? sys : null),
-  });
+  game.fabricate.getCraftingSystemManager = () => ({ getSystem: (id) => (id === 'sys-a' ? sys : null) });
   const validator = new SignatureValidator({
     getSystem: () => sys,
     getRecipesForSystem: () => recipes,
@@ -139,15 +127,10 @@ test('a fizzle records the canonical dead-end key per system when showAttemptHis
     { recipes: [recipe('firebomb', [group('ember', 2)])], components }
   );
   const actor = new FakeActor({});
-  const result = await engine.craftAlchemy(
-    actor,
-    [{ items: [] }],
-    records(components, 'Item.ash', 2),
-    {
-      craftingSystemId: 'sys-a',
-      signatureValidator: validator,
-    }
-  );
+  const result = await engine.craftAlchemy(actor, [{ items: [] }], records(components, 'Item.ash', 2), {
+    craftingSystemId: 'sys-a',
+    signatureValidator: validator,
+  });
 
   assert.equal(result.disposition, 'no-match');
   const stored = actor.getFlag('fabricate', 'fabricate.alchemyDeadEnds');
@@ -182,11 +165,7 @@ test('re-brewing the same fizzle does not duplicate the dead-end key (append-onl
 });
 
 test('DRIFT guard: the engine dead-end write uses the SAME canonical key the store helper produces', async () => {
-  const components = [
-    component('ash', 'Item.ash'),
-    component('quick', 'Item.quick'),
-    component('ember', 'Item.ember'),
-  ];
+  const components = [component('ash', 'Item.ash'), component('quick', 'Item.quick'), component('ember', 'Item.ember')];
   const { engine, validator } = setup(
     { showAttemptHistoryToPlayers: true },
     { recipes: [recipe('firebomb', [group('ember', 2)])], components }
@@ -215,10 +194,7 @@ test('DRIFT guard: the engine dead-end write uses the SAME canonical key the sto
 test('a matched brew delegates to craft() as an alchemy attempt, honouring `interactive`', async () => {
   const components = [component('ash', 'Item.ash')];
   const matched = recipe('smoke', [group('ash', 1)]);
-  const { engine, validator } = setup(
-    { showAttemptHistoryToPlayers: true },
-    { recipes: [matched], components }
-  );
+  const { engine, validator } = setup({ showAttemptHistoryToPlayers: true }, { recipes: [matched], components });
 
   let captured = null;
   engine.craft = async (craftingActor, sources, chosenRecipe, ingredientSetId, options) => {
@@ -227,30 +203,17 @@ test('a matched brew delegates to craft() as an alchemy attempt, honouring `inte
   };
 
   const actor = new FakeActor({});
-  const result = await engine.craftAlchemy(
-    actor,
-    [{ items: [] }],
-    records(components, 'Item.ash', 1),
-    {
-      craftingSystemId: 'sys-a',
-      signatureValidator: validator,
-      interactive: true,
-    }
-  );
+  const result = await engine.craftAlchemy(actor, [{ items: [] }], records(components, 'Item.ash', 1), {
+    craftingSystemId: 'sys-a',
+    signatureValidator: validator,
+    interactive: true,
+  });
 
   assert.equal(result.success, true);
   assert.equal(captured.chosenRecipe.id, 'smoke', 'the matched recipe is crafted');
   assert.equal(captured.ingredientSetId, 'smoke-set');
-  assert.equal(
-    captured.options.isAlchemyAttempt,
-    true,
-    'flagged as an alchemy attempt so learnRecipeOnCraft runs'
-  );
-  assert.equal(
-    captured.options.interactive,
-    true,
-    'interactive roll flows through on the matched path'
-  );
+  assert.equal(captured.options.isAlchemyAttempt, true, 'flagged as an alchemy attempt so learnRecipeOnCraft runs');
+  assert.equal(captured.options.interactive, true, 'interactive roll flows through on the matched path');
   // No dead-end is recorded on a match.
   assert.equal(actor.getFlag('fabricate', 'fabricate.alchemyDeadEnds'), undefined);
 });

@@ -115,7 +115,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     assert.ok(!blockIn(root), 'an empty section eyebrow is worse than no section');
     assert.ok(
       root.querySelector('[data-inventory-bulk-queue="preview"]'),
-      'while the queue itself is untouched'
+      'while the queue itself is untouched',
     );
   });
 
@@ -141,7 +141,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     assert.ok(
       sections.indexOf(blockIn(root)) <
         sections.indexOf(root.querySelector('[data-inventory-bulk-queue="preview"]')),
-      'the forecast is what the player weighs before spending the one batch gesture'
+      'the forecast is what the player weighs before spending the one batch gesture',
     );
   });
 
@@ -162,7 +162,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     assert.deepEqual(
       groupsIn(root).map((group) => group.dataset.inventoryBulkComplicationGroup),
       ['sys:alembic', 'sys:crucible'],
-      'grouped by the row the player selected, so the block reads against the queue'
+      'grouped by the row the player selected, so the block reads against the queue',
     );
   });
 
@@ -187,7 +187,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     assert.equal(
       count.textContent.trim(),
       'FABRICATE.App.Complications.Count:{"count":3}',
-      'a number in the eyebrow that disagreed with the rows beneath it is worse than none'
+      'a number in the eyebrow that disagreed with the rows beneath it is worse than none',
     );
     assert.equal(rowsIn(blockIn(root)).length, 3);
   });
@@ -198,7 +198,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     assert.equal(title.textContent.trim().startsWith('FABRICATE.App.Complications.Title'), true);
     assert.ok(
       title.querySelector('[data-inventory-bulk-complication-count]'),
-      'the count is the eyebrow’s trailing slot — the shipped `.salvage-body-hint` shape'
+      'the count is the eyebrow’s trailing slot — the shipped `.salvage-body-hint` shape',
     );
   });
 
@@ -231,7 +231,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
         'FABRICATE.App.Complications.ResultEyebrow:{"position":2,"name":"Ground Reagent","difficulty":3}',
         'FABRICATE.App.Complications.ResultEyebrow:{"position":5,"name":"Alembic Shard","difficulty":7}',
       ],
-      'the numbers are 2 and 5, never 1 and 2'
+      'the numbers are 2 and 5, never 1 and 2',
     );
   });
 
@@ -250,16 +250,14 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
       ],
     });
     assert.equal(
-      rowsIn(blockIn(root))
-        .map((row) => row.dataset.inventoryBulkComplication)
-        .join(','),
-      'x-dust,x-dust'
+      rowsIn(blockIn(root)).map((row) => row.dataset.inventoryBulkComplication).join(','),
+      'x-dust,x-dust',
     );
     assert.deepEqual(
       [...blockIn(root).querySelectorAll('[data-inventory-bulk-complication-position]')].map(
-        (row) => row.dataset.inventoryBulkComplicationPosition
+        (row) => row.dataset.inventoryBulkComplicationPosition,
       ),
-      ['1', '3']
+      ['1', '3'],
     );
   });
 
@@ -268,19 +266,19 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     const row = rowsIn(blockIn(root))[0];
     assert.equal(
       eyebrowOf(row),
-      'FABRICATE.App.Complications.ResultEyebrow:{"position":2,"name":"Ground Reagent","difficulty":3}'
+      'FABRICATE.App.Complications.ResultEyebrow:{"position":2,"name":"Ground Reagent","difficulty":3}',
     );
     // An ordinal tile plus a severity tile plus a wrapping name is three leading boxes in
     // a 300px column, which is the failure the stacked stage layout exists to prevent.
     assert.equal(
       row.querySelectorAll('.fab-complication-severity').length,
       1,
-      'the severity tile is the row’s ONLY leading box'
+      'the severity tile is the row’s ONLY leading box',
     );
     assert.equal(
       row.querySelectorAll('.fab-complication-row-eyebrow').length,
       1,
-      'and the metadata has one slot, not a second one beside it'
+      'and the metadata has one slot, not a second one beside it',
     );
   });
 
@@ -300,7 +298,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     assert.equal(note.textContent.trim(), 'FABRICATE.App.Complications.OrderPlayers');
     assert.ok(
       note.classList.contains('is-players'),
-      'the one state the player caused reads a step brighter than the GM\u2019s two'
+      'the one state the player caused reads a step brighter than the GM\u2019s two',
     );
   });
 
@@ -318,7 +316,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     assert.equal(note.textContent.trim(), 'FABRICATE.App.Complications.OrderArrangeable');
     assert.ok(
       !note.classList.contains('is-players'),
-      'it is the GM\u2019s order, however changeable'
+      'it is the GM\u2019s order, however changeable',
     );
   });
 
@@ -347,18 +345,14 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
 
     assert.equal(groups.length, 2);
     assert.deepEqual(
-      groups.map((group) =>
-        orderNoteIn(group).getAttribute('data-inventory-bulk-complication-order')
-      ),
-      ['players', 'gm']
+      groups.map((group) => orderNoteIn(group).getAttribute('data-inventory-bulk-complication-order')),
+      ['players', 'gm'],
     );
-    const allNotes = [
-      ...blockIn(root).querySelectorAll('[data-inventory-bulk-complication-order]'),
-    ];
+    const allNotes = [...blockIn(root).querySelectorAll('[data-inventory-bulk-complication-order]')];
     assert.equal(allNotes.length, 2, 'two cards, two statements');
     assert.ok(
       allNotes.every((note) => note.closest('[data-inventory-bulk-complication-group]')),
-      'and every one of them sits INSIDE a card rather than above the block'
+      'and every one of them sits INSIDE a card rather than above the block',
     );
   });
 
@@ -392,7 +386,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     assert.equal(body.textContent.trim(), complication().description);
     assert.ok(
       body.classList.contains('is-clamped'),
-      'in a 300px inspector the description IS the disclosure; one clipped line removes it'
+      'in a 300px inspector the description IS the disclosure; one clipped line removes it',
     );
     assert.match(body.getAttribute('style') || '', /--fab-complication-body-lines:\s*3/);
     assert.equal(body.getAttribute('title'), complication().description);
@@ -410,7 +404,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
     const root = await mount();
     assert.equal(
       groupsIn(root)[0].querySelector('.inventory-detail-row-name').textContent.trim(),
-      'Cracked Alembic'
+      'Cracked Alembic',
     );
   });
 

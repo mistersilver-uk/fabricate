@@ -125,9 +125,9 @@ test('routedOutcomeTierCount counts the active list by id, success and failure a
     relativeOutcomes: [
       { id: 'crit', name: 'Critical', success: true },
       { id: 'ok', name: 'Success', success: true },
-      { id: 'miss', name: 'Miss', success: false },
+      { id: 'miss', name: 'Miss', success: false }
     ],
-    fixedOutcomes: [{ id: 'fixed-1', name: 'Fixed', success: true }],
+    fixedOutcomes: [{ id: 'fixed-1', name: 'Fixed', success: true }]
   };
   assert.equal(routedOutcomeTierCount(routed), 3);
   assert.equal(routedOutcomeTierCount({ ...routed, type: 'fixed' }), 1);
@@ -152,7 +152,7 @@ test('routedOutcomeTierCount agrees with routedHasOutcomeTiers on every shape', 
     { relativeOutcomes: [{ name: 'no id' }] },
     // An id-bearing tier the GM has not named yet: still a tier.
     { relativeOutcomes: [{ id: 'unnamed' }] },
-    { type: 'fixed', fixedOutcomes: [{ id: 'a' }, { id: 'b' }], relativeOutcomes: [] },
+    { type: 'fixed', fixedOutcomes: [{ id: 'a' }, { id: 'b' }], relativeOutcomes: [] }
   ];
   for (const routed of shapes) {
     assert.equal(

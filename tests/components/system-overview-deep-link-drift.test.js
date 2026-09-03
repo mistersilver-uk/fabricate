@@ -38,7 +38,7 @@ const ROOT_VIEW_TOKENS = new Set([
   'environments',
   'environment-edit',
   'gathering-task-edit',
-  'gathering-event-edit',
+  'gathering-event-edit'
 ]);
 
 describe('System overview deep-link drift guard', () => {
@@ -131,11 +131,9 @@ describe('System overview deep-link drift guard', () => {
     assert.ok(tableMatch, 'OVERVIEW_DEEP_LINKS table found in the root component');
     const table = tableMatch[1];
     const targetIds = new Map(
-      [
-        ...table.matchAll(
-          /(\w+):\s*\{\s*view:\s*'[\w-]+',\s*targetId:\s*\(issue\)\s*=>\s*issue\.(\w+)/g
-        ),
-      ].map((match) => [match[1], match[2]])
+      [...table.matchAll(/(\w+):\s*\{\s*view:\s*'[\w-]+',\s*targetId:\s*\(issue\)\s*=>\s*issue\.(\w+)/g)].map(
+        (match) => [match[1], match[2]]
+      )
     );
 
     for (const kind of ['environment', 'task', 'event']) {

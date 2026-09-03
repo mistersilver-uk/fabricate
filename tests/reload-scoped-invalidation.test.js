@@ -59,8 +59,9 @@ import {
 } from './helpers/scopedInvalidationWorld.js';
 
 const { getDefinitionIndex } = await import('../src/utils/definitionIndex.js');
-const { readSignatureCounters, resetSignatureCounters } =
-  await import('../src/systems/SignatureValidator.js');
+const { readSignatureCounters, resetSignatureCounters } = await import(
+  '../src/systems/SignatureValidator.js'
+);
 
 /**
  * Both narrow scopes plus the entity scope, read in one go.

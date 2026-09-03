@@ -103,10 +103,7 @@ function withoutMembership(store, entityId) {
 describe('removal takes the membership and the rules record, and the quantities survive', () => {
   it('the component still carries the removed essence’s quantity after a full normalize', async () => {
     const store = loadedStore();
-    const manager = new CraftingSystemManager(
-      { getRecipes: () => [] },
-      { essenceScopeStore: store }
-    );
+    const manager = new CraftingSystemManager({ getRecipes: () => [] }, { essenceScopeStore: store });
 
     // NEGATIVE CONTROL FIRST: the quantity is there to lose.
     assert.deepEqual(manager._normalizeSystem(systemWith(['fire', 'ice'])).components[0].essences, {
@@ -137,10 +134,7 @@ describe('removal takes the membership and the rules record, and the quantities 
 
   it('re-adding restores the row, and the essence resolves over a quantity it never lost', async () => {
     const store = loadedStore();
-    const manager = new CraftingSystemManager(
-      { getRecipes: () => [] },
-      { essenceScopeStore: store }
-    );
+    const manager = new CraftingSystemManager({ getRecipes: () => [] }, { essenceScopeStore: store });
 
     await store.save(withoutMembership(store, 'fire'));
     const parted = manager._normalizeSystem(systemWith(['ice']));
@@ -177,10 +171,7 @@ describe('removal takes the membership and the rules record, and the quantities 
     // This is what the raised concern described, and it is exactly right for a world that has no
     // world-scope corpus - which is also a world on which `Remove from this system` cannot be
     // reached, because the screen that offers it is the world essence entry.
-    const unwired = new CraftingSystemManager(
-      { getRecipes: () => [] },
-      { essenceScopeStore: null }
-    );
+    const unwired = new CraftingSystemManager({ getRecipes: () => [] }, { essenceScopeStore: null });
     assert.deepEqual(unwired._normalizeSystem(systemWith(['fire', 'ice'])).components[0].essences, {
       fire: 3,
       ice: 1,
@@ -196,10 +187,7 @@ describe('removal takes the membership and the rules record, and the quantities 
     // `Delete this essence` removes the world entity, its defaults and every membership record.
     // The id then leaves the basis, and the prune that follows is correct rather than a defect.
     const store = loadedStore();
-    const manager = new CraftingSystemManager(
-      { getRecipes: () => [] },
-      { essenceScopeStore: store }
-    );
+    const manager = new CraftingSystemManager({ getRecipes: () => [] }, { essenceScopeStore: store });
     const payload = store.get();
     payload.entities = payload.entities.filter((entity) => entity.id !== 'fire');
     delete payload.membership[`fire|${SYSTEM_ID}`];

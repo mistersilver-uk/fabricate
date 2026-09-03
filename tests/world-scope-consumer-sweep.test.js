@@ -77,9 +77,7 @@ function scopePayload(entity, { membership = {}, worldDefault = null } = {}) {
 
 /** A manager wired to one seeded component scope and nothing else. */
 function componentManager(entity, options) {
-  return makeManagerWithScope(CraftingSystemManager, {
-    componentScope: scopePayload(entity, options),
-  });
+  return makeManagerWithScope(CraftingSystemManager, { componentScope: scopePayload(entity, options) });
 }
 
 // -----------------------------------------------------------------------------------------------
@@ -220,13 +218,7 @@ describe('identity is re-derived from the in-system record on every read', () =>
 
     const [row] = manager.resolveScopedTools(system);
 
-    for (const field of [
-      'img',
-      'description',
-      'originItemUuid',
-      'registeredItemUuid',
-      'aliasItemUuids',
-    ]) {
+    for (const field of ['img', 'description', 'originItemUuid', 'registeredItemUuid', 'aliasItemUuids']) {
       assert.equal(field in row, false, `${field} must be deleted, not supplied by the world half`);
     }
     assert.equal(row.name, 'Hammer');
@@ -394,10 +386,7 @@ describe('a repointed reader never narrows a Valid Id Basis', () => {
     const start = source.indexOf('  _scopeBasis(system) {');
     assert.notEqual(start, -1, 'src/systems/CraftingSystemManager.js still declares _scopeBasis');
     const body = source.slice(start, source.indexOf('\n  }', start));
-    assert.ok(
-      body.includes('system?.components'),
-      'non-vacuity: the slice IS the basis derivation'
-    );
+    assert.ok(body.includes('system?.components'), 'non-vacuity: the slice IS the basis derivation');
     for (const seam of [
       'resolveScopedComponents',
       'resolvedComponentsFor',
@@ -524,12 +513,7 @@ describe('the NON-SECTION behaviour keys are re-derived from the in-system recor
 
     assert.deepEqual(read[0].tags, ['reagent', 'fresh-tag']);
     assert.deepEqual(
-      [
-        ...getMatchHandler({ type: 'tags' }).expandToComponentIds(
-          { type: 'tags', tags: ['fresh-tag'] },
-          read
-        ),
-      ],
+      [...getMatchHandler({ type: 'tags' }).expandToComponentIds({ type: 'tags', tags: ['fresh-tag'] }, read)],
       ['comp-1'],
       'the tag matcher expands over the ANSWER, so a reverted tag silently unmatches an ingredient'
     );
@@ -579,10 +563,7 @@ describe('the NON-SECTION behaviour keys are re-derived from the in-system recor
   });
 
   it('(h) emits member and inherited, which no shipped record carries and so cannot contest', () => {
-    const manager = componentManager(
-      { id: 'comp-1' },
-      { membership: { inherit: { category: false } } }
-    );
+    const manager = componentManager({ id: 'comp-1' }, { membership: { inherit: { category: false } } });
     const system = { id: SYSTEM_ID, components: [{ id: 'comp-1', name: 'Ash Salt' }] };
 
     const [row] = manager.resolveScopedComponents(system);
@@ -699,11 +680,7 @@ describe('the world identity drift report', () => {
 
     const message = buildWorldIdentityDriftNotice(drift, null);
 
-    assert.match(
-      message,
-      /out of date for 12 record\(s\) across 12 field\(s\)/,
-      'counts stay EXACT'
-    );
+    assert.match(message, /out of date for 12 record\(s\) across 12 field\(s\)/, 'counts stay EXACT');
     assert.match(message, /\.\.\.and 7 more/, 'and the remainder is stated rather than dropped');
     assert.equal(message.includes('comp-4'), true, 'the first five records are NAMED');
     assert.equal(message.includes('comp-5'), false, 'the sixth is not');
@@ -820,10 +797,7 @@ describe('the deliberate exclusions are unchanged', () => {
   }
 
   it('getItems still answers the PERSISTED record, because it is the authoring accessor', () => {
-    const body = bodyAfter(
-      read('src/systems/CraftingSystemManager.js'),
-      "  getItems(systemId, search = '') {"
-    );
+    const body = bodyAfter(read('src/systems/CraftingSystemManager.js'), "  getItems(systemId, search = '') {");
     assert.ok(body.includes('const managedItems = system.components || [];'));
     for (const seam of SEAM_NAMES) assert.equal(body.includes(seam), false);
   });
@@ -840,9 +814,7 @@ describe('the deliberate exclusions are unchanged', () => {
       read('src/systems/CraftingSystemManager.js'),
       '  _assertNoAlchemySignatureCollisions(system) {'
     );
-    assert.ok(
-      body.includes('const components = Array.isArray(system.components) ? system.components : [];')
-    );
+    assert.ok(body.includes('const components = Array.isArray(system.components) ? system.components : [];'));
     for (const seam of SEAM_NAMES) assert.equal(body.includes(seam), false);
   });
 
@@ -850,15 +822,8 @@ describe('the deliberate exclusions are unchanged', () => {
     // Re-expressed as membership it must DENY on an unknown corpus - widening presence would let
     // a station satisfy a tool gate the GM never granted - so it is 8b's change, not 8a's.
     const source = read('src/gatheringToolRuntime.js');
-    const body = bodyAfter(
-      source,
-      'function resolvePresentIds({ presentTools, systemId, key }) {',
-      ''
-    );
-    assert.ok(
-      body.includes('toolSystemId !== scopeSystemId'),
-      'the scope guard is still an id compare'
-    );
+    const body = bodyAfter(source, 'function resolvePresentIds({ presentTools, systemId, key }) {', '');
+    assert.ok(body.includes('toolSystemId !== scopeSystemId'), 'the scope guard is still an id compare');
     assert.equal(body.includes('.tools'), false, 'and it still reads no entity array at all');
     assert.equal(source.includes('scopedEntityReads'), false);
   });
@@ -921,10 +886,7 @@ describe('the SECTION keys follow the inherit switch, through the manager seam',
     const overriding = makeManagerWithScope(CraftingSystemManager, {
       toolScope: scopePayload(
         { id: 'tool-1' },
-        {
-          worldDefault: { breakage: { mode: 'none' } },
-          membership: { inherit: { breakage: false } },
-        }
+        { worldDefault: { breakage: { mode: 'none' } }, membership: { inherit: { breakage: false } } }
       ),
     });
     assert.deepEqual(overriding.resolveScopedTools(system)[0].breakage, {
@@ -936,20 +898,14 @@ describe('the SECTION keys follow the inherit switch, through the manager seam',
   it('(d) an INHERITING tool takes the world onBreak action, and an OVERRIDING one does not', () => {
     const system = { id: SYSTEM_ID, tools: [{ id: 'tool-1', onBreak: { action: 'replace' } }] };
     const inheriting = makeManagerWithScope(CraftingSystemManager, {
-      toolScope: scopePayload(
-        { id: 'tool-1' },
-        { worldDefault: { onBreak: { action: 'delete' } } }
-      ),
+      toolScope: scopePayload({ id: 'tool-1' }, { worldDefault: { onBreak: { action: 'delete' } } }),
     });
     assert.deepEqual(inheriting.resolveScopedTools(system)[0].onBreak, { action: 'delete' });
 
     const overriding = makeManagerWithScope(CraftingSystemManager, {
       toolScope: scopePayload(
         { id: 'tool-1' },
-        {
-          worldDefault: { onBreak: { action: 'delete' } },
-          membership: { inherit: { onBreak: false } },
-        }
+        { worldDefault: { onBreak: { action: 'delete' } }, membership: { inherit: { onBreak: false } } }
       ),
     });
     assert.deepEqual(overriding.resolveScopedTools(system)[0].onBreak, { action: 'replace' });

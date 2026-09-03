@@ -96,8 +96,9 @@ test('a provider registered before the window is first opened is in the first fr
     try {
       globalThis.game.fabricate = undefined;
       await init();
-      unregister =
-        globalThis.game.fabricate.api.playerExtensions.registerPlayerNavProvider(provider());
+      unregister = globalThis.game.fabricate.api.playerExtensions.registerPlayerNavProvider(
+        provider()
+      );
 
       const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
       const { buildPlayerNavTabs } = await loadModule('/src/ui/playerNavModel.js');
@@ -160,8 +161,9 @@ test('_selectTab refuses every route the window does not currently offer', async
     try {
       globalThis.game.fabricate = undefined;
       await init();
-      unregister =
-        globalThis.game.fabricate.api.playerExtensions.registerPlayerNavProvider(provider());
+      unregister = globalThis.game.fabricate.api.playerExtensions.registerPlayerNavProvider(
+        provider()
+      );
 
       const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
       const pushed = [];

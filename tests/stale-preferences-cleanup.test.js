@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 
 import {
   cleanupStalePreferences,
-  isGatheringActorSelectableByUser,
+  isGatheringActorSelectableByUser
 } from '../src/config/preferencesCleanup.js';
 
 // ---------------------------------------------------------------------------
@@ -23,15 +23,13 @@ import {
 // ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
-  const store = new Map(
-    Object.entries({
-      lastGatheringActor: '',
-      lastManagedCraftingSystem: '',
-      lastAlchemySystem: '',
-      progressiveResultOrder: {},
-      ...initial,
-    })
-  );
+  const store = new Map(Object.entries({
+    lastGatheringActor: '',
+    lastManagedCraftingSystem: '',
+    lastAlchemySystem: '',
+    progressiveResultOrder: {},
+    ...initial
+  }));
   const calls = { get: [], set: [] };
 
   function getSetting(key) {
@@ -57,7 +55,7 @@ function makeGatheringActorResolvers({ actorsById = {}, selectableActorIds = [] 
     // corpus it is pruning against — here, an empty one.
     validComponentIds: new Set(),
     resolveGatheringActor: (actorId) => actorsById[actorId] ?? null,
-    isSelectableGatheringActor: (actor) => selectable.has(actor?.id),
+    isSelectableGatheringActor: (actor) => selectable.has(actor?.id)
   };
 }
 
@@ -67,79 +65,73 @@ function makeGatheringActorResolvers({ actorsById = {}, selectableActorIds = [] 
 
 test('resets lastManagedCraftingSystem to empty when it references a missing system', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
-    lastManagedCraftingSystem: 'system-gone',
+    lastManagedCraftingSystem: 'system-gone'
   });
 
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(),
+    validComponentIds: new Set()
   });
 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
-  const setCall = calls.set.find((c) => c.key === 'lastManagedCraftingSystem');
+  const setCall = calls.set.find(c => c.key === 'lastManagedCraftingSystem');
   assert.ok(setCall, 'setSetting should be called for lastManagedCraftingSystem');
   assert.equal(setCall.value, '');
 });
 
 test('leaves lastManagedCraftingSystem unchanged when it references a valid system', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
-    lastManagedCraftingSystem: 'system-a',
+    lastManagedCraftingSystem: 'system-a'
   });
 
-  await cleanupStalePreferences(
-    new Set(['system-a', 'system-b']),
-    new Set(),
-    getSetting,
-    setSetting,
-    {
-      validComponentIds: new Set(),
-    }
-  );
+  await cleanupStalePreferences(new Set(['system-a', 'system-b']), new Set(), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.equal(store.get('lastManagedCraftingSystem'), 'system-a');
-  const setCall = calls.set.find((c) => c.key === 'lastManagedCraftingSystem');
+  const setCall = calls.set.find(c => c.key === 'lastManagedCraftingSystem');
   assert.equal(setCall, undefined, 'setSetting should NOT be called when value is valid');
 });
 
 test('resets lastAlchemySystem when it references a missing system', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
-    lastAlchemySystem: 'system-deleted',
+    lastAlchemySystem: 'system-deleted'
   });
 
   await cleanupStalePreferences(new Set(['system-other']), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(),
+    validComponentIds: new Set()
   });
 
   assert.equal(store.get('lastAlchemySystem'), '');
-  const setCall = calls.set.find((c) => c.key === 'lastAlchemySystem');
+  const setCall = calls.set.find(c => c.key === 'lastAlchemySystem');
   assert.ok(setCall, 'setSetting should be called for lastAlchemySystem');
   assert.equal(setCall.value, '');
 });
 
 test('leaves lastAlchemySystem unchanged when it references a valid system', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
-    lastAlchemySystem: 'system-a',
+    lastAlchemySystem: 'system-a'
   });
 
   await cleanupStalePreferences(new Set(['system-a']), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(),
+    validComponentIds: new Set()
   });
 
   assert.equal(store.get('lastAlchemySystem'), 'system-a');
-  const setCall = calls.set.find((c) => c.key === 'lastAlchemySystem');
+  const setCall = calls.set.find(c => c.key === 'lastAlchemySystem');
   assert.equal(setCall, undefined, 'setSetting should NOT be called when value is valid');
 });
 
 test('leaves lastManagedCraftingSystem unchanged when it is already empty', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
-    lastManagedCraftingSystem: '',
+    lastManagedCraftingSystem: ''
   });
 
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(),
+    validComponentIds: new Set()
   });
 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
-  const setCall = calls.set.find((c) => c.key === 'lastManagedCraftingSystem');
+  const setCall = calls.set.find(c => c.key === 'lastManagedCraftingSystem');
   assert.equal(setCall, undefined, 'setSetting should NOT be called when value is already empty');
 });
 
@@ -149,7 +141,7 @@ test('leaves lastManagedCraftingSystem unchanged when it is already empty', asyn
 
 test('resets lastGatheringActor when the remembered actor no longer resolves', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
-    lastGatheringActor: 'actor-gone',
+    lastGatheringActor: 'actor-gone'
   });
 
   await cleanupStalePreferences(
@@ -161,7 +153,7 @@ test('resets lastGatheringActor when the remembered actor no longer resolves', a
   );
 
   assert.equal(store.get('lastGatheringActor'), '');
-  const setCall = calls.set.find((c) => c.key === 'lastGatheringActor');
+  const setCall = calls.set.find(c => c.key === 'lastGatheringActor');
   assert.ok(setCall, 'setSetting should be called for lastGatheringActor');
   assert.equal(setCall.value, '');
 });
@@ -169,7 +161,7 @@ test('resets lastGatheringActor when the remembered actor no longer resolves', a
 test('resets lastGatheringActor when the remembered actor is no longer selectable', async () => {
   const rememberedActor = { id: 'actor-1', name: 'Gatherer' };
   const { store, calls, getSetting, setSetting } = makeSettings({
-    lastGatheringActor: rememberedActor.id,
+    lastGatheringActor: rememberedActor.id
   });
 
   await cleanupStalePreferences(
@@ -179,12 +171,12 @@ test('resets lastGatheringActor when the remembered actor is no longer selectabl
     setSetting,
     makeGatheringActorResolvers({
       actorsById: { [rememberedActor.id]: rememberedActor },
-      selectableActorIds: [],
+      selectableActorIds: []
     })
   );
 
   assert.equal(store.get('lastGatheringActor'), '');
-  const setCall = calls.set.find((c) => c.key === 'lastGatheringActor');
+  const setCall = calls.set.find(c => c.key === 'lastGatheringActor');
   assert.ok(setCall, 'setSetting should be called for an unselectable remembered actor');
   assert.equal(setCall.value, '');
 });
@@ -192,7 +184,7 @@ test('resets lastGatheringActor when the remembered actor is no longer selectabl
 test('preserves lastGatheringActor when the remembered actor still resolves and is selectable', async () => {
   const rememberedActor = { id: 'actor-1', name: 'Gatherer' };
   const { store, calls, getSetting, setSetting } = makeSettings({
-    lastGatheringActor: rememberedActor.id,
+    lastGatheringActor: rememberedActor.id
   });
 
   await cleanupStalePreferences(
@@ -202,77 +194,66 @@ test('preserves lastGatheringActor when the remembered actor still resolves and 
     setSetting,
     makeGatheringActorResolvers({
       actorsById: { [rememberedActor.id]: rememberedActor },
-      selectableActorIds: [rememberedActor.id],
+      selectableActorIds: [rememberedActor.id]
     })
   );
 
   assert.equal(store.get('lastGatheringActor'), rememberedActor.id);
-  const setCall = calls.set.find((c) => c.key === 'lastGatheringActor');
+  const setCall = calls.set.find(c => c.key === 'lastGatheringActor');
   assert.equal(setCall, undefined, 'setSetting should not be called for a valid remembered actor');
 });
 
 test('preserves lastGatheringActor when cleanup runs without gathering actor resolver options', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
     lastGatheringActor: 'actor-1',
-    lastManagedCraftingSystem: 'dead-system',
+    lastManagedCraftingSystem: 'dead-system'
   });
 
-  await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(),
-  });
+  await cleanupStalePreferences(
+    new Set(),
+    new Set(),
+    getSetting,
+    setSetting,
+    { validComponentIds: new Set() }
+  );
 
   assert.equal(store.get('lastGatheringActor'), 'actor-1');
   assert.equal(store.get('lastManagedCraftingSystem'), '');
   assert.equal(
-    calls.set.find((c) => c.key === 'lastGatheringActor'),
+    calls.set.find(c => c.key === 'lastGatheringActor'),
     undefined,
     'setSetting should not be called for lastGatheringActor without resolver seams'
   );
   assert.ok(
-    calls.set.find((c) => c.key === 'lastManagedCraftingSystem'),
+    calls.set.find(c => c.key === 'lastManagedCraftingSystem'),
     'stale system cleanup should still run'
   );
 });
 
 test('gathering actor selectability is based on actor existence and ownership only', () => {
   assert.equal(isGatheringActorSelectableByUser(null, { isGM: true }), false);
-  assert.equal(
-    isGatheringActorSelectableByUser({ id: 'npc-1', type: 'npc' }, { isGM: true }),
-    true
-  );
+  assert.equal(isGatheringActorSelectableByUser({ id: 'npc-1', type: 'npc' }, { isGM: true }), true);
   // Ownership is asked of the PASSED user and no one else (issue 1288). A fixture
   // asserting `isOwner: true` used to pass here, which is precisely why the GM-side relay
   // could not see that `isOwner` answers about the AMBIENT user instead.
   assert.equal(
-    isGatheringActorSelectableByUser(
-      {
-        id: 'group-1',
-        type: 'group',
-        isOwner: true,
-      },
-      { id: 'user-1', isGM: false }
-    ),
+    isGatheringActorSelectableByUser({
+      id: 'group-1',
+      type: 'group',
+      isOwner: true
+    }, { id: 'user-1', isGM: false }),
     false,
     'a hard-coded isOwner is not an answer about this user and must not authorize one'
   );
   assert.equal(
-    isGatheringActorSelectableByUser(
-      {
-        id: 'npc-2',
-        type: 'npc',
-        testUserPermission: (_user, permission) => permission === 'OWNER',
-      },
-      { id: 'user-1', isGM: false }
-    ),
+    isGatheringActorSelectableByUser({
+      id: 'npc-2',
+      type: 'npc',
+      testUserPermission: (_user, permission) => permission === 'OWNER'
+    }, { id: 'user-1', isGM: false }),
     true
   );
-  assert.equal(
-    isGatheringActorSelectableByUser(
-      { id: 'actor-1', type: 'character' },
-      { id: 'user-1', isGM: false }
-    ),
-    false
-  );
+  assert.equal(isGatheringActorSelectableByUser({ id: 'actor-1', type: 'character' }, { id: 'user-1', isGM: false }), false);
 });
 
 // The two shapes that became REACHABLE once the `isOwner` disjunct stopped short-circuiting
@@ -285,7 +266,7 @@ test('the ownership predicate denies a nullish or id-string user rather than thr
     // Foundry's real `testUserPermission` reads `user.isGM` as its FIRST statement, so a
     // null viewer throws there rather than returning false. `GatheringListingBuilder`
     // defaults `viewer` to exactly that on two public read paths.
-    testUserPermission: (user, permission) => user.isGM === true || permission === 'OWNER',
+    testUserPermission: (user, permission) => user.isGM === true || permission === 'OWNER'
   };
 
   assert.equal(isGatheringActorSelectableByUser(actor, null), false, 'null denies');
@@ -313,12 +294,12 @@ test('removes progressive-order entries for missing recipes', async () => {
   const { store, getSetting, setSetting } = makeSettings({
     progressiveResultOrder: {
       'recipe:recipe-gone': ['r1', 'r2'],
-      'recipe:recipe-valid': ['r3', 'r4'],
-    },
+      'recipe:recipe-valid': ['r3', 'r4']
+    }
   });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-valid']), getSetting, setSetting, {
-    validComponentIds: new Set(),
+    validComponentIds: new Set()
   });
 
   const result = store.get('progressiveResultOrder');
@@ -328,21 +309,15 @@ test('removes progressive-order entries for missing recipes', async () => {
 test('retains all progressive-order entries when all recipes are valid', async () => {
   const order = { 'recipe:recipe-a': ['r1'], 'recipe:recipe-b': ['r2', 'r3'] };
   const { store, calls, getSetting, setSetting } = makeSettings({
-    progressiveResultOrder: order,
+    progressiveResultOrder: order
   });
 
-  await cleanupStalePreferences(
-    new Set(),
-    new Set(['recipe-a', 'recipe-b']),
-    getSetting,
-    setSetting,
-    {
-      validComponentIds: new Set(),
-    }
-  );
+  await cleanupStalePreferences(new Set(), new Set(['recipe-a', 'recipe-b']), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.deepEqual(store.get('progressiveResultOrder'), order);
-  const setCall = calls.set.find((c) => c.key === 'progressiveResultOrder');
+  const setCall = calls.set.find(c => c.key === 'progressiveResultOrder');
   assert.equal(setCall, undefined, 'setSetting should NOT be called when no entries need removal');
 });
 
@@ -350,30 +325,27 @@ test('does not call setSetting for progressiveResultOrder when no entries need r
   // The load-bearing no-op assertion: a prefix-blind implementation drops this
   // namespaced key, sets `changed`, and writes a wiped map.
   const { calls, getSetting, setSetting } = makeSettings({
-    progressiveResultOrder: { 'recipe:recipe-x': ['r1', 'r2'] },
+    progressiveResultOrder: { 'recipe:recipe-x': ['r1', 'r2'] }
   });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-x']), getSetting, setSetting, {
-    validComponentIds: new Set(),
+    validComponentIds: new Set()
   });
 
-  const setKeys = calls.set.map((c) => c.key);
-  assert.ok(
-    !setKeys.includes('progressiveResultOrder'),
-    'setSetting should not be called for progressiveResultOrder'
-  );
+  const setKeys = calls.set.map(c => c.key);
+  assert.ok(!setKeys.includes('progressiveResultOrder'), 'setSetting should not be called for progressiveResultOrder');
 });
 
 test('keeps a salvage: entry for a valid component and prunes it for an invalid one', async () => {
   const { store, getSetting, setSetting } = makeSettings({
     progressiveResultOrder: {
       'salvage:comp-live': ['r1', 'r2'],
-      'salvage:comp-gone': ['r3'],
-    },
+      'salvage:comp-gone': ['r3']
+    }
   });
 
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(['comp-live']),
+    validComponentIds: new Set(['comp-live'])
   });
 
   assert.deepEqual(store.get('progressiveResultOrder'), { 'salvage:comp-live': ['r1', 'r2'] });
@@ -384,10 +356,10 @@ test('does not call setSetting when every namespaced entry is live (recipe AND s
   const { calls, getSetting, setSetting } = makeSettings({ progressiveResultOrder: order });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-a']), getSetting, setSetting, {
-    validComponentIds: new Set(['comp-a']),
+    validComponentIds: new Set(['comp-a'])
   });
 
-  const setKeys = calls.set.map((c) => c.key);
+  const setKeys = calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('progressiveResultOrder'), 'a fully-live map is never rewritten');
 });
 
@@ -395,13 +367,13 @@ test('scopes the two namespaces separately — a component id does not validate 
   const { store, getSetting, setSetting } = makeSettings({
     progressiveResultOrder: {
       'recipe:shared-id': ['r1'],
-      'salvage:shared-id': ['r2'],
-    },
+      'salvage:shared-id': ['r2']
+    }
   });
 
   // `shared-id` is a live COMPONENT but not a live recipe: only the salvage: key survives.
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(['shared-id']),
+    validComponentIds: new Set(['shared-id'])
   });
 
   assert.deepEqual(store.get('progressiveResultOrder'), { 'salvage:shared-id': ['r2'] });
@@ -416,12 +388,12 @@ test('drops unknown-prefix and legacy BARE-id keys (D14 policy)', async () => {
       'gathering:task-1': ['r2'],
       'recipe:': ['r3'],
       ':recipe-valid': ['r4'],
-      'recipe:recipe-valid': ['r5'],
-    },
+      'recipe:recipe-valid': ['r5']
+    }
   });
 
   await cleanupStalePreferences(new Set(), new Set(['recipe-valid']), getSetting, setSetting, {
-    validComponentIds: new Set(),
+    validComponentIds: new Set()
   });
 
   assert.deepEqual(
@@ -440,8 +412,8 @@ test('cleans both stale system and stale recipe preferences in one call', async 
     lastManagedCraftingSystem: 'dead-system',
     progressiveResultOrder: {
       'recipe:dead-recipe': ['r1', 'r2'],
-      'recipe:live-recipe': ['r2', 'r1'],
-    },
+      'recipe:live-recipe': ['r2', 'r1']
+    }
   });
 
   await cleanupStalePreferences(
@@ -455,7 +427,7 @@ test('cleans both stale system and stale recipe preferences in one call', async 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
   assert.deepEqual(store.get('progressiveResultOrder'), { 'recipe:live-recipe': ['r2', 'r1'] });
 
-  const setKeys = calls.set.map((c) => c.key);
+  const setKeys = calls.set.map(c => c.key);
   assert.ok(setKeys.includes('lastManagedCraftingSystem'));
   assert.ok(setKeys.includes('progressiveResultOrder'));
 });
@@ -463,7 +435,7 @@ test('cleans both stale system and stale recipe preferences in one call', async 
 test('does nothing when all preferences are valid — no setSetting calls for either', async () => {
   const { calls, getSetting, setSetting } = makeSettings({
     lastManagedCraftingSystem: 'system-1',
-    progressiveResultOrder: { 'recipe:recipe-1': ['r1', 'r2'] },
+    progressiveResultOrder: { 'recipe:recipe-1': ['r1', 'r2'] }
   });
 
   await cleanupStalePreferences(
@@ -474,11 +446,7 @@ test('does nothing when all preferences are valid — no setSetting calls for ei
     { validComponentIds: new Set() }
   );
 
-  assert.equal(
-    calls.set.length,
-    0,
-    'setSetting should not be called at all when all preferences are valid'
-  );
+  assert.equal(calls.set.length, 0, 'setSetting should not be called at all when all preferences are valid');
 });
 
 // ---------------------------------------------------------------------------
@@ -491,7 +459,7 @@ test('omitting validComponentIds throws rather than pruning every salvage: key',
   // the whole progressive-order map with every `salvage:<componentId>` key dropped — a
   // corpus-derived prune against a basis of nothing, on a healthy world, with no error.
   const { store, calls, getSetting, setSetting } = makeSettings({
-    progressiveResultOrder: { 'salvage:comp-live': ['r1', 'r2'] },
+    progressiveResultOrder: { 'salvage:comp-live': ['r1', 'r2'] }
   });
 
   await assert.rejects(
@@ -510,11 +478,11 @@ test('omitting validComponentIds throws rather than pruning every salvage: key',
 
 test('an explicitly empty validComponentIds still prunes, so the guard is not a blanket refusal', async () => {
   const { store, getSetting, setSetting } = makeSettings({
-    progressiveResultOrder: { 'salvage:comp-gone': ['r1'] },
+    progressiveResultOrder: { 'salvage:comp-gone': ['r1'] }
   });
 
   await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
-    validComponentIds: new Set(),
+    validComponentIds: new Set()
   });
 
   assert.deepEqual(

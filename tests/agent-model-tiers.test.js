@@ -37,11 +37,7 @@ const FAMILIES = [
   'foundry_integrator',
 ];
 
-const UNTIERED = [
-  'fabricate_orchestrator',
-  'fabricate_docs_writer',
-  'fabricate_competitive_analyst',
-];
+const UNTIERED = ['fabricate_orchestrator', 'fabricate_docs_writer', 'fabricate_competitive_analyst'];
 
 const fileForm = (token) => token.replaceAll('_', '-');
 
@@ -634,10 +630,7 @@ function fencedHighRiskPaths(md) {
   const bodyStart = md.indexOf('\n', fenceStart) + 1;
   const fenceEnd = md.indexOf('```', bodyStart);
   assert.ok(fenceEnd > bodyStart, 'AGENTS.md HIGH_RISK_PATHS fence is unterminated');
-  const groups = md
-    .slice(bodyStart, fenceEnd)
-    .trim()
-    .split(/\n\s*\n/);
+  const groups = md.slice(bodyStart, fenceEnd).trim().split(/\n\s*\n/);
   return groups[groups.length - 1]
     .split('\n')
     .map((l) => l.trim())
@@ -696,10 +689,7 @@ test('13. AGENTS.md mirrors HIGH_RISK_PATHS, the thresholds, the pins, and the r
   const split = parsed.tokens.map((token) => splitTieredToken(token));
   const families = [...new Set(split.filter((s) => s.tier).map((s) => s.base))].sort(byName);
   assert.deepEqual(families, [...FAMILIES].sort(byName), 'AGENTS.md family set drifted');
-  const untiered = split
-    .filter((s) => !s.tier)
-    .map((s) => s.base)
-    .sort(byName);
+  const untiered = split.filter((s) => !s.tier).map((s) => s.base).sort(byName);
   assert.deepEqual(untiered, [...UNTIERED, 'fabricate_pr_explorer'].sort(byName));
 
   // Every declared family is complete against the real AGENTS.md, Family table included.

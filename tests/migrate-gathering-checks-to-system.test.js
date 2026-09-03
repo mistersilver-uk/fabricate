@@ -16,11 +16,7 @@ test('seeds the system gathering check from the first task with a check formula'
   const systems = [{ id: 'sys-1' }];
   const config = configWith('sys-1', [
     { id: 't0', check: { formula: '' } },
-    {
-      id: 't1',
-      check: { formula: '1d20 + @skills.sur.mod' },
-      progressive: { awardMode: 'exceed' },
-    },
+    { id: 't1', check: { formula: '1d20 + @skills.sur.mod' }, progressive: { awardMode: 'exceed' } },
     { id: 't2', check: { formula: '1d20 + 5' }, progressive: { awardMode: 'partial' } },
   ]);
 
@@ -29,11 +25,7 @@ test('seeds the system gathering check from the first task with a check formula'
   assert.equal(result.seededCount, 1);
   const check = result.systems[0].gatheringCraftingCheck;
   assert.equal(check.enabled, true);
-  assert.equal(
-    check.progressive.rollFormula,
-    '1d20 + @skills.sur.mod',
-    'first non-empty formula wins'
-  );
+  assert.equal(check.progressive.rollFormula, '1d20 + @skills.sur.mod', 'first non-empty formula wins');
   assert.equal(check.progressive.awardMode, 'exceed', 'award mode comes from the defining task');
   // Routed is intentionally not seeded.
   assert.equal(check.routed, undefined);
@@ -51,13 +43,7 @@ test('defaults the award mode to "equal" when the defining task has none/invalid
 test('leaves per-task gathering config untouched (only the system copy is written)', () => {
   const systems = [{ id: 'sys-1' }];
   const config = configWith('sys-1', [
-    {
-      id: 't1',
-      check: { formula: '1d20', threshold: '12' },
-      progressive: { awardMode: 'equal' },
-      resolutionMode: 'progressive',
-      dcOverride: null,
-    },
+    { id: 't1', check: { formula: '1d20', threshold: '12' }, progressive: { awardMode: 'equal' }, resolutionMode: 'progressive', dcOverride: null },
   ]);
 
   const result = migrateGatheringChecksToSystem(systems, config);
@@ -132,11 +118,7 @@ test('seeds only the systems that have a defining task (multi-system)', () => {
 
   assert.equal(result.seededCount, 1);
   assert.equal(result.systems[0].gatheringCraftingCheck.progressive.rollFormula, '1d20');
-  assert.equal(
-    result.systems[1].gatheringCraftingCheck,
-    undefined,
-    'a system with no defining task is left alone'
-  );
+  assert.equal(result.systems[1].gatheringCraftingCheck, undefined, 'a system with no defining task is left alone');
 });
 
 test('preserves an existing (not-yet-enabled) sibling check config when seeding', () => {
@@ -149,10 +131,7 @@ test('preserves an existing (not-yet-enabled) sibling check config when seeding'
           checkBreakage: { triggers: [{ id: 'trig-1' }] },
           rollFormula: '',
         },
-        routed: {
-          rollFormula: '1d20',
-          relativeOutcomes: [{ id: 'o', name: 'Find', success: true, dc: 0 }],
-        },
+        routed: { rollFormula: '1d20', relativeOutcomes: [{ id: 'o', name: 'Find', success: true, dc: 0 }] },
       },
     },
   ];
@@ -172,11 +151,7 @@ test('preserves an existing (not-yet-enabled) sibling check config when seeding'
     { triggers: [{ id: 'trig-1' }] },
     'pre-existing progressive field preserved'
   );
-  assert.equal(
-    check.routed.relativeOutcomes[0].name,
-    'Find',
-    'pre-existing routed sibling preserved'
-  );
+  assert.equal(check.routed.relativeOutcomes[0].name, 'Find', 'pre-existing routed sibling preserved');
 });
 
 // ---------------------------------------------------------------------------
@@ -202,26 +177,16 @@ test('1.5.0 runs from 1.4.0, seeds the system gathering check, and bumps the ver
     migrationVersion: '1.4.0',
     craftingSystems: [{ id: 'sys-1' }],
     gatheringConfig: configWith('sys-1', [
-      {
-        id: 't1',
-        check: { formula: '1d20 + @abilities.wis.mod' },
-        progressive: { awardMode: 'partial' },
-      },
+      { id: 't1', check: { formula: '1d20 + @abilities.wis.mod' }, progressive: { awardMode: 'partial' } },
     ]),
   });
-  const runner = new MigrationRunner({
-    getSetting: settings.getSetting,
-    setSetting: settings.setSetting,
-  });
+  const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
   await runner.run();
 
   const systems = settings.store.get('craftingSystems');
   assert.equal(systems[0].gatheringCraftingCheck.enabled, true);
-  assert.equal(
-    systems[0].gatheringCraftingCheck.progressive.rollFormula,
-    '1d20 + @abilities.wis.mod'
-  );
+  assert.equal(systems[0].gatheringCraftingCheck.progressive.rollFormula, '1d20 + @abilities.wis.mod');
   assert.equal(systems[0].gatheringCraftingCheck.progressive.awardMode, 'partial');
   assert.equal(settings.store.get('migrationVersion'), '1.31.0');
 });
@@ -232,19 +197,12 @@ test('version gate: 1.5.0 is NOT re-applied when migrationVersion is already 1.5
     craftingSystems: [{ id: 'sys-1', visibilityMode: 'knowledge' }],
     gatheringConfig: configWith('sys-1', [{ id: 't1', check: { formula: '1d20' } }]),
   });
-  const runner = new MigrationRunner({
-    getSetting: settings.getSetting,
-    setSetting: settings.setSetting,
-  });
+  const runner = new MigrationRunner({ getSetting: settings.getSetting, setSetting: settings.setSetting });
 
   await runner.run();
 
   const systems = settings.store.get('craftingSystems');
-  assert.equal(
-    systems[0].gatheringCraftingCheck,
-    undefined,
-    'no seeding when the gate blocks the run'
-  );
+  assert.equal(systems[0].gatheringCraftingCheck, undefined, 'no seeding when the gate blocks the run');
   const setKeys = settings.calls.set.map((c) => c.key);
   assert.ok(!setKeys.includes('craftingSystems'), 'craftingSystems not persisted');
 });

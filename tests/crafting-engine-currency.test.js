@@ -48,32 +48,14 @@ function setupGlobals(systemConfig) {
 
 test('currency profile validation rejects circular and stale sub-unit references', () => {
   const circular = validateCurrencyProfile([
-    {
-      id: 'gp',
-      label: 'Gold',
-      abbreviation: 'gp',
-      actorPath: 'system.currency.gp',
-      contains: [{ unitId: 'sp', amount: 10 }],
-    },
-    {
-      id: 'sp',
-      label: 'Silver',
-      abbreviation: 'sp',
-      actorPath: 'system.currency.sp',
-      contains: [{ unitId: 'gp', amount: 10 }],
-    },
+    { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp', contains: [{ unitId: 'sp', amount: 10 }] },
+    { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [{ unitId: 'gp', amount: 10 }] },
   ]);
   assert.equal(circular.valid, false);
   assert.match(circular.errors.join('; '), /circular reference/i);
 
   const stale = validateCurrencyProfile([
-    {
-      id: 'gp',
-      label: 'Gold',
-      abbreviation: 'gp',
-      actorPath: 'system.currency.gp',
-      contains: [{ unitId: 'missing', amount: 10 }],
-    },
+    { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp', contains: [{ unitId: 'missing', amount: 10 }] },
   ]);
   assert.equal(stale.valid, false);
   assert.match(stale.errors.join('; '), /unknown unit/i);
@@ -159,19 +141,13 @@ test('currencySubUnitOptions only offers conflict-free sub-units and labels an u
     ladderUnit('sp', [{ unitId: 'cp', amount: 10 }]),
     ladderUnit('cp'),
     // Unauthored abbreviation ('') with a label; must fall back to the label, never the id.
-    {
-      id: 'gem',
-      label: 'Gemstone',
-      abbreviation: '',
-      actorPath: 'system.currency.gem',
-      contains: [],
-    },
+    { id: 'gem', label: 'Gemstone', abbreviation: '', actorPath: 'system.currency.gem', contains: [] },
   ];
   const options = currencySubUnitOptions(units, 'gp');
   // gp already reaches sp and cp; gem is unrelated and eligible.
   assert.deepEqual(
     options.map((option) => option.id),
-    ['gem']
+    ['gem'],
   );
   // An unauthored abbreviation resolves to the unit's label, not the raw id.
   assert.equal(options[0].abbreviation, 'Gemstone');
@@ -186,7 +162,10 @@ test('normalizeCurrencyConfig defaults, trims, and drops the legacy inventoryMod
   // it into every existing world (there is no migration), so this asserts the whole set rather
   // than three names: a normalizer that stopped emitting one would still satisfy a literal that
   // was edited in the same commit.
-  assert.deepEqual(Object.keys(defaults.macros).sort(), [...CURRENCY_MACRO_KEYS].sort());
+  assert.deepEqual(
+    Object.keys(defaults.macros).sort(),
+    [...CURRENCY_MACRO_KEYS].sort()
+  );
   assert.deepEqual(
     Object.values(defaults.macros),
     CURRENCY_MACRO_KEYS.map(() => '')
@@ -355,13 +334,7 @@ test('macro mode does not require a denomination on units', async () => {
 
 test('readCurrencyBalances treats missing paths as zero and present non-numeric as not available', () => {
   const units = [
-    {
-      id: 'cp',
-      label: 'Copper',
-      abbreviation: 'cp',
-      actorPath: 'system.currency.cp',
-      contains: [],
-    },
+    { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp', contains: [] },
     { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp', contains: [] },
   ];
   setupGlobals({});
@@ -392,13 +365,7 @@ test('validateCurrencyProfile rejects a unit that references its own id', () => 
 
 test('validateCurrencyProfile surfaces non-integer and non-positive sub-unit amounts', () => {
   const fractional = validateCurrencyProfile([
-    {
-      id: 'cp',
-      label: 'Copper',
-      abbreviation: 'cp',
-      actorPath: 'system.currency.cp',
-      contains: [],
-    },
+    { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp', contains: [] },
     {
       id: 'sp',
       label: 'Silver',
@@ -411,13 +378,7 @@ test('validateCurrencyProfile surfaces non-integer and non-positive sub-unit amo
   assert.match(fractional.errors.join('; '), /invalid sub-unit amount/i);
 
   const nonPositive = validateCurrencyProfile([
-    {
-      id: 'cp',
-      label: 'Copper',
-      abbreviation: 'cp',
-      actorPath: 'system.currency.cp',
-      contains: [],
-    },
+    { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp', contains: [] },
     {
       id: 'sp',
       label: 'Silver',
@@ -634,11 +595,7 @@ test('buildCurrencySpendUpdates stays exact when paying with mixed denominations
     name: 'Exact',
     system: { currency: { cp: 10, sp: 9, ep: 0, gp: 1, pp: 0 } },
   };
-  const result = buildCurrencySpendUpdates(
-    actor,
-    { unit: 'gp', amount: 2 },
-    DND5E_CURRENCY_PRESETS
-  );
+  const result = buildCurrencySpendUpdates(actor, { unit: 'gp', amount: 2 }, DND5E_CURRENCY_PRESETS);
   assert.equal(result.valid, true);
   assert.equal(result.updates['system.currency.cp'], 0);
   assert.equal(result.updates['system.currency.sp'], 0);
@@ -660,13 +617,7 @@ test('buildCurrencySpendUpdates stays exact when paying with mixed denominations
 
 /** Three coins whose ids, abbreviations and labels are all distinct, so a hit names its tier. */
 const NAMED_LADDER = [
-  {
-    id: 'gp',
-    label: 'Gold Pieces',
-    abbreviation: 'GP',
-    actorPath: 'system.currency.gp',
-    contains: [],
-  },
+  { id: 'gp', label: 'Gold Pieces', abbreviation: 'GP', actorPath: 'system.currency.gp', contains: [] },
   { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [] },
 ];
 
@@ -738,10 +689,7 @@ test('a name two coins answer to is reported ambiguous, never first-matched sile
 
   // One coin matching on SEVERAL of its own fields is not a collision: ambiguity is about how
   // many COINS answered, not how many fields did.
-  const selfMatch = resolveCurrencyUnitByName(
-    [{ id: 'gp', label: 'gp', abbreviation: 'gp' }],
-    'GP'
-  );
+  const selfMatch = resolveCurrencyUnitByName([{ id: 'gp', label: 'gp', abbreviation: 'gp' }], 'GP');
   assert.equal(selfMatch.ambiguous, false);
   assert.equal(selfMatch.unit?.id, 'gp');
 });

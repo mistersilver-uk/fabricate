@@ -492,11 +492,7 @@ test('an essence whose ONLY source spelling is `sourceItemUuid` survives the re-
 
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const essence = manager._normalizeSystem(migratedYounger).essenceDefinitions[0];
-  assert.equal(
-    essence.sourceComponentId,
-    'comp-1',
-    'the effect source still RESOLVES after hydrate'
-  );
+  assert.equal(essence.sourceComponentId, 'comp-1', 'the effect source still RESOLVES after hydrate');
   assert.equal(essence.associatedSystemItemId, 'comp-1', 'and the transitional alias follows it');
   assert.equal(
     essence.sourceItemUuid,

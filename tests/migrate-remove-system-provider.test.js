@@ -45,13 +45,7 @@ function baseFixture() {
       systems: {
         'sys-1': {
           characterModifiers: [
-            {
-              id: 'strength',
-              label: 'Strength',
-              icon: 'fa-user',
-              provider: 'dnd5e',
-              expression: '@abilities.str.mod',
-            },
+            { id: 'strength', label: 'Strength', icon: 'fa-user', provider: 'dnd5e', expression: '@abilities.str.mod' },
             { id: 'macro-mod', label: 'Macro', provider: 'macro', macroUuid: 'Macro.mod' },
           ],
           tasks: [
@@ -61,24 +55,13 @@ function baseFixture() {
                 {
                   id: 'row-1',
                   characterModifiers: [
-                    {
-                      id: 'ref-keep',
-                      modifierId: 'strength',
-                      operator: '+',
-                      providerOverride: 'pf2e',
-                      macroUuidOverride: 'Macro.x',
-                    },
+                    { id: 'ref-keep', modifierId: 'strength', operator: '+', providerOverride: 'pf2e', macroUuidOverride: 'Macro.x' },
                     { id: 'ref-drop', modifierId: 'macro-mod', operator: '+' },
                   ],
                 },
               ],
               staminaCostModifiers: [
-                {
-                  id: 'ref-stamina-keep',
-                  modifierId: 'strength',
-                  operator: '-',
-                  providerOverride: 'dnd5e',
-                },
+                { id: 'ref-stamina-keep', modifierId: 'strength', operator: '-', providerOverride: 'dnd5e' },
                 { id: 'ref-stamina-drop', modifierId: 'macro-mod', operator: '+' },
               ],
             },
@@ -87,12 +70,7 @@ function baseFixture() {
             {
               id: 'event-1',
               characterModifiers: [
-                {
-                  id: 'ref-event-keep',
-                  modifierId: 'strength',
-                  operator: '+',
-                  macroUuidOverride: 'Macro.y',
-                },
+                { id: 'ref-event-keep', modifierId: 'strength', operator: '+', macroUuidOverride: 'Macro.y' },
                 { id: 'ref-event-drop', modifierId: 'macro-mod', operator: '-' },
               ],
             },
@@ -129,11 +107,7 @@ test('strips provider/macroUuid from system tool requirements and nulls macro-on
   const tools = Object.fromEntries(out.systems[0].tools.map((tool) => [tool.id, tool]));
   assert.deepEqual(tools['tool-system'].requirement, { formula: '@flags.proficient' });
   assert.equal(tools['tool-macro'].requirement, null, 'macro-only requirement nulled');
-  assert.deepEqual(
-    tools['tool-macro-with-formula'].requirement,
-    { formula: '1d6' },
-    'formula-bearing macro requirement kept'
-  );
+  assert.deepEqual(tools['tool-macro-with-formula'].requirement, { formula: '1d6' }, 'formula-bearing macro requirement kept');
   assert.equal(tools['tool-null'].requirement, null);
 });
 
@@ -153,27 +127,18 @@ test('deletes macro character modifiers and scrubs all three reference sites', (
 
   // Drop-row references: macro ref scrubbed, survivor stripped of override fields.
   const dropRefs = sys.tasks[0].dropRows[0].characterModifiers;
-  assert.deepEqual(
-    dropRefs.map((ref) => ref.id),
-    ['ref-keep']
-  );
+  assert.deepEqual(dropRefs.map((ref) => ref.id), ['ref-keep']);
   assert.equal('providerOverride' in dropRefs[0], false);
   assert.equal('macroUuidOverride' in dropRefs[0], false);
 
   // staminaCostModifiers references scrubbed.
   const staminaRefs = sys.tasks[0].staminaCostModifiers;
-  assert.deepEqual(
-    staminaRefs.map((ref) => ref.id),
-    ['ref-stamina-keep']
-  );
+  assert.deepEqual(staminaRefs.map((ref) => ref.id), ['ref-stamina-keep']);
   assert.equal('providerOverride' in staminaRefs[0], false);
 
   // Event references scrubbed.
   const eventRefs = sys.events[0].characterModifiers;
-  assert.deepEqual(
-    eventRefs.map((ref) => ref.id),
-    ['ref-event-keep']
-  );
+  assert.deepEqual(eventRefs.map((ref) => ref.id), ['ref-event-keep']);
   assert.equal('macroUuidOverride' in eventRefs[0], false);
 });
 
@@ -181,10 +146,7 @@ test('strips provider/macroUuid from task visibility and check, fail-open on mac
   const out = migrateRemoveSystemProvider(baseFixture());
   const tasks = Object.fromEntries(out.environments[0].tasks.map((task) => [task.id, task]));
 
-  assert.deepEqual(tasks['task-system'].visibility, {
-    formula: '@skills.sur.mod',
-    threshold: '12',
-  });
+  assert.deepEqual(tasks['task-system'].visibility, { formula: '@skills.sur.mod', threshold: '12' });
   assert.deepEqual(tasks['task-system'].check, { formula: '1d20', threshold: '10' });
 
   // Macro visibility gate with no formula → nulled (fail open).

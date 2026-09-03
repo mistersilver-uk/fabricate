@@ -17,14 +17,10 @@ let createActorBarStore;
 let mounted;
 let target;
 
+
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, {
-    filename: sourcePath,
-    generate: 'client',
-    dev: true,
-    css: 'injected',
-  });
+  const compiled = compile(source, { filename: sourcePath, generate: 'client', dev: true, css: 'injected' });
   const destination = join(tempRoot, `${sourcePath}.js`);
   mkdirSync(dirname(destination), { recursive: true });
   writeFileSync(destination, rewriteClientImports(compiled.js.code));
@@ -61,7 +57,7 @@ function environment(overrides = {}) {
     biomeTags: [],
     tasks: [],
     discoveredTasks: [],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -77,7 +73,7 @@ function makeGatheringServices(result) {
       calls.list.push(opts);
       return Promise.resolve(typeof result === 'function' ? result(opts) : result);
     },
-    startGatheringAttempt: () => Promise.resolve({ accepted: true }),
+    startGatheringAttempt: () => Promise.resolve({ accepted: true })
   };
   return { services, calls };
 }
@@ -89,7 +85,7 @@ function makeStore({ actors = [], seededId = '' } = {}) {
     listSelectableActors: () => actors,
     getSelectedActorId: () => seededId,
     setSelectedActorId: () => {},
-    getGatheringConditions: () => ({ weather: 'clear', timeOfDay: 'day' }),
+    getGatheringConditions: () => ({ weather: 'clear', timeOfDay: 'day' })
   };
   return createActorBarStore({ services: storeServices });
 }
@@ -116,7 +112,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     globalThis.Text = document.createTextNode('').constructor;
     globalThis.Comment = document.createComment('').constructor;
     globalThis.game = {
-      i18n: { localize: (key) => key, format: (key, data) => `${key}:${JSON.stringify(data)}` },
+      i18n: { localize: (key) => key, format: (key, data) => `${key}:${JSON.stringify(data)}` }
     };
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-gathering-bar-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
@@ -161,14 +157,12 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
-    GatheringView = (
-      await import(
-        pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/gathering/GatheringView.svelte.js'))
-      )
-    ).default;
-    createActorBarStore = (
-      await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/stores/actorBarStore.svelte.js.js')))
-    ).createActorBarStore;
+    GatheringView = (await import(pathToFileURL(join(
+      tempRoot, 'src/ui/svelte/apps/gathering/GatheringView.svelte.js'
+    )))).default;
+    createActorBarStore = (await import(pathToFileURL(join(
+      tempRoot, 'src/ui/svelte/stores/actorBarStore.svelte.js.js'
+    )))).createActorBarStore;
   });
 
   afterEach(() => {
@@ -201,11 +195,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
 
   it('re-fetches with the new rememberedActorId when the store selection changes', async () => {
     const store = makeStore({
-      actors: [
-        { id: 'a1', name: 'Aria', img: null },
-        { id: 'a2', name: 'Borin', img: null },
-      ],
-      seededId: 'a1',
+      actors: [{ id: 'a1', name: 'Aria', img: null }, { id: 'a2', name: 'Borin', img: null }],
+      seededId: 'a1'
     });
     store.loadSelectableActors();
     flushSync();
@@ -225,19 +216,13 @@ describe('GatheringView ↔ actor bar wiring', () => {
 
   it('first-load backstop adopts listing.selectedActorId once, only when present in the bar list', async () => {
     const store = makeStore({
-      actors: [
-        { id: 'a1', name: 'Aria', img: null },
-        { id: 'a2', name: 'Borin', img: null },
-      ],
-      seededId: '',
+      actors: [{ id: 'a1', name: 'Aria', img: null }, { id: 'a2', name: 'Borin', img: null }],
+      seededId: ''
     });
     // Deliberately leave the store seed empty (do NOT call loadSelectableActors's
     // fallback here): set the selectable list but keep selectedActorId empty.
     // We emulate that by mutating through a fresh store that only populated its list.
-    store.selectableActors.push(
-      { id: 'a1', name: 'Aria', img: null },
-      { id: 'a2', name: 'Borin', img: null }
-    );
+    store.selectableActors.push({ id: 'a1', name: 'Aria', img: null }, { id: 'a2', name: 'Borin', img: null });
 
     const { services, calls } = makeGatheringServices(listing([environment()], 'a2'));
     services.actorBar = store;
@@ -245,11 +230,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     await mountView(services);
     await settle();
 
-    assert.equal(
-      store.selectedActorId,
-      'a2',
-      'adopts the in-list resolved actor on the empty seed'
-    );
+    assert.equal(store.selectedActorId, 'a2', 'adopts the in-list resolved actor on the empty seed');
     const adoptCalls = calls.list.length;
     assert.ok(adoptCalls >= 1);
 
@@ -277,13 +258,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
     const registrations = [];
     const offCalls = [];
     globalThis.Hooks = {
-      on: (event, fn) => {
-        registrations.push({ event, fn });
-        return 'hook-canvas';
-      },
-      off: (event, id) => {
-        offCalls.push({ event, id });
-      },
+      on: (event, fn) => { registrations.push({ event, fn }); return 'hook-canvas'; },
+      off: (event, id) => { offCalls.push({ event, id }); }
     };
     try {
       const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
@@ -296,7 +272,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
       assert.equal(calls.list.length, 1);
       // The view subscribes to canvasReady (scene change) alongside other hooks
       // (e.g. travel-marker token movement); assert canvasReady is among them.
-      const canvasReg = registrations.find((reg) => reg.event === 'canvasReady');
+      const canvasReg = registrations.find(reg => reg.event === 'canvasReady');
       assert.ok(canvasReg, 'subscribes to canvasReady');
 
       // Simulate the player navigating to / the GM activating a scene.
@@ -304,10 +280,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
       await settle();
       assert.equal(calls.list.length, 2, 'canvasReady triggers a listing re-fetch');
       // The populated grid stays mounted across the quiet refresh (no spinner swap).
-      assert.ok(
-        target.querySelector('[data-gathering-state="populated"]'),
-        'keeps the populated layout'
-      );
+      assert.ok(target.querySelector('[data-gathering-state="populated"]'), 'keeps the populated layout');
 
       unmount(mounted);
       mounted = null;
@@ -324,13 +297,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
     const registrations = [];
     const offCalls = [];
     globalThis.Hooks = {
-      on: (event, fn) => {
-        registrations.push({ event, fn });
-        return `hook-${event}`;
-      },
-      off: (event, id) => {
-        offCalls.push({ event, id });
-      },
+      on: (event, fn) => { registrations.push({ event, fn }); return `hook-${event}`; },
+      off: (event, id) => { offCalls.push({ event, id }); }
     };
     try {
       const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
@@ -342,7 +310,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
 
       await mountView(services);
       assert.equal(calls.list.length, 1);
-      const updateReg = registrations.find((reg) => reg.event === 'updateToken');
+      const updateReg = registrations.find(reg => reg.event === 'updateToken');
       assert.ok(updateReg, 'subscribes to updateToken for travel-marker movement');
 
       // A NON-marker token moving must not re-fetch (filtered by isTravelMarkerActor).
@@ -354,20 +322,13 @@ describe('GatheringView ↔ actor bar wiring', () => {
       updateReg.fn({ actor: { uuid: 'Actor.marker' } }, { x: 10 });
       await settle();
       assert.equal(calls.list.length, 2, 'travel-marker move re-fetches the listing');
-      assert.ok(
-        target.querySelector('[data-gathering-state="populated"]'),
-        'keeps the populated layout (quiet)'
-      );
+      assert.ok(target.querySelector('[data-gathering-state="populated"]'), 'keeps the populated layout (quiet)');
 
       // A token that only carries the marker's world-actor id (e.g. an unlinked
       // token) is matched via `Actor.<actorId>` and also re-fetches.
       updateReg.fn({ actorId: 'marker' });
       await settle();
-      assert.equal(
-        calls.list.length,
-        3,
-        're-fetches for a token referencing the marker world actor'
-      );
+      assert.equal(calls.list.length, 3, 're-fetches for a token referencing the marker world actor');
 
       unmount(mounted);
       mounted = null;
@@ -386,15 +347,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
     await mountView(services);
 
     assert.equal(calls.list.length, 1, 'still fetches exactly once');
-    assert.equal(
-      calls.list[0].rememberedActorId,
-      null,
-      'rememberedActorId defaults to null without a store'
-    );
-    assert.ok(
-      target.querySelector('[data-gathering-state="populated"]'),
-      'renders the populated layout'
-    );
+    assert.equal(calls.list[0].rememberedActorId, null, 'rememberedActorId defaults to null without a store');
+    assert.ok(target.querySelector('[data-gathering-state="populated"]'), 'renders the populated layout');
   });
 
   // The attempt must run as the SAME actor the listing was computed for, else the
@@ -402,7 +356,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
   // (the "nothing happens" bug).
   function attemptableEnv() {
     return environment({
-      tasks: [{ id: 'task-1', name: 'Extract Ore', attemptable: true, blockedReasons: [] }],
+      tasks: [{ id: 'task-1', name: 'Extract Ore', attemptable: true, blockedReasons: [] }]
     });
   }
 
@@ -410,15 +364,9 @@ describe('GatheringView ↔ actor bar wiring', () => {
     const attempts = [];
     const services = {
       listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
-      startGatheringAttempt: (opts) => {
-        attempts.push(opts);
-        return Promise.resolve({ accepted: true });
-      },
+      startGatheringAttempt: (opts) => { attempts.push(opts); return Promise.resolve({ accepted: true }); }
     };
-    const store = makeStore({
-      actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }],
-      seededId: 'a1',
-    });
+    const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
     store.loadSelectableActors();
     flushSync();
     services.actorBar = store;
@@ -428,11 +376,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     await settle();
 
     assert.equal(attempts.length, 1, 'attempt fired once');
-    assert.equal(
-      attempts[0].rememberedActorId,
-      'a1',
-      'attempt uses the selected actor, not an engine fallback'
-    );
+    assert.equal(attempts[0].rememberedActorId, 'a1', 'attempt uses the selected actor, not an engine fallback');
     assert.equal(attempts[0].environmentId, 'env-meadow');
     assert.equal(attempts[0].taskId, 'task-1');
   });
@@ -448,20 +392,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
     store.loadSelectableActors();
     flushSync();
     const envs = [
-      environment({
-        id: 'e1',
-        locked: true,
-        attemptable: false,
-        weatherEnabled: false,
-        timeOfDayEnabled: true,
-      }),
-      environment({
-        id: 'e2',
-        locked: true,
-        attemptable: false,
-        weatherEnabled: false,
-        timeOfDayEnabled: true,
-      }),
+      environment({ id: 'e1', locked: true, attemptable: false, weatherEnabled: false, timeOfDayEnabled: true }),
+      environment({ id: 'e2', locked: true, attemptable: false, weatherEnabled: false, timeOfDayEnabled: true })
     ];
     const { services } = makeGatheringServices(listing(envs));
     services.actorBar = store;
@@ -470,16 +402,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
     await settle();
 
     // No environment is auto-selected when every environment is locked.
-    assert.equal(
-      store.conditionVisibility.weather,
-      false,
-      'weather chip hidden: every listed system disables weather'
-    );
-    assert.equal(
-      store.conditionVisibility.timeOfDay,
-      true,
-      'time-of-day chip still shown independently'
-    );
+    assert.equal(store.conditionVisibility.weather, false, 'weather chip hidden: every listed system disables weather');
+    assert.equal(store.conditionVisibility.timeOfDay, true, 'time-of-day chip still shown independently');
   });
 
   it('#287: no selection (all envs locked) hides a system-disabled time-of-day chip, keeping weather', async () => {
@@ -487,13 +411,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     store.loadSelectableActors();
     flushSync();
     const envs = [
-      environment({
-        id: 'e1',
-        locked: true,
-        attemptable: false,
-        weatherEnabled: true,
-        timeOfDayEnabled: false,
-      }),
+      environment({ id: 'e1', locked: true, attemptable: false, weatherEnabled: true, timeOfDayEnabled: false })
     ];
     const { services } = makeGatheringServices(listing(envs));
     services.actorBar = store;
@@ -501,11 +419,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     await mountView(services);
     await settle();
 
-    assert.equal(
-      store.conditionVisibility.timeOfDay,
-      false,
-      'time-of-day chip hidden: the system disables it'
-    );
+    assert.equal(store.conditionVisibility.timeOfDay, false, 'time-of-day chip hidden: the system disables it');
     assert.equal(store.conditionVisibility.weather, true, 'weather chip still shown independently');
   });
 
@@ -514,20 +428,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
     store.loadSelectableActors();
     flushSync();
     const envs = [
-      environment({
-        id: 'e1',
-        locked: true,
-        attemptable: false,
-        weatherEnabled: false,
-        timeOfDayEnabled: false,
-      }),
-      environment({
-        id: 'e2',
-        locked: true,
-        attemptable: false,
-        weatherEnabled: true,
-        timeOfDayEnabled: false,
-      }),
+      environment({ id: 'e1', locked: true, attemptable: false, weatherEnabled: false, timeOfDayEnabled: false }),
+      environment({ id: 'e2', locked: true, attemptable: false, weatherEnabled: true, timeOfDayEnabled: false })
     ];
     const { services } = makeGatheringServices(listing(envs));
     services.actorBar = store;
@@ -535,16 +437,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
     await mountView(services);
     await settle();
 
-    assert.equal(
-      store.conditionVisibility.weather,
-      true,
-      'weather shown: e2 enables it even though e1 does not'
-    );
-    assert.equal(
-      store.conditionVisibility.timeOfDay,
-      false,
-      'time-of-day hidden: no listed system enables it'
-    );
+    assert.equal(store.conditionVisibility.weather, true, 'weather shown: e2 enables it even though e1 does not');
+    assert.equal(store.conditionVisibility.timeOfDay, false, 'time-of-day hidden: no listed system enables it');
   });
 
   // #357: the header realm chip's baseline is the listing-level realm context
@@ -559,23 +453,16 @@ describe('GatheringView ↔ actor bar wiring', () => {
     // carries a realm context with enabled:true and an empty realm list.
     const envs = [
       environment({ id: 'e1', locked: true, attemptable: false }),
-      environment({ id: 'e2', locked: true, attemptable: false }),
+      environment({ id: 'e2', locked: true, attemptable: false })
     ];
-    const result = {
-      ...listing(envs),
-      realmContext: { enabled: true, realms: [], systemId: 'system-a' },
-    };
+    const result = { ...listing(envs), realmContext: { enabled: true, realms: [], systemId: 'system-a' } };
     const { services } = makeGatheringServices(result);
     services.actorBar = store;
 
     await mountView(services);
     await settle();
 
-    assert.equal(
-      store.realmContext.enabled,
-      true,
-      'chip enabled with no selection (no current realm)'
-    );
+    assert.equal(store.realmContext.enabled, true, 'chip enabled with no selection (no current realm)');
     assert.deepEqual(store.realmContext.realms, [], 'empty realm list ("No current realm")');
   });
 
@@ -591,13 +478,10 @@ describe('GatheringView ↔ actor bar wiring', () => {
         locked: false,
         attemptable: true,
         realmsEnabled: true,
-        currentRealms: [{ label: 'Verdant Expanse', placeholder: false }],
-      }),
+        currentRealms: [{ label: 'Verdant Expanse', placeholder: false }]
+      })
     ];
-    const result = {
-      ...listing(envs),
-      realmContext: { enabled: true, realms: [], systemId: 'system-a' },
-    };
+    const result = { ...listing(envs), realmContext: { enabled: true, realms: [], systemId: 'system-a' } };
     const { services } = makeGatheringServices(result);
     services.actorBar = store;
 
@@ -605,11 +489,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     await settle();
 
     assert.equal(store.realmContext.enabled, true);
-    assert.equal(
-      store.realmContext.realms.length,
-      1,
-      'selected env refines to its disclosed realm'
-    );
+    assert.equal(store.realmContext.realms.length, 1, 'selected env refines to its disclosed realm');
     assert.equal(store.realmContext.realms[0].label, 'Verdant Expanse');
   });
 
@@ -619,16 +499,12 @@ describe('GatheringView ↔ actor bar wiring', () => {
     try {
       const services = {
         listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
-        startGatheringAttempt: () =>
-          Promise.resolve({
-            accepted: false,
-            blockedReasons: [{ code: 'NO_CURRENT_REALM' }],
-          }),
+        startGatheringAttempt: () => Promise.resolve({
+          accepted: false,
+          blockedReasons: [{ code: 'NO_CURRENT_REALM' }]
+        })
       };
-      const store = makeStore({
-        actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }],
-        seededId: 'a1',
-      });
+      const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
       store.loadSelectableActors();
       flushSync();
       services.actorBar = store;

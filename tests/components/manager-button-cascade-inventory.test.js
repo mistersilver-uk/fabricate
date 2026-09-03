@@ -692,7 +692,7 @@ const REVIEWED = [
     ),
     disposition: 'EXCLUDE',
     why:
-      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved ' +
+      'NOT IN THE REVIEWED LIST BEFORE — issue 1372 wrote it, and its round-8 extraction moved '+
       'it into `SystemRulesRoster`, which both essence rails compose. The panel`s system ' +
       'rows carry `MembershipActions`, whose Remove is an `ArmedDangerButton`: it renders ' +
       '`manager-button is-danger` from its own template and never gains `fab-manager-button`, ' +
@@ -1396,10 +1396,18 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // Licensed by the same rule as the entries above: each of the six SITES left the product,
   // rather than leaving this instrument's view. Five of them are `<ManagerButton>` or an inline
   // field in the same place on the same screen; none was silently unconverted.
+  // AND TWO ARRIVED AT ISSUE 1371, taking the count to 14. The world Component catalogue's bulk
+  // panel stages two SEARCHABLE pickers — the crafting systems it will add to or remove from, and
+  // the world category it will write — and both are `SearchablePopover` on the recipe bulk
+  // panel's precedent, which is the only shipped panel that stages one inside a `BulkEditSection`.
+  // A hand-rolled picker in their place would be a second implementation of that primitive, which
+  // the duplication gate counts; both stay unconverted on the standing argument above, because
+  // converting a `triggerClass` site changes `SearchablePopover`'s own trigger contract rather
+  // than this call site's.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    12,
-    'plus the 12 SearchablePopover triggerClass sites named as debt'
+    14,
+    'plus the 14 SearchablePopover triggerClass sites named as debt'
   );
   // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
   // converted it, so a bare `=== 0` would be satisfied just as well by the site having been

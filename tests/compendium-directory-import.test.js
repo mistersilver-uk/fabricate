@@ -4,7 +4,7 @@ import { Window } from 'happy-dom';
 
 import {
   buildCompendiumImportContextOption,
-  PACK_DATASET_KEY,
+  PACK_DATASET_KEY
 } from '../src/ui/compendiumDirectoryContext.js';
 
 const window = new Window();
@@ -44,7 +44,7 @@ function collaborators(overrides = {}) {
     promptSelectSystem: spy('sys-1'),
     importPack: spy({ added: 1, updated: 0, skipped: 0, total: 1, sourceFallbacks: [] }),
     notify: { info: spy(), warn: spy() },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -116,9 +116,9 @@ test('Q2: a null picker return (cancel) aborts without calling importPack', asyn
   const deps = collaborators({
     getSystems: () => [
       { id: 'sys-1', name: 'System One' },
-      { id: 'sys-2', name: 'System Two' },
+      { id: 'sys-2', name: 'System Two' }
     ],
-    promptSelectSystem: spy(null),
+    promptSelectSystem: spy(null)
   });
   const option = buildCompendiumImportContextOption(deps);
 
@@ -139,7 +139,7 @@ test('delegation: importPack receives the picked system id and the target datase
 
 test('Q3: a total of zero emits the no-items notice, not the summary', async () => {
   const deps = collaborators({
-    importPack: spy({ added: 0, updated: 0, skipped: 0, total: 0, sourceFallbacks: [] }),
+    importPack: spy({ added: 0, updated: 0, skipped: 0, total: 0, sourceFallbacks: [] })
   });
   const option = buildCompendiumImportContextOption(deps);
 
@@ -150,8 +150,7 @@ test('Q3: a total of zero emits the no-items notice, not the summary', async () 
   // and localize interpolated the pack name into that string.
   assert.ok(
     deps.localize.calls.some(
-      ([key, data]) =>
-        key === 'FABRICATE.Admin.Items.CompendiumImportNoItems' && data?.name === 'name:world.empty'
+      ([key, data]) => key === 'FABRICATE.Admin.Items.CompendiumImportNoItems' && data?.name === 'name:world.empty'
     )
   );
   // the success summary is never emitted on an empty pack.
@@ -163,7 +162,7 @@ test('Q3: a total of zero emits the no-items notice, not the summary', async () 
 
 test('summary: a normal result renders the compendium import summary', async () => {
   const deps = collaborators({
-    importPack: spy({ added: 3, updated: 1, skipped: 2, total: 6, sourceFallbacks: [] }),
+    importPack: spy({ added: 3, updated: 1, skipped: 2, total: 6, sourceFallbacks: [] })
   });
   const option = buildCompendiumImportContextOption(deps);
 
@@ -191,8 +190,8 @@ test('fallback: a result with sourceFallbacks also warns with the fallback summa
       updated: 0,
       skipped: 0,
       total: 1,
-      sourceFallbacks: [{ itemName: 'Sword', brokenUuid: 'a', fallbackUuid: 'b' }],
-    }),
+      sourceFallbacks: [{ itemName: 'Sword', brokenUuid: 'a', fallbackUuid: 'b' }]
+    })
   });
   const option = buildCompendiumImportContextOption(deps);
 

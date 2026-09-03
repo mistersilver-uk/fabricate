@@ -59,11 +59,7 @@ function salvageProps(overrides = {}) {
       salvage: {
         enabled: true,
         resultGroups: [
-          {
-            id: 'grp-1',
-            name: 'Scraps',
-            results: [{ id: 'r1', componentId: 'cmp-a', quantity: 1 }],
-          },
+          { id: 'grp-1', name: 'Scraps', results: [{ id: 'r1', componentId: 'cmp-a', quantity: 1 }] },
         ],
       },
       ...component,
@@ -159,9 +155,7 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
   });
 
   it('offers the SYSTEM catalogue it was handed', async () => {
-    const { target } = await mountSalvage({
-      component: { salvage: { enabled: true, checkModifierIds: ['med'] } },
-    });
+    const { target } = await mountSalvage({ component: { salvage: { enabled: true, checkModifierIds: ['med'] } } });
     assert.ok(
       Boolean(target.querySelector(`${PICKER} [data-modifier-pill="med"]`)),
       'the authored pick renders as a pill from the catalogue, by id'
@@ -359,10 +353,7 @@ describe('gathering check-modifier pick — the GatheringTaskEditView host', () 
     const { target: authored, updates: second } = await mountGathering({
       task: { id: 'task-1', name: 'Forage', dropRows: [], checkModifierIds: ['med'] },
     });
-    setChecked(
-      authored.querySelector(`${GATHERING_PICKER} [data-subject-modifier-authored]`),
-      false
-    );
+    setChecked(authored.querySelector(`${GATHERING_PICKER} [data-subject-modifier-authored]`), false);
     assert.deepEqual(
       second.at(-1),
       { checkModifierIds: undefined },

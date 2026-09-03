@@ -16,7 +16,7 @@ import {
   filterRecipes,
   groupRecipesByCategory,
   paginateRecipes,
-  sortRecipes,
+  sortRecipes
 } from '../../src/utils/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 
@@ -32,7 +32,7 @@ function makeRecipe(overrides = {}) {
     resultItemCount: 0,
     resultGroupCount: 0,
     checkSummary: { kind: 'none', dc: null },
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -70,7 +70,7 @@ describe('recipeBrowserModel — filtering', () => {
   const rows = [
     makeRecipe({ id: 'a', name: 'Alpha', enabled: true, locked: false, category: 'alchemy' }),
     makeRecipe({ id: 'b', name: 'Bravo', enabled: false, locked: true, category: 'smithing' }),
-    makeRecipe({ id: 'c', name: 'Charlie', enabled: true, locked: true, category: 'alchemy' }),
+    makeRecipe({ id: 'c', name: 'Charlie', enabled: true, locked: true, category: 'alchemy' })
   ];
 
   it('defaults to every recipe', () => {
@@ -99,16 +99,12 @@ describe('recipeBrowserModel — sorting', () => {
   const rows = [
     makeRecipe({ name: 'Beta', ingredientCount: 3, resultItemCount: 1, checkSummary: { dc: 18 } }),
     makeRecipe({ name: 'Alpha', ingredientCount: 10, resultItemCount: 4, checkSummary: { dc: 9 } }),
-    makeRecipe({ name: 'Gamma', ingredientCount: 1, resultItemCount: 2, checkSummary: { dc: 30 } }),
+    makeRecipe({ name: 'Gamma', ingredientCount: 1, resultItemCount: 2, checkSummary: { dc: 30 } })
   ];
 
   it('sorts by name ascending by default and flips on direction', () => {
     assert.deepEqual(names(sortRecipes(rows, {})), ['Alpha', 'Beta', 'Gamma']);
-    assert.deepEqual(names(sortRecipes(rows, { key: 'name', direction: 'desc' })), [
-      'Gamma',
-      'Beta',
-      'Alpha',
-    ]);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'name', direction: 'desc' })), ['Gamma', 'Beta', 'Alpha']);
   });
 
   it('sorts numeric keys numerically, not lexicographically', () => {
@@ -122,36 +118,12 @@ describe('recipeBrowserModel — sorting', () => {
   // orderings pin BOTH directions per key so a bug injected into the shared
   // `rowComparator` flips them (rather than a self-comparison against the code).
   it('pins each sort key in both directions (the flat, non-grouped path)', () => {
-    assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'asc' })), [
-      'Gamma',
-      'Beta',
-      'Alpha',
-    ]);
-    assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'desc' })), [
-      'Alpha',
-      'Beta',
-      'Gamma',
-    ]);
-    assert.deepEqual(names(sortRecipes(rows, { key: 'dc', direction: 'asc' })), [
-      'Alpha',
-      'Beta',
-      'Gamma',
-    ]);
-    assert.deepEqual(names(sortRecipes(rows, { key: 'dc', direction: 'desc' })), [
-      'Gamma',
-      'Beta',
-      'Alpha',
-    ]);
-    assert.deepEqual(names(sortRecipes(rows, { key: 'results', direction: 'asc' })), [
-      'Beta',
-      'Gamma',
-      'Alpha',
-    ]);
-    assert.deepEqual(names(sortRecipes(rows, { key: 'results', direction: 'desc' })), [
-      'Alpha',
-      'Gamma',
-      'Beta',
-    ]);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'asc' })), ['Gamma', 'Beta', 'Alpha']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'desc' })), ['Alpha', 'Beta', 'Gamma']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'dc', direction: 'asc' })), ['Alpha', 'Beta', 'Gamma']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'dc', direction: 'desc' })), ['Gamma', 'Beta', 'Alpha']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'results', direction: 'asc' })), ['Beta', 'Gamma', 'Alpha']);
+    assert.deepEqual(names(sortRecipes(rows, { key: 'results', direction: 'desc' })), ['Alpha', 'Gamma', 'Beta']);
   });
 
   it('ranks attention as blocked > incomplete > clear and tiebreaks by name', () => {
@@ -180,7 +152,7 @@ describe('recipeBrowserModel — sorting', () => {
       name: 'Broken',
       incomplete: false,
       enableBlocked: true,
-      enabled: false,
+      enabled: false
     });
     // The mirror case: `incomplete` alone can no longer promote a row the browser paints
     // no pill on at all.
@@ -188,7 +160,7 @@ describe('recipeBrowserModel — sorting', () => {
       name: 'PillLess',
       incomplete: true,
       enableBlocked: false,
-      enabled: false,
+      enabled: false
     });
 
     assert.equal(attentionRank(structurallyBroken), 2, 'the row wearing the red pill sorts first');
@@ -244,20 +216,13 @@ describe('recipeBrowserModel — grouping', () => {
     const groups = groupRecipesByCategory([
       makeRecipe({ name: 'Zinc', category: 'smithing' }),
       makeRecipe({ name: 'Acid', category: 'alchemy' }),
-      makeRecipe({ name: 'Brew', category: 'alchemy' }),
+      makeRecipe({ name: 'Brew', category: 'alchemy' })
     ]);
 
-    assert.deepEqual(
-      groups.map((group) => group.category),
-      ['alchemy', 'smithing']
-    );
+    assert.deepEqual(groups.map((group) => group.category), ['alchemy', 'smithing']);
     assert.deepEqual(names(groups[0].recipes), ['Acid', 'Brew']);
     assert.deepEqual(names(groups[1].recipes), ['Zinc']);
-    assert.deepEqual(
-      groups.map((group) => group.total),
-      [2, 1],
-      'total degrades to the bucket length'
-    );
+    assert.deepEqual(groups.map((group) => group.total), [2, 1], 'total degrades to the bucket length');
   });
 
   // The shared `compareRecipeCategories` orders the reserved `general` catch-all
@@ -267,23 +232,16 @@ describe('recipeBrowserModel — grouping', () => {
     const groups = groupRecipesByCategory([
       makeRecipe({ name: 'Zinc', category: 'smithing' }),
       makeRecipe({ name: 'Plain', category: '  ' }),
-      makeRecipe({ name: 'Acid', category: 'alchemy' }),
+      makeRecipe({ name: 'Acid', category: 'alchemy' })
     ]);
-    assert.deepEqual(
-      groups.map((group) => group.category),
-      ['alchemy', 'general', 'smithing']
-    );
+    assert.deepEqual(groups.map((group) => group.category), ['alchemy', 'general', 'smithing']);
   });
 
   // buildRecipeBrowserModel groups the PAGE, so a bucket's own length is only what is on
   // screen. The header pairs it with the category's FILTERED total — issue 676.
   it('carries the category total from the filtered rows, not the page slice', () => {
     const many = Array.from({ length: 12 }, (_, index) =>
-      makeRecipe({
-        id: `r${index}`,
-        name: `Draught ${String(index).padStart(2, '0')}`,
-        category: 'alchemy',
-      })
+      makeRecipe({ id: `r${index}`, name: `Draught ${String(index).padStart(2, '0')}`, category: 'alchemy' })
     );
     const model = buildRecipeBrowserModel(many, { groupByCategory: true, pageSize: 10 });
 
@@ -297,7 +255,7 @@ describe('recipeBrowserModel — grouping', () => {
       [
         makeRecipe({ id: 'r1', name: 'Acid', category: 'alchemy', enabled: true }),
         makeRecipe({ id: 'r2', name: 'Brew', category: 'alchemy', enabled: false }),
-        makeRecipe({ id: 'r3', name: 'Cure', category: 'alchemy', enabled: false }),
+        makeRecipe({ id: 'r3', name: 'Cure', category: 'alchemy', enabled: false })
       ],
       { groupByCategory: true, status: 'off', pageSize: 1 }
     );
@@ -363,17 +321,7 @@ describe('recipeBrowserModel — category-major grouped pagination (issue 801)',
     // The page order equals a straight category-major sort of the same filtered rows.
     assert.deepEqual(
       sortRecipes(rows, { key: 'name', categoryMajor: true }).map((row) => row.category),
-      [
-        'alchemy',
-        'alchemy',
-        'alchemy',
-        'general',
-        'general',
-        'general',
-        'smithing',
-        'smithing',
-        'smithing',
-      ]
+      ['alchemy', 'alchemy', 'alchemy', 'general', 'general', 'general', 'smithing', 'smithing', 'smithing']
     );
   });
 
@@ -381,24 +329,13 @@ describe('recipeBrowserModel — category-major grouped pagination (issue 801)',
     const rows = interleavedLibrary();
 
     const filling = pageModel(rows, 0).groups.find((group) => group.category === 'general');
-    assert.equal(
-      filling.recipes.length,
-      1,
-      'page 1 fills with one general row after the whole alchemy bucket'
-    );
+    assert.equal(filling.recipes.length, 1, 'page 1 fills with one general row after the whole alchemy bucket');
     assert.equal(filling.total, 3, 'the header reads 1 of 3 on the filling page');
 
     const continuation = pageModel(rows, 1).groups.find((group) => group.category === 'general');
-    assert.equal(
-      continuation.recipes.length,
-      2,
-      'the remaining two general rows continue on page 2'
-    );
+    assert.equal(continuation.recipes.length, 2, 'the remaining two general rows continue on page 2');
     // group.total vs group.recipes.length on the continuation page: still partial, still "N of M".
-    assert.ok(
-      continuation.total > continuation.recipes.length,
-      'the continuation page still reads N of M'
-    );
+    assert.ok(continuation.total > continuation.recipes.length, 'the continuation page still reads N of M');
     assert.equal(continuation.total, 3);
   });
 
@@ -411,29 +348,19 @@ describe('recipeBrowserModel — category-major grouped pagination (issue 801)',
     // desc by ingredients: groups stay alchemy-before-smithing (the primary is
     // direction-independent), and only the rows WITHIN alchemy descend (A2 before A1).
     assert.deepEqual(
-      sortRecipes(rows, { key: 'ingredients', direction: 'desc', categoryMajor: true }).map(
-        (row) => [row.category, row.name]
-      ),
-      [
-        ['alchemy', 'A2'],
-        ['alchemy', 'A1'],
-        ['smithing', 'S1'],
-      ]
+      sortRecipes(rows, { key: 'ingredients', direction: 'desc', categoryMajor: true }).map((row) => [row.category, row.name]),
+      [['alchemy', 'A2'], ['alchemy', 'A1'], ['smithing', 'S1']]
     );
     // asc flips only the within-category order, never the group order.
     assert.deepEqual(
-      sortRecipes(rows, { key: 'ingredients', direction: 'asc', categoryMajor: true }).map(
-        (row) => row.name
-      ),
+      sortRecipes(rows, { key: 'ingredients', direction: 'asc', categoryMajor: true }).map((row) => row.name),
       ['A1', 'A2', 'S1']
     );
   });
 });
 
 describe('recipeBrowserModel — pagination boundaries', () => {
-  const rows = Array.from({ length: 7 }, (_, index) =>
-    makeRecipe({ id: `r${index}`, name: `R${index}` })
-  );
+  const rows = Array.from({ length: 7 }, (_, index) => makeRecipe({ id: `r${index}`, name: `R${index}` }));
 
   it('slices the requested page', () => {
     const page = paginateRecipes(rows, { pageIndex: 1, pageSize: 3 });
@@ -502,20 +429,10 @@ describe('recipeBrowserModel — row derivations', () => {
     const recipe = makeRecipe({ ingredientCount: 2, resultItemCount: 5, resultGroupCount: 3 });
 
     for (const mode of ['simple', 'progressive']) {
-      assert.deepEqual(deriveRecipeIo(recipe, mode), {
-        inCount: 2,
-        outKind: 'items',
-        outCount: 5,
-        empty: false,
-      });
+      assert.deepEqual(deriveRecipeIo(recipe, mode), { inCount: 2, outKind: 'items', outCount: 5, empty: false });
     }
     for (const mode of ['routedByIngredients', 'routedByCheck', 'alchemy']) {
-      assert.deepEqual(deriveRecipeIo(recipe, mode), {
-        inCount: 2,
-        outKind: 'groups',
-        outCount: 3,
-        empty: false,
-      });
+      assert.deepEqual(deriveRecipeIo(recipe, mode), { inCount: 2, outKind: 'groups', outCount: 3, empty: false });
     }
   });
 
@@ -537,21 +454,12 @@ describe('recipeBrowserModel — row derivations', () => {
     );
     // Off + activation-blocked: enabling would be REFUSED, so the row says "can't enable".
     assert.deepEqual(
-      deriveRecipeStatuses(makeRecipe({ enabled: false, enableBlocked: true })).map((pill) => [
-        pill.id,
-        pill.tone,
-      ]),
-      [
-        ['disabled', 'subtle'],
-        ['blocked', 'danger'],
-      ]
+      deriveRecipeStatuses(makeRecipe({ enabled: false, enableBlocked: true })).map((pill) => [pill.id, pill.tone]),
+      [['disabled', 'subtle'], ['blocked', 'danger']]
     );
     // On + activation-blocked: nothing is being refused, it is just unfinished.
     assert.deepEqual(
-      deriveRecipeStatuses(makeRecipe({ enabled: true, enableBlocked: true })).map((pill) => [
-        pill.id,
-        pill.tone,
-      ]),
+      deriveRecipeStatuses(makeRecipe({ enabled: true, enableBlocked: true })).map((pill) => [pill.id, pill.tone]),
       [['incomplete', 'warning']]
     );
   });
@@ -594,9 +502,7 @@ describe('recipeBrowserModel — row derivations', () => {
       // narrower legacy flag says — so the flag is not merely additional, it is retired
       // from this derivation.
       assert.deepEqual(
-        deriveRecipeStatuses(
-          makeRecipe({ enabled: false, incomplete: true, enableBlocked: false })
-        ),
+        deriveRecipeStatuses(makeRecipe({ enabled: false, incomplete: true, enableBlocked: false })),
         [{ id: 'disabled', tone: 'subtle', icon: '' }],
         'a recipe activation would accept carries no blocked pill'
       );
@@ -625,22 +531,14 @@ describe('recipeBrowserModel — row derivations', () => {
 describe('recipeBrowserModel — active-filter chips', () => {
   it('lists only the non-default filters, including the search term', () => {
     assert.deepEqual(describeActiveFilters({}), []);
+    assert.deepEqual(describeActiveFilters({ status: 'all', lock: 'all', category: 'all', search: '  ' }), []);
     assert.deepEqual(
-      describeActiveFilters({ status: 'all', lock: 'all', category: 'all', search: '  ' }),
-      []
-    );
-    assert.deepEqual(
-      describeActiveFilters({
-        status: 'off',
-        lock: 'locked',
-        category: 'alchemy',
-        search: ' ink ',
-      }),
+      describeActiveFilters({ status: 'off', lock: 'locked', category: 'alchemy', search: ' ink ' }),
       [
         { id: 'status', value: 'off' },
         { id: 'lock', value: 'locked' },
         { id: 'category', value: 'alchemy' },
-        { id: 'search', value: 'ink' },
+        { id: 'search', value: 'ink' }
       ]
     );
   });
@@ -649,14 +547,8 @@ describe('recipeBrowserModel — active-filter chips', () => {
 describe('recipeBrowserModel — the whole pipeline', () => {
   const rows = [
     makeRecipe({ id: 'a', name: 'Acid Flask', category: 'alchemy', ingredientCount: 4 }),
-    makeRecipe({
-      id: 'b',
-      name: 'Bronze Ingot',
-      category: 'smithing',
-      enabled: false,
-      ingredientCount: 2,
-    }),
-    makeRecipe({ id: 'c', name: 'Cure Draught', category: 'alchemy', ingredientCount: 6 }),
+    makeRecipe({ id: 'b', name: 'Bronze Ingot', category: 'smithing', enabled: false, ingredientCount: 2 }),
+    makeRecipe({ id: 'c', name: 'Cure Draught', category: 'alchemy', ingredientCount: 6 })
   ];
 
   it('filters, sorts, paginates and groups the page', () => {
@@ -665,14 +557,11 @@ describe('recipeBrowserModel — the whole pipeline', () => {
       sortKey: 'ingredients',
       sortDirection: 'desc',
       groupByCategory: true,
-      pageSize: 10,
+      pageSize: 10
     });
 
     assert.deepEqual(names(model.filtered), ['Cure Draught', 'Acid Flask']);
-    assert.deepEqual(
-      model.groups.map((group) => group.category),
-      ['alchemy']
-    );
+    assert.deepEqual(model.groups.map((group) => group.category), ['alchemy']);
     assert.deepEqual(names(model.groups[0].recipes), ['Cure Draught', 'Acid Flask']);
     assert.deepEqual(model.chips, [{ id: 'status', value: 'on' }]);
     assert.equal(model.pageCount, 1);
@@ -697,7 +586,7 @@ describe('recipeBrowserModel — the whole pipeline', () => {
 const COMPONENTS = [
   { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' },
   { id: 'cmp-potion', name: 'Healing Potion', img: 'icons/potion.webp' },
-  { id: 'cmp-sludge', name: 'Sludge', img: '' },
+  { id: 'cmp-sludge', name: 'Sludge', img: '' }
 ];
 const ESSENCES = [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }];
 
@@ -716,33 +605,33 @@ const SINGLE_SCOPE = {
             {
               id: 'o2',
               quantity: 1,
-              match: { type: 'tags', tags: ['herbal', 'rare'], tagMatch: 'all' },
+              match: { type: 'tags', tags: ['herbal', 'rare'], tagMatch: 'all' }
             },
-            { id: 'o3', quantity: 1, match: { type: 'currency', unit: 'gp', amount: 25 } },
-          ],
-        },
-      ],
-    },
+            { id: 'o3', quantity: 1, match: { type: 'currency', unit: 'gp', amount: 25 } }
+          ]
+        }
+      ]
+    }
   ],
   resultGroups: [
     {
       id: 'g-success',
       name: 'On success',
-      results: [{ id: 'res-1', componentId: 'cmp-potion', quantity: 2 }],
+      results: [{ id: 'res-1', componentId: 'cmp-potion', quantity: 2 }]
     },
     {
       id: 'g-failure',
       name: 'On a failed check',
       role: 'failure',
-      results: [{ id: 'res-2', componentId: 'cmp-sludge', quantity: 1 }],
-    },
-  ],
+      results: [{ id: 'res-2', componentId: 'cmp-sludge', quantity: 1 }]
+    }
+  ]
 };
 
 describe('recipeBrowserModel — the inspector Requires list', () => {
   const rows = buildRecipeRequirementRows(SINGLE_SCOPE, {
     componentOptions: COMPONENTS,
-    essenceOptions: ESSENCES,
+    essenceOptions: ESSENCES
   });
 
   it('reports each option AS ITS OWN MATCH TYPE, never flattened into a component', () => {
@@ -784,13 +673,11 @@ describe('recipeBrowserModel — the inspector Requires list', () => {
             ingredientGroups: [
               {
                 id: 'g',
-                options: [
-                  { id: 'o', quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
-                ],
-              },
-            ],
-          },
-        ],
+                options: [{ id: 'o', quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }]
+              }
+            ]
+          }
+        ]
       },
       { componentOptions: COMPONENTS }
     );
@@ -816,11 +703,11 @@ describe('recipeBrowserModel — the inspector Requires list', () => {
             ingredientGroups: [
               {
                 id: 'g',
-                options: [{ id: 'o', match: { type: 'component', componentId: 'gone' } }],
-              },
-            ],
-          },
-        ],
+                options: [{ id: 'o', match: { type: 'component', componentId: 'gone' } }]
+              }
+            ]
+          }
+        ]
       },
       { componentOptions: COMPONENTS }
     );
@@ -865,16 +752,16 @@ describe('recipeBrowserModel — the inspector Produces list', () => {
           results: [
             { id: 'a', componentId: 'cmp-ring', quantity: 1 },
             { id: 'b', componentId: 'cmp-ring', quantity: 1 },
-            { id: 'c', componentId: 'cmp-nodiff', quantity: 1 },
-          ],
-        },
-      ],
+            { id: 'c', componentId: 'cmp-nodiff', quantity: 1 }
+          ]
+        }
+      ]
     };
     const produce = buildRecipeProduceRows(recipe, {
       componentOptions: [
         { id: 'cmp-ring', name: 'Ring', difficulty: 12 },
-        { id: 'cmp-nodiff', name: 'Plain' },
-      ],
+        { id: 'cmp-nodiff', name: 'Plain' }
+      ]
     });
     // A component repeated in the ordered list appears once per entry (order matters).
     assert.equal(produce.length, 3);
@@ -899,19 +786,15 @@ describe('recipeBrowserModel — multi-step recipes', () => {
               {
                 id: 'g1',
                 options: [
-                  { id: 'o1', quantity: 3, match: { type: 'component', componentId: 'cmp-herb' } },
-                ],
-              },
-            ],
-          },
+                  { id: 'o1', quantity: 3, match: { type: 'component', componentId: 'cmp-herb' } }
+                ]
+              }
+            ]
+          }
         ],
         resultGroups: [
-          {
-            id: 'rg1',
-            name: 'Pulp',
-            results: [{ id: 'x1', componentId: 'cmp-sludge', quantity: 1 }],
-          },
-        ],
+          { id: 'rg1', name: 'Pulp', results: [{ id: 'x1', componentId: 'cmp-sludge', quantity: 1 }] }
+        ]
       },
       {
         id: 'step-2',
@@ -923,38 +806,34 @@ describe('recipeBrowserModel — multi-step recipes', () => {
               {
                 id: 'g2',
                 options: [
-                  {
-                    id: 'o2',
-                    quantity: 1,
-                    match: { type: 'component', componentId: 'cmp-sludge' },
-                  },
-                ],
-              },
-            ],
-          },
+                  { id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-sludge' } }
+                ]
+              }
+            ]
+          }
         ],
         resultGroups: [
           {
             id: 'rg2',
             name: 'On success',
-            results: [{ id: 'x2', componentId: 'cmp-potion', quantity: 1 }],
-          },
-        ],
-      },
-    ],
+            results: [{ id: 'x2', componentId: 'cmp-potion', quantity: 1 }]
+          }
+        ]
+      }
+    ]
   };
 
   it('walks EVERY step, tagging each row with the step it belongs to', () => {
     const requires = buildRecipeRequirementRows(MULTI_STEP, {
       componentOptions: COMPONENTS,
-      essenceOptions: ESSENCES,
+      essenceOptions: ESSENCES
     });
     assert.deepEqual(
       requires.map((row) => [row.scopeName, row.kind]),
       [
         ['Macerate', 'component'],
         ['Macerate', 'essence'],
-        ['Distil', 'component'],
+        ['Distil', 'component']
       ],
       'a step-scoped requirement is not silently attributed to the recipe'
     );
@@ -964,7 +843,7 @@ describe('recipeBrowserModel — multi-step recipes', () => {
       produces.map((row) => [row.scopeName, row.name]),
       [
         ['Macerate', 'Sludge'],
-        ['Distil', 'Healing Potion'],
+        ['Distil', 'Healing Potion']
       ]
     );
   });
@@ -977,7 +856,7 @@ describe('recipeBrowserModel — multi-step recipes', () => {
   it('emits stable, unique row ids so a Svelte keyed each cannot collide', () => {
     const ids = buildRecipeRequirementRows(MULTI_STEP, {
       componentOptions: COMPONENTS,
-      essenceOptions: ESSENCES,
+      essenceOptions: ESSENCES
     }).map((row) => row.id);
     assert.equal(new Set(ids).size, ids.length);
   });
@@ -986,64 +865,29 @@ describe('recipeBrowserModel — multi-step recipes', () => {
 describe('buildRecipeStepModel', () => {
   const COMPS = [
     { id: 'cmp-herb', name: 'Mountain Herb' },
-    { id: 'cmp-potion', name: 'Healing Potion' },
+    { id: 'cmp-potion', name: 'Healing Potion' }
   ];
   const TWO_STEP = {
     steps: [
       {
         id: 's1',
         name: 'Prepare',
-        ingredientSets: [
-          {
-            id: 'set1',
-            ingredientGroups: [
-              {
-                id: 'ig1',
-                options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }],
-              },
-            ],
-          },
-        ],
-        resultGroups: [
-          {
-            id: 'g1',
-            name: 'Base',
-            results: [{ id: 'r1', componentId: 'cmp-potion', quantity: 1 }],
-          },
-        ],
+        ingredientSets: [{ id: 'set1', ingredientGroups: [{ id: 'ig1', options: [{ quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+        resultGroups: [{ id: 'g1', name: 'Base', results: [{ id: 'r1', componentId: 'cmp-potion', quantity: 1 }] }]
       },
       {
         id: 's2',
         name: 'Finish',
-        ingredientSets: [
-          {
-            id: 'set2',
-            ingredientGroups: [
-              {
-                id: 'ig2',
-                options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-potion' } }],
-              },
-            ],
-          },
-        ],
-        resultGroups: [
-          {
-            id: 'g2',
-            name: 'Final',
-            results: [{ id: 'r2', componentId: 'cmp-herb', quantity: 3 }],
-          },
-        ],
-      },
-    ],
+        ingredientSets: [{ id: 'set2', ingredientGroups: [{ id: 'ig2', options: [{ quantity: 1, match: { type: 'component', componentId: 'cmp-potion' } }] }] }],
+        resultGroups: [{ id: 'g2', name: 'Final', results: [{ id: 'r2', componentId: 'cmp-herb', quantity: 3 }] }]
+      }
+    ]
   };
 
   it('returns per-step Requires/Produces for a multi-step recipe, in order', () => {
     const steps = buildRecipeStepModel(TWO_STEP, { componentOptions: COMPS });
     assert.equal(steps.length, 2);
-    assert.deepEqual(
-      steps.map((s) => s.name),
-      ['Prepare', 'Finish']
-    );
+    assert.deepEqual(steps.map((s) => s.name), ['Prepare', 'Finish']);
     // Step 1 requires the herb and produces the potion; step 2 the reverse.
     assert.equal(steps[0].requirementRows[0].name, 'Mountain Herb');
     assert.equal(steps[0].produceRows[0].name, 'Healing Potion');
@@ -1065,16 +909,10 @@ describe('groupProduceRowsByResultGroup', () => {
       { id: 'a', groupId: 'g1', groupName: 'Result Group 1', failure: false },
       { id: 'b', groupId: 'g2', groupName: 'Result Group 2', failure: false },
       { id: 'c', groupId: 'g1', groupName: 'Result Group 1', failure: false },
-      { id: 'd', groupId: 'g3', groupName: 'Botched', failure: true },
+      { id: 'd', groupId: 'g3', groupName: 'Botched', failure: true }
     ]);
-    assert.deepEqual(
-      grouped.map((g) => g.groupId),
-      ['g1', 'g2', 'g3']
-    );
-    assert.deepEqual(
-      grouped[0].rows.map((r) => r.id),
-      ['a', 'c']
-    );
+    assert.deepEqual(grouped.map((g) => g.groupId), ['g1', 'g2', 'g3']);
+    assert.deepEqual(grouped[0].rows.map((r) => r.id), ['a', 'c']);
     assert.equal(grouped[0].groupName, 'Result Group 1');
     assert.equal(grouped[2].failure, true);
   });
@@ -1089,23 +927,23 @@ describe('buildRecipeRoutingModel', () => {
   const ROUTED = {
     ingredientSets: [
       { id: 'set-a', name: 'Fire route', resultGroupId: 'grp-2' },
-      { id: 'set-b', name: '', resultGroupId: 'grp-1' },
+      { id: 'set-b', name: '', resultGroupId: 'grp-1' }
     ],
     resultGroups: [
       { id: 'grp-1', name: 'Result Group 1' },
-      { id: 'grp-2', name: 'Result Group 2' },
-    ],
+      { id: 'grp-2', name: 'Result Group 2' }
+    ]
   };
 
   it('maps each ingredient set to the result group it routes to via resultGroupId', () => {
     const { sets, groups } = buildRecipeRoutingModel(ROUTED);
     assert.deepEqual(sets, [
       { id: 'set-a', name: 'Fire route', groupId: 'grp-2' },
-      { id: 'set-b', name: '', groupId: 'grp-1' },
+      { id: 'set-b', name: '', groupId: 'grp-1' }
     ]);
     assert.deepEqual(groups, [
       { id: 'grp-1', name: 'Result Group 1' },
-      { id: 'grp-2', name: 'Result Group 2' },
+      { id: 'grp-2', name: 'Result Group 2' }
     ]);
   });
 
@@ -1118,38 +956,23 @@ describe('buildRecipeRoutingModel', () => {
           id: 'set-a',
           name: 'Fire route',
           resultGroupId: 'grp-2',
-          ingredientGroups: [
-            {
-              id: 'ig1',
-              options: [{ quantity: 1, match: { type: 'component', componentId: 'c1' } }],
-            },
-          ],
-        },
+          ingredientGroups: [{ id: 'ig1', options: [{ quantity: 1, match: { type: 'component', componentId: 'c1' } }] }]
+        }
       ],
-      resultGroups: [
-        {
-          id: 'grp-2',
-          name: 'Result Group 2',
-          results: [{ id: 'r1', componentId: 'c1', quantity: 1 }],
-        },
-      ],
+      resultGroups: [{ id: 'grp-2', name: 'Result Group 2', results: [{ id: 'r1', componentId: 'c1', quantity: 1 }] }]
     };
     const { sets, groups } = buildRecipeRoutingModel(recipe);
     const reqSetIds = new Set(buildRecipeRequirementRows(recipe, {}).map((row) => row.setId));
     const produceGroupIds = new Set(buildRecipeProduceRows(recipe, {}).map((row) => row.groupId));
     assert.ok(reqSetIds.has(sets[0].id), 'the routing set id filters the requirement rows');
     assert.ok(produceGroupIds.has(groups[0].id), 'the routing group id filters the produce rows');
-    assert.equal(
-      sets[0].groupId,
-      groups[0].id,
-      'the set routes to the group the produce rows carry'
-    );
+    assert.equal(sets[0].groupId, groups[0].id, 'the set routes to the group the produce rows carry');
   });
 
   it('carries a null groupId for an unrouted set and tolerates a recipe with no sets', () => {
     const { sets } = buildRecipeRoutingModel({
       ingredientSets: [{ id: 's1', name: 'Loose' }],
-      resultGroups: [],
+      resultGroups: []
     });
     assert.equal(sets[0].groupId, null);
     assert.deepEqual(buildRecipeRoutingModel({}), { sets: [], groups: [] });

@@ -6,12 +6,15 @@ globalThis.game = {
   settings: {
     register: () => {},
     get: () => undefined,
-    set: async () => undefined,
-  },
+    set: async () => undefined
+  }
 };
 
-const { FABRICATE_SETTINGS_NAMESPACE, SETTING_KEYS, registerFabricateSettings } =
-  await import('../src/config/settings.js');
+const {
+  FABRICATE_SETTINGS_NAMESPACE,
+  SETTING_KEYS,
+  registerFabricateSettings
+} = await import('../src/config/settings.js');
 const {
   DEFAULT_FABRICATE_THEME,
   FABRICATE_THEME_ATTRIBUTE,
@@ -19,10 +22,14 @@ const {
   FABRICATE_THEME_IDS,
   applyCurrentFabricateTheme,
   applyFabricateTheme,
-  normalizeFabricateTheme,
+  normalizeFabricateTheme
 } = await import('../src/ui/theme.js');
 
-const REMOVED_MODULE_SETTING_KEYS = ['enabled', 'showSimpleRecipesOnly', 'autoCraft'];
+const REMOVED_MODULE_SETTING_KEYS = [
+  'enabled',
+  'showSimpleRecipesOnly',
+  'autoCraft'
+];
 
 describe('Fabricate theme management', () => {
   beforeEach(setupDOM);
@@ -36,29 +43,26 @@ describe('Fabricate theme management', () => {
 
     registerFabricateSettings();
 
-    const registeredKeys = registrations.map((entry) => entry.key);
+    const registeredKeys = registrations.map(entry => entry.key);
     for (const removedKey of REMOVED_MODULE_SETTING_KEYS) {
       assert.ok(!registeredKeys.includes(removedKey), `${removedKey} should not be registered`);
     }
 
     const configurableKeys = registrations
-      .filter((entry) => entry.definition.config === true)
-      .map((entry) => entry.key)
+      .filter(entry => entry.definition.config === true)
+      .map(entry => entry.key)
       .sort();
-    assert.deepEqual(
-      configurableKeys,
-      [
-        SETTING_KEYS.EXPERIMENTAL_FEATURES,
-        SETTING_KEYS.INTERACTION_PROMPT_POSITION,
-        // Issue 1024: free text, deliberately — the design refuses to auto-append a
-        // `.value` leaf and the set of real per-system paths is open-ended, so a
-        // `choices` dropdown would be wrong.
-        SETTING_KEYS.ITEM_STACK_QUANTITY_PATH,
-        SETTING_KEYS.THEME,
-      ].sort()
-    );
+    assert.deepEqual(configurableKeys, [
+      SETTING_KEYS.EXPERIMENTAL_FEATURES,
+      SETTING_KEYS.INTERACTION_PROMPT_POSITION,
+      // Issue 1024: free text, deliberately — the design refuses to auto-append a
+      // `.value` leaf and the set of real per-system paths is open-ended, so a
+      // `choices` dropdown would be wrong.
+      SETTING_KEYS.ITEM_STACK_QUANTITY_PATH,
+      SETTING_KEYS.THEME
+    ].sort());
 
-    const theme = registrations.find((entry) => entry.key === SETTING_KEYS.THEME);
+    const theme = registrations.find(entry => entry.key === SETTING_KEYS.THEME);
     assert.ok(theme, 'theme setting should be registered');
     assert.equal(theme.namespace, FABRICATE_SETTINGS_NAMESPACE);
     assert.equal(theme.definition.scope, 'world');
@@ -72,7 +76,7 @@ describe('Fabricate theme management', () => {
       HEARTH_HERB: 'hearth-herb',
       STARGLASS_ARCANA: 'starglass-arcana',
       SOVEREIGN: 'sovereign',
-      FOUNDRY_NATIVE: 'foundry-native',
+      FOUNDRY_NATIVE: 'foundry-native'
     });
     assert.deepEqual(FABRICATE_THEME_CHOICES, {
       fabricate: 'Fabricate',
@@ -81,13 +85,11 @@ describe('Fabricate theme management', () => {
       'hearth-herb': 'Hearth & Herb',
       'starglass-arcana': 'Starglass Arcana',
       sovereign: 'Sovereign',
-      'foundry-native': 'Foundry Native',
+      'foundry-native': 'Foundry Native'
     });
     assert.deepEqual(theme.definition.choices, FABRICATE_THEME_CHOICES);
 
-    const experimental = registrations.find(
-      (entry) => entry.key === SETTING_KEYS.EXPERIMENTAL_FEATURES
-    );
+    const experimental = registrations.find(entry => entry.key === SETTING_KEYS.EXPERIMENTAL_FEATURES);
     assert.ok(experimental, 'experimental features setting should be registered');
     assert.equal(experimental.namespace, FABRICATE_SETTINGS_NAMESPACE);
     assert.equal(experimental.definition.scope, 'world');
@@ -105,9 +107,7 @@ describe('Fabricate theme management', () => {
     registerFabricateSettings();
 
     assert.equal(SETTING_KEYS.MANAGER_RAIL_COLLAPSED, 'managerRailCollapsed');
-    const railSetting = registrations.find(
-      (entry) => entry.key === SETTING_KEYS.MANAGER_RAIL_COLLAPSED
-    );
+    const railSetting = registrations.find(entry => entry.key === SETTING_KEYS.MANAGER_RAIL_COLLAPSED);
     assert.ok(railSetting, 'manager rail collapsed setting should be registered');
     assert.equal(railSetting.namespace, FABRICATE_SETTINGS_NAMESPACE);
     assert.equal(railSetting.definition.scope, 'client');
@@ -130,7 +130,7 @@ describe('Fabricate theme management', () => {
 
     assert.equal(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER, 'progressiveResultOrder');
     const orderSetting = registrations.find(
-      (entry) => entry.key === SETTING_KEYS.PROGRESSIVE_RESULT_ORDER
+      entry => entry.key === SETTING_KEYS.PROGRESSIVE_RESULT_ORDER
     );
     assert.ok(orderSetting, 'progressive result order setting should be registered');
     assert.equal(orderSetting.namespace, FABRICATE_SETTINGS_NAMESPACE);
@@ -156,10 +156,7 @@ describe('Fabricate theme management', () => {
     registerFabricateSettings();
     themeDefinition.onChange(FABRICATE_THEME_IDS.STARGLASS_ARCANA);
 
-    assert.equal(
-      document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE),
-      FABRICATE_THEME_IDS.STARGLASS_ARCANA
-    );
+    assert.equal(document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE), FABRICATE_THEME_IDS.STARGLASS_ARCANA);
     for (const appRoot of document.querySelectorAll('.fabricate')) {
       assert.equal(
         appRoot.getAttribute(FABRICATE_THEME_ATTRIBUTE),
@@ -175,15 +172,12 @@ describe('Fabricate theme management', () => {
   it('applies the current stored theme after settings registration', () => {
     document.body.innerHTML = '<section class="fabricate" data-appid="gathering"></section>';
     const applied = applyCurrentFabricateTheme(
-      (key) => (key === SETTING_KEYS.THEME ? FABRICATE_THEME_IDS.IRONBLOOD_FORGE : undefined),
+      key => key === SETTING_KEYS.THEME ? FABRICATE_THEME_IDS.IRONBLOOD_FORGE : undefined,
       SETTING_KEYS.THEME
     );
 
     assert.equal(applied, FABRICATE_THEME_IDS.IRONBLOOD_FORGE);
-    assert.equal(
-      document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE),
-      FABRICATE_THEME_IDS.IRONBLOOD_FORGE
-    );
+    assert.equal(document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE), FABRICATE_THEME_IDS.IRONBLOOD_FORGE);
     assert.equal(
       document.querySelector('[data-appid="gathering"]').getAttribute(FABRICATE_THEME_ATTRIBUTE),
       FABRICATE_THEME_IDS.IRONBLOOD_FORGE
@@ -201,9 +195,6 @@ describe('Fabricate theme management', () => {
 
     const applied = applyFabricateTheme('unknown');
     assert.equal(applied, FABRICATE_THEME_IDS.FABRICATE);
-    assert.equal(
-      document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE),
-      FABRICATE_THEME_IDS.FABRICATE
-    );
+    assert.equal(document.documentElement.getAttribute(FABRICATE_THEME_ATTRIBUTE), FABRICATE_THEME_IDS.FABRICATE);
   });
 });

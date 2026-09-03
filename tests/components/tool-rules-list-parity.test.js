@@ -455,12 +455,10 @@ test('hovering an already-selected Tool row does not repaint it', async () => {
   try {
     await page.hover('[data-probe="selected-hovered"]');
     const hoveredSelected = await page.evaluate(
-      () =>
-        getComputedStyle(document.querySelector('[data-probe="selected-hovered"]')).backgroundColor
+      () => getComputedStyle(document.querySelector('[data-probe="selected-hovered"]')).backgroundColor
     );
     const stillSelected = await page.evaluate(
-      () =>
-        getComputedStyle(document.querySelector('[data-probe="selected-still"]')).backgroundColor
+      () => getComputedStyle(document.querySelector('[data-probe="selected-still"]')).backgroundColor
     );
 
     // THE DEFECT. `[data-manager-view='tools'] .manager-tools-row:hover` is (0,4,0) and the

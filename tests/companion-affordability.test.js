@@ -254,9 +254,8 @@ describe('the unit and the amount are resolved before any spender runs', () => {
     const { seams, spender } = seamsFor({ units });
     // Derived rather than transcribed, so this pins "the detail IS the profile's errors" rather
     // than restating one wording of them.
-    const expectedDetail = validateCurrencyProfile(units, {
-      spendStrategy: 'actorProperty',
-    }).errors.join('; ');
+    const expectedDetail = validateCurrencyProfile(units, { spendStrategy: 'actorProperty' })
+      .errors.join('; ');
 
     const result = await ask(seams);
 
@@ -354,7 +353,8 @@ describe('the macro arm', () => {
     const recipe = { id: 'r1', craftingSystemId: system.id };
     const seams = {
       getCraftingSystemManager: () => ({ getSystem: () => system }),
-      getCurrencyConfig: () => makeWorldCurrencyConfig({ spendStrategy: 'macro', macros: MACROS }),
+      getCurrencyConfig: () =>
+        makeWorldCurrencyConfig({ spendStrategy: 'macro', macros: MACROS }),
       resolveMacro: resolveRunnableMacro,
       runMacro: async (uuid, context) => {
         received.push(context);
@@ -399,10 +399,7 @@ describe('a spender that throws outright', () => {
   });
 
   it('answers checkUnavailable when the strategy resolves no spender at all', async () => {
-    const { seams } = seamsFor({
-      spendStrategy: 'actorInventory',
-      actorInventoryCoinSpender: null,
-    });
+    const { seams } = seamsFor({ spendStrategy: 'actorInventory', actorInventoryCoinSpender: null });
 
     const result = await ask(seams);
 

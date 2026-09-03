@@ -1436,20 +1436,8 @@ describe('the harness copies are faithful to src/main.js', () => {
     // Foundry smoke by design. The claim this comment used to make, that the swap makes a
     // refused award report itself in the grant's words, was simply false.
     const PAIRS = [
-      [
-        AWARD,
-        'awardComponents',
-        'AWARD_COMPONENTS_GATE_KEYS',
-        'COMPONENT_AWARD_MESSAGE_KEYS',
-        COMPONENT_AWARD_MESSAGE_KEYS,
-      ],
-      [
-        CREDIT,
-        'creditCurrency',
-        'CREDIT_CURRENCY_GATE_KEYS',
-        'CURRENCY_CREDIT_MESSAGE_KEYS',
-        CURRENCY_CREDIT_MESSAGE_KEYS,
-      ],
+      [AWARD, 'awardComponents', 'AWARD_COMPONENTS_GATE_KEYS', 'COMPONENT_AWARD_MESSAGE_KEYS', COMPONENT_AWARD_MESSAGE_KEYS],
+      [CREDIT, 'creditCurrency', 'CREDIT_CURRENCY_GATE_KEYS', 'CURRENCY_CREDIT_MESSAGE_KEYS', CURRENCY_CREDIT_MESSAGE_KEYS],
     ];
     for (const [label, source] of [
       ['production', MAIN_SOURCE],
@@ -1623,14 +1611,8 @@ describe('the harness copies are faithful to src/main.js', () => {
       assert.ok(body.length > 250, `non-vacuity: ${label} sliced to ${body.length} characters`);
       const gmAt = body.indexOf('if (game.user?.isGM !== true) {');
       const gateAt = body.indexOf('return gatePooledActorUuids(actorUuids, {');
-      assert.ok(
-        gmAt >= 0,
-        `${label} lost the GM gate the singular preamble states in the same words`
-      );
-      assert.ok(
-        gateAt >= 0,
-        `${label} stopped delegating the address rule to the ONE place it exists`
-      );
+      assert.ok(gmAt >= 0, `${label} lost the GM gate the singular preamble states in the same words`);
+      assert.ok(gateAt >= 0, `${label} stopped delegating the address rule to the ONE place it exists`);
       assert.ok(gmAt < gateAt, `${label} reads addresses before it has established a GM`);
       // It threads NO refusal string. Both pooled delegators discard `gate.message` and answer
       // through their own result builder, which derives the member's words from its own table by
@@ -1765,10 +1747,7 @@ describe('the harness copies are faithful to src/main.js', () => {
       ['production', MAIN_SOURCE],
       ['the harness mirror', HARNESS_SOURCE],
     ]) {
-      for (const removed of [
-        'READ_POOLED_HOLDINGS_GATE_KEYS',
-        'CONSUME_POOLED_HOLDINGS_GATE_KEYS',
-      ]) {
+      for (const removed of ['READ_POOLED_HOLDINGS_GATE_KEYS', 'CONSUME_POOLED_HOLDINGS_GATE_KEYS']) {
         assert.equal(
           source.includes(removed),
           false,

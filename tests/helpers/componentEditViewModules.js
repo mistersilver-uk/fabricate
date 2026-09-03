@@ -19,11 +19,11 @@
  * throws for it up front.
  */
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
-  // ── THE COMPONENT SCOPE LEAVES (issue 1371) ─────────────────────────────────────────────
+  // -- THE COMPONENT SCOPE LEAVES (issue 1371) --------------------------------------------
   // Both system-scope component screens now read the world projection: the rules list for its
   // ghost cohort and its inherit summary, the rules editor for the category inherit switch and
   // the read-only world tag card. These are the pure leaves behind that, and every one of them
-  // is in the STATIC graph — so an omission here does not fail one test, it HANGS the suite.
+  // is in the STATIC graph - so an omission here does not fail one test, it HANGS the suite.
   'src/ui/svelte/apps/manager/scoped/componentScoped.js',
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',

@@ -38,10 +38,7 @@ const { resolveAlchemySubmissions } = await import('../src/utils/alchemySubmissi
 function getPathValue(object, path) {
   return String(path)
     .split('.')
-    .reduce(
-      (value, part) => (value == null || typeof value !== 'object' ? undefined : value[part]),
-      object
-    );
+    .reduce((value, part) => (value == null || typeof value !== 'object' ? undefined : value[part]), object);
 }
 function setPathValue(object, path, value) {
   const parts = String(path).split('.');
@@ -77,10 +74,7 @@ function ownedItem(uuid, duplicateSource, quantity) {
   return { uuid, name: `owned-${uuid}`, system: { quantity }, _stats: { duplicateSource } };
 }
 function group(componentId, quantity = 1) {
-  return {
-    id: `g-${componentId}`,
-    options: [{ match: { type: 'component', componentId }, quantity }],
-  };
+  return { id: `g-${componentId}`, options: [{ match: { type: 'component', componentId }, quantity }] };
 }
 function recipe(id, groups) {
   return {
@@ -95,18 +89,11 @@ function setup(recipes, components, alchemyCfg = {}) {
   const sys = {
     id: 'sys-a',
     resolutionMode: 'alchemy',
-    alchemy: {
-      learnOnCraft: true,
-      consumeOnFail: false,
-      showAttemptHistoryToPlayers: true,
-      ...alchemyCfg,
-    },
+    alchemy: { learnOnCraft: true, consumeOnFail: false, showAttemptHistoryToPlayers: true, ...alchemyCfg },
     components,
     features: {},
   };
-  game.fabricate.getCraftingSystemManager = () => ({
-    getSystem: (id) => (id === 'sys-a' ? sys : null),
-  });
+  game.fabricate.getCraftingSystemManager = () => ({ getSystem: (id) => (id === 'sys-a' ? sys : null) });
   const validator = new SignatureValidator({
     getSystem: () => sys,
     getRecipesForSystem: () => recipes,
@@ -117,28 +104,18 @@ function setup(recipes, components, alchemyCfg = {}) {
 }
 
 test('a bench equal to a known concrete signature MATCHES (discovers) with a realistic drag-copied owned item', async () => {
-  const components = [
-    component('emberroot', 'Item.ember'),
-    component('springwater', 'Item.spring'),
-  ];
+  const components = [component('emberroot', 'Item.ember'), component('springwater', 'Item.spring')];
   const vigor = recipe('vigor', [group('emberroot', 1), group('springwater', 2)]);
   const { engine, validator } = setup([vigor], components);
 
   const actor = new FakeActor();
   // Owned uuids DIFFER from the component source refs (Actor.x.Item.* vs Item.*).
   const source = {
-    items: [
-      ownedItem('Actor.x.Item.e1', 'Item.ember', 4),
-      ownedItem('Actor.x.Item.w1', 'Item.spring', 6),
-    ],
+    items: [ownedItem('Actor.x.Item.e1', 'Item.ember', 4), ownedItem('Actor.x.Item.w1', 'Item.spring', 6)],
   };
 
   // The REAL resolution path (not hand-built submissions).
-  const submitted = resolveAlchemySubmissions([source], components, [
-    'emberroot',
-    'springwater',
-    'springwater',
-  ]);
+  const submitted = resolveAlchemySubmissions([source], components, ['emberroot', 'springwater', 'springwater']);
   assert.equal(submitted.length, 3, 'the bench resolved to three owned unit-submissions');
 
   let crafted = null;
@@ -154,19 +131,12 @@ test('a bench equal to a known concrete signature MATCHES (discovers) with a rea
   });
 
   assert.equal(result.success, true, 'the brew matched instead of fizzling');
-  assert.equal(
-    crafted.chosenRecipe.id,
-    'vigor',
-    'the matched recipe is crafted (discover -> consume -> produce)'
-  );
+  assert.equal(crafted.chosenRecipe.id, 'vigor', 'the matched recipe is crafted (discover -> consume -> produce)');
   assert.equal(crafted.options.isAlchemyAttempt, true, 'flagged so learnRecipeOnCraft runs');
 });
 
 test('a genuine no-match records the dead-end key resolved from realistic owned items', async () => {
-  const components = [
-    component('emberroot', 'Item.ember'),
-    component('springwater', 'Item.spring'),
-  ];
+  const components = [component('emberroot', 'Item.ember'), component('springwater', 'Item.spring')];
   const vigor = recipe('vigor', [group('emberroot', 1), group('springwater', 2)]);
   const { engine, validator } = setup([vigor], components);
 
@@ -183,7 +153,5 @@ test('a genuine no-match records the dead-end key resolved from realistic owned 
 
   assert.equal(result.disposition, 'no-match');
   // The multiset resolved from the realistic item's source refs -> a real key.
-  assert.deepEqual(actor.getFlag('fabricate', 'fabricate.alchemyDeadEnds'), {
-    'sys-a': ['emberroot:1'],
-  });
+  assert.deepEqual(actor.getFlag('fabricate', 'fabricate.alchemyDeadEnds'), { 'sys-a': ['emberroot:1'] });
 });

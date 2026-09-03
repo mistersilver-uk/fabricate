@@ -30,11 +30,7 @@ export function salvageComponent(id, name, overrides = {}) {
     salvage: {
       enabled: true,
       resultGroups: [
-        {
-          id: `${id}-g`,
-          role: 'success',
-          results: [{ id: `${id}-r`, componentId: id, quantity: 1 }],
-        },
+        { id: `${id}-g`, role: 'success', results: [{ id: `${id}-r`, componentId: id, quantity: 1 }] },
       ],
     },
     ...overrides,

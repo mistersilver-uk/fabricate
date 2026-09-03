@@ -459,26 +459,17 @@ test('every case whose PAGE renders the shared placeholder body also claims it, 
   // own body carries `data-scoped-page="<token>"` on its own `<main>`. The map therefore keeps
   // resolving across exactly the transition this guard has to survive.
   const pageByRoute = new Map();
-  for (const file of readdirSync(resolve(repoRoot, SCOPED_DIR)).filter((n) =>
-    n.endsWith('.svelte')
-  )) {
+  for (const file of readdirSync(resolve(repoRoot, SCOPED_DIR)).filter((n) => n.endsWith('.svelte'))) {
     const source = readFileSync(resolve(repoRoot, SCOPED_DIR, file), 'utf8');
     for (const [, token] of source.matchAll(/(?:pageId|data-scoped-page)="([a-z][a-z-]*)"/g)) {
-      assert.ok(
-        !pageByRoute.has(token),
-        `route ${token} is owned by two pages; the map is ambiguous`
-      );
+      assert.ok(!pageByRoute.has(token), `route ${token} is owned by two pages; the map is ambiguous`);
       // `delegates` is derived from the SHAPE of the page — a page that hands its body to the
       // shared component passes `pageId="<token>"` to it — and never from the component's NAME.
       // The pairing below is what that buys.
       pageByRoute.set(token, { file, source, delegates: /pageId="/.test(source) });
     }
   }
-  assert.equal(
-    pageByRoute.size,
-    7,
-    'the seven world scoped routes each resolve to exactly one page'
-  );
+  assert.equal(pageByRoute.size, 7, 'the seven world scoped routes each resolve to exactly one page');
 
   // ── THE IMPORT LITERAL IS PINNED TO THE SHAPE, SO A RENAME CANNOT SILENCE THIS ─────────
   //
@@ -495,10 +486,7 @@ test('every case whose PAGE renders the shared placeholder body also claims it, 
   // maintenance: as each lane replaces a body both sets lose that route together, and when the
   // epic finishes both are empty because nothing delegates any more.
   assert.deepEqual(
-    [...pageByRoute.entries()]
-      .filter(([, page]) => page.delegates)
-      .map(([token]) => token)
-      .sort(),
+    [...pageByRoute.entries()].filter(([, page]) => page.delegates).map(([token]) => token).sort(),
     [...pageByRoute.entries()]
       .filter(([, page]) => /import ScopedPlaceholderPage/.test(page.source))
       .map(([token]) => token)
@@ -508,16 +496,12 @@ test('every case whose PAGE renders the shared placeholder body also claims it, 
       'biconditional below is comparing an empty set to an empty set'
   );
 
-  const routeOf = (viewCase) =>
-    /data-scoped-page="([a-z][a-z-]*)"/.exec(viewCase.expectSelector || '')?.[1];
+  const routeOf = (viewCase) => /data-scoped-page="([a-z][a-z-]*)"/.exec(viewCase.expectSelector || '')?.[1];
   const rendersPlaceholder = (viewCase) => {
     const route = routeOf(viewCase);
     if (!route) return false;
     const page = pageByRoute.get(route);
-    assert.ok(
-      page,
-      `case ${viewCase.id} asserts route ${route}, which no page under ${SCOPED_DIR} owns`
-    );
+    assert.ok(page, `case ${viewCase.id} asserts route ${route}, which no page under ${SCOPED_DIR} owns`);
     return /import ScopedPlaceholderPage/.test(page.source);
   };
   const claimsPlaceholder = (viewCase) =>
@@ -589,7 +573,7 @@ test('the world-scope write path is supplied FOUR store legs', () => {
   // component no reader can see.
   //
   // IT IS PINNED HERE BECAUSE NOTHING ELSE CAN SEE IT. The composed verb keeps the GENERIC KEY,
-  // so no call site and no mounted test can distinguish it from the verb it replaces — a mounted
+  // so no call site and no mounted test can distinguish it from the verb it replaces - a mounted
   // test supplies the `actions` bag itself. Delete the `component:` entry and every button in the
   // product reaches the membership-only verb; this assertion is the only thing that reds.
   assert.match(

@@ -55,20 +55,11 @@ const SYS = 'alchemy-sys';
 
 // Two distinct components; A's source ref is Item.A, B's is Item.B.
 function component(id, name, sourceUuid) {
-  return {
-    id,
-    name,
-    registeredItemUuid: sourceUuid,
-    originItemUuid: sourceUuid,
-    aliasItemUuids: [],
-  };
+  return { id, name, registeredItemUuid: sourceUuid, originItemUuid: sourceUuid, aliasItemUuids: [] };
 }
 
 function group(componentId, quantity = 1) {
-  return {
-    id: `g-${componentId}`,
-    options: [{ match: { type: 'component', componentId }, quantity }],
-  };
+  return { id: `g-${componentId}`, options: [{ match: { type: 'component', componentId }, quantity }] };
 }
 
 function recipe(id, componentId) {
@@ -87,16 +78,8 @@ function recipe(id, componentId) {
 function world() {
   const components = [component('cA', 'Alpha', 'Item.A'), component('cB', 'Beta', 'Item.B')];
   const recipes = [recipe('needs-B', 'cB'), recipe('needs-A', 'cA')];
-  const system = {
-    id: SYS,
-    resolutionMode: 'alchemy',
-    alchemy: { learnOnCraft: true, consumeOnFail: false },
-    components,
-    features: { essences: false },
-  };
-  game.fabricate.getCraftingSystemManager = () => ({
-    getSystem: (id) => (id === SYS ? system : null),
-  });
+  const system = { id: SYS, resolutionMode: 'alchemy', alchemy: { learnOnCraft: true, consumeOnFail: false }, components, features: { essences: false } };
+  game.fabricate.getCraftingSystemManager = () => ({ getSystem: (id) => (id === SYS ? system : null) });
   game.fabricate.getRecipeManager = () => ({ getRecipes: () => recipes });
   const validator = new SignatureValidator({
     getSystem: () => system,
@@ -111,11 +94,7 @@ function world() {
 // feeding the id the palette EMITTED for `item` into the collector, then craftAlchemy.
 async function paletteToBrew({ engine, validator, system, components }, item) {
   const source = { id: 'src', items: [item] };
-  const palette = new AlchemyListingBuilder({})._projectOwnedComponents(
-    components,
-    [source],
-    system
-  );
+  const palette = new AlchemyListingBuilder({})._projectOwnedComponents(components, [source], system);
   const row = palette.find((r) => r.held > 0);
 
   let captured = null;
@@ -124,12 +103,7 @@ async function paletteToBrew({ engine, validator, system, components }, item) {
     return { success: true, results: [{}], message: '' };
   };
 
-  const submitted = resolveAlchemySubmissions(
-    [source],
-    components,
-    row ? [row.componentId] : [],
-    system.id
-  );
+  const submitted = resolveAlchemySubmissions([source], components, row ? [row.componentId] : [], system.id);
   const result = await engine.craftAlchemy({ id: 'pc' }, [source], submitted, {
     craftingSystemId: system.id,
     signatureValidator: validator,
@@ -157,18 +131,10 @@ test('a divergent roles-B / duplicateSource-A item is bucketed to B by the palet
 
   // (a) the palette attributes the divergent item to B, not the duplicate-lineage A.
   assert.ok(row, 'the palette projects the owned divergent item');
-  assert.equal(
-    row.componentId,
-    'cB',
-    'palette buckets the divergent item to its durable component B, not A'
-  );
+  assert.equal(row.componentId, 'cB', 'palette buckets the divergent item to its durable component B, not A');
 
   // (b) the item is brewable — not dropped as "No ingredients submitted".
-  assert.notEqual(
-    result.message,
-    'No ingredients submitted',
-    'the divergent item is brewable through the real palette->collector path'
-  );
+  assert.notEqual(result.message, 'No ingredients submitted', 'the divergent item is brewable through the real palette->collector path');
   assert.equal(result.success, true, 'the brew matched');
 
   // (c) craftAlchemy credits the B recipe, never the A recipe.
@@ -213,16 +179,8 @@ test('resolveAlchemySubmissions returns { item, componentId } records bucketed s
   const source = { id: 'src', items: [item] };
 
   const submitted = resolveAlchemySubmissions([source], components, ['cB'], SYS);
-  assert.equal(
-    submitted.length,
-    1,
-    'the divergent item is dispensed for the B request (systemId-scoped)'
-  );
-  assert.equal(
-    submitted[0].componentId,
-    'cB',
-    'the record carries the bucket key it was dispensed from'
-  );
+  assert.equal(submitted.length, 1, 'the divergent item is dispensed for the B request (systemId-scoped)');
+  assert.equal(submitted[0].componentId, 'cB', 'the record carries the bucket key it was dispensed from');
   assert.equal(submitted[0].item, item, 'the record carries the REAL owned item');
 });
 

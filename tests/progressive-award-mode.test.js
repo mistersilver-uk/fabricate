@@ -128,14 +128,14 @@ test('equal mode — budget exactly matches difficulty → result awarded, remai
 
 test('equal mode — budget covers first result but not second → first awarded, second not', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 3 },
-      { id: 'item-B', difficulty: 5 },
-    ],
+    [{ id: 'item-A', difficulty: 3 }, { id: 'item-B', difficulty: 5 }],
     'equal'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   // After awarding A (cost 3), remaining = 6 - 3 = 3. 3 < 5, so B not awarded.
@@ -153,14 +153,14 @@ test('equal mode — budget covers first result but not second → first awarded
 
 test('equal mode — budget covers both results → both awarded', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 2 },
-      { id: 'item-B', difficulty: 3 },
-    ],
+    [{ id: 'item-A', difficulty: 2 }, { id: 'item-B', difficulty: 3 }],
     'equal'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   const result = service.resolveResultGroups({
@@ -195,11 +195,7 @@ test('equal mode — budget less than first result difficulty → none awarded',
 
 test('equal mode — budget exactly covers multiple results sequentially → all awarded, remaining = 0', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 1 },
-      { id: 'item-B', difficulty: 2 },
-      { id: 'item-C', difficulty: 3 },
-    ],
+    [{ id: 'item-A', difficulty: 1 }, { id: 'item-B', difficulty: 2 }, { id: 'item-C', difficulty: 3 }],
     'equal'
   );
   const service = buildService(system);
@@ -264,14 +260,14 @@ test('exceed mode — budget exactly equals difficulty → NOT awarded (strict >
 
 test('exceed mode — budget strictly exceeds first, equals second → first awarded only', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 2 },
-      { id: 'item-B', difficulty: 5 },
-    ],
+    [{ id: 'item-A', difficulty: 2 }, { id: 'item-B', difficulty: 5 }],
     'exceed'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   // value = 7. After A (cost 2): remaining = 5. 5 > 5 is false. B not awarded.
@@ -307,14 +303,14 @@ test('exceed mode — budget less than difficulty → none awarded', () => {
 
 test('exceed mode — budget strictly exceeds all results → all awarded', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 2 },
-      { id: 'item-B', difficulty: 3 },
-    ],
+    [{ id: 'item-A', difficulty: 2 }, { id: 'item-B', difficulty: 3 }],
     'exceed'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   // value = 10. After A (cost 2): remaining = 8. 8 > 3 = true. After B (cost 3): remaining = 5.
@@ -373,14 +369,14 @@ test('partial mode — 0 < budget < difficulty → partial credit awarded, remai
 
 test('partial mode — partial on first result stops processing of subsequent results', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 5 },
-      { id: 'item-B', difficulty: 2 },
-    ],
+    [{ id: 'item-A', difficulty: 5 }, { id: 'item-B', difficulty: 2 }],
     'partial'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   // budget = 3 < cost(A) = 5, so A gets partial, remaining = 0, B not reached
@@ -398,14 +394,14 @@ test('partial mode — partial on first result stops processing of subsequent re
 
 test('partial mode — full award on first, then partial on second', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 3 },
-      { id: 'item-B', difficulty: 5 },
-    ],
+    [{ id: 'item-A', difficulty: 3 }, { id: 'item-B', difficulty: 5 }],
     'partial'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   // budget = 5. A costs 3: remaining = 2. 2 < 5 but > 0: B gets partial, remaining = 0.
@@ -423,14 +419,14 @@ test('partial mode — full award on first, then partial on second', () => {
 
 test('partial mode — remaining exactly matches difficulty → full award, no partial needed', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 3 },
-      { id: 'item-B', difficulty: 2 },
-    ],
+    [{ id: 'item-A', difficulty: 3 }, { id: 'item-B', difficulty: 2 }],
     'partial'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   // budget = 3. A costs 3: awarded fully, remaining = 0. 0 is not > 0: B not awarded (no partial).
@@ -488,14 +484,14 @@ test('edge case — single result awarded → meta shows correct remaining', () 
 
 test('edge case — all results awarded with leftover budget → remaining > 0', () => {
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 1 },
-      { id: 'item-B', difficulty: 2 },
-    ],
+    [{ id: 'item-A', difficulty: 1 }, { id: 'item-B', difficulty: 2 }],
     'equal'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   // budget = 10. A costs 1, B costs 2. All awarded. remaining = 7.
@@ -541,14 +537,14 @@ test('edge case — a MAX_SAFE_INTEGER value (a forced-success crit) awards ever
   // mean "award everything"; the budget loop awards every result regardless of
   // difficulty. Uses 'exceed' (the strictest mode) to prove the sentinel covers all.
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 100 },
-      { id: 'item-B', difficulty: 9999 },
-    ],
+    [{ id: 'item-A', difficulty: 100 }, { id: 'item-B', difficulty: 9999 }],
     'exceed'
   );
   const service = buildService(system);
-  const step = buildStep([makeResult('result-A', 'item-A'), makeResult('result-B', 'item-B')]);
+  const step = buildStep([
+    makeResult('result-A', 'item-A'),
+    makeResult('result-B', 'item-B'),
+  ]);
   const recipe = buildRecipe();
 
   const result = service.resolveResultGroups({
@@ -566,10 +562,7 @@ test('edge case — result with missing componentId is skipped, valid results st
   // Results with invalid difficulty (no matching managedItem) are skipped via `continue` (not `break`),
   // so subsequent valid results can still be awarded.
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 2 },
-      { id: 'item-C', difficulty: 3 },
-    ],
+    [{ id: 'item-A', difficulty: 2 }, { id: 'item-C', difficulty: 3 }],
     'equal'
   );
   const service = buildService(system);
@@ -614,21 +607,14 @@ test('awarded results are forced to quantity 1, ignoring any legacy authored qua
 
   assert.equal(result.groups[0].results.length, 1);
   assert.equal(result.groups[0].results[0].quantity, 1, 'the legacy quantity is normalized to 1');
-  assert.equal(
-    result.groups[0].results[0].componentId,
-    'item-A',
-    'the component reference survives'
-  );
+  assert.equal(result.groups[0].results[0].componentId, 'item-A', 'the component reference survives');
 });
 
 test('duplicate components award in order as separate quantity-1 entries', () => {
   // The GM expresses "two of item-A" by listing it twice; each costs the same
   // difficulty and is awarded as its own single-item entry, in order.
   const system = buildProgressiveSystem(
-    [
-      { id: 'item-A', difficulty: 2 },
-      { id: 'item-B', difficulty: 3 },
-    ],
+    [{ id: 'item-A', difficulty: 2 }, { id: 'item-B', difficulty: 3 }],
     'equal'
   );
   const service = buildService(system);

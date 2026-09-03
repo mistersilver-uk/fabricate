@@ -83,10 +83,7 @@ test('a stale ready flag cannot pass for the incoming scene', () => {
   // The other half of the ordering argument: `#ready = false` at board.mjs:1105 runs BEFORE the
   // scene swaps at 1149, so `ready === true` alongside the NEW id can only mean that draw finished.
   withCanvas({ ready: true, scene: { id: OTHER_SCENE_ID } }, () => {
-    assert.ok(
-      !isCanvasReadyForScene(SCENE_ID),
-      'a ready canvas showing another scene is not ready'
-    );
+    assert.ok(!isCanvasReadyForScene(SCENE_ID), 'a ready canvas showing another scene is not ready');
   });
 });
 
@@ -132,10 +129,7 @@ test('the harness routes every scene activation through the readiness helper', (
   const code = harnessCode();
 
   // Non-vacuity: assert the inputs are alive before asserting anything about their contents.
-  assert.ok(
-    code.length > 10_000,
-    'read no meaningful harness source — this guard would be vacuous'
-  );
+  assert.ok(code.length > 10_000, 'read no meaningful harness source — this guard would be vacuous');
   assert.ok(
     code.includes('async function activateSceneAndAwaitCanvasReady('),
     'activateSceneAndAwaitCanvasReady is gone from the harness. If it was renamed, repoint this' +
@@ -175,9 +169,7 @@ test('placeables are seeded BEFORE their scene is viewed, not after', () => {
   const code = harnessCode();
 
   const seedIndex = code.indexOf("createEmbeddedDocuments('Tile'");
-  const viewIndex = code.indexOf(
-    'activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId)'
-  );
+  const viewIndex = code.indexOf('activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId)');
 
   assert.ok(seedIndex > 0, 'could not find the Tile seed in the harness — this guard is vacuous');
   assert.ok(viewIndex > 0, 'could not find the scene activation — this guard is vacuous');
@@ -185,7 +177,7 @@ test('placeables are seeded BEFORE their scene is viewed, not after', () => {
     seedIndex < viewIndex,
     'the Manage Interactables block activates its scene BEFORE seeding placeables into it. That' +
       ' order creates documents on a scene the canvas may be mid-draw on, which throws' +
-      ' "Cannot read properties of undefined (reading \'<PRIORITY>\')" out of core as an' +
+      " \"Cannot read properties of undefined (reading '<PRIORITY>')\" out of core as an" +
       ' unhandled rejection — a pageerror with no failing step. Seed first, then activate.'
   );
 });

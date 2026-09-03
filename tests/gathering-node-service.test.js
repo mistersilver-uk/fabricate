@@ -27,8 +27,8 @@ function libraryTask(overrides = {}) {
       current: 3,
       depletionTiming: 'onStart',
       respawn: { policy: 'manual' },
-      ...overrides,
-    },
+      ...overrides
+    }
   };
 }
 
@@ -41,7 +41,7 @@ function fakeEnvironmentStore(record) {
       env = { ...env, ...patch };
       return env;
     },
-    _peek: () => env,
+    _peek: () => env
   };
 }
 
@@ -51,7 +51,7 @@ function makeService({
   rolls = [1],
   evaluate = null,
   resolveRegionBehavior = null,
-  writeInteractableBehavior = null,
+  writeInteractableBehavior = null
 } = {}) {
   let rollIdx = 0;
   const hooks = [];
@@ -64,7 +64,7 @@ function makeService({
     callHook: (name, payload) => hooks.push({ name, payload }),
     nowWorldTime: () => 0,
     resolveRegionBehavior,
-    writeInteractableBehavior,
+    writeInteractableBehavior
   });
   return { service, hooks };
 }
@@ -73,11 +73,7 @@ function makeService({
 
 test('_currentNodeState returns the runtime pool when present', () => {
   const { service } = makeService();
-  const env = {
-    id: 'env-1',
-    craftingSystemId: SYS,
-    nodeRuntime: { 'lib-1': { current: 1, max: 3 } },
-  };
+  const env = { id: 'env-1', craftingSystemId: SYS, nodeRuntime: { 'lib-1': { current: 1, max: 3 } } };
   assert.deepEqual(service._currentNodeState(env, 'lib-1'), { current: 1, max: 3 });
 });
 
@@ -91,17 +87,14 @@ test('_currentNodeState seeds a fresh full pool from library config when no runt
 
 test('_currentNodeState returns null when the task has no node config', () => {
   const { service } = makeService({ config: { systems: { [SYS]: { tasks: [{ id: 'lib-1' }] } } } });
-  assert.equal(
-    service._currentNodeState({ craftingSystemId: SYS, nodeRuntime: {} }, 'lib-1'),
-    null
-  );
+  assert.equal(service._currentNodeState({ craftingSystemId: SYS, nodeRuntime: {} }, 'lib-1'), null);
 });
 
 // --- _libraryNodeConfigs ---------------------------------------------------
 
 test('_libraryNodeConfigs indexes only tasks carrying node configs', () => {
   const { service } = makeService({
-    config: { systems: { [SYS]: { tasks: [libraryTask(), { id: 'lib-2' }] } } },
+    config: { systems: { [SYS]: { tasks: [libraryTask(), { id: 'lib-2' }] } } }
   });
   const map = service._libraryNodeConfigs(SYS);
   assert.equal(map.size, 1);
@@ -112,17 +105,8 @@ test('_libraryNodeConfigs indexes only tasks carrying node configs', () => {
 
 test('_mergeNodeConfigState keeps library capacity authoritative and clamps current', () => {
   const { service } = makeService();
-  const libNode = {
-    enabled: true,
-    max: 5,
-    current: 5,
-    respawn: { policy: 'overTime', gainMode: 'guaranteed' },
-  };
-  const stored = {
-    max: 99,
-    current: 8,
-    respawn: { lastEvaluatedWorldTime: 42, lastRoll: { rolls: [3] } },
-  };
+  const libNode = { enabled: true, max: 5, current: 5, respawn: { policy: 'overTime', gainMode: 'guaranteed' } };
+  const stored = { max: 99, current: 8, respawn: { lastEvaluatedWorldTime: 42, lastRoll: { rolls: [3] } } };
   const merged = service._mergeNodeConfigState(libNode, stored);
   assert.equal(merged.max, 5, 'capacity is library config');
   assert.equal(merged.current, 5, 'stored current clamped to library max');
@@ -140,34 +124,17 @@ test('_mergeNodeConfigState falls back to stored when the library task was delet
 // --- restockNode -----------------------------------------------------------
 
 test('restockNode tops up a regenerating pool and fires the hook', async () => {
-  const env = {
-    id: 'env-1',
-    craftingSystemId: SYS,
-    nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, respawn: { policy: 'manual' } } },
-  };
+  const env = { id: 'env-1', craftingSystemId: SYS, nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, respawn: { policy: 'manual' } } } };
   const store = fakeEnvironmentStore(env);
   const { service, hooks } = makeService({ store });
-  const updated = await service.restockNode({
-    environmentId: 'env-1',
-    taskId: 'lib-1',
-    current: 3,
-    max: 3,
-  });
+  const updated = await service.restockNode({ environmentId: 'env-1', taskId: 'lib-1', current: 3, max: 3 });
   assert.equal(updated.nodeRuntime['lib-1'].current, 3);
   assert.ok(hooks.some((h) => h.name === 'fabricate.gathering.nodeRestocked'));
 });
 
 test('restockNode is a no-op for a nonRegenerating pool (no write, no hook)', async () => {
-  const config = {
-    systems: { [SYS]: { tasks: [libraryTask({ respawn: { policy: 'nonRegenerating' } })] } },
-  };
-  const env = {
-    id: 'env-1',
-    craftingSystemId: SYS,
-    nodeRuntime: {
-      'lib-1': { enabled: true, max: 3, current: 0, respawn: { policy: 'nonRegenerating' } },
-    },
-  };
+  const config = { systems: { [SYS]: { tasks: [libraryTask({ respawn: { policy: 'nonRegenerating' } })] } } };
+  const env = { id: 'env-1', craftingSystemId: SYS, nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, respawn: { policy: 'nonRegenerating' } } } };
   const store = fakeEnvironmentStore(env);
   const { service, hooks } = makeService({ store, config });
   const result = await service.restockNode({ environmentId: 'env-1', taskId: 'lib-1', current: 3 });
@@ -178,39 +145,13 @@ test('restockNode is a no-op for a nonRegenerating pool (no write, no hook)', as
 // --- respawnNodes ----------------------------------------------------------
 
 test('respawnNodes regrows an overTime pool and writes the environment once', async () => {
-  const config = {
-    systems: {
-      [SYS]: {
-        tasks: [
-          libraryTask({
-            respawn: {
-              policy: 'overTime',
-              gainMode: 'guaranteed',
-              intervalUnit: 'hours',
-              intervalAmount: 1,
-            },
-          }),
-        ],
-      },
-    },
-  };
+  const config = { systems: { [SYS]: { tasks: [libraryTask({ respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1 } })] } } };
   const env = {
     id: 'env-1',
     craftingSystemId: SYS,
     nodeRuntime: {
-      'lib-1': {
-        enabled: true,
-        max: 3,
-        current: 0,
-        respawn: {
-          policy: 'overTime',
-          gainMode: 'guaranteed',
-          intervalUnit: 'hours',
-          intervalAmount: 1,
-          lastEvaluatedWorldTime: 0,
-        },
-      },
-    },
+      'lib-1': { enabled: true, max: 3, current: 0, respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 0 } }
+    }
   };
   const store = fakeEnvironmentStore(env);
   const { service } = makeService({ store, config });
@@ -219,11 +160,7 @@ test('respawnNodes regrows an overTime pool and writes the environment once', as
 });
 
 test('respawnNodes returns null when nothing changed', async () => {
-  const env = {
-    id: 'env-1',
-    craftingSystemId: SYS,
-    nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } },
-  };
+  const env = { id: 'env-1', craftingSystemId: SYS, nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } } } };
   const store = fakeEnvironmentStore(env);
   const { service } = makeService({ store });
   assert.equal(await service.respawnNodes({ environment: env, worldTime: 10 * HOUR }), null);
@@ -233,24 +170,8 @@ test('respawnNodes returns null when nothing changed', async () => {
 
 test('_respawnNode adds chance-mode gains, persists rolls, and fires the respawn hook', async () => {
   const { service, hooks } = makeService({ rolls: [30, 80, 10] }); // hit, miss, hit → +2
-  const node = {
-    current: 0,
-    max: 5,
-    enabled: true,
-    respawn: {
-      policy: 'overTime',
-      gainMode: 'chance',
-      intervalUnit: 'hours',
-      intervalAmount: 1,
-      chance: 0.5,
-      lastEvaluatedWorldTime: 0,
-    },
-  };
-  const { changed, node: next } = await service._respawnNode(node, {
-    now: 3 * HOUR,
-    environmentId: 'env-1',
-    taskId: 'lib-1',
-  });
+  const node = { current: 0, max: 5, enabled: true, respawn: { policy: 'overTime', gainMode: 'chance', intervalUnit: 'hours', intervalAmount: 1, chance: 0.5, lastEvaluatedWorldTime: 0 } };
+  const { changed, node: next } = await service._respawnNode(node, { now: 3 * HOUR, environmentId: 'env-1', taskId: 'lib-1' });
   assert.equal(changed, true);
   assert.equal(next.current, 2);
   const hook = hooks.find((h) => h.name === 'fabricate.gathering.nodeRespawned');
@@ -260,36 +181,15 @@ test('_respawnNode adds chance-mode gains, persists rolls, and fires the respawn
 test('_respawnNode short-circuits for a non-overTime policy', async () => {
   const { service } = makeService();
   const node = { current: 1, max: 5, respawn: { policy: 'manual' } };
-  const result = await service._respawnNode(node, {
-    now: 5 * HOUR,
-    environmentId: 'e',
-    taskId: 't',
-  });
+  const result = await service._respawnNode(node, { now: 5 * HOUR, environmentId: 'e', taskId: 't' });
   assert.equal(result.changed, false);
   assert.equal(result.node, node);
 });
 
 test('_respawnNode (expression) pre-rolls per interval via the evaluator', async () => {
   const { service } = makeService({ evaluate: () => 2 });
-  const node = {
-    current: 0,
-    max: 10,
-    enabled: true,
-    respawn: {
-      policy: 'overTime',
-      gainMode: 'expression',
-      amountExpression: '2',
-      intervalUnit: 'hours',
-      intervalAmount: 1,
-      lastEvaluatedWorldTime: 0,
-    },
-  };
-  const { node: next } = await service._respawnNode(node, {
-    now: 2 * HOUR,
-    environment: null,
-    environmentId: 'e',
-    taskId: 't',
-  });
+  const node = { current: 0, max: 10, enabled: true, respawn: { policy: 'overTime', gainMode: 'expression', amountExpression: '2', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 0 } };
+  const { node: next } = await service._respawnNode(node, { now: 2 * HOUR, environment: null, environmentId: 'e', taskId: 't' });
   assert.equal(next.current, 4, '2 intervals × rolled 2');
 });
 
@@ -316,8 +216,8 @@ function nullAnchoredExpressionPool() {
       amountExpression: '1d4',
       intervalUnit: 'hours',
       intervalAmount: 1,
-      lastEvaluatedWorldTime: null,
-    },
+      lastEvaluatedWorldTime: null
+    }
   };
 }
 
@@ -328,7 +228,7 @@ function countingEvaluatorService() {
     evaluate: () => {
       evaluations += 1;
       return 2;
-    },
+    }
   });
   return { service, evaluations: () => evaluations };
 }
@@ -357,13 +257,9 @@ test('_respawnNode: a null-anchored expression pool pre-rolls nothing on its see
     now: 500 * HOUR,
     environment: null,
     environmentId: 'e',
-    taskId: 't',
+    taskId: 't'
   });
-  assert.equal(
-    evaluations(),
-    0,
-    'issue 896: _respawnNode must roll no expression amounts on the seeding tick'
-  );
+  assert.equal(evaluations(), 0, 'issue 896: _respawnNode must roll no expression amounts on the seeding tick');
   assert.equal(next.respawn.lastEvaluatedWorldTime, 500 * HOUR, 'the tick seeds the anchor at now');
 });
 
@@ -371,13 +267,9 @@ test('respawnInteractableNode: a null-anchored expression pool pre-rolls nothing
   const { service, evaluations } = countingEvaluatorService();
   const { node: next } = await service.respawnInteractableNode({
     node: nullAnchoredExpressionPool(),
-    worldTime: 500 * HOUR,
+    worldTime: 500 * HOUR
   });
-  assert.equal(
-    evaluations(),
-    0,
-    'issue 896: respawnInteractableNode must roll no expression amounts on the seeding tick'
-  );
+  assert.equal(evaluations(), 0, 'issue 896: respawnInteractableNode must roll no expression amounts on the seeding tick');
   assert.equal(next.respawn.lastEvaluatedWorldTime, 500 * HOUR, 'the tick seeds the anchor at now');
 });
 
@@ -402,44 +294,23 @@ test('a legacy zero-interval expression pool pre-rolls nothing at either site', 
     const pool = nullAnchoredExpressionPool();
     return {
       ...pool,
-      respawn: {
-        ...pool.respawn,
-        intervalUnit: null,
-        intervalSeconds: 0,
-        lastEvaluatedWorldTime: 0,
-      },
+      respawn: { ...pool.respawn, intervalUnit: null, intervalSeconds: 0, lastEvaluatedWorldTime: 0 }
     };
   };
   const env = countingEvaluatorService();
-  await env.service._respawnNode(zeroInterval(), {
-    now: 5 * HOUR,
-    environment: null,
-    environmentId: 'e',
-    taskId: 't',
-  });
-  assert.equal(
-    env.evaluations(),
-    0,
-    '_respawnNode: no resolvable interval → the pre-roll block is skipped'
-  );
+  await env.service._respawnNode(zeroInterval(), { now: 5 * HOUR, environment: null, environmentId: 'e', taskId: 't' });
+  assert.equal(env.evaluations(), 0, '_respawnNode: no resolvable interval → the pre-roll block is skipped');
 
   const scoped = countingEvaluatorService();
   await scoped.service.respawnInteractableNode({ node: zeroInterval(), worldTime: 5 * HOUR });
-  assert.equal(
-    scoped.evaluations(),
-    0,
-    'respawnInteractableNode: no resolvable interval → the pre-roll block is skipped'
-  );
+  assert.equal(scoped.evaluations(), 0, 'respawnInteractableNode: no resolvable interval → the pre-roll block is skipped');
 });
 
 // --- _resolveNodeSource (interactable scope) -------------------------------
 
 test('_resolveNodeSource resolves the environment pool by default', () => {
   const { service } = makeService();
-  const source = service._resolveNodeSource({
-    environment: { id: 'env-1' },
-    task: { id: 'lib-1', nodes: { current: 2, max: 3 } },
-  });
+  const source = service._resolveNodeSource({ environment: { id: 'env-1' }, task: { id: 'lib-1', nodes: { current: 2, max: 3 } } });
   assert.equal(source.kind, 'environment');
   assert.deepEqual(source.read(), { current: 2, max: 3 });
 });
@@ -453,17 +324,17 @@ test('_resolveNodeSource resolves an unlinked interactable scoped pool and route
       interactableType: 'gatheringTask',
       sourceUuid: 'Item.task-1',
       taskNodeLink: 'unlinked',
-      node: { enabled: true, max: 4, current: 4, respawn: { policy: 'manual' } },
-    }),
+      node: { enabled: true, max: 4, current: 4, respawn: { policy: 'manual' } }
+    })
   };
   const { service } = makeService({
     resolveRegionBehavior: (r) => (r?.behaviorId === 'b' ? behavior : null),
-    writeInteractableBehavior: (r, patch) => writes.push({ r, patch }),
+    writeInteractableBehavior: (r, patch) => writes.push({ r, patch })
   });
   const source = service._resolveNodeSource({
     environment: { id: 'env-1' },
     task: { id: 'lib-1', nodes: { current: 1, max: 1 } },
-    interactableRef: ref,
+    interactableRef: ref
   });
   assert.equal(source.kind, 'interactable');
   assert.equal(source.read().max, 4, 'self-authoritative scoped pool, no library merge');
@@ -477,7 +348,7 @@ test('_resolveNodeSource falls back to the environment pool when the behaviour i
   const source = service._resolveNodeSource({
     environment: { id: 'env-1' },
     task: { id: 'lib-1', nodes: { current: 2, max: 3 } },
-    interactableRef: { behaviorId: 'missing' },
+    interactableRef: { behaviorId: 'missing' }
   });
   assert.equal(source.kind, 'environment');
 });
@@ -486,22 +357,8 @@ test('_resolveNodeSource falls back to the environment pool when the behaviour i
 
 test('respawnInteractableNode regrows an overTime scoped pool with no library merge', async () => {
   const { service } = makeService({ rolls: [] });
-  const node = {
-    current: 0,
-    max: 5,
-    enabled: true,
-    respawn: {
-      policy: 'overTime',
-      gainMode: 'guaranteed',
-      intervalUnit: 'hours',
-      intervalAmount: 1,
-      lastEvaluatedWorldTime: 0,
-    },
-  };
-  const { changed, node: next } = await service.respawnInteractableNode({
-    node,
-    worldTime: 2 * HOUR,
-  });
+  const node = { current: 0, max: 5, enabled: true, respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 0 } };
+  const { changed, node: next } = await service.respawnInteractableNode({ node, worldTime: 2 * HOUR });
   assert.equal(changed, true);
   assert.equal(next.current, 2);
 });

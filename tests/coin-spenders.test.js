@@ -11,13 +11,7 @@ import {
 import { validateCurrencyProfile } from '../src/systems/currencyProfile.js';
 
 const DND5E_UNITS = [
-  {
-    id: 'gp',
-    label: 'Gold',
-    abbreviation: 'gp',
-    actorPath: 'system.currency.gp',
-    contains: [{ unitId: 'sp', amount: 10 }],
-  },
+  { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp', contains: [{ unitId: 'sp', amount: 10 }] },
   { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [] },
 ];
 
@@ -41,18 +35,10 @@ test('ActorPropertyCoinSpender.check passes when affordable and fails when short
   const profile = dnd5eProfile();
   const spender = new ActorPropertyCoinSpender();
 
-  const rich = spender.check(
-    propertyActor({ gp: 5, sp: 0 }),
-    { amount: 3 },
-    profileCtx(profile, 'gp')
-  );
+  const rich = spender.check(propertyActor({ gp: 5, sp: 0 }), { amount: 3 }, profileCtx(profile, 'gp'));
   assert.equal(rich.valid, true);
 
-  const poor = spender.check(
-    propertyActor({ gp: 1, sp: 0 }),
-    { amount: 3 },
-    profileCtx(profile, 'gp')
-  );
+  const poor = spender.check(propertyActor({ gp: 1, sp: 0 }), { amount: 3 }, profileCtx(profile, 'gp'));
   assert.equal(poor.valid, false);
   assert.match(poor.message, /Insufficient currency/i);
   assert.match(poor.message, /3 gp/);
@@ -74,10 +60,7 @@ test('ActorInventoryCoinSpender.check reports affordability and missing adapter'
   assert.equal(spender.check({ name: 'A' }, { amount: 3 }, ctx).valid, true);
   assert.equal(spender.check({ name: 'A' }, { amount: 600 }, ctx).valid, false);
 
-  const noAdapter = new ActorInventoryCoinSpender({
-    adapters: new Map(),
-    getSystemId: () => 'pf2e',
-  });
+  const noAdapter = new ActorInventoryCoinSpender({ adapters: new Map(), getSystemId: () => 'pf2e' });
   const missing = noAdapter.check({ name: 'A' }, { amount: 1 }, ctx);
   assert.equal(missing.valid, false);
   assert.match(missing.message, /no currency inventory adapter/i);
@@ -123,19 +106,14 @@ test('MacroCoinSpender runs canAfford for check and decrement for spend, never i
     resolveMacro: resolveRunnableMacro,
     runMacro,
   });
-  const ctx = {
-    macroContext: { actor: { name: 'Hero' }, cost: [{ abbreviation: 'gp', amount: 2 }] },
-  };
+  const ctx = { macroContext: { actor: { name: 'Hero' }, cost: [{ abbreviation: 'gp', amount: 2 }] } };
 
   const check = await spender.check({ name: 'Hero' }, { amount: 2 }, ctx);
   assert.equal(check.valid, true);
   const spend = await spender.spend({ name: 'Hero' }, { amount: 2 }, ctx);
   assert.equal(spend.valid, true);
 
-  assert.deepEqual(
-    runs.map((entry) => entry.uuid),
-    ['Macro.can', 'Macro.dec']
-  );
+  assert.deepEqual(runs.map((entry) => entry.uuid), ['Macro.can', 'Macro.dec']);
   assert.ok(!runs.some((entry) => entry.uuid === 'Macro.inc'));
   assert.equal(runs[0].context.actor.name, 'Hero');
 });

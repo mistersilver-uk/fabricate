@@ -26,7 +26,7 @@ globalThis.foundry = { utils: { getProperty } };
 globalThis.game = {};
 
 globalThis.ui = {
-  notifications: { info: () => {}, warn: () => {}, error: () => {} },
+  notifications: { info: () => {}, warn: () => {}, error: () => {} }
 };
 
 // ---------------------------------------------------------------------------
@@ -44,19 +44,19 @@ function setupGame(consumptionPolicy = {}) {
       macroUuid: 'macro:check-uuid',
       consumption: {
         consumeIngredientsOnFail: consumptionPolicy.consumeIngredientsOnFail,
-        breakToolsOnFail: consumptionPolicy.breakToolsOnFail,
-      },
-    },
+        breakToolsOnFail: consumptionPolicy.breakToolsOnFail
+      }
+    }
   };
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({
-        getSystem: () => system,
+        getSystem: () => system
       }),
-      getResolutionModeService: () => null,
+      getResolutionModeService: () => null
     },
     user: { id: 'user-1' },
-    time: { worldTime: 0 },
+    time: { worldTime: 0 }
   };
   return system;
 }
@@ -76,13 +76,8 @@ function buildFakeItem(id, quantity = 1) {
     deleteCalled: false,
     updateCalled: false,
     updatePayloads: [],
-    getFlag(ns, key) {
-      return flags[`${ns}.${key}`];
-    },
-    async setFlag(ns, key, value) {
-      flags[`${ns}.${key}`] = value;
-      return value;
-    },
+    getFlag(ns, key) { return flags[`${ns}.${key}`]; },
+    async setFlag(ns, key, value) { flags[`${ns}.${key}`] = value; return value; },
     async delete() {
       this.deleteCalled = true;
     },
@@ -92,7 +87,7 @@ function buildFakeItem(id, quantity = 1) {
       if (payload['system.quantity'] !== undefined) {
         this.system.quantity = payload['system.quantity'];
       }
-    },
+    }
   };
   return item;
 }
@@ -107,7 +102,7 @@ function buildFakeTool(componentId = 'tool-1') {
     id: `lib-${componentId}`,
     componentId,
     breakage: { mode: 'limitedUses', maxUses: 5 },
-    onBreak: { mode: 'flagBroken' },
+    onBreak: { mode: 'flagBroken' }
   };
 }
 
@@ -117,18 +112,14 @@ function buildFakeTool(componentId = 'tool-1') {
  * (_resolveCraftSelection) calls to build the consumption plan for this stub.
  */
 function buildFakeIngredientSet(ingredientItem) {
-  const ingredient = {
-    systemItemId: ingredientItem.id,
-    quantity: 1,
-    getDescription: () => ingredientItem.name,
-  };
+  const ingredient = { systemItemId: ingredientItem.id, quantity: 1, getDescription: () => ingredientItem.name };
   return {
     id: 'set-1',
     matchIngredients(availableItems, matcher) {
-      const matched = availableItems.find((i) => i === ingredientItem);
+      const matched = availableItems.find(i => i === ingredientItem);
       if (!matched) return [];
       return [{ item: matched, quantity: 1, ingredient }];
-    },
+    }
   };
 }
 
@@ -154,7 +145,7 @@ function buildFakeRecipe(ingredientSet, toolIds = []) {
     },
     toJSON() {
       return { id: this.id, name: this.name };
-    },
+    }
   };
 }
 
@@ -164,11 +155,7 @@ function buildFakeRecipe(ingredientSet, toolIds = []) {
 function buildEngine({ ingredientItem, toolItem, fakeTool, ingredientSet, options = {} } = {}) {
   const mockRecipeManager = {
     canCraft(actors, recipe) {
-      return {
-        canCraft: true,
-        satisfiableSet: ingredientSet,
-        missing: { ingredients: [], essences: [], tools: [] },
-      };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
     getToolsForSet(recipe, set) {
       return fakeTool ? [fakeTool] : [];
@@ -178,7 +165,7 @@ function buildEngine({ ingredientItem, toolItem, fakeTool, ingredientSet, option
     },
     ingredientMatchesItem(recipe, ingredient, item) {
       return item === ingredientItem;
-    },
+    }
   };
 
   return new CraftingEngine(mockRecipeManager, null, null);
@@ -210,11 +197,11 @@ test('_getFailureConsumptionPolicy returns policy from system craftingCheck.cons
       getCraftingSystemManager: () => ({
         getSystem: () => ({
           craftingCheck: {
-            consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
-          },
-        }),
-      }),
-    },
+            consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true }
+          }
+        })
+      })
+    }
   };
   const engine = new CraftingEngine({});
   const policy = engine._getFailureConsumptionPolicy({ craftingSystemId: 'sys-1' });
@@ -227,10 +214,10 @@ test('_getFailureConsumptionPolicy defaults consumeIngredientsOnFail to true whe
     fabricate: {
       getCraftingSystemManager: () => ({
         getSystem: () => ({
-          craftingCheck: { consumption: {} },
-        }),
-      }),
-    },
+          craftingCheck: { consumption: {} }
+        })
+      })
+    }
   };
   const engine = new CraftingEngine({});
   const policy = engine._getFailureConsumptionPolicy({ craftingSystemId: 'sys-1' });
@@ -242,10 +229,10 @@ test('_getFailureConsumptionPolicy defaults breakToolsOnFail to false when consu
     fabricate: {
       getCraftingSystemManager: () => ({
         getSystem: () => ({
-          craftingCheck: { consumption: {} },
-        }),
-      }),
-    },
+          craftingCheck: { consumption: {} }
+        })
+      })
+    }
   };
   const engine = new CraftingEngine({});
   const policy = engine._getFailureConsumptionPolicy({ craftingSystemId: 'sys-1' });
@@ -266,19 +253,10 @@ async function runCheckFailureScenario({ consumeIngredientsOnFail, breakToolsOnF
   const recipe = buildFakeRecipe(ingredientSet, [fakeTool.id]);
 
   const engine = buildEngine({ ingredientItem, toolItem, fakeTool, ingredientSet });
-  stubCraftingCheck(engine, {
-    success: false,
-    message: 'Check failed',
-    outcome: null,
-    value: null,
-    data: {},
-  });
+  stubCraftingCheck(engine, { success: false, message: 'Check failed', outcome: null, value: null, data: {} });
 
   const toolUsed = { value: false };
-  engine._applyToolBreakage = async () => {
-    toolUsed.value = true;
-    return [];
-  };
+  engine._applyToolBreakage = async () => { toolUsed.value = true; return []; };
 
   const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, toolItem] };
   const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
@@ -291,45 +269,29 @@ async function runCheckFailureScenario({ consumeIngredientsOnFail, breakToolsOnF
 test('craft() consumes ingredients AND breaks tools on check failure when both flags true', async () => {
   const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: true,
-    breakToolsOnFail: true,
+    breakToolsOnFail: true
   });
   assert.equal(result.success, false);
-  assert.equal(
-    ingredientItem.updateCalled,
-    true,
-    'ingredient should have been partially consumed via update'
-  );
-  assert.equal(
-    ingredientItem.deleteCalled,
-    false,
-    'ingredient should not have been deleted (quantity > requested)'
-  );
+  assert.equal(ingredientItem.updateCalled, true, 'ingredient should have been partially consumed via update');
+  assert.equal(ingredientItem.deleteCalled, false, 'ingredient should not have been deleted (quantity > requested)');
   assert.equal(toolUsed.value, true, 'tool should have been used/broken');
 });
 
 test('craft() consumes ingredients but NOT tools on check failure (default policy: true/false)', async () => {
   const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: true,
-    breakToolsOnFail: false,
+    breakToolsOnFail: false
   });
   assert.equal(result.success, false);
-  assert.equal(
-    ingredientItem.updateCalled,
-    true,
-    'ingredient should have been partially consumed via update'
-  );
-  assert.equal(
-    ingredientItem.deleteCalled,
-    false,
-    'ingredient should not have been deleted (quantity > requested)'
-  );
+  assert.equal(ingredientItem.updateCalled, true, 'ingredient should have been partially consumed via update');
+  assert.equal(ingredientItem.deleteCalled, false, 'ingredient should not have been deleted (quantity > requested)');
   assert.equal(toolUsed.value, false, 'tool should NOT have been used/broken');
 });
 
 test('craft() does NOT consume ingredients but DOES break tools on check failure (false/true)', async () => {
   const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: false,
-    breakToolsOnFail: true,
+    breakToolsOnFail: true
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
@@ -340,7 +302,7 @@ test('craft() does NOT consume ingredients but DOES break tools on check failure
 test('craft() does NOT consume ingredients AND does NOT break tools on check failure when both flags false', async () => {
   const { result, ingredientItem, toolUsed } = await runCheckFailureScenario({
     consumeIngredientsOnFail: false,
-    breakToolsOnFail: false,
+    breakToolsOnFail: false
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
@@ -363,11 +325,7 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToo
 
   const mockRecipeManager = {
     canCraft() {
-      return {
-        canCraft: true,
-        satisfiableSet: ingredientSet,
-        missing: { ingredients: [], essences: [], tools: [] },
-      };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
     getToolsForSet() {
       return [fakeTool];
@@ -377,23 +335,15 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToo
     },
     ingredientMatchesItem(recipe, ingredient, item) {
       return item === ingredientItem;
-    },
+    }
   };
 
   // resolutionModeService that makes validateCheckResult return false
   const mockResolutionService = {
-    validateRecipe() {
-      return { valid: true, errors: [] };
-    },
-    validateCheckResult() {
-      return false;
-    },
-    resolveResultGroups() {
-      return { groups: [], meta: {} };
-    },
-    getMode() {
-      return 'simple';
-    },
+    validateRecipe() { return { valid: true, errors: [] }; },
+    validateCheckResult() { return false; },
+    resolveResultGroups() { return { groups: [], meta: {} }; },
+    getMode() { return 'simple'; }
   };
 
   const engine = new CraftingEngine(mockRecipeManager, null, mockResolutionService);
@@ -401,10 +351,7 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToo
   stubCraftingCheck(engine, { success: true, outcome: 'pass', value: 10, data: {} });
 
   const toolUsed = { value: false };
-  engine._applyToolBreakage = async () => {
-    toolUsed.value = true;
-    return [];
-  };
+  engine._applyToolBreakage = async () => { toolUsed.value = true; return []; };
 
   const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, toolItem] };
   const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
@@ -417,27 +364,19 @@ async function runValidationFailureScenario({ consumeIngredientsOnFail, breakToo
 test('craft() applies failure consumption policy when check result validation fails (both true)', async () => {
   const { result, ingredientItem, toolUsed } = await runValidationFailureScenario({
     consumeIngredientsOnFail: true,
-    breakToolsOnFail: true,
+    breakToolsOnFail: true
   });
   assert.equal(result.success, false);
   assert.match(result.message, /resolution mode requirements/i);
-  assert.equal(
-    ingredientItem.updateCalled,
-    true,
-    'ingredient should have been partially consumed via update'
-  );
-  assert.equal(
-    ingredientItem.deleteCalled,
-    false,
-    'ingredient should not have been deleted (quantity > requested)'
-  );
+  assert.equal(ingredientItem.updateCalled, true, 'ingredient should have been partially consumed via update');
+  assert.equal(ingredientItem.deleteCalled, false, 'ingredient should not have been deleted (quantity > requested)');
   assert.equal(toolUsed.value, true, 'tool should have been used/broken');
 });
 
 test('craft() does not consume when policy is false/false and check result validation fails', async () => {
   const { result, ingredientItem, toolUsed } = await runValidationFailureScenario({
     consumeIngredientsOnFail: false,
-    breakToolsOnFail: false,
+    breakToolsOnFail: false
   });
   assert.equal(result.success, false);
   assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT have been deleted');
@@ -465,27 +404,18 @@ test('craft() does not consume on pre-check failure (missing ingredients)', asyn
         missing: {
           ingredients: [{ ingredient: { getDescription: () => 'Herb' }, have: 0, need: 1 }],
           essences: [],
-          tools: [],
-        },
+          tools: []
+        }
       };
     },
-    getToolsForSet() {
-      return [fakeTool];
-    },
-    toolMatchesItem() {
-      return false;
-    },
-    ingredientMatchesItem() {
-      return false;
-    },
+    getToolsForSet() { return [fakeTool]; },
+    toolMatchesItem() { return false; },
+    ingredientMatchesItem() { return false; }
   };
 
   const engine = new CraftingEngine(mockRecipeManager, null, null);
   const toolUsed = { value: false };
-  engine._applyToolBreakage = async () => {
-    toolUsed.value = true;
-    return [];
-  };
+  engine._applyToolBreakage = async () => { toolUsed.value = true; return []; };
   const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem] };
   const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
 
@@ -493,11 +423,7 @@ test('craft() does not consume on pre-check failure (missing ingredients)', asyn
 
   assert.equal(result.success, false);
   assert.match(result.message, /Missing required items/i);
-  assert.equal(
-    ingredientItem.deleteCalled,
-    false,
-    'ingredient should NOT be consumed on pre-check failure'
-  );
+  assert.equal(ingredientItem.deleteCalled, false, 'ingredient should NOT be consumed on pre-check failure');
   assert.equal(toolUsed.value, false, 'tool should NOT be used/broken on pre-check failure');
 });
 
@@ -515,16 +441,8 @@ test('_consumeIngredients defaults missing item.system.quantity to 1', async () 
   assert.equal(consumedItems.length, 1, 'one matched ingredient should be returned');
   assert.equal(consumedItems[0].item, ingredientItem);
   assert.equal(consumedItems[0].quantity, 1);
-  assert.equal(
-    ingredientItem.deleteCalled,
-    true,
-    'item without system data should default to quantity 1 and delete cleanly'
-  );
-  assert.equal(
-    ingredientItem.updateCalled,
-    false,
-    'item should not be updated when default quantity is fully consumed'
-  );
+  assert.equal(ingredientItem.deleteCalled, true, 'item without system data should default to quantity 1 and delete cleanly');
+  assert.equal(ingredientItem.updateCalled, false, 'item should not be updated when default quantity is fully consumed');
 });
 
 test('craft() success path still consumes ingredients regardless of consumeIngredientsOnFail policy', async () => {
@@ -537,37 +455,21 @@ test('craft() success path still consumes ingredients regardless of consumeIngre
   const recipe = buildFakeRecipe(ingredientSet, []);
 
   const mockResolutionService = {
-    validateRecipe() {
-      return { valid: true, errors: [] };
-    },
-    validateCheckResult() {
-      return true;
-    },
-    resolveResultGroups() {
-      return { groups: [], meta: {} };
-    },
-    getMode() {
-      return 'simple';
-    },
+    validateRecipe() { return { valid: true, errors: [] }; },
+    validateCheckResult() { return true; },
+    resolveResultGroups() { return { groups: [], meta: {} }; },
+    getMode() { return 'simple'; }
   };
 
   const mockRecipeManager = {
     canCraft() {
-      return {
-        canCraft: true,
-        satisfiableSet: ingredientSet,
-        missing: { ingredients: [], essences: [], tools: [] },
-      };
+      return { canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } };
     },
-    getToolsForSet() {
-      return [];
-    },
-    toolMatchesItem() {
-      return false;
-    },
+    getToolsForSet() { return []; },
+    toolMatchesItem() { return false; },
     ingredientMatchesItem(recipe, ingredient, item) {
       return item === ingredientItem;
-    },
+    }
   };
 
   const engine = new CraftingEngine(mockRecipeManager, null, mockResolutionService);
@@ -575,19 +477,11 @@ test('craft() success path still consumes ingredients regardless of consumeIngre
   stubCraftingCheck(engine, { success: true, outcome: null, value: null, data: {} });
 
   const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem] };
-  const craftingActor = {
-    id: 'a1',
-    name: 'Crafter',
-    uuid: 'Actor.a1',
-    items: { contents: [] },
-    createEmbeddedDocuments: async () => [],
-  };
+  const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] }, createEmbeddedDocuments: async () => [] };
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
   assert.equal(result.success, true, 'craft should succeed');
-  assert.ok(
-    ingredientItem.deleteCalled || ingredientItem.updateCalled,
-    'ingredient should be consumed on success regardless of failure policy'
-  );
+  assert.ok(ingredientItem.deleteCalled || ingredientItem.updateCalled,
+    'ingredient should be consumed on success regardless of failure policy');
 });

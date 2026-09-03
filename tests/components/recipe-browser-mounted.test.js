@@ -226,11 +226,7 @@ describe('RecipeBrowser mounted behavior', () => {
     });
     const badge = target.querySelector('[data-recipe-id="r1"] .crafting-recipe-row-category');
     assert.ok(badge, 'a non-general row shows the category badge');
-    assert.equal(
-      badge.textContent.trim(),
-      'Weapons',
-      'badge text is the categoryLabel, not the raw token'
-    );
+    assert.equal(badge.textContent.trim(), 'Weapons', 'badge text is the categoryLabel, not the raw token');
     assert.equal(badge.getAttribute('title'), 'Weapons', 'full label available via title on hover');
   });
 

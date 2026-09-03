@@ -33,8 +33,8 @@ function libraryTask() {
       max: 3,
       current: 3,
       depletionTiming: 'onStart',
-      respawn: { policy: 'manual' },
-    },
+      respawn: { policy: 'manual' }
+    }
   };
 }
 
@@ -51,7 +51,7 @@ function environmentRecord() {
     enabled: false,
     selectionMode: 'targeted',
     tasks: [],
-    nodeRuntime: {},
+    nodeRuntime: {}
   };
 }
 
@@ -108,22 +108,23 @@ function makeRichState({ seam, depleteEnvironmentNode = null }) {
   const store = new GatheringEnvironmentStore({
     getSetting: seam.getSetting,
     setSetting: seam.setSetting,
-    getSystems: () => [{ id: SYS, name: 'Guard', enabled: true, features: { gathering: true } }],
+    getSystems: () => [{ id: SYS, name: 'Guard', enabled: true, features: { gathering: true } }]
   });
   seam.settings.set(SETTING_KEYS.GATHERING_ENVIRONMENTS, [environmentRecord()]);
   store.load();
 
   const config = {
-    systems: { [SYS]: { tasks: [libraryTask()], economy: { nodes: { enabled: true } } } },
+    systems: { [SYS]: { tasks: [libraryTask()], economy: { nodes: { enabled: true } } } }
   };
   const service = new GatheringRichStateService({
     environmentStore: store,
-    getSetting: (key) => (key === SETTING_KEYS.GATHERING_CONFIG ? config : seam.getSetting(key)),
+    getSetting: (key) =>
+      key === SETTING_KEYS.GATHERING_CONFIG ? config : seam.getSetting(key),
     setSetting: seam.setSetting,
     settingKey: SETTING_KEYS.GATHERING_CONFIG,
     nowWorldTime: () => 0,
     hooks: { callAll: () => {} },
-    depleteEnvironmentNode,
+    depleteEnvironmentNode
   });
   return { service, store };
 }
@@ -134,9 +135,9 @@ const attempt = {
   environment: { id: 'env-1', craftingSystemId: SYS },
   task: {
     id: 'lib-1',
-    nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } },
+    nodes: { enabled: true, max: 3, current: 3, respawn: { policy: 'manual' } }
   },
-  outcome: { status: 'succeeded' },
+  outcome: { status: 'succeeded' }
 };
 
 test('GUARD: an unrouted depletion on a player client reproduces the shipped bug', async () => {
@@ -158,7 +159,7 @@ test('GUARD: the routed depletion writes no world setting on a player client', a
   const seam = makeSettingsSeam({ isGM: false, userName: 'Randall' });
   const { service } = makeRichState({
     seam,
-    depleteEnvironmentNode: (args) => routed.push(args),
+    depleteEnvironmentNode: (args) => routed.push(args)
   });
 
   const evidence = await service.commitAcceptedAttempt(attempt);

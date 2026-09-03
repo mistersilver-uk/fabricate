@@ -68,10 +68,7 @@
     toBulkRecipeEdit,
   } from '../../../../utils/recipeBulkEditModel.js';
   import { createEssenceBrowserState } from '../../../../utils/essenceBrowserModel.js';
-  import {
-    createManagerBrowserViewStates,
-    createScopedListBrowserState,
-  } from '../../../../utils/managerBrowserViewState.js';
+  import { createManagerBrowserViewStates } from '../../../../utils/managerBrowserViewState.js';
   import {
     createEssenceBulkDraft,
     toBulkEssenceEdit,
@@ -470,12 +467,6 @@
   // about — Knowledge and Grant access — are exactly this case: their parents survive every
   // in-surface interaction and die on the route change.
   let managerBrowserState = $state(createManagerBrowserViewStates());
-  // THE WORLD COMPONENT CATALOGUE'S LIST SLOT (issue 1371), seeded HERE rather than added to the
-  // shared factory, which this change does not open. It is the same `createScopedListBrowserState`
-  // shape the world essence catalogue's slot holds, so the catalogue's search, filters, sort and
-  // page survive the trip out to an entry and back exactly as its sibling's do. A follow-up moves
-  // the key onto the factory beside the other thirteen.
-  managerBrowserState.worldComponentCatalogue = createScopedListBrowserState();
   // The staged-but-unwritten essence bulk edit, owned HERE for the reason its two siblings
   // are: the panel is unmounted the moment the selection empties, so a panel-owned draft
   // would be destroyed by the very transition that is supposed to DISCARD it.

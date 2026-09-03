@@ -9,7 +9,7 @@ const {
   routedSuccessTierOptions,
   routedOutcomeTierOptions,
   routedHasOutcomeTiers,
-  routedOutcomeTierNames,
+  routedOutcomeTierNames
 } = await import('../src/utils/routedOutcomeKeywords.js');
 
 test('routedOutcomeTierOptions returns ALL id-bearing tiers (success AND failure) as {id,name}', () => {
@@ -20,13 +20,13 @@ test('routedOutcomeTierOptions returns ALL id-bearing tiers (success AND failure
       { id: 't1', name: 'Standard', success: true },
       { id: 't2', name: 'Botch', success: false }, // failure tier is KEPT here
       { id: '', name: 'NoId', success: true }, // missing id → excluded
-      { id: 't3', success: true }, // no name → falls back to id
-    ],
+      { id: 't3', success: true } // no name → falls back to id
+    ]
   };
   assert.deepEqual(routedOutcomeTierOptions(routed), [
     { id: 't1', name: 'Standard' },
     { id: 't2', name: 'Botch' },
-    { id: 't3', name: 't3' },
+    { id: 't3', name: 't3' }
   ]);
 });
 
@@ -34,7 +34,7 @@ test('routedOutcomeTierOptions reads fixedOutcomes when type is fixed', () => {
   const routed = {
     type: 'fixed',
     fixedOutcomes: [{ id: 'f1', name: 'Masterwork', success: true }],
-    relativeOutcomes: [{ id: 'r1', name: 'Ignored', success: true }],
+    relativeOutcomes: [{ id: 'r1', name: 'Ignored', success: true }]
   };
   assert.deepEqual(routedOutcomeTierOptions(routed), [{ id: 'f1', name: 'Masterwork' }]);
 });
@@ -115,10 +115,7 @@ test('routedHasOutcomeTiers: reads the active type list (fixed vs relative)', ()
 
 test('routedHasOutcomeTiers: tiers without an id do not count', () => {
   assert.equal(
-    routedHasOutcomeTiers({
-      type: 'relative',
-      relativeOutcomes: [{ name: 'NoId', success: true }],
-    }),
+    routedHasOutcomeTiers({ type: 'relative', relativeOutcomes: [{ name: 'NoId', success: true }] }),
     false
   );
   assert.equal(routedHasOutcomeTiers({ type: 'relative', relativeOutcomes: null }), false);

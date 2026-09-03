@@ -9,7 +9,7 @@ import {
   createGatheringSelectableActorsGetter,
   evaluateGatheringExpression,
   processWorldTimeCallbacksSafely,
-  withCurrentGatheringViewer,
+  withCurrentGatheringViewer
 } from '../src/gatheringBootstrapAdapters.js';
 import { createGatheringToolAvailability } from '../src/gatheringToolRuntime.js';
 import { GatheringGateAndCheckEvaluator } from '../src/systems/GatheringGateAndCheckEvaluator.js';
@@ -29,7 +29,7 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
     'getGatheringGateAndCheckEvaluator()',
     'listGatheringForActor(options = {})',
     'startGatheringAttempt(options = {})',
-    'getGatheringDropBreakdown(options = {})',
+    'getGatheringDropBreakdown(options = {})'
   ]) {
     assert.ok(mainSource.includes(expected), `src/main.js should expose ${expected}`);
   }
@@ -71,16 +71,10 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
     /_withRememberedActorDefault\(options = \{\}\) \{[\s\S]*?rememberedActorId: options\.rememberedActorId \|\| this\.getSelectedGatheringActorId\(\) \|\| null,/,
     '_withRememberedActorDefault should coalesce a null/omitted id to the persisted selection (a truthy id overrides)'
   );
-  for (const wrapper of [
-    'listGatheringForActor',
-    'startGatheringAttempt',
-    'getGatheringDropBreakdown',
-  ]) {
+  for (const wrapper of ['listGatheringForActor', 'startGatheringAttempt', 'getGatheringDropBreakdown']) {
     assert.match(
       mainSource,
-      new RegExp(
-        `${wrapper}\\(options = \\{\\}\\) \\{[\\s\\S]*?const withRememberedActor = this\\._withRememberedActorDefault\\(options\\);`
-      ),
+      new RegExp(`${wrapper}\\(options = \\{\\}\\) \\{[\\s\\S]*?const withRememberedActor = this\\._withRememberedActorDefault\\(options\\);`),
       `${wrapper} should default the remembered actor through _withRememberedActorDefault`
     );
   }
@@ -123,9 +117,7 @@ test('actor-selection bar wiring filters to player characters and returns redact
     'main.js should import the shared, GM-configurable player-character predicate'
   );
   assert.ok(
-    mainSource.includes(
-      'return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);'
-    ),
+    mainSource.includes('return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);'),
     'isSelectableBarActor should compose ownership authorization AND the player-character concept'
   );
   assert.ok(
@@ -166,7 +158,7 @@ test('public gathering API wrappers force current user before reaching runtime m
     startAttempt: (payload) => {
       calls.push({ method: 'startAttempt', payload });
       return payload;
-    },
+    }
   };
 
   const listPayload = callGatheringRuntimeWithCurrentViewer(
@@ -186,10 +178,7 @@ test('public gathering API wrappers force current user before reaching runtime m
   assert.equal(startPayload.viewer, currentUser);
   assert.equal(calls[0].payload.viewer.isGM, false);
   assert.equal(calls[1].payload.viewer.isGM, false);
-  assert.deepEqual(
-    calls.map((call) => call.method),
-    ['listForActor', 'startAttempt']
-  );
+  assert.deepEqual(calls.map(call => call.method), ['listForActor', 'startAttempt']);
 });
 
 test('selectable-actors adapter accepts GatheringEngine payload shape and preserves viewer permissions', () => {
@@ -199,27 +188,18 @@ test('selectable-actors adapter accepts GatheringEngine payload shape and preser
   const gmOnlyActor = { id: 'gm-only', ownership: {} };
   const actors = new Map([
     [ownedActor.id, ownedActor],
-    [gmOnlyActor.id, gmOnlyActor],
+    [gmOnlyActor.id, gmOnlyActor]
   ]);
 
   const getSelectableActors = createGatheringSelectableActorsGetter({
     getActors: () => actors,
     getCurrentUser: () => player,
-    isSelectable: (actor, viewer) => viewer?.isGM === true || actor.ownership?.[viewer?.id] >= 3,
+    isSelectable: (actor, viewer) => viewer?.isGM === true || actor.ownership?.[viewer?.id] >= 3
   });
 
-  assert.deepEqual(
-    getSelectableActors({ viewer: player }).map((actor) => actor.id),
-    ['owned']
-  );
-  assert.deepEqual(
-    getSelectableActors({ viewer: gm }).map((actor) => actor.id),
-    ['owned', 'gm-only']
-  );
-  assert.deepEqual(
-    getSelectableActors().map((actor) => actor.id),
-    ['owned']
-  );
+  assert.deepEqual(getSelectableActors({ viewer: player }).map(actor => actor.id), ['owned']);
+  assert.deepEqual(getSelectableActors({ viewer: gm }).map(actor => actor.id), ['owned', 'gm-only']);
+  assert.deepEqual(getSelectableActors().map(actor => actor.id), ['owned']);
 });
 
 test('expression adapter accepts evaluator payload shape and uses actor roll data', async () => {
@@ -234,31 +214,26 @@ test('expression adapter accepts evaluator payload shape and uses actor roll dat
 
     async evaluate(options) {
       rollCalls[rollCalls.length - 1].options = options;
-      return {
-        total: this.formula === '@skills.sur.mod + 10' ? this.data.skills.sur.mod + 10 : 12,
-      };
+      return { total: this.formula === '@skills.sur.mod + 10' ? this.data.skills.sur.mod + 10 : 12 };
     }
   };
 
   try {
     const actor = {
-      getRollData: () => ({ skills: { sur: { mod: 5 } } }),
+      getRollData: () => ({ skills: { sur: { mod: 5 } } })
     };
     const evaluator = new GatheringGateAndCheckEvaluator({
-      evaluateExpression: evaluateGatheringExpression,
+      evaluateExpression: evaluateGatheringExpression
     });
 
     const result = await evaluator.evaluateVisibility({
       gate: { formula: '@skills.sur.mod + 10', threshold: '12' },
-      actor,
+      actor
     });
 
     assert.equal(result.visible, true);
     assert.equal(result.reasonCode, 'VISIBLE');
-    assert.deepEqual(
-      rollCalls.map((call) => call.formula),
-      ['@skills.sur.mod + 10', '12']
-    );
+    assert.deepEqual(rollCalls.map(call => call.formula), ['@skills.sur.mod + 10', '12']);
     assert.deepEqual(rollCalls[0].data, { skills: { sur: { mod: 5 } } });
     // async evaluate() (not evaluateSync()), with the non-interactive option so a
     // manual roll-fulfilment dialog can never surface mid-gather (defect 3).
@@ -294,7 +269,7 @@ test('bootstrap constructs gathering collaborators after systems load with expli
     'resultCreator: createGatheringResultCreator(this.craftingSystemManager)',
     'failureFeedback: createGatheringFailureFeedback()',
     'getRunViewer: getGatheringRunViewer',
-    'localize: localizeGathering',
+    'localize: localizeGathering'
   ]) {
     assert.ok(mainSource.includes(expected), `GatheringEngine should receive ${expected}`);
   }
@@ -302,7 +277,7 @@ test('bootstrap constructs gathering collaborators after systems load with expli
   for (const expected of [
     'removeRunsForSystem: (systemId) => this.gatheringRunManager.removeRunsForSystem(systemId)',
     'removeRunsForEnvironment: (environmentId) => this.gatheringRunManager.removeRunsForEnvironment(environmentId)',
-    'removeRunsForTask: (taskId, options) => this.gatheringRunManager.removeRunsForTask(taskId, options)',
+    'removeRunsForTask: (taskId, options) => this.gatheringRunManager.removeRunsForTask(taskId, options)'
   ]) {
     assert.ok(mainSource.includes(expected), `environment cleanup should wire ${expected}`);
   }
@@ -352,39 +327,36 @@ test('world-time processor helper continues after synchronous throws and async r
   const calls = [];
   const errors = [];
 
-  const settlements = processWorldTimeCallbacksSafely(
-    [
-      {
-        label: 'Crafting',
-        callback: () => {
-          calls.push('crafting');
-          throw new Error('crafting failed');
-        },
-      },
-      {
-        label: 'Salvage',
-        callback: async () => {
-          calls.push('salvage');
-          throw new Error('salvage failed');
-        },
-      },
-      {
-        label: 'Gathering',
-        callback: () => {
-          calls.push('gathering');
-        },
-      },
-    ],
+  const settlements = processWorldTimeCallbacksSafely([
     {
-      onError: (label, error) => errors.push({ label, message: error.message }),
+      label: 'Crafting',
+      callback: () => {
+        calls.push('crafting');
+        throw new Error('crafting failed');
+      }
+    },
+    {
+      label: 'Salvage',
+      callback: async () => {
+        calls.push('salvage');
+        throw new Error('salvage failed');
+      }
+    },
+    {
+      label: 'Gathering',
+      callback: () => {
+        calls.push('gathering');
+      }
     }
-  );
+  ], {
+    onError: (label, error) => errors.push({ label, message: error.message })
+  });
 
   assert.deepEqual(calls, ['crafting', 'salvage', 'gathering']);
   await Promise.all(settlements);
   assert.deepEqual(errors, [
     { label: 'Crafting', message: 'crafting failed' },
-    { label: 'Salvage', message: 'salvage failed' },
+    { label: 'Salvage', message: 'salvage failed' }
   ]);
 });
 
@@ -394,38 +366,33 @@ test('awaited startup settlement delays fabricate.ready until all guarded proces
   let releaseCrafting;
 
   async function simulatedReadyHook() {
-    await Promise.all(
-      processWorldTimeCallbacksSafely(
-        [
-          {
-            label: 'Crafting',
-            callback: () => {
-              calls.push('crafting');
-              return new Promise((resolve) => {
-                releaseCrafting = resolve;
-              });
-            },
-          },
-          {
-            label: 'Salvage',
-            callback: () => {
-              calls.push('salvage');
-              throw new Error('salvage failed');
-            },
-          },
-          {
-            label: 'Gathering',
-            callback: async () => {
-              calls.push('gathering');
-              throw new Error('gathering failed');
-            },
-          },
-        ],
-        {
-          onError: (label, error) => errors.push({ label, message: error.message }),
+    await Promise.all(processWorldTimeCallbacksSafely([
+      {
+        label: 'Crafting',
+        callback: () => {
+          calls.push('crafting');
+          return new Promise(resolve => {
+            releaseCrafting = resolve;
+          });
         }
-      )
-    );
+      },
+      {
+        label: 'Salvage',
+        callback: () => {
+          calls.push('salvage');
+          throw new Error('salvage failed');
+        }
+      },
+      {
+        label: 'Gathering',
+        callback: async () => {
+          calls.push('gathering');
+          throw new Error('gathering failed');
+        }
+      }
+    ], {
+      onError: (label, error) => errors.push({ label, message: error.message })
+    }));
     calls.push('fabricate.ready');
   }
 
@@ -439,7 +406,7 @@ test('awaited startup settlement delays fabricate.ready until all guarded proces
   assert.deepEqual(calls, ['crafting', 'salvage', 'gathering', 'fabricate.ready']);
   assert.deepEqual(errors, [
     { label: 'Salvage', message: 'salvage failed' },
-    { label: 'Gathering', message: 'gathering failed' },
+    { label: 'Gathering', message: 'gathering failed' }
   ]);
 });
 
@@ -502,16 +469,16 @@ test('tool availability injectable matches by componentId and skips broken-flagg
 test('tool availability injectable blocks when actor lacks a required library tool', async () => {
   const availability = createGatheringToolAvailability({
     craftingSystemManager: {
-      toolMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId,
+      toolMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId
     },
-    evaluator: { evaluateRequirement: async () => ({ allowed: true }) },
+    evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
   });
 
   const result = await availability.check({
     actor: { uuid: 'Actor.actor-1', items: [] },
     system: { id: 'system-a' },
     task: { id: 'task-a' },
-    tools: [{ componentId: 'tool-pick' }],
+    tools: [{ componentId: 'tool-pick' }]
   });
 
   assert.equal(result.available, false);
@@ -521,23 +488,22 @@ test('tool availability injectable blocks when actor lacks a required library to
 test('tool availability injectable treats actor tools flagged broken as missing', async () => {
   const availability = createGatheringToolAvailability({
     craftingSystemManager: {
-      toolMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId,
+      toolMatchesItem: (_recipe, tool, item) => tool.componentId === item.componentId
     },
-    evaluator: { evaluateRequirement: async () => ({ allowed: true }) },
+    evaluator: { evaluateRequirement: async () => ({ allowed: true }) }
   });
   const brokenItem = {
     uuid: 'Item.pick',
     componentId: 'tool-pick',
     flags: { fabricate: { toolBroken: true } },
-    getFlag: (namespace, key) =>
-      namespace === 'fabricate' && key === 'toolBroken' ? true : undefined,
+    getFlag: (namespace, key) => namespace === 'fabricate' && key === 'toolBroken' ? true : undefined
   };
 
   const result = await availability.check({
     actor: { uuid: 'Actor.actor-1', items: [brokenItem] },
     system: { id: 'system-a' },
     task: { id: 'task-a' },
-    tools: [{ componentId: 'tool-pick' }],
+    tools: [{ componentId: 'tool-pick' }]
   });
 
   assert.equal(result.available, false);

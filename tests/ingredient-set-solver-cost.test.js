@@ -65,8 +65,9 @@ import { createOperationCounters } from './helpers/scale/scaleCounters.js';
 
 globalThis.foundry = { utils: { randomID: () => crypto.randomUUID() } };
 
-const { IngredientSet, INGREDIENT_SEARCH_NODE_CAP } =
-  await import('../src/models/IngredientSet.js');
+const { IngredientSet, INGREDIENT_SEARCH_NODE_CAP } = await import(
+  '../src/models/IngredientSet.js'
+);
 
 /**
  * A `remaining` ledger that counts the operations performed on it.

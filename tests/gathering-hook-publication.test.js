@@ -125,13 +125,7 @@ test('projects used tools to a public shape, dropping breakage internals', () =>
 
   // mode / evidence / itemRef must NOT leak to subscribers.
   assert.deepEqual(completionOf(hooks).usedTools, [
-    {
-      componentId: 'pick',
-      actorUuid: 'Actor.actor-1',
-      itemUuid: 'Item.tool',
-      quantity: 1,
-      broken: true,
-    },
+    { componentId: 'pick', actorUuid: 'Actor.actor-1', itemUuid: 'Item.tool', quantity: 1, broken: true },
   ]);
 });
 
@@ -244,9 +238,7 @@ test('swallows a payload that cannot be cloned', () => {
 
   // A function is not structured-cloneable — building the payload would throw.
   assert.doesNotThrow(() =>
-    publisher.publishAttemptCompleted(
-      baseArgs({ checkResult: { events: [], notClonable: () => {} } })
-    )
+    publisher.publishAttemptCompleted(baseArgs({ checkResult: { events: [], notClonable: () => {} } }))
   );
 });
 
@@ -378,11 +370,7 @@ function timedEnvironment() {
         toolIds: [],
         timeRequirement: { minutes: 1 },
         resultGroups: [
-          {
-            id: 'group-a',
-            name: 'Iron',
-            results: [{ id: 'r-a', componentId: 'comp-a', quantity: 2 }],
-          },
+          { id: 'group-a', name: 'Iron', results: [{ id: 'r-a', componentId: 'comp-a', quantity: 2 }] },
         ],
       },
     ],

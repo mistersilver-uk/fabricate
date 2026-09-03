@@ -44,8 +44,9 @@ function buildApp(deps, overrides = {}) {
   const MixedClass = createSvelteApplicationMixin(MockBase, deps);
 
   class TestApp extends MixedClass {
-    static SVELTE_COMPONENT =
-      overrides.component !== undefined ? overrides.component : function FakeComponent() {};
+    static SVELTE_COMPONENT = overrides.component !== undefined
+      ? overrides.component
+      : function FakeComponent() {};
 
     _prepareSvelteProps(context) {
       if (overrides.prepareSvelteProps) {
@@ -125,7 +126,7 @@ test('first _replaceHTML calls mountFn with component, target, and props', async
 test('mountFn receives props from _prepareSvelteProps if overridden', async () => {
   const deps = makeDeps();
   const app = buildApp(deps, {
-    prepareSvelteProps: (ctx) => ({ bar: ctx.foo * 2 }),
+    prepareSvelteProps: (ctx) => ({ bar: ctx.foo * 2 })
   });
   const target = makeWindowContent();
 
@@ -267,9 +268,7 @@ test('_onPosition calls onResize prop callback with width and height', async () 
   const target = makeWindowContent();
 
   let resizeArgs = null;
-  const onResize = (args) => {
-    resizeArgs = args;
-  };
+  const onResize = (args) => { resizeArgs = args; };
 
   const result = await app._renderHTML({ onResize }, {});
   app._replaceHTML(result, target, {});
@@ -375,7 +374,7 @@ test('close followed by _onClose does not double-unmount', async () => {
   app._replaceHTML(result, target, {});
 
   await app.close();
-  app._onClose({}); // should be a no-op — component already unmounted
+  app._onClose({});  // should be a no-op — component already unmounted
 
   assert.equal(deps.unmountCalls.length, 1);
 });

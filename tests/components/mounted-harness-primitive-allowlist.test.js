@@ -316,10 +316,7 @@ function importedArraysOf(suite) {
       )
     );
     for (const raw of names.split(',')) {
-      const name = raw
-        .trim()
-        .split(/\s+as\s+/)
-        .at(-1);
+      const name = raw.trim().split(/\s+as\s+/).at(-1);
       if (declared.has(name)) pairs.push([name, declared.get(name)]);
     }
   }
@@ -374,7 +371,8 @@ test('every hand-rolled mount harness names the shared primitives its tree rende
     const required = new Set(
       SHARED_PRIMITIVES.filter(
         (primitive) =>
-          !named.includes(primitive) && named.some((path) => closures.get(path).has(primitive))
+          !named.includes(primitive) &&
+          named.some((path) => closures.get(path).has(primitive))
       )
     );
 
@@ -414,9 +412,9 @@ test('every inspected suite resolves at least one real component, so none passes
   assert.deepEqual(
     unreadable,
     [],
-    'these suites compile components the parser cannot read, so the guard above holds over an ' +
-      'empty set for them and reports clean whatever they render:\n- ' +
-      unreadable.join('\n- ')
+    'these suites compile components the parser cannot read, so the guard above holds over an '
+      + 'empty set for them and reports clean whatever they render:\n- '
+      + unreadable.join('\n- ')
   );
 });
 

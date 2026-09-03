@@ -5,7 +5,7 @@ import {
   secondsPerDayFromCalendar,
   secondsPerWeekFromCalendar,
   secondsPerUnitFromCalendar,
-  daysPerYearFromCalendar,
+  daysPerYearFromCalendar
 } from '../src/systems/foundryCalendar.js';
 
 describe('foundryCalendar — deriving interval lengths from a world calendar', () => {
@@ -24,20 +24,11 @@ describe('foundryCalendar — deriving interval lengths from a world calendar', 
     assert.equal(secondsPerDayFromCalendar(null), 86400);
     assert.equal(secondsPerDayFromCalendar({}), 86400);
     // A throwing componentsToTime is swallowed → Earth day.
-    assert.equal(
-      secondsPerDayFromCalendar({
-        componentsToTime: () => {
-          throw new Error('nope');
-        },
-      }),
-      86400
-    );
+    assert.equal(secondsPerDayFromCalendar({ componentsToTime: () => { throw new Error('nope'); } }), 86400);
   });
 
   it('computes seconds-per-week as weekday-count × day length', () => {
-    const cal = {
-      days: { hoursPerDay: 20, minutesPerHour: 60, secondsPerMinute: 60, values: [0, 1, 2, 3, 4] },
-    };
+    const cal = { days: { hoursPerDay: 20, minutesPerHour: 60, secondsPerMinute: 60, values: [0, 1, 2, 3, 4] } };
     // 5-day week × 72000s = 360000s.
     assert.equal(secondsPerWeekFromCalendar(cal), 360000);
   });
@@ -49,9 +40,7 @@ describe('foundryCalendar — deriving interval lengths from a world calendar', 
   });
 
   it('secondsPerUnitFromCalendar fixes minutes/hours and varies days/weeks', () => {
-    const cal = {
-      days: { hoursPerDay: 20, minutesPerHour: 60, secondsPerMinute: 60, values: [0, 1, 2, 3, 4] },
-    };
+    const cal = { days: { hoursPerDay: 20, minutesPerHour: 60, secondsPerMinute: 60, values: [0, 1, 2, 3, 4] } };
     // Minutes/hours are universal regardless of the calendar.
     assert.equal(secondsPerUnitFromCalendar('minutes', cal), 60);
     assert.equal(secondsPerUnitFromCalendar('hours', cal), 3600);

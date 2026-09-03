@@ -25,7 +25,7 @@ import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
   createMountedComponentHarness,
-  SEARCHABLE_POPOVER_RAW_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES
 } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -33,7 +33,10 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-actorbar-bar-',
-  rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/gatheringConditionIcons.js'],
+  rawModules: [
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    'src/ui/svelte/util/gatheringConditionIcons.js'
+  ],
   compiledModules: [
     // `SearchablePopover` and the two leaves it renders (issue 1475). The Crafting tab renders
     // `ComponentSourcesBar` in the bar's right slot, so that is in the static graph too — on
@@ -42,10 +45,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
-    'src/ui/svelte/apps/ActorSelectTopBar.svelte',
+    'src/ui/svelte/apps/ActorSelectTopBar.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/ActorSelectTopBar.svelte',
-  rootClass: 'fabricate-app',
+  rootClass: 'fabricate-app'
 });
 
 let target;
@@ -94,8 +97,8 @@ function fakeStore(overrides = {}) {
       },
       selectActor: (id) => {
         calls.selectActor.push(id);
-      },
-    },
+      }
+    }
   };
 }
 
@@ -105,7 +108,7 @@ async function mountBar(props) {
 
 const ACTORS = [
   { id: 'a1', uuid: 'Actor.a1', name: 'Aria the Bold', img: 'icons/a.webp' },
-  { id: 'a2', uuid: 'Actor.a2', name: 'Borin', img: null },
+  { id: 'a2', uuid: 'Actor.a2', name: 'Borin', img: null }
 ];
 
 describe('ActorSelectTopBar mounted behavior', () => {
@@ -123,11 +126,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
   });
 
   it('renders a contextual stamina bar on the gathering tab when a pool is set', async () => {
-    const { store } = fakeStore({
-      selectableActors: ACTORS,
-      selectedActorId: 'a1',
-      staminaPool: { current: 4, max: 10 },
-    });
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', staminaPool: { current: 4, max: 10 } });
     await mountBar({ store, activeTab: 'gathering' });
 
     const bar = target.querySelector('[data-actor-bar-stamina]');
@@ -138,20 +137,12 @@ describe('ActorSelectTopBar mounted behavior', () => {
   });
 
   it('hides the stamina bar when there is no pool or off the gathering tab', async () => {
-    const noPool = fakeStore({
-      selectableActors: ACTORS,
-      selectedActorId: 'a1',
-      staminaPool: null,
-    });
+    const noPool = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', staminaPool: null });
     await mountBar({ store: noPool.store, activeTab: 'gathering' });
     assert.ok(!target.querySelector('[data-actor-bar-stamina]'), 'no bar without a pool');
     harness.remount();
 
-    const withPool = fakeStore({
-      selectableActors: ACTORS,
-      selectedActorId: 'a1',
-      staminaPool: { current: 4, max: 10 },
-    });
+    const withPool = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', staminaPool: { current: 4, max: 10 } });
     await mountBar({ store: withPool.store, activeTab: 'crafting' });
     assert.ok(!target.querySelector('[data-actor-bar-stamina]'), 'no bar off the gathering tab');
   });
@@ -176,16 +167,11 @@ describe('ActorSelectTopBar mounted behavior', () => {
     await mountBar({ store, activeTab: 'crafting' });
 
     const button = barTrigger();
-    assert.ok(
-      !button.querySelector('.manager-travel-portrait'),
-      'no portrait tile for a null-img actor'
-    );
+    assert.ok(!button.querySelector('.manager-travel-portrait'), 'no portrait tile for a null-img actor');
     assert.ok(button.querySelector('i.fa-user'), 'neutral fallback icon renders');
     // Hard guard: never emit an <img src="">. The primitive renders `triggerImg` unconditionally
     // once it is truthy, so passing '' rather than omitting it would reintroduce exactly that.
-    const emptyImgs = Array.from(document.querySelectorAll('img')).filter(
-      (img) => !img.getAttribute('src')
-    );
+    const emptyImgs = Array.from(document.querySelectorAll('img')).filter((img) => !img.getAttribute('src'));
     assert.equal(emptyImgs.length, 0, 'no <img src=""> anywhere');
   });
 
@@ -196,18 +182,10 @@ describe('ActorSelectTopBar mounted behavior', () => {
 
     const rows = panelOptions();
     assert.equal(rows.length, 2, 'one option per actor');
-    assert.ok(
-      rows[0].querySelector('.manager-travel-portrait img'),
-      'the img actor gets a portrait'
-    );
-    assert.ok(
-      !rows[1].querySelector('.manager-travel-portrait'),
-      'the null-img actor gets no tile'
-    );
+    assert.ok(rows[0].querySelector('.manager-travel-portrait img'), 'the img actor gets a portrait');
+    assert.ok(!rows[1].querySelector('.manager-travel-portrait'), 'the null-img actor gets no tile');
     assert.ok(rows[1].querySelector('i.fa-user'), 'the null-img actor gets the fallback glyph');
-    const emptyImgs = Array.from(document.querySelectorAll('img')).filter(
-      (img) => !img.getAttribute('src')
-    );
+    const emptyImgs = Array.from(document.querySelectorAll('img')).filter((img) => !img.getAttribute('src'));
     assert.equal(emptyImgs.length, 0, 'no <img src=""> anywhere');
   });
 
@@ -264,11 +242,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     // this bar hand-rolled before the conversion.
     assert.equal(button.getAttribute('aria-haspopup'), 'dialog', 'the trigger says a dialog opens');
     assert.equal(button.getAttribute('aria-expanded'), 'false', 'collapsed before opening');
-    assert.equal(
-      button.getAttribute('aria-label'),
-      'Aria the Bold',
-      'the trigger is named by the selection'
-    );
+    assert.equal(button.getAttribute('aria-label'), 'Aria the Bold', 'the trigger is named by the selection');
     assert.equal(button.getAttribute('title'), 'Aria the Bold', 'and exposes it as a tooltip');
 
     await openPicker();
@@ -335,11 +309,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     flushSync();
 
     assert.ok(!panel(), 'Escape closes the panel');
-    assert.equal(
-      barTrigger().getAttribute('aria-expanded'),
-      'false',
-      'and the trigger reports collapsed'
-    );
+    assert.equal(barTrigger().getAttribute('aria-expanded'), 'false', 'and the trigger reports collapsed');
 
     // Focus restoration waits on `tick()` inside the primitive, so let its promise settle.
     await new Promise((done) => setTimeout(done, 0));
@@ -382,11 +352,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     flushSync();
 
     assert.ok(!panel(), 'popover closes on outside mousedown');
-    assert.equal(
-      barTrigger().getAttribute('aria-expanded'),
-      'false',
-      'trigger reports collapsed after dismiss'
-    );
+    assert.equal(barTrigger().getAttribute('aria-expanded'), 'false', 'trigger reports collapsed after dismiss');
     outside.remove();
   });
 
@@ -475,14 +441,8 @@ describe('ActorSelectTopBar mounted behavior', () => {
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
 
-    assert.ok(
-      !panel().querySelector('[role="listbox"]'),
-      'no listbox is rendered over an empty list'
-    );
-    assert.ok(
-      panel().querySelector('[role="status"]'),
-      'the empty reason is announced as a status'
-    );
+    assert.ok(!panel().querySelector('[role="listbox"]'), 'no listbox is rendered over an empty list');
+    assert.ok(panel().querySelector('[role="status"]'), 'the empty reason is announced as a status');
   });
 
   it('clicking an option calls store.selectActor and closes the popover', async () => {
@@ -515,10 +475,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
 
     const button = barTrigger();
     assert.equal(button.disabled, true, 'trigger disabled with no actors');
-    assert.ok(
-      button.textContent.includes('FABRICATE.App.ActorBar.Trigger'),
-      'placeholder label shown'
-    );
+    assert.ok(button.textContent.includes('FABRICATE.App.ActorBar.Trigger'), 'placeholder label shown');
     // A disabled trigger does not open; assert no popover after a click attempt.
     button.click();
     flushSync();
@@ -533,11 +490,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
 
     // The full name rides on the BUTTON's own `title` now rather than on a nested span's. The
     // bar used to set both, which put a tooltip inside a tooltip; the primitive takes one.
-    assert.equal(
-      barTrigger().getAttribute('title'),
-      longName,
-      'the trigger exposes the full name via title'
-    );
+    assert.equal(barTrigger().getAttribute('title'), longName, 'the trigger exposes the full name via title');
     assert.ok(
       target.querySelector('.actor-bar-trigger-label').textContent.includes(longName),
       'and the ellipsised label still carries the text it truncates'
@@ -555,29 +508,17 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      conditions: { weather: 'clear', timeOfDay: 'dusk' }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
     const right = target.querySelector('.actor-bar-right');
     assert.ok(right, 'gathering tab shows the right-side context');
     // Fixed category icons matching the GM gathering-settings UI (not per-value icons).
-    assert.ok(
-      right.querySelector('.actor-bar-weather i.fa-cloud-sun'),
-      'fixed weather category icon renders'
-    );
-    assert.ok(
-      right.textContent.includes('FABRICATE.App.ActorBar.Weather.clear'),
-      'weather value label'
-    );
-    assert.ok(
-      right.querySelector('.actor-bar-time i.fa-clock'),
-      'fixed time-of-day category icon renders'
-    );
-    assert.ok(
-      right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.dusk'),
-      'time-of-day value label'
-    );
+    assert.ok(right.querySelector('.actor-bar-weather i.fa-cloud-sun'), 'fixed weather category icon renders');
+    assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.Weather.clear'), 'weather value label');
+    assert.ok(right.querySelector('.actor-bar-time i.fa-clock'), 'fixed time-of-day category icon renders');
+    assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.dusk'), 'time-of-day value label');
     // The realm chip only appears when the region/travel subsystem is enabled
     // (realmContext.enabled); it stays hidden for a plain conditions-only store.
     assert.ok(!right.querySelector('.actor-bar-realm'), 'realm chip hidden when realms disabled');
@@ -588,10 +529,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       conditions: { weather: 'clear', timeOfDay: 'dusk' },
-      realmContext: {
-        enabled: true,
-        realms: [{ id: 'r1', label: 'Whispering Wood', placeholder: false }],
-      },
+      realmContext: { enabled: true, realms: [{ id: 'r1', label: 'Whispering Wood', placeholder: false }] }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
@@ -607,7 +545,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       conditions: { weather: 'clear', timeOfDay: 'dusk' },
-      realmContext: { enabled: true, realms: [] },
+      realmContext: { enabled: true, realms: [] }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
@@ -616,10 +554,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     // #357: the no-current-realm placeholder reuses the Realm.None key, whose
     // value is now "No current realm" (the realm is GM/travel-driven, not
     // player-selected).
-    assert.ok(
-      realm.textContent.includes('FABRICATE.App.ActorBar.Realm.None'),
-      'shows the no-current-realm label'
-    );
+    assert.ok(realm.textContent.includes('FABRICATE.App.ActorBar.Realm.None'), 'shows the no-current-realm label');
   });
 
   // #357: the realm chip is the player's primary diagnostic signal in the all-
@@ -630,10 +565,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       conditions: { weather: 'clear', timeOfDay: 'dusk' },
-      realmContext: {
-        enabled: true,
-        realms: [{ id: 'r1', label: 'Whispering Wood', placeholder: false }],
-      },
+      realmContext: { enabled: true, realms: [{ id: 'r1', label: 'Whispering Wood', placeholder: false }] }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
@@ -643,10 +575,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const realm = slot.querySelector('.actor-bar-realm');
     const ariaLabel = realm.getAttribute('aria-label');
     assert.ok(ariaLabel, 'chip carries an accessible name');
-    assert.ok(
-      ariaLabel.includes('FABRICATE.App.ActorBar.Realm.Label'),
-      'aria-label leads with the Realm label'
-    );
+    assert.ok(ariaLabel.includes('FABRICATE.App.ActorBar.Realm.Label'), 'aria-label leads with the Realm label');
     assert.ok(ariaLabel.includes('Whispering Wood'), 'aria-label includes the realm value');
   });
 
@@ -657,7 +586,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       conditions: { weather: 'clear', timeOfDay: 'dusk' },
-      realmContext: { enabled: false, realms: [] },
+      realmContext: { enabled: false, realms: [] }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
@@ -674,22 +603,13 @@ describe('ActorSelectTopBar mounted behavior', () => {
       conditions: { weather: 'clear', timeOfDay: 'dusk' },
       realmContext: {
         enabled: true,
-        realms: [
-          {
-            id: null,
-            placeholder: true,
-            labelKey: 'FABRICATE.Gathering.Realm.UndiscoveredPlaceholder',
-          },
-        ],
-      },
+        realms: [{ id: null, placeholder: true, labelKey: 'FABRICATE.Gathering.Realm.UndiscoveredPlaceholder' }]
+      }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
     const realm = target.querySelector('.actor-bar-realm');
-    assert.ok(
-      realm.textContent.includes('FABRICATE.Gathering.Realm.UndiscoveredPlaceholder'),
-      'placeholder label shown for a redacted realm'
-    );
+    assert.ok(realm.textContent.includes('FABRICATE.Gathering.Realm.UndiscoveredPlaceholder'), 'placeholder label shown for a redacted realm');
   });
 
   it('hides the realm chip on the gathering tab when regions/travel is disabled', async () => {
@@ -697,7 +617,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       conditions: { weather: 'clear', timeOfDay: 'dusk' },
-      realmContext: { enabled: false, realms: [] },
+      realmContext: { enabled: false, realms: [] }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
@@ -709,7 +629,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       conditions: { weather: 'clear', timeOfDay: 'dusk' },
-      conditionVisibility: { weather: false, timeOfDay: true },
+      conditionVisibility: { weather: false, timeOfDay: true }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
@@ -723,7 +643,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       conditions: { weather: 'clear', timeOfDay: 'dusk' },
-      conditionVisibility: { weather: true, timeOfDay: false },
+      conditionVisibility: { weather: true, timeOfDay: false }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
@@ -736,16 +656,13 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      conditions: { weather: 'clear' },
+      conditions: { weather: 'clear' }
     });
     await mountBar({ store, activeTab: 'gathering' });
 
     const right = target.querySelector('.actor-bar-right');
     assert.ok(right.querySelector('.actor-bar-time i.fa-clock'), 'fallback clock icon renders');
-    assert.ok(
-      right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.Unknown'),
-      'unknown label'
-    );
+    assert.ok(right.textContent.includes('FABRICATE.App.ActorBar.TimeOfDay.Unknown'), 'unknown label');
   });
 
   it('renders the component-sources bar on the alchemy tab', async () => {
@@ -754,26 +671,20 @@ describe('ActorSelectTopBar mounted behavior', () => {
 
     const right = target.querySelector('.actor-bar-right');
     assert.ok(right, 'the alchemy tab surfaces the right-side context cluster');
-    assert.ok(
-      right.querySelector('[data-crafting-sources]'),
-      'the component-sources bar renders on the alchemy tab'
-    );
+    assert.ok(right.querySelector('[data-crafting-sources]'), 'the component-sources bar renders on the alchemy tab');
   });
 
   it('hides the gathering-only context on tabs with no right-side context', async () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      conditions: { weather: 'clear', timeOfDay: 'day' },
+      conditions: { weather: 'clear', timeOfDay: 'day' }
     });
     // The Journal tab carries no right-side context (the Crafting tab now hosts
     // the component-sources bar, so it is no longer an "empty right" tab).
     await mountBar({ store, activeTab: 'journal' });
 
-    assert.ok(
-      !target.querySelector('.actor-bar-right'),
-      'no right-side context on a tab without it'
-    );
+    assert.ok(!target.querySelector('.actor-bar-right'), 'no right-side context on a tab without it');
   });
 
   it('exposes data-actor-bar-state=ready once loaded with conditions', async () => {
@@ -781,7 +692,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
       selectableActors: ACTORS,
       selectedActorId: 'a1',
       loaded: true,
-      conditions: { weather: 'clear', timeOfDay: 'day' },
+      conditions: { weather: 'clear', timeOfDay: 'day' }
     });
     await mountBar({ store, activeTab: 'crafting' });
 
@@ -792,12 +703,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
   });
 
   it('reports loading state until conditions arrive', async () => {
-    const { store } = fakeStore({
-      selectableActors: ACTORS,
-      selectedActorId: 'a1',
-      loaded: true,
-      conditions: null,
-    });
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', loaded: true, conditions: null });
     await mountBar({ store, activeTab: 'crafting' });
 
     assert.equal(
@@ -810,37 +716,22 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      conditions: { weather: 'clear', timeOfDay: 'dusk' },
+      conditions: { weather: 'clear', timeOfDay: 'dusk' }
     });
     await mountBar({
       store,
       activeTab: 'gathering',
-      activeCanvasTool: {
-        componentId: 'comp-axe',
-        systemId: 'sysA',
-        toolId: 'tool-1',
-        label: 'Forge Anvil',
-      },
+      activeCanvasTool: { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil' }
     });
 
     const right = target.querySelector('.actor-bar-right');
     assert.ok(right, 'right context cluster renders');
     const chip = right.querySelector('.actor-bar-tool-chip');
     assert.ok(chip, 'tool chip renders inside the right cluster');
-    assert.ok(
-      chip.querySelector('i.fa-screwdriver-wrench'),
-      'chip uses the screwdriver-wrench icon'
-    );
+    assert.ok(chip.querySelector('i.fa-screwdriver-wrench'), 'chip uses the screwdriver-wrench icon');
     assert.ok(chip.textContent.includes('Forge Anvil'), 'chip surfaces the tool label');
-    assert.ok(
-      chip.querySelector('[aria-live="polite"]') || right.querySelector('[aria-live="polite"]'),
-      'chip lives in an aria-live region'
-    );
-    assert.equal(
-      chip.getAttribute('title'),
-      'Forge Anvil',
-      'chip exposes the tool label via title'
-    );
+    assert.ok(chip.querySelector('[aria-live="polite"]') || right.querySelector('[aria-live="polite"]'), 'chip lives in an aria-live region');
+    assert.equal(chip.getAttribute('title'), 'Forge Anvil', 'chip exposes the tool label via title');
 
     // The chip sits at the leading edge of the right cluster, before the weather condition.
     const weather = right.querySelector('.actor-bar-weather');
@@ -853,30 +744,23 @@ describe('ActorSelectTopBar mounted behavior', () => {
   });
 
   it('falls back to the localized label when the active tool carries no name', async () => {
-    const { store } = fakeStore({
-      selectableActors: ACTORS,
-      selectedActorId: 'a1',
-      conditions: { weather: 'clear', timeOfDay: 'day' },
-    });
+    const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1', conditions: { weather: 'clear', timeOfDay: 'day' } });
     await mountBar({
       store,
       activeTab: 'gathering',
-      activeCanvasTool: { componentId: 'comp-x', systemId: 'sysA', toolId: 'tool-2', label: '   ' },
+      activeCanvasTool: { componentId: 'comp-x', systemId: 'sysA', toolId: 'tool-2', label: '   ' }
     });
 
     const chip = target.querySelector('.actor-bar-tool-chip');
     assert.ok(chip, 'chip renders even without a tool name');
-    assert.ok(
-      chip.textContent.includes('FABRICATE.App.ActiveTool.Label'),
-      'falls back to the localized label'
-    );
+    assert.ok(chip.textContent.includes('FABRICATE.App.ActiveTool.Label'), 'falls back to the localized label');
   });
 
   it('omits the tool chip when no active canvas tool is set', async () => {
     const { store } = fakeStore({
       selectableActors: ACTORS,
       selectedActorId: 'a1',
-      conditions: { weather: 'clear', timeOfDay: 'day' },
+      conditions: { weather: 'clear', timeOfDay: 'day' }
     });
     await mountBar({ store, activeTab: 'gathering', activeCanvasTool: null });
 
@@ -890,21 +774,13 @@ describe('ActorSelectTopBar mounted behavior', () => {
     await mountBar({
       store,
       activeTab: 'crafting',
-      activeCanvasTool: {
-        componentId: 'comp-axe',
-        systemId: 'sysA',
-        toolId: 'tool-1',
-        label: 'Forge Anvil',
-      },
+      activeCanvasTool: { componentId: 'comp-axe', systemId: 'sysA', toolId: 'tool-1', label: 'Forge Anvil' }
     });
 
     const right = target.querySelector('.actor-bar-right');
     assert.ok(right, 'right cluster renders on crafting when a tool is active');
     assert.ok(right.querySelector('.actor-bar-tool-chip'), 'chip renders on the non-gathering tab');
     // No gathering conditions on a non-gathering tab.
-    assert.ok(
-      !right.querySelector('.actor-bar-weather'),
-      'no gathering conditions off the gathering tab'
-    );
+    assert.ok(!right.querySelector('.actor-bar-weather'), 'no gathering conditions off the gathering tab');
   });
 });

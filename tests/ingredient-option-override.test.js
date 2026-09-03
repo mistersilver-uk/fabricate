@@ -85,16 +85,7 @@ function makeSystemManager(systemId, components, essenceDefinitions = []) {
     user: { isGM: true },
     fabricate: {
       getCraftingSystemManager: () => ({
-        getSystem: (id) =>
-          id === systemId
-            ? {
-                id: systemId,
-                features: {},
-                components,
-                managedItems: components,
-                essenceDefinitions,
-              }
-            : null,
+        getSystem: (id) => (id === systemId ? { id: systemId, features: {}, components, managedItems: components, essenceDefinitions } : null),
       }),
       getResolutionModeService: () => null,
     },
@@ -103,13 +94,7 @@ function makeSystemManager(systemId, components, essenceDefinitions = []) {
 
 // ── Resolver: satisfiable override wins ─────────────────────────────────────
 test('override selects a satisfiable non-default option (it wins over the default)', () => {
-  const g = group(
-    [
-      { itemUuid: 'red', quantity: 1 },
-      { itemUuid: 'blue', quantity: 1 },
-    ],
-    'g1'
-  );
+  const g = group([{ itemUuid: 'red', quantity: 1 }, { itemUuid: 'blue', quantity: 1 }], 'g1');
   const set = makeSet([g]);
   const items = [makeItem('red', 5), makeItem('blue', 5)];
 
@@ -120,23 +105,13 @@ test('override selects a satisfiable non-default option (it wins over the defaul
     optionOverrides: { g1: { optionIndex: 1 } },
   });
   assert.equal(overridden.success, true);
-  assert.equal(
-    overridden.selectedIngredients[0].itemUuid,
-    'blue',
-    'override selects the second option'
-  );
+  assert.equal(overridden.selectedIngredients[0].itemUuid, 'blue', 'override selects the second option');
   assert.equal(overridden.plan[0].item.uuid, 'blue', 'consumes the overridden option');
 });
 
 // ── Resolver: short override reports THAT option's have/need (no fallback) ───
 test('override to a short option reports its own have/need and does not fall back', () => {
-  const g = group(
-    [
-      { itemUuid: 'red', quantity: 1 },
-      { itemUuid: 'blue', quantity: 3 },
-    ],
-    'g1'
-  );
+  const g = group([{ itemUuid: 'red', quantity: 1 }, { itemUuid: 'blue', quantity: 3 }], 'g1');
   const set = makeSet([g]);
   const items = [makeItem('red', 5), makeItem('blue', 1)];
 
@@ -147,11 +122,7 @@ test('override to a short option reports its own have/need and does not fall bac
   assert.equal(overridden.missingGroups.length, 1);
   assert.equal(overridden.missingGroups[0].have, 1, 'reports the chosen option have');
   assert.equal(overridden.missingGroups[0].need, 3, 'reports the chosen option need');
-  assert.equal(
-    overridden.missingGroups[0].ingredient.itemUuid,
-    'blue',
-    'no silent redirect to the satisfiable option'
-  );
+  assert.equal(overridden.missingGroups[0].ingredient.itemUuid, 'blue', 'no silent redirect to the satisfiable option');
 });
 
 // ── Resolver: tag-stack override consumes the chosen held item ──────────────
@@ -175,10 +146,7 @@ test('a heldItemId override consumes the specific chosen held stack', () => {
 // ── Resolver: currency override routes to currencySpends (decision 3) ───────
 test('a currency override routes an available-item group to currencySpends when affordable', () => {
   const g = group(
-    [
-      { itemUuid: 'red', quantity: 1 },
-      { match: { type: 'currency', unit: 'gp', amount: 50 }, quantity: 1 },
-    ],
+    [{ itemUuid: 'red', quantity: 1 }, { match: { type: 'currency', unit: 'gp', amount: 50 }, quantity: 1 }],
     'g1'
   );
   const set = makeSet([g]);
@@ -217,13 +185,7 @@ test('an unaffordable currency override makes the group missing', () => {
 
 // ── Resolver: no override = byte-for-byte default; out-of-range falls back ──
 test('no override is byte-for-byte the first-satisfiable default', () => {
-  const g = group(
-    [
-      { itemUuid: 'red', quantity: 1 },
-      { itemUuid: 'blue', quantity: 1 },
-    ],
-    'g1'
-  );
+  const g = group([{ itemUuid: 'red', quantity: 1 }, { itemUuid: 'blue', quantity: 1 }], 'g1');
   const set = makeSet([g]);
   const items = [makeItem('red', 5), makeItem('blue', 5)];
 
@@ -236,13 +198,7 @@ test('no override is byte-for-byte the first-satisfiable default', () => {
 });
 
 test('an out-of-range override index falls back to the default resolution', () => {
-  const g = group(
-    [
-      { itemUuid: 'red', quantity: 1 },
-      { itemUuid: 'blue', quantity: 1 },
-    ],
-    'g1'
-  );
+  const g = group([{ itemUuid: 'red', quantity: 1 }, { itemUuid: 'blue', quantity: 1 }], 'g1');
   const set = makeSet([g]);
   const items = [makeItem('red', 5), makeItem('blue', 5)];
   const overridden = set.resolveIngredientSelection(items, null, {
@@ -262,10 +218,7 @@ test('evaluateCraftability display picks the SAME option the resolver consumes',
   const manager = new RecipeManager();
 
   const g = group(
-    [
-      { match: { type: 'component', componentId: 'cmp-a' }, quantity: 1 },
-      { match: { type: 'component', componentId: 'cmp-b' }, quantity: 1 },
-    ],
+    [{ match: { type: 'component', componentId: 'cmp-a' }, quantity: 1 }, { match: { type: 'component', componentId: 'cmp-b' }, quantity: 1 }],
     'g1'
   );
   const set = makeSet([g]);
@@ -275,10 +228,7 @@ test('evaluateCraftability display picks the SAME option the resolver consumes',
     ingredientSets: [set.toJSON()],
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
-  const actor = makeActor([
-    makeComponentItem('i-a', 'reg-a', 2),
-    makeComponentItem('i-b', 'reg-b', 2),
-  ]);
+  const actor = makeActor([makeComponentItem('i-a', 'reg-a', 2), makeComponentItem('i-b', 'reg-b', 2)]);
 
   // Default display: chose option A.
   const dflt = manager.evaluateCraftability([actor], recipe);
@@ -294,10 +244,7 @@ test('evaluateCraftability display picks the SAME option the resolver consumes',
   const overrides = { g1: { optionIndex: 1 } };
   const overridden = manager.evaluateCraftability([actor], recipe, { optionOverrides: overrides });
   assert.equal(overridden.ingredientStates[0].componentId, 'cmp-b', 'override tile shows option B');
-  assert.equal(
-    overridden.ingredientChoices.find((c) => c.kind === 'option').selectedOptionIndex,
-    1
-  );
+  assert.equal(overridden.ingredientChoices.find((c) => c.kind === 'option').selectedOptionIndex, 1);
 
   // The engine's consumption seam resolves the SAME option B with the same override.
   const consumed = recipe.ingredientSets[0].resolveIngredientSelection(
@@ -318,10 +265,7 @@ test('an insufficient overridden option is selectable-but-flagged (not craftable
   const manager = new RecipeManager();
 
   const g = group(
-    [
-      { match: { type: 'component', componentId: 'cmp-a' }, quantity: 1 },
-      { match: { type: 'component', componentId: 'cmp-b' }, quantity: 1 },
-    ],
+    [{ match: { type: 'component', componentId: 'cmp-a' }, quantity: 1 }, { match: { type: 'component', componentId: 'cmp-b' }, quantity: 1 }],
     'g1'
   );
   const recipe = new Recipe({
@@ -337,11 +281,7 @@ test('an insufficient overridden option is selectable-but-flagged (not craftable
   });
   assert.equal(overridden.canCraft, false, 'the short chosen option blocks the craft');
   assert.equal(overridden.ingredientStates[0].satisfied, false);
-  assert.equal(
-    overridden.ingredientStates[0].componentId,
-    'cmp-b',
-    'still shows the chosen option'
-  );
+  assert.equal(overridden.ingredientStates[0].componentId, 'cmp-b', 'still shows the chosen option');
 });
 
 test('mixed OR choices carry authored essence icon metadata without an aura image', () => {
@@ -383,10 +323,7 @@ test('a tag option matching multiple held stacks emits a stack choice', () => {
   globalThis.game = makeSystemManager(systemId, []);
   const manager = new RecipeManager();
 
-  const g = group(
-    [{ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' }, quantity: 1 }],
-    'g1'
-  );
+  const g = group([{ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' }, quantity: 1 }], 'g1');
   const recipe = new Recipe({
     name: 'Ingot',
     craftingSystemId: systemId,

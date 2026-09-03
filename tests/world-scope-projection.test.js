@@ -494,7 +494,7 @@ test('the composition builds all four families and wires each to its own store',
   );
 });
 
-test("the composition preserves each type's KEY SET, which is part of the contract", () => {
+test('the composition preserves each type\'s KEY SET, which is part of the contract', () => {
   const actions = createWorldScopeActions({ getStores: {} });
   // The structural absences survive composition. A composition that built every type from one
   // descriptor would hand the component path a `setEnabled` the normalizer drops, and the

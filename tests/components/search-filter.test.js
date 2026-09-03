@@ -11,9 +11,7 @@ describe('SearchBar debounce logic', () => {
   it('debounce fires callback after delay', () => {
     return new Promise((resolve) => {
       let result = null;
-      const callback = (val) => {
-        result = val;
-      };
+      const callback = (val) => { result = val; };
 
       let timer = null;
       const debounceMs = 50;
@@ -62,9 +60,7 @@ describe('SearchBar debounce logic', () => {
 
   it('zero debounce fires immediately', () => {
     let result = null;
-    const callback = (val) => {
-      result = val;
-    };
+    const callback = (val) => { result = val; };
 
     const debounceMs = 0;
     function handleInput(value) {
@@ -81,9 +77,7 @@ describe('SearchBar debounce logic', () => {
   it('cleanup clears pending timer', () => {
     return new Promise((resolve) => {
       let result = null;
-      const callback = (val) => {
-        result = val;
-      };
+      const callback = (val) => { result = val; };
 
       let timer = null;
       const debounceMs = 50;
@@ -111,9 +105,7 @@ describe('SearchBar debounce logic', () => {
   it('clear action cancels pending debounce and fires empty search immediately', () => {
     return new Promise((resolve) => {
       const calls = [];
-      const callback = (val) => {
-        calls.push(val);
-      };
+      const callback = (val) => { calls.push(val); };
 
       let timer = null;
       const debounceMs = 50;
