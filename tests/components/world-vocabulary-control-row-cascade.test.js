@@ -309,6 +309,42 @@ test('every control row stays one line high, flattened rather than a lit band', 
   }
 });
 
+test('the EMPTY status region takes no height at all', { skip }, async () => {
+  // ── WHY THIS NEEDS THE BROWSER AND THE CORE SHEET ──────────────────────────────────────
+  // The live region is rendered at MOUNT and filled later, because a region inserted together
+  // with its content is not reliably announced. That only costs nothing if the empty element is
+  // genuinely zero-height — and Foundry core declares `p:empty { min-height: 1rem }`, which a
+  // `height: 0` does not beat: `min-height` clamps the USED height upwards whatever `height`
+  // says. Measured before the repair, this box was 16px tall, so the page carried a dead strip
+  // above its first panel and the reclaim it was credited with never landed.
+  //
+  // No mounted suite can see it: happy-dom computes no cascade, so it would report the declared
+  // `height: 0` and never the clamp that overrides it.
+  const { tab, close } = await open(CAPTURE_CASE.position.width);
+  try {
+    const measured = await tab.evaluate(() => {
+      const region = globalThis.document.querySelector('.wvocab-status');
+      return {
+        found: Boolean(region),
+        empty: region ? region.textContent.trim() === '' : false,
+        height: region ? region.getBoundingClientRect().height : -1,
+      };
+    });
+    // NON-VACUITY: a selector that stopped matching would report height 0 and pass.
+    assert.ok(measured.found, 'the status region renders at mount, before it has anything to say');
+    assert.ok(measured.empty, 'and it is the EMPTY state this clause is about');
+    assert.equal(
+      measured.height,
+      0,
+      `the empty live region is ${measured.height}px tall. Core's \`p:empty { min-height: 1rem }\` ` +
+        'clamps the used height above a `height: 0`, so the region has to opt out of the ' +
+        'min-height as well — otherwise it is a dead strip above the first panel'
+    );
+  } finally {
+    await close();
+  }
+});
+
 test('the category grid collapses to ONE track below the manager’s 1120px rung', { skip }, async () => {
   const wide = await open(1280);
   try {

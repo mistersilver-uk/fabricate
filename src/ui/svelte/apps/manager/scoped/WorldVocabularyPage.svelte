@@ -506,10 +506,17 @@
      cancelled rather than the element hidden — `display: none` would take the region out of the
      accessibility tree and undo the whole point of rendering it early. */
   .wvocab-status:empty {
-    /* `:empty` cancels the column GAP; the element itself still generates a line box at this
-       font size, so the height is zeroed too. Not `display: none`, which would take the region
-       out of the accessibility tree and undo the reason it is rendered early at all. */
+    /* AN EMPTY LIVE REGION MUST COST NOTHING, and three declarations are needed rather than one.
+       `:empty` cancels the column GAP; `height: 0` collapses the line box the element would
+       otherwise generate; and `min-height: 0` OPTS OUT OF FOUNDRY CORE'S OWN
+       `p:empty { min-height: 1rem }`, which clamps the USED height upwards whatever `height`
+       says. Without that third line the box measures 16px and the region is a dead strip above
+       the first panel — measured, not reasoned: the declaration was absent and the box was 16px.
+
+       Not `display: none`, which would take the region out of the accessibility tree and undo
+       the reason it is rendered before it has anything to say. */
     height: 0;
+    min-height: 0;
     overflow: hidden;
     margin-block-end: calc(-1 * var(--fab-space-4));
   }
