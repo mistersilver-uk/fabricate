@@ -2171,6 +2171,7 @@ It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the sepa
    All three read one per-row predicate; a primitive whose behaviour reads the row while its affordance reads a different field states one thing and does another, which is the failure `design-system/spec.md` already rules on for the single-select inset bar.
 9. **The screen renders the three vocabularies simultaneously, never as tabs**: the two category vocabularies in a two-column grid and the component-tag vocabulary full width beneath them, matching the reference.
    Each is the shared vocabulary panel primitive, with the page supplying its head — icon, title, subline — and its sort control, and the primitive supplying the add form, the search, the entry count, the rows and the empty states.
+   The page's panel is the card; the primitive's add form runs flush inside it, because a form authored to float on the bare pane draws its own card and two nested cards invert the reference's own nesting.
    The page states no entry count in the head, because the primitive already publishes one.
    A panel column is never narrower than the primitive's own row-card track, so the grid collapses to one column before that floor is crossed; the row's trailing delete control is the element a violation clips, and the released full-width body clips horizontally rather than scrolling.
 

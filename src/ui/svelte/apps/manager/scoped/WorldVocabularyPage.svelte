@@ -15,7 +15,7 @@
   Fabricate cannot draw three columns even if it wanted to. `VocabularyPanel`'s row list is
   `repeat(auto-fill, minmax(340px, 1fr))` (`styles/fabricate.css:8972`), and this route's
   `.manager-main` keeps `overflow-x: hidden`, so a column narrower than that track CLIPS with no
-  scrollbar rather than scrolling. At the capture case's 1280x900 the main column is about
+  scrollbar rather than scrolling. At the capture case's 1280px width the main column is about
   1028px inside its inset: two columns give about 506px each and clear the track comfortably;
   three give about 300px inside a card and clip the last 40px of every row - which is exactly
   `.manager-vocabulary-row > .manager-icon-button`, the DELETE control, in full. The View Lab
@@ -99,6 +99,16 @@
   function panelText(panel, field, fallback) {
     return text(panelKey(panel, field), fallback);
   }
+
+  /**
+   * The primitive's own hint paragraph, DELIBERATELY EMPTY on this screen.
+   *
+   * On the tabbed system-scope screen it is the only sentence explaining the vocabulary. Here
+   * each panel draws a head with a SUBLINE that says the same thing, so rendering both states
+   * one idea twice per panel — and pushes the full-width tag band 46px further down a frame that
+   * has to hold three panels rather than one.
+   */
+  const NO_PANEL_HINT = '';
 
   const title = $derived(text(TITLE_KEY, TITLE_FALLBACK));
   const gridPanels = $derived(WORLD_VOCABULARY_PANELS.filter((panel) => panel.column === 'grid'));
@@ -230,7 +240,7 @@
 
     <VocabularyPanel
       label={panelText(panel, 'Title', '')}
-      hint={panelText(panel, 'Hint', '')}
+      hint={NO_PANEL_HINT}
       inputId={panel.inputId}
       inputLabel={panelText(panel, 'InputLabel', '')}
       inputPlaceholder={panelText(panel, 'Placeholder', '')}
@@ -298,7 +308,7 @@
     min-height: 0;
   }
 
-  /* THE 2-UP CATEGORY GRID. Two columns of about 506px at 1280x900, which clears
+  /* THE 2-UP CATEGORY GRID. Two columns of about 506px at the case's 1280px width, which clears
      `.manager-vocabulary-list`'s 340px card track by a wide margin. */
   .wvocab-grid {
     display: grid;
@@ -361,6 +371,40 @@
     flex: 0 1 auto;
     width: auto;
     min-width: 0;
+  }
+
+  /* THE ADD FORM RUNS FLUSH INSIDE THE PANEL, because the PANEL is the card now.
+     `.manager-vocabulary-form` draws its own card — a `--fab-bg-3` fill two ramp rungs above the
+     panel's `--fab-bg-1`, a hairline and an 11px radius — which is right on the tabbed
+     system-scope screen, where the form floats on the bare pane. Inside a card it is a card in a
+     card, brighter than the panel it sits in and brighter than the rows below it, which sit on a
+     3% overlay. The reference runs the row flush and gives only the FIELD any chrome
+     (`proto:3049`). Flattening it also reclaims 52px above the tag band.
+
+     The hint paragraph the primitive draws above it is emptied at the call site rather than
+     hidden here; this only stops the now-empty element earning the panel's gap. */
+  :global([data-scoped-page='world-vocabulary'] .wvocab-panel .manager-vocabulary-form) {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  :global([data-scoped-page='world-vocabulary'] .wvocab-panel .manager-vocabulary-desc:empty) {
+    display: none;
+  }
+
+  /* EVERY CONTROL SITS ONE RAMP RUNG BELOW THE PANEL, which is a relationship rather than a
+     colour. The reference paints the panel `--bg2` and every control inside it `--bg1`
+     (`proto:3043` against `:3057`-`:3060`); those map to `--fab-bg-1` and `--fab-bg-0` under the
+     manager's one-rung shift. Left alone, the select, the search field and the add field all
+     inherit the shipped control rung — `--fab-bg-1` — which is the PANEL's own fill, so a
+     designed two-tone relationship collapses to one tone and the controls stop reading as
+     inset. The direction toggle takes the same rung in its own rule below. */
+  :global([data-scoped-page='world-vocabulary'] .wvocab-panel select),
+  :global([data-scoped-page='world-vocabulary'] .wvocab-panel .manager-search input),
+  :global([data-scoped-page='world-vocabulary'] .wvocab-panel .manager-vocabulary-form input) {
+    background: var(--fab-bg-0);
   }
 
   /* THE BAND IS FLATTENED. `.manager-toolbar` paints an `--fab-overlay-light-03` fill and a
@@ -437,7 +481,10 @@
     padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
-    background: var(--fab-bg-1);
+    /* One rung BELOW the panel, matching the select and the two fields beside it — see the
+       control-rung rule above. The shipped pair's `--fab-bg-1` is the control rung on a screen
+       whose pane is `--fab-bg-0`; inside a `--fab-bg-1` panel it is the panel's own fill. */
+    background: var(--fab-bg-0);
     color: var(--fab-text);
     font-size: var(--fab-recipe-control-font);
     line-height: 1;
@@ -459,6 +506,11 @@
      cancelled rather than the element hidden — `display: none` would take the region out of the
      accessibility tree and undo the whole point of rendering it early. */
   .wvocab-status:empty {
+    /* `:empty` cancels the column GAP; the element itself still generates a line box at this
+       font size, so the height is zeroed too. Not `display: none`, which would take the region
+       out of the accessibility tree and undo the reason it is rendered early at all. */
+    height: 0;
+    overflow: hidden;
     margin-block-end: calc(-1 * var(--fab-space-4));
   }
 </style>

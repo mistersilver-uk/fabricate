@@ -6012,14 +6012,13 @@
           "ToolEntrySubtitle": "The one world record behind this Tool: the Item it is linked to, the name every system shows, and the breakage defaults they inherit.",
           "ToolCatalogueEmptyHint": "Tools lifted to world scope appear here, each shared by every crafting system that adopts it.",
           "VocabularyTitle": "Tags & Categories",
-          "VocabularySubtitle": "Component categories, Component tags and recipe categories, each with a usage count and a deletion warning naming how many inheriting rule sets are affected.",
+          "VocabularySubtitle": "Component categories, Component tags and recipe categories, each with a reference count and a deletion warning stating what deletion changes for that kind.",
           "WorldVocabulary": {
             "SortToolbar": "Sort {vocabulary}",
             "RemoveFailed": "Nothing was removed. Check that you can change world settings and try again.",
             "RecipeCategories": {
               "Title": "Recipe categories",
               "Subline": "One per recipe, offered by every crafting system.",
-              "Hint": "Recipe categories group recipes in the library. General is always available and is never a world entry.",
               "InputLabel": "Recipe category name",
               "Placeholder": "e.g. Potions",
               "AddLabel": "Add recipe category",
@@ -6040,7 +6039,6 @@
             "ComponentCategories": {
               "Title": "Component categories",
               "Subline": "One per component, offered by every crafting system.",
-              "Hint": "Component categories group components in the directory. Separate from recipe categories, and General is never a world entry.",
               "InputLabel": "Component category name",
               "Placeholder": "e.g. Reagent",
               "AddLabel": "Add component category",
@@ -6063,7 +6061,6 @@
             "ComponentTags": {
               "Title": "Component tags",
               "Subline": "Stored lowercase, granted to every crafting system.",
-              "Hint": "Component tags organise components and power tag-based ingredient options in recipes. A system keeps its own tags beside these and can mute any of them.",
               "InputLabel": "Component tag name",
               "Placeholder": "e.g. herb",
               "AddLabel": "Add component tag",
