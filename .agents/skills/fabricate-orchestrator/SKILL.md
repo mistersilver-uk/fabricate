@@ -137,6 +137,8 @@ Plan the merge order, and rebase whichever merges second to reconcile the shared
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first, then the View Lab for reproducible full-window frames, and reserve `npm run test:foundry` for runtime-sensitive validation or a view the case registry does not cover.
 - For UI work, do not let “screenshot captured” stand as acceptance.
 Define what screenshots must prove: first visible state, image/content fidelity, clipping, spacing, alignment, scroll containment, visible controls, and relevant window sizes.
+- For a screen with a design prototype, the delta carries the reachable-state matrix of `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` — every reachable state paired with the View Lab case that reaches it, the mounted test that acts on it, and its parity-spec screen — and names the harness run and the before, after and control captures as post-implementation steps the driver performs from the integrated coordinator before the review round.
+A state with no case is closed in the plan by registering one; a divergence from the prototype that the design-system library does not require is escalated before implementation, never recorded after it.
 - Require the UX reference comparison and reuse inventory before approving a non-trivial UI plan; authority is per control and state, not per whole artifact.
 - Keep screen-specific UI behavior in canonical specs (or, while still being planned, the issue's `openspec-delta` block).
 Skills and agents should point to those documents instead of carrying detailed product contracts.

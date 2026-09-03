@@ -90,6 +90,9 @@ Flag a test that pins a pure predicate while the path consuming it (an event han
 - UI-only changes use Vite-first verification when available, with container-based validation reserved for runtime-sensitive or reproducibility-focused checks.
 - UI screenshot claims identify what the artifact proves: first view, clipping, spacing, alignment, image fidelity, scroll containment, visible controls, and relevant responsive sizes.
 - Automated screenshot claims bind every affected view to one successful, non-degraded run with matching run/manifest identity, exact requested head, target label, capture record, and declared/decoded PNG dimensions; stricter view-specific parity rules remain additive.
+- A screen with a design prototype ships with the parity protocol's artifacts in the handoff — the reachable-state matrix, both `scripts/visual-parity/` outputs from the integrated branch, and before, after and control frames — per `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md`.
+Approve without them only when the delta records why a step could not run; a parity claim resting on the computed-style pass alone is a finding, because that pass cannot see absence.
+The prototype decides type, colour, copy, structure and state; the design-system library decides geometry, tokens and primitives; a divergence recorded after implementation rather than escalated before it is a finding.
 - Normal UI PR screenshot evidence is an embedded screenshot image in the PR description with `pr-<number>` in its alt text, produced by `npm run screenshots:ui:publish` (uploaded to S3 under `pr-screenshots/<number>/`).
 Uploaded artifacts, `test-results/` paths, and `user-attachments` embeds are accepted fallbacks, not the normal handoff.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label, which an agent must never apply.

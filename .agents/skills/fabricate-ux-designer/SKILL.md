@@ -117,6 +117,7 @@ There is no `SCREENSHOTS_NEEDED:` handoff; only a maintainer-applied `screenshot
 - Validate every automated affected view against the provenance procedure in `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`; generic provenance is mandatory and any view-specific parity constraints remain stricter additions.
 - When a design prototype exists, measure the screen against it with `scripts/visual-parity/` rather than judging by eye, and read `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` first.
 That harness is local-only and never runs in CI, so any drift it exposes and nobody closes must be written into the handoff rather than left to a red build that will not exist.
+Follow that reference's parity review protocol end to end: approve a prototype-backed screen only with the reachable-state matrix, both harness passes and the before, after and control frames in hand, and treat the prototype as authority for type, colour, copy, structure and state while the design-system library keeps geometry, tokens and primitives.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
 ## PR description template
