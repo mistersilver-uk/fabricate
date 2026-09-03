@@ -5401,6 +5401,156 @@ export function createAdminStore(services) {
     return usage;
   }
 
+  /**
+   * Every component id one recipe names, split by WHAT the reference does.
+   *
+   * TWO AXES, NOT ONE. A recipe CONSUMES a component as an ingredient and PRODUCES one as a
+   * result, and the world Component entry states the two as separate lists: "Used by" is what a
+   * GM checks before removing a component, and "Produced by" is what they check before deleting
+   * the thing that makes it. A single reference list would answer neither question.
+   *
+   * FOUR PLACES PER AXIS, on the reasoning `_recipeToolIds` gives for tools: a recipe carries
+   * top-level ingredient sets and result groups, and a MULTI-STEP recipe repeats both per step. A
+   * scan of the top level alone reports nothing for every stepped recipe.
+   *
+   * `componentId` and its `systemItemId` alias are both read, because `Result` accepts either and
+   * an ingredient option carries the pair on itself OR under `match`.
+   *
+   * @param {object} recipe
+   * @returns {{required: Set<string>, produced: Set<string>}}
+   */
+  function _recipeComponentIds(recipe) {
+    const required = new Set();
+    const produced = new Set();
+    const add = (into, raw) => {
+      const trimmed = String(raw ?? '').trim();
+      if (trimmed) into.add(trimmed);
+    };
+    const addOption = (into, option) => {
+      add(into, option?.componentId ?? option?.systemItemId);
+      add(into, option?.match?.componentId ?? option?.match?.systemItemId);
+    };
+    const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
+    for (const holder of [recipe, ...steps]) {
+      for (const set of Array.isArray(holder?.ingredientSets) ? holder.ingredientSets : []) {
+        for (const group of Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : []) {
+          for (const option of Array.isArray(group?.options) ? group.options : []) {
+            addOption(required, option);
+          }
+        }
+        for (const option of Array.isArray(set?.ingredients) ? set.ingredients : []) {
+          addOption(required, option);
+        }
+      }
+      for (const group of Array.isArray(holder?.resultGroups) ? holder.resultGroups : []) {
+        for (const result of Array.isArray(group?.results) ? group.results : []) {
+          addOption(produced, result);
+        }
+      }
+      for (const result of Array.isArray(holder?.results) ? holder.results : []) {
+        addOption(produced, result);
+      }
+    }
+    return { required, produced };
+  }
+
+  /**
+   * How much of the world references each world COMPONENT (issue 1371).
+   *
+   * The third leg of the seam the essence and tool legs already fill: `usage` is a
+   * `buildWorldScopeState` argument the projection consumes and attaches per entity, and nothing
+   * outside this file can supply it. Without it every world component row answered `0 recipes`
+   * and its entry listed nothing, whatever the world actually held.
+   *
+   * ── `recipeCount` COUNTS RECIPES, NOT REFERENCES, AND ONLY RECIPES ────────────────────────
+   * The row's stat is labelled `Recipes`, so a recipe naming one component as both an ingredient
+   * and a result counts ONCE, and a GATHERING reference does not move it at all — it reaches
+   * `requiredBy` instead, exactly as the tool leg's gathering references do. A stat and its label
+   * that disagree is a wrong number rather than a missing one.
+   *
+   * ── WHY A GATHERING TASK'S CONSUMPTION IS RESOLVED THROUGH THE TOOL LIBRARY ───────────────
+   * A gathering task names TOOLS by id, and a library Tool names the component it is sourced
+   * from. So the component a task requires is one join away, and reading `task.toolIds` as
+   * component ids would key every reference by a Tool id no component carries. A task's RESULT
+   * drops are direct, and they are production rather than consumption.
+   *
+   * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>,
+   *   requiredBy: Array<object>, producedBy: Array<object>}>} keyed by world component id.
+   */
+  function _worldComponentUsage() {
+    const usage = {};
+    const recipeManager = services.getRecipeManager?.();
+    const entryFor = (componentId) =>
+      (usage[componentId] ??= {
+        recipeCount: 0,
+        recipeCountBySystem: {},
+        requiredBy: [],
+        producedBy: [],
+      });
+    const record = (componentId, systemId) => {
+      const entry = entryFor(componentId);
+      entry.recipeCount += 1;
+      entry.recipeCountBySystem[systemId] = (entry.recipeCountBySystem[systemId] || 0) + 1;
+    };
+    const reference = (componentId, list, reference_) => {
+      entryFor(componentId)[list].push(reference_);
+    };
+    const gatheringSystems = _currentGatheringConfig()?.systems ?? {};
+    for (const system of _allSystems()) {
+      const systemId = String(system?.id ?? '');
+      if (!systemId) continue;
+      const systemName = String(system?.name ?? systemId);
+      let recipes = [];
+      try {
+        recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
+      } catch {
+        recipes = [];
+      }
+      for (const recipe of recipes) {
+        const { required, produced } = _recipeComponentIds(recipe);
+        const named = {
+          id: String(recipe?.id ?? ''),
+          name: String(recipe?.name ?? recipe?.id ?? ''),
+          kind: 'recipe',
+          systemId,
+          systemName,
+        };
+        for (const componentId of new Set([...required, ...produced])) {
+          record(componentId, systemId);
+        }
+        for (const componentId of required) reference(componentId, 'requiredBy', named);
+        for (const componentId of produced) reference(componentId, 'producedBy', named);
+      }
+      const componentIdByToolId = new Map();
+      for (const tool of Array.isArray(system?.tools) ? system.tools : []) {
+        const componentId = String(tool?.componentId ?? '').trim();
+        const toolId = String(tool?.id ?? '').trim();
+        if (componentId && toolId) componentIdByToolId.set(toolId, componentId);
+      }
+      const tasks = gatheringSystems?.[systemId]?.tasks;
+      for (const task of Array.isArray(tasks) ? tasks : []) {
+        const named = {
+          id: String(task?.id ?? ''),
+          name: String(task?.name ?? task?.id ?? ''),
+          kind: 'gathering',
+          systemId,
+          systemName,
+        };
+        for (const raw of Array.isArray(task?.toolIds) ? task.toolIds : []) {
+          const componentId = componentIdByToolId.get(String(raw ?? '').trim());
+          if (componentId) reference(componentId, 'requiredBy', named);
+        }
+        for (const group of Array.isArray(task?.resultGroups) ? task.resultGroups : []) {
+          for (const result of Array.isArray(group?.results) ? group.results : []) {
+            const componentId = String(result?.componentId ?? result?.systemItemId ?? '').trim();
+            if (componentId) reference(componentId, 'producedBy', named);
+          }
+        }
+      }
+    }
+    return usage;
+  }
+
   function buildWorldScopeState() {
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
@@ -5413,7 +5563,11 @@ export function createAdminStore(services) {
       // is already invoked on every publish, so this adds no new corpus read. The counting
       // itself lives in `worldScopeProjection.js`, an open file.
       recipes: _allRecipes(),
-      usage: { essence: _worldEssenceUsage(), tool: _worldToolUsage() },
+      usage: {
+        component: _worldComponentUsage(),
+        essence: _worldEssenceUsage(),
+        tool: _worldToolUsage(),
+      },
     });
   }
 
@@ -5711,6 +5865,151 @@ export function createAdminStore(services) {
   }
 
   /**
+   * The world component roster, keyed by id, straight off the published corpus.
+   *
+   * @returns {Map<string, object>}
+   */
+  function _worldComponentEntities() {
+    const entities = services.getComponentScopeStore?.()?.corpus?.()?.entities;
+    const byId = new Map();
+    for (const entity of Array.isArray(entities) ? entities : []) {
+      const id = typeof entity?.id === 'string' ? entity.id.trim() : '';
+      if (id) byId.set(id, entity);
+    }
+    return byId;
+  }
+
+  /**
+   * The in-system component record adoption creates: the world entity's IDENTITY and its THREE
+   * SOURCE-LINK FIELDS, and nothing else.
+   *
+   * ── THE SOURCE-LINK FIELDS ARE NOT OPTIONAL, AND THAT IS THE WHOLE POINT ───────────────────
+   * Component-to-Item matching is durable-flag identity FIRST — the per-system `roles` map, then
+   * the legacy `componentId` scalar — and the raw source-reference union THIRD. That union is
+   * exactly `registeredItemUuid` union `originItemUuid` union `aliasItemUuids`. A seed that stamps
+   * no role flag and carries no source refs therefore matches at NO tier: every row on every list
+   * would render, and the component would resolve against nothing in any player's inventory.
+   *
+   * The two uuids are read with the SAME fallback the tool seed uses, so a world component
+   * carrying only one of the pair is tolerated rather than half-seeded.
+   *
+   * ── IT SEEDS NO `category` AND STAMPS NO ROLE FLAG ─────────────────────────────────────────
+   * `category` is the one section, so an unset value INHERITS from the world default — which is
+   * exactly the state the membership record beside it declares. And the role flag is a write on
+   * the Item, which adoption must neither resolve nor fail on when the Item is gone; that is the
+   * reason the tool adoption path gives for the same omission.
+   *
+   * @param {object} entity The world component roster record.
+   * @returns {object}
+   */
+  function _worldComponentAdoptionSeed(entity) {
+    const originItemUuid = entity?.originItemUuid ?? entity?.registeredItemUuid ?? null;
+    return {
+      id: String(entity?.id ?? ''),
+      name: entity?.name ?? null,
+      img: entity?.img ?? null,
+      description: entity?.description ?? '',
+      originItemUuid,
+      registeredItemUuid: entity?.registeredItemUuid ?? originItemUuid,
+      aliasItemUuids: Array.isArray(entity?.aliasItemUuids) ? [...entity.aliasItemUuids] : [],
+    };
+  }
+
+  /**
+   * Join a WORLD component to one crafting system — the membership record AND the in-system one.
+   *
+   * ── THE SAME RULE THE ESSENCE JOIN STATES, FOR THE SAME REASON ─────────────────────────────
+   * `worldScopeActions.addToSystem` writes exactly one thing: a membership row in the world-scope
+   * payload. The read union iterates the IN-SYSTEM array and only enriches rows it already finds
+   * there, so a world entity with a membership record and no in-system row contributes no row at
+   * all. Membership alone is a button that silently does nothing, on every component, forever.
+   *
+   * ── AN EXISTING ROW IS NEVER REWRITTEN ────────────────────────────────────────────────────
+   * A system that already holds a row for the id is left alone: the GM is re-adding a membership
+   * record for a component this system already has, and overwriting its authored essences,
+   * salvage or difficulty would be a destructive reading of "Add".
+   *
+   * @param {string} entityId the world component id.
+   * @param {string} systemId the crafting system to join it to.
+   * @returns {Promise<boolean>} whether anything was written.
+   */
+  async function joinComponentToSystem(entityId, systemId) {
+    const target = typeof entityId === 'string' ? entityId.trim() : '';
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    if (!target || !system) return false;
+    const joined = await worldScopeFamilies.component.addToSystem(target, system);
+    const seeded = await _seedInSystemComponent(target, system);
+    // NO `refresh()` HERE. `_republishingFamily` wraps this verb with every other one, so a
+    // second call would re-project twice per click and would leave the wrapper looking optional.
+    return joined || seeded;
+  }
+
+  /**
+   * Write the in-system `components` row a joined world component needs, when it is absent.
+   *
+   * @param {string} entityId
+   * @param {string} systemId
+   * @returns {Promise<boolean>} whether a row was written.
+   */
+  async function _seedInSystemComponent(entityId, systemId) {
+    const entity = _worldComponentEntities().get(entityId);
+    if (!entity) return false;
+    const systemManager = services.getCraftingSystemManager();
+    const system = systemManager?.getSystem?.(systemId);
+    if (!system) return false;
+    const existing = Array.isArray(system.components) ? system.components : [];
+    if (existing.some((record) => String(record?.id ?? '').trim() === entityId)) return false;
+    await systemManager.updateSystem(systemId, {
+      components: [...existing, _worldComponentAdoptionSeed(entity)],
+    });
+    return true;
+  }
+
+  /**
+   * Remove a WORLD component from one crafting system — the membership record AND this system's
+   * in-system record.
+   *
+   * ── THE MIRROR, AND IT IS COMPOSED FOR A REASON OF ITS OWN ────────────────────────────────
+   * Deleting the membership record alone leaves the in-system record standing, and the read
+   * union's "no world half for this row" branch pushes such a record through UNCHANGED — so the
+   * component goes on resolving in a system the GM has just removed it from, with the world layer
+   * silently no longer consulted. Both halves go together or neither does.
+   *
+   * THE WORLD ENTITY AND EVERY OTHER SYSTEM ARE UNTOUCHED, which is the whole distinction from
+   * deleting the world component itself.
+   *
+   * @param {string} entityId the world component id.
+   * @param {string} systemId the crafting system to remove it from.
+   * @returns {Promise<boolean>} whether anything was written.
+   */
+  async function partComponentFromSystem(entityId, systemId) {
+    const target = typeof entityId === 'string' ? entityId.trim() : '';
+    const system = typeof systemId === 'string' ? systemId.trim() : '';
+    if (!target || !system) return false;
+    const parted = await worldScopeFamilies.component.removeFromSystem(target, system);
+    const dropped = await _dropInSystemComponent(target, system);
+    return parted || dropped;
+  }
+
+  /**
+   * Drop the in-system `components` row for one component, when it is present.
+   *
+   * @param {string} entityId
+   * @param {string} systemId
+   * @returns {Promise<boolean>} whether a row was removed.
+   */
+  async function _dropInSystemComponent(entityId, systemId) {
+    const systemManager = services.getCraftingSystemManager();
+    const system = systemManager?.getSystem?.(systemId);
+    if (!system) return false;
+    const existing = Array.isArray(system.components) ? system.components : [];
+    const components = existing.filter((record) => String(record?.id ?? '').trim() !== entityId);
+    if (components.length === existing.length) return false;
+    await systemManager.updateSystem(systemId, { components });
+    return true;
+  }
+
+  /**
    * Re-publish after a world-scope write that reported it wrote something.
    *
    * ── THE WRITE LANDED AND THE SCREEN DID NOT MOVE ────────────────────────────────────────────
@@ -5749,13 +6048,27 @@ export function createAdminStore(services) {
     return wrapped;
   }
 
-  // The published write path. Only the ESSENCE family is composed: `addToSystem` and
-  // `removeFromSystem` each have a second half in a store this gateway owns, and the generic
-  // family cannot reach `CraftingSystemManager` at all. Every other family and every other essence
-  // verb is the generic one — wrapped, so the screen re-flows on every write that lands.
+  // The published write path. TWO families are composed here — the ESSENCE one and, since issue
+  // 1371, the COMPONENT one: for each of them `addToSystem` and `removeFromSystem` have a second
+  // half in a store this gateway owns, and the generic family cannot reach
+  // `CraftingSystemManager` at all. Every other verb of theirs, and the whole vocabulary family,
+  // is the generic one — wrapped, so the screen re-flows on every write that lands.
+  //
+  // EACH COMPOSED VERB REPLACES THE GENERIC ONE UNDER ITS EXISTING KEY, never beside it. Every
+  // membership control in the product — a ghost row's Add, the system rules roster, the world
+  // entry's per-system rows, the catalogue's bulk membership group — reaches the family through
+  // that one key, so a parallel verb would leave all of them writing a record nothing can read.
+  //
+  // The TOOL family is composed one step later, over the WRAPPED families; see that site for why
+  // the two compositions are not interchangeable.
   const worldScope = Object.fromEntries(
     Object.entries({
       ...worldScopeFamilies,
+      component: {
+        ...worldScopeFamilies.component,
+        addToSystem: joinComponentToSystem,
+        removeFromSystem: partComponentFromSystem,
+      },
       essence: {
         ...worldScopeFamilies.essence,
         addToSystem: joinEssenceToSystem,
@@ -5904,9 +6217,19 @@ export function createAdminStore(services) {
   // is the whole defect. The world-scope leg is unchanged and still owns the membership rule;
   // only the crafting-system leg is new.
   //
-  // TOOL ONLY. Components and essences reach `worldScopeActions` untouched: neither has a
-  // crafting-system-manager write to compose, and inventing one here would be a write path no
-  // screen asked for.
+  // TOOL ONLY AT THIS SITE, and that is a statement about WHERE rather than about which families
+  // are composed at all. The component and essence families are composed one step EARLIER, inside
+  // the `_republishingFamily` argument above, so their composed verbs call the UNWRAPPED family
+  // and do not republish themselves. `adoptWorldTool` does the opposite on both counts: it calls
+  // the WRAPPED `worldScope.tool.addToSystem` and issues its own `refresh()`, which is only
+  // correct because it composes AFTER the wrap. Moving either composition to the other site would
+  // make it self-recurse or double-publish.
+  //
+  // The tool family composes `addToSystem` ALONE. `removeFromSystem` is still the generic verb,
+  // so removing a Tool from a system deletes the membership record and leaves the in-system
+  // record for the read union to push through unchanged — the mirror defect the component family
+  // composes `partComponentFromSystem` to avoid. Named here as a follow-up on the tool path
+  // rather than fixed from a component lane.
   const worldScopeApi = {
     ...worldScope,
     tool: { ...worldScope.tool, addToSystem: adoptWorldTool },

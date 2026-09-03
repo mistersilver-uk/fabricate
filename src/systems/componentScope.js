@@ -18,6 +18,15 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  * it reads; it deliberately does NOT shed the in-system array, because every lifted field still
  * has live production readers.
  *
+ * **THE `category` INHERIT SWITCH IS LIVE AND ITS ANSWER IS CONSUMED (issue 1372, authored at
+ * issue 1371).** `unionScopedDefinitions` applies each INHERITING section from the world default
+ * AFTER the in-system re-spread, on the shipped field name, so an inheriting system's `category`
+ * really does resolve from the world layer and really does change when the world default moves.
+ * The world Component catalogue and entry are the surfaces that author that default. That is the
+ * ONE key on this path with a live world parent: identity is re-derived from the in-system record
+ * unconditionally, and `tags` is not a section at all — see below — so both are authored at world
+ * scope and read back only by the world screens themselves.
+ *
  * A COMPONENT MEMBERSHIP RECORD CARRIES NO `enabled` FLAG, and that absence is STRUCTURAL rather
  * than conventional. The maintainer ruling behind epic 1357 is that essence enabling toggles
  * effect transfer and macros and tool enabling evokes a drained leyline, but component enabling
@@ -35,7 +44,14 @@ import { unionScopedDefinitions } from './scopedDefinitionStore.js';
  *   (`coerceComponentSection`) rather than on that branch, so the overriding branch, which hands
  *   the stored value straight back, is bound by it too.
  * - `tags` is NOT a section and has no inherit switch at all: the effective set is additive, with
- *   per-tag muting. See `resolveComponentTags`.
+ *   per-tag muting. See `resolveComponentTags`. **ITS ANSWER IS RESOLVER-ONLY AND THE READ UNION
+ *   DISCARDS IT**: `tags` carries no writer in `INHERITED_SECTION_WRITERS.components`, and
+ *   `_normalizeComponent` emits `tags` unconditionally, so the union's trailing in-system
+ *   re-spread overwrites the merged set on every read. A world tag and a mute are therefore
+ *   AUTHORED-AND-UNCONSUMED today; routing the merge through the union is deliberately deferred,
+ *   because the resolver's system half is the MEMBERSHIP record's migration-time `tags` copy
+ *   while the in-system record's own `tags` is edited live, so routing it now would revert every
+ *   member system's live tag list to its migration-time state.
  *
  * NEITHER HELPER READS A VOCABULARY. The world component-category and component-tag vocabularies,
  * their icon maps and their deletion semantics are the World Vocabulary, which epic 1357 models in
@@ -257,6 +273,13 @@ export function resolveComponent(worldDefault, membership) {
  * read time, and the world layer supplies only the keys it does not carry. The world-wins
  * precedence below is the TARGET contract and is SUSPENDED, not consumed, for the duration; it
  * re-arms when requirement 36 retires.**
+ *
+ * **WITH ONE ARMED EXCEPTION: AN INHERITING SECTION (issue 1372).** `applyInheritedSections` runs
+ * AFTER that re-spread and after the identity delete, so a `category` whose membership record
+ * marks it inheriting resolves from the world default and the in-system value does NOT win. That
+ * is the one place the suspension does not apply, and it is why the world catalogue's category
+ * picker is a real write with real reach rather than an authored-and-unread one. An UNAUTHORED
+ * world `category` still applies nothing, so an inheriting system keeps its own value.
  * So the surviving record supplies `essences`, `salvage`, `difficulty` and `complications` as it always did, AND every
  * identity and behaviour key it carries; a lifted identity field it does NOT carry is DELETED
  * from the merged row, because absence is a value. A lane adding a world-scope WRITER here
