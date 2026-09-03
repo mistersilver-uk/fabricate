@@ -44,6 +44,66 @@ const SPEND_UNAVAILABLE_FALLBACK =
   'Currency spending is not available: no coin spender is configured for this game system.';
 
 /**
+ * How many of `validateCurrencyProfile`'s errors {@link formatProfileErrors} lists by name before
+ * summarising the rest by count (issue 1493).
+ *
+ * `validateCurrencyProfile` returns one error per malformed unit, so an unbounded join renders a
+ * whole paragraph into a single chat message and, via the requirement rail, into an accessible
+ * name. 3 was chosen by reading the actual output at each count: it names enough faults that a GM
+ * fixing the FIRST reported problem is not left guessing whether there are more, while a dozen
+ * broken units still collapses to one line ("...; and 9 more issues.") instead of a wall of text.
+ */
+const MAX_LISTED_PROFILE_ERRORS = 3;
+
+/**
+ * Join a validated profile's `errors` into one sentence, capped at
+ * {@link MAX_LISTED_PROFILE_ERRORS}. At or under the cap this is byte-identical to
+ * `errors.join('; ')` — the shape every existing caller and test already expects for the common
+ * case of one or a few broken units. Past the cap, the remainder is summarised by count rather
+ * than listed, so the whole thing stays one sentence regardless of how many units are broken.
+ *
+ * @param {string[]} errors
+ * @returns {string}
+ */
+function formatProfileErrors(errors) {
+  const list = errors || [];
+  if (list.length <= MAX_LISTED_PROFILE_ERRORS) return list.join('; ');
+  const shown = list.slice(0, MAX_LISTED_PROFILE_ERRORS).join('; ');
+  const remaining = list.length - MAX_LISTED_PROFILE_ERRORS;
+  return `${shown}; and ${remaining} more issue${remaining === 1 ? '' : 's'}.`;
+}
+
+/**
+ * The player-facing directive appended to a currency refusal caused by world misconfiguration
+ * (issue 1493). `error` and `spenderUnavailableReason` both name WHAT is wrong, but a player
+ * reading either one is holding a problem only a GM can fix; this names who and where.
+ *
+ * The route is the live breadcrumb `CraftingSystemManagerRoot.svelte` renders for this exact tab
+ * (`FABRICATE.Admin.Manager.Nav.Systems` → `World.Breadcrumb` → `World.CurrencyNav`), read from
+ * the component rather than assumed, because the GM editor tab's own copy is edited separately.
+ */
+const CURRENCY_SETUP_DIRECTIVE =
+  "Ask your GM to finish the world's currency setup (Crafting Systems → World → Currency).";
+
+/**
+ * Append {@link CURRENCY_SETUP_DIRECTIVE} to a player-facing currency-refusal reason.
+ *
+ * PLAYER-FACING CALL SITES ONLY. `spendCurrencySpends` and `refundCurrencySpends` compose from
+ * the SAME `error`/`spenderUnavailableReason` fields, but only ever `console.error` the result
+ * (the deduction/refund never abort or surface to a caller a player can read) — a GM reading
+ * their own console does not need to be told to ask themselves, so those two call sites must not
+ * use this. `resolveCurrencyContext`'s raw fields stay undirected for the same reason: other
+ * readers (the GM editor's validation report, the requirement rail) are GM- or display-only
+ * surfaces outside this function's audience.
+ *
+ * @param {string|null|undefined} reason
+ * @returns {string|null|undefined}
+ */
+export function withCurrencySetupDirective(reason) {
+  return reason ? `${reason} ${CURRENCY_SETUP_DIRECTIVE}` : reason;
+}
+
+/**
  * Resolve the effective currency config for a recipe, composed from TWO scopes.
  *
  * `enabled` is a per-crafting-system decision (`requirements.currency.enabled`): it says whether
@@ -197,7 +257,7 @@ export function resolveCurrencyContext(recipe, seams = {}) {
   if (!profile.valid) {
     return {
       enabled: true,
-      error: `Currency configuration is invalid: ${profile.errors.join('; ')}`,
+      error: `Currency configuration is invalid: ${formatProfileErrors(profile.errors)}`,
       config,
       profile,
     };
@@ -347,10 +407,17 @@ export async function checkCurrencySpends(craftingActor, recipe, currencySpends,
   if (!currencySpends?.length) return { valid: true };
   const context = resolveCurrencyContext(recipe, seams);
   if (!context.enabled) return { valid: true };
-  if (context.error) return { valid: false, message: context.error };
+  // Both branches return DIRECTLY to `CraftingEngine.craft`'s result, which is what the crafting
+  // player reads — the directive belongs here (issue 1493).
+  if (context.error) {
+    return { valid: false, message: withCurrencySetupDirective(context.error) };
+  }
   const { profile, config, spender, spenderUnavailableReason } = context;
   if (!spender?.check) {
-    return { valid: false, message: spenderUnavailableReason || SPEND_UNAVAILABLE_FALLBACK };
+    return {
+      valid: false,
+      message: withCurrencySetupDirective(spenderUnavailableReason || SPEND_UNAVAILABLE_FALLBACK),
+    };
   }
 
   for (const group of aggregateCurrencySpends(currencySpends, profile)) {

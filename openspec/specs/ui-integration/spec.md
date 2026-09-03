@@ -1749,7 +1749,8 @@ It is the ONE place the world coin ladder, spend strategy, provider and GM macro
 - **The editor moved wholesale rather than being redesigned.** Every control below is the one that stood in the System Settings units card, with its test hook renamed `data-system-currency-*` -> `data-world-currency-*`; no new primitive is introduced.
 - The page SHALL render the world profile's validation errors (`validateCurrencyProfile`) as a non-blocking, polite live region, listing each error by the unit label it names.
   Persistence stays ungated: the note reports, it never refuses a write (`data-models/spec.md` CurrencyConfig requirement 4).
-  This is the surface `data-models/spec.md` CurrencyConfig requirement 5 requires, and without it a ladder that cannot be spent against was discoverable only by failing a craft.
+  This is the surface `data-models/spec.md` CurrencyConfig requirement 5 requires, and without it a PROFILE-invalid ladder — one `validateCurrencyProfile` itself rejects, such as a missing abbreviation, an empty actor data path, or a unit collision — was discoverable only by failing a craft.
+  It does NOT cover a per-actor failure such as a present-but-wrong actor data path, matching `data-models/spec.md` CurrencyConfig requirement 5: `validateCurrencyProfile` cannot detect it (the path is present), so that fault stays discoverable only by failing a craft on the affected actor.
   The note is suppressed while no currency unit is defined, because the route's empty state already says so and a GM who has authored nothing yet is not in error.
 
 Shipped controls:

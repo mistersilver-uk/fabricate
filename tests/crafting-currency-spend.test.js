@@ -1216,6 +1216,11 @@ test('engine: a broken ladder reports the CONFIGURATION reason, not poverty, to 
     'and the false claim about the purse is gone: this actor holds 500 gp'
   );
   assert.ok(!HAVE_NEED_RATIO.test(result.message), 'no have/need ratio for a currency cost');
+  assert.match(
+    result.message,
+    /Ask your GM to finish the world's currency setup \(Crafting Systems/,
+    'the PLAYER reading this message is told who can fix it and where (issue 1493)'
+  );
 });
 
 test('engine: a valid ladder with no registered inventory adapter names the SYSTEM', async () => {
@@ -1244,6 +1249,7 @@ test('engine: a valid ladder with no registered inventory adapter names the SYST
   assert.match(result.message, /100 gp/);
   assert.ok(!/Insufficient currency/i.test(result.message));
   assert.ok(!HAVE_NEED_RATIO.test(result.message));
+  assert.match(result.message, /Ask your GM to finish the world's currency setup \(Crafting Systems/);
 });
 
 test('engine: a valid ladder with NO coin spender at all still reports a reason', async () => {
@@ -1266,6 +1272,7 @@ test('engine: a valid ladder with NO coin spender at all still reports a reason'
   assert.match(result.message, /100 gp/);
   assert.ok(!/Insufficient currency/i.test(result.message));
   assert.ok(!HAVE_NEED_RATIO.test(result.message));
+  assert.match(result.message, /Ask your GM to finish the world's currency setup \(Crafting Systems/);
 });
 
 test('engine: a GENUINELY poor actor on a sound ladder still reads Insufficient currency, with no ratio', async () => {

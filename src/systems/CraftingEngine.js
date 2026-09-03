@@ -56,6 +56,7 @@ import {
   refundCurrencySpends,
   resolveCurrencyContext,
   spendCurrencySpends,
+  withCurrencySetupDirective,
 } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import {
@@ -5405,12 +5406,18 @@ export class CraftingEngine {
    * Resolved from the context rather than re-derived: `error` covers an invalid profile,
    * `spenderUnavailableReason` a valid profile with no usable coin spender. Never fails a craft
    * message — an unresolvable read degrades to the shortfall wording that shipped before.
+   *
+   * This message is what the crafting player reads (this method's own doc above), so the
+   * misconfiguration reason gets {@link withCurrencySetupDirective}'s "ask your GM" sentence here
+   * (issue 1493) — unlike the raw context fields, which other, non-player-facing readers also
+   * consume undirected.
    * @private
    */
   _missingItemsCurrencyReason(recipe) {
     try {
       const context = resolveCurrencyContext(recipe, this._currencySeams());
-      return context?.error || context?.spenderUnavailableReason || null;
+      const reason = context?.error || context?.spenderUnavailableReason || null;
+      return withCurrencySetupDirective(reason);
     } catch {
       return null;
     }
