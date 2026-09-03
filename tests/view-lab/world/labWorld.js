@@ -197,6 +197,10 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
       },
     },
   });
+  // THE WORLD COMPONENT CORPUS SEED (issue 1371). Built in `labContent.js` beside the tool
+  // corpus and put here, so the capture-registry guard can resolve a clicked component row
+  // against the same literal the world boots from rather than against a copy of it.
+  put('componentScope', content.componentScope);
   // Selection preferences, so the player app opens on a populated actor and system rather than on
   // an empty-state prompt that says nothing about the UI.
   put('lastCraftingActor', characterActors[0].id);

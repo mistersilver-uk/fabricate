@@ -4727,8 +4727,16 @@ test('every world tool id the capture cases click exists in the lab world, proje
   // PAIRED WITH THE CASE THAT CLICKS IT, not flattened to a set of ids (issue 1373, round 2).
   // The membership clause below has exactly one honest exception and it is a PER-CASE fact, so
   // a bare set of ids could not express it without exempting the id everywhere.
+  //
+  // AND THE SCAN IS SCOPED TO THE TOOL ROUTES (issue 1371). It used to walk EVERY case in the
+  // registry and resolve every clicked row id against the TOOL corpus, which was correct only
+  // while the tool screens were the only ones whose cases clicked a scoped-list row. The
+  // component catalogue's cases click component ids, and this test would have reported them as
+  // world tools the lab does not hold — a true statement about the wrong corpus. The component
+  // twin is the test below.
   const clicked = [];
   for (const viewCase of VIEW_LAB_CASES) {
+    if (!String(viewCase.expectView || '').startsWith('world-tool')) continue;
     for (const step of viewCase.steps || []) {
       for (const [, id] of String(step.selector || '').matchAll(
         /\[data-scoped-list-(?:row|inspect)="([^"]+)"\]/g
@@ -4778,5 +4786,81 @@ test('every world tool id the capture cases click exists in the lab world, proje
   assert.ok(
     scope.entries.some((entry) => !entry.hasSourceLink),
     'and an UNLINKED one, which is the state a source-item badge alone cannot show'
+  );
+});
+
+// ── The world-COMPONENT capture cases and the lab fixture that feeds them (issue 1371) ──────
+//
+// The twin of the guard above, and it resolves against a DIFFERENT corpus for a reason that is
+// structural rather than incidental: the lab's world component roster is not a seeded literal.
+// The `1.30.0` migration LIFTS every crafting system's own `components[]` into world records at
+// boot, and the fixture seeds only the four states that migration cannot produce — an inheriting
+// category, a world tag list with a mute, a component no system has, and one with no source Item.
+//
+// So the id set a case may click is the UNION of the two halves, and asserting against either
+// alone would be wrong in opposite directions: the seed alone rejects every migrated row, and the
+// systems alone reject the two world-only records the entry cases are built on.
+test('every world component id the capture cases click exists in the lab world', async () => {
+  const { buildLabContent } = await import('./view-lab/world/labContent.js');
+  const content = buildLabContent();
+
+  const migrated = new Set(
+    (content.systems ?? []).flatMap((system) =>
+      (system.components ?? []).map((component) => String(component?.id ?? ''))
+    )
+  );
+  const seeded = new Set(
+    (content.componentScope?.entities ?? []).map((entity) => String(entity?.id ?? ''))
+  );
+  const available = new Set([...migrated, ...seeded]);
+
+  // NON-VACUITY ON BOTH HALVES, because either one empty would make the union assertion below
+  // pass on the strength of the other.
+  assert.ok(migrated.size > 0, 'the lab systems carry components for the migration to lift');
+  assert.ok(seeded.size > 0, 'and the fixture seeds the world-only records the entry cases need');
+
+  const clicked = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (!String(viewCase.expectView || '').startsWith('world-component')) continue;
+    for (const step of viewCase.steps || []) {
+      for (const [, id] of String(step.selector || '').matchAll(
+        /\[data-scoped-list-(?:row|inspect|select)="([^"]+)"\]/g
+      )) {
+        clicked.push({ caseId: viewCase.id, id });
+      }
+    }
+  }
+  assert.ok(clicked.length > 0, 'the scan found no clicked component row ids; it is broken');
+
+  for (const { caseId, id } of clicked) {
+    assert.ok(
+      available.has(id),
+      `${caseId} clicks the world component row "${id}", which the lab world does not hold`
+    );
+  }
+
+  // THE SEEDED WORLD STATES ARE LIVE, each named by the frame it exists for. An entry that
+  // stopped describing anything would be a fixture the cases silently no longer photograph.
+  assert.ok(
+    content.componentScope.defaults['sm-iron-ingot']?.category,
+    'the inheriting frames need an AUTHORED world category; a refused election photographs the ' +
+      '"no world category is set" branch and looks like a correct inheriting frame'
+  );
+  assert.equal(
+    content.componentScope.membership['sm-iron-ingot|lab-smithing']?.inherit?.category,
+    true,
+    'and the membership record that inherits it'
+  );
+  assert.ok(
+    (content.componentScope.defaults['sm-coal']?.tags ?? []).length > 0,
+    'the world tag list, its note and the mute grid all need world tags the migration never writes'
+  );
+  assert.ok(
+    (content.componentScope.membership['sm-coal|lab-smithing']?.mutedTags ?? []).length > 0,
+    'and one member system muting one of them'
+  );
+  assert.ok(
+    content.componentScope.entities.some((entity) => !entity.originItemUuid),
+    'the entry validation frame needs a record with NO source item, which is its one blocking row'
   );
 });

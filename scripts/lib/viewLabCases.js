@@ -1447,7 +1447,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     // all — they are new here — so there is no smoke frame for any of these six to pair with.
     reaches: 'beyond',
     smokeLabels: [],
-    steps: [{ selector: '#manager-world-nav-component-catalogue' }],
+    // THE ROW IS INSPECTED, NOT MERELY LISTED (issue 1371). The shell's inspector column is
+    // where the world `category` card, its inherit count and the per-system membership rows
+    // live, and none of it renders at rest — so the shipped steps photographed the inspector's
+    // EMPTY state, and the inspector's contents are half of what this screen decides.
+    //
+    // `sm-iron-ingot` is the row whose world default is SEEDED and whose smithing membership
+    // record INHERITS it, which is the state the card's inherit count exists to state.
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-inspect="sm-iron-ingot"]' },
+    ],
     expectView: 'world-components',
     // The page's own hook, so a route that silently fell back to the systems library fails the
     // capture rather than publishing a frame of the wrong screen.
@@ -1473,10 +1483,124 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
+    // THE PLACEHOLDER CLAIM IS GONE (issue 1371), and dropping it is not optional bookkeeping:
+    // `tests/manager-scoped-prop-contract.test.js` pairs "a case claims the shared placeholder
+    // body" with "that route's page still imports it", so a real body left claiming the
+    // placeholder publishes this route's screen as evidence of a placeholder change.
+    //
+    // The shell primitives this screen now composes are claimed instead, each by the case that
+    // RENDERS it: the catalogue shell, the list frame behind it, the bulk panel the selection
+    // swaps in, and the two pure leaves the row and the inspector read.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
     ],
+  }),
+  managerCase({
+    // THE SELECTION'S OWN FACE (issue 1371). The frame above photographs the inspector
+    // describing ONE component; the moment a row is ticked the frame swaps that panel for the
+    // bulk staging model, and nothing in the resting frame can show it. Four staging groups,
+    // the accent register band and the write count on the Apply dock are all this case's.
+    id: 'world-component-catalogue-bulk',
+    label: 'Manager — World Component catalogue, bulk selection',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-select="sm-iron-ingot"]' },
+      { selector: '[data-scoped-list-select="sm-coal"]' },
+    ],
+    expectView: 'world-components',
+    expectSelector: '[data-world-component-bulk-panel]',
+    expectContained: [
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-mode]',
+      },
+      {
+        container: '[data-world-component-bulk-panel]',
+        target: '[data-world-component-bulk-apply]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentCatalogueBulkPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // THE ENTRY EDITOR'S DEFINITION TAB (issue 1371), reached the way a GM reaches it: through
+    // the catalogue row's pen. A case that seeded the route directly would depict a state no
+    // navigation produces, which is the fixture-bypass hazard this registry already carries
+    // against itself.
+    //
+    // `sm-coal` is the subject because it is the ONE lab component carrying world tags AND a
+    // per-system mute, so the world tag list, its note and the N-by-M mute grid are all in one
+    // frame rather than spread across three that each show one of them.
+    id: 'world-component-entry-definition',
+    label: 'Manager — World Component entry',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-inspect="sm-coal"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-page="world-component-entry"]',
+    expectContained: [
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-category="sm-coal"]',
+      },
+      {
+        container: '[data-scoped-page="world-component-entry"]',
+        target: '[data-scoped-entry-tags="sm-coal"]',
+      },
+      {
+        container: '[data-scoped-entry-tags="sm-coal"]',
+        target: '[data-scoped-entry-tag-note]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
+    ],
+  }),
+  managerCase({
+    // THE VALIDATION TAB, on the ONE lab component that fails a blocking check: `lab-unbound-salt`
+    // is seeded with no source uuid at all, so `No source item linked` blocks and the two world
+    // classification rows warn. A frame taken on a healthy record would photograph four passes
+    // and prove nothing about the severities this tab exists to distinguish.
+    id: 'world-component-entry-validation',
+    label: 'Manager — World Component entry, validation',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-component-catalogue' },
+      { selector: '[data-scoped-list-inspect="lab-unbound-salt"]' },
+      { selector: '[data-scoped-component-open-entry]' },
+      { selector: '[data-scoped-entry-tab="validation"]' },
+    ],
+    expectView: 'world-component-entry',
+    expectSelector: '[data-scoped-entry-validation]',
+    expectContained: [
+      {
+        container: '[data-scoped-entry-validation]',
+        target: '[data-scoped-entry-check="source"]',
+      },
+      {
+        container: '[data-scoped-entry-validation]',
+        target: '[data-scoped-entry-check="worldCategory"]',
+      },
+    ],
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world', 'scoped'],
+    sourceMatches: [/^src\/utils\/componentScopeValidation\.js$/],
   }),
   managerCase({
     id: 'world-vocabulary',
@@ -3534,9 +3658,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     },
     position: { width: 1024, height: 860 },
     kinds: ['manager', 'world', 'scoped', 'responsive'],
+    // THE PLACEHOLDER CLAIM IS GONE HERE TOO (issue 1371). This case reaches the same route as
+    // the catalogue case above, so it carried the same claim and goes stale in the same way —
+    // and it is the half a lane replacing the body is most likely to miss, because nothing about
+    // this case's own assertions mentions a placeholder.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedPlaceholderPage\.svelte$/,
     ],
   }),
   managerCase({

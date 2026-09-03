@@ -4078,6 +4078,75 @@ export function buildLabContent() {
     // apart. The lab has no `Item.hb-tool-alembic` document to inherit FROM, so what its row
     // shows is the last rung — which is the honest picture of an unresolvable link and the state
     // the catalogue exists to make findable.
+    // ── THE FOUR WORLD COMPONENT STATES THE MIGRATION CANNOT PRODUCE (issue 1371) ──────────────
+    //
+    // The `1.30.0` pass already lifts every system's `components[]` into world records, so the
+    // world Component catalogue is populated with no seed at all. What it CANNOT produce is any of
+    // the four states below, and each one is a screen this lane ships.
+    //
+    // ── (i) AN INHERITING CATEGORY, WHICH NEEDS BOTH HALVES SEEDED ────────────────────────────
+    // The lab's ESSENCE seed is the membership record ALONE, because the migration's defaults half
+    // is gated per ENTITY and would still elect the world default. That option is not available
+    // here: `worldScopeDefaults` REFUSES an elected `category` whose donor value is the reserved
+    // bucket, and it declines the section outright whenever any member system left it unauthored —
+    // so most lab components end the migration with NO world `category` at all, and a bare
+    // `inherit: { category: true }` would render the note's THIRD branch ("no world category is
+    // set") rather than the inheriting one. A frame of a refused election looks exactly like a
+    // correct inheriting frame, which is why the pair is seeded together and stated here.
+    //
+    // Seeding `defaults['sm-iron-ingot']` suppresses that entity's whole election, which is the
+    // point: the value below IS the world default rather than one the migration happened to pick.
+    //
+    // ── (ii) WORLD TAGS AND A MUTE, ON A DIFFERENT COMPONENT ─────────────────────────────────
+    // The migration deliberately leaves world `tags` UNAUTHORED — an additive list is granted to
+    // every member system at once, so no donor rule can rescue it — so the world tag list, the
+    // entry's mute grid and the rules editor's read-only tag card are all unphotographable without
+    // this. `sm-coal` OVERRIDES its category, so the two components between them cover both
+    // branches of the note that has a world value.
+    //
+    // ── (iii) AND (iv) A COMPONENT NO SYSTEM HAS, AND ONE WITH NO SOURCE ITEM ────────────────
+    // Both are seeded through `entities`, which is safe: the migration seeds its id set FROM the
+    // existing payload and only PUSHES ids it does not already hold, never removing one. The first
+    // is the catalogue's `Unused` flag and the world entry's zero-member state — which is also the
+    // only state in which the entry's Delete actually proceeds. The second is the unlinked source
+    // pill and the entry validation tab's one blocking row.
+    componentScope: {
+      entities: [
+        {
+          id: 'lab-wildwood-resin',
+          name: 'Wildwood Resin',
+          img: `${ICON_BASE}/commodities/tree/sap-drop-amber.webp`,
+          description: 'Tapped from the reach’s oldest ironwoods. No system has rules for it yet.',
+          originItemUuid: 'Item.lab-wildwood-resin',
+          registeredItemUuid: 'Item.lab-wildwood-resin',
+          aliasItemUuids: [],
+        },
+        {
+          id: 'lab-unbound-salt',
+          name: 'Unbound Salt',
+          img: '',
+          description: 'Catalogued from a merchant’s ledger, with no game-world Item behind it.',
+        },
+      ],
+      defaults: {
+        'sm-iron-ingot': { id: 'sm-iron-ingot', category: 'Refined' },
+        'sm-coal': { id: 'sm-coal', category: 'Raw Materials', tags: ['fuel', 'bulk'] },
+      },
+      membership: {
+        [`sm-iron-ingot|${LAB_SYSTEM_IDS.SMITHING}`]: {
+          entityId: 'sm-iron-ingot',
+          systemId: LAB_SYSTEM_IDS.SMITHING,
+          inherit: { category: true },
+        },
+        [`sm-coal|${LAB_SYSTEM_IDS.SMITHING}`]: {
+          entityId: 'sm-coal',
+          systemId: LAB_SYSTEM_IDS.SMITHING,
+          inherit: { category: false },
+          category: 'Raw Materials',
+          mutedTags: ['bulk'],
+        },
+      },
+      },
     toolScope: {
       entities: [
         ...[...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => ({
