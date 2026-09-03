@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabricate Primitive Lab — specimen</title>
+    <!--
+      Same reasoning as `primitives.html` and `index.html`: Foundry serves the game view from the
+      web ROOT, so a module-relative icon path resolves against `/`.
+    -->
+    <base href="/" />
+    <!--
+      One specimen, one document, carrying the WHOLE production cascade itself — this is the fix
+      for issue 1487. `primitives.html` no longer links any of this: it is the library, rendered
+      with its own stylesheet and nothing else, so the library's 948 hand-drawn elements paint
+      exactly as `library.html` authors them. Every live component instead stands in a `<iframe>`
+      pointed at THIS document, which loads:
+
+        1. foundry2.css   - UNLAYERED as a file, but layered end to end INTERNALLY.
+        2. Font Awesome   - layer "variables", via cascade.css.
+        3. fabricate.css  - layer "modules", via cascade.css.
+        4. Component CSS  - svelte.config.js sets css: 'injected', so component <style> blocks
+                            become unlayered runtime <style> elements here and in production
+                            alike.
+
+      Identical order to `primitives.html`'s old page-wide links and to `index.html`'s — this is
+      Foundry's own game view (templates/views/layouts/main.hbs plus Express.CORE_VIEW_STYLES),
+      reproduced per specimen instead of once per page.
+
+      THIS IS MORE FAITHFUL THAN THE OLD SHARED SLOT, NOT LESS. A specimen used to be a `display:
+      contents` subtree of one shared page, which meant `.application` never generated a box and
+      was therefore never a real CSS containing block, and `.fabricate-manager` was never a real
+      `container-type: inline-size` query container — the two things `styles/fabricate.css`
+      actually asks of them. A real DOCUMENT gives `.application` genuine positioning and a
+      genuine containing block, and gives `.fabricate-manager` a genuine container, so the shipped
+      breakpoints and a portaled overlay's positioning become answerable in the same way they are
+      in production, not merely approximated by a subtree that could never generate either box at
+      all. `specimenMount.js` builds a `slot`-declared row's box explicitly for exactly the
+      specimens that need this (an overlay, or a panel that restyles at a breakpoint); every other
+      specimen still measures its own natural size, the same as a bare drawing would have.
+    -->
+    <link rel="stylesheet" href="/@foundry-chrome/css/foundry2.css" media="all" />
+    <link rel="stylesheet" href="/@view-lab/cascade.css" />
+    <link rel="stylesheet" href="/@view-lab/primitives/specimenFrame.css" />
+  </head>
+  <body>
+    <script type="module" src="/tests/view-lab/primitives/specimenMount.js"></script>
+  </body>
+</html>

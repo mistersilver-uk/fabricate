@@ -12,84 +12,62 @@
     -->
     <base href="/" />
     <!--
-      STYLESHEET ORDER IS THE SAME ORDER AS index.html, AND IT IS LOAD-BEARING. It reproduces
-      Foundry's own game view (templates/views/layouts/main.hbs plus Express.CORE_VIEW_STYLES):
+      THIS PAGE LOADS NO FOUNDRY STYLESHEET AT ALL (issue 1487), and that absence is the fix for a
+      measured regression: `foundry2.css` loaded UNLAYERED here used to reach the library's own 948
+      hand-drawn elements — `library.html` opened as a file never loads Foundry's stylesheet, so its
+      drawings are unstyled by core, and this page's foundry2.css link painted them anyway. A
+      `<DataTable>` entry with no live specimen rendered with a header band and row striping the
+      reference never has, for exactly that reason.
 
-        1. foundry2.css   - UNLAYERED as a file, but layered end to end INTERNALLY.
-        2. Font Awesome   - layer "variables", via cascade.css.
-        3. fabricate.css  - layer "modules", via cascade.css. Loading it unlayered would let
-                            rules win here that LOSE in production.
-        4. Component CSS  - svelte.config.js sets css: 'injected', so component <style> blocks
-                            become unlayered runtime <style> elements here and in production alike.
+      IT DOES STILL LOAD `styles/fabricate.css` (RAW, unlayered, no `foundry2.css` beside it), and
+      that is a narrower thing than it sounds: the library's own kit CSS references only `--fab-*`
+      custom properties, its own four page-local names, and nothing Foundry-core at all — measured
+      by grepping every `var(--…)` the file contains. `library.js`'s `pageStyles()` drops the
+      `--fab-*` copy of the palette from the library's own `:root` on purpose, so `fabricate.css`
+      supplies those instead and any drift between the two becomes visible as a colour change
+      rather than staying hidden in two files nobody diffs. `fabricate.css` has NO bare-element
+      selector anywhere in it — every rule below its `:root` block and its `@font-face`s is scoped
+      under `.fabricate`/`.fabricate-manager`, which nothing on this page carries — so linking it
+      supplies exactly the tokens and the two self-hosted faces (Spectral, JetBrains Mono; Signika
+      is a Google Fonts face the library's own `<link>` — never carried onto this page, see below —
+      would otherwise have supplied) and paints not one bare element. THIS is the load-bearing
+      difference from `foundry2.css`: one stylesheet has bare-element rules and one does not, and
+      only the one that does not is safe to load page-wide.
 
-      A primitive drawn under any other order is a primitive drawn under a cascade production does
-      not have, which would make this page confidently wrong rather than merely empty.
+      THE LIBRARY'S OWN STYLESHEET IS THE OTHER ONE LINKED HERE, and it is not even a `<link>`:
+      `library.js` reads it out of `openspec/specs/design-system/library.html` at load time and
+      appends it to <head> as a `<style>` — the same unlayered sheet the standalone file carries,
+      painting the same 948 elements it always did, now correctly against the shipped palette
+      instead of its own frozen copy of it.
 
-      THE LIBRARY'S OWN STYLESHEET IS NOT LINKED HERE. `library.js` reads it out of
-      `openspec/specs/design-system/library.html` at load time, drops the `--fab-*` copy of the
-      palette from its `:root` so `fabricate.css` supplies those instead, and appends it to <head>
-      after these links - which is where an unlayered page stylesheet has to sit to beat Foundry's
-      layers, exactly as it does in the standalone file.
+      EVERY LIVE SPECIMEN IS ITS OWN `<iframe>` NOW, pointed at `specimen.html`, which carries the
+      full production cascade — `foundry2.css`, Font Awesome, `styles/fabricate.css`, component CSS
+      — internally, exactly as `index.html` loads it for a whole page. See `mount.js` and `slot.js`
+      for the mechanics and for why an iframe is MORE faithful than the old shared-page slot, not
+      less.
 
-      NO GOOGLE FONTS LINK, either, and none is needed. The library asks for three faces and all
-      three arrive locally: Signika comes from the harvested chrome (`@font-face` in foundry2.css),
-      and Spectral and JetBrains Mono come from `styles/fabricate.css`, whose own `@font-face`
-      rules point at `assets/fonts/*.woff2` in this repository. The one face the shipped sheet does
-      not carry is ITALIC Spectral, so the `.standfirst` is synthesised - which is also what
-      production does, and is therefore the honest rendering rather than a defect.
+      `page.css` is this page's own remaining stylesheet: the sizing states `mount.js` moves each
+      specimen's `<iframe>` element through, nothing more.
+
+      NO GOOGLE FONTS LINK. The library's own `<head>` carries one (Spectral/Signika/JetBrains
+      Mono), but `readLibrary()` only ever adopts the library's `<body>` and its `<style>` text —
+      the `<link>` is never carried over, on this page or in the standalone file's own history.
+      Signika is therefore visible only INSIDE a specimen's own iframe (`foundry2.css`'s harvested
+      `@font-face`); this page's own drawn interface text falls back past it to the UA default,
+      which is what the reference does too when Google Fonts is unreachable, and is why the oracle
+      normalises `fontFamily` to its first family rather than asserting the fallback chain matched.
     -->
-    <link rel="stylesheet" href="/@foundry-chrome/css/foundry2.css" media="all" />
-    <link rel="stylesheet" href="/@view-lab/cascade.css" />
-    <!--
-      The harness's own chrome, LAST and unlayered. It has to be unlayered for its one rule: the
-      live-slot override, which beats `.application { position: absolute }` and the rest of the
-      window treatment from Foundry's own sheet.
-
-      Served raw through the `/@view-lab/` mount rather than imported, so the browser rather than
-      Vite's PostCSS pipeline resolves it - the same reason `cascade.css` is served raw.
-    -->
+    <link rel="stylesheet" href="/@fabricate-styles/fabricate.css" />
     <link rel="stylesheet" href="/@view-lab/primitives/page.css" />
-    <style>
-      /*
-        NOT index.html's backdrop block. That page pins `html, body` to the viewport and sets
-        `overflow: hidden`, because it draws exactly one window and clips the capture to it. This
-        page is the design library: it is far taller than the viewport by design and it SCROLLS.
-
-        `margin: 0; padding: 0` still has to be stated, because foundry2.css:13930 gives `body` a
-        `padding: 1rem`. The library's own `body` rule owns the gutter and the backdrop, and it
-        arrives later than this block, so nothing here needs to state a colour.
-      */
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-      }
-
-      /*
-        AND THE PAGE HAS TO BE ALLOWED TO SCROLL. `configureLabPage()` stamps Foundry's own body
-        classes - `FOUNDRY_CHROME_SPEC` declares them `['vtt', 'game']` - and foundry2.css:15257
-        answers `body.game` with `position: fixed; display: flex; overflow: hidden`. That is
-        exactly right for a VTT game view, which is one viewport-sized surface, and exactly wrong
-        for a reference page. Measured before this rule existed: 9376px of content in a 1080px
-        viewport, `document.body` computing `position: fixed`, and `window.scrollBy(0, 3000)`
-        moving nothing. Roughly 88% of the page was unreachable by wheel, keyboard or scrollbar.
-
-        `npm run lab:check` was green throughout, and correctly so: it reads the DOM, and every
-        specimen genuinely had mounted. Nothing it asserts is about pixels. This is the class of
-        defect a mount count cannot see.
-
-        The classes STAY, because rules key off them and dropping them would trade a layout bug
-        for a cascade one. Only the four layout declarations are overridden, and the selector
-        carries `body.game` rather than `body` because a bare element selector loses to
-        foundry2.css's (0,1,1) on specificity and would silently do nothing.
-      */
-      body.game {
-        position: static;
-        display: block;
-        height: auto;
-        overflow: visible;
-      }
-    </style>
+    <!--
+      NO BACKDROP BLOCK, and no `body.game` scroll override either — both used to exist here to
+      fight Foundry's OWN `foundry2.css:15257` `body.game { position: fixed; overflow: hidden }`,
+      stamped by `configureLabPage()`. Neither applies to this page any more: `mount.js` no longer
+      calls `configureLabPage()` on this document at all (it now runs once PER SPECIMEN, inside
+      each iframe, where that fixed-viewport rule is exactly right for one production window). This
+      page never carries Foundry's `vtt`/`game` body classes and never loads `foundry2.css`, so it
+      scrolls the ordinary way a document scrolls, with nothing here needing to say so.
+    -->
   </head>
   <body>
     <script type="module" src="/tests/view-lab/primitives/mount.js"></script>

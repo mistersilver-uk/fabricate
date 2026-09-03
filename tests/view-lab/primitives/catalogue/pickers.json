@@ -95,12 +95,12 @@
     "draws": ":scope > div",
     "path": "src/ui/svelte/apps/manager/SearchablePopover.svelte",
     "slot": {
+      "width": 300,
       "height": 320
     },
     "props": {
       "open": true,
       "value": "steel-ingot",
-      "triggerClass": "manager-travel-picker-trigger",
       "triggerIcon": "fas fa-hammer",
       "triggerLabel": "Steel Ingot",
       "triggerAriaLabel": "Choose a component",
