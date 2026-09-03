@@ -69,26 +69,29 @@ test('a paginated gh api call buffered through execSync states its own maxBuffer
   }
 });
 
-// The Foundry package listing showed 1.9.0, 1.9.1 and 1.9.2 without their `v` prefix (issue #1457)
-// because ONE value served two masters: the registry payload's `version` field and the `v${...}` tag
-// URLs. Bare gave a correct URL and a bare display version; prefixing it would have produced
-// `vv1.9.3`. The artefact is now the source of truth for what is advertised, and the URLs keep using
-// the bare input.
-test('the registry advertises the ARTEFACT version, while the URLs are built from the bare input', () => {
+// The Foundry package listing dropped the `v` after v1.2.1 (issue #1462 / #1490). v1.2.1's own
+// module.json says `1.2.1` while its listing reads `v1.2.1`, so the prefix was never in the manifest
+// — it is PRESENTATION, and the registry payload is the one place it belongs.
+//
+// Issue 1407 put it in module.json instead and 1457 then made this payload read the artefact, which
+// coupled them: `release-s3.js` compares the built manifest against the requested version, so every
+// publish after that refused (`version mismatch: requested 1.9.3 built v1.9.3`), stranding v1.9.3
+// and three betas. These assertions pin the separation that keeps both correct.
+test('the registry payload constructs the v, and never re-derives it from the artefact', () => {
   const source = readFileSync(WORKFLOW, 'utf8');
 
   assert.match(
     source,
-    /--arg version "\$BUILT_VERSION"/,
-    'the registry payload must advertise the version the artefact itself carries, so the string Foundry offers and the string an installed module.json reports cannot drift'
+    /--arg version "v\$\{VERSION\}"/,
+    'the payload must BUILD the display version from the bare input, so the manifest need not carry a prefix'
   );
   assert.ok(
-    !/--arg version "\$VERSION"/.test(source),
-    'the payload must not advertise the dispatch input: it is bare by contract, so it would strip a prefix the artefact carries'
+    !/--arg version "\$BUILT_VERSION"/.test(source),
+    'reading the artefact couples the advertised version to the manifest, which is what broke every publish after #1407'
   );
 
-  // The tag is `v` plus the bare version, so the URLs must interpolate the input rather than the
-  // artefact's version — otherwise a prefixed artefact yields `vv1.9.3` and a manifest URL that 404s.
+  // The tag is `v` plus the bare version, so the URLs interpolate the input. `v${BUILT_VERSION}`
+  // would be `vv1.9.3` the moment anything reintroduced a prefix into the manifest.
   for (const url of [
     /releases\/download\/v\$\{VERSION\}\/module\.json/,
     /releases\/tag\/v\$\{VERSION\}/,
@@ -101,14 +104,13 @@ test('the registry advertises the ARTEFACT version, while the URLs are built fro
   }
   assert.ok(
     !/v\$\{BUILT_VERSION\}/.test(source),
-    'no URL may interpolate the artefact version behind a literal v — that is the vv1.9.3 defect'
+    'no URL may interpolate the artefact version behind a literal v'
   );
 
-  // The guard still establishes "this artefact is the version being promoted", but comparing the
-  // bare forms so the release line can start carrying a prefix without a lockstep change here.
+  // The manifest is bare again, so this is a literal identity check.
   assert.match(
     source,
-    /if \[ "\$\{BUILT_VERSION#v\}" != "\$VERSION" \]; then/,
-    'the artefact-matches-input guard must compare the two after normalising the built side'
+    /if \[ "\$BUILT_VERSION" != "\$VERSION" \]; then/,
+    'the artefact IS the version being promoted, compared literally now the manifest carries no prefix'
   );
 });
