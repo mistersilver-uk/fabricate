@@ -60,3 +60,26 @@ A tag's reference count on this screen includes both the components that carry i
 Removing a tag is reference-safe.
 Fabricate asks you to confirm on the row and tells you how many references will lose the tag.
 Confirming strips the tag from every component that carries it and from every recipe ingredient that filters on it, so nothing is left pointing at a tag that no longer exists.
+
+## World Tags & Categories
+
+Under **World**, the **Tags & Categories** screen holds the same three vocabularies again, but authored once for the whole world instead of once per crafting system: recipe categories, component categories, and component tags.
+All three panels are shown at once, with the two category panels side by side and the component tag panel spanning the full width beneath them, rather than as separate tabs.
+The two category vocabularies stay independent of one another here too, so a world recipe category is never offered as a world component category and neither is aliased across the world and system screens.
+
+Each entry's reference count on this screen is counted across the whole world, not just one crafting system, so it adds up every recipe and every component that names the entry in every crafting system you have set up.
+
+Most entries either delete in one click or ask you to confirm, and the difference is not always just the reference count.
+An entry with no references anywhere in the world, and whose removal changes nothing else, shows an **Unused** label and deletes in one click.
+Every other entry asks you to confirm, even one whose reference count reads as zero, because deleting it would still change a category or a tag recorded on the world's shared component defaults.
+The confirmation tells you exactly what changes: how many crafting systems inherit the category from the shared default it clears, how many world-level components lose the tag, or, for a recipe category, that no recipe anywhere is rewritten.
+
+Each panel has its own sort control, so you can order that vocabulary's entries by name or by reference count, and reverse the direction, without affecting the other two panels.
+
+Each panel's add field refuses a name you have already added to that vocabulary, ignoring case and leading or trailing spaces.
+The two category panels also refuse the reserved **General** category, which is always available without being added or removed as an entry.
+Component tags have no reserved name, so any other name is accepted.
+
+{: .gm }
+> Entries you add here are not yet offered anywhere else.
+> No crafting system's category or tag pickers read from the world vocabulary yet, so an entry you create on this screen is recorded but not offered to any system until a later update wires it in.
